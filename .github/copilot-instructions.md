@@ -4,6 +4,7 @@
 
 - The product brief lives in [docs/product-requirements.md](../docs/product-requirements.md).
 - The phased delivery plan lives in [docs/implementation-roadmap.md](../docs/implementation-roadmap.md).
+- The technical architecture lives in [docs/technical-architecture.md](../docs/technical-architecture.md).
 - For product explanations and feature planning, use [.github/instructions/project-scope.instructions.md](./instructions/project-scope.instructions.md) before making assumptions.
 
 ## Working Rules
@@ -22,4 +23,5 @@
 ## Repository State
 
 - The repository is currently documentation-first and may not yet contain implementation code.
-- Do not assume build, test, or run commands exist until they are added to the project.
+- A mobile scaffold now exists under `apps/mobile`, but dependency installation requires Node 20+.
+- Do not assume build, test, or run commands exist until local prerequisites are satisfied.

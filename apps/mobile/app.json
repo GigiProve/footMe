@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "footMe",
+    "slug": "footme",
+    "scheme": "footme",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.footme.mobile"
+    },
+    "android": {
+      "package": "com.footme.mobile"
+    },
+    "extra": {
+      "projectName": "footMe"
+    }
+  }
+}
