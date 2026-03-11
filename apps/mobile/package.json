@@ -9,7 +9,7 @@
     "dev": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "node ../../node_modules/eslint/bin/eslint.js .",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -28,7 +28,6 @@
   },
   "devDependencies": {
     "@types/react": "^18.3.0",
-    "eslint": "^8.57.1",
     "eslint-config-expo": "^8.0.0",
     "metro": "^0.81.0",
     "typescript": "^5.6.0"

@@ -9,6 +9,8 @@ on:
 jobs:
   mobile-quality:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -24,7 +26,7 @@ jobs:
         run: npm ci
 
       - name: Lint mobile workspace
-        run: npm run lint
+        run: npm run lint:mobile
 
       - name: Typecheck mobile workspace
-        run: npm run typecheck
+        run: npm run typecheck:mobile

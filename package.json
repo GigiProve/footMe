@@ -20,7 +20,8 @@
     "react-native-screens": "4.4.0"
   },
   "devDependencies": {
-    "@babel/plugin-syntax-export-default-from": "^7.27.1"
+    "@babel/plugin-syntax-export-default-from": "^7.27.1",
+    "eslint": "^8.57.1"
   },
   "scripts": {
     "start": "npm run start:mobile",
@@ -30,7 +31,9 @@
     "dev:mobile": "npm run dev --workspace @footme/mobile",
     "ios": "npm run ios --workspace @footme/mobile",
     "android": "npm run android --workspace @footme/mobile",
-    "lint": "npm run lint --workspace @footme/mobile",
-    "typecheck": "npm run typecheck --workspace @footme/mobile"
+    "lint": "npm run lint:mobile",
+    "lint:mobile": "npm run lint --workspace @footme/mobile",
+    "typecheck": "npm run typecheck:mobile",
+    "typecheck:mobile": "npm run typecheck --workspace @footme/mobile"
   }
 }
