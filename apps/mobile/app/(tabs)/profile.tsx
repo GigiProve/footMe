@@ -254,7 +254,7 @@ function Section({
   title: string;
 }) {
   return (
-    <Card style={{ gap: 14 }}>
+    <Card style={{ gap: spacing[14] }}>
       <View style={{ gap: spacing[6] }}>
         <Text
           style={{
@@ -266,7 +266,7 @@ function Section({
           {title}
         </Text>
         {subtitle ? (
-          <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>{subtitle}</Text>
+          <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>{subtitle}</Text>
         ) : null}
       </View>
       {children}
@@ -318,9 +318,9 @@ function BooleanField({
   value: boolean;
 }) {
   return (
-    <View style={{ gap: 8 }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{label}</Text>
-      <View style={{ flexDirection: "row", gap: 10 }}>
+    <View style={{ gap: spacing[8] }}>
+      <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>{label}</Text>
+      <View style={{ flexDirection: "row", gap: spacing[10] }}>
         {[
           { active: true, label: trueLabel },
           { active: false, label: falseLabel },
@@ -341,12 +341,12 @@ function BooleanField({
               }}
             >
               <Text
-                  style={{
-                    color: isActive ? colors.inkInvert : colors.textPrimary,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  {option.label}
+                style={{
+                  color: isActive ? colors.inkInvert : colors.textPrimary,
+                  fontWeight: typography.fontWeight.bold,
+                }}
+              >
+                {option.label}
               </Text>
             </Pressable>
           );
@@ -368,9 +368,9 @@ function PillSelector<T extends string>({
   value: T;
 }) {
   return (
-    <View style={{ gap: 8 }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{label}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+    <View style={{ gap: spacing[8] }}>
+      <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>{label}</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
         {options.map((option) => {
           const isActive = option.value === value;
 
@@ -388,12 +388,12 @@ function PillSelector<T extends string>({
               }}
             >
               <Text
-                  style={{
-                    color: isActive ? colors.inkInvert : colors.textPrimary,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  {option.label}
+                style={{
+                  color: isActive ? colors.inkInvert : colors.textPrimary,
+                  fontWeight: typography.fontWeight.bold,
+                }}
+              >
+                {option.label}
               </Text>
             </Pressable>
           );
@@ -653,31 +653,31 @@ export default function ProfileScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: 18, paddingBottom: 28 }}>
+      <ScrollView contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}>
         <View
           style={{
-            gap: 12,
+            gap: spacing[12],
             padding: 22,
-            borderRadius: 26,
+            borderRadius: radius[26],
             backgroundColor: colors.textPrimary,
           }}
         >
           <Text
             style={{
               color: colors.heroSoft,
-              fontSize: 12,
-              fontWeight: "800",
+              fontSize: typography.fontSize[12],
+              fontWeight: typography.fontWeight.heavy,
               textTransform: "uppercase",
-              letterSpacing: 1.2,
+              letterSpacing: typography.letterSpacing.md,
             }}
           >
             Fase 2 · Identita' professionale
           </Text>
           <Text
             style={{
-              fontSize: 30,
-              lineHeight: 34,
-              fontWeight: "800",
+              fontSize: typography.fontSize[30],
+              lineHeight: typography.lineHeight[34],
+              fontWeight: typography.fontWeight.heavy,
               color: colors.inkInvert,
             }}
           >
@@ -685,24 +685,24 @@ export default function ProfileScreen() {
           </Text>
           <Text
             style={{
-              fontSize: 16,
-              lineHeight: 24,
+              fontSize: typography.fontSize[16],
+              lineHeight: typography.lineHeight[24],
               color: colors.textInverseMuted,
             }}
           >
             Completa e aggiorna il tuo profilo pubblico con i dati richiesti dalla
             roadmap MVP: identita', disponibilita', carriera e dettagli di ruolo.
           </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[10] }}>
             <View
               style={{
                 paddingHorizontal: 12,
                 paddingVertical: 8,
-                borderRadius: 999,
+                borderRadius: radius.full,
                 backgroundColor: colors.surfaceOverlay,
               }}
             >
-              <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
+              <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
                 {profile.full_name ?? "Profilo"}
               </Text>
             </View>
@@ -710,11 +710,11 @@ export default function ProfileScreen() {
               style={{
                 paddingHorizontal: 12,
                 paddingVertical: 8,
-                borderRadius: 999,
+                borderRadius: radius.full,
                 backgroundColor: colors.surfaceOverlay,
               }}
             >
-              <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
+              <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
                 {roleLabels[profile.role as AppRole] ?? "Ruolo"}
               </Text>
             </View>
@@ -722,16 +722,16 @@ export default function ProfileScreen() {
         </View>
 
         {completeProfile ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[12] }}>
             {profileHighlights.map((item) => (
               <View
                 key={item.label}
                 style={{
                   minWidth: "30%",
                   flexGrow: 1,
-                  gap: 6,
+                  gap: spacing[6],
                   padding: 16,
-                  borderRadius: 20,
+                  borderRadius: radius[20],
                   backgroundColor: colors.surface,
                   borderWidth: 1,
                   borderColor: colors.border,
@@ -740,14 +740,14 @@ export default function ProfileScreen() {
                 <Text
                   style={{
                     color: colors.textMuted,
-                    fontSize: 12,
-                    fontWeight: "700",
+                    fontSize: typography.fontSize[12],
+                    fontWeight: typography.fontWeight.bold,
                     textTransform: "uppercase",
                   }}
                 >
                   {item.label}
                 </Text>
-                <Text style={{ color: colors.textPrimary, fontWeight: "800" }}>
+                <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
                   {item.value}
                 </Text>
               </View>
@@ -865,11 +865,11 @@ export default function ProfileScreen() {
                     options={positionOptions}
                     value={formState.primaryPosition}
                   />
-                  <View style={{ gap: 8 }}>
-                    <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                  <View style={{ gap: spacing[8] }}>
+                    <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
                       Posizione secondaria
                     </Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
                       <Pressable
                         onPress={() =>
                           setFormState((current) =>
@@ -879,7 +879,7 @@ export default function ProfileScreen() {
                         style={{
                           paddingHorizontal: 14,
                           paddingVertical: 10,
-                          borderRadius: 999,
+                          borderRadius: radius.full,
                           backgroundColor:
                             formState.secondaryPosition === ""
                               ? colors.accentStrong
@@ -897,7 +897,7 @@ export default function ProfileScreen() {
                               formState.secondaryPosition === ""
                                 ? colors.inkInvert
                                 : colors.textPrimary,
-                            fontWeight: "700",
+                            fontWeight: typography.fontWeight.bold,
                           }}
                         >
                           Nessuna
@@ -919,7 +919,7 @@ export default function ProfileScreen() {
                             style={{
                               paddingHorizontal: 14,
                               paddingVertical: 10,
-                              borderRadius: 999,
+                              borderRadius: radius.full,
                               backgroundColor: isActive
                                 ? colors.accentStrong
                                 : colors.background,
@@ -934,7 +934,7 @@ export default function ProfileScreen() {
                                 color: isActive
                                   ? colors.inkInvert
                                   : colors.textPrimary,
-                                fontWeight: "700",
+                                fontWeight: typography.fontWeight.bold,
                               }}
                             >
                               {option.label}
@@ -1024,9 +1024,9 @@ export default function ProfileScreen() {
                     <View
                       key={entry.id ?? `career-${index}`}
                       style={{
-                        gap: 12,
+                        gap: spacing[12],
                         padding: 16,
-                        borderRadius: 18,
+                        borderRadius: radius[18],
                         backgroundColor: colors.background,
                         borderWidth: 1,
                         borderColor: colors.border,
@@ -1039,7 +1039,7 @@ export default function ProfileScreen() {
                           alignItems: "center",
                         }}
                       >
-                        <Text style={{ color: colors.textPrimary, fontWeight: "800" }}>
+                        <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
                           Stagione {index + 1}
                         </Text>
                         <Pressable
@@ -1059,7 +1059,7 @@ export default function ProfileScreen() {
                             )
                           }
                         >
-                          <Text style={{ color: colors.hero, fontWeight: "700" }}>
+                          <Text style={{ color: colors.hero, fontWeight: typography.fontWeight.bold }}>
                             Rimuovi
                           </Text>
                         </Pressable>
@@ -1236,12 +1236,12 @@ export default function ProfileScreen() {
                     }
                     style={{
                       paddingVertical: 13,
-                      borderRadius: 16,
+                      borderRadius: radius[16],
                       alignItems: "center",
                       backgroundColor: colors.surfaceMuted,
                     }}
                   >
-                    <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                    <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
                       Aggiungi stagione
                     </Text>
                   </Pressable>
@@ -1462,12 +1462,12 @@ export default function ProfileScreen() {
               onPress={() => void handleSave()}
               style={{
                 paddingVertical: 16,
-                borderRadius: 18,
+                borderRadius: radius[18],
                 alignItems: "center",
                 backgroundColor: isSaving ? colors.borderStrong : colors.hero,
               }}
             >
-              <Text style={{ color: colors.inkInvert, fontSize: 16, fontWeight: "800" }}>
+              <Text style={{ color: colors.inkInvert, fontSize: typography.fontSize[16], fontWeight: typography.fontWeight.heavy }}>
                 {isSaving ? "Salvataggio in corso..." : "Salva profilo completo"}
               </Text>
             </Pressable>

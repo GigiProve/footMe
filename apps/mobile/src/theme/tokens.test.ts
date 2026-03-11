@@ -21,7 +21,10 @@ describe("theme tokens", () => {
     expect(spacing[16]).toBe(16);
     expect(radius.full).toBe(999);
     expect(sizes.touchTarget).toBeGreaterThanOrEqual(44);
+    expect(sizes.tabBarHeight).toBe(72);
+    expect(sizes.recruitingDescriptionMinHeight).toBe(120);
     expect(typography.fontSize[16]).toBe(16);
+    expect(typography.fontWeight.semibold).toBe("600");
     expect(zIndex.content).toBeGreaterThan(zIndex.base);
   });
 });
