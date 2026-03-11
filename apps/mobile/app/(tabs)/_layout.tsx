@@ -20,6 +20,7 @@ export default function TabsLayout() {
   return (
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" options={{ title: "Home" }} />
+      <Tabs.Screen name="profile" options={{ title: "Profilo" }} />
       <Tabs.Screen name="network" options={{ title: "Rete" }} />
       <Tabs.Screen name="messages" options={{ title: "Messaggi" }} />
       <Tabs.Screen name="announcements" options={{ title: "Annunci" }} />
