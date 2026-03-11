@@ -120,6 +120,7 @@ const specializationOptions: { label: string; value: StaffSpecialization }[] = [
   { label: "Team manager", value: "team_manager" },
   { label: "Altro", value: "other" },
 ];
+const minBirthYear = 1940;
 
 function createEmptyCareerEntry(): CareerEntryForm {
   return {
@@ -246,7 +247,7 @@ function createNumericOptions(
 
 const birthDayOptions = createNumericOptions(1, 31);
 const birthMonthOptions = createNumericOptions(1, 12);
-const birthYearOptions = createNumericOptions(1940, new Date().getFullYear(), {
+const birthYearOptions = createNumericOptions(minBirthYear, new Date().getFullYear(), {
   descending: true,
   padLength: 0,
 });
@@ -1936,50 +1937,61 @@ export default function ProfileScreen() {
               >
                 {careerSummaryEntries.length > 0 ? (
                   <View style={{ gap: 14 }}>
-                    {careerSummaryEntries.map((entry, index) => (
-                      <View
-                        key={entry.id ?? `career-summary-${index}`}
-                        style={{
-                          gap: 12,
-                          padding: 16,
-                          borderRadius: 18,
-                          backgroundColor: colors.background,
-                          borderWidth: 1,
-                          borderColor: colors.border,
-                        }}
-                      >
-                        <Text style={{ color: colors.textPrimary, fontWeight: "800" }}>
-                          Stagione {normalizeSeasonLabelInput(entry.seasonLabel) || index + 1}
-                        </Text>
-                        <SummaryList
-                          items={[
-                            {
-                              label: "Stagione",
-                              value: normalizeSeasonLabelInput(entry.seasonLabel),
-                            },
-                            { label: "Club", value: formatTextValue(entry.clubName) },
-                            {
-                              label: "Campionato o categoria",
-                              value: formatTextValue(entry.competitionName),
-                            },
-                            {
-                              label: "Presenze",
-                              value: formatTextValue(entry.appearances, "0"),
-                            },
-                            { label: "Gol", value: formatTextValue(entry.goals, "0") },
-                            { label: "Assist", value: formatTextValue(entry.assists, "0") },
-                            {
-                              label: "Minuti giocati",
-                              value: formatTextValue(entry.minutesPlayed, "0"),
-                            },
-                            {
-                              label: "Premi o riconoscimenti",
-                              value: formatTextValue(entry.awards),
-                            },
-                          ]}
-                        />
-                      </View>
-                    ))}
+                    {careerSummaryEntries.map((entry, index) => {
+                      const normalizedSeasonLabel = normalizeSeasonLabelInput(
+                        entry.seasonLabel,
+                      );
+
+                      return (
+                        <View
+                          key={entry.id ?? `career-summary-${index}`}
+                          style={{
+                            gap: 12,
+                            padding: 16,
+                            borderRadius: 18,
+                            backgroundColor: colors.background,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                          }}
+                        >
+                          <Text style={{ color: colors.textPrimary, fontWeight: "800" }}>
+                            {normalizedSeasonLabel
+                              ? `Stagione ${normalizedSeasonLabel}`
+                              : "Stagione senza etichetta"}
+                          </Text>
+                          <SummaryList
+                            items={[
+                              {
+                                label: "Stagione",
+                                value: normalizedSeasonLabel || "Da completare",
+                              },
+                              { label: "Club", value: formatTextValue(entry.clubName) },
+                              {
+                                label: "Campionato o categoria",
+                                value: formatTextValue(entry.competitionName),
+                              },
+                              {
+                                label: "Presenze",
+                                value: formatTextValue(entry.appearances, "0"),
+                              },
+                              { label: "Gol", value: formatTextValue(entry.goals, "0") },
+                              {
+                                label: "Assist",
+                                value: formatTextValue(entry.assists, "0"),
+                              },
+                              {
+                                label: "Minuti giocati",
+                                value: formatTextValue(entry.minutesPlayed, "0"),
+                              },
+                              {
+                                label: "Premi o riconoscimenti",
+                                value: formatTextValue(entry.awards),
+                              },
+                            ]}
+                          />
+                        </View>
+                      );
+                    })}
                   </View>
                 ) : (
                   <Text style={{ color: colors.textSecondary }}>
