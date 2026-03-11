@@ -21,7 +21,7 @@ import {
   type PlayerPosition,
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
-import { colors, radius, typography } from "../../src/theme/tokens";
+import { colors, radius, spacing, typography } from "../../src/theme/tokens";
 import { Card, Input } from "../../src/ui";
 
 type CareerEntryForm = {
@@ -255,8 +255,14 @@ function Section({
 }) {
   return (
     <Card style={{ gap: 14 }}>
-      <View style={{ gap: 6 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "800" }}>
+      <View style={{ gap: spacing[6] }}>
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontSize: typography.fontSize[20],
+            fontWeight: typography.fontWeight.heavy,
+          }}
+        >
           {title}
         </Text>
         {subtitle ? (
@@ -282,8 +288,12 @@ function Field({
   value: string;
 }) {
   return (
-    <View style={{ gap: 8 }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{label}</Text>
+    <View style={{ gap: spacing[8] }}>
+      <Text
+        style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
+      >
+        {label}
+      </Text>
       <Input
         multiline={multiline}
         onChangeText={onChangeText}

@@ -23,6 +23,12 @@ type IconProps = {
   size?: keyof typeof iconSizes;
 };
 
-export function Icon({ color = colors.textMuted, name, size = "md" }: IconProps) {
-  return <Ionicons color={color} name={iconNames[name]} size={iconSizes[size]} />;
+export function Icon({ color, name, size = "md" }: IconProps) {
+  return (
+    <Ionicons
+      color={color ?? colors.textPrimary}
+      name={iconNames[name]}
+      size={iconSizes[size]}
+    />
+  );
 }

@@ -2,7 +2,7 @@ import { Redirect, Tabs } from "expo-router";
 
 import { useSession } from "../../src/features/auth/use-session";
 import { Icon, type IconName } from "../../src/ui";
-import { colors, spacing, typography } from "../../src/theme/tokens";
+import { colors, sizes, spacing, typography } from "../../src/theme/tokens";
 
 export default function TabsLayout() {
   const { isLoading, needsOnboarding, session } = useSession();
@@ -35,7 +35,7 @@ export default function TabsLayout() {
           borderTopColor: colors.border,
           paddingTop: spacing[8],
           paddingBottom: spacing[8],
-          height: 72,
+          height: sizes.tabBarHeight,
         },
       }}
     >

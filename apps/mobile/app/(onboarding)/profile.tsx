@@ -273,7 +273,7 @@ export default function OnboardingProfileScreen() {
           ) : null}
 
             {role === "club_admin" ? (
-              <View style={{ gap: 12 }}>
+              <View style={{ gap: spacing[12] }}>
                 <Input
                   onChangeText={setClubName}
                   placeholder="Nome societa'"

@@ -18,7 +18,7 @@ import {
   unsubscribeFromConversation,
   type ConversationMessage,
 } from "../../src/features/messaging/messaging-service";
-import { colors } from "../../src/theme/tokens";
+import { colors, radius, spacing, sizes } from "../../src/theme/tokens";
 import { Button, Card, Input } from "../../src/ui";
 
 function formatTimestamp(value: string) {
@@ -239,14 +239,15 @@ export default function ConversationScreen() {
 
         <Card
           style={{
-            gap: 12,
-            borderRadius: 22,
+            gap: spacing[12],
+            borderRadius: radius[22],
           }}
         >
           <Input
             multiline
             onChangeText={setDraft}
             placeholder="Scrivi un messaggio professionale e diretto"
+            style={{ minHeight: sizes.messageComposerMinHeight }}
             value={draft}
           />
           <Button

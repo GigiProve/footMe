@@ -21,7 +21,7 @@ import {
   type RecruitingAdForm,
   type RecruitingAdSummary,
 } from "../../src/features/recruiting/recruiting-service";
-import { colors } from "../../src/theme/tokens";
+import { colors, sizes, spacing } from "../../src/theme/tokens";
 import { Button, Input } from "../../src/ui";
 
 const positions: Array<{
@@ -448,7 +448,7 @@ export default function AnnouncementsScreen() {
                 {isSelected ? (
                   <View
                     style={{
-                      gap: 10,
+                      gap: spacing[10],
                       paddingTop: 6,
                     }}
                   >
@@ -624,7 +624,7 @@ export default function AnnouncementsScreen() {
             multiline
             onChangeText={(value) => patchForm("description", value)}
             placeholder="Descrizione annuncio"
-            style={{ minHeight: 120 }}
+            style={{ minHeight: sizes.recruitingDescriptionMinHeight }}
             value={form.description}
           />
           <Button
