@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Alert, Pressable, Text, TextInput, View } from "react-native";
 
 import { Screen } from "../../src/components/ui/screen";
-import { supabase } from "../../src/lib/supabase";
+import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
 import { colors } from "../../src/theme/tokens";
 
 export default function SignUpScreen() {
@@ -30,7 +30,10 @@ export default function SignUpScreen() {
       });
 
       if (error) {
-        Alert.alert("Registrazione non riuscita", error.message);
+        Alert.alert(
+          "Registrazione non riuscita",
+          error.code ? `${error.code}: ${error.message}` : error.message,
+        );
         return;
       }
 
@@ -83,6 +86,22 @@ export default function SignUpScreen() {
             Entra nel portale con una registrazione essenziale e completa il tuo
             posizionamento sportivo nel passo successivo.
           </Text>
+          {__DEV__ ? (
+            <Text
+              style={{
+                fontSize: 12,
+                lineHeight: 18,
+                color: colors.textMuted,
+              }}
+            >
+              Supabase env: {hasSupabaseEnv ? "live" : "missing"} · key prefix:{" "}
+              {String(
+                process.env.EXPO_PUBLIC_SUPABASE_KEY ??
+                  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+                  "missing",
+              ).slice(0, 12)}
+            </Text>
+          ) : null}
         </View>
         <View
           style={{
