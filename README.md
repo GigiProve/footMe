@@ -28,3 +28,4 @@ Documenti di riferimento:
 - `docs/implementation-roadmap.md`
 - `docs/mvp-backlog.md`
 - `docs/technical-architecture.md`
+- `docs/mobile-ux-ui-guidelines.md`
