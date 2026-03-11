@@ -45,13 +45,13 @@ footMe deve apparire come:
 
 ### Riferimento cromatico
 
-Il repository ha gia' una base colori in `apps/mobile/src/theme/tokens.ts`.
+Il repository ha gia' una base colori in `apps/mobile/src/styles/tokens` ed e' riesposta da `apps/mobile/src/theme/tokens.ts`.
 
-- `accent #0D7A43`: colore identitario footMe per CTA primarie e stati positivi
-- `background #F5F2E9` e `surface #FFFDFC`: superfici calde e premium
-- `textPrimary #14261D`: testo principale
-- `border #D9D0C0`: separatori e outline
-- `hero #C96E3D`: evidenza editoriale, recruiting premium, alert contestuali
+- `accent #0A66C2`: colore identitario per CTA primarie e stati attivi, coerente con il riferimento LinkedIn-style
+- `background #F4F8FB` e `surface #FFFFFF`: superfici chiare, pulite e professionali
+- `textPrimary #1D2226`: testo principale ad alta leggibilita'
+- `border #D6E1EB`: separatori e outline leggeri
+- `hero #004182`: evidenza editoriale e stati ad alta enfasi
 
 ### Traduzione dello stile "simile a LinkedIn"
 
@@ -194,9 +194,13 @@ Struttura:
 Pattern chiave:
 
 - sezione header ad alta fiducia
+- apertura della schermata profilo su un riepilogo leggibile dei dati principali
+- CTA primaria di modifica chiara e immediata per entrare nei blocchi editabili
 - moduli editabili a blocchi
 - CTA contestuali: Messaggio, Collegati, Segui, Candidati
 - progressivo completamento profilo con nudges
+- campi strutturati per ridurre errori di input (es. picker per data, nazionalita' e regione)
+- carriera del giocatore gestita per stagioni con formato coerente `xx/xx`
 
 ## Pattern UI fondamentali
 

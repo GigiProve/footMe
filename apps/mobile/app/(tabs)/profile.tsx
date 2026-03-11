@@ -4,11 +4,26 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
+  type TextInputProps,
 } from "react-native";
 
+import { SelectField } from "../../src/components/ui/select-field";
 import { Screen } from "../../src/components/ui/screen";
 import { useSession } from "../../src/features/auth/use-session";
+import {
+  getSelectLabel,
+  italianRegionOptions,
+  nationalityOptions,
+  type SelectOption,
+} from "../../src/features/profiles/profile-form-options";
+import {
+  buildBirthDate,
+  isValidSeasonLabel,
+  normalizeSeasonLabelInput,
+  splitBirthDate,
+} from "../../src/features/profiles/profile-form-utils";
 import {
   getCompleteProfessionalProfile,
   updateCompleteProfessionalProfile,
@@ -21,8 +36,7 @@ import {
   type PlayerPosition,
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
-import { colors, radius, spacing, typography } from "../../src/theme/tokens";
-import { Card, Input } from "../../src/ui";
+import { colors } from "../../src/theme/tokens";
 
 type CareerEntryForm = {
   appearances: string;
@@ -106,6 +120,7 @@ const specializationOptions: { label: string; value: StaffSpecialization }[] = [
   { label: "Team manager", value: "team_manager" },
   { label: "Altro", value: "other" },
 ];
+const minBirthYear = 1940;
 
 function createEmptyCareerEntry(): CareerEntryForm {
   return {
@@ -179,6 +194,63 @@ function formatSpecialization(value: StaffSpecialization | null) {
     specializationOptions.find((option) => option.value === value)?.label ?? value
   );
 }
+
+function formatTextValue(
+  value: string | null | undefined,
+  fallback = "Da completare",
+) {
+  const trimmed = value?.trim();
+
+  return trimmed ? trimmed : fallback;
+}
+
+function formatBirthDateValue(value: string | null | undefined) {
+  const parts = splitBirthDate(value);
+
+  if (!parts.day || !parts.month || !parts.year) {
+    return "Da completare";
+  }
+
+  return `${parts.day}/${parts.month}/${parts.year}`;
+}
+
+function createNumericOptions(
+  start: number,
+  end: number,
+  {
+    descending = false,
+    padLength = 2,
+  }: {
+    descending?: boolean;
+    padLength?: number;
+  } = {},
+): SelectOption[] {
+  const values = Array.from(
+    { length: end - start + 1 },
+    (_, index) => start + index,
+  );
+
+  if (descending) {
+    values.reverse();
+  }
+
+  return values.map((value) => {
+    const formattedValue =
+      padLength > 0 ? String(value).padStart(padLength, "0") : String(value);
+
+    return {
+      label: formattedValue,
+      value: formattedValue,
+    };
+  });
+}
+
+const birthDayOptions = createNumericOptions(1, 31);
+const birthMonthOptions = createNumericOptions(1, 12);
+const birthYearOptions = createNumericOptions(minBirthYear, new Date().getFullYear(), {
+  descending: true,
+  padLength: 0,
+});
 
 function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState {
   const playerProfile = data.playerProfile;
@@ -254,52 +326,198 @@ function Section({
   title: string;
 }) {
   return (
-    <Card style={{ gap: spacing[14] }}>
-      <View style={{ gap: spacing[6] }}>
-        <Text
-          style={{
-            color: colors.textPrimary,
-            fontSize: typography.fontSize[20],
-            fontWeight: typography.fontWeight.heavy,
-          }}
-        >
+    <View
+      style={{
+        gap: 14,
+        padding: 18,
+        borderRadius: 24,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
+    >
+      <View style={{ gap: 6 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "800" }}>
           {title}
         </Text>
         {subtitle ? (
-          <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>{subtitle}</Text>
+          <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>{subtitle}</Text>
         ) : null}
       </View>
       {children}
-    </Card>
+    </View>
   );
 }
 
 function Field({
+  autoCapitalize,
+  error,
+  helperText,
+  keyboardType,
   label,
+  maxLength,
   multiline,
   onChangeText,
   placeholder,
   value,
 }: {
+  autoCapitalize?: TextInputProps["autoCapitalize"];
+  error?: string;
+  helperText?: string;
+  keyboardType?: TextInputProps["keyboardType"];
   label: string;
+  maxLength?: number;
   multiline?: boolean;
   onChangeText: (value: string) => void;
   placeholder?: string;
   value: string;
 }) {
   return (
-    <View style={{ gap: spacing[8] }}>
-      <Text
-        style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
-      >
-        {label}
-      </Text>
-      <Input
+    <View style={{ gap: 8 }}>
+      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{label}</Text>
+      <TextInput
+        autoCapitalize={autoCapitalize}
+        keyboardType={keyboardType}
+        maxLength={maxLength}
         multiline={multiline}
         onChangeText={onChangeText}
         placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        style={{
+          minHeight: multiline ? 110 : undefined,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: error ? colors.hero : colors.border,
+          backgroundColor: colors.background,
+          textAlignVertical: multiline ? "top" : "center",
+        }}
         value={value}
       />
+      {error ? (
+        <Text style={{ color: colors.hero, fontSize: 13, fontWeight: "600" }}>{error}</Text>
+      ) : helperText ? (
+        <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{helperText}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function DatePickerField({
+  label,
+  onChange,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const [draftDateParts, setDraftDateParts] = useState(() => splitBirthDate(value));
+
+  useEffect(() => {
+    const parsedValue = splitBirthDate(value);
+    const hasCompleteValue =
+      !!parsedValue.day && !!parsedValue.month && !!parsedValue.year;
+    const hasEmptyDraft =
+      !draftDateParts.day && !draftDateParts.month && !draftDateParts.year;
+
+    if (hasCompleteValue || (!value && hasEmptyDraft)) {
+      setDraftDateParts(parsedValue);
+    }
+  }, [draftDateParts.day, draftDateParts.month, draftDateParts.year, value]);
+
+  function patchDate(nextParts: Partial<typeof draftDateParts>) {
+    setDraftDateParts((current) => {
+      const nextDateParts = {
+        ...current,
+        ...nextParts,
+      };
+      const nextBirthDate = buildBirthDate(nextDateParts);
+
+      onChange(nextBirthDate);
+
+      return nextDateParts;
+    });
+  }
+
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{label}</Text>
+      <View style={{ gap: 12 }}>
+        <SelectField
+          clearable
+          clearLabel="Rimuovi anno"
+          onChange={(nextValue) => patchDate({ year: nextValue })}
+          options={birthYearOptions}
+          placeholder="Anno"
+          value={draftDateParts.year}
+        />
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <SelectField
+              clearable
+              clearLabel="Rimuovi mese"
+              onChange={(nextValue) => patchDate({ month: nextValue })}
+              options={birthMonthOptions}
+              placeholder="Mese"
+              value={draftDateParts.month}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <SelectField
+              clearable
+              clearLabel="Rimuovi giorno"
+              onChange={(nextValue) => patchDate({ day: nextValue })}
+              options={birthDayOptions}
+              placeholder="Giorno"
+              value={draftDateParts.day}
+            />
+          </View>
+        </View>
+      </View>
+      <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+        {value
+          ? `Data selezionata: ${formatBirthDateValue(value)}`
+          : "Seleziona giorno, mese e anno dal picker."}
+      </Text>
+      {value ? (
+        <Pressable onPress={() => onChange("")}>
+          <Text style={{ color: colors.hero, fontWeight: "700" }}>Svuota data</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function SummaryList({ items }: { items: { label: string; value: string }[] }) {
+  return (
+    <View style={{ gap: 12 }}>
+      {items.map((item) => (
+        <View
+          key={item.label}
+          style={{
+            gap: 4,
+            paddingBottom: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.textMuted,
+              fontSize: 12,
+              fontWeight: "700",
+              textTransform: "uppercase",
+            }}
+          >
+            {item.label}
+          </Text>
+          <Text style={{ color: colors.textPrimary, lineHeight: 22, fontWeight: "600" }}>
+            {item.value}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -318,9 +536,9 @@ function BooleanField({
   value: boolean;
 }) {
   return (
-    <View style={{ gap: spacing[8] }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>{label}</Text>
-      <View style={{ flexDirection: "row", gap: spacing[10] }}>
+    <View style={{ gap: 8 }}>
+      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{label}</Text>
+      <View style={{ flexDirection: "row", gap: 10 }}>
         {[
           { active: true, label: trueLabel },
           { active: false, label: falseLabel },
@@ -334,7 +552,7 @@ function BooleanField({
               style={{
                 paddingHorizontal: 14,
                 paddingVertical: 10,
-                borderRadius: radius.full,
+                borderRadius: 999,
                 backgroundColor: isActive ? colors.textPrimary : colors.background,
                 borderWidth: 1,
                 borderColor: isActive ? colors.textPrimary : colors.border,
@@ -343,7 +561,7 @@ function BooleanField({
               <Text
                 style={{
                   color: isActive ? colors.inkInvert : colors.textPrimary,
-                  fontWeight: typography.fontWeight.bold,
+                  fontWeight: "700",
                 }}
               >
                 {option.label}
@@ -368,9 +586,9 @@ function PillSelector<T extends string>({
   value: T;
 }) {
   return (
-    <View style={{ gap: spacing[8] }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>{label}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
+    <View style={{ gap: 8 }}>
+      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{label}</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {options.map((option) => {
           const isActive = option.value === value;
 
@@ -381,7 +599,7 @@ function PillSelector<T extends string>({
               style={{
                 paddingHorizontal: 14,
                 paddingVertical: 10,
-                borderRadius: radius.full,
+                borderRadius: 999,
                 backgroundColor: isActive ? colors.accentStrong : colors.background,
                 borderWidth: 1,
                 borderColor: isActive ? colors.accentStrong : colors.border,
@@ -390,7 +608,7 @@ function PillSelector<T extends string>({
               <Text
                 style={{
                   color: isActive ? colors.inkInvert : colors.textPrimary,
-                  fontWeight: typography.fontWeight.bold,
+                  fontWeight: "700",
                 }}
               >
                 {option.label}
@@ -411,6 +629,7 @@ export default function ProfileScreen() {
   const [formState, setFormState] = useState<ProfileFormState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const loadProfile = useCallback(async () => {
     if (!userId) {
@@ -512,6 +731,169 @@ export default function ProfileScreen() {
     ];
   }, [completeProfile]);
 
+  const baseSummaryItems = useMemo(() => {
+    if (!formState) {
+      return [];
+    }
+
+    return [
+      { label: "Nome e cognome", value: formatTextValue(formState.fullName) },
+      {
+        label: "Data di nascita",
+        value: formatBirthDateValue(formState.birthDate),
+      },
+      {
+        label: "Nazionalita'",
+        value: getSelectLabel(formState.nationality, nationalityOptions),
+      },
+      { label: "Citta'", value: formatTextValue(formState.city) },
+      {
+        label: "Regione",
+        value: getSelectLabel(formState.region, italianRegionOptions),
+      },
+      { label: "Bio", value: formatTextValue(formState.bio) },
+      { label: "Foto profilo", value: formatTextValue(formState.avatarUrl) },
+      { label: "Disponibile", value: formState.isAvailable ? "Si" : "No" },
+      ...(completeProfile?.profile.role === "player"
+        ? [
+            {
+              label: "Aperto al trasferimento",
+              value: formState.isOpenToTransfer ? "Si" : "No",
+            },
+          ]
+        : []),
+    ];
+  }, [completeProfile?.profile.role, formState]);
+
+  const professionalSummaryItems = useMemo(() => {
+    if (!completeProfile || !formState) {
+      return [];
+    }
+
+    if (completeProfile.profile.role === "player") {
+      return [
+        {
+          label: "Posizione principale",
+          value: formatPosition(formState.primaryPosition),
+        },
+        {
+          label: "Posizione secondaria",
+          value: formatPosition(formState.secondaryPosition || null),
+        },
+        {
+          label: "Piede preferito",
+          value: formatPreferredFoot(formState.preferredFoot || null),
+        },
+        {
+          label: "Altezza",
+          value: formState.heightCm ? `${formState.heightCm} cm` : "Da completare",
+        },
+        {
+          label: "Peso",
+          value: formState.weightKg ? `${formState.weightKg} kg` : "Da completare",
+        },
+        {
+          label: "Categorie preferite",
+          value: formatTextValue(formState.preferredCategories),
+        },
+        {
+          label: "Aree di trasferimento",
+          value: formatTextValue(formState.transferRegions),
+        },
+        {
+          label: "Video highlight",
+          value: formatTextValue(formState.highlightVideoUrl),
+        },
+        {
+          label: "Disponibile a cambiare squadra",
+          value: formState.willingToChangeClub ? "Si" : "No",
+        },
+      ];
+    }
+
+    if (completeProfile.profile.role === "coach") {
+      return [
+        { label: "Licenze", value: formatTextValue(formState.licenses) },
+        {
+          label: "Squadre allenate",
+          value: formatTextValue(formState.coachedClubs),
+        },
+        {
+          label: "Categorie allenate",
+          value: formatTextValue(formState.coachedCategories),
+        },
+        {
+          label: "Filosofia di gioco",
+          value: formatTextValue(formState.gamePhilosophy),
+        },
+        {
+          label: "Video tecnico",
+          value: formatTextValue(formState.technicalVideoUrl),
+        },
+        {
+          label: "Aree geografiche di interesse",
+          value: formatTextValue(formState.preferredRegions),
+        },
+        {
+          label: "Disponibile per nuove panchine",
+          value: formState.openToNewRole ? "Si" : "No",
+        },
+      ];
+    }
+
+    if (completeProfile.profile.role === "staff") {
+      return [
+        {
+          label: "Specializzazione",
+          value: formatSpecialization(formState.specialization || null),
+        },
+        {
+          label: "Esperienza",
+          value: formatTextValue(formState.experienceSummary),
+        },
+        {
+          label: "Certificazioni",
+          value: formatTextValue(formState.certifications),
+        },
+        {
+          label: "Aree geografiche di interesse",
+          value: formatTextValue(formState.preferredRegions),
+        },
+        {
+          label: "Disponibile a lavorare",
+          value: formState.openToWork ? "Si" : "No",
+        },
+      ];
+    }
+
+    return [
+      { label: "Nome club", value: formatTextValue(formState.clubName) },
+      { label: "Citta' club", value: formatTextValue(formState.clubCity) },
+      {
+        label: "Regione club",
+        value: getSelectLabel(formState.clubRegion, italianRegionOptions),
+      },
+      { label: "Categoria", value: formatTextValue(formState.clubCategory) },
+      { label: "Campionato", value: formatTextValue(formState.clubLeague) },
+      {
+        label: "Descrizione club",
+        value: formatTextValue(formState.clubDescription),
+      },
+      { label: "Logo", value: formatTextValue(formState.clubLogoUrl) },
+      { label: "Gallery media", value: formatTextValue(formState.clubGalleryUrls) },
+    ];
+  }, [completeProfile, formState]);
+
+  const careerSummaryEntries = useMemo(() => {
+    if (completeProfile?.profile.role !== "player" || !formState) {
+      return [];
+    }
+
+    return formState.careerEntries.filter(
+      (entry) => entry.seasonLabel.trim() || entry.clubName.trim(),
+    );
+  }, [completeProfile?.profile.role, formState]);
+
   if (!userId || !profile) {
     return null;
   }
@@ -532,7 +914,7 @@ export default function ProfileScreen() {
 
       const parsedCareerEntries = formState.careerEntries
         .map<PlayerCareerEntryInput | null>((entry, index) => {
-          const seasonLabel = entry.seasonLabel.trim();
+          const seasonLabel = normalizeSeasonLabelInput(entry.seasonLabel.trim());
           const clubName = entry.clubName.trim();
 
           if (!seasonLabel && !clubName) {
@@ -542,6 +924,12 @@ export default function ProfileScreen() {
           if (!seasonLabel || !clubName) {
             throw new Error(
               "Ogni riga carriera deve includere almeno stagione e club.",
+            );
+          }
+
+          if (!isValidSeasonLabel(seasonLabel)) {
+            throw new Error(
+              "Ogni stagione deve rispettare il formato xx/xx, ad esempio 24/25.",
             );
           }
 
@@ -641,6 +1029,7 @@ export default function ProfileScreen() {
       });
 
       await Promise.all([loadProfile(), refreshProfile()]);
+      setIsEditing(false);
       Alert.alert("Profilo aggiornato", "Le informazioni professionali sono state salvate.");
     } catch (error) {
       const message =
@@ -653,31 +1042,31 @@ export default function ProfileScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}>
+      <ScrollView contentContainerStyle={{ gap: 18, paddingBottom: 28 }}>
         <View
           style={{
-            gap: spacing[12],
+            gap: 12,
             padding: 22,
-            borderRadius: radius[26],
+            borderRadius: 26,
             backgroundColor: colors.textPrimary,
           }}
         >
           <Text
             style={{
               color: colors.heroSoft,
-              fontSize: typography.fontSize[12],
-              fontWeight: typography.fontWeight.heavy,
+              fontSize: 12,
+              fontWeight: "800",
               textTransform: "uppercase",
-              letterSpacing: typography.letterSpacing.md,
+              letterSpacing: 1.2,
             }}
           >
             Fase 2 · Identita' professionale
           </Text>
           <Text
             style={{
-              fontSize: typography.fontSize[30],
-              lineHeight: typography.lineHeight[34],
-              fontWeight: typography.fontWeight.heavy,
+              fontSize: 30,
+              lineHeight: 34,
+              fontWeight: "800",
               color: colors.inkInvert,
             }}
           >
@@ -685,24 +1074,24 @@ export default function ProfileScreen() {
           </Text>
           <Text
             style={{
-              fontSize: typography.fontSize[16],
-              lineHeight: typography.lineHeight[24],
-              color: colors.textInverseMuted,
+              fontSize: 16,
+              lineHeight: 24,
+              color: "rgba(255,253,252,0.78)",
             }}
           >
             Completa e aggiorna il tuo profilo pubblico con i dati richiesti dalla
             roadmap MVP: identita', disponibilita', carriera e dettagli di ruolo.
           </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[10] }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
             <View
               style={{
                 paddingHorizontal: 12,
                 paddingVertical: 8,
-                borderRadius: radius.full,
-                backgroundColor: colors.surfaceOverlay,
+                borderRadius: 999,
+                backgroundColor: "rgba(255,253,252,0.12)",
               }}
             >
-              <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
+              <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
                 {profile.full_name ?? "Profilo"}
               </Text>
             </View>
@@ -710,11 +1099,11 @@ export default function ProfileScreen() {
               style={{
                 paddingHorizontal: 12,
                 paddingVertical: 8,
-                borderRadius: radius.full,
-                backgroundColor: colors.surfaceOverlay,
+                borderRadius: 999,
+                backgroundColor: "rgba(255,253,252,0.12)",
               }}
             >
-              <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
+              <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
                 {roleLabels[profile.role as AppRole] ?? "Ruolo"}
               </Text>
             </View>
@@ -722,16 +1111,16 @@ export default function ProfileScreen() {
         </View>
 
         {completeProfile ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[12] }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {profileHighlights.map((item) => (
               <View
                 key={item.label}
                 style={{
                   minWidth: "30%",
                   flexGrow: 1,
-                  gap: spacing[6],
+                  gap: 6,
                   padding: 16,
-                  borderRadius: radius[20],
+                  borderRadius: 20,
                   backgroundColor: colors.surface,
                   borderWidth: 1,
                   borderColor: colors.border,
@@ -740,19 +1129,42 @@ export default function ProfileScreen() {
                 <Text
                   style={{
                     color: colors.textMuted,
-                    fontSize: typography.fontSize[12],
-                    fontWeight: typography.fontWeight.bold,
+                    fontSize: 12,
+                    fontWeight: "700",
                     textTransform: "uppercase",
                   }}
                 >
                   {item.label}
                 </Text>
-                <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
+                <Text style={{ color: colors.textPrimary, fontWeight: "800" }}>
                   {item.value}
                 </Text>
               </View>
             ))}
           </View>
+        ) : null}
+
+        {!isLoading && formState ? (
+          <Pressable
+            onPress={() => setIsEditing((current) => !current)}
+            style={{
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderRadius: 18,
+              alignItems: "center",
+              backgroundColor: isEditing ? colors.surfaceMuted : colors.textPrimary,
+            }}
+          >
+            <Text
+              style={{
+                color: isEditing ? colors.textPrimary : colors.inkInvert,
+                fontSize: 15,
+                fontWeight: "800",
+              }}
+            >
+              {isEditing ? "Torna al riepilogo" : "Modifica profilo"}
+            </Text>
+          </Pressable>
         ) : null}
 
         {isLoading || !formState ? (
@@ -761,7 +1173,7 @@ export default function ProfileScreen() {
               Sto recuperando i dati professionali del tuo account...
             </Text>
           </Section>
-        ) : (
+        ) : isEditing ? (
           <>
             <Section
               subtitle="Dati anagrafici, localita', disponibilita' e presentazione pubblica."
@@ -774,21 +1186,25 @@ export default function ProfileScreen() {
                 }
                 value={formState.fullName}
               />
-              <Field
+              <DatePickerField
                 label="Data di nascita"
-                onChangeText={(value) =>
+                onChange={(value) =>
                   setFormState((current) => (current ? { ...current, birthDate: value } : current))
                 }
-                placeholder="YYYY-MM-DD"
                 value={formState.birthDate}
               />
-              <Field
+              <SelectField
+                clearable
                 label="Nazionalita'"
-                onChangeText={(value) =>
+                onChange={(value) =>
                   setFormState((current) =>
                     current ? { ...current, nationality: value } : current,
                   )
                 }
+                options={nationalityOptions}
+                placeholder="Seleziona una nazionalita'"
+                searchable
+                searchPlaceholder="Cerca la nazionalita'"
                 value={formState.nationality}
               />
               <Field
@@ -798,11 +1214,14 @@ export default function ProfileScreen() {
                 }
                 value={formState.city}
               />
-              <Field
+              <SelectField
+                clearable
                 label="Regione"
-                onChangeText={(value) =>
+                onChange={(value) =>
                   setFormState((current) => (current ? { ...current, region: value } : current))
                 }
+                options={italianRegionOptions}
+                placeholder="Seleziona una regione"
                 value={formState.region}
               />
               <Field
@@ -865,11 +1284,11 @@ export default function ProfileScreen() {
                     options={positionOptions}
                     value={formState.primaryPosition}
                   />
-                  <View style={{ gap: spacing[8] }}>
-                    <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
                       Posizione secondaria
                     </Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                       <Pressable
                         onPress={() =>
                           setFormState((current) =>
@@ -879,7 +1298,7 @@ export default function ProfileScreen() {
                         style={{
                           paddingHorizontal: 14,
                           paddingVertical: 10,
-                          borderRadius: radius.full,
+                          borderRadius: 999,
                           backgroundColor:
                             formState.secondaryPosition === ""
                               ? colors.accentStrong
@@ -897,7 +1316,7 @@ export default function ProfileScreen() {
                               formState.secondaryPosition === ""
                                 ? colors.inkInvert
                                 : colors.textPrimary,
-                            fontWeight: typography.fontWeight.bold,
+                            fontWeight: "700",
                           }}
                         >
                           Nessuna
@@ -919,7 +1338,7 @@ export default function ProfileScreen() {
                             style={{
                               paddingHorizontal: 14,
                               paddingVertical: 10,
-                              borderRadius: radius.full,
+                              borderRadius: 999,
                               backgroundColor: isActive
                                 ? colors.accentStrong
                                 : colors.background,
@@ -934,7 +1353,7 @@ export default function ProfileScreen() {
                                 color: isActive
                                   ? colors.inkInvert
                                   : colors.textPrimary,
-                                fontWeight: typography.fontWeight.bold,
+                                fontWeight: "700",
                               }}
                             >
                               {option.label}
@@ -1024,9 +1443,9 @@ export default function ProfileScreen() {
                     <View
                       key={entry.id ?? `career-${index}`}
                       style={{
-                        gap: spacing[12],
+                        gap: 12,
                         padding: 16,
-                        borderRadius: radius[18],
+                        borderRadius: 18,
                         backgroundColor: colors.background,
                         borderWidth: 1,
                         borderColor: colors.border,
@@ -1039,7 +1458,7 @@ export default function ProfileScreen() {
                           alignItems: "center",
                         }}
                       >
-                        <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
+                        <Text style={{ color: colors.textPrimary, fontWeight: "800" }}>
                           Stagione {index + 1}
                         </Text>
                         <Pressable
@@ -1059,13 +1478,22 @@ export default function ProfileScreen() {
                             )
                           }
                         >
-                          <Text style={{ color: colors.hero, fontWeight: typography.fontWeight.bold }}>
+                          <Text style={{ color: colors.hero, fontWeight: "700" }}>
                             Rimuovi
                           </Text>
                         </Pressable>
                       </View>
                       <Field
+                        error={
+                          entry.seasonLabel.trim() &&
+                          !isValidSeasonLabel(normalizeSeasonLabelInput(entry.seasonLabel))
+                            ? "Usa il formato xx/xx, ad esempio 24/25."
+                            : undefined
+                        }
+                        helperText="Formato richiesto: xx/xx"
+                        keyboardType="number-pad"
                         label="Stagione"
+                        maxLength={5}
                         onChangeText={(value) =>
                           setFormState((current) =>
                             current
@@ -1074,14 +1502,17 @@ export default function ProfileScreen() {
                                   careerEntries: current.careerEntries.map(
                                     (currentEntry, entryIndex) =>
                                       entryIndex === index
-                                        ? { ...currentEntry, seasonLabel: value }
+                                        ? {
+                                            ...currentEntry,
+                                            seasonLabel: normalizeSeasonLabelInput(value),
+                                          }
                                         : currentEntry,
                                   ),
                                 }
                               : current,
                           )
                         }
-                        placeholder="2024/25"
+                        placeholder="24/25"
                         value={entry.seasonLabel}
                       />
                       <Field
@@ -1236,12 +1667,12 @@ export default function ProfileScreen() {
                     }
                     style={{
                       paddingVertical: 13,
-                      borderRadius: radius[16],
+                      borderRadius: 16,
                       alignItems: "center",
                       backgroundColor: colors.surfaceMuted,
                     }}
                   >
-                    <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
+                    <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
                       Aggiungi stagione
                     </Text>
                   </Pressable>
@@ -1398,13 +1829,16 @@ export default function ProfileScreen() {
                   }
                   value={formState.clubCity}
                 />
-                <Field
+                <SelectField
+                  clearable
                   label="Regione club"
-                  onChangeText={(value) =>
+                  onChange={(value) =>
                     setFormState((current) =>
                       current ? { ...current, clubRegion: value } : current,
                     )
                   }
+                  options={italianRegionOptions}
+                  placeholder="Seleziona una regione"
                   value={formState.clubRegion}
                 />
                 <Field
@@ -1462,15 +1896,110 @@ export default function ProfileScreen() {
               onPress={() => void handleSave()}
               style={{
                 paddingVertical: 16,
-                borderRadius: radius[18],
+                borderRadius: 18,
                 alignItems: "center",
                 backgroundColor: isSaving ? colors.borderStrong : colors.hero,
               }}
             >
-              <Text style={{ color: colors.inkInvert, fontSize: typography.fontSize[16], fontWeight: typography.fontWeight.heavy }}>
+              <Text style={{ color: colors.inkInvert, fontSize: 16, fontWeight: "800" }}>
                 {isSaving ? "Salvataggio in corso..." : "Salva profilo completo"}
               </Text>
             </Pressable>
+          </>
+        ) : (
+          <>
+            <Section
+              subtitle="Quando apri il profilo trovi un riepilogo completo di cio' che hai configurato."
+              title="Riepilogo profilo"
+            >
+              <SummaryList items={baseSummaryItems} />
+            </Section>
+
+            <Section
+              subtitle="Dettagli specifici del tuo ruolo professionale."
+              title={
+                (profile.role as AppRole) === "player"
+                  ? "Profilo giocatore"
+                  : (profile.role as AppRole) === "coach"
+                    ? "Profilo allenatore"
+                    : (profile.role as AppRole) === "staff"
+                      ? "Profilo staff tecnico"
+                      : "Pagina societa'"
+              }
+            >
+              <SummaryList items={professionalSummaryItems} />
+            </Section>
+
+            {(profile.role as AppRole) === "player" ? (
+              <Section
+                subtitle="Le stagioni salvate vengono mostrate in ordine con il formato richiesto xx/xx."
+                title="Carriera e statistiche"
+              >
+                {careerSummaryEntries.length > 0 ? (
+                  <View style={{ gap: 14 }}>
+                    {careerSummaryEntries.map((entry, index) => {
+                      const normalizedSeasonLabel = normalizeSeasonLabelInput(
+                        entry.seasonLabel,
+                      );
+
+                      return (
+                        <View
+                          key={entry.id ?? `career-summary-${index}`}
+                          style={{
+                            gap: 12,
+                            padding: 16,
+                            borderRadius: 18,
+                            backgroundColor: colors.background,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                          }}
+                        >
+                          <Text style={{ color: colors.textPrimary, fontWeight: "800" }}>
+                            {normalizedSeasonLabel
+                              ? `Stagione ${normalizedSeasonLabel}`
+                              : "Stagione senza etichetta"}
+                          </Text>
+                          <SummaryList
+                            items={[
+                              {
+                                label: "Stagione",
+                                value: normalizedSeasonLabel || "Da completare",
+                              },
+                              { label: "Club", value: formatTextValue(entry.clubName) },
+                              {
+                                label: "Campionato o categoria",
+                                value: formatTextValue(entry.competitionName),
+                              },
+                              {
+                                label: "Presenze",
+                                value: formatTextValue(entry.appearances, "0"),
+                              },
+                              { label: "Gol", value: formatTextValue(entry.goals, "0") },
+                              {
+                                label: "Assist",
+                                value: formatTextValue(entry.assists, "0"),
+                              },
+                              {
+                                label: "Minuti giocati",
+                                value: formatTextValue(entry.minutesPlayed, "0"),
+                              },
+                              {
+                                label: "Premi o riconoscimenti",
+                                value: formatTextValue(entry.awards),
+                              },
+                            ]}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <Text style={{ color: colors.textSecondary }}>
+                    Non hai ancora inserito stagioni nella carriera.
+                  </Text>
+                )}
+              </Section>
+            ) : null}
           </>
         )}
       </ScrollView>
