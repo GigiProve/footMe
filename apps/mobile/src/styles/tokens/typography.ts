@@ -1,0 +1,36 @@
+export const typography = {
+  fontSize: {
+    12: 12,
+    14: 14,
+    16: 16,
+    17: 17,
+    18: 18,
+    20: 20,
+    24: 24,
+    26: 26,
+    28: 28,
+    30: 30,
+    32: 32,
+    34: 34,
+  },
+  lineHeight: {
+    22: 22,
+    24: 24,
+    28: 28,
+    32: 32,
+    34: 34,
+    36: 36,
+    38: 38,
+  },
+  fontWeight: {
+    regular: "400",
+    medium: "500",
+    semibold: "600",
+    bold: "700",
+    heavy: "800",
+  },
+  letterSpacing: {
+    sm: 1,
+    md: 1.2,
+  },
+} as const;

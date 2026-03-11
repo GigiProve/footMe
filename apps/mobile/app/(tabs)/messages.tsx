@@ -13,7 +13,7 @@ import {
   startDirectConversation,
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
-import { colors } from "../../src/theme/tokens";
+import { colors, radius, spacing, typography } from "../../src/theme/tokens";
 
 const roleLabels: Record<string, string> = {
   club_admin: "Societa'",
@@ -125,31 +125,31 @@ export default function MessagesScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
+      <ScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
         <View
           style={{
-            gap: 10,
+            gap: spacing[10],
             padding: 22,
-            borderRadius: 26,
+            borderRadius: radius[26],
             backgroundColor: colors.textPrimary,
           }}
         >
           <Text
             style={{
               color: colors.heroSoft,
-              fontSize: 12,
-              fontWeight: "800",
+              fontSize: typography.fontSize[12],
+              fontWeight: typography.fontWeight.heavy,
               textTransform: "uppercase",
-              letterSpacing: 1,
+              letterSpacing: typography.letterSpacing.sm,
             }}
           >
             Messaging MVP
           </Text>
           <Text
             style={{
-              fontSize: 30,
-              lineHeight: 34,
-              fontWeight: "800",
+              fontSize: typography.fontSize[30],
+              lineHeight: typography.lineHeight[34],
+              fontWeight: typography.fontWeight.heavy,
               color: colors.inkInvert,
             }}
           >
@@ -157,9 +157,9 @@ export default function MessagesScreen() {
           </Text>
           <Text
             style={{
-              fontSize: 16,
-              lineHeight: 24,
-              color: "rgba(255,253,252,0.78)",
+              fontSize: typography.fontSize[16],
+              lineHeight: typography.lineHeight[24],
+              color: colors.textInverseMuted,
             }}
           >
             Le connessioni accettate possono trasformarsi in conversazioni 1:1.
@@ -168,12 +168,12 @@ export default function MessagesScreen() {
           </Text>
         </View>
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flexDirection: "row", gap: spacing[12] }}>
           <View
             style={{
               flex: 1,
               padding: 16,
-              borderRadius: 22,
+              borderRadius: radius[22],
               backgroundColor: colors.surface,
               borderWidth: 1,
               borderColor: colors.border,
@@ -182,8 +182,8 @@ export default function MessagesScreen() {
             <Text
               style={{
                 color: colors.textMuted,
-                fontSize: 12,
-                fontWeight: "700",
+                fontSize: typography.fontSize[12],
+                fontWeight: typography.fontWeight.bold,
                 textTransform: "uppercase",
               }}
             >
@@ -193,8 +193,8 @@ export default function MessagesScreen() {
               style={{
                 marginTop: 8,
                 color: colors.textPrimary,
-                fontSize: 24,
-                fontWeight: "800",
+                fontSize: typography.fontSize[24],
+                fontWeight: typography.fontWeight.heavy,
               }}
             >
               {summaries.length}
@@ -204,15 +204,15 @@ export default function MessagesScreen() {
             style={{
               flex: 1,
               padding: 16,
-              borderRadius: 22,
+              borderRadius: radius[22],
               backgroundColor: colors.surfaceMuted,
             }}
           >
             <Text
               style={{
                 color: colors.textMuted,
-                fontSize: 12,
-                fontWeight: "700",
+                fontSize: typography.fontSize[12],
+                fontWeight: typography.fontWeight.bold,
                 textTransform: "uppercase",
               }}
             >
@@ -222,8 +222,8 @@ export default function MessagesScreen() {
               style={{
                 marginTop: 8,
                 color: colors.textPrimary,
-                fontSize: 24,
-                fontWeight: "800",
+                fontSize: typography.fontSize[24],
+                fontWeight: typography.fontWeight.heavy,
               }}
             >
               {unreadCount}
@@ -233,9 +233,9 @@ export default function MessagesScreen() {
 
         <View
           style={{
-            gap: 14,
+            gap: spacing[14],
             padding: 18,
-            borderRadius: 22,
+            borderRadius: radius[22],
             backgroundColor: colors.surface,
             borderWidth: 1,
             borderColor: colors.border,
@@ -248,11 +248,11 @@ export default function MessagesScreen() {
               alignItems: "center",
             }}
           >
-            <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "800" }}>
+            <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[18], fontWeight: typography.fontWeight.heavy }}>
               Pronti a scriverti
             </Text>
             <Pressable onPress={() => void loadInbox()}>
-              <Text style={{ color: colors.accentStrong, fontWeight: "700" }}>
+              <Text style={{ color: colors.accentStrong, fontWeight: typography.fontWeight.bold }}>
                 Aggiorna
               </Text>
             </Pressable>
@@ -272,15 +272,15 @@ export default function MessagesScreen() {
             <View
               key={entry.connection_id}
               style={{
-                gap: 8,
+                gap: spacing[8],
                 padding: 16,
-                borderRadius: 18,
+                borderRadius: radius[18],
                 backgroundColor: colors.background,
                 borderWidth: 1,
                 borderColor: colors.border,
               }}
             >
-              <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "800" }}>
+              <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[16], fontWeight: typography.fontWeight.heavy }}>
                 {entry.other_full_name}
               </Text>
               <Text style={{ color: colors.textSecondary }}>
@@ -299,12 +299,12 @@ export default function MessagesScreen() {
                 }
                 style={{
                   paddingVertical: 12,
-                  borderRadius: 14,
+                  borderRadius: radius[14],
                   alignItems: "center",
                   backgroundColor: colors.hero,
                 }}
               >
-                <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
+                <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
                   {actionProfileId === entry.other_profile_id
                     ? "Apertura chat..."
                     : "Scrivi ora"}
@@ -314,15 +314,15 @@ export default function MessagesScreen() {
           ))}
         </View>
 
-        <View style={{ gap: 12 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "800" }}>
+        <View style={{ gap: spacing[12] }}>
+          <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[18], fontWeight: typography.fontWeight.heavy }}>
             Conversazioni recenti
           </Text>
           {!isLoading && summaries.length === 0 ? (
             <View
               style={{
                 padding: 18,
-                borderRadius: 20,
+                borderRadius: radius[20],
                 backgroundColor: colors.surface,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -347,9 +347,9 @@ export default function MessagesScreen() {
                 })
               }
               style={{
-                gap: 8,
+                gap: spacing[8],
                 padding: 18,
-                borderRadius: 22,
+                borderRadius: radius[22],
                 backgroundColor: colors.surface,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -360,15 +360,15 @@ export default function MessagesScreen() {
                   flexDirection: "row",
                   justifyContent: "space-between",
                   alignItems: "flex-start",
-                  gap: 12,
+                  gap: spacing[12],
                 }}
               >
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text
                     style={{
                       color: colors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: "800",
+                      fontSize: typography.fontSize[18],
+                      fontWeight: typography.fontWeight.heavy,
                     }}
                   >
                     {summary.other_full_name}
@@ -386,12 +386,12 @@ export default function MessagesScreen() {
                       minWidth: 28,
                       paddingHorizontal: 8,
                       paddingVertical: 5,
-                      borderRadius: 999,
+                      borderRadius: radius.full,
                       backgroundColor: colors.hero,
                       alignItems: "center",
                     }}
                   >
-                    <Text style={{ color: colors.inkInvert, fontWeight: "800" }}>
+                    <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.heavy }}>
                       {summary.unread_count}
                     </Text>
                   </View>
@@ -400,11 +400,11 @@ export default function MessagesScreen() {
               <Text style={{ color: colors.textSecondary }}>
                 {formatLocation(summary.other_city, summary.other_region)}
               </Text>
-              <Text style={{ color: colors.textPrimary, lineHeight: 22 }}>
+              <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
                 {summary.last_message_body ??
                   "Nessun messaggio ancora inviato: apri la chat per iniziare."}
               </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700" }}>
+              <Text style={{ color: colors.textMuted, fontSize: typography.fontSize[12], fontWeight: typography.fontWeight.bold }}>
                 {summary.last_message_sent_at
                   ? new Date(summary.last_message_sent_at).toLocaleString("it-IT")
                   : "Conversazione pronta"}

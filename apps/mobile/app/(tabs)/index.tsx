@@ -8,7 +8,7 @@ import {
 } from "../../src/features/home/home-dashboard-service";
 import { useSession } from "../../src/features/auth/use-session";
 import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
-import { colors } from "../../src/theme/tokens";
+import { colors, radius, shadows, spacing, typography } from "../../src/theme/tokens";
 
 export default function HomeScreen() {
   const { profile, session } = useSession();
@@ -59,12 +59,12 @@ export default function HomeScreen() {
 
   return (
     <Screen>
-      <View style={{ flex: 1, gap: 18 }}>
+      <View style={{ flex: 1, gap: spacing[18] }}>
         <View
           style={{
-            gap: 12,
+            gap: spacing[12],
             padding: 24,
-            borderRadius: 28,
+            borderRadius: radius[28],
             backgroundColor: colors.textPrimary,
           }}
         >
@@ -73,13 +73,13 @@ export default function HomeScreen() {
               alignSelf: "flex-start",
               paddingHorizontal: 10,
               paddingVertical: 6,
-              borderRadius: 999,
+              borderRadius: radius.full,
               overflow: "hidden",
-              backgroundColor: "rgba(255,253,252,0.12)",
+              backgroundColor: colors.surfaceOverlay,
               color: colors.inkInvert,
-              fontSize: 12,
-              fontWeight: "700",
-              letterSpacing: 1,
+              fontSize: typography.fontSize[12],
+              fontWeight: typography.fontWeight.bold,
+              letterSpacing: typography.letterSpacing.sm,
               textTransform: "uppercase",
             }}
           >
@@ -87,9 +87,9 @@ export default function HomeScreen() {
           </Text>
           <Text
             style={{
-              fontSize: 34,
-              lineHeight: 38,
-              fontWeight: "800",
+              fontSize: typography.fontSize[34],
+              lineHeight: typography.lineHeight[38],
+              fontWeight: typography.fontWeight.heavy,
               color: colors.inkInvert,
             }}
           >
@@ -97,9 +97,9 @@ export default function HomeScreen() {
           </Text>
           <Text
             style={{
-              fontSize: 18,
-              lineHeight: 28,
-              color: "rgba(255,253,252,0.82)",
+              fontSize: typography.fontSize[18],
+              lineHeight: typography.lineHeight[28],
+              color: colors.textInverseSoft,
             }}
           >
             {dashboard?.summary.body ??
@@ -107,24 +107,21 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flexDirection: "row", gap: spacing[12] }}>
           <View
             style={{
               flex: 1,
               padding: 16,
-              borderRadius: 22,
+              borderRadius: radius[22],
               backgroundColor: colors.surface,
-              shadowColor: colors.shadow,
-              shadowOpacity: 1,
-              shadowRadius: 18,
-              shadowOffset: { width: 0, height: 8 },
+              ...shadows.card,
             }}
           >
             <Text
               style={{
                 color: colors.textMuted,
-                fontSize: 12,
-                fontWeight: "700",
+                fontSize: typography.fontSize[12],
+                fontWeight: typography.fontWeight.bold,
                 textTransform: "uppercase",
               }}
             >
@@ -134,8 +131,8 @@ export default function HomeScreen() {
               style={{
                 marginTop: 8,
                 color: colors.textPrimary,
-                fontSize: 17,
-                fontWeight: "700",
+                fontSize: typography.fontSize[17],
+                fontWeight: typography.fontWeight.bold,
               }}
             >
               {displayName}
@@ -148,15 +145,15 @@ export default function HomeScreen() {
             style={{
               flex: 1,
               padding: 16,
-              borderRadius: 22,
+              borderRadius: radius[22],
               backgroundColor: colors.surfaceMuted,
             }}
           >
             <Text
               style={{
                 color: colors.textMuted,
-                fontSize: 12,
-                fontWeight: "700",
+                fontSize: typography.fontSize[12],
+                fontWeight: typography.fontWeight.bold,
                 textTransform: "uppercase",
               }}
             >
@@ -166,8 +163,8 @@ export default function HomeScreen() {
               style={{
                 marginTop: 8,
                 color: colors.textPrimary,
-                fontSize: 17,
-                fontWeight: "700",
+                fontSize: typography.fontSize[17],
+                fontWeight: typography.fontWeight.bold,
               }}
             >
               {backendLabel}
@@ -178,7 +175,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flexDirection: "row", gap: spacing[12] }}>
           {(dashboard?.highlights ?? []).map((highlight) => {
             const backgroundColor =
               highlight.tone === "accent"
@@ -196,15 +193,15 @@ export default function HomeScreen() {
                 style={{
                   flex: 1,
                   padding: 16,
-                  borderRadius: 20,
+                  borderRadius: radius[20],
                   backgroundColor,
                 }}
               >
                 <Text
                   style={{
                     color: colors.textMuted,
-                    fontSize: 12,
-                    fontWeight: "700",
+                    fontSize: typography.fontSize[12],
+                    fontWeight: typography.fontWeight.bold,
                     textTransform: "uppercase",
                   }}
                 >
@@ -214,8 +211,8 @@ export default function HomeScreen() {
                   style={{
                     marginTop: 10,
                     color: textColor,
-                    fontSize: 26,
-                    fontWeight: "800",
+                    fontSize: typography.fontSize[26],
+                    fontWeight: typography.fontWeight.heavy,
                   }}
                 >
                   {isLoadingDashboard ? "..." : highlight.value}
@@ -227,9 +224,9 @@ export default function HomeScreen() {
 
         <View
           style={{
-            gap: 12,
+            gap: spacing[12],
             padding: 18,
-            borderRadius: 24,
+            borderRadius: radius[24],
             backgroundColor: colors.surface,
             borderWidth: 1,
             borderColor: colors.border,
@@ -237,10 +234,10 @@ export default function HomeScreen() {
         >
           <Text
             style={{
-              fontSize: 12,
-              fontWeight: "800",
+              fontSize: typography.fontSize[12],
+              fontWeight: typography.fontWeight.heavy,
               color: colors.textPrimary,
-              letterSpacing: 1,
+              letterSpacing: typography.letterSpacing.sm,
               textTransform: "uppercase",
             }}
           >
@@ -249,14 +246,14 @@ export default function HomeScreen() {
           <Text
             style={{
               color: colors.textPrimary,
-              fontSize: 18,
-              fontWeight: "700",
+              fontSize: typography.fontSize[18],
+              fontWeight: typography.fontWeight.bold,
             }}
           >
             {dashboard?.summary.kicker ??
               "Dashboard iniziale del network calcistico"}
           </Text>
-          <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+          <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>
             {dashboard
               ? [
                   dashboard.profile.region,
@@ -274,11 +271,11 @@ export default function HomeScreen() {
                 alignSelf: "flex-start",
                 paddingHorizontal: 10,
                 paddingVertical: 6,
-                borderRadius: 999,
+                borderRadius: radius.full,
                 backgroundColor: colors.accentSoft,
               }}
             >
-              <Text style={{ color: colors.accentStrong, fontWeight: "700" }}>
+              <Text style={{ color: colors.accentStrong, fontWeight: typography.fontWeight.bold }}>
                 Disponibile ora
               </Text>
             </View>
@@ -289,17 +286,17 @@ export default function HomeScreen() {
                 alignSelf: "flex-start",
                 paddingHorizontal: 10,
                 paddingVertical: 6,
-                borderRadius: 999,
+                borderRadius: radius.full,
                 backgroundColor: colors.heroSoft,
               }}
             >
-              <Text style={{ color: colors.hero, fontWeight: "700" }}>
+              <Text style={{ color: colors.hero, fontWeight: typography.fontWeight.bold }}>
                 Aperto a nuove opportunita'
               </Text>
             </View>
           ) : null}
           {!hasSupabaseEnv ? (
-            <Text style={{ color: colors.hero, lineHeight: 22 }}>
+            <Text style={{ color: colors.hero, lineHeight: typography.lineHeight[22] }}>
               Configura `apps/mobile/.env.local` con URL e anon key del progetto
               Supabase per usare auth e dashboard reali.
             </Text>
@@ -310,13 +307,13 @@ export default function HomeScreen() {
               alignSelf: "flex-start",
               paddingHorizontal: 16,
               paddingVertical: 12,
-              borderRadius: 14,
+              borderRadius: radius[14],
               backgroundColor: colors.background,
               borderWidth: 1,
               borderColor: colors.border,
             }}
           >
-            <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+            <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
               Aggiorna dati reali
             </Text>
           </Pressable>
@@ -328,11 +325,11 @@ export default function HomeScreen() {
             alignSelf: "flex-start",
             paddingHorizontal: 18,
             paddingVertical: 13,
-            borderRadius: 999,
+            borderRadius: radius.full,
             backgroundColor: colors.hero,
           }}
         >
-          <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
+          <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
             Esci
           </Text>
         </Pressable>

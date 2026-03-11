@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -22,7 +21,8 @@ import {
   type RecruitingAdForm,
   type RecruitingAdSummary,
 } from "../../src/features/recruiting/recruiting-service";
-import { colors } from "../../src/theme/tokens";
+import { colors, radius, sizes, spacing, typography } from "../../src/theme/tokens";
+import { Button, Input } from "../../src/ui";
 
 const positions: Array<{
   label: string;
@@ -244,31 +244,31 @@ export default function AnnouncementsScreen() {
   if (profile?.role !== "club_admin") {
     return (
       <Screen>
-        <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
+        <ScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
           <View
             style={{
-              gap: 10,
+              gap: spacing[10],
               padding: 22,
-              borderRadius: 26,
+              borderRadius: radius[26],
               backgroundColor: colors.textPrimary,
             }}
           >
             <Text
               style={{
                 color: colors.heroSoft,
-                fontSize: 12,
-                fontWeight: "800",
+                fontSize: typography.fontSize[12],
+                fontWeight: typography.fontWeight.heavy,
                 textTransform: "uppercase",
-                letterSpacing: 1,
+                letterSpacing: typography.letterSpacing.sm,
               }}
             >
               Recruiting Market
             </Text>
             <Text
               style={{
-                fontSize: 30,
-                lineHeight: 34,
-                fontWeight: "800",
+                fontSize: typography.fontSize[30],
+                lineHeight: typography.lineHeight[34],
+                fontWeight: typography.fontWeight.heavy,
                 color: colors.inkInvert,
               }}
             >
@@ -276,9 +276,9 @@ export default function AnnouncementsScreen() {
             </Text>
             <Text
               style={{
-                fontSize: 16,
-                lineHeight: 24,
-                color: "rgba(255,253,252,0.78)",
+                fontSize: typography.fontSize[16],
+                lineHeight: typography.lineHeight[24],
+                color: colors.textInverseMuted,
               }}
             >
               Da qui un giocatore puo' consultare le opportunita' attive,
@@ -290,11 +290,11 @@ export default function AnnouncementsScreen() {
             <View
               style={{
                 padding: 16,
-                borderRadius: 18,
+                borderRadius: radius[18],
                 backgroundColor: colors.surfaceMuted,
               }}
             >
-              <Text style={{ color: colors.textPrimary, lineHeight: 22 }}>
+              <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
                 In questa fase la candidatura e' disponibile per i profili
                 giocatore. Gli altri ruoli possono comunque esplorare il
                 mercato.
@@ -306,7 +306,7 @@ export default function AnnouncementsScreen() {
             <View
               style={{
                 padding: 18,
-                borderRadius: 20,
+                borderRadius: radius[20],
                 backgroundColor: colors.surface,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -326,29 +326,29 @@ export default function AnnouncementsScreen() {
               <View
                 key={ad.id}
                 style={{
-                  gap: 12,
+                  gap: spacing[12],
                   padding: 18,
-                  borderRadius: 22,
+                  borderRadius: radius[22],
                   backgroundColor: colors.surface,
                   borderWidth: 1,
                   borderColor: colors.border,
                 }}
               >
-                <View style={{ gap: 6 }}>
+                <View style={{ gap: spacing[6] }}>
                   <Text
                     style={{
-                      fontSize: 18,
-                      fontWeight: "800",
+                      fontSize: typography.fontSize[18],
+                      fontWeight: typography.fontWeight.heavy,
                       color: colors.textPrimary,
                     }}
                   >
                     {ad.title}
                   </Text>
-                  <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+                  <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>
                     {ad.club?.name ?? "Societa' non disponibile"} ·{" "}
                     {formatRoleLabel(ad.role_required)}
                   </Text>
-                  <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+                  <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>
                     {ad.region ?? ad.club?.region ?? "Regione da definire"}
                     {ad.age_min || ad.age_max
                       ? ` · Eta' ${ad.age_min ?? "?"}-${ad.age_max ?? "?"}`
@@ -356,7 +356,7 @@ export default function AnnouncementsScreen() {
                   </Text>
                 </View>
 
-                <Text style={{ color: colors.textPrimary, lineHeight: 22 }}>
+                <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
                   {ad.description}
                 </Text>
 
@@ -366,12 +366,12 @@ export default function AnnouncementsScreen() {
                       alignSelf: "flex-start",
                       paddingHorizontal: 10,
                       paddingVertical: 6,
-                      borderRadius: 999,
+                      borderRadius: radius.full,
                       backgroundColor: colors.accentSoft,
                     }}
                   >
                     <Text
-                      style={{ color: colors.accentStrong, fontWeight: "700" }}
+                      style={{ color: colors.accentStrong, fontWeight: typography.fontWeight.bold }}
                     >
                       {ad.compensation_summary}
                     </Text>
@@ -384,12 +384,12 @@ export default function AnnouncementsScreen() {
                       alignSelf: "flex-start",
                       paddingHorizontal: 10,
                       paddingVertical: 6,
-                      borderRadius: 999,
+                      borderRadius: radius.full,
                       backgroundColor: colors.surfaceMuted,
                     }}
                   >
                     <Text
-                      style={{ color: colors.textPrimary, fontWeight: "700" }}
+                      style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
                     >
                       Candidatura:{" "}
                       {formatApplicationStatus(ad.application_status)}
@@ -397,14 +397,14 @@ export default function AnnouncementsScreen() {
                   </View>
                 ) : null}
 
-                <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flexDirection: "row", gap: spacing[10] }}>
                   <Pressable
                     disabled={isSubmittingAd}
                     onPress={() => handleToggleSavedAd(ad.id, !ad.is_saved)}
                     style={{
                       paddingHorizontal: 16,
                       paddingVertical: 12,
-                      borderRadius: 14,
+                      borderRadius: radius[14],
                       backgroundColor: ad.is_saved
                         ? colors.surfaceMuted
                         : colors.background,
@@ -413,7 +413,7 @@ export default function AnnouncementsScreen() {
                     }}
                   >
                     <Text
-                      style={{ color: colors.textPrimary, fontWeight: "700" }}
+                      style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
                     >
                       {ad.is_saved ? "Salvato" : "Salva"}
                     </Text>
@@ -430,14 +430,14 @@ export default function AnnouncementsScreen() {
                       style={{
                         paddingHorizontal: 16,
                         paddingVertical: 12,
-                        borderRadius: 14,
+                        borderRadius: radius[14],
                         backgroundColor: ad.application_status
                           ? colors.borderStrong
                           : colors.hero,
                       }}
                     >
                       <Text
-                        style={{ color: colors.inkInvert, fontWeight: "700" }}
+                        style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}
                       >
                         {ad.application_status ? "Gia' candidato" : "Candidati"}
                       </Text>
@@ -448,33 +448,22 @@ export default function AnnouncementsScreen() {
                 {isSelected ? (
                   <View
                     style={{
-                      gap: 10,
+                      gap: spacing[10],
                       paddingTop: 6,
                     }}
                   >
                     <Text
-                      style={{ color: colors.textPrimary, fontWeight: "700" }}
+                      style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
                     >
                       Messaggio di presentazione
                     </Text>
-                    <TextInput
+                    <Input
                       multiline
                       onChangeText={setCoverMessage}
                       placeholder="Scrivi in poche righe il tuo profilo e perche' sei adatto all'annuncio"
-                      placeholderTextColor={colors.textMuted}
-                      style={{
-                        minHeight: 110,
-                        textAlignVertical: "top",
-                        paddingHorizontal: 16,
-                        paddingVertical: 14,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        borderRadius: 16,
-                        backgroundColor: colors.background,
-                      }}
                       value={coverMessage}
                     />
-                    <View style={{ flexDirection: "row", gap: 10 }}>
+                    <View style={{ flexDirection: "row", gap: spacing[10] }}>
                       <Pressable
                         disabled={isSubmittingAd}
                         onPress={() => {
@@ -484,7 +473,7 @@ export default function AnnouncementsScreen() {
                         style={{
                           paddingHorizontal: 16,
                           paddingVertical: 12,
-                          borderRadius: 14,
+                          borderRadius: radius[14],
                           backgroundColor: colors.background,
                           borderWidth: 1,
                           borderColor: colors.border,
@@ -493,28 +482,17 @@ export default function AnnouncementsScreen() {
                         <Text
                           style={{
                             color: colors.textPrimary,
-                            fontWeight: "700",
+                            fontWeight: typography.fontWeight.bold,
                           }}
                         >
                           Annulla
                         </Text>
                       </Pressable>
-                      <Pressable
+                      <Button
                         disabled={isSubmittingAd}
+                        label={isSubmittingAd ? "Invio..." : "Invia candidatura"}
                         onPress={() => handleApplyToAd(ad.id)}
-                        style={{
-                          paddingHorizontal: 16,
-                          paddingVertical: 12,
-                          borderRadius: 14,
-                          backgroundColor: colors.accent,
-                        }}
-                      >
-                        <Text
-                          style={{ color: colors.inkInvert, fontWeight: "700" }}
-                        >
-                          {isSubmittingAd ? "Invio..." : "Invia candidatura"}
-                        </Text>
-                      </Pressable>
+                      />
                     </View>
                   </View>
                 ) : null}
@@ -528,12 +506,12 @@ export default function AnnouncementsScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
-        <View style={{ gap: 8 }}>
+      <ScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
+        <View style={{ gap: spacing[8] }}>
           <Text
             style={{
-              fontSize: 28,
-              fontWeight: "700",
+              fontSize: typography.fontSize[28],
+              fontWeight: typography.fontWeight.bold,
               color: colors.textPrimary,
             }}
           >
@@ -541,8 +519,8 @@ export default function AnnouncementsScreen() {
           </Text>
           <Text
             style={{
-              fontSize: 16,
-              lineHeight: 24,
+              fontSize: typography.fontSize[16],
+              lineHeight: typography.lineHeight[24],
               color: colors.textSecondary,
             }}
           >
@@ -554,9 +532,9 @@ export default function AnnouncementsScreen() {
 
         <View
           style={{
-            gap: 12,
+            gap: spacing[12],
             padding: 16,
-            borderRadius: 16,
+            borderRadius: radius[16],
             backgroundColor: colors.surface,
             borderWidth: 1,
             borderColor: colors.border,
@@ -564,28 +542,19 @@ export default function AnnouncementsScreen() {
         >
           <Text
             style={{
-              fontSize: 18,
-              fontWeight: "700",
+              fontSize: typography.fontSize[18],
+              fontWeight: typography.fontWeight.bold,
               color: colors.textPrimary,
             }}
           >
             Nuovo annuncio
           </Text>
-          <TextInput
+          <Input
             onChangeText={(value) => patchForm("title", value)}
             placeholder="Titolo annuncio"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
             value={form.title}
           />
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
             {positions.map((entry) => {
               const isActive = form.roleRequired === entry.value;
 
@@ -596,7 +565,7 @@ export default function AnnouncementsScreen() {
                   style={{
                     paddingHorizontal: 14,
                     paddingVertical: 10,
-                    borderRadius: 999,
+                    borderRadius: radius.full,
                     backgroundColor: isActive
                       ? colors.accent
                       : colors.background,
@@ -606,8 +575,8 @@ export default function AnnouncementsScreen() {
                 >
                   <Text
                     style={{
-                      color: isActive ? "#FFFFFF" : colors.textPrimary,
-                      fontWeight: "600",
+                      color: isActive ? colors.inkInvert : colors.textPrimary,
+                      fontWeight: typography.fontWeight.semibold,
                     }}
                   >
                     {entry.label}
@@ -616,120 +585,60 @@ export default function AnnouncementsScreen() {
               );
             })}
           </View>
-          <View style={{ flexDirection: "row", gap: 12 }}>
-            <TextInput
+          <View style={{ flexDirection: "row", gap: spacing[12] }}>
+            <Input
               keyboardType="number-pad"
               onChangeText={(value) => patchForm("ageMin", value)}
               placeholder="Eta' min"
-              placeholderTextColor={colors.textSecondary}
               style={{
                 flex: 1,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 14,
-                backgroundColor: colors.background,
               }}
               value={form.ageMin}
             />
-            <TextInput
+            <Input
               keyboardType="number-pad"
               onChangeText={(value) => patchForm("ageMax", value)}
               placeholder="Eta' max"
-              placeholderTextColor={colors.textSecondary}
               style={{
                 flex: 1,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 14,
-                backgroundColor: colors.background,
               }}
               value={form.ageMax}
             />
           </View>
-          <TextInput
+          <Input
             onChangeText={(value) => patchForm("category", value)}
             placeholder="Categoria"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
             value={form.category}
           />
-          <TextInput
+          <Input
             onChangeText={(value) => patchForm("region", value)}
             placeholder="Regione"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
             value={form.region}
           />
-          <TextInput
+          <Input
             onChangeText={(value) => patchForm("compensationSummary", value)}
             placeholder="Rimborso o benefit"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
             value={form.compensationSummary}
           />
-          <TextInput
+          <Input
             multiline
             onChangeText={(value) => patchForm("description", value)}
             placeholder="Descrizione annuncio"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              minHeight: 120,
-              textAlignVertical: "top",
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
+            style={{ minHeight: sizes.recruitingDescriptionMinHeight }}
             value={form.description}
           />
-          <Pressable
+          <Button
             disabled={isSubmitting || isLoading}
+            label={isSubmitting ? "Pubblicazione..." : "Pubblica annuncio"}
             onPress={handleCreateAd}
-            style={{
-              paddingVertical: 14,
-              borderRadius: 14,
-              alignItems: "center",
-              backgroundColor: isSubmitting ? "#73B48E" : colors.accent,
-            }}
-          >
-            <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "700" }}>
-              {isSubmitting ? "Pubblicazione..." : "Pubblica annuncio"}
-            </Text>
-          </Pressable>
+          />
         </View>
 
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: spacing[12] }}>
           <Text
             style={{
-              fontSize: 18,
-              fontWeight: "700",
+              fontSize: typography.fontSize[18],
+              fontWeight: typography.fontWeight.bold,
               color: colors.textPrimary,
             }}
           >
@@ -739,7 +648,7 @@ export default function AnnouncementsScreen() {
             <View
               style={{
                 padding: 16,
-                borderRadius: 16,
+                borderRadius: radius[16],
                 backgroundColor: colors.surface,
               }}
             >
@@ -752,16 +661,16 @@ export default function AnnouncementsScreen() {
             <View
               key={ad.id}
               style={{
-                gap: 6,
+                gap: spacing[6],
                 padding: 16,
-                borderRadius: 16,
+                borderRadius: radius[16],
                 backgroundColor: colors.surface,
               }}
             >
               <Text
                 style={{
-                  fontSize: 16,
-                  fontWeight: "700",
+                  fontSize: typography.fontSize[16],
+                  fontWeight: typography.fontWeight.bold,
                   color: colors.textPrimary,
                 }}
               >
@@ -778,11 +687,11 @@ export default function AnnouncementsScreen() {
           ))}
         </View>
 
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: spacing[12] }}>
           <Text
             style={{
-              fontSize: 18,
-              fontWeight: "700",
+              fontSize: typography.fontSize[18],
+              fontWeight: typography.fontWeight.bold,
               color: colors.textPrimary,
             }}
           >
@@ -792,7 +701,7 @@ export default function AnnouncementsScreen() {
             <View
               style={{
                 padding: 16,
-                borderRadius: 16,
+                borderRadius: radius[16],
                 backgroundColor: colors.surface,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -807,9 +716,9 @@ export default function AnnouncementsScreen() {
             <View
               key={application.id}
               style={{
-                gap: 8,
+                gap: spacing[8],
                 padding: 16,
-                borderRadius: 16,
+                borderRadius: radius[16],
                 backgroundColor: colors.surface,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -817,8 +726,8 @@ export default function AnnouncementsScreen() {
             >
               <Text
                 style={{
-                  fontSize: 16,
-                  fontWeight: "700",
+                  fontSize: typography.fontSize[16],
+                  fontWeight: typography.fontWeight.bold,
                   color: colors.textPrimary,
                 }}
               >
@@ -832,7 +741,7 @@ export default function AnnouncementsScreen() {
                 {formatApplicationStatus(application.status)}
               </Text>
               {application.cover_message ? (
-                <Text style={{ color: colors.textPrimary, lineHeight: 22 }}>
+                <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
                   {application.cover_message}
                 </Text>
               ) : (

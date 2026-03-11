@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -16,7 +15,8 @@ import {
   type PlayerPosition,
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
-import { colors } from "../../src/theme/tokens";
+import { colors, radius, spacing, typography } from "../../src/theme/tokens";
+import { Button, Card, Input } from "../../src/ui";
 
 const roles: Array<{ label: string; value: AppRole }> = [
   { label: "Calciatore", value: "player" },
@@ -134,35 +134,17 @@ export default function OnboardingProfileScreen() {
             style={{
               fontSize: 16,
               lineHeight: 24,
-              color: "rgba(255,253,252,0.78)",
+              color: colors.textInverseMuted,
             }}
           >
             Scegli il ruolo e crea i dati minimi per entrare nella piattaforma.
           </Text>
         </View>
 
-        <View
-          style={{
-            gap: 16,
-            padding: 18,
-            borderRadius: 24,
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}
-        >
-          <TextInput
+        <Card style={{ gap: spacing[16] }}>
+          <Input
             onChangeText={setFullName}
             placeholder="Nome e cognome"
-            placeholderTextColor={colors.textMuted}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 16,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 16,
-              backgroundColor: colors.background,
-            }}
             value={fullName}
           />
 
@@ -181,7 +163,7 @@ export default function OnboardingProfileScreen() {
                     style={{
                       paddingHorizontal: 14,
                       paddingVertical: 10,
-                      borderRadius: 999,
+                      borderRadius: radius.full,
                       backgroundColor: isActive
                         ? colors.textPrimary
                         : colors.background,
@@ -194,7 +176,7 @@ export default function OnboardingProfileScreen() {
                     <Text
                       style={{
                         color: isActive ? colors.inkInvert : colors.textPrimary,
-                        fontWeight: "700",
+                        fontWeight: typography.fontWeight.bold,
                       }}
                     >
                       {entry.label}
@@ -224,7 +206,7 @@ export default function OnboardingProfileScreen() {
                       style={{
                         paddingHorizontal: 14,
                         paddingVertical: 10,
-                        borderRadius: 999,
+                        borderRadius: radius.full,
                         backgroundColor: isActive
                           ? colors.accent
                           : colors.background,
@@ -237,7 +219,7 @@ export default function OnboardingProfileScreen() {
                           color: isActive
                             ? colors.inkInvert
                             : colors.textPrimary,
-                          fontWeight: "700",
+                          fontWeight: typography.fontWeight.bold,
                         }}
                       >
                         {entry.label}
@@ -265,7 +247,7 @@ export default function OnboardingProfileScreen() {
                       style={{
                         paddingHorizontal: 14,
                         paddingVertical: 10,
-                        borderRadius: 999,
+                        borderRadius: radius.full,
                         backgroundColor: isActive
                           ? colors.accent
                           : colors.background,
@@ -278,7 +260,7 @@ export default function OnboardingProfileScreen() {
                           color: isActive
                             ? colors.inkInvert
                             : colors.textPrimary,
-                          fontWeight: "700",
+                          fontWeight: typography.fontWeight.bold,
                         }}
                       >
                         {entry.label}
@@ -290,74 +272,33 @@ export default function OnboardingProfileScreen() {
             </View>
           ) : null}
 
-          {role === "club_admin" ? (
-            <View style={{ gap: 12 }}>
-              <TextInput
-                onChangeText={setClubName}
-                placeholder="Nome societa'"
-                placeholderTextColor={colors.textMuted}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 16,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 16,
-                  backgroundColor: colors.background,
-                }}
-                value={clubName}
-              />
-              <TextInput
-                onChangeText={setClubCity}
-                placeholder="Citta'"
-                placeholderTextColor={colors.textMuted}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 16,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 16,
-                  backgroundColor: colors.background,
-                }}
-                value={clubCity}
-              />
-              <TextInput
-                onChangeText={setClubRegion}
-                placeholder="Regione"
-                placeholderTextColor={colors.textMuted}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 16,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 16,
-                  backgroundColor: colors.background,
-                }}
-                value={clubRegion}
-              />
-            </View>
-          ) : null}
+            {role === "club_admin" ? (
+              <View style={{ gap: spacing[12] }}>
+                <Input
+                  onChangeText={setClubName}
+                  placeholder="Nome societa'"
+                  value={clubName}
+                />
+                <Input
+                  onChangeText={setClubCity}
+                  placeholder="Citta'"
+                  value={clubCity}
+                />
+                <Input
+                  onChangeText={setClubRegion}
+                  placeholder="Regione"
+                  value={clubRegion}
+                />
+              </View>
+            ) : null}
 
-          <Pressable
+          <Button
             disabled={isSubmitting}
+            label={isSubmitting ? "Salvataggio..." : "Completa onboarding"}
             onPress={handleSubmit}
-            style={{
-              paddingVertical: 15,
-              borderRadius: 16,
-              alignItems: "center",
-              backgroundColor: isSubmitting ? "#6AA687" : colors.hero,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.inkInvert,
-                fontSize: 16,
-                fontWeight: "800",
-              }}
-            >
-              {isSubmitting ? "Salvataggio..." : "Completa onboarding"}
-            </Text>
-          </Pressable>
-        </View>
+            variant="hero"
+          />
+        </Card>
       </ScrollView>
     </Screen>
   );

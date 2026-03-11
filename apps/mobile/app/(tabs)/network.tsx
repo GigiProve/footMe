@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -27,7 +26,8 @@ import {
   updateConnectionStatus,
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
-import { colors } from "../../src/theme/tokens";
+import { colors, radius, spacing, typography } from "../../src/theme/tokens";
+import { Input } from "../../src/ui";
 
 const modeOptions: { label: string; value: SearchMode }[] = [
   { label: "Profili", value: "profiles" },
@@ -267,31 +267,31 @@ export default function NetworkScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
+      <ScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
         <View
           style={{
-            gap: 10,
+            gap: spacing[10],
             padding: 22,
-            borderRadius: 26,
+            borderRadius: radius[26],
             backgroundColor: colors.textPrimary,
           }}
         >
           <Text
             style={{
               color: colors.heroSoft,
-              fontSize: 12,
-              fontWeight: "800",
+              fontSize: typography.fontSize[12],
+              fontWeight: typography.fontWeight.heavy,
               textTransform: "uppercase",
-              letterSpacing: 1,
+              letterSpacing: typography.letterSpacing.sm,
             }}
           >
             Networking MVP
           </Text>
           <Text
             style={{
-              fontSize: 30,
-              lineHeight: 34,
-              fontWeight: "800",
+              fontSize: typography.fontSize[30],
+              lineHeight: typography.lineHeight[34],
+              fontWeight: typography.fontWeight.heavy,
               color: colors.inkInvert,
             }}
           >
@@ -299,9 +299,9 @@ export default function NetworkScreen() {
           </Text>
           <Text
             style={{
-              fontSize: 16,
-              lineHeight: 24,
-              color: "rgba(255,253,252,0.78)",
+              fontSize: typography.fontSize[16],
+              lineHeight: typography.lineHeight[24],
+              color: colors.textInverseMuted,
             }}
           >
             Ora la sezione rete non è più solo discovery: puoi gestire
@@ -309,12 +309,12 @@ export default function NetworkScreen() {
           </Text>
         </View>
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flexDirection: "row", gap: spacing[12] }}>
           <View
             style={{
               flex: 1,
               padding: 16,
-              borderRadius: 22,
+              borderRadius: radius[22],
               backgroundColor: colors.surface,
               borderWidth: 1,
               borderColor: colors.border,
@@ -323,8 +323,8 @@ export default function NetworkScreen() {
             <Text
               style={{
                 color: colors.textMuted,
-                fontSize: 12,
-                fontWeight: "700",
+                fontSize: typography.fontSize[12],
+                fontWeight: typography.fontWeight.bold,
                 textTransform: "uppercase",
               }}
             >
@@ -334,8 +334,8 @@ export default function NetworkScreen() {
               style={{
                 marginTop: 8,
                 color: colors.textPrimary,
-                fontSize: 24,
-                fontWeight: "800",
+                fontSize: typography.fontSize[24],
+                fontWeight: typography.fontWeight.heavy,
               }}
             >
               {acceptedConnections.length}
@@ -345,15 +345,15 @@ export default function NetworkScreen() {
             style={{
               flex: 1,
               padding: 16,
-              borderRadius: 22,
+              borderRadius: radius[22],
               backgroundColor: colors.surfaceMuted,
             }}
           >
             <Text
               style={{
                 color: colors.textMuted,
-                fontSize: 12,
-                fontWeight: "700",
+                fontSize: typography.fontSize[12],
+                fontWeight: typography.fontWeight.bold,
                 textTransform: "uppercase",
               }}
             >
@@ -363,8 +363,8 @@ export default function NetworkScreen() {
               style={{
                 marginTop: 8,
                 color: colors.textPrimary,
-                fontSize: 24,
-                fontWeight: "800",
+                fontSize: typography.fontSize[24],
+                fontWeight: typography.fontWeight.heavy,
               }}
             >
               {incomingRequests.length}
@@ -374,15 +374,15 @@ export default function NetworkScreen() {
 
         <View
           style={{
-            gap: 14,
+            gap: spacing[14],
             padding: 18,
-            borderRadius: 22,
+            borderRadius: radius[22],
             backgroundColor: colors.surface,
             borderWidth: 1,
             borderColor: colors.border,
           }}
         >
-          <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "800" }}>
+          <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[18], fontWeight: typography.fontWeight.heavy }}>
             Stato della rete
           </Text>
           {isNetworkLoading ? (
@@ -400,15 +400,15 @@ export default function NetworkScreen() {
             <View
               key={entry.connection_id}
               style={{
-                gap: 10,
+                gap: spacing[10],
                 padding: 16,
-                borderRadius: 18,
+                borderRadius: radius[18],
                 backgroundColor: colors.background,
                 borderWidth: 1,
                 borderColor: colors.border,
               }}
             >
-              <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "800" }}>
+              <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[16], fontWeight: typography.fontWeight.heavy }}>
                 {entry.other_full_name}
               </Text>
               <Text style={{ color: colors.textSecondary }}>
@@ -420,7 +420,7 @@ export default function NetworkScreen() {
               <Text style={{ color: colors.textSecondary }}>
                 {formatLocation(entry.other_city, entry.other_region)}
               </Text>
-              <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flexDirection: "row", gap: spacing[10] }}>
                 <Pressable
                   disabled={actionConnectionId === entry.connection_id}
                   onPress={() =>
@@ -429,12 +429,12 @@ export default function NetworkScreen() {
                   style={{
                     flex: 1,
                     paddingVertical: 12,
-                    borderRadius: 14,
+                    borderRadius: radius[14],
                     alignItems: "center",
                     backgroundColor: colors.accent,
                   }}
                 >
-                  <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
+                  <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
                     Accetta
                   </Text>
                 </Pressable>
@@ -446,14 +446,14 @@ export default function NetworkScreen() {
                   style={{
                     flex: 1,
                     paddingVertical: 12,
-                    borderRadius: 14,
+                    borderRadius: radius[14],
                     alignItems: "center",
                     backgroundColor: colors.surfaceMuted,
                     borderWidth: 1,
                     borderColor: colors.borderStrong,
                   }}
                 >
-                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
                     Rifiuta
                   </Text>
                 </Pressable>
@@ -461,17 +461,17 @@ export default function NetworkScreen() {
             </View>
           ))}
           {!isNetworkLoading && acceptedConnections.length > 0 ? (
-            <View style={{ gap: 10 }}>
-              <Text style={{ color: colors.textPrimary, fontWeight: "800" }}>
+            <View style={{ gap: spacing[10] }}>
+              <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
                 Connessioni pronte per la chat
               </Text>
               {acceptedConnections.slice(0, 3).map((entry) => (
                 <View
                   key={entry.connection_id}
                   style={{
-                    gap: 8,
+                    gap: spacing[8],
                     padding: 16,
-                    borderRadius: 18,
+                    borderRadius: radius[18],
                     backgroundColor: colors.background,
                     borderWidth: 1,
                     borderColor: colors.border,
@@ -480,8 +480,8 @@ export default function NetworkScreen() {
                   <Text
                     style={{
                       color: colors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: "800",
+                      fontSize: typography.fontSize[16],
+                      fontWeight: typography.fontWeight.heavy,
                     }}
                   >
                     {entry.other_full_name}
@@ -502,12 +502,12 @@ export default function NetworkScreen() {
                     }
                     style={{
                       paddingVertical: 12,
-                      borderRadius: 14,
+                      borderRadius: radius[14],
                       alignItems: "center",
                       backgroundColor: colors.hero,
                     }}
                   >
-                    <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
+                    <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
                       {actionProfileId === entry.other_profile_id
                         ? "Apertura chat..."
                         : "Apri chat"}
@@ -526,15 +526,15 @@ export default function NetworkScreen() {
 
         <View
           style={{
-            gap: 14,
+            gap: spacing[14],
             padding: 18,
-            borderRadius: 22,
+            borderRadius: radius[22],
             backgroundColor: colors.surface,
             borderWidth: 1,
             borderColor: colors.border,
           }}
         >
-          <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flexDirection: "row", gap: spacing[10] }}>
             {modeOptions.map((option) => {
               const isActive = option.value === mode;
 
@@ -545,7 +545,7 @@ export default function NetworkScreen() {
                   style={{
                     paddingHorizontal: 14,
                     paddingVertical: 10,
-                    borderRadius: 999,
+                    borderRadius: radius.full,
                     backgroundColor: isActive
                       ? colors.textPrimary
                       : colors.background,
@@ -556,7 +556,7 @@ export default function NetworkScreen() {
                   <Text
                     style={{
                       color: isActive ? colors.inkInvert : colors.textPrimary,
-                      fontWeight: "700",
+                      fontWeight: typography.fontWeight.bold,
                     }}
                   >
                     {option.label}
@@ -566,46 +566,28 @@ export default function NetworkScreen() {
             })}
           </View>
 
-          <TextInput
+          <Input
             onChangeText={setQuery}
             placeholder={
               mode === "profiles"
                 ? "Cerca per nome o profilo"
                 : "Cerca per annuncio o societa'"
             }
-            placeholderTextColor={colors.textMuted}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 16,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 16,
-              backgroundColor: colors.background,
-            }}
             value={query}
           />
 
-          <TextInput
+          <Input
             onChangeText={setRegion}
             placeholder="Regione"
-            placeholderTextColor={colors.textMuted}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 16,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 16,
-              backgroundColor: colors.background,
-            }}
             value={region}
           />
 
           {mode === "profiles" ? (
-            <View style={{ gap: 8 }}>
-              <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+            <View style={{ gap: spacing[8] }}>
+              <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
                 Ruolo
               </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
                 {roleOptions.map((option) => {
                   const isActive = option.value === roleFilter;
 
@@ -616,7 +598,7 @@ export default function NetworkScreen() {
                       style={{
                         paddingHorizontal: 12,
                         paddingVertical: 10,
-                        borderRadius: 999,
+                        borderRadius: radius.full,
                         backgroundColor: isActive
                           ? colors.accent
                           : colors.background,
@@ -627,7 +609,7 @@ export default function NetworkScreen() {
                       <Text
                         style={{
                           color: isActive ? colors.inkInvert : colors.textPrimary,
-                          fontWeight: "700",
+                          fontWeight: typography.fontWeight.bold,
                         }}
                       >
                         {option.label}
@@ -639,11 +621,11 @@ export default function NetworkScreen() {
             </View>
           ) : null}
 
-          <View style={{ gap: 8 }}>
-            <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+          <View style={{ gap: spacing[8] }}>
+            <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
               Posizione
             </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
               {positionOptions.map((option) => {
                 const isActive = option.value === positionFilter;
 
@@ -654,7 +636,7 @@ export default function NetworkScreen() {
                     style={{
                       paddingHorizontal: 12,
                       paddingVertical: 10,
-                      borderRadius: 999,
+                      borderRadius: radius.full,
                       backgroundColor: isActive
                         ? colors.hero
                         : colors.background,
@@ -665,7 +647,7 @@ export default function NetworkScreen() {
                     <Text
                       style={{
                         color: isActive ? colors.inkInvert : colors.textPrimary,
-                        fontWeight: "700",
+                        fontWeight: typography.fontWeight.bold,
                       }}
                     >
                       {option.label}
@@ -681,7 +663,7 @@ export default function NetworkScreen() {
           <View
             style={{
               padding: 18,
-              borderRadius: 20,
+              borderRadius: radius[20],
               backgroundColor: colors.surface,
               borderWidth: 1,
               borderColor: colors.border,
@@ -697,7 +679,7 @@ export default function NetworkScreen() {
           <View
             style={{
               padding: 18,
-              borderRadius: 20,
+              borderRadius: radius[20],
               backgroundColor: colors.surface,
               borderWidth: 1,
               borderColor: colors.border,
@@ -719,9 +701,9 @@ export default function NetworkScreen() {
                 <View
                   key={result.profile_id}
                   style={{
-                    gap: 10,
+                    gap: spacing[10],
                     padding: 18,
-                    borderRadius: 22,
+                    borderRadius: radius[22],
                     backgroundColor: colors.surface,
                     borderWidth: 1,
                     borderColor: colors.border,
@@ -729,8 +711,8 @@ export default function NetworkScreen() {
                 >
                   <Text
                     style={{
-                      fontSize: 18,
-                      fontWeight: "800",
+                      fontSize: typography.fontSize[18],
+                      fontWeight: typography.fontWeight.heavy,
                       color: colors.textPrimary,
                     }}
                   >
@@ -750,7 +732,7 @@ export default function NetworkScreen() {
                       alignSelf: "flex-start",
                       paddingHorizontal: 10,
                       paddingVertical: 6,
-                      borderRadius: 999,
+                      borderRadius: radius.full,
                       backgroundColor: result.is_available
                         ? colors.accentSoft
                         : colors.surfaceMuted,
@@ -761,7 +743,7 @@ export default function NetworkScreen() {
                         color: result.is_available
                           ? colors.accentStrong
                           : colors.textSecondary,
-                        fontWeight: "700",
+                        fontWeight: typography.fontWeight.bold,
                       }}
                     >
                       {result.is_available ? "Disponibile" : "Non disponibile"}
@@ -778,17 +760,17 @@ export default function NetworkScreen() {
                       }
                       style={{
                         paddingVertical: 12,
-                        borderRadius: 14,
+                        borderRadius: radius[14],
                         alignItems: "center",
                         backgroundColor: colors.hero,
                       }}
                     >
-                      <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
+                      <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
                         {isBusy ? "Apertura chat..." : "Messaggia"}
                       </Text>
                     </Pressable>
                   ) : connection?.status === "pending" && !connection.is_requester ? (
-                    <View style={{ flexDirection: "row", gap: 10 }}>
+                    <View style={{ flexDirection: "row", gap: spacing[10] }}>
                       <Pressable
                         disabled={actionConnectionId === connection.connection_id}
                         onPress={() =>
@@ -800,12 +782,12 @@ export default function NetworkScreen() {
                         style={{
                           flex: 1,
                           paddingVertical: 12,
-                          borderRadius: 14,
+                          borderRadius: radius[14],
                           alignItems: "center",
                           backgroundColor: colors.accent,
                         }}
                       >
-                        <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
+                        <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
                           Accetta
                         </Text>
                       </Pressable>
@@ -820,14 +802,14 @@ export default function NetworkScreen() {
                         style={{
                           flex: 1,
                           paddingVertical: 12,
-                          borderRadius: 14,
+                          borderRadius: radius[14],
                           alignItems: "center",
                           backgroundColor: colors.surfaceMuted,
                           borderWidth: 1,
                           borderColor: colors.borderStrong,
                         }}
                       >
-                        <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                        <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
                           Rifiuta
                         </Text>
                       </Pressable>
@@ -836,12 +818,12 @@ export default function NetworkScreen() {
                     <View
                       style={{
                         paddingVertical: 12,
-                        borderRadius: 14,
+                        borderRadius: radius[14],
                         alignItems: "center",
                         backgroundColor: colors.surfaceMuted,
                       }}
                     >
-                      <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>
+                      <Text style={{ color: colors.textSecondary, fontWeight: typography.fontWeight.bold }}>
                         Richiesta in attesa
                       </Text>
                     </View>
@@ -849,12 +831,12 @@ export default function NetworkScreen() {
                     <View
                       style={{
                         paddingVertical: 12,
-                        borderRadius: 14,
+                        borderRadius: radius[14],
                         alignItems: "center",
                         backgroundColor: colors.surfaceMuted,
                       }}
                     >
-                      <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>
+                      <Text style={{ color: colors.textSecondary, fontWeight: typography.fontWeight.bold }}>
                         Connessione bloccata
                       </Text>
                     </View>
@@ -864,12 +846,12 @@ export default function NetworkScreen() {
                       onPress={() => handleRequestConnection(result.profile_id)}
                       style={{
                         paddingVertical: 12,
-                        borderRadius: 14,
+                        borderRadius: radius[14],
                         alignItems: "center",
                         backgroundColor: colors.accent,
                       }}
                     >
-                      <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
+                      <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
                         {isBusy ? "Invio richiesta..." : "Connettiti"}
                       </Text>
                     </Pressable>
@@ -881,9 +863,9 @@ export default function NetworkScreen() {
               <View
                 key={result.ad_id}
                 style={{
-                  gap: 8,
+                  gap: spacing[8],
                   padding: 18,
-                  borderRadius: 22,
+                  borderRadius: radius[22],
                   backgroundColor: colors.surface,
                   borderWidth: 1,
                   borderColor: colors.border,
@@ -891,8 +873,8 @@ export default function NetworkScreen() {
               >
                 <Text
                   style={{
-                    fontSize: 18,
-                    fontWeight: "800",
+                    fontSize: typography.fontSize[18],
+                    fontWeight: typography.fontWeight.heavy,
                     color: colors.textPrimary,
                   }}
                 >
@@ -911,11 +893,11 @@ export default function NetworkScreen() {
                       alignSelf: "flex-start",
                       paddingHorizontal: 10,
                       paddingVertical: 6,
-                      borderRadius: 999,
+                      borderRadius: radius.full,
                       backgroundColor: colors.accentSoft,
                     }}
                   >
-                    <Text style={{ color: colors.accentStrong, fontWeight: "700" }}>
+                    <Text style={{ color: colors.accentStrong, fontWeight: typography.fontWeight.bold }}>
                       {result.compensation_summary}
                     </Text>
                   </View>
