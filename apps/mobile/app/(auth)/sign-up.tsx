@@ -1,19 +1,11 @@
 import { Link } from "expo-router";
 import { useState } from "react";
-import {
-  Alert,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, Platform, StyleSheet, Text, View } from "react-native";
 
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
-import { startOAuthSignIn } from "../../src/features/auth/oauth";
-import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
-import { colors, spacing, typography } from "../../src/theme/tokens";
-import { Button, Card, Input } from "../../src/ui";
+import { supabase } from "../../src/lib/supabase";
+import { colors } from "../../src/theme/tokens";
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState("");
@@ -91,16 +83,6 @@ export default function SignUpScreen() {
             Entra nel portale con una registrazione essenziale e completa il tuo
             posizionamento sportivo nel passo successivo.
           </Text>
-          {__DEV__ ? (
-            <Text style={styles.debugText}>
-              Supabase env: {hasSupabaseEnv ? "live" : "missing"} · key prefix:{" "}
-              {String(
-                process.env.EXPO_PUBLIC_SUPABASE_KEY ??
-                  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
-                  "missing",
-              ).slice(0, 12)}
-            </Text>
-          ) : null}
         </View>
         <Card style={styles.formCard}>
           <Input

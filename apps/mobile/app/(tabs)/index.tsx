@@ -8,7 +8,13 @@ import {
 } from "../../src/features/home/home-dashboard-service";
 import { useSession } from "../../src/features/auth/use-session";
 import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
-import { colors, radius, shadows, spacing, typography } from "../../src/theme/tokens";
+import {
+  colors,
+  radius,
+  shadows,
+  spacing,
+  typography,
+} from "../../src/theme/tokens";
 import { Button } from "../../src/ui";
 
 export default function HomeScreen() {
@@ -253,7 +259,12 @@ export default function HomeScreen() {
             {dashboard?.summary.kicker ??
               "Dashboard iniziale del network calcistico"}
           </Text>
-          <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              lineHeight: typography.lineHeight[22],
+            }}
+          >
             {dashboard
               ? [
                   dashboard.profile.region,
@@ -275,7 +286,12 @@ export default function HomeScreen() {
                 backgroundColor: colors.accentSoft,
               }}
             >
-              <Text style={{ color: colors.accentStrong, fontWeight: typography.fontWeight.bold }}>
+              <Text
+                style={{
+                  color: colors.accentStrong,
+                  fontWeight: typography.fontWeight.bold,
+                }}
+              >
                 Disponibile ora
               </Text>
             </View>
@@ -290,13 +306,23 @@ export default function HomeScreen() {
                 backgroundColor: colors.heroSoft,
               }}
             >
-              <Text style={{ color: colors.hero, fontWeight: typography.fontWeight.bold }}>
+              <Text
+                style={{
+                  color: colors.hero,
+                  fontWeight: typography.fontWeight.bold,
+                }}
+              >
                 Aperto a nuove opportunita'
               </Text>
             </View>
           ) : null}
           {!hasSupabaseEnv ? (
-            <Text style={{ color: colors.hero, lineHeight: typography.lineHeight[22] }}>
+            <Text
+              style={{
+                color: colors.hero,
+                lineHeight: typography.lineHeight[22],
+              }}
+            >
               Configura `apps/mobile/.env.local` con URL e anon key del progetto
               Supabase per usare auth e dashboard reali.
             </Text>
