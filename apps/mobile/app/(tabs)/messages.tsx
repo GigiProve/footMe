@@ -159,7 +159,7 @@ export default function MessagesScreen() {
             style={{
               fontSize: 16,
               lineHeight: 24,
-              color: "rgba(255,253,252,0.78)",
+              color: colors.textInverseMuted,
             }}
           >
             Le connessioni accettate possono trasformarsi in conversazioni 1:1.

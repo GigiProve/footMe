@@ -1,6 +1,8 @@
 import { Redirect, Tabs } from "expo-router";
 
 import { useSession } from "../../src/features/auth/use-session";
+import { Icon, type IconName } from "../../src/ui";
+import { colors, spacing, typography } from "../../src/theme/tokens";
 
 export default function TabsLayout() {
   const { isLoading, needsOnboarding, session } = useSession();
@@ -18,12 +20,54 @@ export default function TabsLayout() {
   }
 
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="index" options={{ title: "Home" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profilo" }} />
-      <Tabs.Screen name="network" options={{ title: "Rete" }} />
-      <Tabs.Screen name="messages" options={{ title: "Messaggi" }} />
-      <Tabs.Screen name="announcements" options={{ title: "Annunci" }} />
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelStyle: {
+          fontSize: typography.fontSize[12],
+          fontWeight: typography.fontWeight.bold,
+          marginBottom: spacing[4],
+        },
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          paddingTop: spacing[8],
+          paddingBottom: spacing[8],
+          height: 72,
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={buildTabOptions("Home", "home")}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={buildTabOptions("Profilo", "profile")}
+      />
+      <Tabs.Screen
+        name="network"
+        options={buildTabOptions("Rete", "network")}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={buildTabOptions("Messaggi", "messages")}
+      />
+      <Tabs.Screen
+        name="announcements"
+        options={buildTabOptions("Annunci", "announcements")}
+      />
     </Tabs>
   );
+}
+
+function buildTabOptions(title: string, iconName: IconName) {
+  return {
+    title,
+    tabBarIcon: ({ color }: { color: string }) => (
+      <Icon color={color} name={iconName} size="lg" />
+    ),
+  };
 }

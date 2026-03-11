@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -28,6 +27,7 @@ import {
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
 import { colors } from "../../src/theme/tokens";
+import { Input } from "../../src/ui";
 
 const modeOptions: { label: string; value: SearchMode }[] = [
   { label: "Profili", value: "profiles" },
@@ -301,7 +301,7 @@ export default function NetworkScreen() {
             style={{
               fontSize: 16,
               lineHeight: 24,
-              color: "rgba(255,253,252,0.78)",
+              color: colors.textInverseMuted,
             }}
           >
             Ora la sezione rete non è più solo discovery: puoi gestire
@@ -566,37 +566,19 @@ export default function NetworkScreen() {
             })}
           </View>
 
-          <TextInput
+          <Input
             onChangeText={setQuery}
             placeholder={
               mode === "profiles"
                 ? "Cerca per nome o profilo"
                 : "Cerca per annuncio o societa'"
             }
-            placeholderTextColor={colors.textMuted}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 16,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 16,
-              backgroundColor: colors.background,
-            }}
             value={query}
           />
 
-          <TextInput
+          <Input
             onChangeText={setRegion}
             placeholder="Regione"
-            placeholderTextColor={colors.textMuted}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 16,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 16,
-              backgroundColor: colors.background,
-            }}
             value={region}
           />
 

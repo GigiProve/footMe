@@ -75,7 +75,7 @@ export default function HomeScreen() {
               paddingVertical: 6,
               borderRadius: 999,
               overflow: "hidden",
-              backgroundColor: "rgba(255,253,252,0.12)",
+              backgroundColor: colors.surfaceOverlay,
               color: colors.inkInvert,
               fontSize: 12,
               fontWeight: "700",
@@ -99,7 +99,7 @@ export default function HomeScreen() {
             style={{
               fontSize: 18,
               lineHeight: 28,
-              color: "rgba(255,253,252,0.82)",
+              color: colors.textInverseSoft,
             }}
           >
             {dashboard?.summary.body ??

@@ -1,18 +1,1 @@
-export const colors = {
-  background: "#F5F2E9",
-  backgroundStrong: "#EAE3D3",
-  surface: "#FFFDFC",
-  surfaceMuted: "#EFE7D9",
-  textPrimary: "#14261D",
-  textSecondary: "#566659",
-  textMuted: "#7A877D",
-  accent: "#0D7A43",
-  accentStrong: "#08592F",
-  accentSoft: "#D8E9DB",
-  border: "#D9D0C0",
-  borderStrong: "#B9AE9B",
-  hero: "#C96E3D",
-  heroSoft: "#F0C8AF",
-  inkInvert: "#FFFDFC",
-  shadow: "rgba(20, 38, 29, 0.08)",
-} as const;
+export * from "../styles/tokens";

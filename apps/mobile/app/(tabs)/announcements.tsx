@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -23,6 +22,7 @@ import {
   type RecruitingAdSummary,
 } from "../../src/features/recruiting/recruiting-service";
 import { colors } from "../../src/theme/tokens";
+import { Button, Input } from "../../src/ui";
 
 const positions: Array<{
   label: string;
@@ -278,7 +278,7 @@ export default function AnnouncementsScreen() {
               style={{
                 fontSize: 16,
                 lineHeight: 24,
-                color: "rgba(255,253,252,0.78)",
+                color: colors.textInverseMuted,
               }}
             >
               Da qui un giocatore puo' consultare le opportunita' attive,
@@ -457,21 +457,10 @@ export default function AnnouncementsScreen() {
                     >
                       Messaggio di presentazione
                     </Text>
-                    <TextInput
+                    <Input
                       multiline
                       onChangeText={setCoverMessage}
                       placeholder="Scrivi in poche righe il tuo profilo e perche' sei adatto all'annuncio"
-                      placeholderTextColor={colors.textMuted}
-                      style={{
-                        minHeight: 110,
-                        textAlignVertical: "top",
-                        paddingHorizontal: 16,
-                        paddingVertical: 14,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        borderRadius: 16,
-                        backgroundColor: colors.background,
-                      }}
                       value={coverMessage}
                     />
                     <View style={{ flexDirection: "row", gap: 10 }}>
@@ -499,22 +488,11 @@ export default function AnnouncementsScreen() {
                           Annulla
                         </Text>
                       </Pressable>
-                      <Pressable
+                      <Button
                         disabled={isSubmittingAd}
+                        label={isSubmittingAd ? "Invio..." : "Invia candidatura"}
                         onPress={() => handleApplyToAd(ad.id)}
-                        style={{
-                          paddingHorizontal: 16,
-                          paddingVertical: 12,
-                          borderRadius: 14,
-                          backgroundColor: colors.accent,
-                        }}
-                      >
-                        <Text
-                          style={{ color: colors.inkInvert, fontWeight: "700" }}
-                        >
-                          {isSubmittingAd ? "Invio..." : "Invia candidatura"}
-                        </Text>
-                      </Pressable>
+                      />
                     </View>
                   </View>
                 ) : null}
@@ -571,18 +549,9 @@ export default function AnnouncementsScreen() {
           >
             Nuovo annuncio
           </Text>
-          <TextInput
+          <Input
             onChangeText={(value) => patchForm("title", value)}
             placeholder="Titolo annuncio"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
             value={form.title}
           />
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -606,7 +575,7 @@ export default function AnnouncementsScreen() {
                 >
                   <Text
                     style={{
-                      color: isActive ? "#FFFFFF" : colors.textPrimary,
+                      color: isActive ? colors.inkInvert : colors.textPrimary,
                       fontWeight: "600",
                     }}
                   >
@@ -617,112 +586,52 @@ export default function AnnouncementsScreen() {
             })}
           </View>
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <TextInput
+            <Input
               keyboardType="number-pad"
               onChangeText={(value) => patchForm("ageMin", value)}
               placeholder="Eta' min"
-              placeholderTextColor={colors.textSecondary}
               style={{
                 flex: 1,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 14,
-                backgroundColor: colors.background,
               }}
               value={form.ageMin}
             />
-            <TextInput
+            <Input
               keyboardType="number-pad"
               onChangeText={(value) => patchForm("ageMax", value)}
               placeholder="Eta' max"
-              placeholderTextColor={colors.textSecondary}
               style={{
                 flex: 1,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 14,
-                backgroundColor: colors.background,
               }}
               value={form.ageMax}
             />
           </View>
-          <TextInput
+          <Input
             onChangeText={(value) => patchForm("category", value)}
             placeholder="Categoria"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
             value={form.category}
           />
-          <TextInput
+          <Input
             onChangeText={(value) => patchForm("region", value)}
             placeholder="Regione"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
             value={form.region}
           />
-          <TextInput
+          <Input
             onChangeText={(value) => patchForm("compensationSummary", value)}
             placeholder="Rimborso o benefit"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
             value={form.compensationSummary}
           />
-          <TextInput
+          <Input
             multiline
             onChangeText={(value) => patchForm("description", value)}
             placeholder="Descrizione annuncio"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              minHeight: 120,
-              textAlignVertical: "top",
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 14,
-              backgroundColor: colors.background,
-            }}
+            style={{ minHeight: 120 }}
             value={form.description}
           />
-          <Pressable
+          <Button
             disabled={isSubmitting || isLoading}
+            label={isSubmitting ? "Pubblicazione..." : "Pubblica annuncio"}
             onPress={handleCreateAd}
-            style={{
-              paddingVertical: 14,
-              borderRadius: 14,
-              alignItems: "center",
-              backgroundColor: isSubmitting ? "#73B48E" : colors.accent,
-            }}
-          >
-            <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "700" }}>
-              {isSubmitting ? "Pubblicazione..." : "Pubblica annuncio"}
-            </Text>
-          </Pressable>
+          />
         </View>
 
         <View style={{ gap: 12 }}>

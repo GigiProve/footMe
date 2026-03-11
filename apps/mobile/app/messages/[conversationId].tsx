@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -20,6 +19,7 @@ import {
   type ConversationMessage,
 } from "../../src/features/messaging/messaging-service";
 import { colors } from "../../src/theme/tokens";
+import { Button, Card, Input } from "../../src/ui";
 
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString("it-IT", {
@@ -164,7 +164,7 @@ export default function ConversationScreen() {
           >
             {otherName}
           </Text>
-          <Text style={{ color: "rgba(255,253,252,0.78)", lineHeight: 22 }}>
+          <Text style={{ color: colors.textInverseMuted, lineHeight: 22 }}>
             Conversazione privata 1:1 del network footMe.
           </Text>
         </View>
@@ -174,35 +174,19 @@ export default function ConversationScreen() {
           style={{ flex: 1 }}
         >
           {isLoading ? (
-            <View
-              style={{
-                padding: 18,
-                borderRadius: 20,
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
+            <Card style={{ borderRadius: 20 }}>
               <Text style={{ color: colors.textSecondary }}>
                 Caricamento conversazione in corso...
               </Text>
-            </View>
+            </Card>
           ) : null}
           {!isLoading && messages.length === 0 ? (
-            <View
-              style={{
-                padding: 18,
-                borderRadius: 20,
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
+            <Card style={{ borderRadius: 20 }}>
               <Text style={{ color: colors.textSecondary }}>
                 Nessun messaggio ancora inviato. Usa il box qui sotto per rompere
                 il ghiaccio.
               </Text>
-            </View>
+            </Card>
           ) : null}
           {messages.map((message) => {
             const isOwnMessage = message.sender_profile_id === session.user.id;
@@ -241,7 +225,7 @@ export default function ConversationScreen() {
                 </Text>
                 <Text
                   style={{
-                    color: isOwnMessage ? "rgba(255,253,252,0.78)" : colors.textMuted,
+                    color: isOwnMessage ? colors.textInverseMuted : colors.textMuted,
                     fontSize: 12,
                     fontWeight: "700",
                   }}
@@ -253,48 +237,25 @@ export default function ConversationScreen() {
           })}
         </ScrollView>
 
-        <View
+        <Card
           style={{
             gap: 12,
-            padding: 16,
             borderRadius: 22,
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
           }}
         >
-          <TextInput
+          <Input
             multiline
             onChangeText={setDraft}
             placeholder="Scrivi un messaggio professionale e diretto"
-            placeholderTextColor={colors.textMuted}
-            style={{
-              minHeight: 88,
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 16,
-              backgroundColor: colors.background,
-              textAlignVertical: "top",
-            }}
             value={draft}
           />
-          <Pressable
+          <Button
             disabled={isSending}
+            label={isSending ? "Invio in corso..." : "Invia messaggio"}
             onPress={handleSendMessage}
-            style={{
-              paddingVertical: 14,
-              borderRadius: 16,
-              alignItems: "center",
-              backgroundColor: isSending ? "#6AA687" : colors.hero,
-            }}
-          >
-            <Text style={{ color: colors.inkInvert, fontWeight: "800" }}>
-              {isSending ? "Invio in corso..." : "Invia messaggio"}
-            </Text>
-          </Pressable>
-        </View>
+            variant="hero"
+          />
+        </Card>
       </View>
     </Screen>
   );

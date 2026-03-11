@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -22,7 +21,8 @@ import {
   type PlayerPosition,
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
-import { colors } from "../../src/theme/tokens";
+import { colors, radius, typography } from "../../src/theme/tokens";
+import { Card, Input } from "../../src/ui";
 
 type CareerEntryForm = {
   appearances: string;
@@ -254,16 +254,7 @@ function Section({
   title: string;
 }) {
   return (
-    <View
-      style={{
-        gap: 14,
-        padding: 18,
-        borderRadius: 24,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-      }}
-    >
+    <Card style={{ gap: 14 }}>
       <View style={{ gap: 6 }}>
         <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "800" }}>
           {title}
@@ -273,7 +264,7 @@ function Section({
         ) : null}
       </View>
       {children}
-    </View>
+    </Card>
   );
 }
 
@@ -293,21 +284,10 @@ function Field({
   return (
     <View style={{ gap: 8 }}>
       <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{label}</Text>
-      <TextInput
+      <Input
         multiline={multiline}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        style={{
-          minHeight: multiline ? 110 : undefined,
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.background,
-          textAlignVertical: multiline ? "top" : "center",
-        }}
         value={value}
       />
     </View>
@@ -344,19 +324,19 @@ function BooleanField({
               style={{
                 paddingHorizontal: 14,
                 paddingVertical: 10,
-                borderRadius: 999,
+                borderRadius: radius.full,
                 backgroundColor: isActive ? colors.textPrimary : colors.background,
                 borderWidth: 1,
                 borderColor: isActive ? colors.textPrimary : colors.border,
               }}
             >
               <Text
-                style={{
-                  color: isActive ? colors.inkInvert : colors.textPrimary,
-                  fontWeight: "700",
-                }}
-              >
-                {option.label}
+                  style={{
+                    color: isActive ? colors.inkInvert : colors.textPrimary,
+                    fontWeight: typography.fontWeight.bold,
+                  }}
+                >
+                  {option.label}
               </Text>
             </Pressable>
           );
@@ -391,19 +371,19 @@ function PillSelector<T extends string>({
               style={{
                 paddingHorizontal: 14,
                 paddingVertical: 10,
-                borderRadius: 999,
+                borderRadius: radius.full,
                 backgroundColor: isActive ? colors.accentStrong : colors.background,
                 borderWidth: 1,
                 borderColor: isActive ? colors.accentStrong : colors.border,
               }}
             >
               <Text
-                style={{
-                  color: isActive ? colors.inkInvert : colors.textPrimary,
-                  fontWeight: "700",
-                }}
-              >
-                {option.label}
+                  style={{
+                    color: isActive ? colors.inkInvert : colors.textPrimary,
+                    fontWeight: typography.fontWeight.bold,
+                  }}
+                >
+                  {option.label}
               </Text>
             </Pressable>
           );
@@ -697,7 +677,7 @@ export default function ProfileScreen() {
             style={{
               fontSize: 16,
               lineHeight: 24,
-              color: "rgba(255,253,252,0.78)",
+              color: colors.textInverseMuted,
             }}
           >
             Completa e aggiorna il tuo profilo pubblico con i dati richiesti dalla
@@ -709,7 +689,7 @@ export default function ProfileScreen() {
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 999,
-                backgroundColor: "rgba(255,253,252,0.12)",
+                backgroundColor: colors.surfaceOverlay,
               }}
             >
               <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
@@ -721,7 +701,7 @@ export default function ProfileScreen() {
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 999,
-                backgroundColor: "rgba(255,253,252,0.12)",
+                backgroundColor: colors.surfaceOverlay,
               }}
             >
               <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
