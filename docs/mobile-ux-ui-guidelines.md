@@ -234,13 +234,13 @@ Tipologie:
 
 ### 3. CTA pattern
 
-### CTA primarie
+#### CTA primarie
 
 Uso:
 
 - Collegati
 - Candidati
-- Salva profilo
+- Completa profilo
 - Pubblica annuncio
 
 Stile:
@@ -250,7 +250,7 @@ Stile:
 - testo bianco
 - altezza minima 44
 
-### CTA secondarie
+#### CTA secondarie
 
 Uso:
 
@@ -264,7 +264,7 @@ Stile:
 - outline su `borderStrong`
 - testo `textPrimary`
 
-### CTA terziarie
+#### CTA terziarie
 
 Uso:
 
@@ -471,7 +471,7 @@ Come in LinkedIn, il profilo deve essere costruito come una sequenza di moduli p
 Ordine raccomandato:
 
 1. hero identity
-2. ruolo e availability
+2. ruolo e disponibilita'
 3. summary
 4. carriera stagionale
 5. statistiche
@@ -524,7 +524,7 @@ Per soddisfare l'indicazione di rendere l'app piu' simile possibile a LinkedIn, 
 4. **Network come sezione dedicata a inviti e suggeriti**
 5. **Messaggistica separata e persistente**
 6. **Notifiche accessibili da top bar**
-7. **Gerarchia contenutistica densa ma pulita**
+7. **Gerarchia dei contenuti densa ma pulita**
 8. **Card con meta-informazioni, badge e CTA discrete**
 
 Le differenze distintive footMe devono stare nei contenuti:
