@@ -136,7 +136,7 @@ export default function OnboardingProfileScreen() {
             style={{
               fontSize: 16,
               lineHeight: 24,
-              color: "rgba(255,253,252,0.78)",
+              color: colors.textInverseMuted,
             }}
           >
             Scegli il ruolo e crea i dati minimi per entrare nella piattaforma.
@@ -338,7 +338,7 @@ export default function OnboardingProfileScreen() {
               paddingVertical: 15,
               borderRadius: 16,
               alignItems: "center",
-              backgroundColor: isSubmitting ? "#6AA687" : colors.hero,
+              backgroundColor: isSubmitting ? colors.buttonDisabled : colors.hero,
             }}
           >
             <Text

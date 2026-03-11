@@ -120,7 +120,7 @@ const specializationOptions: { label: string; value: StaffSpecialization }[] = [
   { label: "Team manager", value: "team_manager" },
   { label: "Altro", value: "other" },
 ];
-const minBirthYear = 1940;
+const maxSupportedProfileAge = 85;
 
 function createEmptyCareerEntry(): CareerEntryForm {
   return {
@@ -247,10 +247,14 @@ function createNumericOptions(
 
 const birthDayOptions = createNumericOptions(1, 31);
 const birthMonthOptions = createNumericOptions(1, 12);
-const birthYearOptions = createNumericOptions(minBirthYear, new Date().getFullYear(), {
-  descending: true,
-  padLength: 0,
-});
+const birthYearOptions = createNumericOptions(
+  new Date().getFullYear() - maxSupportedProfileAge,
+  new Date().getFullYear(),
+  {
+    descending: true,
+    padLength: 0,
+  },
+);
 
 function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState {
   const playerProfile = data.playerProfile;
@@ -416,16 +420,8 @@ function DatePickerField({
   const [draftDateParts, setDraftDateParts] = useState(() => splitBirthDate(value));
 
   useEffect(() => {
-    const parsedValue = splitBirthDate(value);
-    const hasCompleteValue =
-      !!parsedValue.day && !!parsedValue.month && !!parsedValue.year;
-    const hasEmptyDraft =
-      !draftDateParts.day && !draftDateParts.month && !draftDateParts.year;
-
-    if (hasCompleteValue || (!value && hasEmptyDraft)) {
-      setDraftDateParts(parsedValue);
-    }
-  }, [draftDateParts.day, draftDateParts.month, draftDateParts.year, value]);
+    setDraftDateParts(splitBirthDate(value));
+  }, [value]);
 
   function patchDate(nextParts: Partial<typeof draftDateParts>) {
     setDraftDateParts((current) => {
@@ -1076,7 +1072,7 @@ export default function ProfileScreen() {
             style={{
               fontSize: 16,
               lineHeight: 24,
-              color: "rgba(255,253,252,0.78)",
+              color: colors.textInverseMuted,
             }}
           >
             Completa e aggiorna il tuo profilo pubblico con i dati richiesti dalla
@@ -1088,7 +1084,7 @@ export default function ProfileScreen() {
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 999,
-                backgroundColor: "rgba(255,253,252,0.12)",
+                backgroundColor: colors.surfaceOverlay,
               }}
             >
               <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
@@ -1100,7 +1096,7 @@ export default function ProfileScreen() {
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 999,
-                backgroundColor: "rgba(255,253,252,0.12)",
+                backgroundColor: colors.surfaceOverlay,
               }}
             >
               <Text style={{ color: colors.inkInvert, fontWeight: "700" }}>
