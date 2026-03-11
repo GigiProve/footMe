@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 
+import { SelectField } from "../../src/components/ui/select-field";
 import { Screen } from "../../src/components/ui/screen";
 import { useSession } from "../../src/features/auth/use-session";
 import {
@@ -16,6 +17,7 @@ import {
   type PlayerPosition,
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
+import { italianRegionOptions } from "../../src/features/profiles/profile-form-options";
 import { colors } from "../../src/theme/tokens";
 
 const roles: Array<{ label: string; value: AppRole }> = [
@@ -320,18 +322,10 @@ export default function OnboardingProfileScreen() {
                 }}
                 value={clubCity}
               />
-              <TextInput
-                onChangeText={setClubRegion}
-                placeholder="Regione"
-                placeholderTextColor={colors.textMuted}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 16,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 16,
-                  backgroundColor: colors.background,
-                }}
+              <SelectField
+                onChange={(value) => setClubRegion(value)}
+                options={italianRegionOptions}
+                placeholder="Seleziona la regione"
                 value={clubRegion}
               />
             </View>

@@ -4,6 +4,7 @@ import type {
   StaffSpecialization,
 } from "../onboarding/create-initial-profile";
 
+import { isValidSeasonLabel } from "./profile-form-utils";
 import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
 
@@ -285,6 +286,12 @@ export async function updateCompleteProfessionalProfile(
   }
 
   if (input.role === "player" && input.playerProfile) {
+    input.playerCareerEntries.forEach((entry) => {
+      if (!isValidSeasonLabel(entry.season_label)) {
+        throw new Error("Il formato della stagione deve essere xx/xx, ad esempio 24/25.");
+      }
+    });
+
     const { error: playerProfileError } = await supabase
       .from("player_profiles")
       .upsert({
@@ -307,6 +314,14 @@ export async function updateCompleteProfessionalProfile(
     const currentIds = input.playerCareerEntries
       .map((entry) => entry.id)
       .filter((entryId): entryId is string => !!entryId);
+    const { data: existingCareerRows, error: existingCareerError } = await supabase
+      .from("player_career_entries")
+      .select("id")
+      .eq("player_profile_id", input.profileId);
+
+    if (existingCareerError) {
+      throw existingCareerError;
+    }
 
     const existingEntries = input.playerCareerEntries
       .filter((entry) => !!entry.id)
@@ -356,15 +371,6 @@ export async function updateCompleteProfessionalProfile(
       if (careerInsertError) {
         throw careerInsertError;
       }
-    }
-
-    const { data: existingCareerRows, error: existingCareerError } = await supabase
-      .from("player_career_entries")
-      .select("id")
-      .eq("player_profile_id", input.profileId);
-
-    if (existingCareerError) {
-      throw existingCareerError;
     }
 
     const removableIds = (existingCareerRows ?? [])
