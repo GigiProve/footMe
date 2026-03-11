@@ -30,3 +30,6 @@ jobs:
 
       - name: Typecheck mobile workspace
         run: npm run typecheck:mobile
+
+      - name: Test mobile workspace
+        run: npm run test:mobile

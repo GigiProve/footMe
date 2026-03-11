@@ -1,0 +1,244 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { getCompleteProfessionalProfile } from "./profile-service";
+
+const mocks = vi.hoisted(() => {
+  const clubMaybeSingleMock = vi.fn();
+  const coachMaybeSingleMock = vi.fn();
+  const playerCareerEqMock = vi.fn();
+  const playerCareerFirstOrderMock = vi.fn();
+  const playerCareerSecondOrderMock = vi.fn();
+  const playerMaybeSingleMock = vi.fn();
+  const profileMaybeSingleMock = vi.fn();
+  const staffMaybeSingleMock = vi.fn();
+
+  const playerCareerSecondOrderChain = {
+    order: playerCareerSecondOrderMock,
+  };
+  const playerCareerFirstOrderChain = {
+    order: playerCareerFirstOrderMock,
+  };
+
+  return {
+    clubMaybeSingleMock,
+    coachMaybeSingleMock,
+    fromMock: vi.fn((table: string) => {
+      if (table === "profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: profileMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "player_profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: playerMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "coach_profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: coachMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "staff_profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: staffMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "clubs") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: clubMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "player_career_entries") {
+        return {
+          select: vi.fn(() => ({
+            eq: playerCareerEqMock,
+          })),
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    }),
+    playerCareerEqMock,
+    playerCareerFirstOrderChain,
+    playerCareerFirstOrderMock,
+    playerCareerSecondOrderChain,
+    playerCareerSecondOrderMock,
+    playerMaybeSingleMock,
+    profileMaybeSingleMock,
+    staffMaybeSingleMock,
+  };
+});
+
+vi.mock("../../lib/supabase", () => ({
+  supabase: {
+    from: mocks.fromMock,
+  },
+}));
+
+describe("getCompleteProfessionalProfile", () => {
+  beforeEach(() => {
+    mocks.fromMock.mockClear();
+    mocks.profileMaybeSingleMock.mockReset();
+    mocks.playerMaybeSingleMock.mockReset();
+    mocks.coachMaybeSingleMock.mockReset();
+    mocks.staffMaybeSingleMock.mockReset();
+    mocks.clubMaybeSingleMock.mockReset();
+    mocks.playerCareerEqMock.mockReset();
+    mocks.playerCareerFirstOrderMock.mockReset();
+    mocks.playerCareerSecondOrderMock.mockReset();
+
+    mocks.profileMaybeSingleMock.mockResolvedValue({
+      data: {
+        avatar_url: null,
+        bio: null,
+        birth_date: null,
+        city: "Perugia",
+        full_name: "Marco Rossi",
+        id: "profile-1",
+        is_available: true,
+        is_open_to_transfer: true,
+        nationality: "IT",
+        region: "Umbria",
+        role: "player",
+      },
+      error: null,
+    });
+    mocks.playerMaybeSingleMock.mockResolvedValue({
+      data: {
+        height_cm: 180,
+        highlight_video_url: null,
+        preferred_categories: ["Promozione"],
+        preferred_foot: "right",
+        primary_position: "forward",
+        profile_id: "profile-1",
+        secondary_position: null,
+        transfer_regions: ["Umbria"],
+        weight_kg: 75,
+        willing_to_change_club: true,
+      },
+      error: null,
+    });
+    mocks.coachMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.staffMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.clubMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.playerCareerEqMock.mockImplementation(() => mocks.playerCareerFirstOrderChain);
+    mocks.playerCareerFirstOrderMock.mockImplementation(
+      () => mocks.playerCareerSecondOrderChain,
+    );
+    mocks.playerCareerSecondOrderMock.mockResolvedValue({
+      data: [
+        {
+          appearances: 30,
+          assists: 8,
+          awards: null,
+          club_name: "AC FootMe",
+          competition_name: "Promozione",
+          goals: 12,
+          id: "career-1",
+          minutes_played: 2400,
+          player_profile_id: "profile-1",
+          season_label: "2024/25",
+          sort_order: 0,
+        },
+      ],
+      error: null,
+    });
+  });
+
+  it("throws when the base profile cannot be found", async () => {
+    mocks.profileMaybeSingleMock.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    await expect(getCompleteProfessionalProfile("missing-profile")).rejects.toThrow(
+      "Profilo non trovato.",
+    );
+
+    expect(mocks.fromMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads player-specific data and career entries for player profiles", async () => {
+    const result = await getCompleteProfessionalProfile("profile-1");
+
+    expect(result.profile.role).toBe("player");
+    expect(result.playerProfile?.primary_position).toBe("forward");
+    expect(result.playerCareerEntries).toHaveLength(1);
+    expect(mocks.playerCareerEqMock).toHaveBeenCalledWith(
+      "player_profile_id",
+      "profile-1",
+    );
+    expect(mocks.playerCareerFirstOrderMock).toHaveBeenCalledWith("sort_order", {
+      ascending: true,
+    });
+    expect(mocks.playerCareerSecondOrderMock).toHaveBeenCalledWith("created_at", {
+      ascending: false,
+    });
+  });
+
+  it("loads only club data for club admins", async () => {
+    const club = {
+      category: "Eccellenza",
+      city: "Roma",
+      description: null,
+      gallery_urls: [],
+      id: "club-77",
+      league: "Serie D",
+      logo_url: null,
+      name: "FC Roma",
+      owner_profile_id: "profile-9",
+      region: "Lazio",
+    };
+    mocks.profileMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        avatar_url: null,
+        bio: null,
+        birth_date: null,
+        city: "Roma",
+        full_name: "Club Admin",
+        id: "profile-9",
+        is_available: false,
+        is_open_to_transfer: false,
+        nationality: null,
+        region: "Lazio",
+        role: "club_admin",
+      },
+      error: null,
+    });
+    mocks.clubMaybeSingleMock.mockResolvedValueOnce({ data: club, error: null });
+
+    const result = await getCompleteProfessionalProfile("profile-9");
+
+    expect(result.club).toEqual(club);
+    expect(result.playerProfile).toBeNull();
+    expect(result.playerCareerEntries).toEqual([]);
+    expect(
+      mocks.fromMock.mock.calls.some(([table]) => table === "player_career_entries"),
+    ).toBe(false);
+  });
+});

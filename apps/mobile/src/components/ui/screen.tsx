@@ -5,8 +5,12 @@ import { colors } from "../../theme/tokens";
 
 export function Screen({ children }: PropsWithChildren) {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView
+      testID="screen-root"
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
       <View
+        testID="screen-orb-hero"
         pointerEvents="none"
         style={{
           position: "absolute",
@@ -20,6 +24,7 @@ export function Screen({ children }: PropsWithChildren) {
         }}
       />
       <View
+        testID="screen-orb-accent"
         pointerEvents="none"
         style={{
           position: "absolute",
@@ -32,7 +37,10 @@ export function Screen({ children }: PropsWithChildren) {
           opacity: 0.8,
         }}
       />
-      <View style={{ flex: 1, paddingHorizontal: 20, paddingVertical: 24 }}>
+      <View
+        testID="screen-content"
+        style={{ flex: 1, paddingHorizontal: 20, paddingVertical: 24 }}
+      >
         {children}
       </View>
     </SafeAreaView>

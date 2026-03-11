@@ -34,6 +34,8 @@
     "lint": "npm run lint:mobile",
     "lint:mobile": "npm run lint --workspace @footme/mobile",
     "typecheck": "npm run typecheck:mobile",
-    "typecheck:mobile": "npm run typecheck --workspace @footme/mobile"
+    "typecheck:mobile": "npm run typecheck --workspace @footme/mobile",
+    "test": "npm run test:mobile",
+    "test:mobile": "npm run test --workspace @footme/mobile"
   }
 }

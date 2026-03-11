@@ -1,16 +1,61 @@
-import { Pressable, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Pressable, Text, View } from "react-native";
 
 import { Screen } from "../../src/components/ui/screen";
+import {
+  getHomeDashboard,
+  type HomeDashboardData,
+} from "../../src/features/home/home-dashboard-service";
 import { useSession } from "../../src/features/auth/use-session";
 import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
 import { colors } from "../../src/theme/tokens";
 
 export default function HomeScreen() {
-  const { profile } = useSession();
+  const { profile, session } = useSession();
+  const [dashboard, setDashboard] = useState<HomeDashboardData | null>(null);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
+
+  useEffect(() => {
+    if (!session?.user || !profile) {
+      setDashboard(null);
+      setIsLoadingDashboard(false);
+      return;
+    }
+
+    loadDashboard();
+  }, [profile?.id, session?.user?.id]);
+
+  async function loadDashboard() {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      setIsLoadingDashboard(true);
+      const nextDashboard = await getHomeDashboard(
+        session.user.id,
+        session.user.email ?? null,
+      );
+      setDashboard(nextDashboard);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore nel caricamento della home reale.";
+      Alert.alert("Home non disponibile", message);
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  }
 
   async function handleSignOut() {
     await supabase.auth.signOut();
   }
+
+  const backendLabel = hasSupabaseEnv ? "Collegato" : "Da collegare";
+  const displayName =
+    dashboard?.profile.fullName ?? profile?.full_name ?? "Utente autenticato";
+  const displayRole = dashboard?.summary.title ?? "Profilo in caricamento";
 
   return (
     <Screen>
@@ -57,8 +102,8 @@ export default function HomeScreen() {
               color: "rgba(255,253,252,0.82)",
             }}
           >
-            Il tuo profilo sportivo, la tua rete di contatti e le opportunita'
-            giuste nello stesso posto.
+            {dashboard?.summary.body ??
+              "Il tuo profilo sportivo, la tua rete di contatti e le opportunita' giuste nello stesso posto."}
           </Text>
         </View>
 
@@ -93,7 +138,10 @@ export default function HomeScreen() {
                 fontWeight: "700",
               }}
             >
-              {profile?.full_name ?? "Utente autenticato"}
+              {displayName}
+            </Text>
+            <Text style={{ marginTop: 4, color: colors.textSecondary }}>
+              {displayRole}
             </Text>
           </View>
           <View
@@ -122,9 +170,59 @@ export default function HomeScreen() {
                 fontWeight: "700",
               }}
             >
-              {hasSupabaseEnv ? "Pronto" : "Da collegare"}
+              {backendLabel}
+            </Text>
+            <Text style={{ marginTop: 4, color: colors.textSecondary }}>
+              {session?.user.email ?? "Auth non disponibile"}
             </Text>
           </View>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          {(dashboard?.highlights ?? []).map((highlight) => {
+            const backgroundColor =
+              highlight.tone === "accent"
+                ? colors.accentSoft
+                : highlight.tone === "hero"
+                  ? colors.heroSoft
+                  : colors.surfaceMuted;
+
+            const textColor =
+              highlight.tone === "hero" ? colors.hero : colors.textPrimary;
+
+            return (
+              <View
+                key={highlight.label}
+                style={{
+                  flex: 1,
+                  padding: 16,
+                  borderRadius: 20,
+                  backgroundColor,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: "700",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {highlight.label}
+                </Text>
+                <Text
+                  style={{
+                    marginTop: 10,
+                    color: textColor,
+                    fontSize: 26,
+                    fontWeight: "800",
+                  }}
+                >
+                  {isLoadingDashboard ? "..." : highlight.value}
+                </Text>
+              </View>
+            );
+          })}
         </View>
 
         <View
@@ -146,7 +244,7 @@ export default function HomeScreen() {
               textTransform: "uppercase",
             }}
           >
-            Primo look & feel
+            Landing autenticata
           </Text>
           <Text
             style={{
@@ -155,13 +253,73 @@ export default function HomeScreen() {
               fontWeight: "700",
             }}
           >
-            Dashboard iniziale del network calcistico
+            {dashboard?.summary.kicker ??
+              "Dashboard iniziale del network calcistico"}
           </Text>
           <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-            Questa schermata e' il punto di ingresso del feed, del recruiting e
-            della rete contatti. Il prossimo passo naturale e' sostituire questi
-            blocchi con dati reali da Supabase.
+            {dashboard
+              ? [
+                  dashboard.profile.region,
+                  dashboard.profile.city,
+                  dashboard.profile.clubName,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") ||
+                "I dati reali del profilo sono arrivati da Supabase."
+              : "Questa schermata e' il punto di ingresso del feed, del recruiting e della rete contatti. Collega Supabase reale per sostituire i placeholder."}
           </Text>
+          {dashboard?.profile.isAvailable ? (
+            <View
+              style={{
+                alignSelf: "flex-start",
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 999,
+                backgroundColor: colors.accentSoft,
+              }}
+            >
+              <Text style={{ color: colors.accentStrong, fontWeight: "700" }}>
+                Disponibile ora
+              </Text>
+            </View>
+          ) : null}
+          {dashboard?.profile.isOpenToTransfer ? (
+            <View
+              style={{
+                alignSelf: "flex-start",
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 999,
+                backgroundColor: colors.heroSoft,
+              }}
+            >
+              <Text style={{ color: colors.hero, fontWeight: "700" }}>
+                Aperto a nuove opportunita'
+              </Text>
+            </View>
+          ) : null}
+          {!hasSupabaseEnv ? (
+            <Text style={{ color: colors.hero, lineHeight: 22 }}>
+              Configura `apps/mobile/.env.local` con URL e anon key del progetto
+              Supabase per usare auth e dashboard reali.
+            </Text>
+          ) : null}
+          <Pressable
+            onPress={loadDashboard}
+            style={{
+              alignSelf: "flex-start",
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderRadius: 14,
+              backgroundColor: colors.background,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+              Aggiorna dati reali
+            </Text>
+          </Pressable>
         </View>
 
         <Pressable
