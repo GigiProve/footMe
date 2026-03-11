@@ -14,6 +14,7 @@ describe("profile-form-utils", () => {
     expect(normalizeSeasonLabelInput("2425")).toBe("24/25");
     expect(normalizeSeasonLabelInput("2024/25")).toBe("24/25");
     expect(normalizeSeasonLabelInput(" 98 / 99 ")).toBe("98/99");
+    expect(normalizeSeasonLabelInput("12024/25")).toBe("12024");
   });
 
   it("validates season labels with the xx/xx pattern", () => {

@@ -63,7 +63,7 @@ export const NATIONALITY_OPTIONS: SelectOption[] = [
   { label: "Norvegia", value: "NO" },
   { label: "Paesi Bassi", value: "NL" },
   { label: "Paraguay", value: "PY" },
-  { label: "Peru", value: "PE" },
+  { label: "Perù", value: "PE" },
   { label: "Polonia", value: "PL" },
   { label: "Portogallo", value: "PT" },
   { label: "Repubblica Ceca", value: "CZ" },
@@ -100,6 +100,10 @@ export const BIRTH_MONTH_OPTIONS: SelectOption[] = [
   { label: "Novembre", value: "11" },
   { label: "Dicembre", value: "12" },
 ];
+
+// The current mobile MVP targets adult and senior amateur football profiles, so
+// we cap the picker to a conservative historical range without introducing UX noise.
+const FIRST_BIRTH_YEAR = 1940;
 
 export function ensureOption<T extends string>(
   options: SelectOption<T>[],
@@ -161,7 +165,7 @@ export function getBirthDateParts(value: string | null | undefined) {
 }
 
 export function createBirthYearOptions(currentYear = new Date().getFullYear()) {
-  return Array.from({ length: currentYear - 1939 }, (_, index) => {
+  return Array.from({ length: currentYear - FIRST_BIRTH_YEAR + 1 }, (_, index) => {
     const year = String(currentYear - index);
     return { label: year, value: year };
   });
@@ -193,17 +197,30 @@ export function composeBirthDate(parts: {
 }
 
 export function normalizeSeasonLabelInput(value: string) {
-  let digits = value.replace(/\D/g, "");
+  const compactValue = value.replace(/\s+/g, "");
+  const shortPatternMatch = compactValue.match(/^(\d{2})\/?(\d{0,2})$/);
 
-  if (digits.length > 4) {
-    digits = digits.slice(-4);
+  if (shortPatternMatch) {
+    const [, startYear, endYear] = shortPatternMatch;
+    return endYear ? `${startYear}/${endYear}` : startYear;
   }
 
-  if (digits.length <= 2) {
-    return digits;
+  const longPatternMatch = compactValue.match(/^(\d{4})\/?(\d{0,2})$/);
+
+  if (longPatternMatch) {
+    const [, startYear, endYear] = longPatternMatch;
+    const normalizedStartYear = startYear.slice(-2);
+    return endYear ? `${normalizedStartYear}/${endYear}` : normalizedStartYear;
   }
 
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}`;
+  if (/^\d+$/.test(compactValue)) {
+    const digits = compactValue.slice(0, 4);
+    return digits.length <= 2
+      ? digits
+      : `${digits.slice(0, 2)}/${digits.slice(2, 4)}`;
+  }
+
+  return compactValue.slice(0, 5);
 }
 
 export function isSeasonLabelValid(value: string) {

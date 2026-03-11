@@ -440,7 +440,7 @@ function BirthDateField({
   useEffect(() => {
     const nextParts = getBirthDateParts(value);
 
-    if (nextParts.day || nextParts.month || nextParts.year) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
       setParts(nextParts);
     }
   }, [value]);
@@ -619,7 +619,7 @@ export default function ProfileScreen() {
         },
         {
           label: "Nuove panchine",
-          value: completeProfile.coachProfile?.open_to_new_role ? "Si" : "No",
+          value: completeProfile.coachProfile?.open_to_new_role ? "Sì" : "No",
         },
       ];
     }
@@ -636,7 +636,7 @@ export default function ProfileScreen() {
         },
         {
           label: "Disponibile",
-          value: completeProfile.staffProfile?.open_to_work ? "Si" : "No",
+          value: completeProfile.staffProfile?.open_to_work ? "Sì" : "No",
         },
       ];
     }
@@ -670,6 +670,14 @@ export default function ProfileScreen() {
     [formState?.clubRegion],
   );
   const playerCareerEntries = completeProfile?.playerCareerEntries ?? [];
+  const playerCareerSummaryEntries = useMemo(
+    () =>
+      playerCareerEntries.map((entry) => ({
+        entry,
+        seasonTitle: normalizeSeasonLabelInput(entry.season_label),
+      })),
+    [playerCareerEntries],
+  );
 
   const summarySections = useMemo(() => {
     if (!completeProfile) {
@@ -682,7 +690,7 @@ export default function ProfileScreen() {
       title: string;
     }[] = [
       {
-        title: "Identita' di base",
+        title: "Identità di base",
         subtitle: "Riepilogo delle informazioni pubbliche configurate per il profilo.",
         items: [
           { label: "Nome e cognome", value: completeProfile.profile.full_name },
@@ -691,14 +699,14 @@ export default function ProfileScreen() {
             value: formatBirthDate(completeProfile.profile.birth_date),
           },
           {
-            label: "Nazionalita'",
+            label: "Nazionalità",
             value: getOptionLabel(
               NATIONALITY_OPTIONS,
               completeProfile.profile.nationality,
             ),
           },
           {
-            label: "Citta'",
+            label: "Città",
             value: formatOptionalSummary(completeProfile.profile.city),
           },
           {
@@ -707,12 +715,12 @@ export default function ProfileScreen() {
           },
           { label: "Bio", value: formatOptionalSummary(completeProfile.profile.bio) },
           {
-            label: "Disponibile a nuove opportunita'",
-            value: completeProfile.profile.is_available ? "Si" : "No",
+            label: "Disponibile a nuove opportunità",
+            value: completeProfile.profile.is_available ? "Sì" : "No",
           },
           {
             label: "Aperto al trasferimento",
-            value: completeProfile.profile.is_open_to_transfer ? "Si" : "No",
+            value: completeProfile.profile.is_open_to_transfer ? "Sì" : "No",
           },
         ],
       },
@@ -757,7 +765,7 @@ export default function ProfileScreen() {
           },
           {
             label: "Disponibile a cambiare squadra",
-            value: completeProfile.playerProfile?.willing_to_change_club ? "Si" : "No",
+            value: completeProfile.playerProfile?.willing_to_change_club ? "Sì" : "No",
           },
           {
             label: "Video highlights",
@@ -772,7 +780,7 @@ export default function ProfileScreen() {
     if (completeProfile.profile.role === "coach") {
       sections.push({
         title: "Profilo allenatore",
-        subtitle: "Licenze, storia e disponibilita' del tecnico.",
+        subtitle: "Licenze, storia e disponibilità del tecnico.",
         items: [
           {
             label: "Licenze",
@@ -800,7 +808,7 @@ export default function ProfileScreen() {
           },
           {
             label: "Disponibile per nuove panchine",
-            value: completeProfile.coachProfile?.open_to_new_role ? "Si" : "No",
+            value: completeProfile.coachProfile?.open_to_new_role ? "Sì" : "No",
           },
         ],
       });
@@ -809,7 +817,7 @@ export default function ProfileScreen() {
     if (completeProfile.profile.role === "staff") {
       sections.push({
         title: "Profilo staff tecnico",
-        subtitle: "Specializzazione, esperienza e disponibilita' lavorativa.",
+        subtitle: "Specializzazione, esperienza e disponibilità lavorativa.",
         items: [
           {
             label: "Specializzazione",
@@ -831,7 +839,7 @@ export default function ProfileScreen() {
           },
           {
             label: "Disponibile a lavorare",
-            value: completeProfile.staffProfile?.open_to_work ? "Si" : "No",
+            value: completeProfile.staffProfile?.open_to_work ? "Sì" : "No",
           },
         ],
       });
@@ -839,11 +847,11 @@ export default function ProfileScreen() {
 
     if (completeProfile.profile.role === "club_admin") {
       sections.push({
-        title: "Pagina societa'",
+        title: "Pagina società",
         subtitle: "Dati pubblici configurati per il club.",
         items: [
           { label: "Nome club", value: formatOptionalSummary(completeProfile.club?.name) },
-          { label: "Citta' club", value: formatOptionalSummary(completeProfile.club?.city) },
+          { label: "Città club", value: formatOptionalSummary(completeProfile.club?.city) },
           {
             label: "Regione club",
             value: getOptionLabel(REGION_OPTIONS, completeProfile.club?.region),
@@ -952,7 +960,7 @@ export default function ProfileScreen() {
 
         if (!clubName || !clubCity || !clubRegion) {
           throw new Error(
-            "Per la pagina societa' servono nome club, citta' e regione.",
+            "Per la pagina società servono nome club, città e regione.",
           );
         }
       }
@@ -1057,7 +1065,7 @@ export default function ProfileScreen() {
               letterSpacing: typography.letterSpacing.md,
             }}
           >
-            Fase 2 · Identita' professionale
+            Fase 2 · Identità professionale
           </Text>
           <Text
             style={{
@@ -1077,7 +1085,7 @@ export default function ProfileScreen() {
             }}
           >
             Completa e aggiorna il tuo profilo pubblico con i dati richiesti dalla
-            roadmap MVP: identita', disponibilita', carriera e dettagli di ruolo.
+            roadmap MVP: identità, disponibilità, carriera e dettagli di ruolo.
           </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[10] }}>
             <View
@@ -1192,8 +1200,8 @@ export default function ProfileScreen() {
                 subtitle="Le stagioni salvate vengono mantenute e riepilogate qui."
                 title="Stagioni salvate"
               >
-                {playerCareerEntries.length > 0 ? (
-                  playerCareerEntries.map((entry) => (
+                {playerCareerSummaryEntries.length > 0 ? (
+                  playerCareerSummaryEntries.map(({ entry, seasonTitle }) => (
                     <Card key={entry.id} style={{ gap: spacing[10] }} variant="muted">
                       <Text
                         style={{
@@ -1202,7 +1210,7 @@ export default function ProfileScreen() {
                           fontWeight: typography.fontWeight.heavy,
                         }}
                       >
-                        {normalizeSeasonLabelInput(entry.season_label)} · {entry.club_name}
+                        {seasonTitle} · {entry.club_name}
                       </Text>
                       <Text style={{ color: colors.textSecondary }}>
                         {entry.competition_name?.trim() || "Competizione da completare"}
@@ -1243,8 +1251,8 @@ export default function ProfileScreen() {
         ) : (
           <>
             <Section
-              subtitle="Dati anagrafici, localita', disponibilita' e presentazione pubblica."
-              title="Identita' di base"
+              subtitle="Dati anagrafici, località, disponibilità e presentazione pubblica."
+              title="Identità di base"
             >
               <Field
                 label="Nome e cognome"
@@ -1262,19 +1270,19 @@ export default function ProfileScreen() {
               />
               <SelectField
                 allowClear
-                clearLabel="Rimuovi la nazionalita'"
-                label="Nazionalita'"
+                clearLabel="Rimuovi la nazionalità"
+                label="Nazionalità"
                 onChange={(value) =>
                   setFormState((current) =>
                     current ? { ...current, nationality: value } : current,
                   )
                 }
                 options={nationalityOptions}
-                placeholder="Seleziona la nazionalita'"
+                placeholder="Seleziona la nazionalità"
                 value={formState.nationality}
               />
               <Field
-                label="Citta'"
+                label="Città"
                 onChangeText={(value) =>
                   setFormState((current) => (current ? { ...current, city: value } : current))
                 }
@@ -1311,7 +1319,7 @@ export default function ProfileScreen() {
               />
               <BooleanField
                 falseLabel="Non disponibile"
-                label="Disponibile a nuove opportunita'"
+                label="Disponibile a nuove opportunità"
                 onChange={(value) =>
                   setFormState((current) =>
                     current ? { ...current, isAvailable: value } : current,
@@ -1329,7 +1337,7 @@ export default function ProfileScreen() {
                       current ? { ...current, isOpenToTransfer: value } : current,
                     )
                   }
-                  trueLabel="Si"
+                  trueLabel="Sì"
                   value={formState.isOpenToTransfer}
                 />
               ) : null}
@@ -1338,7 +1346,7 @@ export default function ProfileScreen() {
             {(profile.role as AppRole) === "player" ? (
               <>
                 <Section
-                  subtitle="Dati sportivi e disponibilita' del calciatore."
+                  subtitle="Dati sportivi e disponibilità del calciatore."
                   title="Profilo giocatore"
                 >
                   <PillSelector
@@ -1497,7 +1505,7 @@ export default function ProfileScreen() {
                           : current,
                       )
                     }
-                    trueLabel="Si"
+                    trueLabel="Sì"
                     value={formState.willingToChangeClub}
                   />
                 </Section>
@@ -1805,7 +1813,7 @@ export default function ProfileScreen() {
                       current ? { ...current, openToNewRole: value } : current,
                     )
                   }
-                  trueLabel="Si"
+                  trueLabel="Sì"
                   value={formState.openToNewRole}
                 />
               </Section>
@@ -1813,7 +1821,7 @@ export default function ProfileScreen() {
 
             {(profile.role as AppRole) === "staff" ? (
               <Section
-                subtitle="Specializzazione, certificazioni e disponibilita' lavorativa."
+                subtitle="Specializzazione, certificazioni e disponibilità lavorativa."
                 title="Profilo staff tecnico"
               >
                 <PillSelector
@@ -1862,7 +1870,7 @@ export default function ProfileScreen() {
                       current ? { ...current, openToWork: value } : current,
                     )
                   }
-                  trueLabel="Si"
+                  trueLabel="Sì"
                   value={formState.openToWork}
                 />
               </Section>
@@ -1871,7 +1879,7 @@ export default function ProfileScreen() {
             {(profile.role as AppRole) === "club_admin" ? (
               <Section
                 subtitle="Pagina ufficiale del club con informazioni pubbliche, gallery e contesto competitivo."
-                title="Pagina societa'"
+                title="Pagina società"
               >
                 <Field
                   label="Nome club"
@@ -1881,7 +1889,7 @@ export default function ProfileScreen() {
                   value={formState.clubName}
                 />
                 <Field
-                  label="Citta' club"
+                  label="Città club"
                   onChangeText={(value) =>
                     setFormState((current) => (current ? { ...current, clubCity: value } : current))
                   }
