@@ -8,7 +8,24 @@ import {
 } from "react-native";
 
 import { Screen } from "../../src/components/ui/screen";
+import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
+import {
+  BIRTH_MONTH_OPTIONS,
+  NATIONALITY_OPTIONS,
+  REGION_OPTIONS,
+  composeBirthDate,
+  createBirthDayOptions,
+  createBirthYearOptions,
+  ensureOption,
+  formatBirthDate,
+  formatListSummary,
+  formatOptionalSummary,
+  getBirthDateParts,
+  getOptionLabel,
+  isSeasonLabelValid,
+  normalizeSeasonLabelInput,
+} from "../../src/features/profiles/profile-form-utils";
 import {
   getCompleteProfessionalProfile,
   updateCompleteProfessionalProfile,
@@ -22,7 +39,7 @@ import {
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
-import { Card, Input } from "../../src/ui";
+import { Button, Card, Input } from "../../src/ui";
 
 type CareerEntryForm = {
   appearances: string;
@@ -201,7 +218,7 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
             goals: String(entry.goals),
             id: entry.id,
             minutesPlayed: String(entry.minutes_played),
-            seasonLabel: entry.season_label,
+            seasonLabel: normalizeSeasonLabelInput(entry.season_label),
           }))
         : [createEmptyCareerEntry()],
     certifications: toDelimitedString(staffProfile?.certifications),
@@ -403,12 +420,140 @@ function PillSelector<T extends string>({
   );
 }
 
+function BirthDateField({
+  label,
+  onChange,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const [parts, setParts] = useState(() => getBirthDateParts(value));
+  const { day, month, year } = parts;
+  const yearOptions = useMemo(() => createBirthYearOptions(), []);
+  const dayOptions = useMemo(
+    () => createBirthDayOptions(year, month),
+    [month, year],
+  );
+
+  useEffect(() => {
+    const nextParts = getBirthDateParts(value);
+
+    if (nextParts.day || nextParts.month || nextParts.year) {
+      setParts(nextParts);
+    }
+  }, [value]);
+
+  function handlePartChange(partial: Partial<{ day: string; month: string; year: string }>) {
+    setParts((currentParts) => {
+      const nextYear = partial.year ?? currentParts.year;
+      const nextMonth = partial.month ?? currentParts.month;
+      const rawDay = partial.day ?? currentParts.day;
+      const maxDay = createBirthDayOptions(nextYear, nextMonth).length;
+      const nextDay =
+        rawDay && Number(rawDay) > maxDay
+          ? String(maxDay).padStart(2, "0")
+          : rawDay;
+      const nextParts = {
+        day: nextDay,
+        month: nextMonth,
+        year: nextYear,
+      };
+
+      onChange(composeBirthDate(nextParts));
+      return nextParts;
+    });
+  }
+
+  return (
+    <View style={{ gap: spacing[8] }}>
+      <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
+        {label}
+      </Text>
+      <View style={{ gap: spacing[10] }}>
+        <SelectField
+          allowClear
+          clearLabel="Rimuovi il giorno"
+          label="Giorno"
+          onChange={(selectedDay) => handlePartChange({ day: selectedDay })}
+          options={dayOptions}
+          placeholder="Seleziona il giorno"
+          value={day}
+        />
+        <SelectField
+          allowClear
+          clearLabel="Rimuovi il mese"
+          label="Mese"
+          onChange={(selectedMonth) => handlePartChange({ month: selectedMonth })}
+          options={BIRTH_MONTH_OPTIONS}
+          placeholder="Seleziona il mese"
+          value={month}
+        />
+        <SelectField
+          allowClear
+          clearLabel="Rimuovi l'anno"
+          label="Anno"
+          onChange={(selectedYear) => handlePartChange({ year: selectedYear })}
+          options={yearOptions}
+          placeholder="Seleziona l'anno"
+          value={year}
+        />
+      </View>
+      <Text style={{ color: colors.textSecondary }}>
+        {value ? `Data selezionata: ${formatBirthDate(value)}` : "Seleziona giorno, mese e anno dal picker."}
+      </Text>
+    </View>
+  );
+}
+
+function SummaryCard({
+  items,
+  subtitle,
+  title,
+}: {
+  items: { label: string; value: string }[];
+  subtitle?: string;
+  title: string;
+}) {
+  return (
+    <Section subtitle={subtitle} title={title}>
+      {items.map((item) => (
+        <View
+          key={`${title}-${item.label}`}
+          style={{
+            gap: spacing[4],
+            paddingBottom: spacing[10],
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.textMuted,
+              fontSize: typography.fontSize[12],
+              fontWeight: typography.fontWeight.bold,
+              textTransform: "uppercase",
+            }}
+          >
+            {item.label}
+          </Text>
+          <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
+            {item.value}
+          </Text>
+        </View>
+      ))}
+    </Section>
+  );
+}
+
 export default function ProfileScreen() {
   const { profile, refreshProfile, session } = useSession();
   const userId = session?.user.id ?? null;
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
   const [formState, setFormState] = useState<ProfileFormState | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -512,8 +657,242 @@ export default function ProfileScreen() {
     ];
   }, [completeProfile]);
 
+  const nationalityOptions = useMemo(
+    () => ensureOption(NATIONALITY_OPTIONS, formState?.nationality),
+    [formState?.nationality],
+  );
+  const regionOptions = useMemo(
+    () => ensureOption(REGION_OPTIONS, formState?.region),
+    [formState?.region],
+  );
+  const clubRegionOptions = useMemo(
+    () => ensureOption(REGION_OPTIONS, formState?.clubRegion),
+    [formState?.clubRegion],
+  );
+  const playerCareerEntries = completeProfile?.playerCareerEntries ?? [];
+
+  const summarySections = useMemo(() => {
+    if (!completeProfile) {
+      return [];
+    }
+
+    const sections: {
+      items: { label: string; value: string }[];
+      subtitle?: string;
+      title: string;
+    }[] = [
+      {
+        title: "Identita' di base",
+        subtitle: "Riepilogo delle informazioni pubbliche configurate per il profilo.",
+        items: [
+          { label: "Nome e cognome", value: completeProfile.profile.full_name },
+          {
+            label: "Data di nascita",
+            value: formatBirthDate(completeProfile.profile.birth_date),
+          },
+          {
+            label: "Nazionalita'",
+            value: getOptionLabel(
+              NATIONALITY_OPTIONS,
+              completeProfile.profile.nationality,
+            ),
+          },
+          {
+            label: "Citta'",
+            value: formatOptionalSummary(completeProfile.profile.city),
+          },
+          {
+            label: "Regione",
+            value: getOptionLabel(REGION_OPTIONS, completeProfile.profile.region),
+          },
+          { label: "Bio", value: formatOptionalSummary(completeProfile.profile.bio) },
+          {
+            label: "Disponibile a nuove opportunita'",
+            value: completeProfile.profile.is_available ? "Si" : "No",
+          },
+          {
+            label: "Aperto al trasferimento",
+            value: completeProfile.profile.is_open_to_transfer ? "Si" : "No",
+          },
+        ],
+      },
+    ];
+
+    if (completeProfile.profile.role === "player") {
+      sections.push({
+        title: "Profilo giocatore",
+        subtitle: "Ruolo, caratteristiche e preferenze del calciatore.",
+        items: [
+          {
+            label: "Posizione principale",
+            value: formatPosition(completeProfile.playerProfile?.primary_position ?? null),
+          },
+          {
+            label: "Posizione secondaria",
+            value: formatPosition(completeProfile.playerProfile?.secondary_position ?? null),
+          },
+          {
+            label: "Piede preferito",
+            value: formatPreferredFoot(completeProfile.playerProfile?.preferred_foot ?? null),
+          },
+          {
+            label: "Altezza",
+            value: completeProfile.playerProfile?.height_cm
+              ? `${completeProfile.playerProfile.height_cm} cm`
+              : "Da completare",
+          },
+          {
+            label: "Peso",
+            value: completeProfile.playerProfile?.weight_kg
+              ? `${completeProfile.playerProfile.weight_kg} kg`
+              : "Da completare",
+          },
+          {
+            label: "Categorie preferite",
+            value: formatListSummary(completeProfile.playerProfile?.preferred_categories),
+          },
+          {
+            label: "Regioni di interesse",
+            value: formatListSummary(completeProfile.playerProfile?.transfer_regions),
+          },
+          {
+            label: "Disponibile a cambiare squadra",
+            value: completeProfile.playerProfile?.willing_to_change_club ? "Si" : "No",
+          },
+          {
+            label: "Video highlights",
+            value: formatOptionalSummary(
+              completeProfile.playerProfile?.highlight_video_url,
+            ),
+          },
+        ],
+      });
+    }
+
+    if (completeProfile.profile.role === "coach") {
+      sections.push({
+        title: "Profilo allenatore",
+        subtitle: "Licenze, storia e disponibilita' del tecnico.",
+        items: [
+          {
+            label: "Licenze",
+            value: formatListSummary(completeProfile.coachProfile?.licenses),
+          },
+          {
+            label: "Squadre allenate",
+            value: formatListSummary(completeProfile.coachProfile?.coached_clubs),
+          },
+          {
+            label: "Categorie allenate",
+            value: formatListSummary(completeProfile.coachProfile?.coached_categories),
+          },
+          {
+            label: "Filosofia di gioco",
+            value: formatOptionalSummary(completeProfile.coachProfile?.game_philosophy),
+          },
+          {
+            label: "Video tecnico",
+            value: formatOptionalSummary(completeProfile.coachProfile?.technical_video_url),
+          },
+          {
+            label: "Aree di interesse",
+            value: formatListSummary(completeProfile.coachProfile?.preferred_regions),
+          },
+          {
+            label: "Disponibile per nuove panchine",
+            value: completeProfile.coachProfile?.open_to_new_role ? "Si" : "No",
+          },
+        ],
+      });
+    }
+
+    if (completeProfile.profile.role === "staff") {
+      sections.push({
+        title: "Profilo staff tecnico",
+        subtitle: "Specializzazione, esperienza e disponibilita' lavorativa.",
+        items: [
+          {
+            label: "Specializzazione",
+            value: formatSpecialization(completeProfile.staffProfile?.specialization ?? null),
+          },
+          {
+            label: "Esperienza",
+            value: formatOptionalSummary(
+              completeProfile.staffProfile?.experience_summary,
+            ),
+          },
+          {
+            label: "Certificazioni",
+            value: formatListSummary(completeProfile.staffProfile?.certifications),
+          },
+          {
+            label: "Aree di interesse",
+            value: formatListSummary(completeProfile.staffProfile?.preferred_regions),
+          },
+          {
+            label: "Disponibile a lavorare",
+            value: completeProfile.staffProfile?.open_to_work ? "Si" : "No",
+          },
+        ],
+      });
+    }
+
+    if (completeProfile.profile.role === "club_admin") {
+      sections.push({
+        title: "Pagina societa'",
+        subtitle: "Dati pubblici configurati per il club.",
+        items: [
+          { label: "Nome club", value: formatOptionalSummary(completeProfile.club?.name) },
+          { label: "Citta' club", value: formatOptionalSummary(completeProfile.club?.city) },
+          {
+            label: "Regione club",
+            value: getOptionLabel(REGION_OPTIONS, completeProfile.club?.region),
+          },
+          {
+            label: "Categoria",
+            value: formatOptionalSummary(completeProfile.club?.category),
+          },
+          {
+            label: "Campionato",
+            value: formatOptionalSummary(completeProfile.club?.league),
+          },
+          {
+            label: "Descrizione club",
+            value: formatOptionalSummary(completeProfile.club?.description),
+          },
+          {
+            label: "Logo",
+            value: formatOptionalSummary(completeProfile.club?.logo_url),
+          },
+          {
+            label: "Gallery media",
+            value: formatListSummary(completeProfile.club?.gallery_urls),
+          },
+        ],
+      });
+    }
+
+    return sections;
+  }, [completeProfile]);
+
   if (!userId || !profile) {
     return null;
+  }
+
+  function handleStartEditing() {
+    if (completeProfile) {
+      setFormState(buildInitialState(completeProfile));
+    }
+
+    setIsEditing(true);
+  }
+
+  function handleStopEditing() {
+    if (completeProfile) {
+      setFormState(buildInitialState(completeProfile));
+    }
+
+    setIsEditing(false);
   }
 
   async function handleSave() {
@@ -532,7 +911,7 @@ export default function ProfileScreen() {
 
       const parsedCareerEntries = formState.careerEntries
         .map<PlayerCareerEntryInput | null>((entry, index) => {
-          const seasonLabel = entry.seasonLabel.trim();
+          const seasonLabel = normalizeSeasonLabelInput(entry.seasonLabel);
           const clubName = entry.clubName.trim();
 
           if (!seasonLabel && !clubName) {
@@ -542,6 +921,12 @@ export default function ProfileScreen() {
           if (!seasonLabel || !clubName) {
             throw new Error(
               "Ogni riga carriera deve includere almeno stagione e club.",
+            );
+          }
+
+          if (!isSeasonLabelValid(seasonLabel)) {
+            throw new Error(
+              "Usa il formato stagione xx/xx, ad esempio 24/25.",
             );
           }
 
@@ -641,6 +1026,7 @@ export default function ProfileScreen() {
       });
 
       await Promise.all([loadProfile(), refreshProfile()]);
+      setIsEditing(false);
       Alert.alert("Profilo aggiornato", "Le informazioni professionali sono state salvate.");
     } catch (error) {
       const message =
@@ -755,12 +1141,105 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
+        {completeProfile && !isLoading ? (
+          <View style={{ flexDirection: "row", gap: spacing[12] }}>
+            {isEditing ? (
+              <>
+                <Button
+                  label="Annulla modifiche"
+                  onPress={handleStopEditing}
+                  style={{ flex: 1 }}
+                  variant="secondary"
+                />
+                <Button
+                  disabled={isSaving}
+                  label={isSaving ? "Salvataggio..." : "Salva profilo"}
+                  onPress={() => void handleSave()}
+                  style={{ flex: 1 }}
+                  variant="hero"
+                />
+              </>
+            ) : (
+              <Button
+                label="Modifica profilo"
+                onPress={handleStartEditing}
+                style={{ flex: 1 }}
+                variant="hero"
+              />
+            )}
+          </View>
+        ) : null}
+
         {isLoading || !formState ? (
           <Section title="Caricamento profilo">
             <Text style={{ color: colors.textSecondary }}>
               Sto recuperando i dati professionali del tuo account...
             </Text>
           </Section>
+        ) : !isEditing ? (
+          <>
+            {summarySections.map((section) => (
+              <SummaryCard
+                key={section.title}
+                items={section.items}
+                subtitle={section.subtitle}
+                title={section.title}
+              />
+            ))}
+
+            {(profile.role as AppRole) === "player" ? (
+              <Section
+                subtitle="Le stagioni salvate vengono mantenute e riepilogate qui."
+                title="Stagioni salvate"
+              >
+                {playerCareerEntries.length > 0 ? (
+                  playerCareerEntries.map((entry) => (
+                    <Card key={entry.id} style={{ gap: spacing[10] }} variant="muted">
+                      <Text
+                        style={{
+                          color: colors.textPrimary,
+                          fontSize: typography.fontSize[18],
+                          fontWeight: typography.fontWeight.heavy,
+                        }}
+                      >
+                        {normalizeSeasonLabelInput(entry.season_label)} · {entry.club_name}
+                      </Text>
+                      <Text style={{ color: colors.textSecondary }}>
+                        {entry.competition_name?.trim() || "Competizione da completare"}
+                      </Text>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
+                        {[
+                          `Presenze ${entry.appearances}`,
+                          `Gol ${entry.goals}`,
+                          `Assist ${entry.assists}`,
+                          `Minuti ${entry.minutes_played}`,
+                        ].map((item) => (
+                          <View
+                            key={item}
+                            style={{
+                              paddingHorizontal: spacing[12],
+                              paddingVertical: spacing[8],
+                              borderRadius: radius.full,
+                              backgroundColor: colors.background,
+                            }}
+                          >
+                            <Text style={{ color: colors.textPrimary }}>{item}</Text>
+                          </View>
+                        ))}
+                      </View>
+                      {entry.awards?.trim() ? (
+                        <Text style={{ color: colors.textSecondary }}>{entry.awards}</Text>
+                      ) : null}
+                    </Card>
+                  ))
+                ) : (
+                  <Text style={{ color: colors.textSecondary }}>
+                    Nessuna stagione salvata al momento.
+                  </Text>
+                )}
+              </Section>
+            ) : null}
+          </>
         ) : (
           <>
             <Section
@@ -774,21 +1253,24 @@ export default function ProfileScreen() {
                 }
                 value={formState.fullName}
               />
-              <Field
+              <BirthDateField
                 label="Data di nascita"
-                onChangeText={(value) =>
+                onChange={(value) =>
                   setFormState((current) => (current ? { ...current, birthDate: value } : current))
                 }
-                placeholder="YYYY-MM-DD"
                 value={formState.birthDate}
               />
-              <Field
+              <SelectField
+                allowClear
+                clearLabel="Rimuovi la nazionalita'"
                 label="Nazionalita'"
-                onChangeText={(value) =>
+                onChange={(value) =>
                   setFormState((current) =>
                     current ? { ...current, nationality: value } : current,
                   )
                 }
+                options={nationalityOptions}
+                placeholder="Seleziona la nazionalita'"
                 value={formState.nationality}
               />
               <Field
@@ -798,11 +1280,15 @@ export default function ProfileScreen() {
                 }
                 value={formState.city}
               />
-              <Field
+              <SelectField
+                allowClear
+                clearLabel="Rimuovi la regione"
                 label="Regione"
-                onChangeText={(value) =>
+                onChange={(value) =>
                   setFormState((current) => (current ? { ...current, region: value } : current))
                 }
+                options={regionOptions}
+                placeholder="Seleziona la regione"
                 value={formState.region}
               />
               <Field
@@ -1074,14 +1560,17 @@ export default function ProfileScreen() {
                                   careerEntries: current.careerEntries.map(
                                     (currentEntry, entryIndex) =>
                                       entryIndex === index
-                                        ? { ...currentEntry, seasonLabel: value }
+                                        ? {
+                                            ...currentEntry,
+                                            seasonLabel: normalizeSeasonLabelInput(value),
+                                          }
                                         : currentEntry,
                                   ),
                                 }
                               : current,
                           )
                         }
-                        placeholder="2024/25"
+                        placeholder="24/25"
                         value={entry.seasonLabel}
                       />
                       <Field
@@ -1398,13 +1887,17 @@ export default function ProfileScreen() {
                   }
                   value={formState.clubCity}
                 />
-                <Field
+                <SelectField
+                  allowClear
+                  clearLabel="Rimuovi la regione del club"
                   label="Regione club"
-                  onChangeText={(value) =>
+                  onChange={(value) =>
                     setFormState((current) =>
                       current ? { ...current, clubRegion: value } : current,
                     )
                   }
+                  options={clubRegionOptions}
+                  placeholder="Seleziona la regione del club"
                   value={formState.clubRegion}
                 />
                 <Field
@@ -1457,20 +1950,6 @@ export default function ProfileScreen() {
               </Section>
             ) : null}
 
-            <Pressable
-              disabled={isSaving}
-              onPress={() => void handleSave()}
-              style={{
-                paddingVertical: 16,
-                borderRadius: radius[18],
-                alignItems: "center",
-                backgroundColor: isSaving ? colors.borderStrong : colors.hero,
-              }}
-            >
-              <Text style={{ color: colors.inkInvert, fontSize: typography.fontSize[16], fontWeight: typography.fontWeight.heavy }}>
-                {isSaving ? "Salvataggio in corso..." : "Salva profilo completo"}
-              </Text>
-            </Pressable>
           </>
         )}
       </ScrollView>

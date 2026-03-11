@@ -8,6 +8,7 @@ import {
 } from "react-native";
 
 import { Screen } from "../../src/components/ui/screen";
+import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
 import {
   createInitialProfile,
@@ -15,6 +16,7 @@ import {
   type PlayerPosition,
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
+import { REGION_OPTIONS } from "../../src/features/profiles/profile-form-utils";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
 import { Button, Card, Input } from "../../src/ui";
 
@@ -284,9 +286,11 @@ export default function OnboardingProfileScreen() {
                   placeholder="Citta'"
                   value={clubCity}
                 />
-                <Input
-                  onChangeText={setClubRegion}
-                  placeholder="Regione"
+                <SelectField
+                  label="Regione"
+                  onChange={(value) => setClubRegion(value)}
+                  options={REGION_OPTIONS}
+                  placeholder="Seleziona la regione"
                   value={clubRegion}
                 />
               </View>
