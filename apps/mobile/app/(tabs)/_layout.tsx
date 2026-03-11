@@ -66,8 +66,8 @@ export default function TabsLayout() {
 function buildTabOptions(title: string, iconName: IconName) {
   return {
     title,
-    tabBarIcon: ({ color }: { color: string }) => (
-      <Icon color={color} name={iconName} size="lg" />
+    tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
+      <Icon active={focused} color={color} name={iconName} size="lg" />
     ),
   };
 }
