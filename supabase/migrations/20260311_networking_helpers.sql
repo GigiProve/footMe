@@ -40,7 +40,7 @@ begin
 
   if found then
     if existing_connection.status = 'blocked' then
-      raise exception 'Questa connessione non e'' disponibile';
+      raise exception 'Questa connessione non è disponibile';
     end if;
 
     if existing_connection.status = 'accepted' then

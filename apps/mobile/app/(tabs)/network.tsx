@@ -304,7 +304,7 @@ export default function NetworkScreen() {
               color: "rgba(255,253,252,0.78)",
             }}
           >
-            Ora la sezione rete non e' piu' solo discovery: puoi gestire
+            Ora la sezione rete non è più solo discovery: puoi gestire
             richieste, vedere connessioni attive e passare subito alla chat.
           </Text>
         </View>

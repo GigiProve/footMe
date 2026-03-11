@@ -61,17 +61,17 @@ export default function MessagesScreen() {
     () => summaries.reduce((total, summary) => total + summary.unread_count, 0),
     [summaries],
   );
+  const existingConversationProfiles = useMemo(
+    () => new Set(summaries.map((summary) => summary.other_profile_id)),
+    [summaries],
+  );
   const connectedWithoutConversation = useMemo(() => {
-    const existingConversationProfiles = new Set(
-      summaries.map((summary) => summary.other_profile_id),
-    );
-
     return connections.filter(
       (entry) =>
         entry.status === "accepted" &&
         !existingConversationProfiles.has(entry.other_profile_id),
     );
-  }, [connections, summaries]);
+  }, [connections, existingConversationProfiles]);
 
   const loadInbox = useCallback(async () => {
     if (!session?.user) {
@@ -163,7 +163,7 @@ export default function MessagesScreen() {
             }}
           >
             Le connessioni accettate possono trasformarsi in conversazioni 1:1.
-            Da qui controlli le chat, i messaggi non letti e chi e' pronto per
+            Da qui controlli le chat, i messaggi non letti e chi è pronto per
             il primo contatto.
           </Text>
         </View>
@@ -329,7 +329,7 @@ export default function MessagesScreen() {
               }}
             >
               <Text style={{ color: colors.textSecondary }}>
-                La tua inbox e' vuota. Accetta una connessione o avvia una chat
+                La tua inbox è vuota. Accetta una connessione o avvia una chat
                 dalla tab Rete.
               </Text>
             </View>

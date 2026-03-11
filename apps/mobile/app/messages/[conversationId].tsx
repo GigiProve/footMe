@@ -66,7 +66,6 @@ export default function ConversationScreen() {
       setIsLoading(true);
       const nextMessages = await getConversationMessages(conversationId);
       setMessages(nextMessages);
-      await markConversationRead(conversationId);
     } catch (error) {
       const message =
         error instanceof Error
@@ -75,6 +74,16 @@ export default function ConversationScreen() {
       Alert.alert("Conversazione non disponibile", message);
     } finally {
       setIsLoading(false);
+    }
+
+    try {
+      await markConversationRead(conversationId);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Impossibile aggiornare lo stato di lettura.";
+      Alert.alert("Stato lettura non aggiornato", message);
     }
   }, [conversationId]);
 
