@@ -4,6 +4,7 @@ import type {
   StaffSpecialization,
 } from "../onboarding/create-initial-profile";
 
+import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
 
 export type PreferredFoot = "right" | "left" | "both";
@@ -158,16 +159,6 @@ export type CompleteProfessionalProfileUpdate = {
     specialization: StaffSpecialization;
   } | null;
 };
-
-function slugify(value: string) {
-  return value
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 export async function getCompleteProfessionalProfile(profileId: string) {
   const { data: profileData, error: profileError } = await supabase

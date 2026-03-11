@@ -1,3 +1,4 @@
+import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
 
 export type AppRole = "player" | "coach" | "staff" | "club_admin";
@@ -24,16 +25,6 @@ type CreateInitialProfileInput = {
   staffSpecialization: StaffSpecialization;
   userId: string;
 };
-
-function slugify(value: string) {
-  return value
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 export async function createInitialProfile(input: CreateInitialProfileInput) {
   const fullName = input.fullName.trim();

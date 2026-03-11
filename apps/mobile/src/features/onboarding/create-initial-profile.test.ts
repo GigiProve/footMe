@@ -78,7 +78,7 @@ describe("createInitialProfile", () => {
   it("creates a club profile with an accent-safe slug", async () => {
     await createInitialProfile({
       clubCity: "  Città di Castello ",
-      clubName: "  Città Élite FC ",
+      clubName: "  Città Élite Naïve FC ",
       clubRegion: " Umbria ",
       fullName: "Club Owner",
       primaryPosition: "midfielder",
@@ -89,10 +89,10 @@ describe("createInitialProfile", () => {
 
     expect(upsertMocks.clubs).toHaveBeenCalledWith({
       city: "Città di Castello",
-      name: "Città Élite FC",
+      name: "Città Élite Naïve FC",
       owner_profile_id: "club-1",
       region: "Umbria",
-      slug: "citta-elite-fc",
+      slug: "citta-elite-naive-fc",
     });
   });
 
