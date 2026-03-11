@@ -39,4 +39,25 @@ describe("profile-form-utils", () => {
     });
     expect(buildBirthDate({ day: "", month: "02", year: "1998" })).toBe("");
   });
+
+  it("rejects invalid date formats and preserves syntactically valid ISO values", () => {
+    expect(splitBirthDate("invalid-date")).toEqual({
+      day: "",
+      month: "",
+      year: "",
+    });
+    expect(splitBirthDate("98-02-18")).toEqual({
+      day: "",
+      month: "",
+      year: "",
+    });
+  });
+
+  it("keeps ISO date parts even when the calendar values are unusual", () => {
+    expect(splitBirthDate("1998-13-45")).toEqual({
+      day: "45",
+      month: "13",
+      year: "1998",
+    });
+  });
 });
