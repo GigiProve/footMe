@@ -1399,6 +1399,7 @@ export default function ProfileScreen() {
                           Stagione {index + 1}
                         </Text>
                         <Button
+                          accessibilityLabel={`Rimuovi stagione ${index + 1}`}
                           destructive
                           label="Rimuovi"
                           onPress={() =>

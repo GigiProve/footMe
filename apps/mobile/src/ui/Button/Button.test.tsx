@@ -2,7 +2,7 @@ import React from "react";
 import TestRenderer from "react-test-renderer";
 import { describe, expect, it } from "vitest";
 
-import { colors } from "../../theme/tokens";
+import { colors } from "../../styles";
 import { Button } from "./Button";
 
 describe("Button", () => {

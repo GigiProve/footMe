@@ -91,13 +91,26 @@ function resolvePalette(variant: ButtonVariant, destructive: boolean, selected: 
 
 function resolveContainerSize(size: ButtonSize, variant: ButtonVariant): ViewStyle {
   const height = buttonHeights[size];
+  const borderRadius = resolveBorderRadius(variant);
 
   return {
-    borderRadius: variant === "chipAction" ? buttonRadius.chip : variant === "icon" ? buttonRadius.icon : buttonRadius.default,
+    borderRadius,
     minHeight: height,
     paddingHorizontal: variant === "icon" ? 0 : buttonHorizontalPadding[size],
     width: variant === "icon" ? height : undefined,
   };
+}
+
+function resolveBorderRadius(variant: ButtonVariant) {
+  if (variant === "chipAction") {
+    return buttonRadius.chip;
+  }
+
+  if (variant === "icon") {
+    return buttonRadius.icon;
+  }
+
+  return buttonRadius.default;
 }
 
 function resolveLabelSize(size: ButtonSize): TextStyle {

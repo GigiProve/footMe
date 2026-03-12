@@ -59,6 +59,7 @@
 ## Regole UX obbligatorie
 
 - Al massimo una `primary` dominante per sezione/schermata.
+- Nelle liste dense o ripetute (es. risultati in `network` o card annunci) preferire `secondary` anche per l’azione principale della card, così la schermata non diventa una griglia di primary concorrenti.
 - `danger` solo per azioni semanticamente distruttive o irreversibili.
 - `secondary` per alternative alla CTA principale (`Annulla`, `Indietro`, `Aggiorna`, `Messaggia`).
 - `link`/`tertiary` per navigazione o azioni leggere.
