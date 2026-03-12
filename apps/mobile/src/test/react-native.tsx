@@ -11,6 +11,7 @@ const createComponent = (name: string) =>
   };
 
 export const SafeAreaView = createComponent("SafeAreaView");
+export const ActivityIndicator = createComponent("ActivityIndicator");
 export const Image = createComponent("Image");
 export const Pressable = createComponent("Pressable");
 export const Text = createComponent("Text");

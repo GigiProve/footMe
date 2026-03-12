@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import {
   Alert,
-  Pressable,
   ScrollView,
   Text,
   View,
@@ -27,7 +26,7 @@ import {
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
-import { Input } from "../../src/ui";
+import { Button, Input } from "../../src/ui";
 
 const modeOptions: { label: string; value: SearchMode }[] = [
   { label: "Profili", value: "profiles" },
@@ -421,42 +420,23 @@ export default function NetworkScreen() {
                 {formatLocation(entry.other_city, entry.other_region)}
               </Text>
               <View style={{ flexDirection: "row", gap: spacing[10] }}>
-                <Pressable
+                <Button
                   disabled={actionConnectionId === entry.connection_id}
+                  label="Accetta"
                   onPress={() =>
                     handleUpdateConnectionStatus(entry.connection_id, "accepted")
                   }
-                  style={{
-                    flex: 1,
-                    paddingVertical: 12,
-                    borderRadius: radius[14],
-                    alignItems: "center",
-                    backgroundColor: colors.accent,
-                  }}
-                >
-                  <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
-                    Accetta
-                  </Text>
-                </Pressable>
-                <Pressable
+                  style={{ flex: 1 }}
+                />
+                <Button
                   disabled={actionConnectionId === entry.connection_id}
+                  label="Rifiuta"
                   onPress={() =>
                     handleUpdateConnectionStatus(entry.connection_id, "rejected")
                   }
-                  style={{
-                    flex: 1,
-                    paddingVertical: 12,
-                    borderRadius: radius[14],
-                    alignItems: "center",
-                    backgroundColor: colors.surfaceMuted,
-                    borderWidth: 1,
-                    borderColor: colors.borderStrong,
-                  }}
-                >
-                  <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-                    Rifiuta
-                  </Text>
-                </Pressable>
+                  style={{ flex: 1 }}
+                  variant="secondary"
+                />
               </View>
             </View>
           ))}
@@ -492,27 +472,22 @@ export default function NetworkScreen() {
                       ? ` · ${formatPosition(entry.other_primary_position)}`
                       : ""}
                   </Text>
-                  <Pressable
+                  <Button
                     disabled={actionProfileId === entry.other_profile_id}
+                    fullWidth
+                    label={
+                      actionProfileId === entry.other_profile_id
+                        ? "Apertura chat..."
+                        : "Apri chat"
+                    }
                     onPress={() =>
                       handleOpenConversation(
                         entry.other_profile_id,
                         entry.other_full_name,
                       )
                     }
-                    style={{
-                      paddingVertical: 12,
-                      borderRadius: radius[14],
-                      alignItems: "center",
-                      backgroundColor: colors.hero,
-                    }}
-                  >
-                    <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
-                      {actionProfileId === entry.other_profile_id
-                        ? "Apertura chat..."
-                        : "Apri chat"}
-                    </Text>
-                  </Pressable>
+                    variant="secondary"
+                  />
                 </View>
               ))}
             </View>
@@ -539,29 +514,14 @@ export default function NetworkScreen() {
               const isActive = option.value === mode;
 
               return (
-                <Pressable
+                <Button
                   key={option.value}
+                  label={option.label}
                   onPress={() => setMode(option.value)}
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: radius.full,
-                    backgroundColor: isActive
-                      ? colors.textPrimary
-                      : colors.background,
-                    borderWidth: 1,
-                    borderColor: isActive ? colors.textPrimary : colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: isActive ? colors.inkInvert : colors.textPrimary,
-                      fontWeight: typography.fontWeight.bold,
-                    }}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
+                  selected={isActive}
+                  size="sm"
+                  variant="chipAction"
+                />
               );
             })}
           </View>
@@ -592,29 +552,14 @@ export default function NetworkScreen() {
                   const isActive = option.value === roleFilter;
 
                   return (
-                    <Pressable
+                    <Button
                       key={option.value}
+                      label={option.label}
                       onPress={() => setRoleFilter(option.value)}
-                      style={{
-                        paddingHorizontal: 12,
-                        paddingVertical: 10,
-                        borderRadius: radius.full,
-                        backgroundColor: isActive
-                          ? colors.accent
-                          : colors.background,
-                        borderWidth: 1,
-                        borderColor: isActive ? colors.accent : colors.border,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: isActive ? colors.inkInvert : colors.textPrimary,
-                          fontWeight: typography.fontWeight.bold,
-                        }}
-                      >
-                        {option.label}
-                      </Text>
-                    </Pressable>
+                      selected={isActive}
+                      size="sm"
+                      variant="chipAction"
+                    />
                   );
                 })}
               </View>
@@ -630,29 +575,14 @@ export default function NetworkScreen() {
                 const isActive = option.value === positionFilter;
 
                 return (
-                  <Pressable
+                  <Button
                     key={option.value}
+                    label={option.label}
                     onPress={() => setPositionFilter(option.value)}
-                    style={{
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderRadius: radius.full,
-                      backgroundColor: isActive
-                        ? colors.hero
-                        : colors.background,
-                      borderWidth: 1,
-                      borderColor: isActive ? colors.hero : colors.border,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: isActive ? colors.inkInvert : colors.textPrimary,
-                        fontWeight: typography.fontWeight.bold,
-                      }}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
+                    selected={isActive}
+                    size="sm"
+                    variant="chipAction"
+                  />
                 );
               })}
             </View>
@@ -753,66 +683,40 @@ export default function NetworkScreen() {
                     <Text style={{ color: colors.textSecondary }}>{statusLabel}</Text>
                   ) : null}
                   {connection?.status === "accepted" ? (
-                    <Pressable
+                    <Button
                       disabled={isBusy}
+                      fullWidth
+                      label={isBusy ? "Apertura chat..." : "Messaggia"}
                       onPress={() =>
                         handleOpenConversation(result.profile_id, result.full_name)
                       }
-                      style={{
-                        paddingVertical: 12,
-                        borderRadius: radius[14],
-                        alignItems: "center",
-                        backgroundColor: colors.hero,
-                      }}
-                    >
-                      <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
-                        {isBusy ? "Apertura chat..." : "Messaggia"}
-                      </Text>
-                    </Pressable>
+                      variant="secondary"
+                    />
                   ) : connection?.status === "pending" && !connection.is_requester ? (
                     <View style={{ flexDirection: "row", gap: spacing[10] }}>
-                      <Pressable
+                      <Button
                         disabled={actionConnectionId === connection.connection_id}
+                        label="Accetta"
                         onPress={() =>
                           handleUpdateConnectionStatus(
                             connection.connection_id,
                             "accepted",
                           )
                         }
-                        style={{
-                          flex: 1,
-                          paddingVertical: 12,
-                          borderRadius: radius[14],
-                          alignItems: "center",
-                          backgroundColor: colors.accent,
-                        }}
-                      >
-                        <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
-                          Accetta
-                        </Text>
-                      </Pressable>
-                      <Pressable
+                        style={{ flex: 1 }}
+                      />
+                      <Button
                         disabled={actionConnectionId === connection.connection_id}
+                        label="Rifiuta"
                         onPress={() =>
                           handleUpdateConnectionStatus(
                             connection.connection_id,
                             "rejected",
                           )
                         }
-                        style={{
-                          flex: 1,
-                          paddingVertical: 12,
-                          borderRadius: radius[14],
-                          alignItems: "center",
-                          backgroundColor: colors.surfaceMuted,
-                          borderWidth: 1,
-                          borderColor: colors.borderStrong,
-                        }}
-                      >
-                        <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-                          Rifiuta
-                        </Text>
-                      </Pressable>
+                        style={{ flex: 1 }}
+                        variant="secondary"
+                      />
                     </View>
                   ) : connection?.status === "pending" && connection.is_requester ? (
                     <View
@@ -841,21 +745,14 @@ export default function NetworkScreen() {
                       </Text>
                     </View>
                   ) : (
-                    <Pressable
-                      disabled={isBusy}
-                      onPress={() => handleRequestConnection(result.profile_id)}
-                      style={{
-                        paddingVertical: 12,
-                        borderRadius: radius[14],
-                        alignItems: "center",
-                        backgroundColor: colors.accent,
-                      }}
-                    >
-                      <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
-                        {isBusy ? "Invio richiesta..." : "Connettiti"}
-                      </Text>
-                    </Pressable>
-                  )}
+                      <Button
+                        disabled={isBusy}
+                        fullWidth
+                        label={isBusy ? "Invio richiesta..." : "Connettiti"}
+                        onPress={() => handleRequestConnection(result.profile_id)}
+                        variant="secondary"
+                      />
+                    )}
                 </View>
               );
             })

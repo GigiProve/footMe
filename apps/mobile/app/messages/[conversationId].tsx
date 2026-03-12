@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   Alert,
-  Pressable,
   ScrollView,
   Text,
   View,
@@ -149,11 +148,13 @@ export default function ConversationScreen() {
             backgroundColor: colors.textPrimary,
           }}
         >
-          <Pressable onPress={() => router.back()}>
-            <Text style={{ color: colors.heroSoft, fontWeight: "700" }}>
-              ← Torna ai messaggi
-            </Text>
-          </Pressable>
+          <Button
+            label="← Torna ai messaggi"
+            onPress={() => router.back()}
+            size="sm"
+            style={{ alignSelf: "flex-start" }}
+            variant="link"
+          />
           <Text
             style={{
               fontSize: 28,
@@ -254,7 +255,7 @@ export default function ConversationScreen() {
             disabled={isSending}
             label={isSending ? "Invio in corso..." : "Invia messaggio"}
             onPress={handleSendMessage}
-            variant="hero"
+            variant="primary"
           />
         </Card>
       </View>

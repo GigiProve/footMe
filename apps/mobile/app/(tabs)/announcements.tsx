@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
-  Pressable,
   ScrollView,
   Text,
   View,
@@ -398,50 +397,24 @@ export default function AnnouncementsScreen() {
                 ) : null}
 
                 <View style={{ flexDirection: "row", gap: spacing[10] }}>
-                  <Pressable
+                  <Button
                     disabled={isSubmittingAd}
+                    label={ad.is_saved ? "Salvato" : "Salva"}
                     onPress={() => handleToggleSavedAd(ad.id, !ad.is_saved)}
-                    style={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      borderRadius: radius[14],
-                      backgroundColor: ad.is_saved
-                        ? colors.surfaceMuted
-                        : colors.background,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                    }}
-                  >
-                    <Text
-                      style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
-                    >
-                      {ad.is_saved ? "Salvato" : "Salva"}
-                    </Text>
-                  </Pressable>
+                    size="sm"
+                    variant={ad.is_saved ? "tertiary" : "secondary"}
+                  />
 
                   {profile?.role === "player" ? (
-                    <Pressable
+                    <Button
                       disabled={isSubmittingAd || !!ad.application_status}
+                      label={ad.application_status ? "Gia' candidato" : "Candidati"}
                       onPress={() =>
-                        setSelectedAdId((current) =>
-                          current === ad.id ? null : ad.id,
-                        )
+                        setSelectedAdId((current) => (current === ad.id ? null : ad.id))
                       }
-                      style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderRadius: radius[14],
-                        backgroundColor: ad.application_status
-                          ? colors.borderStrong
-                          : colors.hero,
-                      }}
-                    >
-                      <Text
-                        style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}
-                      >
-                        {ad.application_status ? "Gia' candidato" : "Candidati"}
-                      </Text>
-                    </Pressable>
+                      size="sm"
+                      variant={ad.application_status ? "secondary" : "primary"}
+                    />
                   ) : null}
                 </View>
 
@@ -464,30 +437,16 @@ export default function AnnouncementsScreen() {
                       value={coverMessage}
                     />
                     <View style={{ flexDirection: "row", gap: spacing[10] }}>
-                      <Pressable
+                      <Button
                         disabled={isSubmittingAd}
+                        label="Annulla"
                         onPress={() => {
                           setSelectedAdId(null);
                           setCoverMessage("");
                         }}
-                        style={{
-                          paddingHorizontal: 16,
-                          paddingVertical: 12,
-                          borderRadius: radius[14],
-                          backgroundColor: colors.background,
-                          borderWidth: 1,
-                          borderColor: colors.border,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: colors.textPrimary,
-                            fontWeight: typography.fontWeight.bold,
-                          }}
-                        >
-                          Annulla
-                        </Text>
-                      </Pressable>
+                        size="sm"
+                        variant="secondary"
+                      />
                       <Button
                         disabled={isSubmittingAd}
                         label={isSubmittingAd ? "Invio..." : "Invia candidatura"}
@@ -559,29 +518,14 @@ export default function AnnouncementsScreen() {
               const isActive = form.roleRequired === entry.value;
 
               return (
-                <Pressable
+                <Button
                   key={entry.value}
+                  label={entry.label}
                   onPress={() => patchForm("roleRequired", entry.value)}
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: radius.full,
-                    backgroundColor: isActive
-                      ? colors.accent
-                      : colors.background,
-                    borderWidth: 1,
-                    borderColor: isActive ? colors.accent : colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: isActive ? colors.inkInvert : colors.textPrimary,
-                      fontWeight: typography.fontWeight.semibold,
-                    }}
-                  >
-                    {entry.label}
-                  </Text>
-                </Pressable>
+                  selected={isActive}
+                  size="sm"
+                  variant="chipAction"
+                />
               );
             })}
           </View>

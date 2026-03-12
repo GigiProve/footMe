@@ -220,27 +220,13 @@ function OptionPill({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      accessibilityRole="button"
+    <Button
+      label={label}
       onPress={onPress}
-      style={{
-        paddingHorizontal: spacing[14],
-        paddingVertical: spacing[10],
-        borderRadius: radius.full,
-        borderWidth: 1,
-        borderColor: active ? colors.hero : colors.border,
-        backgroundColor: active ? colors.hero : colors.background,
-      }}
-    >
-      <Text
-        style={{
-          color: active ? colors.inkInvert : colors.textPrimary,
-          fontWeight: typography.fontWeight.bold,
-        }}
-      >
-        {label}
-      </Text>
-    </Pressable>
+      selected={active}
+      size="sm"
+      variant="chipAction"
+    />
   );
 }
 
@@ -659,7 +645,7 @@ export default function OnboardingProfileScreen() {
               );
             })}
 
-            <Button label="Continua" onPress={() => setStep("base")} variant="hero" />
+            <Button label="Continua" onPress={() => setStep("base")} variant="primary" />
           </Card>
         ) : null}
 
@@ -836,7 +822,7 @@ export default function OnboardingProfileScreen() {
                   disabled={isBusy}
                   label={isBusy ? "Salvataggio..." : "Salva e continua"}
                   onPress={handleContinueToDecision}
-                  variant="hero"
+                  variant="primary"
                 />
               </View>
             </View>
@@ -874,7 +860,7 @@ export default function OnboardingProfileScreen() {
               disabled={isBusy}
               label="Completa ora il tuo profilo sportivo"
               onPress={() => handleChooseCompletion("now")}
-              variant="hero"
+              variant="primary"
             />
             <Button
               disabled={isBusy}
@@ -1480,7 +1466,7 @@ export default function OnboardingProfileScreen() {
                   disabled={isBusy}
                   label={isBusy ? "Salvataggio..." : "Conferma profilo"}
                   onPress={handleSubmitDetails}
-                  variant="hero"
+                  variant="primary"
                 />
               </View>
             </View>
@@ -1505,7 +1491,7 @@ export default function OnboardingProfileScreen() {
             <Button
               label="Vai alla home feed"
               onPress={() => finishOnboarding("feed")}
-              variant="hero"
+              variant="primary"
             />
             <Button
               label="Cerca squadre e contatti"
@@ -1515,7 +1501,7 @@ export default function OnboardingProfileScreen() {
             <Button
               label="Completa ulteriormente il profilo"
               onPress={() => finishOnboarding("profile")}
-              variant="ghost"
+              variant="tertiary"
             />
           </Card>
         ) : null}
