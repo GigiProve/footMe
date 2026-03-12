@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createInitialProfile } from "./create-initial-profile";
+import { DEFAULT_PROFILE_AVATAR_URI } from "../profiles/profile-avatar";
 
 const { fromMock, upsertMocks } = vi.hoisted(() => {
   const upsertMocks = {
@@ -168,9 +169,35 @@ describe("createInitialProfile", () => {
         userId: "user-3",
       }),
     ).rejects.toThrow(
-      "Completa sesso, data di nascita, nazionalita', residenza, domicilio e foto profilo.",
+      "Completa sesso, data di nascita, nazionalita', residenza e domicilio.",
     );
 
     expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it("uses the blank default avatar when no profile image is uploaded", async () => {
+    await createInitialProfile({
+      avatarUrl: " ",
+      birthDate: "1998-05-12",
+      clubCity: "",
+      clubName: "",
+      clubRegion: "",
+      domicile: "Assisi",
+      fullName: "Marco Rossi",
+      gender: "male",
+      nationality: "IT",
+      phoneNumber: "",
+      primaryPosition: "forward",
+      residence: "Perugia",
+      role: "player",
+      staffSpecialization: "fitness_coach",
+      userId: "user-4",
+    });
+
+    expect(upsertMocks.profiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        avatar_url: DEFAULT_PROFILE_AVATAR_URI,
+      }),
+    );
   });
 });

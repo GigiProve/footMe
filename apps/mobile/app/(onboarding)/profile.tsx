@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
+import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { MediaPickerField } from "../../src/components/ui/media-picker-field";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
@@ -14,15 +15,12 @@ import {
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
 import {
-  BIRTH_MONTH_OPTIONS,
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
-  composeBirthDate,
-  createBirthDayOptions,
-  createBirthYearOptions,
   isSeasonLabelValid,
   normalizeSeasonLabelInput,
 } from "../../src/features/profiles/profile-form-utils";
+import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
 import {
   pickAndUploadMedia,
   type UploadedMediaItem,
@@ -254,9 +252,7 @@ export default function OnboardingProfileScreen() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [gender, setGender] = useState<ProfileGender>("male");
-  const [birthYear, setBirthYear] = useState("");
-  const [birthMonth, setBirthMonth] = useState("");
-  const [birthDay, setBirthDay] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [nationality, setNationality] = useState("");
   const [residence, setResidence] = useState("");
   const [useResidenceForDomicile, setUseResidenceForDomicile] = useState(true);
@@ -306,18 +302,7 @@ export default function OnboardingProfileScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
-  const birthYearOptions = useMemo(() => createBirthYearOptions(), []);
-  const birthDayOptions = useMemo(
-    () => createBirthDayOptions(birthYear, birthMonth),
-    [birthMonth, birthYear],
-  );
-
   const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-  const birthDate = composeBirthDate({
-    day: birthDay,
-    month: birthMonth,
-    year: birthYear,
-  });
   const effectiveDomicile = useResidenceForDomicile ? residence : domicile;
 
   const stepIndex = {
@@ -512,7 +497,7 @@ export default function OnboardingProfileScreen() {
               }
             : null,
         profile: {
-          avatar_url: parseOptionalText(avatarUrl),
+          avatar_url: withDefaultProfileAvatar(avatarUrl),
           bio: parseOptionalText(bio),
           birth_date: birthDate,
           city: null,
@@ -731,40 +716,12 @@ export default function OnboardingProfileScreen() {
               </View>
             </View>
 
-            <View style={{ gap: spacing[12] }}>
-              <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-                Data di nascita
-              </Text>
-              <View style={{ flexDirection: "row", gap: spacing[10] }}>
-                <View style={{ flex: 1 }}>
-                  <SelectField
-                    label="Giorno"
-                    onChange={(value) => setBirthDay(value)}
-                    options={birthDayOptions}
-                    placeholder="GG"
-                    value={birthDay}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <SelectField
-                    label="Mese"
-                    onChange={(value) => setBirthMonth(value)}
-                    options={BIRTH_MONTH_OPTIONS}
-                    placeholder="MM"
-                    value={birthMonth}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <SelectField
-                    label="Anno"
-                    onChange={(value) => setBirthYear(value)}
-                    options={birthYearOptions}
-                    placeholder="AAAA"
-                    value={birthYear}
-                  />
-                </View>
-              </View>
-            </View>
+            <DatePickerField
+              label="Data di nascita"
+              onChange={setBirthDate}
+              placeholder="Apri il calendario e seleziona la data"
+              value={birthDate}
+            />
 
             <SelectField
               label="Nazionalita'"
@@ -818,7 +775,7 @@ export default function OnboardingProfileScreen() {
 
             <MediaPickerField
               buttonLabel="Carica foto profilo"
-              helperText="La foto profilo e' obbligatoria per completare il primo accesso."
+              helperText="Se non la carichi ora useremo un'immagine profilo blank di default."
               isUploading={uploadingField === "avatar"}
               label="Foto profilo"
               onPick={() =>
@@ -829,9 +786,11 @@ export default function OnboardingProfileScreen() {
                   onUploaded: (items) => setAvatarUrl(items[0]?.url ?? ""),
                 })
               }
-              previewUrl={avatarUrl}
+              previewUrl={withDefaultProfileAvatar(avatarUrl)}
               selectedLabel={
-                avatarUrl ? "Immagine profilo caricata correttamente" : undefined
+                avatarUrl
+                  ? "Immagine profilo caricata correttamente"
+                  : "Immagine blank di default attiva"
               }
             />
 

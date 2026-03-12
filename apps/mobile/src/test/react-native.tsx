@@ -11,5 +11,9 @@ const createComponent = (name: string) =>
   };
 
 export const SafeAreaView = createComponent("SafeAreaView");
+export const Pressable = createComponent("Pressable");
 export const Text = createComponent("Text");
 export const View = createComponent("View");
+export const Platform = {
+  OS: "ios",
+};

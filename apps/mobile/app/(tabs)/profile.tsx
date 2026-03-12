@@ -7,25 +7,22 @@ import {
   View,
 } from "react-native";
 
+import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
 import {
-  BIRTH_MONTH_OPTIONS,
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
-  composeBirthDate,
-  createBirthDayOptions,
-  createBirthYearOptions,
   ensureOption,
   formatBirthDate,
   formatListSummary,
   formatOptionalSummary,
-  getBirthDateParts,
   getOptionLabel,
   isSeasonLabelValid,
   normalizeSeasonLabelInput,
 } from "../../src/features/profiles/profile-form-utils";
+import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
 import {
   getCompleteProfessionalProfile,
   updateCompleteProfessionalProfile,
@@ -429,81 +426,13 @@ function BirthDateField({
   onChange: (value: string) => void;
   value: string;
 }) {
-  const [parts, setParts] = useState(() => getBirthDateParts(value));
-  const { day, month, year } = parts;
-  const yearOptions = useMemo(() => createBirthYearOptions(), []);
-  const dayOptions = useMemo(
-    () => createBirthDayOptions(year, month),
-    [month, year],
-  );
-
-  useEffect(() => {
-    const nextParts = getBirthDateParts(value);
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      setParts(nextParts);
-    }
-  }, [value]);
-
-  function handlePartChange(partial: Partial<{ day: string; month: string; year: string }>) {
-    setParts((currentParts) => {
-      const nextYear = partial.year ?? currentParts.year;
-      const nextMonth = partial.month ?? currentParts.month;
-      const rawDay = partial.day ?? currentParts.day;
-      const maxDay = createBirthDayOptions(nextYear, nextMonth).length;
-      const nextDay =
-        rawDay && Number(rawDay) > maxDay
-          ? String(maxDay).padStart(2, "0")
-          : rawDay;
-      const nextParts = {
-        day: nextDay,
-        month: nextMonth,
-        year: nextYear,
-      };
-
-      onChange(composeBirthDate(nextParts));
-      return nextParts;
-    });
-  }
-
   return (
-    <View style={{ gap: spacing[8] }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-        {label}
-      </Text>
-      <View style={{ gap: spacing[10] }}>
-        <SelectField
-          allowClear
-          clearLabel="Rimuovi il giorno"
-          label="Giorno"
-          onChange={(selectedDay) => handlePartChange({ day: selectedDay })}
-          options={dayOptions}
-          placeholder="Seleziona il giorno"
-          value={day}
-        />
-        <SelectField
-          allowClear
-          clearLabel="Rimuovi il mese"
-          label="Mese"
-          onChange={(selectedMonth) => handlePartChange({ month: selectedMonth })}
-          options={BIRTH_MONTH_OPTIONS}
-          placeholder="Seleziona il mese"
-          value={month}
-        />
-        <SelectField
-          allowClear
-          clearLabel="Rimuovi l'anno"
-          label="Anno"
-          onChange={(selectedYear) => handlePartChange({ year: selectedYear })}
-          options={yearOptions}
-          placeholder="Seleziona l'anno"
-          value={year}
-        />
-      </View>
-      <Text style={{ color: colors.textSecondary }}>
-        {value ? `Data selezionata: ${formatBirthDate(value)}` : "Seleziona giorno, mese e anno dal picker."}
-      </Text>
-    </View>
+    <DatePickerField
+      label={label}
+      onChange={onChange}
+      placeholder="Apri il calendario e scegli la data"
+      value={value}
+    />
   );
 }
 
@@ -1009,7 +938,7 @@ export default function ProfileScreen() {
               }
             : null,
         profile: {
-          avatar_url: parseOptionalText(formState.avatarUrl),
+          avatar_url: withDefaultProfileAvatar(formState.avatarUrl),
           bio: parseOptionalText(formState.bio),
           birth_date: parseOptionalText(formState.birthDate),
           city: parseOptionalText(formState.city),
@@ -1309,12 +1238,13 @@ export default function ProfileScreen() {
                 value={formState.bio}
               />
               <Field
-                label="URL foto profilo"
+                label="URL foto profilo (facoltativo)"
                 onChangeText={(value) =>
                   setFormState((current) =>
                     current ? { ...current, avatarUrl: value } : current,
                   )
                 }
+                placeholder="Lascia vuoto per usare l'immagine blank di default"
                 value={formState.avatarUrl}
               />
               <BooleanField

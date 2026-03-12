@@ -1,5 +1,6 @@
 import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
+import { withDefaultProfileAvatar } from "../profiles/profile-avatar";
 
 export type AppRole = "player" | "coach" | "staff" | "club_admin";
 export type ProfileGender =
@@ -39,7 +40,7 @@ type CreateInitialProfileInput = {
 };
 
 export async function createInitialProfile(input: CreateInitialProfileInput) {
-  const avatarUrl = input.avatarUrl.trim();
+  const avatarUrl = withDefaultProfileAvatar(input.avatarUrl);
   const birthDate = input.birthDate.trim();
   const domicile = input.domicile.trim();
   const fullName = input.fullName.trim();
@@ -57,11 +58,10 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
     !gender ||
     !nationality ||
     !residence ||
-    !domicile ||
-    !avatarUrl
+    !domicile
   ) {
     throw new Error(
-      "Completa sesso, data di nascita, nazionalita', residenza, domicilio e foto profilo.",
+      "Completa sesso, data di nascita, nazionalita', residenza e domicilio.",
     );
   }
 
