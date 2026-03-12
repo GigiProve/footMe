@@ -22,6 +22,14 @@ npm install
 npm run dev:mobile
 ```
 
+Per aprire subito il QR code in Expo Go e condividere i progressi anche fuori dalla rete locale:
+
+```bash
+npm run qr:mobile
+```
+
+Il comando avvia Expo in modalita' tunnel e mostra il QR code nel terminale, pronto da scansionare con Expo Go.
+
 Documenti di riferimento:
 
 - `docs/product-requirements.md`
