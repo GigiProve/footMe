@@ -37,11 +37,18 @@ describe("createInitialProfile", () => {
   it("rejects empty full name before calling Supabase", async () => {
     await expect(
       createInitialProfile({
+        avatarUrl: "https://example.com/avatar.jpg",
+        birthDate: "1998-05-12",
         clubCity: "",
         clubName: "",
         clubRegion: "",
+        domicile: "Perugia",
         fullName: "   ",
+        gender: "male",
+        nationality: "IT",
+        phoneNumber: "",
         primaryPosition: "midfielder",
+        residence: "Perugia",
         role: "player",
         staffSpecialization: "fitness_coach",
         userId: "user-1",
@@ -53,19 +60,33 @@ describe("createInitialProfile", () => {
 
   it("creates a player profile with trimmed base profile data", async () => {
     await createInitialProfile({
+      avatarUrl: " https://example.com/avatar.jpg ",
+      birthDate: "1998-05-12",
       clubCity: "",
       clubName: "",
       clubRegion: "",
+      domicile: "  Assisi ",
       fullName: "  Marco Rossi  ",
+      gender: "male",
+      nationality: " IT ",
+      phoneNumber: " +39 333 1234567 ",
       primaryPosition: "forward",
+      residence: "  Perugia ",
       role: "player",
       staffSpecialization: "fitness_coach",
       userId: "user-2",
     });
 
     expect(upsertMocks.profiles).toHaveBeenCalledWith({
+      avatar_url: "https://example.com/avatar.jpg",
+      birth_date: "1998-05-12",
+      domicile: "Assisi",
       full_name: "Marco Rossi",
+      gender: "male",
       id: "user-2",
+      nationality: "IT",
+      phone_number: "+39 333 1234567",
+      residence: "Perugia",
       role: "player",
     });
     expect(upsertMocks.player_profiles).toHaveBeenCalledWith({
@@ -77,11 +98,18 @@ describe("createInitialProfile", () => {
 
   it("creates a club profile with an accent-safe slug", async () => {
     await createInitialProfile({
+      avatarUrl: "https://example.com/avatar.jpg",
+      birthDate: "1988-03-17",
       clubCity: "  Città di Castello ",
       clubName: "  Città Élite Naïve FC ",
       clubRegion: " Umbria ",
+      domicile: "Città di Castello",
       fullName: "Club Owner",
+      gender: "female",
+      nationality: "IT",
+      phoneNumber: "",
       primaryPosition: "midfielder",
+      residence: "Città di Castello",
       role: "club_admin",
       staffSpecialization: "fitness_coach",
       userId: "club-1",
@@ -99,11 +127,18 @@ describe("createInitialProfile", () => {
   it("requires club identity fields for club admins", async () => {
     await expect(
       createInitialProfile({
+        avatarUrl: "https://example.com/avatar.jpg",
+        birthDate: "1988-03-17",
         clubCity: " ",
         clubName: "Club",
         clubRegion: "",
+        domicile: "Roma",
         fullName: "Club Owner",
+        gender: "male",
+        nationality: "IT",
+        phoneNumber: "",
         primaryPosition: "midfielder",
+        residence: "Roma",
         role: "club_admin",
         staffSpecialization: "fitness_coach",
         userId: "club-2",
@@ -111,5 +146,31 @@ describe("createInitialProfile", () => {
     ).rejects.toThrow("Per una societa' servono nome, citta' e regione.");
 
     expect(upsertMocks.clubs).not.toHaveBeenCalled();
+  });
+
+  it("requires the mandatory base onboarding fields", async () => {
+    await expect(
+      createInitialProfile({
+        avatarUrl: " ",
+        birthDate: "",
+        clubCity: "",
+        clubName: "",
+        clubRegion: "",
+        domicile: "",
+        fullName: "Player Example",
+        gender: "male",
+        nationality: "",
+        phoneNumber: "",
+        primaryPosition: "midfielder",
+        residence: "",
+        role: "player",
+        staffSpecialization: "fitness_coach",
+        userId: "user-3",
+      }),
+    ).rejects.toThrow(
+      "Completa sesso, data di nascita, nazionalita', residenza, domicilio e foto profilo.",
+    );
+
+    expect(fromMock).not.toHaveBeenCalled();
   });
 });

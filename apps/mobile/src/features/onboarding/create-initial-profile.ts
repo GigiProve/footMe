@@ -2,6 +2,11 @@ import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
 
 export type AppRole = "player" | "coach" | "staff" | "club_admin";
+export type ProfileGender =
+  | "male"
+  | "female"
+  | "non_binary"
+  | "prefer_not_to_say";
 export type PlayerPosition =
   | "goalkeeper"
   | "defender"
@@ -16,21 +21,47 @@ export type StaffSpecialization =
   | "other";
 
 type CreateInitialProfileInput = {
+  avatarUrl: string;
+  birthDate: string;
   clubCity: string;
   clubName: string;
   clubRegion: string;
+  domicile: string;
   fullName: string;
+  gender: ProfileGender;
+  nationality: string;
+  phoneNumber: string;
   primaryPosition: PlayerPosition;
+  residence: string;
   role: AppRole;
   staffSpecialization: StaffSpecialization;
   userId: string;
 };
 
 export async function createInitialProfile(input: CreateInitialProfileInput) {
+  const avatarUrl = input.avatarUrl.trim();
+  const birthDate = input.birthDate.trim();
+  const domicile = input.domicile.trim();
   const fullName = input.fullName.trim();
+  const nationality = input.nationality.trim();
+  const phoneNumber = input.phoneNumber.trim();
+  const residence = input.residence.trim();
 
   if (!fullName) {
     throw new Error("Inserisci nome e cognome prima di continuare.");
+  }
+
+  if (
+    !birthDate ||
+    !input.gender ||
+    !nationality ||
+    !residence ||
+    !domicile ||
+    !avatarUrl
+  ) {
+    throw new Error(
+      "Completa sesso, data di nascita, nazionalita', residenza, domicilio e foto profilo.",
+    );
   }
 
   if (input.role === "club_admin") {
@@ -44,9 +75,16 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
   }
 
   const { error: profileError } = await supabase.from("profiles").upsert({
+    avatar_url: avatarUrl,
+    birth_date: birthDate,
+    domicile,
     id: input.userId,
+    gender: input.gender,
     role: input.role,
     full_name: fullName,
+    nationality,
+    phone_number: phoneNumber || null,
+    residence,
   });
 
   if (profileError) {
