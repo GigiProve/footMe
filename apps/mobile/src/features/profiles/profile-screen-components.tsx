@@ -112,7 +112,6 @@ export function ProfileField({
   renderInput,
   value,
 }: ProfileFieldProps) {
-  const displayValue = value.trim() ? value : "Da completare";
   const isEditable = editable || Boolean(renderInput) || Boolean(onChangeText);
 
   return (
@@ -131,7 +130,7 @@ export function ProfileField({
         )
       ) : (
         <View style={styles.readonlySurface}>
-          <Text style={styles.readonlyValue}>{displayValue}</Text>
+          <Text style={styles.readonlyValue}>{value.trim() ? value : "Da completare"}</Text>
         </View>
       )}
       {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}

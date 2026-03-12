@@ -362,7 +362,17 @@ type SummarySection = {
 };
 
 function getLatestCareerEntry(entries: PlayerCareerEntryRecord[]) {
-  return [...entries].reverse().find((entry) => entry.club_name.trim() || entry.competition_name?.trim()) ?? null;
+  const reversedEntries = [...entries].reverse();
+
+  return (
+    reversedEntries.find(
+      (entry) => entry.club_name.trim() && entry.competition_name?.trim(),
+    ) ??
+    reversedEntries.find(
+      (entry) => entry.club_name.trim() || entry.competition_name?.trim(),
+    ) ??
+    null
+  );
 }
 
 function buildHeaderDetails(data: CompleteProfessionalProfile) {
@@ -1053,7 +1063,11 @@ export default function ProfileScreen() {
               description="L'email account è visibile ma non modificabile da questa schermata."
               title="Contatti"
             >
-              <Field helperText="Il numero di telefono non è ancora gestito nel profilo MVP." label="Email" value={accountEmail} />
+              <Field
+                helperText="Questa schermata mostra l'email dell'account autenticato."
+                label="Email"
+                value={accountEmail}
+              />
             </Section>
 
             {(profile.role as AppRole) === "player" ? (
