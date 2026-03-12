@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -10,6 +10,11 @@ import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
+import {
+  ProfileField as Field,
+  ProfileHeader,
+  ProfileSection as Section,
+} from "../../src/features/profiles/profile-screen-components";
 import {
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
@@ -27,6 +32,7 @@ import {
   updateCompleteProfessionalProfile,
   type CompleteProfessionalProfile,
   type PlayerCareerEntryInput,
+  type PlayerCareerEntryRecord,
   type PreferredFoot,
 } from "../../src/features/profiles/profile-service";
 import {
@@ -35,7 +41,7 @@ import {
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
-import { Button, Card, Input } from "../../src/ui";
+import { Button, Card } from "../../src/ui";
 
 type CareerEntryForm = {
   appearances: string;
@@ -257,66 +263,6 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
   };
 }
 
-function Section({
-  children,
-  title,
-  subtitle,
-}: {
-  children: ReactNode;
-  subtitle?: string;
-  title: string;
-}) {
-  return (
-    <Card style={{ gap: spacing[14] }}>
-      <View style={{ gap: spacing[6] }}>
-        <Text
-          style={{
-            color: colors.textPrimary,
-            fontSize: typography.fontSize[20],
-            fontWeight: typography.fontWeight.heavy,
-          }}
-        >
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>{subtitle}</Text>
-        ) : null}
-      </View>
-      {children}
-    </Card>
-  );
-}
-
-function Field({
-  label,
-  multiline,
-  onChangeText,
-  placeholder,
-  value,
-}: {
-  label: string;
-  multiline?: boolean;
-  onChangeText: (value: string) => void;
-  placeholder?: string;
-  value: string;
-}) {
-  return (
-    <View style={{ gap: spacing[8] }}>
-      <Text
-        style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
-      >
-        {label}
-      </Text>
-      <Input
-        multiline={multiline}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        value={value}
-      />
-    </View>
-  );
-}
-
 function BooleanField({
   falseLabel,
   label,
@@ -409,44 +355,59 @@ function BirthDateField({
   );
 }
 
-function SummaryCard({
-  items,
-  subtitle,
-  title,
-}: {
+type SummarySection = {
   items: { label: string; value: string }[];
   subtitle?: string;
   title: string;
-}) {
-  return (
-    <Section subtitle={subtitle} title={title}>
-      {items.map((item) => (
-        <View
-          key={`${title}-${item.label}`}
-          style={{
-            gap: spacing[4],
-            paddingBottom: spacing[10],
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-          }}
-        >
-          <Text
-            style={{
-              color: colors.textMuted,
-              fontSize: typography.fontSize[12],
-              fontWeight: typography.fontWeight.bold,
-              textTransform: "uppercase",
-            }}
-          >
-            {item.label}
-          </Text>
-          <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
-            {item.value}
-          </Text>
-        </View>
-      ))}
-    </Section>
-  );
+};
+
+function getLatestCareerEntry(entries: PlayerCareerEntryRecord[]) {
+  return [...entries].reverse().find((entry) => entry.club_name.trim() || entry.competition_name?.trim()) ?? null;
+}
+
+function buildHeaderDetails(data: CompleteProfessionalProfile) {
+  const roleBadge = roleLabels[data.profile.role];
+  const availabilityBadge = data.profile.is_available ? "Disponibile" : "Non disponibile";
+
+  if (data.profile.role === "player") {
+    const latestEntry = getLatestCareerEntry(data.playerCareerEntries);
+
+    return {
+      badges: [roleBadge, availabilityBadge],
+      primaryMeta: `${latestEntry?.club_name ?? "Squadra da completare"} · ${
+        latestEntry?.competition_name?.trim() || "Categoria da definire"
+      }`,
+      secondaryMeta: formatPosition(data.playerProfile?.primary_position ?? null),
+    };
+  }
+
+  if (data.profile.role === "coach") {
+    return {
+      badges: [roleBadge, data.coachProfile?.open_to_new_role ? "Aperto a nuove panchine" : "Profilo attivo"],
+      primaryMeta: `${data.coachProfile?.coached_clubs[0] ?? "Squadra da completare"} · ${
+        data.coachProfile?.coached_categories[0] ?? "Categoria da definire"
+      }`,
+      secondaryMeta: "Allenatore",
+    };
+  }
+
+  if (data.profile.role === "staff") {
+    return {
+      badges: [roleBadge, data.staffProfile?.open_to_work ? "Open to work" : "Profilo attivo"],
+      primaryMeta: `${formatSpecialization(data.staffProfile?.specialization ?? null)} · ${
+        data.staffProfile?.preferred_regions[0] ?? "Area da definire"
+      }`,
+      secondaryMeta: "Supporto tecnico e performance",
+    };
+  }
+
+  return {
+    badges: [roleBadge],
+    primaryMeta: `${data.club?.name ?? "Società da completare"} · ${
+      data.club?.category ?? "Categoria da definire"
+    }`,
+    secondaryMeta: data.club?.league ?? "Contesto competitivo da definire",
+  };
 }
 
 export default function ProfileScreen() {
@@ -487,78 +448,6 @@ export default function ProfileScreen() {
     void loadProfile();
   }, [loadProfile]);
 
-  const profileHighlights = useMemo(() => {
-    if (!completeProfile) {
-      return [];
-    }
-
-    if (completeProfile.profile.role === "player") {
-      return [
-        {
-          label: "Ruolo",
-          value: formatPosition(completeProfile.playerProfile?.primary_position ?? null),
-        },
-        {
-          label: "Piede",
-          value: formatPreferredFoot(completeProfile.playerProfile?.preferred_foot ?? null),
-        },
-        {
-          label: "Stagioni",
-          value: String(completeProfile.playerCareerEntries.length),
-        },
-      ];
-    }
-
-    if (completeProfile.profile.role === "coach") {
-      return [
-        {
-          label: "Licenze",
-          value: String(completeProfile.coachProfile?.licenses.length ?? 0),
-        },
-        {
-          label: "Squadre",
-          value: String(completeProfile.coachProfile?.coached_clubs.length ?? 0),
-        },
-        {
-          label: "Nuove panchine",
-          value: completeProfile.coachProfile?.open_to_new_role ? "Sì" : "No",
-        },
-      ];
-    }
-
-    if (completeProfile.profile.role === "staff") {
-      return [
-        {
-          label: "Specializzazione",
-          value: formatSpecialization(completeProfile.staffProfile?.specialization ?? null),
-        },
-        {
-          label: "Certificazioni",
-          value: String(completeProfile.staffProfile?.certifications.length ?? 0),
-        },
-        {
-          label: "Disponibile",
-          value: completeProfile.staffProfile?.open_to_work ? "Sì" : "No",
-        },
-      ];
-    }
-
-    return [
-      {
-        label: "Club",
-        value: completeProfile.club?.name ?? "Da completare",
-      },
-      {
-        label: "Categoria",
-        value: completeProfile.club?.category ?? "Da definire",
-      },
-      {
-        label: "Campionato",
-        value: completeProfile.club?.league ?? "Da definire",
-      },
-    ];
-  }, [completeProfile]);
-
   const nationalityOptions = useMemo(
     () => ensureOption(NATIONALITY_OPTIONS, formState?.nationality),
     [formState?.nationality],
@@ -571,29 +460,29 @@ export default function ProfileScreen() {
     () => ensureOption(REGION_OPTIONS, formState?.clubRegion),
     [formState?.clubRegion],
   );
-  const playerCareerEntries = completeProfile?.playerCareerEntries ?? [];
+  const headerDetails = useMemo(
+    () => (completeProfile ? buildHeaderDetails(completeProfile) : null),
+    [completeProfile],
+  );
   const playerCareerSummaryEntries = useMemo(
     () =>
-      playerCareerEntries.map((entry) => ({
+      (completeProfile?.playerCareerEntries ?? []).map((entry) => ({
         entry,
         seasonTitle: normalizeSeasonLabelInput(entry.season_label),
       })),
-    [playerCareerEntries],
+    [completeProfile?.playerCareerEntries],
   );
+  const accountEmail = session?.user.email ?? "";
 
-  const summarySections = useMemo(() => {
+  const summarySections = useMemo<SummarySection[]>(() => {
     if (!completeProfile) {
       return [];
     }
 
-    const sections: {
-      items: { label: string; value: string }[];
-      subtitle?: string;
-      title: string;
-    }[] = [
+    const sections: SummarySection[] = [
       {
-        title: "Identità di base",
-        subtitle: "Riepilogo delle informazioni pubbliche configurate per il profilo.",
+        title: "Informazioni personali",
+        subtitle: "Dati anagrafici e localizzazione visibili a colpo d'occhio.",
         items: [
           { label: "Nome e cognome", value: completeProfile.profile.full_name },
           {
@@ -615,6 +504,22 @@ export default function ProfileScreen() {
             label: "Regione",
             value: getOptionLabel(REGION_OPTIONS, completeProfile.profile.region),
           },
+        ],
+      },
+      {
+        title: "Contatti",
+        subtitle: "Canali diretti disponibili in questa fase del prodotto.",
+        items: [
+          {
+            label: "Email",
+            value: formatOptionalSummary(accountEmail),
+          },
+        ],
+      },
+      {
+        title: "Presentazione",
+        subtitle: "Disponibilità e descrizione pubblica del profilo.",
+        items: [
           { label: "Bio", value: formatOptionalSummary(completeProfile.profile.bio) },
           {
             label: "Disponibile a nuove opportunità",
@@ -629,10 +534,20 @@ export default function ProfileScreen() {
     ];
 
     if (completeProfile.profile.role === "player") {
+      const latestEntry = getLatestCareerEntry(completeProfile.playerCareerEntries);
+
       sections.push({
-        title: "Profilo giocatore",
-        subtitle: "Ruolo, caratteristiche e preferenze del calciatore.",
+        title: "Informazioni sportive",
+        subtitle: "Squadra, categoria e preferenze calcistiche attuali.",
         items: [
+          {
+            label: "Squadra attuale",
+            value: formatOptionalSummary(latestEntry?.club_name),
+          },
+          {
+            label: "Categoria attuale",
+            value: formatOptionalSummary(latestEntry?.competition_name),
+          },
           {
             label: "Posizione principale",
             value: formatPosition(completeProfile.playerProfile?.primary_position ?? null),
@@ -644,18 +559,6 @@ export default function ProfileScreen() {
           {
             label: "Piede preferito",
             value: formatPreferredFoot(completeProfile.playerProfile?.preferred_foot ?? null),
-          },
-          {
-            label: "Altezza",
-            value: completeProfile.playerProfile?.height_cm
-              ? `${completeProfile.playerProfile.height_cm} cm`
-              : "Da completare",
-          },
-          {
-            label: "Peso",
-            value: completeProfile.playerProfile?.weight_kg
-              ? `${completeProfile.playerProfile.weight_kg} kg`
-              : "Da completare",
           },
           {
             label: "Categorie preferite",
@@ -677,12 +580,31 @@ export default function ProfileScreen() {
           },
         ],
       });
+
+      sections.push({
+        title: "Informazioni fisiche",
+        subtitle: "Dati fisici leggibili separati dal resto del profilo.",
+        items: [
+          {
+            label: "Altezza",
+            value: completeProfile.playerProfile?.height_cm
+              ? `${completeProfile.playerProfile.height_cm} cm`
+              : "Da completare",
+          },
+          {
+            label: "Peso",
+            value: completeProfile.playerProfile?.weight_kg
+              ? `${completeProfile.playerProfile.weight_kg} kg`
+              : "Da completare",
+          },
+        ],
+      });
     }
 
     if (completeProfile.profile.role === "coach") {
       sections.push({
-        title: "Profilo allenatore",
-        subtitle: "Licenze, storia e disponibilità del tecnico.",
+        title: "Informazioni sportive",
+        subtitle: "Licenze, categorie e posizionamento del profilo allenatore.",
         items: [
           {
             label: "Licenze",
@@ -718,8 +640,8 @@ export default function ProfileScreen() {
 
     if (completeProfile.profile.role === "staff") {
       sections.push({
-        title: "Profilo staff tecnico",
-        subtitle: "Specializzazione, esperienza e disponibilità lavorativa.",
+        title: "Informazioni sportive",
+        subtitle: "Specializzazione, esperienza e aree operative del profilo staff.",
         items: [
           {
             label: "Specializzazione",
@@ -749,8 +671,8 @@ export default function ProfileScreen() {
 
     if (completeProfile.profile.role === "club_admin") {
       sections.push({
-        title: "Pagina società",
-        subtitle: "Dati pubblici configurati per il club.",
+        title: "Informazioni sportive",
+        subtitle: "Dati pubblici del club organizzati come pagina profilo.",
         items: [
           { label: "Nome club", value: formatOptionalSummary(completeProfile.club?.name) },
           { label: "Città club", value: formatOptionalSummary(completeProfile.club?.city) },
@@ -783,7 +705,7 @@ export default function ProfileScreen() {
     }
 
     return sections;
-  }, [completeProfile]);
+  }, [accountEmail, completeProfile]);
 
   if (!userId || !profile) {
     return null;
@@ -950,134 +872,16 @@ export default function ProfileScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}>
-        <View
-          style={{
-            gap: spacing[12],
-            padding: 22,
-            borderRadius: radius[26],
-            backgroundColor: colors.textPrimary,
-          }}
-        >
-          <Text
-            style={{
-              color: colors.heroSoft,
-              fontSize: typography.fontSize[12],
-              fontWeight: typography.fontWeight.heavy,
-              textTransform: "uppercase",
-              letterSpacing: typography.letterSpacing.md,
-            }}
-          >
-            Fase 2 · Identità professionale
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.fontSize[30],
-              lineHeight: typography.lineHeight[34],
-              fontWeight: typography.fontWeight.heavy,
-              color: colors.inkInvert,
-            }}
-          >
-            Profilo professionale completo
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.fontSize[16],
-              lineHeight: typography.lineHeight[24],
-              color: colors.textInverseMuted,
-            }}
-          >
-            Completa e aggiorna il tuo profilo pubblico con i dati richiesti dalla
-            roadmap MVP: identità, disponibilità, carriera e dettagli di ruolo.
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[10] }}>
-            <View
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: radius.full,
-                backgroundColor: colors.surfaceOverlay,
-              }}
-            >
-              <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
-                {profile.full_name ?? "Profilo"}
-              </Text>
-            </View>
-            <View
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: radius.full,
-                backgroundColor: colors.surfaceOverlay,
-              }}
-            >
-              <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
-                {roleLabels[profile.role as AppRole] ?? "Ruolo"}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {completeProfile ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[12] }}>
-            {profileHighlights.map((item) => (
-              <View
-                key={item.label}
-                style={{
-                  minWidth: "30%",
-                  flexGrow: 1,
-                  gap: spacing[6],
-                  padding: 16,
-                  borderRadius: radius[20],
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.textMuted,
-                    fontSize: typography.fontSize[12],
-                    fontWeight: typography.fontWeight.bold,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {item.label}
-                </Text>
-                <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
-                  {item.value}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        {completeProfile && !isLoading ? (
-          <View style={{ flexDirection: "row", gap: spacing[12] }}>
-            {isEditing ? (
-              <>
-                <Button
-                  label="Annulla modifiche"
-                  onPress={handleStopEditing}
-                  style={{ flex: 1 }}
-                  variant="secondary"
-                />
-                <Button
-                  disabled={isSaving}
-                  label={isSaving ? "Salvataggio..." : "Salva profilo"}
-                  onPress={() => void handleSave()}
-                  style={{ flex: 1 }}
-                  variant="primary"
-                />
-              </>
-            ) : (
-              <Button
-                label="Modifica profilo"
-                onPress={handleStartEditing}
-                style={{ flex: 1 }}
-                variant="primary"
-              />
-            )}
-          </View>
+        {completeProfile && headerDetails ? (
+          <ProfileHeader
+            avatarUrl={formState?.avatarUrl ?? completeProfile.profile.avatar_url}
+            badges={headerDetails.badges}
+            fullName={formState?.fullName ?? completeProfile.profile.full_name}
+            isEditing={isEditing}
+            onEditPress={isEditing ? handleStopEditing : handleStartEditing}
+            primaryMeta={headerDetails.primaryMeta}
+            secondaryMeta={headerDetails.secondaryMeta}
+          />
         ) : null}
 
         {isLoading || !formState ? (
@@ -1089,17 +893,16 @@ export default function ProfileScreen() {
         ) : !isEditing ? (
           <>
             {summarySections.map((section) => (
-              <SummaryCard
-                key={section.title}
-                items={section.items}
-                subtitle={section.subtitle}
-                title={section.title}
-              />
+              <Section key={section.title} description={section.subtitle} title={section.title}>
+                {section.items.map((item) => (
+                  <Field key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
+                ))}
+              </Section>
             ))}
 
             {(profile.role as AppRole) === "player" ? (
               <Section
-                subtitle="Le stagioni salvate vengono mantenute e riepilogate qui."
+                description="Le stagioni salvate vengono mantenute e riepilogate qui."
                 title="Stagioni salvate"
               >
                 {playerCareerSummaryEntries.length > 0 ? (
@@ -1153,8 +956,8 @@ export default function ProfileScreen() {
         ) : (
           <>
             <Section
-              subtitle="Dati anagrafici, località, disponibilità e presentazione pubblica."
-              title="Identità di base"
+              description="Dati anagrafici, località e informazioni pubbliche di base."
+              title="Informazioni personali"
             >
               <Field
                 label="Nome e cognome"
@@ -1246,11 +1049,18 @@ export default function ProfileScreen() {
               ) : null}
             </Section>
 
+            <Section
+              description="L'email account è visibile ma non modificabile da questa schermata."
+              title="Contatti"
+            >
+              <Field helperText="Il numero di telefono non è ancora gestito nel profilo MVP." label="Email" value={accountEmail} />
+            </Section>
+
             {(profile.role as AppRole) === "player" ? (
               <>
                 <Section
-                  subtitle="Dati sportivi e disponibilità del calciatore."
-                  title="Profilo giocatore"
+                  description="Ruolo, piede, preferenze e disponibilità del calciatore."
+                  title="Informazioni sportive"
                 >
                   <PillSelector
                     label="Posizione principale"
@@ -1311,24 +1121,6 @@ export default function ProfileScreen() {
                     value={formState.preferredFoot || "right"}
                   />
                   <Field
-                    label="Altezza (cm)"
-                    onChangeText={(value) =>
-                      setFormState((current) =>
-                        current ? { ...current, heightCm: value } : current,
-                      )
-                    }
-                    value={formState.heightCm}
-                  />
-                  <Field
-                    label="Peso (kg)"
-                    onChangeText={(value) =>
-                      setFormState((current) =>
-                        current ? { ...current, weightKg: value } : current,
-                      )
-                    }
-                    value={formState.weightKg}
-                  />
-                  <Field
                     label="Categorie preferite"
                     onChangeText={(value) =>
                       setFormState((current) =>
@@ -1373,7 +1165,31 @@ export default function ProfileScreen() {
                 </Section>
 
                 <Section
-                  subtitle="Cronologia multistagione con club, campionato e numeri chiave."
+                  description="Altezza e peso restano separati per una lettura più chiara."
+                  title="Informazioni fisiche"
+                >
+                  <Field
+                    label="Altezza (cm)"
+                    onChangeText={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, heightCm: value } : current,
+                      )
+                    }
+                    value={formState.heightCm}
+                  />
+                  <Field
+                    label="Peso (kg)"
+                    onChangeText={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, weightKg: value } : current,
+                      )
+                    }
+                    value={formState.weightKg}
+                  />
+                </Section>
+
+                <Section
+                  description="Cronologia multistagione con club, campionato e numeri chiave."
                   title="Carriera e statistiche"
                 >
                   {formState.careerEntries.map((entry, index) => (
@@ -1603,8 +1419,8 @@ export default function ProfileScreen() {
 
             {(profile.role as AppRole) === "coach" ? (
               <Section
-                subtitle="Licenze, storico squadre e filosofia di gioco per il profilo allenatore."
-                title="Profilo allenatore"
+                description="Licenze, storico squadre e filosofia di gioco per il profilo allenatore."
+                title="Informazioni sportive"
               >
                 <Field
                   label="Licenze"
@@ -1676,8 +1492,8 @@ export default function ProfileScreen() {
 
             {(profile.role as AppRole) === "staff" ? (
               <Section
-                subtitle="Specializzazione, certificazioni e disponibilità lavorativa."
-                title="Profilo staff tecnico"
+                description="Specializzazione, certificazioni e disponibilità lavorativa."
+                title="Informazioni sportive"
               >
                 <PillSelector
                   label="Specializzazione"
@@ -1733,8 +1549,8 @@ export default function ProfileScreen() {
 
             {(profile.role as AppRole) === "club_admin" ? (
               <Section
-                subtitle="Pagina ufficiale del club con informazioni pubbliche, gallery e contesto competitivo."
-                title="Pagina società"
+                description="Pagina ufficiale del club con informazioni pubbliche, gallery e contesto competitivo."
+                title="Informazioni sportive"
               >
                 <Field
                   label="Nome club"
@@ -1812,6 +1628,22 @@ export default function ProfileScreen() {
                 />
               </Section>
             ) : null}
+
+            <View style={{ flexDirection: "row", gap: spacing[12] }}>
+              <Button
+                label="Annulla"
+                onPress={handleStopEditing}
+                style={{ flex: 1 }}
+                variant="secondary"
+              />
+              <Button
+                disabled={isSaving}
+                label={isSaving ? "Salvataggio..." : "Salva modifiche"}
+                onPress={() => void handleSave()}
+                style={{ flex: 1 }}
+                variant="primary"
+              />
+            </View>
 
           </>
         )}

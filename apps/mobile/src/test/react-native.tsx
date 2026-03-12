@@ -15,6 +15,7 @@ export const ActivityIndicator = createComponent("ActivityIndicator");
 export const Image = createComponent("Image");
 export const Pressable = createComponent("Pressable");
 export const Text = createComponent("Text");
+export const TextInput = createComponent("TextInput");
 export const View = createComponent("View");
 export const StyleSheet = {
   create: <T,>(styles: T) => styles,
