@@ -14,6 +14,7 @@ import {
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
+import { Button } from "../../src/ui";
 
 const roleLabels: Record<string, string> = {
   club_admin: "Societa'",
@@ -251,11 +252,12 @@ export default function MessagesScreen() {
             <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[18], fontWeight: typography.fontWeight.heavy }}>
               Pronti a scriverti
             </Text>
-            <Pressable onPress={() => void loadInbox()}>
-              <Text style={{ color: colors.accentStrong, fontWeight: typography.fontWeight.bold }}>
-                Aggiorna
-              </Text>
-            </Pressable>
+            <Button
+              label="Aggiorna"
+              onPress={() => void loadInbox()}
+              size="sm"
+              variant="link"
+            />
           </View>
           {isLoading ? (
             <Text style={{ color: colors.textSecondary }}>
@@ -292,24 +294,19 @@ export default function MessagesScreen() {
               <Text style={{ color: colors.textSecondary }}>
                 {formatLocation(entry.other_city, entry.other_region)}
               </Text>
-              <Pressable
+              <Button
                 disabled={actionProfileId === entry.other_profile_id}
+                fullWidth
+                label={
+                  actionProfileId === entry.other_profile_id
+                    ? "Apertura chat..."
+                    : "Scrivi ora"
+                }
                 onPress={() =>
                   handleOpenConversation(entry.other_profile_id, entry.other_full_name)
                 }
-                style={{
-                  paddingVertical: 12,
-                  borderRadius: radius[14],
-                  alignItems: "center",
-                  backgroundColor: colors.hero,
-                }}
-              >
-                <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
-                  {actionProfileId === entry.other_profile_id
-                    ? "Apertura chat..."
-                    : "Scrivi ora"}
-                </Text>
-              </Pressable>
+                variant="secondary"
+              />
             </View>
           ))}
         </View>

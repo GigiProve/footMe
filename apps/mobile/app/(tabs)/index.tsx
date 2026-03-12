@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, Text, View } from "react-native";
 
 import { Screen } from "../../src/components/ui/screen";
 import {
@@ -9,6 +9,7 @@ import {
 import { useSession } from "../../src/features/auth/use-session";
 import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
 import { colors, radius, shadows, spacing, typography } from "../../src/theme/tokens";
+import { Button } from "../../src/ui";
 
 export default function HomeScreen() {
   const { profile, session } = useSession();
@@ -301,38 +302,22 @@ export default function HomeScreen() {
               Supabase per usare auth e dashboard reali.
             </Text>
           ) : null}
-          <Pressable
+          <Button
+            label="Aggiorna dati reali"
             onPress={loadDashboard}
-            style={{
-              alignSelf: "flex-start",
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              borderRadius: radius[14],
-              backgroundColor: colors.background,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-              Aggiorna dati reali
-            </Text>
-          </Pressable>
+            size="sm"
+            style={{ alignSelf: "flex-start" }}
+            variant="secondary"
+          />
         </View>
 
-        <Pressable
+        <Button
+          label="Esci"
           onPress={handleSignOut}
-          style={{
-            alignSelf: "flex-start",
-            paddingHorizontal: 18,
-            paddingVertical: 13,
-            borderRadius: radius.full,
-            backgroundColor: colors.hero,
-          }}
-        >
-          <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.bold }}>
-            Esci
-          </Text>
-        </Pressable>
+          size="sm"
+          style={{ alignSelf: "flex-start" }}
+          variant="secondary"
+        />
       </View>
     </Screen>
   );

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
-  Pressable,
   ScrollView,
   Text,
   View,
@@ -342,27 +341,14 @@ function BooleanField({
           const isActive = value === option.active;
 
           return (
-            <Pressable
+            <Button
               key={option.label}
+              label={option.label}
               onPress={() => onChange(option.active)}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                borderRadius: radius.full,
-                backgroundColor: isActive ? colors.textPrimary : colors.background,
-                borderWidth: 1,
-                borderColor: isActive ? colors.textPrimary : colors.border,
-              }}
-            >
-              <Text
-                style={{
-                  color: isActive ? colors.inkInvert : colors.textPrimary,
-                  fontWeight: typography.fontWeight.bold,
-                }}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
+              selected={isActive}
+              size="sm"
+              variant="chipAction"
+            />
           );
         })}
       </View>
@@ -389,27 +375,14 @@ function PillSelector<T extends string>({
           const isActive = option.value === value;
 
           return (
-            <Pressable
+            <Button
               key={option.value}
+              label={option.label}
               onPress={() => onChange(option.value)}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                borderRadius: radius.full,
-                backgroundColor: isActive ? colors.accentStrong : colors.background,
-                borderWidth: 1,
-                borderColor: isActive ? colors.accentStrong : colors.border,
-              }}
-            >
-              <Text
-                style={{
-                  color: isActive ? colors.inkInvert : colors.textPrimary,
-                  fontWeight: typography.fontWeight.bold,
-                }}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
+              selected={isActive}
+              size="sm"
+              variant="chipAction"
+            />
           );
         })}
       </View>
@@ -1093,7 +1066,7 @@ export default function ProfileScreen() {
                   label={isSaving ? "Salvataggio..." : "Salva profilo"}
                   onPress={() => void handleSave()}
                   style={{ flex: 1 }}
-                  variant="hero"
+                  variant="primary"
                 />
               </>
             ) : (
@@ -1101,7 +1074,7 @@ export default function ProfileScreen() {
                 label="Modifica profilo"
                 onPress={handleStartEditing}
                 style={{ flex: 1 }}
-                variant="hero"
+                variant="primary"
               />
             )}
           </View>
@@ -1294,45 +1267,24 @@ export default function ProfileScreen() {
                       Posizione secondaria
                     </Text>
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
-                      <Pressable
+                      <Button
+                        label="Nessuna"
                         onPress={() =>
                           setFormState((current) =>
                             current ? { ...current, secondaryPosition: "" } : current,
                           )
                         }
-                        style={{
-                          paddingHorizontal: 14,
-                          paddingVertical: 10,
-                          borderRadius: radius.full,
-                          backgroundColor:
-                            formState.secondaryPosition === ""
-                              ? colors.accentStrong
-                              : colors.background,
-                          borderWidth: 1,
-                          borderColor:
-                            formState.secondaryPosition === ""
-                              ? colors.accentStrong
-                              : colors.border,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color:
-                              formState.secondaryPosition === ""
-                                ? colors.inkInvert
-                                : colors.textPrimary,
-                            fontWeight: typography.fontWeight.bold,
-                          }}
-                        >
-                          Nessuna
-                        </Text>
-                      </Pressable>
+                        selected={formState.secondaryPosition === ""}
+                        size="sm"
+                        variant="chipAction"
+                      />
                       {positionOptions.map((option) => {
                         const isActive = option.value === formState.secondaryPosition;
 
                         return (
-                          <Pressable
+                          <Button
                             key={option.value}
+                            label={option.label}
                             onPress={() =>
                               setFormState((current) =>
                                 current
@@ -1340,30 +1292,10 @@ export default function ProfileScreen() {
                                   : current,
                               )
                             }
-                            style={{
-                              paddingHorizontal: 14,
-                              paddingVertical: 10,
-                              borderRadius: radius.full,
-                              backgroundColor: isActive
-                                ? colors.accentStrong
-                                : colors.background,
-                              borderWidth: 1,
-                              borderColor: isActive
-                                ? colors.accentStrong
-                                : colors.border,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                color: isActive
-                                  ? colors.inkInvert
-                                  : colors.textPrimary,
-                                fontWeight: typography.fontWeight.bold,
-                              }}
-                            >
-                              {option.label}
-                            </Text>
-                          </Pressable>
+                            selected={isActive}
+                            size="sm"
+                            variant="chipAction"
+                          />
                         );
                       })}
                     </View>
@@ -1466,7 +1398,10 @@ export default function ProfileScreen() {
                         <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
                           Stagione {index + 1}
                         </Text>
-                        <Pressable
+                        <Button
+                          accessibilityLabel={`Rimuovi stagione ${index + 1}`}
+                          destructive
+                          label="Rimuovi"
                           onPress={() =>
                             setFormState((current) =>
                               current
@@ -1482,11 +1417,9 @@ export default function ProfileScreen() {
                                 : current,
                             )
                           }
-                        >
-                          <Text style={{ color: colors.hero, fontWeight: typography.fontWeight.bold }}>
-                            Rimuovi
-                          </Text>
-                        </Pressable>
+                          size="sm"
+                          variant="link"
+                        />
                       </View>
                       <Field
                         label="Stagione"
@@ -1647,7 +1580,8 @@ export default function ProfileScreen() {
                       />
                     </View>
                   ))}
-                  <Pressable
+                  <Button
+                    label="Aggiungi stagione"
                     onPress={() =>
                       setFormState((current) =>
                         current
@@ -1661,17 +1595,8 @@ export default function ProfileScreen() {
                           : current,
                       )
                     }
-                    style={{
-                      paddingVertical: 13,
-                      borderRadius: radius[16],
-                      alignItems: "center",
-                      backgroundColor: colors.surfaceMuted,
-                    }}
-                  >
-                    <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-                      Aggiungi stagione
-                    </Text>
-                  </Pressable>
+                    variant="secondary"
+                  />
                 </Section>
               </>
             ) : null}

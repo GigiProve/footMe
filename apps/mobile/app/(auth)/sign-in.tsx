@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   Alert,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -114,9 +113,12 @@ export default function SignInScreen() {
           ) : null}
         </Card>
         <Link href="/(auth)/sign-up" asChild>
-          <Pressable style={styles.linkButton}>
-            <Text style={styles.linkLabel}>Non hai un account? Crea il tuo profilo</Text>
-          </Pressable>
+          <Button
+            label="Non hai un account? Crea il tuo profilo"
+            size="sm"
+            style={styles.linkButton}
+            variant="link"
+          />
         </Link>
       </View>
     </Screen>
@@ -170,11 +172,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   linkButton: {
-    alignItems: "center",
-    paddingVertical: spacing[8],
-  },
-  linkLabel: {
-    color: colors.accentStrong,
-    fontWeight: typography.fontWeight.bold,
+    alignSelf: "center",
   },
 });
