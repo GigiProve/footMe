@@ -1,8 +1,16 @@
 import { Link } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { Screen } from "../../src/components/ui/screen";
+import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
 import { colors, spacing, typography } from "../../src/theme/tokens";
 import { Button, Card, Input } from "../../src/ui";
@@ -12,6 +20,9 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<"apple" | "google" | null>(
+    null,
+  );
 
   async function handleSignUp() {
     if (password !== confirmPassword) {
@@ -49,6 +60,21 @@ export default function SignUpScreen() {
       Alert.alert("Account creato", "Completa ora il profilo iniziale.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleOAuthSignIn(provider: "apple" | "google") {
+    try {
+      setOauthProvider(provider);
+      await startOAuthSignIn(provider);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso durante la registrazione social.";
+      Alert.alert("Registrazione social non riuscita", message);
+    } finally {
+      setOauthProvider(null);
     }
   }
 
@@ -98,6 +124,33 @@ export default function SignUpScreen() {
             label={isSubmitting ? "Creazione account..." : "Registrati"}
             onPress={handleSignUp}
           />
+          <View style={styles.socialDivider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerLabel}>oppure registrati con</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          <Button
+            disabled={oauthProvider !== null}
+            label={
+              oauthProvider === "google"
+                ? "Connessione a Google..."
+                : "Continua con Google"
+            }
+            onPress={() => handleOAuthSignIn("google")}
+            variant="secondary"
+          />
+          {Platform.OS === "ios" ? (
+            <Button
+              disabled={oauthProvider !== null}
+              label={
+                oauthProvider === "apple"
+                  ? "Connessione ad Apple..."
+                  : "Continua con Apple"
+              }
+              onPress={() => handleOAuthSignIn("apple")}
+              variant="secondary"
+            />
+          ) : null}
         </Card>
         <Link href="/(auth)/sign-in" asChild>
           <Pressable style={styles.linkButton}>
@@ -143,6 +196,22 @@ const styles = StyleSheet.create({
   },
   formCard: {
     gap: spacing[14],
+  },
+  socialDivider: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[10],
+  },
+  dividerLine: {
+    backgroundColor: colors.border,
+    flex: 1,
+    height: 1,
+  },
+  dividerLabel: {
+    color: colors.textMuted,
+    fontSize: typography.fontSize[12],
+    fontWeight: typography.fontWeight.bold,
+    textTransform: "uppercase",
   },
   linkButton: {
     alignItems: "center",

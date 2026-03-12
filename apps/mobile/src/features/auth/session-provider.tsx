@@ -5,9 +5,11 @@ import {
   useMemo,
   useState,
 } from "react";
+import { Linking } from "react-native";
 
 import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
+import { completeOAuthSessionFromUrl } from "./oauth";
 import { supabase } from "../../lib/supabase";
 
 type AppProfile = {
@@ -68,6 +70,16 @@ export function SessionProvider({ children }: PropsWithChildren) {
     }
 
     async function bootstrap() {
+      const initialUrl = await Linking.getInitialURL();
+
+      if (initialUrl) {
+        try {
+          await completeOAuthSessionFromUrl(initialUrl);
+        } catch (error) {
+          console.warn("[auth] OAuth callback bootstrap failed", error);
+        }
+      }
+
       const {
         data: { session: initialSession },
       } = await supabase.auth.getSession();
@@ -103,9 +115,16 @@ export function SessionProvider({ children }: PropsWithChildren) {
       },
     );
 
+    const urlSubscription = Linking.addEventListener("url", ({ url }) => {
+      completeOAuthSessionFromUrl(url).catch((error) => {
+        console.warn("[auth] OAuth callback failed", error);
+      });
+    });
+
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      urlSubscription.remove();
     };
   }, []);
 

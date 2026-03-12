@@ -417,7 +417,23 @@ export async function updateCompleteProfessionalProfile(
   }
 
   if (input.role === "club_admin" && input.club) {
-    if (input.club.id) {
+    let clubId = input.club.id;
+
+    if (!clubId) {
+      const { data: existingClub, error: existingClubError } = await supabase
+        .from("clubs")
+        .select("id")
+        .eq("owner_profile_id", input.profileId)
+        .maybeSingle();
+
+      if (existingClubError) {
+        throw existingClubError;
+      }
+
+      clubId = existingClub?.id;
+    }
+
+    if (clubId) {
       const { error } = await supabase
         .from("clubs")
         .update({
@@ -430,7 +446,7 @@ export async function updateCompleteProfessionalProfile(
           name: input.club.name,
           region: input.club.region,
         })
-        .eq("id", input.club.id)
+        .eq("id", clubId)
         .eq("owner_profile_id", input.profileId);
 
       if (error) {

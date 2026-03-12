@@ -103,7 +103,7 @@ export const BIRTH_MONTH_OPTIONS: SelectOption[] = [
 
 // The current mobile MVP targets adult and senior amateur football profiles, so
 // we cap the picker to a conservative historical range without introducing UX noise.
-const FIRST_BIRTH_YEAR = 1940;
+export const FIRST_BIRTH_YEAR = 1940;
 
 export function ensureOption<T extends string>(
   options: SelectOption<T>[],
@@ -194,6 +194,34 @@ export function composeBirthDate(parts: {
 
   const candidate = `${parts.year}-${parts.month}-${parts.day}`;
   return /^\d{4}-\d{2}-\d{2}$/.test(candidate) ? candidate : "";
+}
+
+export function parseBirthDate(value: string | null | undefined) {
+  const parts = getBirthDateParts(value);
+
+  if (!parts.year || !parts.month || !parts.day) {
+    return null;
+  }
+
+  const candidate = new Date(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+  );
+
+  if (Number.isNaN(candidate.getTime())) {
+    return null;
+  }
+
+  return candidate;
+}
+
+export function formatBirthDateValue(date: Date) {
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 export function normalizeSeasonLabelInput(value: string) {

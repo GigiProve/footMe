@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   composeBirthDate,
   createBirthDayOptions,
+  formatBirthDateValue,
   formatBirthDate,
   getBirthDateParts,
   isSeasonLabelValid,
   normalizeSeasonLabelInput,
+  parseBirthDate,
 } from "./profile-form-utils";
 
 describe("profile-form-utils", () => {
@@ -33,6 +35,8 @@ describe("profile-form-utils", () => {
       year: "2001",
     });
     expect(formatBirthDate("2001-03-11")).toBe("11/03/2001");
+    expect(parseBirthDate("2001-03-11")).toEqual(new Date(2001, 2, 11));
+    expect(formatBirthDateValue(new Date(2001, 2, 11))).toBe("2001-03-11");
   });
 
   it("adjusts available days based on month and leap years", () => {

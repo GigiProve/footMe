@@ -13,8 +13,8 @@ File SQL di riferimento:
 
 ## Entita' principali
 
-- `profiles`: anagrafica comune per tutti gli utenti applicativi collegata a `auth.users`
-- `player_profiles`: estensione del profilo per calciatori
+- `profiles`: anagrafica comune per tutti gli utenti applicativi collegata a `auth.users`, inclusi dati base di onboarding come sesso, residenza, domicilio e telefono
+- `player_profiles`: estensione del profilo per calciatori, con informazioni tecniche, disponibilita' e media sportivi
 - `coach_profiles`: estensione del profilo per allenatori
 - `staff_profiles`: estensione del profilo per staff tecnico
 - `clubs`: pagina societa' e dati club
