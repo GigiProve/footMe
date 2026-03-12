@@ -2,6 +2,7 @@ import {
   PropsWithChildren,
   createContext,
   useEffect,
+  useCallback,
   useMemo,
   useState,
 } from "react";
@@ -13,8 +14,12 @@ import { completeOAuthSessionFromUrl } from "./oauth";
 import { supabase } from "../../lib/supabase";
 
 type AppProfile = {
+  avatar_url: string | null;
+  club_name: string | null;
+  city: string | null;
   id: string;
   full_name: string | null;
+  region: string | null;
   role: string | null;
 };
 
@@ -35,7 +40,36 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AppProfile | null>(null);
 
-  async function refreshProfile() {
+  const loadProfile = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, role, avatar_url, region, city")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!data) {
+      return null;
+    }
+
+    const nextProfile: AppProfile = {
+      ...data,
+      club_name: null,
+    };
+
+    if (nextProfile.role === "club_admin") {
+      const { data: club } = await supabase
+        .from("clubs")
+        .select("name")
+        .eq("owner_profile_id", userId)
+        .maybeSingle();
+
+      nextProfile.club_name = club?.name ?? null;
+    }
+
+    return nextProfile;
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
     const {
       data: { session: currentSession },
     } = await supabase.auth.getSession();
@@ -45,27 +79,18 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, role")
-      .eq("id", currentSession.user.id)
-      .maybeSingle();
-
-    setProfile(data ?? null);
-  }
+    const nextProfile = await loadProfile(currentSession.user.id);
+    setProfile(nextProfile);
+  }, [loadProfile]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function hydrateProfile(userId: string) {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, role")
-        .eq("id", userId)
-        .maybeSingle();
+      const nextProfile = await loadProfile(userId);
 
       if (isMounted) {
-        setProfile(data ?? null);
+        setProfile(nextProfile);
       }
     }
 
@@ -126,7 +151,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       subscription.unsubscribe();
       urlSubscription.remove();
     };
-  }, []);
+  }, [loadProfile]);
 
   const value = useMemo(
     () => ({
@@ -136,7 +161,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       refreshProfile,
       session,
     }),
-    [isLoading, profile, session],
+    [isLoading, profile, refreshProfile, session],
   );
 
   return (
