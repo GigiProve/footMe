@@ -22,7 +22,7 @@ function normalizeFileName(fileName: string | null | undefined, fallback: string
 }
 
 function createUploadSuffix() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-upload`;
 }
 
 function inferAssetType(asset: ImagePicker.ImagePickerAsset): UploadedMediaItem["type"] {
@@ -49,11 +49,12 @@ async function uploadAsset(
     );
   }
 
+  const uploadSuffix = createUploadSuffix();
   const fileName = normalizeFileName(
     asset.fileName,
-    `${inferAssetType(asset)}-${createUploadSuffix()}-${index}`,
+    `${inferAssetType(asset)}-${uploadSuffix}-${index}`,
   );
-  const path = `${input.userId}/${input.folder}/${fileName}-${createUploadSuffix()}`;
+  const path = `${input.userId}/${input.folder}/${fileName}-${uploadSuffix}`;
 
   const { error } = await supabase.storage
     .from(PROFILE_MEDIA_BUCKET)

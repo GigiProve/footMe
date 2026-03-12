@@ -6,9 +6,17 @@ const DEFAULT_PROFILE_AVATAR_SVG = `
 </svg>
 `.trim();
 
-export const DEFAULT_PROFILE_AVATAR_URI = `data:image/svg+xml;utf8,${encodeURIComponent(
-  DEFAULT_PROFILE_AVATAR_SVG,
-)}`;
+function encodeSvgToBase64(value: string) {
+  const binaryValue = Array.from(
+    new TextEncoder().encode(value),
+    (byte) => String.fromCharCode(byte),
+  ).join("");
+
+  return globalThis.btoa(binaryValue);
+}
+
+const defaultAvatarPayload = encodeSvgToBase64(DEFAULT_PROFILE_AVATAR_SVG);
+export const DEFAULT_PROFILE_AVATAR_URI = `data:image/svg+xml;base64,${defaultAvatarPayload}`;
 
 export function withDefaultProfileAvatar(value: string | null | undefined) {
   const trimmedValue = value?.trim();

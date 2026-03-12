@@ -302,7 +302,7 @@ export default function OnboardingProfileScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
-  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+  const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
   const effectiveDomicile = useResidenceForDomicile ? residence : domicile;
 
   const stepIndex = {

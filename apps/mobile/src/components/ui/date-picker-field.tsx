@@ -20,6 +20,7 @@ type DatePickerFieldProps = {
 };
 
 const minimumBirthDate = new Date(FIRST_BIRTH_YEAR, 0, 1);
+const DEFAULT_PICKER_DATE = new Date(2000, 0, 1);
 
 export function DatePickerField({
   label,
@@ -28,7 +29,7 @@ export function DatePickerField({
   value,
 }: DatePickerFieldProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const selectedDate = useMemo(() => parseBirthDate(value) ?? new Date(2000, 0, 1), [value]);
+  const selectedDate = useMemo(() => parseBirthDate(value) ?? DEFAULT_PICKER_DATE, [value]);
   const maximumDate = useMemo(() => new Date(), []);
 
   function handlePickerChange(event: DateTimePickerEvent, nextDate?: Date) {
