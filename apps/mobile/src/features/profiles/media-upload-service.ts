@@ -21,6 +21,10 @@ function normalizeFileName(fileName: string | null | undefined, fallback: string
   return (fileName ?? fallback).replace(/[^a-zA-Z0-9._-]+/g, "-");
 }
 
+function createUploadSuffix() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function inferAssetType(asset: ImagePicker.ImagePickerAsset): UploadedMediaItem["type"] {
   if (asset.type === "image" || asset.type === "video") {
     return asset.type;
@@ -34,13 +38,22 @@ async function uploadAsset(
   input: PickAndUploadMediaInput,
   index: number,
 ) {
-  const response = await fetch(asset.uri);
-  const arrayBuffer = await response.arrayBuffer();
+  let arrayBuffer: ArrayBuffer;
+
+  try {
+    const response = await fetch(asset.uri);
+    arrayBuffer = await response.arrayBuffer();
+  } catch {
+    throw new Error(
+      `Impossibile leggere il file selezionato ${asset.fileName ?? asset.uri}.`,
+    );
+  }
+
   const fileName = normalizeFileName(
     asset.fileName,
-    `${inferAssetType(asset)}-${Date.now()}-${index}`,
+    `${inferAssetType(asset)}-${createUploadSuffix()}-${index}`,
   );
-  const path = `${input.userId}/${input.folder}/${Date.now()}-${index}-${fileName}`;
+  const path = `${input.userId}/${input.folder}/${fileName}-${createUploadSuffix()}`;
 
   const { error } = await supabase.storage
     .from(PROFILE_MEDIA_BUCKET)

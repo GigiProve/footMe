@@ -43,6 +43,7 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
   const birthDate = input.birthDate.trim();
   const domicile = input.domicile.trim();
   const fullName = input.fullName.trim();
+  const gender = input.gender;
   const nationality = input.nationality.trim();
   const phoneNumber = input.phoneNumber.trim();
   const residence = input.residence.trim();
@@ -53,7 +54,7 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
 
   if (
     !birthDate ||
-    !input.gender ||
+    !gender ||
     !nationality ||
     !residence ||
     !domicile ||
@@ -79,7 +80,7 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
     birth_date: birthDate,
     domicile,
     id: input.userId,
-    gender: input.gender,
+    gender,
     role: input.role,
     full_name: fullName,
     nationality,

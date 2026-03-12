@@ -2,6 +2,12 @@ insert into storage.buckets (id, name, public)
 values ('profile-media', 'profile-media', true)
 on conflict (id) do nothing;
 
+create policy "profile media readable by authenticated users"
+on storage.objects
+for select
+to authenticated
+using (bucket_id = 'profile-media');
+
 create policy "profile media upload by owner"
 on storage.objects
 for insert

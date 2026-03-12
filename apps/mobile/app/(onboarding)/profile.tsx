@@ -593,7 +593,7 @@ export default function OnboardingProfileScreen() {
               textTransform: "uppercase",
             }}
           >
-            First access
+            Primo accesso
           </Text>
           <Text
             style={{
