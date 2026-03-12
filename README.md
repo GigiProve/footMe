@@ -28,7 +28,7 @@ Per aprire subito il QR code in Expo Go e condividere i progressi anche fuori da
 npm run qr:mobile
 ```
 
-Il comando avvia Expo in modalita' tunnel e mostra il QR code nel terminale, pronto da scansionare con Expo Go.
+Il comando avvia Expo in modalità tunnel e mostra il QR code nel terminale, pronto da scansionare con Expo Go.
 
 Documenti di riferimento:
 

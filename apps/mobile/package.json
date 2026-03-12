@@ -6,7 +6,6 @@
     "start": "expo start",
     "start:clear": "expo start --clear",
     "start:tunnel": "expo start --tunnel",
-    "qr": "expo start --tunnel",
     "dev": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
