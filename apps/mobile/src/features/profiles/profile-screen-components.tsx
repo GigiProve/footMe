@@ -66,9 +66,9 @@ export function ProfileHeader({
             style={({ pressed }) => [styles.editButton, pressed ? styles.pressed : null]}
           >
             <Ionicons
-              color={colors.accentStrong}
+              color={colors.textSecondary}
               name={isEditing ? "close-outline" : "create-outline"}
-              size={22}
+              size={18}
             />
           </Pressable>
         </View>
@@ -184,14 +184,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.35)",
   },
   editButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: radius.full,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.surfaceMuted,
+    marginTop: spacing[12],
   },
   fieldContainer: {
     gap: spacing[8],
