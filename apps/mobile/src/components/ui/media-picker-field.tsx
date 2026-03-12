@@ -42,6 +42,7 @@ export function MediaPickerField({
             testID="media-picker-preview-frame"
           >
             <Image
+              accessibilityLabel="Anteprima foto profilo"
               source={{ uri: previewUrl }}
               style={{
                 width: "100%",

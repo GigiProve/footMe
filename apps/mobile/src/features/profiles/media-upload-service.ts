@@ -22,7 +22,14 @@ function normalizeFileName(fileName: string | null | undefined, fallback: string
 }
 
 function createUploadSuffix() {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-upload`;
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  const fallbackTime = globalThis.performance?.now?.() ?? 0;
+  const fallbackEntropy =
+    fallbackTime > 0 ? Math.trunc(fallbackTime * 1000) : Math.trunc(Math.random() * 1_000_000);
+  return `${Date.now()}-${fallbackEntropy}`;
 }
 
 function inferAssetType(asset: ImagePicker.ImagePickerAsset): UploadedMediaItem["type"] {
