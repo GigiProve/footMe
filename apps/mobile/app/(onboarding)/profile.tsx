@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
+import { MediaPickerField } from "../../src/components/ui/media-picker-field";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
@@ -22,6 +23,10 @@ import {
   isSeasonLabelValid,
   normalizeSeasonLabelInput,
 } from "../../src/features/profiles/profile-form-utils";
+import {
+  pickAndUploadMedia,
+  type UploadedMediaItem,
+} from "../../src/features/profiles/media-upload-service";
 import { updateCompleteProfessionalProfile } from "../../src/features/profiles/profile-service";
 import { supabase } from "../../src/lib/supabase";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
@@ -278,7 +283,7 @@ export default function OnboardingProfileScreen() {
     createEmptyCareerEntry(),
   ]);
   const [highlightVideoUrl, setHighlightVideoUrl] = useState("");
-  const [playerMediaUrls, setPlayerMediaUrls] = useState("");
+  const [playerMediaItems, setPlayerMediaItems] = useState<UploadedMediaItem[]>([]);
   const [licenses, setLicenses] = useState("");
   const [coachedClubs, setCoachedClubs] = useState("");
   const [coachedCategories, setCoachedCategories] = useState("");
@@ -296,9 +301,10 @@ export default function OnboardingProfileScreen() {
   const [clubLeague, setClubLeague] = useState("");
   const [clubDescription, setClubDescription] = useState("");
   const [clubLogoUrl, setClubLogoUrl] = useState("");
-  const [clubGalleryUrls, setClubGalleryUrls] = useState("");
+  const [clubGalleryItems, setClubGalleryItems] = useState<UploadedMediaItem[]>([]);
   const [hasCreatedProfile, setHasCreatedProfile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
 
   const birthYearOptions = useMemo(() => createBirthYearOptions(), []);
   const birthDayOptions = useMemo(
@@ -321,6 +327,48 @@ export default function OnboardingProfileScreen() {
     details: 3,
     role: 0,
   }[step];
+  const isBusy = isSubmitting || uploadingField !== null;
+
+  async function handleMediaUpload({
+    allowsMultipleSelection = false,
+    field,
+    folder,
+    mediaTypes,
+    onUploaded,
+  }: {
+    allowsMultipleSelection?: boolean;
+    field: string;
+    folder: string;
+    mediaTypes: ["images"] | ["videos"] | ["images", "videos"];
+    onUploaded: (items: UploadedMediaItem[]) => void;
+  }) {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      setUploadingField(field);
+
+      const uploadedItems = await pickAndUploadMedia({
+        allowsMultipleSelection,
+        folder,
+        mediaTypes,
+        userId: session.user.id,
+      });
+
+      if (uploadedItems.length > 0) {
+        onUploaded(uploadedItems);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso durante il caricamento dei media.";
+      Alert.alert("Caricamento non riuscito", message);
+    } finally {
+      setUploadingField(null);
+    }
+  }
 
   async function ensureInitialProfileCreated() {
     if (!session?.user) {
@@ -429,7 +477,7 @@ export default function OnboardingProfileScreen() {
                 category: parseOptionalText(clubCategory),
                 city: clubCity.trim(),
                 description: parseOptionalText(clubDescription),
-                gallery_urls: fromDelimitedString(clubGalleryUrls),
+                gallery_urls: clubGalleryItems.map((item) => item.url),
                 league: parseOptionalText(clubLeague),
                 logo_url: parseOptionalText(clubLogoUrl),
                 name: clubName.trim(),
@@ -491,7 +539,7 @@ export default function OnboardingProfileScreen() {
       if (role === "player") {
         const { error } = await supabase
           .from("player_profiles")
-          .update({ media_urls: fromDelimitedString(playerMediaUrls) })
+          .update({ media_urls: playerMediaItems.map((item) => item.url) })
           .eq("profile_id", session.user.id);
 
         if (error) {
@@ -768,13 +816,23 @@ export default function OnboardingProfileScreen() {
               value={phoneNumber}
             />
 
-            <Input
-              autoCapitalize="none"
-              keyboardType="url"
-              label="Foto profilo (URL)"
-              onChangeText={setAvatarUrl}
-              placeholder="https://..."
-              value={avatarUrl}
+            <MediaPickerField
+              buttonLabel="Carica foto profilo"
+              helperText="La foto profilo e' obbligatoria per completare il primo accesso."
+              isUploading={uploadingField === "avatar"}
+              label="Foto profilo"
+              onPick={() =>
+                handleMediaUpload({
+                  field: "avatar",
+                  folder: "avatars",
+                  mediaTypes: ["images"],
+                  onUploaded: (items) => setAvatarUrl(items[0]?.url ?? ""),
+                })
+              }
+              previewUrl={avatarUrl}
+              selectedLabel={
+                avatarUrl ? "Immagine profilo caricata correttamente" : undefined
+              }
             />
 
             {role === "club_admin" ? (
@@ -816,8 +874,8 @@ export default function OnboardingProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Button
-                  disabled={isSubmitting}
-                  label={isSubmitting ? "Salvataggio..." : "Salva e continua"}
+                  disabled={isBusy}
+                  label={isBusy ? "Salvataggio..." : "Salva e continua"}
                   onPress={handleContinueToDecision}
                   variant="hero"
                 />
@@ -854,13 +912,13 @@ export default function OnboardingProfileScreen() {
             </Card>
 
             <Button
-              disabled={isSubmitting}
+              disabled={isBusy}
               label="Completa ora il tuo profilo sportivo"
               onPress={() => handleChooseCompletion("now")}
               variant="hero"
             />
             <Button
-              disabled={isSubmitting}
+              disabled={isBusy}
               label="Salta e completa piu' tardi"
               onPress={() => handleChooseCompletion("later")}
               variant="secondary"
@@ -1193,21 +1251,39 @@ export default function OnboardingProfileScreen() {
                   >
                     Media e contenuti
                   </Text>
-                  <Input
-                    autoCapitalize="none"
-                    keyboardType="url"
+                  <MediaPickerField
+                    buttonLabel="Carica video highlights"
+                    helperText="Seleziona un video dal cellulare per mostrare i tuoi highlights."
+                    isUploading={uploadingField === "highlight-video"}
                     label="Video highlights"
-                    onChangeText={setHighlightVideoUrl}
-                    placeholder="https://..."
-                    value={highlightVideoUrl}
+                    onPick={() =>
+                      handleMediaUpload({
+                        field: "highlight-video",
+                        folder: "highlight-videos",
+                        mediaTypes: ["videos"],
+                        onUploaded: (items) => setHighlightVideoUrl(items[0]?.url ?? ""),
+                      })
+                    }
+                    selectedLabel={
+                      highlightVideoUrl ? "Video highlights caricato correttamente" : undefined
+                    }
                   />
-                  <Input
-                    autoCapitalize="none"
+                  <MediaPickerField
+                    buttonLabel="Carica foto e video in azione"
+                    helperText="Puoi selezionare piu' file direttamente dalla libreria del telefono."
+                    isUploading={uploadingField === "player-media"}
                     label="Foto e video in azione"
-                    multiline
-                    onChangeText={setPlayerMediaUrls}
-                    placeholder="Inserisci uno o piu' URL separati da virgola"
-                    value={playerMediaUrls}
+                    onPick={() =>
+                      handleMediaUpload({
+                        allowsMultipleSelection: true,
+                        field: "player-media",
+                        folder: "player-media",
+                        mediaTypes: ["images", "videos"],
+                        onUploaded: (items) =>
+                          setPlayerMediaItems((current) => [...current, ...items]),
+                      })
+                    }
+                    selectedCount={playerMediaItems.length}
                   />
                 </View>
               </>
@@ -1249,13 +1325,22 @@ export default function OnboardingProfileScreen() {
                   placeholder="Descrivi principi, metodologia e obiettivi"
                   value={gamePhilosophy}
                 />
-                <Input
-                  autoCapitalize="none"
-                  keyboardType="url"
+                <MediaPickerField
+                  buttonLabel="Carica video tecnico"
+                  helperText="Carica dal telefono una clip tecnica o una presentazione video."
+                  isUploading={uploadingField === "coach-video"}
                   label="Video tecnico"
-                  onChangeText={setTechnicalVideoUrl}
-                  placeholder="https://..."
-                  value={technicalVideoUrl}
+                  onPick={() =>
+                    handleMediaUpload({
+                      field: "coach-video",
+                      folder: "coach-videos",
+                      mediaTypes: ["videos"],
+                      onUploaded: (items) => setTechnicalVideoUrl(items[0]?.url ?? ""),
+                    })
+                  }
+                  selectedLabel={
+                    technicalVideoUrl ? "Video tecnico caricato correttamente" : undefined
+                  }
                 />
                 <Input
                   label="Regioni preferite"
@@ -1363,21 +1448,40 @@ export default function OnboardingProfileScreen() {
                   placeholder="Es. Girone A"
                   value={clubLeague}
                 />
-                <Input
-                  autoCapitalize="none"
-                  keyboardType="url"
+                <MediaPickerField
+                  buttonLabel="Carica logo societa'"
+                  helperText="Seleziona il logo direttamente dal telefono."
+                  isUploading={uploadingField === "club-logo"}
                   label="Logo societa'"
-                  onChangeText={setClubLogoUrl}
-                  placeholder="https://..."
-                  value={clubLogoUrl}
+                  onPick={() =>
+                    handleMediaUpload({
+                      field: "club-logo",
+                      folder: "club-logos",
+                      mediaTypes: ["images"],
+                      onUploaded: (items) => setClubLogoUrl(items[0]?.url ?? ""),
+                    })
+                  }
+                  previewUrl={clubLogoUrl}
+                  selectedLabel={
+                    clubLogoUrl ? "Logo societa' caricato correttamente" : undefined
+                  }
                 />
-                <Input
-                  autoCapitalize="none"
+                <MediaPickerField
+                  buttonLabel="Carica gallery media"
+                  helperText="Aggiungi foto e video della societa' dalla libreria del telefono."
+                  isUploading={uploadingField === "club-gallery"}
                   label="Gallery media"
-                  multiline
-                  onChangeText={setClubGalleryUrls}
-                  placeholder="Inserisci gli URL separati da virgola"
-                  value={clubGalleryUrls}
+                  onPick={() =>
+                    handleMediaUpload({
+                      allowsMultipleSelection: true,
+                      field: "club-gallery",
+                      folder: "club-gallery",
+                      mediaTypes: ["images", "videos"],
+                      onUploaded: (items) =>
+                        setClubGalleryItems((current) => [...current, ...items]),
+                    })
+                  }
+                  selectedCount={clubGalleryItems.length}
                 />
                 <Input
                   label="Descrizione"
@@ -1414,8 +1518,8 @@ export default function OnboardingProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Button
-                  disabled={isSubmitting}
-                  label={isSubmitting ? "Salvataggio..." : "Conferma profilo"}
+                  disabled={isBusy}
+                  label={isBusy ? "Salvataggio..." : "Conferma profilo"}
                   onPress={handleSubmitDetails}
                   variant="hero"
                 />
