@@ -31,15 +31,25 @@ export function MediaPickerField({
       </Text>
       <Card style={{ gap: spacing[12] }}>
         {previewUrl ? (
-          <Image
-            source={{ uri: previewUrl }}
+          <View
             style={{
               width: 96,
               height: 96,
               borderRadius: radius[20],
+              overflow: "hidden",
               backgroundColor: colors.surfaceMuted,
             }}
-          />
+            testID="media-picker-preview-frame"
+          >
+            <Image
+              source={{ uri: previewUrl }}
+              style={{
+                width: "100%",
+                height: "100%",
+                backgroundColor: colors.surfaceMuted,
+              }}
+            />
+          </View>
         ) : null}
 
         <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
