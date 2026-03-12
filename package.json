@@ -10,14 +10,20 @@
     "npm": ">=10.0.0"
   },
   "overrides": {
-    "@react-native-async-storage/async-storage": "1.23.1",
-    "react-native-safe-area-context": "4.12.0",
-    "react-native-screens": "4.4.0"
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0"
   },
   "dependencies": {
-    "@react-native-async-storage/async-storage": "1.23.1",
-    "react-native-safe-area-context": "4.12.0",
-    "react-native-screens": "4.4.0"
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0"
   },
   "devDependencies": {
     "@babel/plugin-syntax-export-default-from": "^7.27.1",
@@ -27,6 +33,7 @@
     "start": "npm run start:mobile",
     "start:mobile": "npm run start --workspace @footme/mobile",
     "start:mobile:clear": "npm run start:clear --workspace @footme/mobile",
+    "start:mobile:ios-sim": "npm run start:ios-sim --workspace @footme/mobile",
     "start:mobile:tunnel": "npm run start:tunnel --workspace @footme/mobile",
     "dev:mobile": "npm run dev --workspace @footme/mobile",
     "ios": "npm run ios --workspace @footme/mobile",
