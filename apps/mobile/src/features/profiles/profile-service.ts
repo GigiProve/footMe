@@ -430,7 +430,7 @@ export async function updateCompleteProfessionalProfile(
         throw existingClubError;
       }
 
-      clubId = (existingClub?.id as string | undefined) ?? undefined;
+      clubId = existingClub?.id;
     }
 
     if (clubId) {
