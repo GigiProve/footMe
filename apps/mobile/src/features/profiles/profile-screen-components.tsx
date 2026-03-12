@@ -48,28 +48,30 @@ export function ProfileHeader({
     <View style={styles.headerCard}>
       <View style={styles.coverArea}>
         <View pointerEvents="none" style={styles.coverStripe} />
-        <Pressable
-          accessibilityLabel={actionLabel}
-          accessibilityRole="button"
-          accessibilityState={{ selected: isEditing }}
-          hitSlop={12}
-          onPress={onEditPress}
-          style={({ pressed }) => [styles.editButton, pressed ? styles.pressed : null]}
-        >
-          <Ionicons
-            color={colors.accentStrong}
-            name={isEditing ? "close-outline" : "create-outline"}
-            size={22}
-          />
-        </Pressable>
       </View>
 
       <View style={styles.identityBlock}>
-        <Image
-          accessibilityLabel="Foto profilo"
-          source={{ uri: withDefaultProfileAvatar(avatarUrl) }}
-          style={styles.avatar}
-        />
+        <View style={styles.identityTopRow}>
+          <Image
+            accessibilityLabel="Foto profilo"
+            source={{ uri: withDefaultProfileAvatar(avatarUrl) }}
+            style={styles.avatar}
+          />
+          <Pressable
+            accessibilityLabel={actionLabel}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isEditing }}
+            hitSlop={12}
+            onPress={onEditPress}
+            style={({ pressed }) => [styles.editButton, pressed ? styles.pressed : null]}
+          >
+            <Ionicons
+              color={colors.accentStrong}
+              name={isEditing ? "close-outline" : "create-outline"}
+              size={22}
+            />
+          </Pressable>
+        </View>
         <View style={styles.identityCopy}>
           <Text style={styles.fullName}>{fullName}</Text>
           <Text style={styles.primaryMeta}>{primaryMeta}</Text>
@@ -218,6 +220,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[20],
     paddingBottom: spacing[8],
     gap: spacing[14],
+  },
+  identityTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
   },
   identityCopy: {
     gap: spacing[6],
