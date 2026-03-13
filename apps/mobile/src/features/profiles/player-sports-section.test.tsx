@@ -89,6 +89,9 @@ describe("player-sports-section", () => {
 
     expect(tree!.root.findByProps({ children: "⚽ 10+ gol stagione" })).toBeTruthy();
     expect(tree!.root.findByProps({ children: "⭐ Stagione completa" })).toBeTruthy();
+    expect(
+      tree!.root.findByProps({ children: "30 presenze • 10 gol • 5 assist" }),
+    ).toBeTruthy();
   });
 
   it("keeps the timeline ordered and supports deletion in edit mode", () => {

@@ -166,6 +166,27 @@ export type CompleteProfessionalProfileUpdate = {
   userContacts: UserContactsRecord;
 };
 
+function toPlayerCareerEntryMutation(
+  entry: PlayerCareerEntryInput,
+  profileId: string,
+) {
+  return {
+    appearances: entry.appearances,
+    assists: entry.assists,
+    awards: entry.awards,
+    club_id: entry.club_id,
+    club_name: entry.club_name,
+    competition_name: entry.competition_name,
+    goals: entry.goals,
+    id: entry.id,
+    minutes_played: entry.minutes_played,
+    player_profile_id: profileId,
+    season_label: entry.season_label,
+    sort_order: entry.sort_order,
+    team_logo_url: entry.team_logo_url,
+  };
+}
+
 function normalizeOptionalText(value: unknown) {
   return typeof value === "string" ? value : null;
 }
@@ -574,61 +595,6 @@ export async function updateCompleteProfessionalProfile(
     const currentIds = input.playerCareerEntries
       .map((entry) => entry.id)
       .filter((entryId): entryId is string => !!entryId);
-
-    const existingEntries = input.playerCareerEntries
-      .filter((entry) => !!entry.id)
-        .map((entry) => ({
-          appearances: entry.appearances,
-          assists: entry.assists,
-          awards: entry.awards,
-          club_id: entry.club_id,
-          club_name: entry.club_name,
-          competition_name: entry.competition_name,
-          goals: entry.goals,
-          id: entry.id,
-          minutes_played: entry.minutes_played,
-          player_profile_id: input.profileId,
-          season_label: entry.season_label,
-          sort_order: entry.sort_order,
-          team_logo_url: entry.team_logo_url,
-        }));
-    const newEntries = input.playerCareerEntries
-      .filter((entry) => !entry.id)
-      .map((entry) => ({
-        appearances: entry.appearances,
-        assists: entry.assists,
-        awards: entry.awards,
-        club_id: entry.club_id,
-        club_name: entry.club_name,
-        competition_name: entry.competition_name,
-        goals: entry.goals,
-        minutes_played: entry.minutes_played,
-        player_profile_id: input.profileId,
-        season_label: entry.season_label,
-        sort_order: entry.sort_order,
-        team_logo_url: entry.team_logo_url,
-      }));
-
-    if (existingEntries.length > 0) {
-      const { error: careerUpsertError } = await supabase
-        .from("player_career_entries")
-        .upsert(existingEntries);
-
-      if (careerUpsertError) {
-        throw careerUpsertError;
-      }
-    }
-
-    if (newEntries.length > 0) {
-      const { error: careerInsertError } = await supabase
-        .from("player_career_entries")
-        .insert(newEntries);
-
-      if (careerInsertError) {
-        throw careerInsertError;
-      }
-    }
-
     const { data: existingCareerRows, error: existingCareerError } = await supabase
       .from("player_career_entries")
       .select("id")
@@ -642,6 +608,30 @@ export async function updateCompleteProfessionalProfile(
       .map((entry) => entry.id as string)
       .filter((entryId) => !currentIds.includes(entryId));
 
+    const existingEntries = input.playerCareerEntries
+      .filter((entry) => !!entry.id)
+      .map((entry) => toPlayerCareerEntryMutation(entry, input.profileId));
+    const newEntries = input.playerCareerEntries
+      .filter((entry) => !entry.id)
+      .map((entry) => {
+        const { id: _ignoredId, ...newEntry } = toPlayerCareerEntryMutation(
+          entry,
+          input.profileId,
+        );
+
+        return newEntry;
+      });
+
+    if (existingEntries.length > 0) {
+      const { error: careerUpsertError } = await supabase
+        .from("player_career_entries")
+        .upsert(existingEntries);
+
+      if (careerUpsertError) {
+        throw careerUpsertError;
+      }
+    }
+
     if (removableIds.length > 0) {
       const { error: deleteCareerError } = await supabase
         .from("player_career_entries")
@@ -651,6 +641,16 @@ export async function updateCompleteProfessionalProfile(
 
       if (deleteCareerError) {
         throw deleteCareerError;
+      }
+    }
+
+    if (newEntries.length > 0) {
+      const { error: careerInsertError } = await supabase
+        .from("player_career_entries")
+        .insert(newEntries);
+
+      if (careerInsertError) {
+        throw careerInsertError;
       }
     }
   }

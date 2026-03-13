@@ -993,6 +993,29 @@ export default function ProfileScreen() {
           </Section>
         ) : !isEditing ? (
           <>
+            <PersonalInfoSection
+              birthDate={formatBirthDateInputValue(completeProfile?.profile.birth_date)}
+              city={completeProfile?.profile.city ?? ""}
+              citySuggestions={[]}
+              fullName={completeProfile?.profile.full_name ?? ""}
+              nationality={completeProfile?.profile.nationality ?? ""}
+              nationalityOptions={nationalityOptions}
+              region={completeProfile?.profile.region ?? ""}
+              regionOptions={regionOptions}
+            />
+            {(profile.role as AppRole) === "player" ? (
+              <Section
+                description="Squadra, categoria, stagione e numeri chiave del percorso calcistico."
+                title="Esperienze calcistiche"
+              >
+                <PlayerExperiencesSection
+                  emptyStateLabel="Nessuna esperienza calcistica salvata."
+                  experiences={playerExperienceCards}
+                  searchTeams={searchTeams}
+                  showHeader={false}
+                />
+              </Section>
+            ) : null}
             <BioSection bio={completeProfile?.profile.bio}>
               {summarySections
                 .find((section) => section.title === "Presentazione")
@@ -1001,7 +1024,8 @@ export default function ProfileScreen() {
                 ))}
             </BioSection>
             {summarySections.map((section) => (
-              section.title === "Presentazione" ? null : (
+              section.title === "Presentazione" ||
+              section.title === "Informazioni personali" ? null : (
                 <Section key={section.title} description={section.subtitle} title={section.title}>
                   {section.items.map((item) => (
                     <Field key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
@@ -1010,12 +1034,10 @@ export default function ProfileScreen() {
               )
             ))}
 
-            {completeProfile ? <ContactSection contacts={completeProfile.userContacts} /> : null}
-
             {(profile.role as AppRole) === "player" ? (
               <Section
-                description="Ruolo, piede preferito e timeline esperienze per lo scouting."
-                title="Informazioni sportive"
+                description="Ruolo e piede preferito leggibili rapidamente anche in consultazione."
+                title="Profilo sportivo"
               >
                 <PlayerCharacteristicsSection
                   preferredFoot={completeProfile?.playerProfile?.preferred_foot ?? ""}
@@ -1025,13 +1047,10 @@ export default function ProfileScreen() {
                   }
                   secondaryPosition={completeProfile?.playerProfile?.secondary_position ?? ""}
                 />
-                <PlayerExperiencesSection
-                  emptyStateLabel="Nessuna esperienza calcistica salvata."
-                  experiences={playerExperienceCards}
-                  searchTeams={searchTeams}
-                />
               </Section>
             ) : null}
+
+            {completeProfile ? <ContactSection contacts={completeProfile.userContacts} /> : null}
           </>
         ) : (
           <>
@@ -1230,6 +1249,7 @@ export default function ProfileScreen() {
                       )
                     }
                     searchTeams={searchTeams}
+                    showHeader={false}
                   />
                 </Section>
 
