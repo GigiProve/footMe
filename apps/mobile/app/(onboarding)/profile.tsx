@@ -278,6 +278,17 @@ function getMediaUploadAlert(field: string, error: unknown) {
   };
 }
 
+function logMediaUploadFailure(payload: {
+  bucket: string;
+  error: unknown;
+  field: string;
+  folder: string;
+}) {
+  if (__DEV__) {
+    console.error("[onboarding] media upload failed", payload);
+  }
+}
+
 export default function OnboardingProfileScreen() {
   const router = useRouter();
   const { refreshProfile, session } = useSession();
@@ -379,7 +390,7 @@ export default function OnboardingProfileScreen() {
         onUploaded(uploadedItems);
       }
     } catch (error) {
-      console.error("[onboarding] media upload failed", {
+      logMediaUploadFailure({
         bucket: PROFILE_MEDIA_BUCKET,
         error,
         field,
