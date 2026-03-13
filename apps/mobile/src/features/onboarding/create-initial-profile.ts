@@ -1,5 +1,7 @@
 import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
+import type { PlayerPosition } from "../profiles/player-sports";
+export type { PlayerPosition } from "../profiles/player-sports";
 
 export type AppRole = "player" | "coach" | "staff" | "club_admin";
 export type ProfileGender =
@@ -7,11 +9,6 @@ export type ProfileGender =
   | "female"
   | "non_binary"
   | "prefer_not_to_say";
-export type PlayerPosition =
-  | "goalkeeper"
-  | "defender"
-  | "midfielder"
-  | "forward";
 export type StaffSpecialization =
   | "fitness_coach"
   | "goalkeeper_coach"

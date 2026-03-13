@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getCompleteProfessionalProfile } from "./profile-service";
+import { getCompleteProfessionalProfile, searchTeams } from "./profile-service";
 
 const mocks = vi.hoisted(() => {
   const clubMaybeSingleMock = vi.fn();
+  const clubSearchIlikeMock = vi.fn();
+  const clubSearchLimitMock = vi.fn();
+  const clubSearchOrderMock = vi.fn();
   const coachMaybeSingleMock = vi.fn();
   const playerCareerEqMock = vi.fn();
   const playerCareerFirstOrderMock = vi.fn();
@@ -20,9 +23,20 @@ const mocks = vi.hoisted(() => {
   const playerCareerFirstOrderChain = {
     order: playerCareerFirstOrderMock,
   };
+  const clubSearchOrderChain = {
+    limit: clubSearchLimitMock,
+  };
+  const clubSearchIlikeChain = {
+    order: clubSearchOrderMock,
+  };
 
   return {
     clubMaybeSingleMock,
+    clubSearchIlikeMock,
+    clubSearchIlikeChain,
+    clubSearchLimitMock,
+    clubSearchOrderChain,
+    clubSearchOrderMock,
     coachMaybeSingleMock,
     fromMock: vi.fn((table: string) => {
       if (table === "profiles_with_age") {
@@ -71,6 +85,7 @@ const mocks = vi.hoisted(() => {
             eq: vi.fn(() => ({
               maybeSingle: clubMaybeSingleMock,
             })),
+            ilike: clubSearchIlikeMock,
           })),
         };
       }
@@ -132,6 +147,9 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.coachMaybeSingleMock.mockReset();
     mocks.staffMaybeSingleMock.mockReset();
     mocks.clubMaybeSingleMock.mockReset();
+    mocks.clubSearchIlikeMock.mockReset();
+    mocks.clubSearchOrderMock.mockReset();
+    mocks.clubSearchLimitMock.mockReset();
     mocks.profileContactsMaybeSingleMock.mockReset();
     mocks.privateContactsMaybeSingleMock.mockReset();
     mocks.playerCareerEqMock.mockReset();
@@ -194,12 +212,15 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.playerCareerFirstOrderMock.mockImplementation(
       () => mocks.playerCareerSecondOrderChain,
     );
+    mocks.clubSearchIlikeMock.mockImplementation(() => mocks.clubSearchIlikeChain);
+    mocks.clubSearchOrderMock.mockImplementation(() => mocks.clubSearchOrderChain);
     mocks.playerCareerSecondOrderMock.mockResolvedValue({
       data: [
         {
           appearances: 30,
           assists: 8,
           awards: null,
+          club_id: "club-1",
           club_name: "AC FootMe",
           competition_name: "Promozione",
           goals: 12,
@@ -208,6 +229,7 @@ describe("getCompleteProfessionalProfile", () => {
           player_profile_id: "profile-1",
           season_label: "2024/25",
           sort_order: 0,
+          team_logo_url: "https://example.com/club.png",
         },
       ],
       error: null,
@@ -233,6 +255,10 @@ describe("getCompleteProfessionalProfile", () => {
     expect(result.profile.role).toBe("player");
     expect(result.playerProfile?.primary_position).toBe("forward");
     expect(result.playerCareerEntries).toHaveLength(1);
+    expect(result.playerCareerEntries[0]).toMatchObject({
+      club_id: "club-1",
+      team_logo_url: "https://example.com/club.png",
+    });
     expect(result.userContacts).toEqual({
       email: "marco@example.com",
       facebook: "https://facebook.com/marcorossi",
@@ -358,5 +384,37 @@ describe("getCompleteProfessionalProfile", () => {
       showFacebook: false,
       showInstagram: false,
     });
+  });
+});
+
+describe("searchTeams", () => {
+  it("returns club suggestions for team autocomplete", async () => {
+    mocks.clubSearchLimitMock.mockResolvedValueOnce({
+      data: [
+        {
+          city: "Milano",
+          id: "club-1",
+          logo_url: "https://example.com/logo.png",
+          name: "ASD Real Milano",
+        },
+      ],
+      error: null,
+    });
+
+    const result = await searchTeams("Mil");
+
+    expect(mocks.clubSearchIlikeMock).toHaveBeenCalledWith("name", "%Mil%");
+    expect(mocks.clubSearchOrderMock).toHaveBeenCalledWith("name", {
+      ascending: true,
+    });
+    expect(mocks.clubSearchLimitMock).toHaveBeenCalledWith(5);
+    expect(result).toEqual([
+      {
+        city: "Milano",
+        id: "club-1",
+        logoUrl: "https://example.com/logo.png",
+        name: "ASD Real Milano",
+      },
+    ]);
   });
 });

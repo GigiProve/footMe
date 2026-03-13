@@ -13,10 +13,25 @@ import { BioSection } from "../../src/features/profiles/bio-section";
 import { ContactSection } from "../../src/features/profiles/contact-section";
 import { PersonalInfoSection } from "../../src/features/profiles/personal-info-section";
 import {
+  PlayerCharacteristicsSection,
+  PlayerExperiencesSection,
+} from "../../src/features/profiles/player-sports-section";
+import {
   ProfileField as Field,
   ProfileHeader,
   ProfileSection as Section,
 } from "../../src/features/profiles/profile-screen-components";
+import {
+  DEFAULT_PLAYER_PRIMARY_POSITION,
+  getLatestPlayerExperience,
+  getPlayerPositionLabel,
+  parsePlayerExperienceForms,
+  sortPlayerExperiencesBySeason,
+  toPlayerExperienceForm,
+  type PlayerExperienceForm,
+  type PlayerPosition,
+  type PreferredFoot,
+} from "../../src/features/profiles/player-sports";
 import {
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
@@ -33,14 +48,12 @@ import {
   getRegionFromCity,
   getOptionLabel,
   isRegionConsistentWithCity,
-  isSeasonLabelValid,
   normalizeContactEmail,
   normalizeBirthDateInput,
   normalizeFacebookInput,
   normalizeProfileBioInput,
   normalizeInstagramInput,
   normalizePhoneInput,
-  normalizeSeasonLabelInput,
   searchItalianCities,
   validateProfileBio,
   validateBirthDateInput,
@@ -50,34 +63,20 @@ import {
   updateCompleteProfessionalProfile,
   type CompleteProfessionalProfile,
   type PlayerCareerEntryInput,
-  type PlayerCareerEntryRecord,
-  type PreferredFoot,
+  searchTeams,
 } from "../../src/features/profiles/profile-service";
 import {
   type AppRole,
-  type PlayerPosition,
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
-import { colors, radius, spacing, typography } from "../../src/theme/tokens";
-import { Button, Card } from "../../src/ui";
-
-type CareerEntryForm = {
-  appearances: string;
-  assists: string;
-  awards: string;
-  clubName: string;
-  competitionName: string;
-  goals: string;
-  id?: string;
-  minutesPlayed: string;
-  seasonLabel: string;
-};
+import { colors, spacing, typography } from "../../src/theme/tokens";
+import { Button } from "../../src/ui";
 
 type ProfileFormState = {
   avatarUrl: string;
   bio: string;
   birthDate: string;
-  careerEntries: CareerEntryForm[];
+  careerEntries: PlayerExperienceForm[];
   certifications: string;
   contactEmail: string;
   contactFacebook: string;
@@ -129,19 +128,6 @@ const roleLabels: Record<AppRole, string> = {
   staff: "Staff tecnico",
 };
 
-const positionOptions: { label: string; value: PlayerPosition }[] = [
-  { label: "Portiere", value: "goalkeeper" },
-  { label: "Difensore", value: "defender" },
-  { label: "Centrocampista", value: "midfielder" },
-  { label: "Attaccante", value: "forward" },
-];
-
-const preferredFootOptions: { label: string; value: PreferredFoot }[] = [
-  { label: "Destro", value: "right" },
-  { label: "Sinistro", value: "left" },
-  { label: "Ambidestro", value: "both" },
-];
-
 const specializationOptions: { label: string; value: StaffSpecialization }[] = [
   { label: "Preparatore atletico", value: "fitness_coach" },
   { label: "Preparatore portieri", value: "goalkeeper_coach" },
@@ -150,19 +136,6 @@ const specializationOptions: { label: string; value: StaffSpecialization }[] = [
   { label: "Team manager", value: "team_manager" },
   { label: "Altro", value: "other" },
 ];
-
-function createEmptyCareerEntry(): CareerEntryForm {
-  return {
-    appearances: "",
-    assists: "",
-    awards: "",
-    clubName: "",
-    competitionName: "",
-    goals: "",
-    minutesPlayed: "",
-    seasonLabel: "",
-  };
-}
 
 function toDelimitedString(values: string[] | null | undefined) {
   return (values ?? []).join(", ");
@@ -196,24 +169,6 @@ function parseOptionalNumber(value: string) {
   return parsed;
 }
 
-function formatPosition(value: PlayerPosition | null) {
-  if (!value) {
-    return "Non definita";
-  }
-
-  return positionOptions.find((option) => option.value === value)?.label ?? value;
-}
-
-function formatPreferredFoot(value: PreferredFoot | null) {
-  if (!value) {
-    return "Da completare";
-  }
-
-  return (
-    preferredFootOptions.find((option) => option.value === value)?.label ?? value
-  );
-}
-
 function formatSpecialization(value: StaffSpecialization | null) {
   if (!value) {
     return "Da definire";
@@ -236,18 +191,10 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
     birthDate: formatBirthDateInputValue(data.profile.birth_date),
     careerEntries:
       data.playerCareerEntries.length > 0
-        ? data.playerCareerEntries.map((entry) => ({
-            appearances: String(entry.appearances),
-            assists: String(entry.assists),
-            awards: entry.awards ?? "",
-            clubName: entry.club_name,
-            competitionName: entry.competition_name ?? "",
-            goals: String(entry.goals),
-            id: entry.id,
-            minutesPlayed: String(entry.minutes_played),
-            seasonLabel: normalizeSeasonLabelInput(entry.season_label),
-          }))
-        : [createEmptyCareerEntry()],
+        ? sortPlayerExperiencesBySeason(
+            data.playerCareerEntries.map((entry) => toPlayerExperienceForm(entry)),
+          )
+        : [],
     certifications: toDelimitedString(staffProfile?.certifications),
     city: data.profile.city ?? "",
     contactEmail: data.userContacts.email,
@@ -281,7 +228,7 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
     preferredRegions: toDelimitedString(
       coachProfile?.preferred_regions ?? staffProfile?.preferred_regions,
     ),
-    primaryPosition: playerProfile?.primary_position ?? "midfielder",
+    primaryPosition: playerProfile?.primary_position ?? DEFAULT_PLAYER_PRIMARY_POSITION,
     region: data.profile.region ?? "",
     showContactEmail: data.userContacts.showEmail,
     showContactFacebook: data.userContacts.showFacebook,
@@ -374,20 +321,6 @@ type SummarySection = {
   title: string;
 };
 
-function getLatestCareerEntry(entries: PlayerCareerEntryRecord[]) {
-  const reversedEntries = [...entries].reverse();
-
-  return (
-    reversedEntries.find(
-      (entry) => entry.club_name.trim() && entry.competition_name?.trim(),
-    ) ??
-    reversedEntries.find(
-      (entry) => entry.club_name.trim() || entry.competition_name?.trim(),
-    ) ??
-    null
-  );
-}
-
 function buildHeaderDetails(
   data: CompleteProfessionalProfile,
   overrides?: {
@@ -413,15 +346,20 @@ function buildHeaderDetails(
   );
 
   if (data.profile.role === "player") {
-    const latestEntry = getLatestCareerEntry(data.playerCareerEntries);
+    const latestEntry = getLatestPlayerExperience(
+      data.playerCareerEntries.map((entry) => toPlayerExperienceForm(entry)),
+    );
 
     return {
       badges: [roleBadge, availabilityBadge],
       fullName,
       primaryMeta,
-      secondaryMeta: `${formatPosition(data.playerProfile?.primary_position ?? null)} · ${
-        latestEntry?.club_name ?? "Squadra da completare"
-      } · ${latestEntry?.competition_name?.trim() || "Categoria da definire"}`,
+      secondaryMeta: `${getPlayerPositionLabel(
+        data.playerProfile?.primary_position ?? null,
+        "Non definita",
+      )} · ${latestEntry?.clubName ?? "Squadra da completare"} · ${
+        latestEntry?.category.trim() || "Categoria da definire"
+      }`,
     };
   }
 
@@ -529,12 +467,11 @@ export default function ProfileScreen() {
         : null,
     [completeProfile, formState, isEditing],
   );
-  const playerCareerSummaryEntries = useMemo(
+  const playerExperienceCards = useMemo(
     () =>
-      (completeProfile?.playerCareerEntries ?? []).map((entry) => ({
-        entry,
-        seasonTitle: normalizeSeasonLabelInput(entry.season_label),
-      })),
+      sortPlayerExperiencesBySeason(
+        (completeProfile?.playerCareerEntries ?? []).map((entry) => toPlayerExperienceForm(entry)),
+      ),
     [completeProfile?.playerCareerEntries],
   );
   const birthDateHelperText = useMemo(() => {
@@ -624,32 +561,10 @@ export default function ProfileScreen() {
     ];
 
     if (completeProfile.profile.role === "player") {
-      const latestEntry = getLatestCareerEntry(completeProfile.playerCareerEntries);
-
       sections.push({
-        title: "Informazioni sportive",
-        subtitle: "Squadra, categoria e preferenze calcistiche attuali.",
+        title: "Preferenze sportive",
+        subtitle: "Disponibilità, aree di interesse e contenuti extra del profilo giocatore.",
         items: [
-          {
-            label: "Squadra attuale",
-            value: formatOptionalSummary(latestEntry?.club_name),
-          },
-          {
-            label: "Categoria attuale",
-            value: formatOptionalSummary(latestEntry?.competition_name),
-          },
-          {
-            label: "Posizione principale",
-            value: formatPosition(completeProfile.playerProfile?.primary_position ?? null),
-          },
-          {
-            label: "Posizione secondaria",
-            value: formatPosition(completeProfile.playerProfile?.secondary_position ?? null),
-          },
-          {
-            label: "Piede preferito",
-            value: formatPreferredFoot(completeProfile.playerProfile?.preferred_foot ?? null),
-          },
           {
             label: "Categorie preferite",
             value: formatListSummary(completeProfile.playerProfile?.preferred_categories),
@@ -947,41 +862,9 @@ export default function ProfileScreen() {
         );
       }
 
-      const parsedCareerEntries = formState.careerEntries
-        .map<PlayerCareerEntryInput | null>((entry, index) => {
-          const seasonLabel = normalizeSeasonLabelInput(entry.seasonLabel);
-          const clubName = entry.clubName.trim();
-
-          if (!seasonLabel && !clubName) {
-            return null;
-          }
-
-          if (!seasonLabel || !clubName) {
-            throw new Error(
-              "Ogni riga carriera deve includere almeno stagione e club.",
-            );
-          }
-
-          if (!isSeasonLabelValid(seasonLabel)) {
-            throw new Error(
-              "Usa il formato stagione xx/xx, ad esempio 24/25.",
-            );
-          }
-
-          return {
-            appearances: parseOptionalNumber(entry.appearances) ?? 0,
-            assists: parseOptionalNumber(entry.assists) ?? 0,
-            awards: parseOptionalText(entry.awards),
-            club_name: clubName,
-            competition_name: parseOptionalText(entry.competitionName),
-            goals: parseOptionalNumber(entry.goals) ?? 0,
-            id: entry.id,
-            minutes_played: parseOptionalNumber(entry.minutesPlayed) ?? 0,
-            season_label: seasonLabel,
-            sort_order: index,
-          };
-        })
-        .filter((entry): entry is PlayerCareerEntryInput => entry !== null);
+      const parsedCareerEntries: PlayerCareerEntryInput[] = parsePlayerExperienceForms(
+        formState.careerEntries,
+      );
 
       if (completeProfile.profile.role === "club_admin") {
         const clubName = formState.clubName.trim();
@@ -1131,54 +1014,22 @@ export default function ProfileScreen() {
 
             {(profile.role as AppRole) === "player" ? (
               <Section
-                description="Le stagioni salvate vengono mantenute e riepilogate qui."
-                title="Stagioni salvate"
+                description="Ruolo, piede preferito e timeline esperienze per lo scouting."
+                title="Informazioni sportive"
               >
-                {playerCareerSummaryEntries.length > 0 ? (
-                  playerCareerSummaryEntries.map(({ entry, seasonTitle }) => (
-                    <Card key={entry.id} style={{ gap: spacing[10] }} variant="muted">
-                      <Text
-                        style={{
-                          color: colors.textPrimary,
-                          fontSize: typography.fontSize[18],
-                          fontWeight: typography.fontWeight.heavy,
-                        }}
-                      >
-                        {seasonTitle} · {entry.club_name}
-                      </Text>
-                      <Text style={{ color: colors.textSecondary }}>
-                        {entry.competition_name?.trim() || "Competizione da completare"}
-                      </Text>
-                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
-                        {[
-                          `Presenze ${entry.appearances}`,
-                          `Gol ${entry.goals}`,
-                          `Assist ${entry.assists}`,
-                          `Minuti ${entry.minutes_played}`,
-                        ].map((item) => (
-                          <View
-                            key={item}
-                            style={{
-                              paddingHorizontal: spacing[12],
-                              paddingVertical: spacing[8],
-                              borderRadius: radius.full,
-                              backgroundColor: colors.background,
-                            }}
-                          >
-                            <Text style={{ color: colors.textPrimary }}>{item}</Text>
-                          </View>
-                        ))}
-                      </View>
-                      {entry.awards?.trim() ? (
-                        <Text style={{ color: colors.textSecondary }}>{entry.awards}</Text>
-                      ) : null}
-                    </Card>
-                  ))
-                ) : (
-                  <Text style={{ color: colors.textSecondary }}>
-                    Nessuna stagione salvata al momento.
-                  </Text>
-                )}
+                <PlayerCharacteristicsSection
+                  preferredFoot={completeProfile?.playerProfile?.preferred_foot ?? ""}
+                  primaryPosition={
+                    completeProfile?.playerProfile?.primary_position ??
+                    DEFAULT_PLAYER_PRIMARY_POSITION
+                  }
+                  secondaryPosition={completeProfile?.playerProfile?.secondary_position ?? ""}
+                />
+                <PlayerExperiencesSection
+                  emptyStateLabel="Nessuna esperienza calcistica salvata."
+                  experiences={playerExperienceCards}
+                  searchTeams={searchTeams}
+                />
               </Section>
             ) : null}
           </>
@@ -1302,66 +1153,29 @@ export default function ProfileScreen() {
             {(profile.role as AppRole) === "player" ? (
               <>
                 <Section
-                  description="Ruolo, piede, preferenze e disponibilità del calciatore."
+                  description="Ruolo, piede, preferenze e timeline esperienze del calciatore."
                   title="Informazioni sportive"
                 >
-                  <PillSelector
-                    label="Posizione principale"
-                    onChange={(value) =>
-                      setFormState((current) =>
-                        current ? { ...current, primaryPosition: value } : current,
-                      )
-                    }
-                    options={positionOptions}
-                    value={formState.primaryPosition}
-                  />
-                  <View style={{ gap: spacing[8] }}>
-                    <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-                      Posizione secondaria
-                    </Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
-                      <Button
-                        label="Nessuna"
-                        onPress={() =>
-                          setFormState((current) =>
-                            current ? { ...current, secondaryPosition: "" } : current,
-                          )
-                        }
-                        selected={formState.secondaryPosition === ""}
-                        size="sm"
-                        variant="chipAction"
-                      />
-                      {positionOptions.map((option) => {
-                        const isActive = option.value === formState.secondaryPosition;
-
-                        return (
-                          <Button
-                            key={option.value}
-                            label={option.label}
-                            onPress={() =>
-                              setFormState((current) =>
-                                current
-                                  ? { ...current, secondaryPosition: option.value }
-                                  : current,
-                              )
-                            }
-                            selected={isActive}
-                            size="sm"
-                            variant="chipAction"
-                          />
-                        );
-                      })}
-                    </View>
-                  </View>
-                  <PillSelector
-                    label="Piede preferito"
-                    onChange={(value) =>
+                  <PlayerCharacteristicsSection
+                    editable
+                    onPreferredFootChange={(value) =>
                       setFormState((current) =>
                         current ? { ...current, preferredFoot: value } : current,
                       )
                     }
-                    options={preferredFootOptions}
-                    value={formState.preferredFoot || "right"}
+                    onPrimaryPositionChange={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, primaryPosition: value } : current,
+                      )
+                    }
+                    onSecondaryPositionChange={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, secondaryPosition: value } : current,
+                      )
+                    }
+                    preferredFoot={formState.preferredFoot}
+                    primaryPosition={formState.primaryPosition}
+                    secondaryPosition={formState.secondaryPosition}
                   />
                   <Field
                     label="Categorie preferite"
@@ -1405,6 +1219,18 @@ export default function ProfileScreen() {
                     trueLabel="Sì"
                     value={formState.willingToChangeClub}
                   />
+                  <PlayerExperiencesSection
+                    addButtonLabel="Aggiungi esperienza calcistica"
+                    editable
+                    emptyStateLabel="Aggiungi una stagione per completare il profilo."
+                    experiences={formState.careerEntries}
+                    onChange={(experiences) =>
+                      setFormState((current) =>
+                        current ? { ...current, careerEntries: experiences } : current,
+                      )
+                    }
+                    searchTeams={searchTeams}
+                  />
                 </Section>
 
                 <Section
@@ -1428,233 +1254,6 @@ export default function ProfileScreen() {
                       )
                     }
                     value={formState.weightKg}
-                  />
-                </Section>
-
-                <Section
-                  description="Cronologia multistagione con club, campionato e numeri chiave."
-                  title="Carriera e statistiche"
-                >
-                  {formState.careerEntries.map((entry, index) => (
-                    <View
-                      key={entry.id ?? `career-${index}`}
-                      style={{
-                        gap: spacing[12],
-                        padding: 16,
-                        borderRadius: radius[18],
-                        backgroundColor: colors.background,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                      }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
-                          Stagione {index + 1}
-                        </Text>
-                        <Button
-                          accessibilityLabel={`Rimuovi stagione ${index + 1}`}
-                          destructive
-                          label="Rimuovi"
-                          onPress={() =>
-                            setFormState((current) =>
-                              current
-                                ? {
-                                    ...current,
-                                    careerEntries:
-                                      current.careerEntries.length > 1
-                                        ? current.careerEntries.filter(
-                                            (_, entryIndex) => entryIndex !== index,
-                                          )
-                                        : [createEmptyCareerEntry()],
-                                  }
-                                : current,
-                            )
-                          }
-                          size="sm"
-                          variant="link"
-                        />
-                      </View>
-                      <Field
-                        label="Stagione"
-                        onChangeText={(value) =>
-                          setFormState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  careerEntries: current.careerEntries.map(
-                                    (currentEntry, entryIndex) =>
-                                      entryIndex === index
-                                        ? {
-                                            ...currentEntry,
-                                            seasonLabel: normalizeSeasonLabelInput(value),
-                                          }
-                                        : currentEntry,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                        placeholder="24/25"
-                        value={entry.seasonLabel}
-                      />
-                      <Field
-                        label="Club"
-                        onChangeText={(value) =>
-                          setFormState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  careerEntries: current.careerEntries.map(
-                                    (currentEntry, entryIndex) =>
-                                      entryIndex === index
-                                        ? { ...currentEntry, clubName: value }
-                                        : currentEntry,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                        value={entry.clubName}
-                      />
-                      <Field
-                        label="Campionato o categoria"
-                        onChangeText={(value) =>
-                          setFormState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  careerEntries: current.careerEntries.map(
-                                    (currentEntry, entryIndex) =>
-                                      entryIndex === index
-                                        ? { ...currentEntry, competitionName: value }
-                                        : currentEntry,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                        value={entry.competitionName}
-                      />
-                      <Field
-                        label="Presenze"
-                        onChangeText={(value) =>
-                          setFormState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  careerEntries: current.careerEntries.map(
-                                    (currentEntry, entryIndex) =>
-                                      entryIndex === index
-                                        ? { ...currentEntry, appearances: value }
-                                        : currentEntry,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                        value={entry.appearances}
-                      />
-                      <Field
-                        label="Gol"
-                        onChangeText={(value) =>
-                          setFormState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  careerEntries: current.careerEntries.map(
-                                    (currentEntry, entryIndex) =>
-                                      entryIndex === index
-                                        ? { ...currentEntry, goals: value }
-                                        : currentEntry,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                        value={entry.goals}
-                      />
-                      <Field
-                        label="Assist"
-                        onChangeText={(value) =>
-                          setFormState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  careerEntries: current.careerEntries.map(
-                                    (currentEntry, entryIndex) =>
-                                      entryIndex === index
-                                        ? { ...currentEntry, assists: value }
-                                        : currentEntry,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                        value={entry.assists}
-                      />
-                      <Field
-                        label="Minuti giocati"
-                        onChangeText={(value) =>
-                          setFormState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  careerEntries: current.careerEntries.map(
-                                    (currentEntry, entryIndex) =>
-                                      entryIndex === index
-                                        ? { ...currentEntry, minutesPlayed: value }
-                                        : currentEntry,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                        value={entry.minutesPlayed}
-                      />
-                      <Field
-                        label="Premi o riconoscimenti"
-                        multiline
-                        onChangeText={(value) =>
-                          setFormState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  careerEntries: current.careerEntries.map(
-                                    (currentEntry, entryIndex) =>
-                                      entryIndex === index
-                                        ? { ...currentEntry, awards: value }
-                                        : currentEntry,
-                                  ),
-                                }
-                              : current,
-                          )
-                        }
-                        value={entry.awards}
-                      />
-                    </View>
-                  ))}
-                  <Button
-                    label="Aggiungi stagione"
-                    onPress={() =>
-                      setFormState((current) =>
-                        current
-                          ? {
-                              ...current,
-                              careerEntries: [
-                                ...current.careerEntries,
-                                createEmptyCareerEntry(),
-                              ],
-                            }
-                          : current,
-                      )
-                    }
-                    variant="secondary"
                   />
                 </Section>
               </>

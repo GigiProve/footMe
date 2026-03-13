@@ -11,16 +11,24 @@ import {
   createInitialProfile,
   BaseProfileValidationError,
   type AppRole,
-  type PlayerPosition,
   type ProfileGender,
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
 import {
+  PlayerCharacteristicsSection,
+  PlayerExperiencesSection,
+} from "../../src/features/profiles/player-sports-section";
+import {
+  DEFAULT_PLAYER_PRIMARY_POSITION,
+  parsePlayerExperienceForms,
+  type PlayerExperienceForm,
+  type PlayerPosition,
+  type PreferredFoot,
+} from "../../src/features/profiles/player-sports";
+import {
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
-  isSeasonLabelValid,
   normalizeProfileBioInput,
-  normalizeSeasonLabelInput,
   validateProfileBio,
 } from "../../src/features/profiles/profile-form-utils";
 import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
@@ -30,23 +38,15 @@ import {
   PROFILE_MEDIA_BUCKET,
   type UploadedMediaItem,
 } from "../../src/features/profiles/media-upload-service";
-import { updateCompleteProfessionalProfile } from "../../src/features/profiles/profile-service";
+import {
+  searchTeams,
+  updateCompleteProfessionalProfile,
+} from "../../src/features/profiles/profile-service";
 import { supabase } from "../../src/lib/supabase";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
 import { Button, Card, Input } from "../../src/ui";
 
 type OnboardingStep = "role" | "base" | "decision" | "details" | "complete";
-
-type CareerEntryForm = {
-  appearances: string;
-  assists: string;
-  awards: string;
-  clubName: string;
-  competitionName: string;
-  goals: string;
-  minutesPlayed: string;
-  seasonLabel: string;
-};
 
 type CompletionDestination = "feed" | "network" | "profile";
 
@@ -93,19 +93,6 @@ const genderOptions: { label: string; value: ProfileGender }[] = [
   { label: "Preferisco non specificarlo", value: "prefer_not_to_say" },
 ];
 
-const positionOptions: { label: string; value: PlayerPosition }[] = [
-  { label: "Portiere", value: "goalkeeper" },
-  { label: "Difensore", value: "defender" },
-  { label: "Centrocampista", value: "midfielder" },
-  { label: "Attaccante", value: "forward" },
-];
-
-const preferredFootOptions: { label: string; value: "right" | "left" | "both" }[] = [
-  { label: "Destro", value: "right" },
-  { label: "Sinistro", value: "left" },
-  { label: "Ambidestro", value: "both" },
-];
-
 const staffSpecializationOptions: { label: string; value: StaffSpecialization }[] = [
   { label: "Preparatore atletico", value: "fitness_coach" },
   { label: "Preparatore portieri", value: "goalkeeper_coach" },
@@ -114,19 +101,6 @@ const staffSpecializationOptions: { label: string; value: StaffSpecialization }[
   { label: "Team manager", value: "team_manager" },
   { label: "Altro", value: "other" },
 ];
-
-function createEmptyCareerEntry(): CareerEntryForm {
-  return {
-    appearances: "",
-    assists: "",
-    awards: "",
-    clubName: "",
-    competitionName: "",
-    goals: "",
-    minutesPlayed: "",
-    seasonLabel: "",
-  };
-}
 
 function parseOptionalText(value: string) {
   const trimmed = value.trim();
@@ -149,40 +123,11 @@ function parseOptionalNumber(value: string) {
   return parsed;
 }
 
-function parseStatNumber(value: string) {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return 0;
-  }
-
-  const parsed = Number(trimmed);
-
-  if (Number.isNaN(parsed)) {
-    throw new Error("Inserisci solo numeri validi nelle statistiche stagionali.");
-  }
-
-  return parsed;
-}
-
 function fromDelimitedString(value: string) {
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-function hasCareerEntryContent(entry: CareerEntryForm) {
-  return !!(
-    entry.seasonLabel.trim() ||
-    entry.clubName.trim() ||
-    entry.competitionName.trim() ||
-    entry.appearances.trim() ||
-    entry.goals.trim() ||
-    entry.assists.trim() ||
-    entry.minutesPlayed.trim() ||
-    entry.awards.trim()
-  );
 }
 
 function StepChip({
@@ -312,19 +257,16 @@ export default function OnboardingProfileScreen() {
   const [bio, setBio] = useState("");
   const [isAvailable, setIsAvailable] = useState(false);
   const [isOpenToTransfer, setIsOpenToTransfer] = useState(false);
-  const [primaryPosition, setPrimaryPosition] = useState<PlayerPosition>("midfielder");
+  const [primaryPosition, setPrimaryPosition] =
+    useState<PlayerPosition>(DEFAULT_PLAYER_PRIMARY_POSITION);
   const [secondaryPosition, setSecondaryPosition] = useState<PlayerPosition | "">("");
-  const [preferredFoot, setPreferredFoot] = useState<"right" | "left" | "both" | "">(
-    "",
-  );
+  const [preferredFoot, setPreferredFoot] = useState<PreferredFoot | "">("");
   const [heightCm, setHeightCm] = useState("");
   const [weightKg, setWeightKg] = useState("");
   const [preferredCategories, setPreferredCategories] = useState("");
   const [transferRegions, setTransferRegions] = useState("");
   const [willingToChangeClub, setWillingToChangeClub] = useState(false);
-  const [careerEntries, setCareerEntries] = useState<CareerEntryForm[]>([
-    createEmptyCareerEntry(),
-  ]);
+  const [careerEntries, setCareerEntries] = useState<PlayerExperienceForm[]>([]);
   const [highlightVideoUrl, setHighlightVideoUrl] = useState("");
   const [playerMediaItems, setPlayerMediaItems] = useState<UploadedMediaItem[]>([]);
   const [licenses, setLicenses] = useState("");
@@ -481,33 +423,7 @@ export default function OnboardingProfileScreen() {
         );
       }
 
-      const normalizedCareerEntries = careerEntries
-        .filter(hasCareerEntryContent)
-        .map((entry, index) => {
-          const seasonLabel = normalizeSeasonLabelInput(entry.seasonLabel);
-
-          if (!isSeasonLabelValid(seasonLabel)) {
-            throw new Error(
-              `La stagione dell'esperienza ${index + 1} deve essere nel formato 24/25.`,
-            );
-          }
-
-          if (!entry.clubName.trim()) {
-            throw new Error(`Inserisci la squadra per l'esperienza ${index + 1}.`);
-          }
-
-          return {
-            appearances: parseStatNumber(entry.appearances),
-            assists: parseStatNumber(entry.assists),
-            awards: parseOptionalText(entry.awards),
-            club_name: entry.clubName.trim(),
-            competition_name: parseOptionalText(entry.competitionName),
-            goals: parseStatNumber(entry.goals),
-            minutes_played: parseStatNumber(entry.minutesPlayed),
-            season_label: seasonLabel,
-            sort_order: index,
-          };
-        });
+      const normalizedCareerEntries = parsePlayerExperienceForms(careerEntries);
 
       await updateCompleteProfessionalProfile({
         club:
@@ -978,32 +894,14 @@ export default function OnboardingProfileScreen() {
                   >
                     Informazioni tecniche
                   </Text>
-                  <SelectField
-                    label="Ruolo principale"
-                    onChange={(value) => setPrimaryPosition(value as PlayerPosition)}
-                    options={positionOptions}
-                    placeholder="Seleziona il ruolo"
-                    value={primaryPosition}
-                  />
-                  <SelectField
-                    allowClear
-                    clearLabel="Rimuovi ruolo secondario"
-                    label="Ruolo secondario"
-                    onChange={(value) => setSecondaryPosition(value as PlayerPosition | "")}
-                    options={positionOptions}
-                    placeholder="Seleziona il ruolo secondario"
-                    value={secondaryPosition}
-                  />
-                  <SelectField
-                    allowClear
-                    clearLabel="Rimuovi piede preferito"
-                    label="Piede preferito"
-                    onChange={(value) =>
-                      setPreferredFoot(value as "right" | "left" | "both" | "")
-                    }
-                    options={preferredFootOptions}
-                    placeholder="Seleziona il piede preferito"
-                    value={preferredFoot}
+                  <PlayerCharacteristicsSection
+                    editable
+                    onPreferredFootChange={setPreferredFoot}
+                    onPrimaryPositionChange={setPrimaryPosition}
+                    onSecondaryPositionChange={setSecondaryPosition}
+                    preferredFoot={preferredFoot}
+                    primaryPosition={primaryPosition}
+                    secondaryPosition={secondaryPosition}
                   />
                   <View style={{ flexDirection: "row", gap: spacing[12] }}>
                     <View style={{ flex: 1 }}>
@@ -1119,147 +1017,15 @@ export default function OnboardingProfileScreen() {
                     Carriera calcistica
                   </Text>
                   <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                    Aggiungi una stagione per volta, in stile esperienze LinkedIn.
+                    Aggiungi una stagione per volta con squadra, categoria e statistiche.
                   </Text>
-                  {careerEntries.map((entry, index) => (
-                    <Card key={`career-${index}`} style={{ gap: spacing[10] }}>
-                      <Text
-                        style={{
-                          color: colors.textPrimary,
-                          fontSize: typography.fontSize[16],
-                          fontWeight: typography.fontWeight.heavy,
-                        }}
-                      >
-                        Stagione {index + 1}
-                      </Text>
-                      <Input
-                        label="Stagione"
-                        onChangeText={(value) =>
-                          setCareerEntries((current) =>
-                            current.map((item, currentIndex) =>
-                              currentIndex === index
-                                ? {
-                                    ...item,
-                                    seasonLabel: normalizeSeasonLabelInput(value),
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                        placeholder="Es. 24/25"
-                        value={entry.seasonLabel}
-                      />
-                      <Input
-                        label="Squadra"
-                        onChangeText={(value) =>
-                          setCareerEntries((current) =>
-                            current.map((item, currentIndex) =>
-                              currentIndex === index ? { ...item, clubName: value } : item,
-                            ),
-                          )
-                        }
-                        placeholder="Es. ASD Example"
-                        value={entry.clubName}
-                      />
-                      <Input
-                        label="Campionato / categoria"
-                        onChangeText={(value) =>
-                          setCareerEntries((current) =>
-                            current.map((item, currentIndex) =>
-                              currentIndex === index
-                                ? { ...item, competitionName: value }
-                                : item,
-                            ),
-                          )
-                        }
-                        placeholder="Es. Promozione"
-                        value={entry.competitionName}
-                      />
-                      <View
-                        style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[12] }}
-                      >
-                        <View style={{ flexBasis: "47%", flexGrow: 1 }}>
-                          <Input
-                            keyboardType="number-pad"
-                            label="Presenze"
-                            onChangeText={(value) =>
-                              setCareerEntries((current) =>
-                                current.map((item, currentIndex) =>
-                                  currentIndex === index
-                                    ? { ...item, appearances: value }
-                                    : item,
-                                ),
-                              )
-                            }
-                            value={entry.appearances}
-                          />
-                        </View>
-                        <View style={{ flexBasis: "47%", flexGrow: 1 }}>
-                          <Input
-                            keyboardType="number-pad"
-                            label="Gol"
-                            onChangeText={(value) =>
-                              setCareerEntries((current) =>
-                                current.map((item, currentIndex) =>
-                                  currentIndex === index ? { ...item, goals: value } : item,
-                                ),
-                              )
-                            }
-                            value={entry.goals}
-                          />
-                        </View>
-                        <View style={{ flexBasis: "47%", flexGrow: 1 }}>
-                          <Input
-                            keyboardType="number-pad"
-                            label="Assist"
-                            onChangeText={(value) =>
-                              setCareerEntries((current) =>
-                                current.map((item, currentIndex) =>
-                                  currentIndex === index ? { ...item, assists: value } : item,
-                                ),
-                              )
-                            }
-                            value={entry.assists}
-                          />
-                        </View>
-                        <View style={{ flexBasis: "47%", flexGrow: 1 }}>
-                          <Input
-                            keyboardType="number-pad"
-                            label="Minuti giocati"
-                            onChangeText={(value) =>
-                              setCareerEntries((current) =>
-                                current.map((item, currentIndex) =>
-                                  currentIndex === index
-                                    ? { ...item, minutesPlayed: value }
-                                    : item,
-                                ),
-                              )
-                            }
-                            value={entry.minutesPlayed}
-                          />
-                        </View>
-                      </View>
-                      <Input
-                        label="Premi o risultati"
-                        multiline
-                        onChangeText={(value) =>
-                          setCareerEntries((current) =>
-                            current.map((item, currentIndex) =>
-                              currentIndex === index ? { ...item, awards: value } : item,
-                            ),
-                          )
-                        }
-                        placeholder="Es. playoff vinti, premio miglior giocatore"
-                        value={entry.awards}
-                      />
-                    </Card>
-                  ))}
-                  <Button
-                    label="Aggiungi esperienza"
-                    onPress={() =>
-                      setCareerEntries((current) => [...current, createEmptyCareerEntry()])
-                    }
-                    variant="secondary"
+                  <PlayerExperiencesSection
+                    addButtonLabel="Aggiungi esperienza calcistica"
+                    editable
+                    emptyStateLabel="Aggiungi la tua prima esperienza stagionale."
+                    experiences={careerEntries}
+                    onChange={setCareerEntries}
+                    searchTeams={searchTeams}
                   />
                 </View>
 
