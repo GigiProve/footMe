@@ -173,6 +173,218 @@ export type CompleteProfessionalProfileUpdate = {
   userContacts: UserContactsRecord;
 };
 
+function normalizeOptionalText(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function normalizeRequiredText(value: unknown, fallback: string) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+function normalizeBoolean(value: unknown, fallback = false) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizeNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function normalizeStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function normalizeRole(value: unknown): AppRole {
+  return value === "coach" || value === "staff" || value === "club_admin" ? value : "player";
+}
+
+function normalizeBaseProfileRecord(
+  profileId: string,
+  rawProfile: Partial<BaseProfileRecord> | null | undefined,
+): BaseProfileRecord {
+  return {
+    age: normalizeNumber(rawProfile?.age),
+    avatar_url: normalizeOptionalText(rawProfile?.avatar_url),
+    bio: normalizeOptionalText(rawProfile?.bio),
+    birth_date: normalizeOptionalText(rawProfile?.birth_date),
+    city: normalizeOptionalText(rawProfile?.city),
+    full_name: normalizeRequiredText(rawProfile?.full_name, "Profilo FootMe"),
+    id: normalizeRequiredText(rawProfile?.id, profileId),
+    is_available: normalizeBoolean(rawProfile?.is_available),
+    is_open_to_transfer: normalizeBoolean(rawProfile?.is_open_to_transfer),
+    nationality: normalizeOptionalText(rawProfile?.nationality),
+    region: normalizeOptionalText(rawProfile?.region),
+    role: normalizeRole(rawProfile?.role),
+  };
+}
+
+function normalizePlayerProfileRecord(
+  profileId: string,
+  rawProfile: Partial<PlayerProfileRecord> | null | undefined,
+) {
+  if (!rawProfile) {
+    return null;
+  }
+
+  return {
+    height_cm: normalizeNumber(rawProfile.height_cm),
+    highlight_video_url: normalizeOptionalText(rawProfile.highlight_video_url),
+    preferred_categories: normalizeStringArray(rawProfile.preferred_categories),
+    preferred_foot:
+      rawProfile.preferred_foot === "right" ||
+      rawProfile.preferred_foot === "left" ||
+      rawProfile.preferred_foot === "both"
+        ? rawProfile.preferred_foot
+        : null,
+    primary_position:
+      rawProfile.primary_position === "goalkeeper" ||
+      rawProfile.primary_position === "defender" ||
+      rawProfile.primary_position === "forward"
+        ? rawProfile.primary_position
+        : "midfielder",
+    profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+    secondary_position:
+      rawProfile.secondary_position === "goalkeeper" ||
+      rawProfile.secondary_position === "defender" ||
+      rawProfile.secondary_position === "midfielder" ||
+      rawProfile.secondary_position === "forward"
+        ? rawProfile.secondary_position
+        : null,
+    transfer_regions: normalizeStringArray(rawProfile.transfer_regions),
+    weight_kg: normalizeNumber(rawProfile.weight_kg),
+    willing_to_change_club: normalizeBoolean(rawProfile.willing_to_change_club),
+  } satisfies PlayerProfileRecord;
+}
+
+function normalizeCoachProfileRecord(
+  profileId: string,
+  rawProfile: Partial<CoachProfileRecord> | null | undefined,
+) {
+  if (!rawProfile) {
+    return null;
+  }
+
+  return {
+    coached_categories: normalizeStringArray(rawProfile.coached_categories),
+    coached_clubs: normalizeStringArray(rawProfile.coached_clubs),
+    game_philosophy: normalizeOptionalText(rawProfile.game_philosophy),
+    licenses: normalizeStringArray(rawProfile.licenses),
+    open_to_new_role: normalizeBoolean(rawProfile.open_to_new_role),
+    preferred_regions: normalizeStringArray(rawProfile.preferred_regions),
+    profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+    technical_video_url: normalizeOptionalText(rawProfile.technical_video_url),
+  } satisfies CoachProfileRecord;
+}
+
+function normalizeStaffProfileRecord(
+  profileId: string,
+  rawProfile: Partial<StaffProfileRecord> | null | undefined,
+) {
+  if (!rawProfile) {
+    return null;
+  }
+
+  return {
+    certifications: normalizeStringArray(rawProfile.certifications),
+    experience_summary: normalizeOptionalText(rawProfile.experience_summary),
+    open_to_work: normalizeBoolean(rawProfile.open_to_work),
+    preferred_regions: normalizeStringArray(rawProfile.preferred_regions),
+    profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+    specialization:
+      rawProfile.specialization === "goalkeeper_coach" ||
+      rawProfile.specialization === "physiotherapist" ||
+      rawProfile.specialization === "match_analyst" ||
+      rawProfile.specialization === "team_manager" ||
+      rawProfile.specialization === "other"
+        ? rawProfile.specialization
+        : "fitness_coach",
+  } satisfies StaffProfileRecord;
+}
+
+function normalizeClubRecord(profileId: string, rawClub: Partial<ClubRecord> | null | undefined) {
+  if (!rawClub) {
+    return null;
+  }
+
+  return {
+    category: normalizeOptionalText(rawClub.category),
+    city: normalizeRequiredText(rawClub.city, ""),
+    description: normalizeOptionalText(rawClub.description),
+    gallery_urls: normalizeStringArray(rawClub.gallery_urls),
+    id: normalizeRequiredText(rawClub.id, profileId),
+    league: normalizeOptionalText(rawClub.league),
+    logo_url: normalizeOptionalText(rawClub.logo_url),
+    name: normalizeRequiredText(rawClub.name, ""),
+    owner_profile_id: normalizeRequiredText(rawClub.owner_profile_id, profileId),
+    region: normalizeRequiredText(rawClub.region, ""),
+  } satisfies ClubRecord;
+}
+
+function normalizePlayerCareerEntryRecord(
+  profileId: string,
+  rawEntry: Partial<PlayerCareerEntryRecord>,
+  index: number,
+) {
+  return {
+    appearances: normalizeNumber(rawEntry.appearances) ?? 0,
+    assists: normalizeNumber(rawEntry.assists) ?? 0,
+    awards: normalizeOptionalText(rawEntry.awards),
+    club_name: normalizeRequiredText(rawEntry.club_name, ""),
+    competition_name: normalizeOptionalText(rawEntry.competition_name),
+    goals: normalizeNumber(rawEntry.goals) ?? 0,
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-career-${index}`),
+    minutes_played: normalizeNumber(rawEntry.minutes_played) ?? 0,
+    player_profile_id: normalizeRequiredText(rawEntry.player_profile_id, profileId),
+    season_label: normalizeRequiredText(rawEntry.season_label, ""),
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+  } satisfies PlayerCareerEntryRecord;
+}
+
+export function normalizeUserProfile(input: {
+  club?: Partial<ClubRecord> | null;
+  coachProfile?: Partial<CoachProfileRecord> | null;
+  playerCareerEntries?: Partial<PlayerCareerEntryRecord>[] | null;
+  playerProfile?: Partial<PlayerProfileRecord> | null;
+  profile: Partial<BaseProfileRecord> | null | undefined;
+  profileId: string;
+  profileContacts?: {
+    email?: string | null;
+    facebook?: string | null;
+    instagram?: string | null;
+    show_email?: boolean | null;
+    show_facebook?: boolean | null;
+    show_instagram?: boolean | null;
+  } | null;
+  privateContacts?: {
+    phone?: string | null;
+  } | null;
+  staffProfile?: Partial<StaffProfileRecord> | null;
+}): CompleteProfessionalProfile {
+  return {
+    club: normalizeClubRecord(input.profileId, input.club),
+    coachProfile: normalizeCoachProfileRecord(input.profileId, input.coachProfile),
+    playerCareerEntries: (input.playerCareerEntries ?? []).map((entry, index) =>
+      normalizePlayerCareerEntryRecord(input.profileId, entry, index),
+    ),
+    playerProfile: normalizePlayerProfileRecord(input.profileId, input.playerProfile),
+    profile: normalizeBaseProfileRecord(input.profileId, input.profile),
+    staffProfile: normalizeStaffProfileRecord(input.profileId, input.staffProfile),
+    userContacts: {
+      email: input.profileContacts?.email ?? "",
+      facebook: input.profileContacts?.facebook ?? "",
+      instagram: input.profileContacts?.instagram ?? "",
+      phone: input.privateContacts?.phone ?? "",
+      showEmail: normalizeBoolean(input.profileContacts?.show_email),
+      showFacebook: normalizeBoolean(input.profileContacts?.show_facebook),
+      showInstagram: normalizeBoolean(input.profileContacts?.show_instagram),
+    },
+  };
+}
+
 export async function getCompleteProfessionalProfile(profileId: string) {
   const { data: profileData, error: profileError } = await supabase
     .from("profiles_with_age")
@@ -190,7 +402,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     throw new Error("Profilo non trovato.");
   }
 
-  const profile = profileData as BaseProfileRecord;
+  const profile = normalizeBaseProfileRecord(profileId, profileData as Partial<BaseProfileRecord>);
   const [playerProfile, coachProfile, staffProfile, club, profileContacts, privateContacts] =
     await Promise.all([
     profile.role === "player"
@@ -281,26 +493,22 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       throw careerError;
     }
 
-    playerCareerEntries = (careerData ?? []) as PlayerCareerEntryRecord[];
+    playerCareerEntries = (careerData ?? []).map((entry, index) =>
+      normalizePlayerCareerEntryRecord(profileId, entry as Partial<PlayerCareerEntryRecord>, index),
+    );
   }
 
-  return {
-    club: (club.data as ClubRecord | null) ?? null,
-    coachProfile: (coachProfile.data as CoachProfileRecord | null) ?? null,
+  return normalizeUserProfile({
+    club: (club.data as Partial<ClubRecord> | null) ?? null,
+    coachProfile: (coachProfile.data as Partial<CoachProfileRecord> | null) ?? null,
     playerCareerEntries,
-    playerProfile: (playerProfile.data as PlayerProfileRecord | null) ?? null,
+    playerProfile: (playerProfile.data as Partial<PlayerProfileRecord> | null) ?? null,
+    privateContacts: privateContacts.data,
     profile,
-    staffProfile: (staffProfile.data as StaffProfileRecord | null) ?? null,
-    userContacts: {
-      email: profileContacts.data?.email ?? "",
-      facebook: profileContacts.data?.facebook ?? "",
-      instagram: profileContacts.data?.instagram ?? "",
-      phone: privateContacts.data?.phone ?? "",
-      showEmail: profileContacts.data?.show_email ?? false,
-      showFacebook: profileContacts.data?.show_facebook ?? false,
-      showInstagram: profileContacts.data?.show_instagram ?? false,
-    },
-  } satisfies CompleteProfessionalProfile;
+    profileContacts: profileContacts.data,
+    profileId,
+    staffProfile: (staffProfile.data as Partial<StaffProfileRecord> | null) ?? null,
+  });
 }
 
 export async function updateCompleteProfessionalProfile(

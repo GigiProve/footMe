@@ -1,6 +1,5 @@
 import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
-import { withDefaultProfileAvatar } from "../profiles/profile-avatar";
 
 export type AppRole = "player" | "coach" | "staff" | "club_admin";
 export type ProfileGender =
@@ -39,48 +38,97 @@ type CreateInitialProfileInput = {
   userId: string;
 };
 
-export async function createInitialProfile(input: CreateInitialProfileInput) {
-  const avatarUrl = withDefaultProfileAvatar(input.avatarUrl);
+type ValidatedBaseProfileStep = {
+  avatarUrl: string | null;
+  birthDate: string;
+  domicile: string;
+  fullName: string;
+  nationality: string;
+  phoneNumber: string;
+  residence: string;
+};
+
+export class BaseProfileValidationError extends Error {
+  missingFields: string[];
+
+  constructor(message: string, missingFields: string[] = []) {
+    super(message);
+    this.name = "BaseProfileValidationError";
+    this.missingFields = missingFields;
+  }
+}
+
+function parseOptionalText(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function validateBaseProfileStep(input: CreateInitialProfileInput): ValidatedBaseProfileStep {
+  const avatarUrl = parseOptionalText(input.avatarUrl);
   const birthDate = input.birthDate.trim();
   const domicile = input.domicile.trim();
   const fullName = input.fullName.trim();
-  const gender = input.gender;
   const nationality = input.nationality.trim();
   const phoneNumber = input.phoneNumber.trim();
   const residence = input.residence.trim();
 
   if (!fullName) {
-    throw new Error("Inserisci nome e cognome prima di continuare.");
+    throw new BaseProfileValidationError("Inserisci nome e cognome prima di continuare.", [
+      "nome e cognome",
+    ]);
   }
 
-  if (
-    !birthDate ||
-    !gender ||
-    !nationality ||
-    !residence ||
-    !domicile
-  ) {
-    throw new Error(
-      "Completa sesso, data di nascita, nazionalita', residenza e domicilio.",
+  const missingFields = [
+    !input.gender ? "sesso" : null,
+    !birthDate ? "data di nascita" : null,
+    !nationality ? "nazionalità" : null,
+    !residence ? "residenza" : null,
+    !domicile ? "domicilio" : null,
+  ].filter(Boolean) as string[];
+
+  if (missingFields.length > 0) {
+    throw new BaseProfileValidationError(
+      `Completa i campi obbligatori: ${missingFields.join(", ")}.`,
+      missingFields,
     );
   }
 
   if (input.role === "club_admin") {
-    if (
-      !input.clubName.trim() ||
-      !input.clubCity.trim() ||
-      !input.clubRegion.trim()
-    ) {
-      throw new Error("Per una societa' servono nome, citta' e regione.");
+    const missingClubFields = [
+      !input.clubName.trim() ? "nome società" : null,
+      !input.clubCity.trim() ? "città società" : null,
+      !input.clubRegion.trim() ? "regione società" : null,
+    ].filter(Boolean) as string[];
+
+    if (missingClubFields.length > 0) {
+      throw new BaseProfileValidationError(
+        `Completa i dati obbligatori della società: ${missingClubFields.join(", ")}.`,
+        missingClubFields,
+      );
     }
   }
+
+  return {
+    avatarUrl,
+    birthDate,
+    domicile,
+    fullName,
+    nationality,
+    phoneNumber,
+    residence,
+  };
+}
+
+export async function createInitialProfile(input: CreateInitialProfileInput) {
+  const { avatarUrl, birthDate, domicile, fullName, nationality, phoneNumber, residence } =
+    validateBaseProfileStep(input);
 
   const { error: profileError } = await supabase.from("profiles").upsert({
     avatar_url: avatarUrl,
     birth_date: birthDate,
     domicile,
     id: input.userId,
-    gender,
+    gender: input.gender,
     role: input.role,
     full_name: fullName,
     nationality,

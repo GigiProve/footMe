@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createInitialProfile } from "./create-initial-profile";
-import { DEFAULT_PROFILE_AVATAR_URI } from "../profiles/profile-avatar";
+import { createInitialProfile, validateBaseProfileStep } from "./create-initial-profile";
 
 const { fromMock, upsertMocks } = vi.hoisted(() => {
   const upsertMocks = {
@@ -149,7 +148,9 @@ describe("createInitialProfile", () => {
         staffSpecialization: "fitness_coach",
         userId: "club-2",
       }),
-    ).rejects.toThrow("Per una societa' servono nome, citta' e regione.");
+    ).rejects.toThrow(
+      "Completa i dati obbligatori della società: città società, regione società.",
+    );
 
     expect(upsertMocks.clubs).not.toHaveBeenCalled();
   });
@@ -173,14 +174,34 @@ describe("createInitialProfile", () => {
         staffSpecialization: "fitness_coach",
         userId: "user-3",
       }),
-    ).rejects.toThrow(
-      "Completa sesso, data di nascita, nazionalita', residenza e domicilio.",
-    );
+    ).rejects.toThrow("Completa i campi obbligatori: data di nascita, nazionalità, residenza, domicilio.");
 
     expect(fromMock).not.toHaveBeenCalled();
   });
 
-  it("uses the blank default avatar when no profile image is uploaded", async () => {
+  it("reports the exact required fields that are missing", () => {
+    expect(() =>
+      validateBaseProfileStep({
+        avatarUrl: "",
+        birthDate: "",
+        clubCity: "",
+        clubName: "",
+        clubRegion: "",
+        domicile: " ",
+        fullName: "Marco Rossi",
+        gender: "male",
+        nationality: "",
+        phoneNumber: "",
+        primaryPosition: "forward",
+        residence: "",
+        role: "player",
+        staffSpecialization: "fitness_coach",
+        userId: "user-5",
+      }),
+    ).toThrow("Completa i campi obbligatori: data di nascita, nazionalità, residenza, domicilio.");
+  });
+
+  it("saves a null avatar when no profile image is uploaded", async () => {
     await createInitialProfile({
       avatarUrl: " ",
       birthDate: "1998-05-12",
@@ -201,7 +222,7 @@ describe("createInitialProfile", () => {
 
     expect(upsertMocks.profiles).toHaveBeenCalledWith(
       expect.objectContaining({
-        avatar_url: DEFAULT_PROFILE_AVATAR_URI,
+        avatar_url: null,
       }),
     );
   });

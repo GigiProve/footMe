@@ -2,7 +2,26 @@ import * as ImagePicker from "expo-image-picker";
 
 import { supabase } from "../../lib/supabase";
 
-const PROFILE_MEDIA_BUCKET = "profile-media";
+export const PROFILE_MEDIA_BUCKET = "profile-media";
+
+export type ProfileMediaUploadErrorCode =
+  | "bucket_not_found"
+  | "file_read_failed"
+  | "permission_denied"
+  | "public_url_failed"
+  | "upload_failed";
+
+export class ProfileMediaUploadError extends Error {
+  code: ProfileMediaUploadErrorCode;
+  cause?: unknown;
+
+  constructor(code: ProfileMediaUploadErrorCode, message: string, options?: { cause?: unknown }) {
+    super(message);
+    this.name = "ProfileMediaUploadError";
+    this.code = code;
+    this.cause = options?.cause;
+  }
+}
 
 export type UploadedMediaItem = {
   fileName: string;
@@ -16,6 +35,29 @@ type PickAndUploadMediaInput = {
   mediaTypes: ImagePicker.MediaType[] | ImagePicker.MediaTypeOptions;
   userId: string;
 };
+
+function mapUploadError(error: unknown) {
+  if (error instanceof ProfileMediaUploadError) {
+    return error;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "Upload del media non riuscito.";
+
+  if (/bucket not found/i.test(message)) {
+    return new ProfileMediaUploadError(
+      "bucket_not_found",
+      `Archivio media profilo non disponibile (${PROFILE_MEDIA_BUCKET}).`,
+      { cause: error },
+    );
+  }
+
+  return new ProfileMediaUploadError("upload_failed", message, { cause: error });
+}
 
 function normalizeFileName(fileName: string | null | undefined, fallback: string) {
   return (fileName ?? fallback).replace(/[^a-zA-Z0-9._-]+/g, "-");
@@ -50,9 +92,11 @@ async function uploadAsset(
   try {
     const response = await fetch(asset.uri);
     arrayBuffer = await response.arrayBuffer();
-  } catch {
-    throw new Error(
+  } catch (error) {
+    throw new ProfileMediaUploadError(
+      "file_read_failed",
       `Impossibile leggere il file selezionato ${asset.fileName ?? asset.uri}.`,
+      { cause: error },
     );
   }
 
@@ -71,12 +115,19 @@ async function uploadAsset(
     });
 
   if (error) {
-    throw error;
+    throw mapUploadError(error);
   }
 
   const {
     data: { publicUrl },
   } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
+
+  if (!publicUrl) {
+    throw new ProfileMediaUploadError(
+      "public_url_failed",
+      "Impossibile generare l'anteprima pubblica del media caricato.",
+    );
+  }
 
   return {
     fileName,
@@ -89,7 +140,10 @@ export async function pickAndUploadMedia(input: PickAndUploadMediaInput) {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
   if (!permission.granted) {
-    throw new Error("Consenti l'accesso alla libreria foto per caricare i media.");
+    throw new ProfileMediaUploadError(
+      "permission_denied",
+      "Consenti l'accesso alla libreria foto per caricare i media.",
+    );
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -104,7 +158,11 @@ export async function pickAndUploadMedia(input: PickAndUploadMediaInput) {
     return [];
   }
 
-  return Promise.all(
-    result.assets.map((asset, index) => uploadAsset(asset, input, index)),
-  );
+  try {
+    return await Promise.all(
+      result.assets.map((asset, index) => uploadAsset(asset, input, index)),
+    );
+  } catch (error) {
+    throw mapUploadError(error);
+  }
 }

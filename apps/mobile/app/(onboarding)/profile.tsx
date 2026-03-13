@@ -9,6 +9,7 @@ import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
 import {
   createInitialProfile,
+  BaseProfileValidationError,
   type AppRole,
   type PlayerPosition,
   type ProfileGender,
@@ -23,6 +24,8 @@ import {
 import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
 import {
   pickAndUploadMedia,
+  ProfileMediaUploadError,
+  PROFILE_MEDIA_BUCKET,
   type UploadedMediaItem,
 } from "../../src/features/profiles/media-upload-service";
 import { updateCompleteProfessionalProfile } from "../../src/features/profiles/profile-service";
@@ -230,6 +233,62 @@ function OptionPill({
   );
 }
 
+function getBaseStepAlert(error: unknown) {
+  if (error instanceof BaseProfileValidationError) {
+    return {
+      title: "Dati base non completi",
+      message: error.message,
+    };
+  }
+
+  return {
+    title: "Salvataggio non riuscito",
+    message:
+      error instanceof Error
+        ? error.message
+        : "Errore inatteso durante il salvataggio dei dati base.",
+  };
+}
+
+function getMediaUploadAlert(field: string, error: unknown) {
+  if (field === "avatar") {
+    if (error instanceof ProfileMediaUploadError && error.code === "bucket_not_found") {
+      return {
+        title: "Foto profilo non caricata",
+        message:
+          "La foto profilo non è stata caricata perché l'archivio media del profilo non è disponibile. Puoi continuare e aggiungerla più tardi.",
+      };
+    }
+
+    return {
+      title: "Foto profilo non caricata",
+      message:
+        error instanceof Error
+          ? `${error.message} Puoi continuare e aggiungerla più tardi.`
+          : "La foto profilo non è stata caricata, ma puoi continuare e aggiungerla più tardi.",
+    };
+  }
+
+  return {
+    title: "Caricamento non riuscito",
+    message:
+      error instanceof Error
+        ? error.message
+        : "Errore inatteso durante il caricamento dei media.",
+  };
+}
+
+function logMediaUploadFailure(payload: {
+  bucket: string;
+  error: unknown;
+  field: string;
+  folder: string;
+}) {
+  if (__DEV__) {
+    console.error("[onboarding] media upload failed", payload);
+  }
+}
+
 export default function OnboardingProfileScreen() {
   const router = useRouter();
   const { refreshProfile, session } = useSession();
@@ -331,11 +390,14 @@ export default function OnboardingProfileScreen() {
         onUploaded(uploadedItems);
       }
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso durante il caricamento dei media.";
-      Alert.alert("Caricamento non riuscito", message);
+      logMediaUploadFailure({
+        bucket: PROFILE_MEDIA_BUCKET,
+        error,
+        field,
+        folder,
+      });
+      const alertCopy = getMediaUploadAlert(field, error);
+      Alert.alert(alertCopy.title, alertCopy.message);
     } finally {
       setUploadingField(null);
     }
@@ -373,11 +435,8 @@ export default function OnboardingProfileScreen() {
       await ensureInitialProfileCreated();
       setStep("decision");
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso durante il salvataggio dei dati base.";
-      Alert.alert("Dati base non completi", message);
+      const alertCopy = getBaseStepAlert(error);
+      Alert.alert(alertCopy.title, alertCopy.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -393,9 +452,8 @@ export default function OnboardingProfileScreen() {
 
       setStep(mode === "now" ? "details" : "complete");
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Errore inatteso durante l'onboarding.";
-      Alert.alert("Operazione non completata", message);
+      const alertCopy = getBaseStepAlert(error);
+      Alert.alert(alertCopy.title, alertCopy.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -483,7 +541,7 @@ export default function OnboardingProfileScreen() {
               }
             : null,
         profile: {
-          avatar_url: withDefaultProfileAvatar(avatarUrl),
+          avatar_url: parseOptionalText(avatarUrl),
           bio: parseOptionalText(bio),
           birth_date: birthDate,
           city: null,
