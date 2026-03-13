@@ -1,9 +1,19 @@
 import React from "react";
-import TestRenderer from "react-test-renderer";
+import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it } from "vitest";
 
 import { colors } from "../../theme/tokens";
 import { Screen } from "./screen";
+
+function renderScreen(element: React.ReactElement) {
+  let tree!: TestRenderer.ReactTestRenderer;
+
+  act(() => {
+    tree = TestRenderer.create(element);
+  });
+
+  return tree;
+}
 
 describe("Screen", () => {
   it("renders children inside the content container", () => {
@@ -11,7 +21,7 @@ describe("Screen", () => {
       return React.createElement("mock-text", null, "Contenuto test");
     }
 
-    const tree = TestRenderer.create(
+    const tree = renderScreen(
       <Screen>
         <Child />
       </Screen>,
@@ -27,7 +37,7 @@ describe("Screen", () => {
       return React.createElement("mock-text", null, "Decorazioni");
     }
 
-    const tree = TestRenderer.create(
+    const tree = renderScreen(
       <Screen>
         <Child />
       </Screen>,

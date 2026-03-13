@@ -166,6 +166,26 @@ export type CompleteProfessionalProfileUpdate = {
   userContacts: UserContactsRecord;
 };
 
+function toPlayerCareerEntryRpcPayload(
+  entry: PlayerCareerEntryInput,
+  { includeId = true }: { includeId?: boolean } = {},
+) {
+  return {
+    appearances: entry.appearances,
+    assists: entry.assists,
+    awards: entry.awards,
+    club_id: entry.club_id,
+    club_name: entry.club_name,
+    competition_name: entry.competition_name,
+    goals: entry.goals,
+    ...(includeId ? { id: entry.id } : {}),
+    minutes_played: entry.minutes_played,
+    season_label: entry.season_label,
+    sort_order: entry.sort_order,
+    team_logo_url: entry.team_logo_url,
+  };
+}
+
 function normalizeOptionalText(value: unknown) {
   return typeof value === "string" ? value : null;
 }
@@ -552,106 +572,19 @@ export async function updateCompleteProfessionalProfile(
   }
 
   if (input.role === "player" && input.playerProfile) {
-    const { error: playerProfileError } = await supabase
-      .from("player_profiles")
-      .upsert({
-        height_cm: input.playerProfile.height_cm,
-        highlight_video_url: input.playerProfile.highlight_video_url,
-        preferred_categories: input.playerProfile.preferred_categories,
-        preferred_foot: input.playerProfile.preferred_foot,
-        primary_position: input.playerProfile.primary_position,
-        profile_id: input.profileId,
-        secondary_position: input.playerProfile.secondary_position,
-        transfer_regions: input.playerProfile.transfer_regions,
-        weight_kg: input.playerProfile.weight_kg,
-        willing_to_change_club: input.playerProfile.willing_to_change_club,
-      });
+    const { error: playerProfileError } = await supabase.rpc(
+      "save_player_profile_details",
+      {
+        p_career_entries: input.playerCareerEntries.map((entry) =>
+          toPlayerCareerEntryRpcPayload(entry, { includeId: Boolean(entry.id) }),
+        ),
+        p_player_profile: input.playerProfile,
+        p_profile_id: input.profileId,
+      },
+    );
 
     if (playerProfileError) {
       throw playerProfileError;
-    }
-
-    const currentIds = input.playerCareerEntries
-      .map((entry) => entry.id)
-      .filter((entryId): entryId is string => !!entryId);
-
-    const existingEntries = input.playerCareerEntries
-      .filter((entry) => !!entry.id)
-        .map((entry) => ({
-          appearances: entry.appearances,
-          assists: entry.assists,
-          awards: entry.awards,
-          club_id: entry.club_id,
-          club_name: entry.club_name,
-          competition_name: entry.competition_name,
-          goals: entry.goals,
-          id: entry.id,
-          minutes_played: entry.minutes_played,
-          player_profile_id: input.profileId,
-          season_label: entry.season_label,
-          sort_order: entry.sort_order,
-          team_logo_url: entry.team_logo_url,
-        }));
-    const newEntries = input.playerCareerEntries
-      .filter((entry) => !entry.id)
-      .map((entry) => ({
-        appearances: entry.appearances,
-        assists: entry.assists,
-        awards: entry.awards,
-        club_id: entry.club_id,
-        club_name: entry.club_name,
-        competition_name: entry.competition_name,
-        goals: entry.goals,
-        minutes_played: entry.minutes_played,
-        player_profile_id: input.profileId,
-        season_label: entry.season_label,
-        sort_order: entry.sort_order,
-        team_logo_url: entry.team_logo_url,
-      }));
-
-    if (existingEntries.length > 0) {
-      const { error: careerUpsertError } = await supabase
-        .from("player_career_entries")
-        .upsert(existingEntries);
-
-      if (careerUpsertError) {
-        throw careerUpsertError;
-      }
-    }
-
-    if (newEntries.length > 0) {
-      const { error: careerInsertError } = await supabase
-        .from("player_career_entries")
-        .insert(newEntries);
-
-      if (careerInsertError) {
-        throw careerInsertError;
-      }
-    }
-
-    const { data: existingCareerRows, error: existingCareerError } = await supabase
-      .from("player_career_entries")
-      .select("id")
-      .eq("player_profile_id", input.profileId);
-
-    if (existingCareerError) {
-      throw existingCareerError;
-    }
-
-    const removableIds = (existingCareerRows ?? [])
-      .map((entry) => entry.id as string)
-      .filter((entryId) => !currentIds.includes(entryId));
-
-    if (removableIds.length > 0) {
-      const { error: deleteCareerError } = await supabase
-        .from("player_career_entries")
-        .delete()
-        .eq("player_profile_id", input.profileId)
-        .in("id", removableIds);
-
-      if (deleteCareerError) {
-        throw deleteCareerError;
-      }
     }
   }
 

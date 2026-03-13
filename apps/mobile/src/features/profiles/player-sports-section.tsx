@@ -54,6 +54,12 @@ type ExperienceBadgeProps = {
   label: string;
 };
 
+type ExperienceStatsRowProps = {
+  appearances: string;
+  assists: string;
+  goals: string;
+};
+
 type ExperienceCardProps = {
   editable?: boolean;
   experience: PlayerExperienceForm;
@@ -68,6 +74,7 @@ type AddPlayerExperienceFormProps = {
   onSave: () => void;
   saveLabel?: string;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  title?: string;
 };
 
 type PlayerCharacteristicsSectionProps = {
@@ -87,6 +94,7 @@ type PlayerExperiencesSectionProps = {
   experiences: PlayerExperienceForm[];
   onChange?: (experiences: PlayerExperienceForm[]) => void;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  showHeader?: boolean;
 };
 
 function TeamLogo({
@@ -111,6 +119,20 @@ export function ExperienceBadge({ label }: ExperienceBadgeProps) {
   return (
     <View style={styles.badge}>
       <Text style={styles.badgeText}>{label}</Text>
+    </View>
+  );
+}
+
+export function ExperienceStatsRow({
+  appearances,
+  assists,
+  goals,
+}: ExperienceStatsRowProps) {
+  return (
+    <View style={styles.statsInlineRow}>
+      <Text style={styles.statsInlineText}>
+        {`${appearances || "0"} presenze • ${goals || "0"} gol • ${assists || "0"} assist`}
+      </Text>
     </View>
   );
 }
@@ -290,7 +312,6 @@ export function ExperienceCard({
 
   return (
     <Card style={styles.experienceCard} variant="muted">
-      <View style={styles.timelineDot} />
       <View style={styles.experienceHeader}>
         <View style={styles.experienceIdentity}>
           <TeamLogo name={experience.clubName} teamLogoUrl={experience.teamLogoUrl} />
@@ -300,8 +321,8 @@ export function ExperienceCard({
             </Text>
             <Text style={styles.experienceMeta}>
               {(experience.category.trim() || "Categoria da definire") +
-                " — Stagione " +
-                (experience.seasonLabel.trim() || "da completare")}
+                " • " +
+                (experience.seasonLabel.trim() || "Stagione da completare")}
             </Text>
           </View>
         </View>
@@ -320,20 +341,11 @@ export function ExperienceCard({
         ) : null}
       </View>
 
-      <View style={styles.statsSummaryTable}>
-        <View style={styles.statsSummaryCell}>
-          <Text style={styles.statsSummaryHeader}>Presenze</Text>
-          <Text style={styles.statsSummaryValue}>{experience.appearances || "0"}</Text>
-        </View>
-        <View style={styles.statsSummaryCell}>
-          <Text style={styles.statsSummaryHeader}>Gol</Text>
-          <Text style={styles.statsSummaryValue}>{experience.goals || "0"}</Text>
-        </View>
-        <View style={styles.statsSummaryCell}>
-          <Text style={styles.statsSummaryHeader}>Assist</Text>
-          <Text style={styles.statsSummaryValue}>{experience.assists || "0"}</Text>
-        </View>
-      </View>
+      <ExperienceStatsRow
+        appearances={experience.appearances}
+        assists={experience.assists}
+        goals={experience.goals}
+      />
 
       {badges.length > 0 ? (
         <View style={styles.badgesRow}>
@@ -353,10 +365,11 @@ export function AddPlayerExperienceForm({
   onSave,
   saveLabel = "Salva esperienza",
   searchTeams,
+  title = "Aggiungi esperienza calcistica",
 }: AddPlayerExperienceFormProps) {
   return (
     <View style={styles.modalBody}>
-      <Text style={styles.modalTitle}>Aggiungi esperienza calcistica</Text>
+      <Text style={styles.modalTitle}>{title}</Text>
       <Text style={styles.modalDescription}>
         Compila una stagione alla volta con squadra, categoria e numeri chiave.
       </Text>
@@ -518,6 +531,7 @@ export function PlayerExperiencesSection({
   experiences,
   onChange,
   searchTeams,
+  showHeader = true,
 }: PlayerExperiencesSectionProps) {
   const [draft, setDraft] = useState<PlayerExperienceForm>(createEmptyPlayerExperienceForm());
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -573,19 +587,21 @@ export function PlayerExperiencesSection({
 
   return (
     <View style={styles.sectionStack}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Esperienze calcistiche</Text>
-        <Text style={styles.sectionDescription}>
-          Timeline ordinata dalla stagione più recente, con squadra, categoria e statistiche.
-        </Text>
-      </View>
+      {showHeader ? (
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Esperienze calcistiche</Text>
+          <Text style={styles.sectionDescription}>
+            Timeline ordinata dalla stagione più recente, con squadra, categoria e statistiche.
+          </Text>
+        </View>
+      ) : null}
 
       {editable ? (
         <Button label={addButtonLabel} onPress={openNewExperience} variant="secondary" />
       ) : null}
 
       {sortedExperiences.length > 0 ? (
-        <View style={styles.timeline}>
+        <View style={styles.experiencesList}>
           {sortedExperiences.map((experience, index) => (
             <ExperienceCard
               editable={editable}
@@ -618,6 +634,11 @@ export function PlayerExperiencesSection({
                 onSave={handleSave}
                 saveLabel={editingIndex === null ? "Aggiungi esperienza" : "Aggiorna esperienza"}
                 searchTeams={searchTeams}
+                title={
+                  editingIndex === null
+                    ? "Aggiungi esperienza calcistica"
+                    : "Modifica esperienza calcistica"
+                }
               />
             </ScrollView>
           </Pressable>
@@ -629,8 +650,8 @@ export function PlayerExperiencesSection({
 
 const styles = StyleSheet.create({
   badge: {
-    paddingHorizontal: spacing[10],
-    paddingVertical: spacing[6],
+    paddingHorizontal: spacing[8],
+    paddingVertical: spacing[4],
     borderRadius: radius.full,
     backgroundColor: colors.accentSoft,
   },
@@ -642,22 +663,24 @@ const styles = StyleSheet.create({
   badgesRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing[8],
+    gap: spacing[6],
   },
   emptyState: {
     color: colors.textSecondary,
     lineHeight: typography.lineHeight[22],
   },
+  experiencesList: {
+    gap: spacing[10],
+  },
   experienceActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing[8],
+    gap: spacing[6],
     flexWrap: "wrap",
   },
   experienceCard: {
-    gap: spacing[14],
-    marginLeft: spacing[16],
-    position: "relative",
+    gap: spacing[10],
+    paddingVertical: spacing[14],
   },
   experienceCopy: {
     flex: 1,
@@ -666,21 +689,23 @@ const styles = StyleSheet.create({
   experienceHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: spacing[12],
-    alignItems: "flex-start",
+    gap: spacing[10],
+    alignItems: "center",
   },
   experienceIdentity: {
     flexDirection: "row",
-    gap: spacing[12],
+    gap: spacing[10],
     flex: 1,
+    alignItems: "center",
   },
   experienceMeta: {
     color: colors.textSecondary,
+    fontSize: typography.fontSize[12],
     lineHeight: typography.lineHeight[22],
   },
   experienceTeamName: {
     color: colors.textPrimary,
-    fontSize: typography.fontSize[18],
+    fontSize: typography.fontSize[16],
     fontWeight: typography.fontWeight.heavy,
   },
   fieldGroup: {
@@ -774,25 +799,14 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     textTransform: "uppercase",
   },
-  statsSummaryCell: {
-    flex: 1,
-    gap: spacing[4],
+  statsInlineRow: {
+    paddingHorizontal: spacing[4],
   },
-  statsSummaryHeader: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
-  },
-  statsSummaryTable: {
-    flexDirection: "row",
-    gap: spacing[12],
-    flexWrap: "wrap",
-  },
-  statsSummaryValue: {
+  statsInlineText: {
     color: colors.textPrimary,
-    fontSize: typography.fontSize[20],
-    fontWeight: typography.fontWeight.heavy,
+    fontSize: typography.fontSize[12],
+    lineHeight: typography.lineHeight[22],
+    fontWeight: typography.fontWeight.bold,
   },
   subsectionLabel: {
     color: colors.textPrimary,
@@ -835,8 +849,8 @@ const styles = StyleSheet.create({
     padding: spacing[10],
   },
   teamLogo: {
-    width: 44,
-    height: 44,
+    width: 38,
+    height: 38,
     borderRadius: radius.full,
     backgroundColor: colors.surface,
   },
@@ -845,23 +859,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  timeline: {
-    gap: spacing[12],
-    borderLeftWidth: 2,
-    borderLeftColor: colors.border,
-    marginLeft: spacing[8],
-    paddingLeft: spacing[6],
-  },
-  timelineDot: {
-    position: "absolute",
-    left: -26,
-    top: spacing[22],
-    width: 12,
-    height: 12,
-    borderRadius: radius.full,
-    backgroundColor: colors.hero,
-    borderWidth: 2,
-    borderColor: colors.surface,
   },
 });

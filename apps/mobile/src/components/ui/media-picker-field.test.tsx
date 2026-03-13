@@ -1,5 +1,5 @@
 import React from "react";
-import TestRenderer from "react-test-renderer";
+import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 
 import { colors, radius } from "../../theme/tokens";
@@ -10,13 +10,23 @@ vi.mock("../../ui", () => ({
   Card: ({
     children,
     ...props
-  }: React.PropsWithChildren<Record<string, unknown>>) =>
-    React.createElement("mock-card", props, children),
+    }: React.PropsWithChildren<Record<string, unknown>>) =>
+      React.createElement("mock-card", props, children),
 }));
+
+function renderMediaPickerField(element: React.ReactElement) {
+  let tree!: TestRenderer.ReactTestRenderer;
+
+  act(() => {
+    tree = TestRenderer.create(element);
+  });
+
+  return tree;
+}
 
 describe("MediaPickerField", () => {
   it("clips the preview inside a rounded frame", () => {
-    const tree = TestRenderer.create(
+    const tree = renderMediaPickerField(
       <MediaPickerField
         buttonLabel="Carica foto profilo"
         label="Foto profilo"
