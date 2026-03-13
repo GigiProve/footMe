@@ -1,13 +1,23 @@
 import React from "react";
-import TestRenderer from "react-test-renderer";
+import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it } from "vitest";
 
 import { colors } from "../../styles";
 import { Button } from "./Button";
 
+function renderButton(element: React.ReactElement) {
+  let tree!: TestRenderer.ReactTestRenderer;
+
+  act(() => {
+    tree = TestRenderer.create(element);
+  });
+
+  return tree;
+}
+
 describe("Button", () => {
   it("uses the primary palette by default", () => {
-    const tree = TestRenderer.create(<Button label="Salva" onPress={() => undefined} />);
+    const tree = renderButton(<Button label="Salva" onPress={() => undefined} />);
     const pressable = tree.root.findByProps({ accessibilityRole: "button" });
     const styles = pressable.props.style({ focused: false, pressed: false });
     const label = tree.root.findByProps({ children: "Salva" });
@@ -26,7 +36,7 @@ describe("Button", () => {
   });
 
   it("renders chip actions with a selected accent treatment", () => {
-    const tree = TestRenderer.create(
+    const tree = renderButton(
       <Button
         label="Calciatori"
         onPress={() => undefined}
@@ -50,8 +60,13 @@ describe("Button", () => {
   });
 
   it("shows a spinner and disables presses while loading", () => {
-    const tree = TestRenderer.create(
-      <Button label="Invio candidatura" loading onPress={() => undefined} testID="apply-action" />,
+    const tree = renderButton(
+      <Button
+        label="Invio candidatura"
+        loading
+        onPress={() => undefined}
+        testID="apply-action"
+      />,
     );
     const pressable = tree.root.findByProps({ accessibilityRole: "button" });
 
@@ -61,7 +76,7 @@ describe("Button", () => {
   });
 
   it("supports destructive secondary buttons without promoting them to filled danger", () => {
-    const tree = TestRenderer.create(
+    const tree = renderButton(
       <Button
         destructive
         label="Rimuovi"

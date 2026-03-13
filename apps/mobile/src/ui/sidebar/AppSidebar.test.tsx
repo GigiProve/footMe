@@ -44,6 +44,16 @@ vi.mock("@expo/vector-icons/Ionicons", () => {
   };
 });
 
+function renderSidebar(props: React.ComponentProps<typeof AppSidebar>) {
+  let tree!: TestRenderer.ReactTestRenderer;
+
+  act(() => {
+    tree = TestRenderer.create(<AppSidebar {...props} />);
+  });
+
+  return tree;
+}
+
 describe("AppSidebar", () => {
   beforeEach(() => {
     pushMock.mockReset();
@@ -78,7 +88,7 @@ describe("AppSidebar", () => {
       } as never,
     });
 
-    const tree = TestRenderer.create(<AppSidebar isOpen onClose={() => undefined} />);
+    const tree = renderSidebar({ isOpen: true, onClose: () => undefined });
 
     expect(tree.root.findByProps({ children: "Mario Rossi" })).toBeTruthy();
     expect(tree.root.findByProps({ children: "Calciatore" })).toBeTruthy();
@@ -114,7 +124,7 @@ describe("AppSidebar", () => {
       } as never,
     });
 
-    const tree = TestRenderer.create(<AppSidebar isOpen onClose={onClose} />);
+    const tree = renderSidebar({ isOpen: true, onClose });
     const profileAction = tree.root.findByProps({ accessibilityLabel: "Apri Profilo" });
 
     act(() => {
@@ -153,7 +163,7 @@ describe("AppSidebar", () => {
       } as never,
     });
 
-    const tree = TestRenderer.create(<AppSidebar isOpen onClose={onClose} />);
+    const tree = renderSidebar({ isOpen: true, onClose });
     const logoutAction = tree.root.findByProps({ accessibilityLabel: "Logout" });
 
     await act(async () => {

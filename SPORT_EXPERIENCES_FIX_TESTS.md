@@ -44,8 +44,8 @@ npm run test:mobile -- src/features/profiles/player-sports.test.ts src/features/
 Dettaglio copertura:
 
 - `profile-service-update.test.ts`
-  - verifica che una nuova esperienza venga inserita e **non** cancellata nello stesso save
-  - verifica che un save misto aggiorni l'esistente, elimini solo la legacy rimossa e mantenga la nuova entry
+  - verifica che il save player usi il nuovo RPC atomico `save_player_profile_details`
+  - verifica che le nuove esperienze vengano serializzate senza `id` nel payload RPC
 
 ### Parsing / mapping
 
@@ -87,19 +87,19 @@ npm run test:mobile
 
 ### Esito
 
-La suite completa presenta **fallimenti pre-esistenti non correlati** in altri componenti UI:
+La suite completa ora è **verde**:
+
+- 24 file test passati
+- 80 test passati
+- 0 test falliti
+
+Oltre ai test mirati sulle esperienze, sono stati corretti i test UI che fallivano sotto React 19 creando i renderer fuori da `act(...)`:
 
 - `src/ui/sidebar/AppSidebar.test.tsx`
 - `src/ui/Button/Button.test.tsx`
 - `src/components/ui/screen.test.tsx`
 - `src/components/ui/date-picker-field.test.tsx`
 - `src/components/ui/media-picker-field.test.tsx`
-
-Errore ricorrente:
-
-- `Error: Can't access .root on unmounted test renderer`
-
-Questi fallimenti non dipendono dalle modifiche sulle esperienze calcistiche: i test mirati dell'area toccata sono verdi.
 
 ## Regressioni controllate
 
@@ -110,5 +110,5 @@ Questi fallimenti non dipendono dalle modifiche sulle esperienze calcistiche: i 
 
 ## Note residue
 
-- Il save player resta composto da più chiamate Supabase lato client; non è ancora una transazione atomica server-side
-- La validazione visiva è stata fatta tramite revisione del rendering e screenshot del layout aggiornato
+- La validazione visiva dell'Experience Card resta confermata tramite revisione del rendering e screenshot del layout aggiornato
+- Restano warning non bloccanti di lint in file non correlati al task

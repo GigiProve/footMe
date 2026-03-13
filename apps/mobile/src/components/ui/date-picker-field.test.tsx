@@ -10,9 +10,19 @@ vi.mock("@react-native-community/datetimepicker", () => ({
     React.createElement("mock-date-time-picker", props),
 }));
 
+function renderDatePickerField(element: React.ReactElement) {
+  let tree!: TestRenderer.ReactTestRenderer;
+
+  act(() => {
+    tree = TestRenderer.create(element);
+  });
+
+  return tree;
+}
+
 describe("DatePickerField", () => {
   it("shows the placeholder until a date is selected", () => {
-    const tree = TestRenderer.create(
+    const tree = renderDatePickerField(
       <DatePickerField label="Data di nascita" onChange={() => undefined} value="" />,
     );
     const root = tree.root;
@@ -22,7 +32,7 @@ describe("DatePickerField", () => {
   });
 
   it("opens the picker surface and formats the current ISO value", () => {
-    const tree = TestRenderer.create(
+    const tree = renderDatePickerField(
       <DatePickerField
         label="Data di nascita"
         onChange={() => undefined}

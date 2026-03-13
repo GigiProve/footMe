@@ -67,14 +67,14 @@ La card usava timeline verticale, dot decorativo, tabella statistiche a 3 colonn
 Nel servizio di salvataggio:
 
 - recuperare gli `id` persistiti **prima** di cancellare e inserire
-- calcolare `removableIds` solo rispetto alle righe già presenti nel database
+- calcolare le entry da rimuovere lato database, dentro una singola transazione SQL
 - fare `upsert` delle entry esistenti
 - fare `delete` solo delle entry realmente rimosse
 - fare `insert` delle nuove entry **dopo** il calcolo dei removals
 
 In aggiunta:
 
-- centralizzare il mapping DB in `toPlayerCareerEntryMutation`
+- centralizzare il mapping del payload verso il layer di persistenza
 - preservare in modo uniforme `team_logo_url`, `competition_name`, `club_id`, `minutes_played`, `sort_order`
 
 ### UX readonly
@@ -107,13 +107,17 @@ Refactor compatto:
 
 ### Medi
 
-- il flusso di save player resta multi-step e non transazionale lato Supabase client; un errore rete tra delete e insert può ancora lasciare uno stato parziale
-- la suite test completa del workspace contiene fallimenti pre-esistenti non correlati (`react-test-renderer` unmounted root), quindi la validazione end-to-end resta limitata ai test mirati verdi
+- il salvataggio completo del profilo resta multi-step per le sezioni non player (profilo base, contatti, ecc.), ma la parte critica `player_profiles + player_career_entries` ora è atomica lato Postgres tramite RPC
+- restano warning non bloccanti di lint in file non correlati (`Array<T>` vs `T[]`)
 
 ## Fix implementato
 
-- Spostato il calcolo di `existingCareerRows` e `removableIds` prima dell'`insert`
-- Introdotto `toPlayerCareerEntryMutation` per unificare il mapping verso il DB
-- Mantenuta la separazione corretta tra create, update e delete nello stesso save
+- Introdotto `toPlayerCareerEntryRpcPayload` per unificare il mapping inviato al RPC
+- Introdotto il nuovo RPC atomico `public.save_player_profile_details(...)` per gestire in un'unica transazione:
+  - upsert di `player_profiles`
+  - delete delle esperienze rimosse
+  - upsert delle esperienze esistenti
+  - insert delle nuove esperienze
+- Aggiornato il client mobile per usare il nuovo RPC invece di orchestrare create/update/delete separati
 - Riposizionata la sezione esperienze sotto "Informazioni personali" in readonly
 - Uniformata la card esperienze con layout compatto e leggibile
