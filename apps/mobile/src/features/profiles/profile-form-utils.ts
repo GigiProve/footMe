@@ -397,6 +397,16 @@ export function getRegionsFromCity(cityName: string) {
   return Array.from(new Set(regions));
 }
 
+export function isRegionConsistentWithCity(cityName: string, region: string) {
+  const normalizedRegion = region.trim();
+
+  if (!cityName.trim() || !normalizedRegion) {
+    return true;
+  }
+
+  return getRegionsFromCity(cityName).includes(normalizedRegion);
+}
+
 export function searchItalianCities(query: string, limit = 8) {
   const normalizedQuery = normalizeLookupValue(query);
 

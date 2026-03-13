@@ -27,8 +27,8 @@ import {
   formatOptionalSummary,
   formatProfileDisplayName,
   getRegionFromCity,
-  getRegionsFromCity,
   getOptionLabel,
+  isRegionConsistentWithCity,
   isSeasonLabelValid,
   normalizeBirthDateInput,
   normalizeSeasonLabelInput,
@@ -863,7 +863,11 @@ export default function ProfileScreen() {
         throw new Error("Seleziona una città italiana valida dai suggerimenti.");
       }
 
-      if (trimmedCity && inferredRegion && trimmedRegion && !getRegionsFromCity(trimmedCity).includes(trimmedRegion)) {
+      if (
+        trimmedCity &&
+        inferredRegion &&
+        !isRegionConsistentWithCity(trimmedCity, trimmedRegion)
+      ) {
         throw new Error("La regione deve essere coerente con la città selezionata.");
       }
 

@@ -11,6 +11,7 @@ import {
   formatProfileDisplayName,
   getBirthDateParts,
   getRegionFromCity,
+  isRegionConsistentWithCity,
   isSeasonLabelValid,
   normalizeBirthDateInput,
   normalizeSeasonLabelInput,
@@ -84,5 +85,7 @@ describe("profile-form-utils", () => {
     expect(suggestions.some((entry) => entry.name === "Milano")).toBe(true);
     expect(getRegionFromCity("Milano")).toBe("Lombardia");
     expect(getRegionFromCity("Roma")).toBe("Lazio");
+    expect(isRegionConsistentWithCity("Milano", "Lombardia")).toBe(true);
+    expect(isRegionConsistentWithCity("Milano", "Lazio")).toBe(false);
   });
 });
