@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => {
     clubMaybeSingleMock,
     coachMaybeSingleMock,
     fromMock: vi.fn((table: string) => {
-      if (table === "profiles") {
+      if (table === "profiles_with_age") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -117,6 +117,7 @@ describe("getCompleteProfessionalProfile", () => {
         avatar_url: null,
         bio: null,
         birth_date: null,
+        age: null,
         city: "Perugia",
         full_name: "Marco Rossi",
         id: "profile-1",
@@ -219,6 +220,7 @@ describe("getCompleteProfessionalProfile", () => {
         avatar_url: null,
         bio: null,
         birth_date: null,
+        age: null,
         city: "Roma",
         full_name: "Club Admin",
         id: "profile-9",

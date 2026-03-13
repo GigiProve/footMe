@@ -50,9 +50,9 @@ export function SelectField<T extends string>({
           paddingHorizontal: spacing[16],
           paddingVertical: spacing[14],
           borderWidth: 1,
-          borderColor: colors.border,
+          borderColor: isOpen ? colors.accentStrong : colors.border,
           borderRadius: radius[16],
-          backgroundColor: colors.background,
+          backgroundColor: selectedLabel ? colors.accentSoft : colors.background,
         }}
       >
         <Text

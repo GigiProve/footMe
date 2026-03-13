@@ -1,6 +1,13 @@
+import italianCities from "./italian-cities.json";
+
 export type SelectOption<T extends string = string> = {
   label: string;
   value: T;
+};
+
+export type ItalianCityOption = {
+  name: string;
+  region: string;
 };
 
 export const REGION_OPTIONS: SelectOption[] = [
@@ -104,6 +111,11 @@ export const BIRTH_MONTH_OPTIONS: SelectOption[] = [
 // The current mobile MVP targets adult and senior amateur football profiles, so
 // we cap the picker to a conservative historical range without introducing UX noise.
 export const FIRST_BIRTH_YEAR = 1940;
+const italianCityOptions = italianCities as ItalianCityOption[];
+const normalizedItalianCityOptions = italianCityOptions.map((entry) => ({
+  ...entry,
+  normalizedName: normalizeLookupValue(entry.name),
+}));
 
 export function ensureOption<T extends string>(
   options: SelectOption<T>[],
@@ -152,6 +164,11 @@ export function formatBirthDate(value: string | null | undefined) {
   }
 
   return `${parts.day}/${parts.month}/${parts.year}`;
+}
+
+export function formatBirthDateInputValue(value: string | null | undefined) {
+  const formattedValue = formatBirthDate(value);
+  return formattedValue === "Da completare" ? "" : formattedValue;
 }
 
 export function getBirthDateParts(value: string | null | undefined) {
@@ -224,6 +241,190 @@ export function formatBirthDateValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+export function normalizeBirthDateInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+
+  if (digits.length <= 2) {
+    return digits;
+  }
+
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  }
+
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+export function parseBirthDateInput(
+  value: string | null | undefined,
+  currentDate = new Date(),
+) {
+  const normalizedValue = normalizeBirthDateInput(value ?? "");
+  const match = normalizedValue.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, day, month, year] = match;
+  const numericDay = Number(day);
+  const numericMonth = Number(month);
+  const numericYear = Number(year);
+
+  if (
+    numericYear < FIRST_BIRTH_YEAR ||
+    numericYear > currentDate.getFullYear() ||
+    numericMonth < 1 ||
+    numericMonth > 12 ||
+    numericDay < 1
+  ) {
+    return null;
+  }
+
+  const candidate = new Date(numericYear, numericMonth - 1, numericDay);
+
+  if (
+    Number.isNaN(candidate.getTime()) ||
+    candidate.getFullYear() !== numericYear ||
+    candidate.getMonth() !== numericMonth - 1 ||
+    candidate.getDate() !== numericDay
+  ) {
+    return null;
+  }
+
+  if (candidate > currentDate) {
+    return null;
+  }
+
+  return {
+    date: candidate,
+    isoValue: formatBirthDateValue(candidate),
+    normalizedValue,
+  };
+}
+
+export function validateBirthDateInput(
+  value: string | null | undefined,
+  currentDate = new Date(),
+) {
+  const normalizedValue = normalizeBirthDateInput(value ?? "");
+
+  if (!normalizedValue) {
+    return {
+      isValid: true,
+      isoValue: null,
+      message: null,
+    };
+  }
+
+  const parsedValue = parseBirthDateInput(normalizedValue, currentDate);
+
+  if (!parsedValue) {
+    return {
+      isValid: false,
+      isoValue: null,
+      message:
+        "Inserisci una data valida in formato GG/MM/AAAA senza usare date future.",
+    };
+  }
+
+  return {
+    isValid: true,
+    isoValue: parsedValue.isoValue,
+    message: null,
+  };
+}
+
+export function calculateAge(
+  value: Date | string | null | undefined,
+  currentDate = new Date(),
+) {
+  const parsedValue =
+    value instanceof Date
+      ? value
+      : parseBirthDate(value) ?? parseBirthDateInput(value, currentDate)?.date ?? null;
+
+  if (!parsedValue) {
+    return null;
+  }
+
+  let age = currentDate.getFullYear() - parsedValue.getFullYear();
+  const currentMonth = currentDate.getMonth();
+  const birthMonth = parsedValue.getMonth();
+
+  if (
+    currentMonth < birthMonth ||
+    (currentMonth === birthMonth && currentDate.getDate() < parsedValue.getDate())
+  ) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : null;
+}
+
+export function formatProfileDisplayName(fullName: string, age: number | null | undefined) {
+  const trimmedName = fullName.trim();
+
+  if (!trimmedName) {
+    return "Da completare";
+  }
+
+  return age === null || age === undefined ? trimmedName : `${trimmedName}, ${age}`;
+}
+
+export function formatLocationSummary(
+  city: string | null | undefined,
+  region: string | null | undefined,
+) {
+  const normalizedValues = [city, region].map((value) => value?.trim()).filter(Boolean);
+  return normalizedValues.length > 0 ? normalizedValues.join(", ") : "Da completare";
+}
+
+export function getRegionFromCity(cityName: string) {
+  return (
+    normalizedItalianCityOptions.find(
+      (entry) => entry.normalizedName === normalizeLookupValue(cityName),
+    )?.region ?? ""
+  );
+}
+
+export function getRegionsFromCity(cityName: string) {
+  const normalizedName = normalizeLookupValue(cityName);
+  const regions = normalizedItalianCityOptions
+    .filter((entry) => entry.normalizedName === normalizedName)
+    .map((entry) => entry.region);
+
+  return Array.from(new Set(regions));
+}
+
+export function searchItalianCities(query: string, limit = 8) {
+  const normalizedQuery = normalizeLookupValue(query);
+
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const startsWithMatches: ItalianCityOption[] = [];
+  const includesMatches: ItalianCityOption[] = [];
+
+  for (const entry of normalizedItalianCityOptions) {
+    if (entry.normalizedName.startsWith(normalizedQuery)) {
+      startsWithMatches.push({ name: entry.name, region: entry.region });
+      continue;
+    }
+
+    if (entry.normalizedName.includes(normalizedQuery)) {
+      includesMatches.push({ name: entry.name, region: entry.region });
+    }
+  }
+
+  return [...startsWithMatches, ...includesMatches].slice(0, limit);
+}
+
+export function isItalianCity(cityName: string) {
+  return Boolean(getRegionFromCity(cityName));
+}
+
 export function normalizeSeasonLabelInput(value: string) {
   const compactValue = value.replace(/\s+/g, "");
   const shortPatternMatch = compactValue.match(/^(\d{2})\/?(\d{0,2})$/);
@@ -253,4 +454,14 @@ export function normalizeSeasonLabelInput(value: string) {
 
 export function isSeasonLabelValid(value: string) {
   return /^\d{2}\/\d{2}$/.test(value.trim());
+}
+
+function normalizeLookupValue(value: string) {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }

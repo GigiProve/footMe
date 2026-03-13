@@ -6,10 +6,10 @@ import {
   View,
 } from "react-native";
 
-import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
+import { PersonalInfoSection } from "../../src/features/profiles/personal-info-section";
 import {
   ProfileField as Field,
   ProfileHeader,
@@ -18,13 +18,22 @@ import {
 import {
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
+  calculateAge,
   ensureOption,
   formatBirthDate,
+  formatBirthDateInputValue,
+  formatLocationSummary,
   formatListSummary,
   formatOptionalSummary,
+  formatProfileDisplayName,
+  getRegionFromCity,
+  getRegionsFromCity,
   getOptionLabel,
   isSeasonLabelValid,
+  normalizeBirthDateInput,
   normalizeSeasonLabelInput,
+  searchItalianCities,
+  validateBirthDateInput,
 } from "../../src/features/profiles/profile-form-utils";
 import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
 import {
@@ -208,7 +217,7 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
   return {
     avatarUrl: data.profile.avatar_url ?? "",
     bio: data.profile.bio ?? "",
-    birthDate: data.profile.birth_date ?? "",
+    birthDate: formatBirthDateInputValue(data.profile.birth_date),
     careerEntries:
       data.playerCareerEntries.length > 0
         ? data.playerCareerEntries.map((entry) => ({
@@ -336,25 +345,6 @@ function PillSelector<T extends string>({
   );
 }
 
-function BirthDateField({
-  label,
-  onChange,
-  value,
-}: {
-  label: string;
-  onChange: (value: string) => void;
-  value: string;
-}) {
-  return (
-    <DatePickerField
-      label={label}
-      onChange={onChange}
-      placeholder="Apri il calendario e scegli la data"
-      value={value}
-    />
-  );
-}
-
 type SummarySection = {
   items: { label: string; value: string }[];
   subtitle?: string;
@@ -375,48 +365,72 @@ function getLatestCareerEntry(entries: PlayerCareerEntryRecord[]) {
   );
 }
 
-function buildHeaderDetails(data: CompleteProfessionalProfile) {
+function buildHeaderDetails(
+  data: CompleteProfessionalProfile,
+  overrides?: {
+    birthDate?: string;
+    city?: string;
+    fullName?: string;
+    region?: string;
+  },
+) {
   const roleBadge = roleLabels[data.profile.role];
   const availabilityBadge = data.profile.is_available ? "Disponibile" : "Non disponibile";
+  const age =
+    calculateAge(overrides?.birthDate ?? undefined) ??
+    data.profile.age ??
+    calculateAge(data.profile.birth_date);
+  const fullName = formatProfileDisplayName(
+    overrides?.fullName ?? data.profile.full_name,
+    age,
+  );
+  const primaryMeta = formatLocationSummary(
+    overrides?.city ?? data.profile.city,
+    overrides?.region ?? data.profile.region,
+  );
 
   if (data.profile.role === "player") {
     const latestEntry = getLatestCareerEntry(data.playerCareerEntries);
 
     return {
       badges: [roleBadge, availabilityBadge],
-      primaryMeta: `${latestEntry?.club_name ?? "Squadra da completare"} · ${
-        latestEntry?.competition_name?.trim() || "Categoria da definire"
-      }`,
-      secondaryMeta: formatPosition(data.playerProfile?.primary_position ?? null),
+      fullName,
+      primaryMeta,
+      secondaryMeta: `${formatPosition(data.playerProfile?.primary_position ?? null)} · ${
+        latestEntry?.club_name ?? "Squadra da completare"
+      } · ${latestEntry?.competition_name?.trim() || "Categoria da definire"}`,
     };
   }
 
   if (data.profile.role === "coach") {
     return {
       badges: [roleBadge, data.coachProfile?.open_to_new_role ? "Aperto a nuove panchine" : "Profilo attivo"],
-      primaryMeta: `${data.coachProfile?.coached_clubs[0] ?? "Squadra da completare"} · ${
+      fullName,
+      primaryMeta,
+      secondaryMeta: `${data.coachProfile?.coached_clubs[0] ?? "Squadra da completare"} · ${
         data.coachProfile?.coached_categories[0] ?? "Categoria da definire"
       }`,
-      secondaryMeta: "Allenatore",
     };
   }
 
   if (data.profile.role === "staff") {
     return {
       badges: [roleBadge, data.staffProfile?.open_to_work ? "Open to work" : "Profilo attivo"],
-      primaryMeta: `${formatSpecialization(data.staffProfile?.specialization ?? null)} · ${
+      fullName,
+      primaryMeta,
+      secondaryMeta: `${formatSpecialization(data.staffProfile?.specialization ?? null)} · ${
         data.staffProfile?.preferred_regions[0] ?? "Area da definire"
       }`,
-      secondaryMeta: "Supporto tecnico e performance",
     };
   }
 
   return {
     badges: [roleBadge],
-    primaryMeta: `${data.club?.name ?? "Società da completare"} · ${
+    fullName,
+    primaryMeta,
+    secondaryMeta: `${data.club?.name ?? "Società da completare"} · ${
       data.club?.category ?? "Categoria da definire"
     }`,
-    secondaryMeta: data.club?.league ?? "Contesto competitivo da definire",
   };
 }
 
@@ -470,9 +484,26 @@ export default function ProfileScreen() {
     () => ensureOption(REGION_OPTIONS, formState?.clubRegion),
     [formState?.clubRegion],
   );
+  const citySuggestions = useMemo(
+    () => searchItalianCities(formState?.city ?? ""),
+    [formState?.city],
+  );
   const headerDetails = useMemo(
-    () => (completeProfile ? buildHeaderDetails(completeProfile) : null),
-    [completeProfile],
+    () =>
+      completeProfile
+        ? buildHeaderDetails(
+            completeProfile,
+            isEditing && formState
+              ? {
+                  birthDate: formState.birthDate,
+                  city: formState.city,
+                  fullName: formState.fullName,
+                  region: formState.region,
+                }
+              : undefined,
+          )
+        : null,
+    [completeProfile, formState, isEditing],
   );
   const playerCareerSummaryEntries = useMemo(
     () =>
@@ -483,6 +514,26 @@ export default function ProfileScreen() {
     [completeProfile?.playerCareerEntries],
   );
   const accountEmail = session?.user.email ?? "";
+  const birthDateHelperText = useMemo(() => {
+    const validation = validateBirthDateInput(formState?.birthDate);
+
+    if (!validation.isValid) {
+      return validation.message ?? undefined;
+    }
+
+    return formState?.birthDate ? "Formato GG/MM/AAAA" : undefined;
+  }, [formState?.birthDate]);
+  const cityHelperText = useMemo(() => {
+    if (!formState?.city.trim()) {
+      return undefined;
+    }
+
+    if (getRegionFromCity(formState.city)) {
+      return `Regione suggerita: ${getRegionFromCity(formState.city)}`;
+    }
+
+    return "Seleziona una città presente nel dataset ISTAT.";
+  }, [formState?.city]);
 
   const summarySections = useMemo<SummarySection[]>(() => {
     if (!completeProfile) {
@@ -737,6 +788,44 @@ export default function ProfileScreen() {
     setIsEditing(false);
   }
 
+  function handleFullNameChange(value: string) {
+    setFormState((current) =>
+      current
+        ? {
+            ...current,
+            fullName: value.slice(0, 60),
+          }
+        : current,
+    );
+  }
+
+  function handleBirthDateChange(value: string) {
+    setFormState((current) =>
+      current
+        ? {
+            ...current,
+            birthDate: normalizeBirthDateInput(value),
+          }
+        : current,
+    );
+  }
+
+  function handleCityChange(value: string) {
+    setFormState((current) => (current ? { ...current, city: value } : current));
+  }
+
+  function handleCitySuggestionPress(selection: { name: string; region: string }) {
+    setFormState((current) =>
+      current
+        ? {
+            ...current,
+            city: selection.name,
+            region: selection.region,
+          }
+        : current,
+    );
+  }
+
   async function handleSave() {
     if (!userId || !completeProfile || !formState) {
       return;
@@ -746,9 +835,36 @@ export default function ProfileScreen() {
       setIsSaving(true);
 
       const trimmedFullName = formState.fullName.trim();
+      const birthDateValidation = validateBirthDateInput(formState.birthDate);
+      const trimmedCity = formState.city.trim();
+      const inferredRegion = trimmedCity ? getRegionFromCity(trimmedCity) : "";
+      const trimmedRegion = (formState.region.trim() || inferredRegion).trim();
 
       if (!trimmedFullName) {
         throw new Error("Nome e cognome sono obbligatori.");
+      }
+
+      if (trimmedFullName.length < 3) {
+        throw new Error("Nome e cognome devono contenere almeno 3 caratteri.");
+      }
+
+      if (trimmedFullName.length > 60) {
+        throw new Error("Nome e cognome non possono superare i 60 caratteri.");
+      }
+
+      if (!birthDateValidation.isValid) {
+        throw new Error(
+          birthDateValidation.message ??
+            "Inserisci una data di nascita valida in formato GG/MM/AAAA.",
+        );
+      }
+
+      if (trimmedCity && !inferredRegion) {
+        throw new Error("Seleziona una città italiana valida dai suggerimenti.");
+      }
+
+      if (trimmedCity && inferredRegion && trimmedRegion && !getRegionsFromCity(trimmedCity).includes(trimmedRegion)) {
+        throw new Error("La regione deve essere coerente con la città selezionata.");
       }
 
       const parsedCareerEntries = formState.careerEntries
@@ -845,13 +961,13 @@ export default function ProfileScreen() {
         profile: {
           avatar_url: withDefaultProfileAvatar(formState.avatarUrl),
           bio: parseOptionalText(formState.bio),
-          birth_date: parseOptionalText(formState.birthDate),
-          city: parseOptionalText(formState.city),
+          birth_date: birthDateValidation.isoValue,
+          city: parseOptionalText(trimmedCity),
           full_name: trimmedFullName,
           is_available: formState.isAvailable,
           is_open_to_transfer: formState.isOpenToTransfer,
           nationality: parseOptionalText(formState.nationality),
-          region: parseOptionalText(formState.region),
+          region: parseOptionalText(trimmedRegion),
         },
         profileId: userId,
         role: completeProfile.profile.role,
@@ -886,7 +1002,7 @@ export default function ProfileScreen() {
           <ProfileHeader
             avatarUrl={formState?.avatarUrl ?? completeProfile.profile.avatar_url}
             badges={headerDetails.badges}
-            fullName={formState?.fullName ?? completeProfile.profile.full_name}
+            fullName={headerDetails.fullName}
             isEditing={isEditing}
             onEditPress={isEditing ? handleStopEditing : handleStartEditing}
             primaryMeta={headerDetails.primaryMeta}
@@ -965,55 +1081,35 @@ export default function ProfileScreen() {
           </>
         ) : (
           <>
+            <PersonalInfoSection
+              birthDate={formState.birthDate}
+              birthDateHelperText={birthDateHelperText}
+              city={formState.city}
+              cityHelperText={cityHelperText}
+              citySuggestions={citySuggestions}
+              editable
+              fullName={formState.fullName}
+              nationality={formState.nationality}
+              nationalityOptions={nationalityOptions}
+              onBirthDateChange={handleBirthDateChange}
+              onCityChange={handleCityChange}
+              onCitySuggestionPress={handleCitySuggestionPress}
+              onFullNameChange={handleFullNameChange}
+              onNationalityChange={(value) =>
+                setFormState((current) =>
+                  current ? { ...current, nationality: value } : current,
+                )
+              }
+              onRegionChange={(value) =>
+                setFormState((current) => (current ? { ...current, region: value } : current))
+              }
+              region={formState.region}
+              regionOptions={regionOptions}
+            />
             <Section
-              description="Dati anagrafici, località e informazioni pubbliche di base."
-              title="Informazioni personali"
+              description="Visibilità e asset del profilo pubblico."
+              title="Presentazione"
             >
-              <Field
-                label="Nome e cognome"
-                onChangeText={(value) =>
-                  setFormState((current) => (current ? { ...current, fullName: value } : current))
-                }
-                value={formState.fullName}
-              />
-              <BirthDateField
-                label="Data di nascita"
-                onChange={(value) =>
-                  setFormState((current) => (current ? { ...current, birthDate: value } : current))
-                }
-                value={formState.birthDate}
-              />
-              <SelectField
-                allowClear
-                clearLabel="Rimuovi la nazionalità"
-                label="Nazionalità"
-                onChange={(value) =>
-                  setFormState((current) =>
-                    current ? { ...current, nationality: value } : current,
-                  )
-                }
-                options={nationalityOptions}
-                placeholder="Seleziona la nazionalità"
-                value={formState.nationality}
-              />
-              <Field
-                label="Città"
-                onChangeText={(value) =>
-                  setFormState((current) => (current ? { ...current, city: value } : current))
-                }
-                value={formState.city}
-              />
-              <SelectField
-                allowClear
-                clearLabel="Rimuovi la regione"
-                label="Regione"
-                onChange={(value) =>
-                  setFormState((current) => (current ? { ...current, region: value } : current))
-                }
-                options={regionOptions}
-                placeholder="Seleziona la regione"
-                value={formState.region}
-              />
               <Field
                 label="Bio"
                 multiline
@@ -1652,7 +1748,7 @@ export default function ProfileScreen() {
               />
               <Button
                 disabled={isSaving}
-                label={isSaving ? "Salvataggio..." : "Salva modifiche"}
+                label={isSaving ? "Salvataggio..." : "Salva profilo"}
                 onPress={() => void handleSave()}
                 style={{ flex: 1 }}
                 variant="primary"
