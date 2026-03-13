@@ -29,3 +29,4 @@ Documenti di riferimento:
 - `docs/mvp-backlog.md`
 - `docs/technical-architecture.md`
 - `docs/mobile-ux-ui-guidelines.md`
+- `docs/react-best-practices.md`

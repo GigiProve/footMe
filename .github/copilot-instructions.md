@@ -6,6 +6,7 @@
 - The phased delivery plan lives in [docs/implementation-roadmap.md](../docs/implementation-roadmap.md).
 - The technical architecture lives in [docs/technical-architecture.md](../docs/technical-architecture.md).
 - The UX/UI reference for mobile patterns lives in [docs/mobile-ux-ui-guidelines.md](../docs/mobile-ux-ui-guidelines.md).
+- The React/React Native engineering guidance lives in [docs/react-best-practices.md](../docs/react-best-practices.md).
 - For product explanations and feature planning, use [.github/instructions/project-scope.instructions.md](./instructions/project-scope.instructions.md) before making assumptions.
 
 ## Working Rules
@@ -14,6 +15,7 @@
 - Do not assume a web version is part of the current delivery unless the user explicitly asks for it.
 - Do not invent undocumented features, roles, constraints, or business rules.
 - If requirements are incomplete, ask focused questions and convert uncertainty into explicit decisions.
+- When editing React or React Native code, follow [docs/react-best-practices.md](../docs/react-best-practices.md), especially for async loading, hook dependencies, state colocations, and render performance.
 
 ## Planning Guidance
 
