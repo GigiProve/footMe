@@ -505,6 +505,15 @@ export default function OnboardingProfileScreen() {
                 specialization: staffSpecialization,
               }
             : null,
+        userContacts: {
+          email: "",
+          facebook: "",
+          instagram: "",
+          phone: phoneNumber.trim(),
+          showEmail: false,
+          showFacebook: false,
+          showInstagram: false,
+        },
       });
 
       if (role === "player") {

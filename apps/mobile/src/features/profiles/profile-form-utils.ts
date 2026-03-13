@@ -466,6 +466,96 @@ export function isSeasonLabelValid(value: string) {
   return /^\d{2}\/\d{2}$/.test(value.trim());
 }
 
+export function normalizeInstagramInput(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const normalizedValue = trimmed.replace(/^@+/, "");
+
+  if (/^https?:\/\//i.test(normalizedValue)) {
+    const match = normalizedValue.match(
+      /^https?:\/\/(?:www\.)?instagram\.com\/([A-Za-z0-9._]+)\/?(?:\?.*)?$/i,
+    );
+
+    return match?.[1] ? `https://instagram.com/${match[1]}` : "";
+  }
+
+  return /^[A-Za-z0-9._]+$/.test(normalizedValue)
+    ? `https://instagram.com/${normalizedValue}`
+    : "";
+}
+
+export function normalizeFacebookInput(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    const match = trimmed.match(
+      /^https?:\/\/(?:www\.)?facebook\.com\/([A-Za-z0-9.\-]+)\/?(?:\?.*)?$/i,
+    );
+
+    return match?.[1] ? `https://facebook.com/${match[1]}` : "";
+  }
+
+  return /^[A-Za-z0-9.\-]+$/.test(trimmed) ? `https://facebook.com/${trimmed}` : "";
+}
+
+export function normalizeContactEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export function isEmailValid(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+export function normalizePhoneInput(value: string) {
+  const compactValue = value.replace(/[^\d+]/g, "");
+
+  if (!compactValue) {
+    return "";
+  }
+
+  if (compactValue.startsWith("00")) {
+    return `+${compactValue.slice(2).replace(/[^\d]/g, "")}`;
+  }
+
+  if (compactValue.startsWith("+")) {
+    return `+${compactValue.slice(1).replace(/[^\d]/g, "")}`;
+  }
+
+  return compactValue.replace(/[^\d]/g, "");
+}
+
+export function isPhoneNumberValid(value: string) {
+  const normalizedValue = normalizePhoneInput(value);
+  // Prefer strict E.164 semantics for stored phone numbers so chat sharing can
+  // always generate stable tel: links and avoid ambiguous local formats.
+  return /^\+[1-9]\d{6,14}$/.test(normalizedValue);
+}
+
+export function getSocialDisplayValue(
+  platform: "facebook" | "instagram",
+  value: string | null | undefined,
+) {
+  const normalizedValue =
+    platform === "instagram"
+      ? normalizeInstagramInput(value ?? "")
+      : normalizeFacebookInput(value ?? "");
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  const username = normalizedValue.split("/").filter(Boolean).at(-1) ?? "";
+  return platform === "instagram" ? `@${username}` : username;
+}
+
 function normalizeLookupValue(value: string) {
   return value
     .trim()

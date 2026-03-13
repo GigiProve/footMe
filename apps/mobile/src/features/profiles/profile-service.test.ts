@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => {
   const playerCareerFirstOrderMock = vi.fn();
   const playerCareerSecondOrderMock = vi.fn();
   const playerMaybeSingleMock = vi.fn();
+  const profileContactsMaybeSingleMock = vi.fn();
+  const privateContactsMaybeSingleMock = vi.fn();
   const profileMaybeSingleMock = vi.fn();
   const staffMaybeSingleMock = vi.fn();
 
@@ -81,6 +83,26 @@ const mocks = vi.hoisted(() => {
         };
       }
 
+      if (table === "profile_contacts") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: profileContactsMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "profile_private_contacts") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: privateContactsMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     }),
     playerCareerEqMock,
@@ -89,6 +111,8 @@ const mocks = vi.hoisted(() => {
     playerCareerSecondOrderChain,
     playerCareerSecondOrderMock,
     playerMaybeSingleMock,
+    privateContactsMaybeSingleMock,
+    profileContactsMaybeSingleMock,
     profileMaybeSingleMock,
     staffMaybeSingleMock,
   };
@@ -108,6 +132,8 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.coachMaybeSingleMock.mockReset();
     mocks.staffMaybeSingleMock.mockReset();
     mocks.clubMaybeSingleMock.mockReset();
+    mocks.profileContactsMaybeSingleMock.mockReset();
+    mocks.privateContactsMaybeSingleMock.mockReset();
     mocks.playerCareerEqMock.mockReset();
     mocks.playerCareerFirstOrderMock.mockReset();
     mocks.playerCareerSecondOrderMock.mockReset();
@@ -147,6 +173,23 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.coachMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.staffMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.clubMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.profileContactsMaybeSingleMock.mockResolvedValue({
+      data: {
+        email: "marco@example.com",
+        facebook: "https://facebook.com/marcorossi",
+        instagram: "https://instagram.com/marcorossi",
+        show_email: true,
+        show_facebook: false,
+        show_instagram: true,
+      },
+      error: null,
+    });
+    mocks.privateContactsMaybeSingleMock.mockResolvedValue({
+      data: {
+        phone: "+393331234567",
+      },
+      error: null,
+    });
     mocks.playerCareerEqMock.mockImplementation(() => mocks.playerCareerFirstOrderChain);
     mocks.playerCareerFirstOrderMock.mockImplementation(
       () => mocks.playerCareerSecondOrderChain,
@@ -190,6 +233,15 @@ describe("getCompleteProfessionalProfile", () => {
     expect(result.profile.role).toBe("player");
     expect(result.playerProfile?.primary_position).toBe("forward");
     expect(result.playerCareerEntries).toHaveLength(1);
+    expect(result.userContacts).toEqual({
+      email: "marco@example.com",
+      facebook: "https://facebook.com/marcorossi",
+      instagram: "https://instagram.com/marcorossi",
+      phone: "+393331234567",
+      showEmail: true,
+      showFacebook: false,
+      showInstagram: true,
+    });
     expect(mocks.playerCareerEqMock).toHaveBeenCalledWith(
       "player_profile_id",
       "profile-1",

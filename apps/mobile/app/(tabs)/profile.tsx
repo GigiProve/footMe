@@ -9,6 +9,7 @@ import {
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
+import { ContactSection } from "../../src/features/profiles/contact-section";
 import { PersonalInfoSection } from "../../src/features/profiles/personal-info-section";
 import {
   ProfileField as Field,
@@ -24,13 +25,19 @@ import {
   formatBirthDateInputValue,
   formatLocationSummary,
   formatListSummary,
+  isEmailValid,
+  isPhoneNumberValid,
   formatOptionalSummary,
   formatProfileDisplayName,
   getRegionFromCity,
   getOptionLabel,
   isRegionConsistentWithCity,
   isSeasonLabelValid,
+  normalizeContactEmail,
   normalizeBirthDateInput,
+  normalizeFacebookInput,
+  normalizeInstagramInput,
+  normalizePhoneInput,
   normalizeSeasonLabelInput,
   searchItalianCities,
   validateBirthDateInput,
@@ -70,6 +77,10 @@ type ProfileFormState = {
   birthDate: string;
   careerEntries: CareerEntryForm[];
   certifications: string;
+  contactEmail: string;
+  contactFacebook: string;
+  contactInstagram: string;
+  contactPhone: string;
   clubCategory: string;
   clubCity: string;
   clubDescription: string;
@@ -96,6 +107,9 @@ type ProfileFormState = {
   preferredRegions: string;
   primaryPosition: PlayerPosition;
   region: string;
+  showContactEmail: boolean;
+  showContactFacebook: boolean;
+  showContactInstagram: boolean;
   secondaryPosition: PlayerPosition | "";
   specialization: StaffSpecialization;
   technicalVideoUrl: string;
@@ -234,6 +248,10 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
         : [createEmptyCareerEntry()],
     certifications: toDelimitedString(staffProfile?.certifications),
     city: data.profile.city ?? "",
+    contactEmail: data.userContacts.email,
+    contactFacebook: data.userContacts.facebook,
+    contactInstagram: data.userContacts.instagram,
+    contactPhone: data.userContacts.phone,
     clubCategory: club?.category ?? "",
     clubCity: club?.city ?? "",
     clubDescription: club?.description ?? "",
@@ -263,6 +281,9 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
     ),
     primaryPosition: playerProfile?.primary_position ?? "midfielder",
     region: data.profile.region ?? "",
+    showContactEmail: data.userContacts.showEmail,
+    showContactFacebook: data.userContacts.showFacebook,
+    showContactInstagram: data.userContacts.showInstagram,
     secondaryPosition: playerProfile?.secondary_position ?? "",
     specialization: staffProfile?.specialization ?? "fitness_coach",
     technicalVideoUrl: coachProfile?.technical_video_url ?? "",
@@ -513,7 +534,6 @@ export default function ProfileScreen() {
       })),
     [completeProfile?.playerCareerEntries],
   );
-  const accountEmail = session?.user.email ?? "";
   const birthDateHelperText = useMemo(() => {
     const validation = validateBirthDateInput(formState?.birthDate);
 
@@ -564,16 +584,6 @@ export default function ProfileScreen() {
           {
             label: "Regione",
             value: getOptionLabel(REGION_OPTIONS, completeProfile.profile.region),
-          },
-        ],
-      },
-      {
-        title: "Contatti",
-        subtitle: "Canali diretti disponibili in questa fase del prodotto.",
-        items: [
-          {
-            label: "Email",
-            value: formatOptionalSummary(accountEmail),
           },
         ],
       },
@@ -766,7 +776,7 @@ export default function ProfileScreen() {
     }
 
     return sections;
-  }, [accountEmail, completeProfile]);
+  }, [completeProfile]);
 
   if (!userId || !profile) {
     return null;
@@ -839,6 +849,10 @@ export default function ProfileScreen() {
       const trimmedCity = formState.city.trim();
       const inferredRegion = trimmedCity ? getRegionFromCity(trimmedCity) : "";
       const trimmedRegion = (formState.region.trim() || inferredRegion).trim();
+      const normalizedInstagram = normalizeInstagramInput(formState.contactInstagram);
+      const normalizedFacebook = normalizeFacebookInput(formState.contactFacebook);
+      const normalizedEmail = normalizeContactEmail(formState.contactEmail);
+      const normalizedPhone = normalizePhoneInput(formState.contactPhone);
 
       if (!trimmedFullName) {
         throw new Error("Nome e cognome sono obbligatori.");
@@ -869,6 +883,28 @@ export default function ProfileScreen() {
         !isRegionConsistentWithCity(trimmedCity, trimmedRegion)
       ) {
         throw new Error("La regione deve essere coerente con la città selezionata.");
+      }
+
+      if (formState.contactInstagram.trim() && !normalizedInstagram) {
+        throw new Error(
+          "Instagram deve contenere un username valido oppure un link completo al profilo.",
+        );
+      }
+
+      if (formState.contactFacebook.trim() && !normalizedFacebook) {
+        throw new Error(
+          "Facebook deve contenere un username valido oppure un link completo al profilo.",
+        );
+      }
+
+      if (normalizedEmail && !isEmailValid(normalizedEmail)) {
+        throw new Error("Inserisci un indirizzo email valido.");
+      }
+
+      if (formState.contactPhone.trim() && !isPhoneNumberValid(normalizedPhone)) {
+        throw new Error(
+          "Inserisci un numero di cellulare valido in formato internazionale, ad esempio +393331234567.",
+        );
       }
 
       const parsedCareerEntries = formState.careerEntries
@@ -985,6 +1021,15 @@ export default function ProfileScreen() {
                 specialization: formState.specialization,
               }
             : null,
+        userContacts: {
+          email: normalizedEmail,
+          facebook: normalizedFacebook,
+          instagram: normalizedInstagram,
+          phone: normalizedPhone,
+          showEmail: formState.showContactEmail,
+          showFacebook: formState.showContactFacebook,
+          showInstagram: formState.showContactInstagram,
+        },
       });
 
       await Promise.all([loadProfile(), refreshProfile()]);
@@ -1029,6 +1074,8 @@ export default function ProfileScreen() {
                 ))}
               </Section>
             ))}
+
+            {completeProfile ? <ContactSection contacts={completeProfile.userContacts} /> : null}
 
             {(profile.role as AppRole) === "player" ? (
               <Section
@@ -1159,16 +1206,53 @@ export default function ProfileScreen() {
               ) : null}
             </Section>
 
-            <Section
-              description="L'email account è visibile ma non modificabile da questa schermata."
-              title="Contatti"
-            >
-              <Field
-                helperText="Questa schermata mostra l'email dell'account autenticato."
-                label="Email"
-                value={accountEmail}
-              />
-            </Section>
+            <ContactSection
+              contacts={{
+                email: formState.contactEmail,
+                facebook: formState.contactFacebook,
+                instagram: formState.contactInstagram,
+                phone: formState.contactPhone,
+                showEmail: formState.showContactEmail,
+                showFacebook: formState.showContactFacebook,
+                showInstagram: formState.showContactInstagram,
+              }}
+              editable
+              onEmailChange={(value) =>
+                setFormState((current) =>
+                  current ? { ...current, contactEmail: value } : current,
+                )
+              }
+              onFacebookChange={(value) =>
+                setFormState((current) =>
+                  current ? { ...current, contactFacebook: value } : current,
+                )
+              }
+              onInstagramChange={(value) =>
+                setFormState((current) =>
+                  current ? { ...current, contactInstagram: value } : current,
+                )
+              }
+              onPhoneChange={(value) =>
+                setFormState((current) =>
+                  current ? { ...current, contactPhone: value } : current,
+                )
+              }
+              onShowEmailChange={(value) =>
+                setFormState((current) =>
+                  current ? { ...current, showContactEmail: value } : current,
+                )
+              }
+              onShowFacebookChange={(value) =>
+                setFormState((current) =>
+                  current ? { ...current, showContactFacebook: value } : current,
+                )
+              }
+              onShowInstagramChange={(value) =>
+                setFormState((current) =>
+                  current ? { ...current, showContactInstagram: value } : current,
+                )
+              }
+            />
 
             {(profile.role as AppRole) === "player" ? (
               <>

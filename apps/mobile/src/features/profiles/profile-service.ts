@@ -24,6 +24,16 @@ type BaseProfileRecord = {
   role: AppRole;
 };
 
+export type UserContactsRecord = {
+  email: string;
+  facebook: string;
+  instagram: string;
+  phone: string;
+  showEmail: boolean;
+  showFacebook: boolean;
+  showInstagram: boolean;
+};
+
 type PlayerProfileRecord = {
   height_cm: number | null;
   highlight_video_url: string | null;
@@ -91,6 +101,7 @@ export type CompleteProfessionalProfile = {
   playerProfile: PlayerProfileRecord | null;
   profile: BaseProfileRecord;
   staffProfile: StaffProfileRecord | null;
+  userContacts: UserContactsRecord;
 };
 
 export type PlayerCareerEntryInput = {
@@ -159,6 +170,7 @@ export type CompleteProfessionalProfileUpdate = {
     preferred_regions: string[];
     specialization: StaffSpecialization;
   } | null;
+  userContacts: UserContactsRecord;
 };
 
 export async function getCompleteProfessionalProfile(profileId: string) {
@@ -179,7 +191,8 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   }
 
   const profile = profileData as BaseProfileRecord;
-  const [playerProfile, coachProfile, staffProfile, club] = await Promise.all([
+  const [playerProfile, coachProfile, staffProfile, club, profileContacts, privateContacts] =
+    await Promise.all([
     profile.role === "player"
       ? supabase
           .from("player_profiles")
@@ -216,7 +229,17 @@ export async function getCompleteProfessionalProfile(profileId: string) {
           .eq("owner_profile_id", profileId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-  ]);
+    supabase
+      .from("profile_contacts")
+      .select("instagram, facebook, email, show_instagram, show_facebook, show_email")
+      .eq("profile_id", profileId)
+      .maybeSingle(),
+    supabase
+      .from("profile_private_contacts")
+      .select("phone")
+      .eq("profile_id", profileId)
+      .maybeSingle(),
+    ]);
 
   if (playerProfile.error) {
     throw playerProfile.error;
@@ -232,6 +255,14 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 
   if (club.error) {
     throw club.error;
+  }
+
+  if (profileContacts.error) {
+    throw profileContacts.error;
+  }
+
+  if (privateContacts.error) {
+    throw privateContacts.error;
   }
 
   let playerCareerEntries: PlayerCareerEntryRecord[] = [];
@@ -260,6 +291,15 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     playerProfile: (playerProfile.data as PlayerProfileRecord | null) ?? null,
     profile,
     staffProfile: (staffProfile.data as StaffProfileRecord | null) ?? null,
+    userContacts: {
+      email: profileContacts.data?.email ?? "",
+      facebook: profileContacts.data?.facebook ?? "",
+      instagram: profileContacts.data?.instagram ?? "",
+      phone: privateContacts.data?.phone ?? "",
+      showEmail: profileContacts.data?.show_email ?? false,
+      showFacebook: profileContacts.data?.show_facebook ?? false,
+      showInstagram: profileContacts.data?.show_instagram ?? false,
+    },
   } satisfies CompleteProfessionalProfile;
 }
 
@@ -283,6 +323,33 @@ export async function updateCompleteProfessionalProfile(
 
   if (profileError) {
     throw profileError;
+  }
+
+  const { error: profileContactsError } = await supabase
+    .from("profile_contacts")
+    .upsert({
+      email: input.userContacts.email || null,
+      facebook: input.userContacts.facebook || null,
+      instagram: input.userContacts.instagram || null,
+      profile_id: input.profileId,
+      show_email: input.userContacts.showEmail,
+      show_facebook: input.userContacts.showFacebook,
+      show_instagram: input.userContacts.showInstagram,
+    });
+
+  if (profileContactsError) {
+    throw profileContactsError;
+  }
+
+  const { error: privateContactsError } = await supabase
+    .from("profile_private_contacts")
+    .upsert({
+      phone: input.userContacts.phone || null,
+      profile_id: input.profileId,
+    });
+
+  if (privateContactsError) {
+    throw privateContactsError;
   }
 
   if (input.role === "player" && input.playerProfile) {
