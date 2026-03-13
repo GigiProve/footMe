@@ -30,6 +30,8 @@ import {
   type TeamAutocompleteOption,
 } from "./player-sports";
 
+const TEAM_SEARCH_DEBOUNCE_MS = 250;
+
 type TeamAutocompleteInputProps = {
   label: string;
   onChangeText: (value: string) => void;
@@ -169,28 +171,35 @@ export function TeamAutocompleteInput({
 
   useEffect(() => {
     let isMounted = true;
+    const debounceTimeout = setTimeout(() => {
+      async function loadSuggestions() {
+        const query = value.trim();
 
-    async function loadSuggestions() {
-      const query = value.trim();
-
-      if (query.length < 2) {
-        if (isMounted) {
-          setSuggestions([]);
+        if (query.length < 2) {
+          if (isMounted) {
+            setSuggestions([]);
+          }
+          return;
         }
-        return;
+
+        try {
+          const results = await searchTeams(query);
+
+          if (isMounted) {
+            setSuggestions(results);
+          }
+        } catch {
+          if (isMounted) {
+            setSuggestions([]);
+          }
+        }
       }
-
-      const results = await searchTeams(query);
-
-      if (isMounted) {
-        setSuggestions(results);
-      }
-    }
-
-    void loadSuggestions();
+      void loadSuggestions();
+    }, TEAM_SEARCH_DEBOUNCE_MS);
 
     return () => {
       isMounted = false;
+      clearTimeout(debounceTimeout);
     };
   }, [searchTeams, value]);
 
@@ -213,10 +222,10 @@ export function TeamAutocompleteInput({
       {shouldShowSuggestions ? (
         <View style={styles.suggestionsSurface} testID="team-autocomplete-suggestions">
           <ScrollView contentContainerStyle={styles.suggestionsContent} nestedScrollEnabled>
-            {suggestions.map((suggestion, index) => (
+            {suggestions.map((suggestion) => (
               <Pressable
                 accessibilityRole="button"
-                key={suggestion.id ?? `${suggestion.name}-${suggestion.city ?? "na"}-${index}`}
+                key={suggestion.id ?? `${suggestion.name}-${suggestion.city ?? "na"}`}
                 onPress={() => onSelectTeam(suggestion)}
                 style={({ pressed }) => [
                   styles.suggestionButton,

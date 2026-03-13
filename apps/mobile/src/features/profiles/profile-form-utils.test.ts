@@ -44,6 +44,9 @@ describe("profile-form-utils", () => {
     expect(isSeasonLabelValid("2024/2025")).toBe(true);
     expect(isSeasonLabelValid("2024/25")).toBe(true);
     expect(isSeasonLabelValid("24-25")).toBe(false);
+    expect(isSeasonLabelValid("25/24")).toBe(false);
+    expect(isSeasonLabelValid("abcd")).toBe(false);
+    expect(isSeasonLabelValid("2/3")).toBe(false);
   });
 
   it("builds and formats birth dates from picker parts", () => {

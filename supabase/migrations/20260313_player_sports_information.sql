@@ -1,3 +1,5 @@
+-- Enable trigram search support so the mobile team autocomplete can stay fast
+-- even when players search by partial club names.
 create extension if not exists pg_trgm;
 
 alter type public.player_position add value if not exists 'center_back';

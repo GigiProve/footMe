@@ -751,10 +751,12 @@ export async function searchTeams(query: string, limit = 5) {
     return [] as TeamAutocompleteOption[];
   }
 
+  const escapedQuery = trimmedQuery.replace(/[\\%_]/g, (match) => `\\${match}`);
+
   const { data, error } = await supabase
     .from("clubs")
     .select("id, name, city, logo_url")
-    .ilike("name", `${trimmedQuery}%`)
+    .ilike("name", `%${escapedQuery}%`)
     .order("name", { ascending: true })
     .limit(limit);
 

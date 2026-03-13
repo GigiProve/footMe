@@ -14,6 +14,7 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
 
 describe("player-sports-section", () => {
   it("shows team suggestions and the create-new-team action", async () => {
+    vi.useFakeTimers();
     const searchTeams = vi.fn().mockResolvedValue([
       {
         city: "Milano",
@@ -38,6 +39,12 @@ describe("player-sports-section", () => {
       );
     });
 
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
     expect(
       tree!.root.findByProps({ testID: "team-autocomplete-suggestion-ASD Real Milano" }),
     ).toBeTruthy();
@@ -53,6 +60,8 @@ describe("player-sports-section", () => {
       logoUrl: "https://example.com/logo.png",
       name: "ASD Real Milano",
     });
+
+    vi.useRealTimers();
   });
 
   it("renders the automatic experience badges", () => {

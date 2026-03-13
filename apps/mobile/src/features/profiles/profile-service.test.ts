@@ -403,7 +403,7 @@ describe("searchTeams", () => {
 
     const result = await searchTeams("Mil");
 
-    expect(mocks.clubSearchIlikeMock).toHaveBeenCalledWith("name", "Mil%");
+    expect(mocks.clubSearchIlikeMock).toHaveBeenCalledWith("name", "%Mil%");
     expect(mocks.clubSearchOrderMock).toHaveBeenCalledWith("name", {
       ascending: true,
     });

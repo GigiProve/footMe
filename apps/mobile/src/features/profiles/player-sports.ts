@@ -121,8 +121,10 @@ export const PLAYER_SEASON_OPTIONS = createPlayerSeasonOptions();
 function expandTwoDigitSeasonYear(startYear: number, endYear: number) {
   const currentYear = new Date().getFullYear();
   const currentCentury = Math.floor(currentYear / 100) * 100;
-  const currentCenturyThreshold = (currentYear % 100) + 1;
-  const baseCentury = startYear <= currentCenturyThreshold ? currentCentury : currentCentury - 100;
+  // Pivot 50: 00-49 map to the current century, while 50-99 map to the
+  // previous century so legacy seasons like 99/00 normalize to 1999/2000.
+  const pivotYear = 50;
+  const baseCentury = startYear < pivotYear ? currentCentury : currentCentury - 100;
   const normalizedStartYear = baseCentury + startYear;
   const normalizedEndYear =
     endYear >= startYear ? baseCentury + endYear : baseCentury + 100 + endYear;
