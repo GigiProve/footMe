@@ -169,6 +169,7 @@ export type CompleteProfessionalProfileUpdate = {
 function toPlayerCareerEntryMutation(
   entry: PlayerCareerEntryInput,
   profileId: string,
+  { includeId = true }: { includeId?: boolean } = {},
 ) {
   return {
     appearances: entry.appearances,
@@ -178,7 +179,7 @@ function toPlayerCareerEntryMutation(
     club_name: entry.club_name,
     competition_name: entry.competition_name,
     goals: entry.goals,
-    id: entry.id,
+    ...(includeId ? { id: entry.id } : {}),
     minutes_played: entry.minutes_played,
     player_profile_id: profileId,
     season_label: entry.season_label,
@@ -613,14 +614,9 @@ export async function updateCompleteProfessionalProfile(
       .map((entry) => toPlayerCareerEntryMutation(entry, input.profileId));
     const newEntries = input.playerCareerEntries
       .filter((entry) => !entry.id)
-      .map((entry) => {
-        const { id: _ignoredId, ...newEntry } = toPlayerCareerEntryMutation(
-          entry,
-          input.profileId,
-        );
-
-        return newEntry;
-      });
+      .map((entry) =>
+        toPlayerCareerEntryMutation(entry, input.profileId, { includeId: false }),
+      );
 
     if (existingEntries.length > 0) {
       const { error: careerUpsertError } = await supabase
