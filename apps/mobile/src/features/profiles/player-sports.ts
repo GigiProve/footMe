@@ -47,9 +47,9 @@ export type PlayerExperiencePayload = {
   appearances: number;
   assists: number;
   awards: string | null;
-  category: string | null;
   club_id: string | null;
   club_name: string;
+  competition_name: string | null;
   goals: number;
   id?: string;
   minutes_played: number;
@@ -117,6 +117,21 @@ export function createPlayerSeasonOptions(startYear = 2024, totalSeasons = 4) {
 }
 
 export const PLAYER_SEASON_OPTIONS = createPlayerSeasonOptions();
+
+function expandTwoDigitSeasonYear(startYear: number, endYear: number) {
+  const currentYear = new Date().getFullYear();
+  const currentCentury = Math.floor(currentYear / 100) * 100;
+  const currentCenturyThreshold = (currentYear % 100) + 1;
+  const baseCentury = startYear <= currentCenturyThreshold ? currentCentury : currentCentury - 100;
+  const normalizedStartYear = baseCentury + startYear;
+  const normalizedEndYear =
+    endYear >= startYear ? baseCentury + endYear : baseCentury + 100 + endYear;
+
+  return {
+    normalizedEndYear,
+    normalizedStartYear,
+  };
+}
 
 const playerPositionLabels: Record<PlayerPosition, string> = {
   attacking_midfielder: "Trequartista",
@@ -233,7 +248,8 @@ export function normalizeSeasonLabelInput(value: string) {
 
   if (mixedPatternMatch) {
     const startYear = Number(mixedPatternMatch[1]);
-    const normalizedEndYear = Number(`${String(startYear).slice(0, 2)}${mixedPatternMatch[2]}`);
+    const century = Math.floor(startYear / 100) * 100;
+    const normalizedEndYear = century + Number(mixedPatternMatch[2]);
 
     return `${startYear}/${normalizedEndYear}`;
   }
@@ -241,10 +257,12 @@ export function normalizeSeasonLabelInput(value: string) {
   const shortPatternMatch = compactValue.match(/^(\d{2})\/(\d{2})$/);
 
   if (shortPatternMatch) {
-    const startYear = Number(`20${shortPatternMatch[1]}`);
-    const endYear = Number(`20${shortPatternMatch[2]}`);
+    const { normalizedEndYear, normalizedStartYear } = expandTwoDigitSeasonYear(
+      Number(shortPatternMatch[1]),
+      Number(shortPatternMatch[2]),
+    );
 
-    return `${startYear}/${endYear}`;
+    return `${normalizedStartYear}/${normalizedEndYear}`;
   }
 
   if (/^\d{8}$/.test(compactValue)) {
@@ -254,7 +272,12 @@ export function normalizeSeasonLabelInput(value: string) {
 
   if (/^\d{4}$/.test(compactValue)) {
     const digitsOnly = compactValue;
-    return `20${digitsOnly.slice(0, 2)}/20${digitsOnly.slice(2, 4)}`;
+    const { normalizedEndYear, normalizedStartYear } = expandTwoDigitSeasonYear(
+      Number(digitsOnly.slice(0, 2)),
+      Number(digitsOnly.slice(2, 4)),
+    );
+
+    return `${normalizedStartYear}/${normalizedEndYear}`;
   }
 
   return compactValue;
@@ -349,9 +372,9 @@ export function parsePlayerExperienceForms(entries: PlayerExperienceForm[]) {
         appearances: parseNonNegativeStat(entry.appearances, "Presenze"),
         assists: parseNonNegativeStat(entry.assists, "Assist"),
         awards: parseOptionalText(entry.awards),
-        category,
         club_id: entry.clubId,
         club_name: clubName,
+        competition_name: category,
         goals: parseNonNegativeStat(entry.goals, "Gol"),
         id: entry.id,
         minutes_played: parseNonNegativeStat(entry.minutesPlayed, "Minuti giocati"),

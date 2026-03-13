@@ -14,6 +14,7 @@ describe("player-sports", () => {
     expect(normalizeSeasonLabelInput("24/25")).toBe("2024/2025");
     expect(normalizeSeasonLabelInput("2024/25")).toBe("2024/2025");
     expect(normalizeSeasonLabelInput("2024/2025")).toBe("2024/2025");
+    expect(normalizeSeasonLabelInput("99/00")).toBe("1999/2000");
   });
 
   it("sorts experiences from the most recent season to the oldest", () => {
@@ -84,9 +85,9 @@ describe("player-sports", () => {
         appearances: 18,
         assists: 3,
         awards: null,
-        category: "Promozione",
         club_id: "club-1",
         club_name: "ASD Real Milano",
+        competition_name: "Promozione",
         goals: 6,
         id: "experience-1",
         minutes_played: 1440,

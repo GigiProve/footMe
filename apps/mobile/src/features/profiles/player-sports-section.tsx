@@ -92,9 +92,9 @@ function TeamLogo({
   teamLogoUrl,
 }: {
   name: string;
-  teamLogoUrl: string;
+  teamLogoUrl: string | null | undefined;
 }) {
-  if (teamLogoUrl.trim()) {
+  if (teamLogoUrl?.trim()) {
     return <Image source={{ uri: teamLogoUrl }} style={styles.teamLogo} />;
   }
 
@@ -213,10 +213,10 @@ export function TeamAutocompleteInput({
       {shouldShowSuggestions ? (
         <View style={styles.suggestionsSurface} testID="team-autocomplete-suggestions">
           <ScrollView contentContainerStyle={styles.suggestionsContent} nestedScrollEnabled>
-            {suggestions.map((suggestion) => (
+            {suggestions.map((suggestion, index) => (
               <Pressable
                 accessibilityRole="button"
-                key={`${suggestion.id ?? suggestion.name}-${suggestion.city ?? "na"}`}
+                key={suggestion.id ?? `${suggestion.name}-${suggestion.city ?? "na"}-${index}`}
                 onPress={() => onSelectTeam(suggestion)}
                 style={({ pressed }) => [
                   styles.suggestionButton,
@@ -601,7 +601,7 @@ export function PlayerExperiencesSection({
       >
         <Pressable onPress={closeModal} style={styles.modalOverlay}>
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.modalCard}>
-            <ScrollView contentContainerStyle={{ gap: spacing[16] }}>
+            <ScrollView contentContainerStyle={styles.modalScrollContent}>
               <AddPlayerExperienceForm
                 experience={draft}
                 onCancel={closeModal}
@@ -702,6 +702,9 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     backgroundColor: "rgba(15, 23, 42, 0.45)",
     padding: spacing[16],
+  },
+  modalScrollContent: {
+    gap: spacing[16],
   },
   modalTitle: {
     color: colors.textPrimary,
