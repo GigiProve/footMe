@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { sendMessage } from "./messaging-service";
+import { sendContactCardMessage, sendMessage } from "./messaging-service";
 
 const { fromMock, insertMock } = vi.hoisted(() => {
   const insertMock = vi.fn();
@@ -49,7 +49,26 @@ describe("sendMessage", () => {
     expect(insertMock).toHaveBeenCalledWith({
       body: "Ciao mister!",
       conversation_id: "conversation-9",
+      message_kind: "text",
       sender_profile_id: "profile-7",
+    });
+  });
+
+  it("sends a dedicated contact card message", async () => {
+    await sendContactCardMessage({
+      contactName: "Mario Rossi",
+      conversationId: "conversation-5",
+      phone: "+393331234567",
+      senderProfileId: "profile-7",
+    });
+
+    expect(insertMock).toHaveBeenCalledWith({
+      body: "Numero di telefono condiviso",
+      conversation_id: "conversation-5",
+      message_kind: "contact_card",
+      sender_profile_id: "profile-7",
+      shared_contact_name: "Mario Rossi",
+      shared_contact_phone: "+393331234567",
     });
   });
 });

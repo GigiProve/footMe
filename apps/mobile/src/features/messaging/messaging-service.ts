@@ -19,8 +19,11 @@ export type ConversationSummary = {
 export type ConversationMessage = {
   message_id: string;
   body: string;
+  message_kind: "contact_card" | "text";
   sent_at: string;
   read_at: string | null;
+  shared_contact_name: string | null;
+  shared_contact_phone: string | null;
   sender_profile_id: string;
   sender_full_name: string;
 };
@@ -71,12 +74,61 @@ export async function sendMessage(input: {
   const { error } = await supabase.from("messages").insert({
     body,
     conversation_id: input.conversationId,
+    message_kind: "text",
     sender_profile_id: input.senderProfileId,
   });
 
   if (error) {
     throw error;
   }
+}
+
+export async function sendContactCardMessage(input: {
+  contactName: string;
+  conversationId: string;
+  phone: string;
+  senderProfileId: string;
+}) {
+  const contactName = input.contactName.trim();
+  const phone = input.phone.trim();
+
+  if (!contactName || !phone) {
+    throw new Error("Aggiungi un numero di telefono valido prima di condividerlo.");
+  }
+
+  const { error } = await supabase.from("messages").insert({
+    body: "Numero di telefono condiviso",
+    conversation_id: input.conversationId,
+    message_kind: "contact_card",
+    sender_profile_id: input.senderProfileId,
+    shared_contact_name: contactName,
+    shared_contact_phone: phone,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function getShareablePhoneContact(profileId: string) {
+  const { data, error } = await supabase
+    .from("profile_private_contacts")
+    .select("phone, profiles!inner(full_name)")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const relatedProfile = Array.isArray(data?.profiles)
+    ? data.profiles[0]
+    : data?.profiles;
+
+  return {
+    fullName: relatedProfile?.full_name ?? "",
+    phone: data?.phone ?? "",
+  };
 }
 
 export function subscribeToConversation(

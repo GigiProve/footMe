@@ -8,6 +8,7 @@ const { fromMock, upsertMocks } = vi.hoisted(() => {
     clubs: vi.fn(),
     coach_profiles: vi.fn(),
     player_profiles: vi.fn(),
+    profile_private_contacts: vi.fn(),
     profiles: vi.fn(),
     staff_profiles: vi.fn(),
   };
@@ -86,9 +87,13 @@ describe("createInitialProfile", () => {
       gender: "male",
       id: "user-2",
       nationality: "IT",
-      phone_number: "+39 333 1234567",
+      phone_number: null,
       residence: "Perugia",
       role: "player",
+    });
+    expect(upsertMocks.profile_private_contacts).toHaveBeenCalledWith({
+      phone: "+39 333 1234567",
+      profile_id: "user-2",
     });
     expect(upsertMocks.player_profiles).toHaveBeenCalledWith({
       primary_position: "forward",

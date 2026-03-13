@@ -84,12 +84,23 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
     role: input.role,
     full_name: fullName,
     nationality,
-    phone_number: phoneNumber || null,
+    phone_number: null,
     residence,
   });
 
   if (profileError) {
     throw profileError;
+  }
+
+  const { error: privateContactError } = await supabase
+    .from("profile_private_contacts")
+    .upsert({
+      phone: phoneNumber || null,
+      profile_id: input.userId,
+    });
+
+  if (privateContactError) {
+    throw privateContactError;
   }
 
   if (input.role === "player") {

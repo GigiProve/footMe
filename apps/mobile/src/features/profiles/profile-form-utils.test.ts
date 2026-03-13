@@ -9,11 +9,18 @@ import {
   formatBirthDateInputValue,
   formatLocationSummary,
   formatProfileDisplayName,
+  getSocialDisplayValue,
   getBirthDateParts,
   getRegionFromCity,
+  isEmailValid,
+  isPhoneNumberValid,
   isRegionConsistentWithCity,
   isSeasonLabelValid,
+  normalizeContactEmail,
   normalizeBirthDateInput,
+  normalizeFacebookInput,
+  normalizeInstagramInput,
+  normalizePhoneInput,
   normalizeSeasonLabelInput,
   parseBirthDate,
   parseBirthDateInput,
@@ -87,5 +94,30 @@ describe("profile-form-utils", () => {
     expect(getRegionFromCity("Roma")).toBe("Lazio");
     expect(isRegionConsistentWithCity("Milano", "Lombardia")).toBe(true);
     expect(isRegionConsistentWithCity("Milano", "Lazio")).toBe(false);
+  });
+
+  it("normalizes and validates public contact fields", () => {
+    expect(normalizeInstagramInput("@mario.rossi")).toBe(
+      "https://instagram.com/mario.rossi",
+    );
+    expect(normalizeInstagramInput("https://instagram.com/mario.rossi/")).toBe(
+      "https://instagram.com/mario.rossi",
+    );
+    expect(normalizeFacebookInput("mario.rossi")).toBe(
+      "https://facebook.com/mario.rossi",
+    );
+    expect(normalizeContactEmail(" Mario@Example.com ")).toBe("mario@example.com");
+    expect(isEmailValid("mario@example.com")).toBe(true);
+    expect(isEmailValid("mario@example")).toBe(false);
+    expect(normalizePhoneInput("+39 333 123 4567")).toBe("+393331234567");
+    expect(normalizePhoneInput("0039 3331234567")).toBe("+393331234567");
+    expect(isPhoneNumberValid("+393331234567")).toBe(true);
+    expect(isPhoneNumberValid("3331234567")).toBe(false);
+    expect(getSocialDisplayValue("instagram", "https://instagram.com/mario.rossi")).toBe(
+      "@mario.rossi",
+    );
+    expect(getSocialDisplayValue("facebook", "https://facebook.com/mario.rossi")).toBe(
+      "mario.rossi",
+    );
   });
 });

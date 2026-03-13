@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import * as Clipboard from "expo-clipboard";
 import {
   Alert,
+  Linking,
   ScrollView,
   Text,
   View,
@@ -10,13 +12,17 @@ import {
 import { useSession } from "../../src/features/auth/use-session";
 import { Screen } from "../../src/components/ui/screen";
 import {
+  getShareablePhoneContact,
   getConversationMessages,
   markConversationRead,
+  sendContactCardMessage,
   sendMessage,
   subscribeToConversation,
   unsubscribeFromConversation,
   type ConversationMessage,
 } from "../../src/features/messaging/messaging-service";
+import { ContactCardMessage } from "../../src/features/messaging/contact-card-message";
+import { ShareContactModal } from "../../src/features/messaging/share-contact-modal";
 import { colors, radius, spacing, sizes } from "../../src/theme/tokens";
 import { Button, Card, Input } from "../../src/ui";
 
@@ -32,11 +38,14 @@ function formatTimestamp(value: string) {
 export default function ConversationScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ conversationId?: string; otherName?: string }>();
-  const { needsOnboarding, session } = useSession();
+  const { needsOnboarding, profile, session } = useSession();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isShareModalVisible, setIsShareModalVisible] = useState(false);
+  const [isSharingContact, setIsSharingContact] = useState(false);
+  const [shareablePhone, setShareablePhone] = useState("");
 
   const conversationId = useMemo(() => {
     if (Array.isArray(params.conversationId)) {
@@ -129,6 +138,66 @@ export default function ConversationScreen() {
     }
   }
 
+  async function handleOpenShareContact() {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      const shareableContact = await getShareablePhoneContact(session.user.id);
+
+      if (!shareableContact.phone.trim()) {
+        throw new Error(
+          "Aggiungi prima il tuo numero nella sezione Contatti del profilo per condividerlo in chat.",
+        );
+      }
+
+      setShareablePhone(shareableContact.phone);
+      setIsShareModalVisible(true);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore durante il recupero del contatto da condividere.";
+      Alert.alert("Contatto non disponibile", message);
+    }
+  }
+
+  async function handleConfirmShareContact() {
+    if (!conversationId || !session?.user || !shareablePhone.trim()) {
+      return;
+    }
+
+    try {
+      setIsSharingContact(true);
+      await sendContactCardMessage({
+        contactName: profile?.full_name?.trim() || "Utente footMe",
+        conversationId,
+        phone: shareablePhone,
+        senderProfileId: session.user.id,
+      });
+      setIsShareModalVisible(false);
+      await loadConversation();
+      Alert.alert(
+        "Contatto condiviso",
+        "Il tuo numero è stato inviato come card dedicata in questa conversazione.",
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore durante la condivisione del contatto.";
+      Alert.alert("Condivisione non riuscita", message);
+    } finally {
+      setIsSharingContact(false);
+    }
+  }
+
+  async function handleCopyPhone(phone: string) {
+    await Clipboard.setStringAsync(phone);
+    Alert.alert("Numero copiato", "Puoi incollarlo dove preferisci.");
+  }
+
   if (!session) {
     return <Redirect href="/(auth)/sign-in" />;
   }
@@ -192,7 +261,26 @@ export default function ConversationScreen() {
           {messages.map((message) => {
             const isOwnMessage = message.sender_profile_id === session.user.id;
 
-            return (
+            return message.message_kind === "contact_card" &&
+              message.shared_contact_name &&
+              message.shared_contact_phone ? (
+              <View
+                key={message.message_id}
+                style={{
+                  alignSelf: isOwnMessage ? "flex-end" : "flex-start",
+                  maxWidth: "82%",
+                }}
+              >
+                <ContactCardMessage
+                  isOwnMessage={isOwnMessage}
+                  name={message.shared_contact_name}
+                  onLongPress={() => void handleCopyPhone(message.shared_contact_phone ?? "")}
+                  onPress={() => void Linking.openURL(`tel:${message.shared_contact_phone}`)}
+                  phone={message.shared_contact_phone}
+                  timestamp={formatTimestamp(message.sent_at)}
+                />
+              </View>
+            ) : (
               <View
                 key={message.message_id}
                 style={{
@@ -252,12 +340,29 @@ export default function ConversationScreen() {
             value={draft}
           />
           <Button
+            disabled={isSharingContact}
+            label="Condividi contatto"
+            onPress={() => void handleOpenShareContact()}
+            variant="secondary"
+          />
+          <Button
             disabled={isSending}
             label={isSending ? "Invio in corso..." : "Invia messaggio"}
             onPress={handleSendMessage}
             variant="primary"
           />
         </Card>
+        <ShareContactModal
+          isLoading={isSharingContact}
+          onCancel={() => {
+            if (!isSharingContact) {
+              setIsShareModalVisible(false);
+            }
+          }}
+          onConfirm={() => void handleConfirmShareContact()}
+          phone={shareablePhone}
+          visible={isShareModalVisible}
+        />
       </View>
     </Screen>
   );
