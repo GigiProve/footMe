@@ -121,6 +121,8 @@ export async function getShareablePhoneContact(profileId: string) {
     throw error;
   }
 
+  // Supabase join payloads can be typed as either a nested object or a single-item
+  // array depending on generated relation metadata, so normalize both shapes.
   const relatedProfile = Array.isArray(data?.profiles)
     ? data.profiles[0]
     : data?.profiles;

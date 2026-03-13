@@ -112,6 +112,7 @@ describe("profile-form-utils", () => {
     expect(normalizePhoneInput("+39 333 123 4567")).toBe("+393331234567");
     expect(normalizePhoneInput("0039 3331234567")).toBe("+393331234567");
     expect(isPhoneNumberValid("+393331234567")).toBe(true);
+    expect(isPhoneNumberValid("+1234567")).toBe(true);
     expect(isPhoneNumberValid("3331234567")).toBe(false);
     expect(getSocialDisplayValue("instagram", "https://instagram.com/mario.rossi")).toBe(
       "@mario.rossi",

@@ -534,7 +534,9 @@ export function normalizePhoneInput(value: string) {
 
 export function isPhoneNumberValid(value: string) {
   const normalizedValue = normalizePhoneInput(value);
-  return /^\+[1-9]\d{7,14}$/.test(normalizedValue);
+  // Prefer strict E.164 semantics for stored phone numbers so chat sharing can
+  // always generate stable tel: links and avoid ambiguous local formats.
+  return /^\+[1-9]\d{6,14}$/.test(normalizedValue);
 }
 
 export function getSocialDisplayValue(
