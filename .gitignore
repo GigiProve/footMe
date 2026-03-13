@@ -12,3 +12,4 @@ apps/mobile/web-build/
 apps/mobile/.env
 apps/mobile/.env.*
 !apps/mobile/.env.example
+supabase/.temp/cli-latest

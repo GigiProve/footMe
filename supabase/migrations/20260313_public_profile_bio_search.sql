@@ -1,4 +1,6 @@
-create or replace function public.search_profiles(
+drop function if exists public.search_profiles(text, public.app_role, text, public.player_position);
+
+create function public.search_profiles(
   search_text text default null,
   role_filter public.app_role default null,
   region_filter text default null,

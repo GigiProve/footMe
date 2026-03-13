@@ -89,11 +89,12 @@ const roleOptions: {
 const genderOptions: { label: string; value: ProfileGender }[] = [
   { label: "Uomo", value: "male" },
   { label: "Donna", value: "female" },
-  { label: "Non binario", value: "non_binary" },
-  { label: "Preferisco non specificarlo", value: "prefer_not_to_say" },
 ];
 
-const staffSpecializationOptions: { label: string; value: StaffSpecialization }[] = [
+const staffSpecializationOptions: {
+  label: string;
+  value: StaffSpecialization;
+}[] = [
   { label: "Preparatore atletico", value: "fitness_coach" },
   { label: "Preparatore portieri", value: "goalkeeper_coach" },
   { label: "Fisioterapista", value: "physiotherapist" },
@@ -130,13 +131,7 @@ function fromDelimitedString(value: string) {
     .filter(Boolean);
 }
 
-function StepChip({
-  isActive,
-  label,
-}: {
-  isActive: boolean;
-  label: string;
-}) {
+function StepChip({ isActive, label }: { isActive: boolean; label: string }) {
   return (
     <View
       style={{
@@ -199,7 +194,10 @@ function getBaseStepAlert(error: unknown) {
 
 function getMediaUploadAlert(field: string, error: unknown) {
   if (field === "avatar") {
-    if (error instanceof ProfileMediaUploadError && error.code === "bucket_not_found") {
+    if (
+      error instanceof ProfileMediaUploadError &&
+      error.code === "bucket_not_found"
+    ) {
       return {
         title: "Foto profilo non caricata",
         message:
@@ -257,18 +255,25 @@ export default function OnboardingProfileScreen() {
   const [bio, setBio] = useState("");
   const [isAvailable, setIsAvailable] = useState(false);
   const [isOpenToTransfer, setIsOpenToTransfer] = useState(false);
-  const [primaryPosition, setPrimaryPosition] =
-    useState<PlayerPosition>(DEFAULT_PLAYER_PRIMARY_POSITION);
-  const [secondaryPosition, setSecondaryPosition] = useState<PlayerPosition | "">("");
+  const [primaryPosition, setPrimaryPosition] = useState<PlayerPosition>(
+    DEFAULT_PLAYER_PRIMARY_POSITION,
+  );
+  const [secondaryPosition, setSecondaryPosition] = useState<
+    PlayerPosition | ""
+  >("");
   const [preferredFoot, setPreferredFoot] = useState<PreferredFoot | "">("");
   const [heightCm, setHeightCm] = useState("");
   const [weightKg, setWeightKg] = useState("");
   const [preferredCategories, setPreferredCategories] = useState("");
   const [transferRegions, setTransferRegions] = useState("");
   const [willingToChangeClub, setWillingToChangeClub] = useState(false);
-  const [careerEntries, setCareerEntries] = useState<PlayerExperienceForm[]>([]);
+  const [careerEntries, setCareerEntries] = useState<PlayerExperienceForm[]>(
+    [],
+  );
   const [highlightVideoUrl, setHighlightVideoUrl] = useState("");
-  const [playerMediaItems, setPlayerMediaItems] = useState<UploadedMediaItem[]>([]);
+  const [playerMediaItems, setPlayerMediaItems] = useState<UploadedMediaItem[]>(
+    [],
+  );
   const [licenses, setLicenses] = useState("");
   const [coachedClubs, setCoachedClubs] = useState("");
   const [coachedCategories, setCoachedCategories] = useState("");
@@ -286,12 +291,16 @@ export default function OnboardingProfileScreen() {
   const [clubLeague, setClubLeague] = useState("");
   const [clubDescription, setClubDescription] = useState("");
   const [clubLogoUrl, setClubLogoUrl] = useState("");
-  const [clubGalleryItems, setClubGalleryItems] = useState<UploadedMediaItem[]>([]);
+  const [clubGalleryItems, setClubGalleryItems] = useState<UploadedMediaItem[]>(
+    [],
+  );
   const [hasCreatedProfile, setHasCreatedProfile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
-  const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+  const fullName = [firstName.trim(), lastName.trim()]
+    .filter(Boolean)
+    .join(" ");
   const effectiveDomicile = useResidenceForDomicile ? residence : domicile;
 
   const stepIndex = {
@@ -419,7 +428,8 @@ export default function OnboardingProfileScreen() {
 
       if (!bioValidation.isValid) {
         throw new Error(
-          bioValidation.message ?? "Inserisci una descrizione valida del tuo profilo.",
+          bioValidation.message ??
+            "Inserisci una descrizione valida del tuo profilo.",
         );
       }
 
@@ -514,7 +524,9 @@ export default function OnboardingProfileScreen() {
       setStep("complete");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Errore inatteso nel completamento profilo.";
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo sportivo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -539,7 +551,9 @@ export default function OnboardingProfileScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}>
+      <ScrollView
+        contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}
+      >
         <View
           style={{
             gap: spacing[10],
@@ -576,10 +590,12 @@ export default function OnboardingProfileScreen() {
               lineHeight: typography.lineHeight[24],
             }}
           >
-            Un percorso guidato, rapido e flessibile: inserisci i dati essenziali ora e
-            completa i dettagli quando vuoi.
+            Un percorso guidato, rapido e flessibile: inserisci i dati
+            essenziali ora e completa i dettagli quando vuoi.
           </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
+          <View
+            style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}
+          >
             <StepChip isActive={stepIndex >= 0} label="Ruolo" />
             <StepChip isActive={stepIndex >= 1} label="Dati base" />
             <StepChip isActive={stepIndex >= 2} label="Scelta" />
@@ -600,8 +616,8 @@ export default function OnboardingProfileScreen() {
                 1. Che profilo vuoi creare?
               </Text>
               <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                Questa scelta definisce il percorso di onboarding e le informazioni sportive
-                che ti chiederemo in seguito.
+                Questa scelta definisce il percorso di onboarding e le
+                informazioni sportive che ti chiederemo in seguito.
               </Text>
             </View>
 
@@ -618,7 +634,9 @@ export default function OnboardingProfileScreen() {
                     borderRadius: radius[20],
                     borderWidth: 1,
                     borderColor: isActive ? colors.hero : colors.border,
-                    backgroundColor: isActive ? colors.heroSoft : colors.surface,
+                    backgroundColor: isActive
+                      ? colors.heroSoft
+                      : colors.surface,
                     padding: spacing[16],
                   }}
                 >
@@ -638,7 +656,11 @@ export default function OnboardingProfileScreen() {
               );
             })}
 
-            <Button label="Continua" onPress={() => setStep("base")} variant="primary" />
+            <Button
+              label="Continua"
+              onPress={() => setStep("base")}
+              variant="primary"
+            />
           </Card>
         ) : null}
 
@@ -655,8 +677,8 @@ export default function OnboardingProfileScreen() {
                 2. Inserisci le informazioni essenziali
               </Text>
               <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                Completa il minimo necessario per attivare il profilo e farti trovare in
-                piattaforma.
+                Completa il minimo necessario per attivare il profilo e farti
+                trovare in piattaforma.
               </Text>
             </View>
 
@@ -680,10 +702,21 @@ export default function OnboardingProfileScreen() {
             </View>
 
             <View style={{ gap: spacing[8] }}>
-              <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontWeight: typography.fontWeight.bold,
+                }}
+              >
                 Sesso
               </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: spacing[8],
+                }}
+              >
                 {genderOptions.map((entry) => (
                   <OptionPill
                     key={entry.value}
@@ -718,10 +751,21 @@ export default function OnboardingProfileScreen() {
             />
 
             <View style={{ gap: spacing[8] }}>
-              <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontWeight: typography.fontWeight.bold,
+                }}
+              >
                 Domicilio
               </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: spacing[8],
+                }}
+              >
                 <OptionPill
                   active={useResidenceForDomicile}
                   label="Uguale alla residenza"
@@ -808,7 +852,11 @@ export default function OnboardingProfileScreen() {
 
             <View style={{ flexDirection: "row", gap: spacing[12] }}>
               <View style={{ flex: 1 }}>
-                <Button label="Indietro" onPress={() => setStep("role")} variant="secondary" />
+                <Button
+                  label="Indietro"
+                  onPress={() => setStep("role")}
+                  variant="secondary"
+                />
               </View>
               <View style={{ flex: 1 }}>
                 <Button
@@ -835,17 +883,25 @@ export default function OnboardingProfileScreen() {
                 3. Vuoi completare ora il profilo sportivo?
               </Text>
               <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                Un profilo completo aumenta la tua visibilita' verso squadre, allenatori
-                e dirigenti.
+                Un profilo completo aumenta la tua visibilita' verso squadre,
+                allenatori e dirigenti.
               </Text>
             </View>
 
-            <Card style={{ gap: spacing[8], backgroundColor: colors.surfaceMuted }}>
-              <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
+            <Card
+              style={{ gap: spacing[8], backgroundColor: colors.surfaceMuted }}
+            >
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontWeight: typography.fontWeight.heavy,
+                }}
+              >
                 Profilo selezionato
               </Text>
               <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                {roleOptions.find((entry) => entry.value === role)?.label} · {fullName}
+                {roleOptions.find((entry) => entry.value === role)?.label} ·{" "}
+                {fullName}
               </Text>
             </Card>
 
@@ -877,8 +933,8 @@ export default function OnboardingProfileScreen() {
                 4. Completa il tuo profilo sportivo
               </Text>
               <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                Aggiungi dettagli professionali, esperienze e contenuti media. Puoi sempre
-                aggiornare tutto in seguito.
+                Aggiungi dettagli professionali, esperienze e contenuti media.
+                Puoi sempre aggiornare tutto in seguito.
               </Text>
             </View>
 
@@ -937,7 +993,10 @@ export default function OnboardingProfileScreen() {
                   </Text>
                   <View style={{ gap: spacing[8] }}>
                     <Text
-                      style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
+                      style={{
+                        color: colors.textPrimary,
+                        fontWeight: typography.fontWeight.bold,
+                      }}
                     >
                       Disponibile per una nuova squadra?
                     </Text>
@@ -968,7 +1027,10 @@ export default function OnboardingProfileScreen() {
                   />
                   <View style={{ gap: spacing[8] }}>
                     <Text
-                      style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
+                      style={{
+                        color: colors.textPrimary,
+                        fontWeight: typography.fontWeight.bold,
+                      }}
                     >
                       Disponibile al trasferimento?
                     </Text>
@@ -987,7 +1049,10 @@ export default function OnboardingProfileScreen() {
                   </View>
                   <View style={{ gap: spacing[8] }}>
                     <Text
-                      style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
+                      style={{
+                        color: colors.textPrimary,
+                        fontWeight: typography.fontWeight.bold,
+                      }}
                     >
                       Disponibile a cambiare club subito?
                     </Text>
@@ -1017,7 +1082,8 @@ export default function OnboardingProfileScreen() {
                     Carriera calcistica
                   </Text>
                   <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                    Aggiungi una stagione per volta con squadra, categoria e statistiche.
+                    Aggiungi una stagione per volta con squadra, categoria e
+                    statistiche.
                   </Text>
                   <PlayerExperiencesSection
                     addButtonLabel="Aggiungi esperienza calcistica"
@@ -1049,11 +1115,14 @@ export default function OnboardingProfileScreen() {
                         field: "highlight-video",
                         folder: "highlight-videos",
                         mediaTypes: ["videos"],
-                        onUploaded: (items) => setHighlightVideoUrl(items[0]?.url ?? ""),
+                        onUploaded: (items) =>
+                          setHighlightVideoUrl(items[0]?.url ?? ""),
                       })
                     }
                     selectedLabel={
-                      highlightVideoUrl ? "Video highlights caricato correttamente" : undefined
+                      highlightVideoUrl
+                        ? "Video highlights caricato correttamente"
+                        : undefined
                     }
                   />
                   <MediaPickerField
@@ -1068,7 +1137,10 @@ export default function OnboardingProfileScreen() {
                         folder: "player-media",
                         mediaTypes: ["images", "videos"],
                         onUploaded: (items) =>
-                          setPlayerMediaItems((current) => [...current, ...items]),
+                          setPlayerMediaItems((current) => [
+                            ...current,
+                            ...items,
+                          ]),
                       })
                     }
                     selectedCount={playerMediaItems.length}
@@ -1123,11 +1195,14 @@ export default function OnboardingProfileScreen() {
                       field: "coach-video",
                       folder: "coach-videos",
                       mediaTypes: ["videos"],
-                      onUploaded: (items) => setTechnicalVideoUrl(items[0]?.url ?? ""),
+                      onUploaded: (items) =>
+                        setTechnicalVideoUrl(items[0]?.url ?? ""),
                     })
                   }
                   selectedLabel={
-                    technicalVideoUrl ? "Video tecnico caricato correttamente" : undefined
+                    technicalVideoUrl
+                      ? "Video tecnico caricato correttamente"
+                      : undefined
                   }
                 />
                 <Input
@@ -1137,7 +1212,12 @@ export default function OnboardingProfileScreen() {
                   value={coachPreferredRegions}
                 />
                 <View style={{ gap: spacing[8] }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
+                  <Text
+                    style={{
+                      color: colors.textPrimary,
+                      fontWeight: typography.fontWeight.bold,
+                    }}
+                  >
                     Disponibile a un nuovo incarico?
                   </Text>
                   <View style={{ flexDirection: "row", gap: spacing[8] }}>
@@ -1169,7 +1249,9 @@ export default function OnboardingProfileScreen() {
                 </Text>
                 <SelectField
                   label="Specializzazione"
-                  onChange={(value) => setStaffSpecialization(value as StaffSpecialization)}
+                  onChange={(value) =>
+                    setStaffSpecialization(value as StaffSpecialization)
+                  }
                   options={staffSpecializationOptions}
                   placeholder="Seleziona la specializzazione"
                   value={staffSpecialization}
@@ -1194,7 +1276,12 @@ export default function OnboardingProfileScreen() {
                   value={staffPreferredRegions}
                 />
                 <View style={{ gap: spacing[8] }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
+                  <Text
+                    style={{
+                      color: colors.textPrimary,
+                      fontWeight: typography.fontWeight.bold,
+                    }}
+                  >
                     Disponibile a collaborare subito?
                   </Text>
                   <View style={{ flexDirection: "row", gap: spacing[8] }}>
@@ -1246,12 +1333,15 @@ export default function OnboardingProfileScreen() {
                       field: "club-logo",
                       folder: "club-logos",
                       mediaTypes: ["images"],
-                      onUploaded: (items) => setClubLogoUrl(items[0]?.url ?? ""),
+                      onUploaded: (items) =>
+                        setClubLogoUrl(items[0]?.url ?? ""),
                     })
                   }
                   previewUrl={clubLogoUrl}
                   selectedLabel={
-                    clubLogoUrl ? "Logo societa' caricato correttamente" : undefined
+                    clubLogoUrl
+                      ? "Logo societa' caricato correttamente"
+                      : undefined
                   }
                 />
                 <MediaPickerField
@@ -1266,7 +1356,10 @@ export default function OnboardingProfileScreen() {
                       folder: "club-gallery",
                       mediaTypes: ["images", "videos"],
                       onUploaded: (items) =>
-                        setClubGalleryItems((current) => [...current, ...items]),
+                        setClubGalleryItems((current) => [
+                          ...current,
+                          ...items,
+                        ]),
                     })
                   }
                   selectedCount={clubGalleryItems.length}
@@ -1295,7 +1388,9 @@ export default function OnboardingProfileScreen() {
                 label="Presentazione"
                 maxLength={400}
                 multiline
-                onChangeText={(value) => setBio(normalizeProfileBioInput(value))}
+                onChangeText={(value) =>
+                  setBio(normalizeProfileBioInput(value))
+                }
                 placeholder="Racconta brevemente il tuo percorso calcistico, le tue caratteristiche e cosa cerchi per la prossima stagione."
                 value={bio}
               />
@@ -1303,7 +1398,11 @@ export default function OnboardingProfileScreen() {
 
             <View style={{ flexDirection: "row", gap: spacing[12] }}>
               <View style={{ flex: 1 }}>
-                <Button label="Piu' tardi" onPress={() => setStep("complete")} variant="secondary" />
+                <Button
+                  label="Piu' tardi"
+                  onPress={() => setStep("complete")}
+                  variant="secondary"
+                />
               </View>
               <View style={{ flex: 1 }}>
                 <Button
@@ -1329,8 +1428,9 @@ export default function OnboardingProfileScreen() {
               Il tuo profilo e' pronto!
             </Text>
             <Text style={{ color: colors.textSecondary, lineHeight: 24 }}>
-              Ora puoi iniziare a connetterti con squadre, allenatori e giocatori. Se
-              vuoi, potrai aggiungere altri dettagli in qualsiasi momento.
+              Ora puoi iniziare a connetterti con squadre, allenatori e
+              giocatori. Se vuoi, potrai aggiungere altri dettagli in qualsiasi
+              momento.
             </Text>
             <Button
               label="Vai alla home feed"

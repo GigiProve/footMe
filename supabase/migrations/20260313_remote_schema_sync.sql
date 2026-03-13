@@ -1,3 +1,65 @@
+create extension if not exists pg_trgm;
+
+alter type public.player_position add value if not exists 'center_back';
+alter type public.player_position add value if not exists 'right_back';
+alter type public.player_position add value if not exists 'left_back';
+alter type public.player_position add value if not exists 'defensive_midfielder';
+alter type public.player_position add value if not exists 'central_midfielder';
+alter type public.player_position add value if not exists 'attacking_midfielder';
+alter type public.player_position add value if not exists 'right_winger';
+alter type public.player_position add value if not exists 'left_winger';
+alter type public.player_position add value if not exists 'striker';
+
+alter table public.player_career_entries
+add column if not exists club_id uuid references public.clubs(id) on delete set null,
+add column if not exists team_logo_url text;
+
+create index if not exists player_career_entries_club_id_idx
+on public.player_career_entries (club_id);
+
+create index if not exists clubs_name_search_idx
+on public.clubs using gin (name gin_trgm_ops);
+
+drop function if exists public.search_profiles(text, public.app_role, text, public.player_position);
+
+create function public.search_profiles(
+  search_text text default null,
+  role_filter public.app_role default null,
+  region_filter text default null,
+  position_filter public.player_position default null
+)
+returns table (
+  profile_id uuid,
+  full_name text,
+  role public.app_role,
+  region text,
+  city text,
+  bio text,
+  primary_position public.player_position,
+  is_available boolean
+)
+language sql
+stable
+as $$
+  select
+    profile.id as profile_id,
+    profile.full_name,
+    profile.role,
+    profile.region,
+    profile.city,
+    profile.bio,
+    player.primary_position,
+    profile.is_available
+  from public.profiles profile
+  left join public.player_profiles player on player.profile_id = profile.id
+  where
+    (search_text is null or profile.full_name ilike '%' || search_text || '%')
+    and (role_filter is null or profile.role = role_filter)
+    and (region_filter is null or profile.region = region_filter)
+    and (position_filter is null or player.primary_position = position_filter)
+  order by profile.full_name asc;
+$$;
+
 create or replace function public.request_connection(target_profile_id uuid)
 returns uuid
 language plpgsql
@@ -198,7 +260,10 @@ returns table (
   sent_at timestamptz,
   read_at timestamptz,
   sender_profile_id uuid,
-  sender_full_name text
+  sender_full_name text,
+  message_kind text,
+  shared_contact_name text,
+  shared_contact_phone text
 )
 language sql
 stable
@@ -209,7 +274,10 @@ as $$
     message.sent_at,
     message.read_at,
     sender_profile.id as sender_profile_id,
-    sender_profile.full_name as sender_full_name
+    sender_profile.full_name as sender_full_name,
+    message.message_kind,
+    message.shared_contact_name,
+    message.shared_contact_phone
   from public.messages message
   join public.profiles sender_profile on sender_profile.id = message.sender_profile_id
   where message.conversation_id = target_conversation_id
