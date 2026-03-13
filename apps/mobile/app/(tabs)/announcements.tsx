@@ -23,10 +23,10 @@ import {
 import { colors, radius, sizes, spacing, typography } from "../../src/theme/tokens";
 import { Button, Input } from "../../src/ui";
 
-const positions: {
+const positions: Array<{
   label: string;
   value: RecruitingAdForm["roleRequired"];
-}[] = [
+}> = [
   { label: "Portiere", value: "goalkeeper" },
   { label: "Difensore", value: "defender" },
   { label: "Centrocampista", value: "midfielder" },

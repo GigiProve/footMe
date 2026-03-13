@@ -94,3 +94,8 @@ Entita' core da modellare per l'MVP:
 ## Nota operativa
 
 L'ambiente corrente del repository ha Node 16, quindi lo scaffold e' stato preparato a livello file e struttura, ma l'installazione delle dipendenze va eseguita dopo l'upgrade di Node.
+
+## Riferimenti operativi
+
+- Per linee guida React / React Native: `docs/react-best-practices.md`
+- Per linee guida Supabase / Postgres: `docs/supabase-best-practices.md`

@@ -7,6 +7,7 @@
 - The technical architecture lives in [docs/technical-architecture.md](../docs/technical-architecture.md).
 - The UX/UI reference for mobile patterns lives in [docs/mobile-ux-ui-guidelines.md](../docs/mobile-ux-ui-guidelines.md).
 - The React/React Native engineering guidance lives in [docs/react-best-practices.md](../docs/react-best-practices.md).
+- The Supabase/Postgres engineering guidance lives in [docs/supabase-best-practices.md](../docs/supabase-best-practices.md).
 - For product explanations and feature planning, use [.github/instructions/project-scope.instructions.md](./instructions/project-scope.instructions.md) before making assumptions.
 
 ## Working Rules
@@ -16,6 +17,7 @@
 - Do not invent undocumented features, roles, constraints, or business rules.
 - If requirements are incomplete, ask focused questions and convert uncertainty into explicit decisions.
 - When editing React or React Native code, follow [docs/react-best-practices.md](../docs/react-best-practices.md), especially for async loading, hook dependencies, state colocations, and render performance.
+- When editing Supabase schema, RLS policies, SQL helpers, or client queries, follow [docs/supabase-best-practices.md](../docs/supabase-best-practices.md), especially for RLS, migrations, indexing, overfetching, and service-role boundaries.
 
 ## Planning Guidance
 
