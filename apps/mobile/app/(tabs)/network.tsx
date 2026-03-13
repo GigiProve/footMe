@@ -8,6 +8,7 @@ import {
 } from "react-native";
 
 import { useSession } from "../../src/features/auth/use-session";
+import { PublicBioBlock } from "../../src/features/profiles/bio-section";
 import { Screen } from "../../src/components/ui/screen";
 import {
   searchProfiles,
@@ -648,6 +649,7 @@ export default function NetworkScreen() {
                   >
                     {result.full_name}
                   </Text>
+                  <PublicBioBlock bio={result.bio} />
                   <Text style={{ color: colors.textSecondary }}>
                     {formatRole(result.role)}
                     {result.role === "player"

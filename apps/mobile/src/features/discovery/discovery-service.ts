@@ -17,6 +17,7 @@ export type SearchPositionFilter =
   | "forward";
 
 export type ProfileSearchResult = {
+  bio: string | null;
   city: string | null;
   full_name: string;
   is_available: boolean;

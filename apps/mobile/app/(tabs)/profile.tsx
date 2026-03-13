@@ -9,6 +9,7 @@ import {
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
+import { BioSection } from "../../src/features/profiles/bio-section";
 import { ContactSection } from "../../src/features/profiles/contact-section";
 import { PersonalInfoSection } from "../../src/features/profiles/personal-info-section";
 import {
@@ -36,10 +37,12 @@ import {
   normalizeContactEmail,
   normalizeBirthDateInput,
   normalizeFacebookInput,
+  normalizeProfileBioInput,
   normalizeInstagramInput,
   normalizePhoneInput,
   normalizeSeasonLabelInput,
   searchItalianCities,
+  validateProfileBio,
   validateBirthDateInput,
 } from "../../src/features/profiles/profile-form-utils";
 import {
@@ -461,6 +464,7 @@ export default function ProfileScreen() {
     useState<CompleteProfessionalProfile | null>(null);
   const [formState, setFormState] = useState<ProfileFormState | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isBioTouched, setIsBioTouched] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -553,6 +557,21 @@ export default function ProfileScreen() {
 
     return "Seleziona una città presente nel dataset ISTAT.";
   }, [formState?.city]);
+  const bioValidation = useMemo(
+    () => validateProfileBio(formState?.bio ?? ""),
+    [formState?.bio],
+  );
+  const bioErrorMessage = useMemo(() => {
+    if (!isEditing || !formState) {
+      return null;
+    }
+
+    if (!isBioTouched && !formState.bio.trim()) {
+      return null;
+    }
+
+    return bioValidation.message;
+  }, [bioValidation.message, formState, isBioTouched, isEditing]);
 
   const summarySections = useMemo<SummarySection[]>(() => {
     if (!completeProfile) {
@@ -590,16 +609,17 @@ export default function ProfileScreen() {
         title: "Presentazione",
         subtitle: "Disponibilità e descrizione pubblica del profilo.",
         items: [
-          { label: "Bio", value: formatOptionalSummary(completeProfile.profile.bio) },
           {
             label: "Disponibile a nuove opportunità",
             value: completeProfile.profile.is_available ? "Sì" : "No",
           },
-          {
-            label: "Aperto al trasferimento",
-            value: completeProfile.profile.is_open_to_transfer ? "Sì" : "No",
-          },
-        ],
+          completeProfile.profile.role === "player"
+            ? {
+                label: "Aperto al trasferimento",
+                value: completeProfile.profile.is_open_to_transfer ? "Sì" : "No",
+              }
+            : null,
+        ].filter((item): item is { label: string; value: string } => item !== null),
       },
     ];
 
@@ -786,6 +806,7 @@ export default function ProfileScreen() {
       setFormState(buildInitialState(completeProfile));
     }
 
+    setIsBioTouched(false);
     setIsEditing(true);
   }
 
@@ -794,7 +815,20 @@ export default function ProfileScreen() {
       setFormState(buildInitialState(completeProfile));
     }
 
+    setIsBioTouched(false);
     setIsEditing(false);
+  }
+
+  function handleBioChange(value: string) {
+    setIsBioTouched(true);
+    setFormState((current) =>
+      current
+        ? {
+            ...current,
+            bio: normalizeProfileBioInput(value),
+          }
+        : current,
+    );
   }
 
   function handleFullNameChange(value: string) {
@@ -903,6 +937,13 @@ export default function ProfileScreen() {
       if (formState.contactPhone.trim() && !isPhoneNumberValid(normalizedPhone)) {
         throw new Error(
           "Inserisci un numero di cellulare valido in formato internazionale, ad esempio +393331234567.",
+        );
+      }
+
+      if (!bioValidation.isValid) {
+        setIsBioTouched(true);
+        throw new Error(
+          bioValidation.message ?? "Inserisci una descrizione valida del tuo profilo.",
         );
       }
 
@@ -1045,7 +1086,10 @@ export default function ProfileScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}>
+      <ScrollView
+        contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}
+        keyboardShouldPersistTaps="handled"
+      >
         {completeProfile && headerDetails ? (
           <ProfileHeader
             avatarUrl={formState?.avatarUrl ?? completeProfile.profile.avatar_url}
@@ -1066,12 +1110,21 @@ export default function ProfileScreen() {
           </Section>
         ) : !isEditing ? (
           <>
-            {summarySections.map((section) => (
-              <Section key={section.title} description={section.subtitle} title={section.title}>
-                {section.items.map((item) => (
-                  <Field key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
+            <BioSection bio={completeProfile?.profile.bio}>
+              {summarySections
+                .find((section) => section.title === "Presentazione")
+                ?.items.map((item) => (
+                  <Field key={`presentation-${item.label}`} label={item.label} value={item.value} />
                 ))}
-              </Section>
+            </BioSection>
+            {summarySections.map((section) => (
+              section.title === "Presentazione" ? null : (
+                <Section key={section.title} description={section.subtitle} title={section.title}>
+                  {section.items.map((item) => (
+                    <Field key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
+                  ))}
+                </Section>
+              )
             ))}
 
             {completeProfile ? <ContactSection contacts={completeProfile.userContacts} /> : null}
@@ -1156,19 +1209,12 @@ export default function ProfileScreen() {
               region={formState.region}
               regionOptions={regionOptions}
             />
-            <Section
-              description="Visibilità e asset del profilo pubblico."
-              title="Presentazione"
+            <BioSection
+              bio={formState.bio}
+              editable
+              errorMessage={bioErrorMessage}
+              onChangeText={handleBioChange}
             >
-              <Field
-                label="Bio"
-                multiline
-                onChangeText={(value) =>
-                  setFormState((current) => (current ? { ...current, bio: value } : current))
-                }
-                placeholder="Racconta identita', obiettivi e punti di forza."
-                value={formState.bio}
-              />
               <Field
                 label="URL foto profilo (facoltativo)"
                 onChangeText={(value) =>
@@ -1201,9 +1247,9 @@ export default function ProfileScreen() {
                   }
                   trueLabel="Sì"
                   value={formState.isOpenToTransfer}
-                />
-              ) : null}
-            </Section>
+                  />
+                ) : null}
+            </BioSection>
 
             <ContactSection
               contacts={{
