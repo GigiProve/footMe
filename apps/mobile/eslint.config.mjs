@@ -18,4 +18,10 @@ export default [
     ignores: [".expo/**", "dist/**", "node_modules/**"],
   },
   ...compat.extends("expo"),
+  {
+    files: ["**/*.{js,jsx,ts,tsx}"],
+    rules: {
+      "react-hooks/exhaustive-deps": "error",
+    },
+  },
 ];

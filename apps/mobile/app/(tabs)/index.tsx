@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, Text, View } from "react-native";
 
 import { Screen } from "../../src/components/ui/screen";
@@ -13,30 +13,19 @@ import { Button } from "../../src/ui";
 
 export default function HomeScreen() {
   const { profile, session } = useSession();
+  const userId = session?.user?.id;
+  const userEmail = session?.user?.email ?? null;
   const [dashboard, setDashboard] = useState<HomeDashboardData | null>(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
 
-  useEffect(() => {
-    if (!session?.user || !profile) {
-      setDashboard(null);
-      setIsLoadingDashboard(false);
-      return;
-    }
-
-    loadDashboard();
-  }, [profile?.id, session?.user?.id]);
-
-  async function loadDashboard() {
-    if (!session?.user) {
+  const loadDashboard = useCallback(async () => {
+    if (!userId) {
       return;
     }
 
     try {
       setIsLoadingDashboard(true);
-      const nextDashboard = await getHomeDashboard(
-        session.user.id,
-        session.user.email ?? null,
-      );
+      const nextDashboard = await getHomeDashboard(userId, userEmail);
       setDashboard(nextDashboard);
     } catch (error) {
       const message =
@@ -47,7 +36,17 @@ export default function HomeScreen() {
     } finally {
       setIsLoadingDashboard(false);
     }
-  }
+  }, [userEmail, userId]);
+
+  useEffect(() => {
+    if (!userId || !profile?.id) {
+      setDashboard(null);
+      setIsLoadingDashboard(false);
+      return;
+    }
+
+    loadDashboard();
+  }, [loadDashboard, profile?.id, userId]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();

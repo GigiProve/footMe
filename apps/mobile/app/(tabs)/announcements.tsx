@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -58,6 +58,7 @@ function formatApplicationStatus(status: string) {
 
 export default function AnnouncementsScreen() {
   const { profile, session } = useSession();
+  const userId = session?.user?.id;
   const [ads, setAds] = useState<RecruitingAdSummary[]>([]);
   const [publicAds, setPublicAds] = useState<DiscoverableRecruitingAd[]>([]);
   const [applications, setApplications] = useState<ClubApplicationSummary[]>(
@@ -80,30 +81,16 @@ export default function AnnouncementsScreen() {
     title: "",
   });
 
-  useEffect(() => {
-    if (!session?.user) {
-      setIsLoading(false);
-      return;
-    }
-
-    if (profile?.role === "club_admin") {
-      loadClubDashboard();
-      return;
-    }
-
-    loadPublicAnnouncements();
-  }, [profile?.role, session?.user?.id]);
-
-  async function loadClubDashboard() {
-    if (!session?.user) {
+  const loadClubDashboard = useCallback(async () => {
+    if (!userId) {
       return;
     }
 
     try {
       setIsLoading(true);
       const [result, nextApplications] = await Promise.all([
-        getClubAds(session.user.id),
-        getClubApplications(session.user.id),
+        getClubAds(userId),
+        getClubApplications(userId),
       ]);
       setAds(result.ads);
       setClubName(result.club?.name ?? null);
@@ -117,16 +104,16 @@ export default function AnnouncementsScreen() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [userId]);
 
-  async function loadPublicAnnouncements() {
-    if (!session?.user) {
+  const loadPublicAnnouncements = useCallback(async () => {
+    if (!userId) {
       return;
     }
 
     try {
       setIsLoading(true);
-      const result = await getPublishedAds(session.user.id);
+      const result = await getPublishedAds(userId);
       setPublicAds(result);
     } catch (error) {
       const message =
@@ -137,7 +124,21 @@ export default function AnnouncementsScreen() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      setIsLoading(false);
+      return;
+    }
+
+    if (profile?.role === "club_admin") {
+      loadClubDashboard();
+      return;
+    }
+
+    loadPublicAnnouncements();
+  }, [loadClubDashboard, loadPublicAnnouncements, profile?.role, userId]);
 
   function patchForm<Key extends keyof RecruitingAdForm>(
     key: Key,
