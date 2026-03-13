@@ -10,6 +10,7 @@ import { supabase } from "../../lib/supabase";
 export type PreferredFoot = "right" | "left" | "both";
 
 type BaseProfileRecord = {
+  age: number | null;
   avatar_url: string | null;
   bio: string | null;
   birth_date: string | null;
@@ -162,9 +163,9 @@ export type CompleteProfessionalProfileUpdate = {
 
 export async function getCompleteProfessionalProfile(profileId: string) {
   const { data: profileData, error: profileError } = await supabase
-    .from("profiles")
+    .from("profiles_with_age")
     .select(
-      "id, full_name, role, birth_date, nationality, bio, avatar_url, region, city, is_available, is_open_to_transfer",
+      "id, full_name, role, birth_date, age, nationality, bio, avatar_url, region, city, is_available, is_open_to_transfer",
     )
     .eq("id", profileId)
     .maybeSingle();

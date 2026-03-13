@@ -104,6 +104,8 @@ export function ProfileSection({ children, description, title }: ProfileSectionP
   );
 }
 
+export const ProfileSectionCard = ProfileSection;
+
 export function ProfileField({
   editable = false,
   helperText,
@@ -115,6 +117,7 @@ export function ProfileField({
   value,
 }: ProfileFieldProps) {
   const isEditable = editable || Boolean(renderInput) || Boolean(onChangeText);
+  const hasValue = value.trim().length > 0;
 
   return (
     <View style={styles.fieldContainer}>
@@ -131,8 +134,17 @@ export function ProfileField({
           />
         )
       ) : (
-        <View style={styles.readonlySurface}>
-          <Text style={styles.readonlyValue}>{value.trim() ? value : "Da completare"}</Text>
+        <View
+          style={[
+            styles.readonlySurface,
+            hasValue ? styles.completedReadonlySurface : styles.emptyReadonlySurface,
+          ]}
+        >
+          <Text
+            style={[styles.readonlyValue, hasValue ? null : styles.readonlyPlaceholder]}
+          >
+            {hasValue ? value : "Da completare"}
+          </Text>
         </View>
       )}
       {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
@@ -182,6 +194,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 52,
     backgroundColor: "rgba(255,255,255,0.35)",
+  },
+  completedReadonlySurface: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accentSoft,
+  },
+  emptyReadonlySurface: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
   },
   editButton: {
     width: 40,
@@ -242,10 +262,11 @@ const styles = StyleSheet.create({
   readonlySurface: {
     borderRadius: radius[18],
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[14],
+  },
+  readonlyPlaceholder: {
+    color: colors.textSecondary,
   },
   readonlyValue: {
     color: colors.textPrimary,
