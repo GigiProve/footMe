@@ -33,15 +33,16 @@ import {
 
 describe("profile-form-utils", () => {
   it("normalizes season labels to the xx/xx pattern", () => {
-    expect(normalizeSeasonLabelInput("2425")).toBe("24/25");
-    expect(normalizeSeasonLabelInput("2024/25")).toBe("24/25");
-    expect(normalizeSeasonLabelInput(" 98 / 99 ")).toBe("98/99");
-    expect(normalizeSeasonLabelInput("12024/25")).toBe("12024");
+    expect(normalizeSeasonLabelInput("2425")).toBe("2024/2025");
+    expect(normalizeSeasonLabelInput("2024/25")).toBe("2024/2025");
+    expect(normalizeSeasonLabelInput(" 24 / 25 ")).toBe("2024/2025");
+    expect(normalizeSeasonLabelInput("2024/2025")).toBe("2024/2025");
   });
 
   it("validates season labels with the xx/xx pattern", () => {
     expect(isSeasonLabelValid("24/25")).toBe(true);
-    expect(isSeasonLabelValid("2024/25")).toBe(false);
+    expect(isSeasonLabelValid("2024/2025")).toBe(true);
+    expect(isSeasonLabelValid("2024/25")).toBe(true);
     expect(isSeasonLabelValid("24-25")).toBe(false);
   });
 

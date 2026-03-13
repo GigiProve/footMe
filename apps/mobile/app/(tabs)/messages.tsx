@@ -13,6 +13,7 @@ import {
   startDirectConversation,
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
+import { getPlayerPositionLabel } from "../../src/features/profiles/player-sports";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
 import { Button } from "../../src/ui";
 
@@ -21,13 +22,6 @@ const roleLabels: Record<string, string> = {
   coach: "Allenatore",
   player: "Calciatore",
   staff: "Staff",
-};
-
-const positionLabels: Record<string, string> = {
-  defender: "Difensore",
-  forward: "Attaccante",
-  goalkeeper: "Portiere",
-  midfielder: "Centrocampista",
 };
 
 function formatRole(value: string | null) {
@@ -39,11 +33,7 @@ function formatRole(value: string | null) {
 }
 
 function formatPosition(value: string | null) {
-  if (!value) {
-    return "Posizione non definita";
-  }
-
-  return positionLabels[value] ?? value;
+  return getPlayerPositionLabel(value, "Posizione non definita");
 }
 
 function formatLocation(city: string | null, region: string | null) {

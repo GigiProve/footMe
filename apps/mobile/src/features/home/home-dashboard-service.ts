@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { getPlayerPositionLabel } from "../profiles/player-sports";
 
 type ProfileRow = {
   city: string | null;
@@ -76,18 +77,7 @@ function formatRoleLabel(role: string) {
 }
 
 function formatPositionLabel(position: string | null) {
-  switch (position) {
-    case "goalkeeper":
-      return "Portiere";
-    case "defender":
-      return "Difensore";
-    case "midfielder":
-      return "Centrocampista";
-    case "forward":
-      return "Attaccante";
-    default:
-      return null;
-  }
+  return position ? getPlayerPositionLabel(position, position) : null;
 }
 
 export async function getHomeDashboard(

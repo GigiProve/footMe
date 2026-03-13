@@ -1,4 +1,8 @@
 import italianCities from "./italian-cities.json";
+import {
+  isSeasonLabelValid as isPlayerSeasonLabelValid,
+  normalizeSeasonLabelInput as normalizePlayerSeasonLabelInput,
+} from "./player-sports";
 
 export type SelectOption<T extends string = string> = {
   label: string;
@@ -521,34 +525,11 @@ export function isItalianCity(cityName: string) {
 }
 
 export function normalizeSeasonLabelInput(value: string) {
-  const compactValue = value.replace(/\s+/g, "");
-  const shortPatternMatch = compactValue.match(/^(\d{2})\/?(\d{0,2})$/);
-
-  if (shortPatternMatch) {
-    const [, startYear, endYear] = shortPatternMatch;
-    return endYear ? `${startYear}/${endYear}` : startYear;
-  }
-
-  const longPatternMatch = compactValue.match(/^(\d{4})\/?(\d{0,2})$/);
-
-  if (longPatternMatch) {
-    const [, startYear, endYear] = longPatternMatch;
-    const normalizedStartYear = startYear.slice(-2);
-    return endYear ? `${normalizedStartYear}/${endYear}` : normalizedStartYear;
-  }
-
-  if (/^\d+$/.test(compactValue)) {
-    const digits = compactValue.slice(0, 4);
-    return digits.length <= 2
-      ? digits
-      : `${digits.slice(0, 2)}/${digits.slice(2, 4)}`;
-  }
-
-  return compactValue.slice(0, 5);
+  return normalizePlayerSeasonLabelInput(value);
 }
 
 export function isSeasonLabelValid(value: string) {
-  return /^\d{2}\/\d{2}$/.test(value.trim());
+  return isPlayerSeasonLabelValid(value);
 }
 
 export function normalizeInstagramInput(value: string) {

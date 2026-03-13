@@ -1,13 +1,15 @@
-import type {
-  AppRole,
-  PlayerPosition,
-  StaffSpecialization,
-} from "../onboarding/create-initial-profile";
+import type { AppRole, StaffSpecialization } from "../onboarding/create-initial-profile";
 
 import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
-
-export type PreferredFoot = "right" | "left" | "both";
+import {
+  DEFAULT_PLAYER_PRIMARY_POSITION,
+  isPlayerPosition,
+  type PlayerExperiencePayload,
+  type PlayerPosition,
+  type PreferredFoot,
+  type TeamAutocompleteOption,
+} from "./player-sports";
 
 type BaseProfileRecord = {
   age: number | null;
@@ -84,6 +86,7 @@ export type PlayerCareerEntryRecord = {
   appearances: number;
   assists: number;
   awards: string | null;
+  club_id: string | null;
   club_name: string;
   competition_name: string | null;
   goals: number;
@@ -92,6 +95,7 @@ export type PlayerCareerEntryRecord = {
   player_profile_id: string;
   season_label: string;
   sort_order: number;
+  team_logo_url: string | null;
 };
 
 export type CompleteProfessionalProfile = {
@@ -104,18 +108,7 @@ export type CompleteProfessionalProfile = {
   userContacts: UserContactsRecord;
 };
 
-export type PlayerCareerEntryInput = {
-  appearances: number;
-  assists: number;
-  awards: string | null;
-  club_name: string;
-  competition_name: string | null;
-  goals: number;
-  id?: string;
-  minutes_played: number;
-  season_label: string;
-  sort_order: number;
-};
+export type PlayerCareerEntryInput = PlayerExperiencePayload;
 
 export type CompleteProfessionalProfileUpdate = {
   club: {
@@ -240,20 +233,13 @@ function normalizePlayerProfileRecord(
       rawProfile.preferred_foot === "both"
         ? rawProfile.preferred_foot
         : null,
-    primary_position:
-      rawProfile.primary_position === "goalkeeper" ||
-      rawProfile.primary_position === "defender" ||
-      rawProfile.primary_position === "forward"
-        ? rawProfile.primary_position
-        : "midfielder",
+    primary_position: isPlayerPosition(rawProfile.primary_position)
+      ? rawProfile.primary_position
+      : DEFAULT_PLAYER_PRIMARY_POSITION,
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
-    secondary_position:
-      rawProfile.secondary_position === "goalkeeper" ||
-      rawProfile.secondary_position === "defender" ||
-      rawProfile.secondary_position === "midfielder" ||
-      rawProfile.secondary_position === "forward"
-        ? rawProfile.secondary_position
-        : null,
+    secondary_position: isPlayerPosition(rawProfile.secondary_position)
+      ? rawProfile.secondary_position
+      : null,
     transfer_regions: normalizeStringArray(rawProfile.transfer_regions),
     weight_kg: normalizeNumber(rawProfile.weight_kg),
     willing_to_change_club: normalizeBoolean(rawProfile.willing_to_change_club),
@@ -333,6 +319,10 @@ function normalizePlayerCareerEntryRecord(
     appearances: normalizeNumber(rawEntry.appearances) ?? 0,
     assists: normalizeNumber(rawEntry.assists) ?? 0,
     awards: normalizeOptionalText(rawEntry.awards),
+    club_id:
+      typeof rawEntry.club_id === "string" && rawEntry.club_id.trim()
+        ? rawEntry.club_id
+        : null,
     club_name: normalizeRequiredText(rawEntry.club_name, ""),
     competition_name: normalizeOptionalText(rawEntry.competition_name),
     goals: normalizeNumber(rawEntry.goals) ?? 0,
@@ -341,6 +331,7 @@ function normalizePlayerCareerEntryRecord(
     player_profile_id: normalizeRequiredText(rawEntry.player_profile_id, profileId),
     season_label: normalizeRequiredText(rawEntry.season_label, ""),
     sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+    team_logo_url: normalizeOptionalText(rawEntry.team_logo_url),
   } satisfies PlayerCareerEntryRecord;
 }
 
@@ -483,7 +474,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     const { data: careerData, error: careerError } = await supabase
       .from("player_career_entries")
       .select(
-        "id, player_profile_id, season_label, club_name, competition_name, appearances, goals, assists, minutes_played, awards, sort_order",
+        "id, player_profile_id, season_label, club_id, club_name, competition_name, appearances, goals, assists, minutes_played, awards, sort_order, team_logo_url",
       )
       .eq("player_profile_id", profileId)
       .order("sort_order", { ascending: true })
@@ -586,32 +577,36 @@ export async function updateCompleteProfessionalProfile(
 
     const existingEntries = input.playerCareerEntries
       .filter((entry) => !!entry.id)
-      .map((entry) => ({
-        appearances: entry.appearances,
-        assists: entry.assists,
-        awards: entry.awards,
-        club_name: entry.club_name,
-        competition_name: entry.competition_name,
-        goals: entry.goals,
-        id: entry.id,
-        minutes_played: entry.minutes_played,
-        player_profile_id: input.profileId,
-        season_label: entry.season_label,
-        sort_order: entry.sort_order,
-      }));
+        .map((entry) => ({
+          appearances: entry.appearances,
+          assists: entry.assists,
+          awards: entry.awards,
+          club_id: entry.club_id,
+          club_name: entry.club_name,
+          competition_name: entry.category,
+          goals: entry.goals,
+          id: entry.id,
+          minutes_played: entry.minutes_played,
+          player_profile_id: input.profileId,
+          season_label: entry.season_label,
+          sort_order: entry.sort_order,
+          team_logo_url: entry.team_logo_url,
+        }));
     const newEntries = input.playerCareerEntries
       .filter((entry) => !entry.id)
       .map((entry) => ({
         appearances: entry.appearances,
         assists: entry.assists,
         awards: entry.awards,
+        club_id: entry.club_id,
         club_name: entry.club_name,
-        competition_name: entry.competition_name,
+        competition_name: entry.category,
         goals: entry.goals,
         minutes_played: entry.minutes_played,
         player_profile_id: input.profileId,
         season_label: entry.season_label,
         sort_order: entry.sort_order,
+        team_logo_url: entry.team_logo_url,
       }));
 
     if (existingEntries.length > 0) {
@@ -747,4 +742,35 @@ export async function updateCompleteProfessionalProfile(
       }
     }
   }
+}
+
+export async function searchTeams(query: string, limit = 5) {
+  const trimmedQuery = query.trim();
+
+  if (trimmedQuery.length < 2) {
+    return [] as TeamAutocompleteOption[];
+  }
+
+  const { data, error } = await supabase
+    .from("clubs")
+    .select("id, name, city, logo_url")
+    .ilike("name", `${trimmedQuery}%`)
+    .order("name", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as {
+    city: string | null;
+    id: string;
+    logo_url: string | null;
+    name: string;
+  }[]).map((club) => ({
+    city: club.city,
+    id: club.id,
+    logoUrl: club.logo_url,
+    name: club.name,
+  }));
 }
