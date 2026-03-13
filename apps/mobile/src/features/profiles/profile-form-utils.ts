@@ -10,6 +10,10 @@ export type ItalianCityOption = {
   region: string;
 };
 
+export const PROFILE_BIO_MIN_LENGTH = 20;
+export const PROFILE_BIO_MAX_LENGTH = 400;
+export const PROFILE_BIO_WARNING_THRESHOLD = 360;
+
 export const REGION_OPTIONS: SelectOption[] = [
   { label: "Abruzzo", value: "Abruzzo" },
   { label: "Basilicata", value: "Basilicata" },
@@ -146,6 +150,83 @@ export function formatOptionalSummary(
 ) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : fallback;
+}
+
+export function normalizeProfileBioInput(value: string) {
+  return value.replace(/\r\n?/g, "\n").slice(0, PROFILE_BIO_MAX_LENGTH);
+}
+
+function hasRepeatedBioPattern(value: string) {
+  const compactValue = value.toLowerCase().replace(/\s+/g, " ").trim();
+
+  if (!compactValue) {
+    return false;
+  }
+
+  if (/([a-zà-ù0-9!?.,])\1{5,}/i.test(compactValue)) {
+    return true;
+  }
+
+  const compactNoSpaces = compactValue.replace(/\s+/g, "");
+
+  if (compactNoSpaces.length >= 12 && /^(.{1,4})\1+$/.test(compactNoSpaces)) {
+    return true;
+  }
+
+  const words = compactValue.split(" ").filter(Boolean);
+
+  return words.length >= 4 && new Set(words).size === 1;
+}
+
+export function validateProfileBio(value: string) {
+  const normalizedValue = normalizeProfileBioInput(value);
+  const trimmedValue = normalizedValue.trim();
+
+  if (!normalizedValue.length) {
+    return {
+      isValid: true,
+      message: null,
+      normalizedValue,
+    };
+  }
+
+  if (!trimmedValue) {
+    return {
+      isValid: false,
+      message: "Inserisci una descrizione valida del tuo profilo.",
+      normalizedValue,
+    };
+  }
+
+  if (trimmedValue.length < PROFILE_BIO_MIN_LENGTH) {
+    return {
+      isValid: false,
+      message: `La bio deve contenere almeno ${PROFILE_BIO_MIN_LENGTH} caratteri.`,
+      normalizedValue,
+    };
+  }
+
+  if (trimmedValue.length > PROFILE_BIO_MAX_LENGTH) {
+    return {
+      isValid: false,
+      message: `La bio non può superare ${PROFILE_BIO_MAX_LENGTH} caratteri.`,
+      normalizedValue,
+    };
+  }
+
+  if (hasRepeatedBioPattern(trimmedValue)) {
+    return {
+      isValid: false,
+      message: "Inserisci una descrizione valida del tuo profilo.",
+      normalizedValue,
+    };
+  }
+
+  return {
+    isValid: true,
+    message: null,
+    normalizedValue,
+  };
 }
 
 export function formatListSummary(

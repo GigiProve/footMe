@@ -19,7 +19,9 @@ import {
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
   isSeasonLabelValid,
+  normalizeProfileBioInput,
   normalizeSeasonLabelInput,
+  validateProfileBio,
 } from "../../src/features/profiles/profile-form-utils";
 import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
 import {
@@ -471,6 +473,14 @@ export default function OnboardingProfileScreen() {
         await ensureInitialProfileCreated();
       }
 
+      const bioValidation = validateProfileBio(bio);
+
+      if (!bioValidation.isValid) {
+        throw new Error(
+          bioValidation.message ?? "Inserisci una descrizione valida del tuo profilo.",
+        );
+      }
+
       const normalizedCareerEntries = careerEntries
         .filter(hasCareerEntryContent)
         .map((entry, index) => {
@@ -542,7 +552,7 @@ export default function OnboardingProfileScreen() {
             : null,
         profile: {
           avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(bio),
+          bio: parseOptionalText(bioValidation.normalizedValue),
           birth_date: birthDate,
           city: null,
           full_name: fullName,
@@ -1517,9 +1527,10 @@ export default function OnboardingProfileScreen() {
               </Text>
               <Input
                 label="Presentazione"
+                maxLength={400}
                 multiline
-                onChangeText={setBio}
-                placeholder="Obiettivi sportivi, caratteristiche di gioco, mentalita' e attitudine"
+                onChangeText={(value) => setBio(normalizeProfileBioInput(value))}
+                placeholder="Racconta brevemente il tuo percorso calcistico, le tue caratteristiche e cosa cerchi per la prossima stagione."
                 value={bio}
               />
             </View>

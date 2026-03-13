@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PROFILE_BIO_MAX_LENGTH,
   calculateAge,
   composeBirthDate,
   createBirthDayOptions,
@@ -21,10 +22,12 @@ import {
   normalizeFacebookInput,
   normalizeInstagramInput,
   normalizePhoneInput,
+  normalizeProfileBioInput,
   normalizeSeasonLabelInput,
   parseBirthDate,
   parseBirthDateInput,
   searchItalianCities,
+  validateProfileBio,
   validateBirthDateInput,
 } from "./profile-form-utils";
 
@@ -119,6 +122,43 @@ describe("profile-form-utils", () => {
     );
     expect(getSocialDisplayValue("facebook", "https://facebook.com/mario.rossi")).toBe(
       "mario.rossi",
+    );
+  });
+
+  it("validates profile bios, including legacy empty values and spammy patterns", () => {
+    expect(validateProfileBio("")).toEqual({
+      isValid: true,
+      message: null,
+      normalizedValue: "",
+    });
+    expect(validateProfileBio("      ").isValid).toBe(false);
+    expect(
+      validateProfileBio(
+        "Centrocampista classe 2001 con visione di gioco e disponibilità a trasferirmi in Lombardia.",
+      ),
+    ).toEqual({
+      isValid: true,
+      message: null,
+      normalizedValue:
+        "Centrocampista classe 2001 con visione di gioco e disponibilità a trasferirmi in Lombardia.",
+    });
+    expect(validateProfileBio("Troppo corta").message).toBe(
+      "La bio deve contenere almeno 20 caratteri.",
+    );
+    expect(validateProfileBio("spam spam spam spam spam").message).toBe(
+      "Inserisci una descrizione valida del tuo profilo.",
+    );
+    expect(validateProfileBio("aaaaaa bio di prova che non va bene").message).toBe(
+      "Inserisci una descrizione valida del tuo profilo.",
+    );
+  });
+
+  it("caps profile bio input at four hundred characters", () => {
+    const oversizedValue = "a".repeat(PROFILE_BIO_MAX_LENGTH + 25);
+
+    expect(normalizeProfileBioInput(oversizedValue)).toHaveLength(PROFILE_BIO_MAX_LENGTH);
+    expect(validateProfileBio(oversizedValue).normalizedValue).toHaveLength(
+      PROFILE_BIO_MAX_LENGTH,
     );
   });
 });
