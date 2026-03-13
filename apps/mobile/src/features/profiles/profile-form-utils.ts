@@ -163,12 +163,16 @@ function hasRepeatedBioPattern(value: string) {
     return false;
   }
 
+  // Se l'utente ripete lo stesso carattere 6+ volte di fila, trattiamo il testo
+  // come riempitivo/spam e lo blocchiamo prima del salvataggio.
   if (/([a-zà-ù0-9!?.,])\1{5,}/i.test(compactValue)) {
     return true;
   }
 
   const compactNoSpaces = compactValue.replace(/\s+/g, "");
 
+  // Blocca pattern ultra-ripetitivi come "abababababab" o "123412341234":
+  // almeno 12 caratteri composti dalla stessa sequenza da 1 a 4 caratteri.
   if (compactNoSpaces.length >= 12 && /^(.{1,4})\1+$/.test(compactNoSpaces)) {
     return true;
   }
