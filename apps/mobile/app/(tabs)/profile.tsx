@@ -42,7 +42,6 @@ import {
   searchItalianCities,
   validateBirthDateInput,
 } from "../../src/features/profiles/profile-form-utils";
-import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
 import {
   getCompleteProfessionalProfile,
   updateCompleteProfessionalProfile,
@@ -428,8 +427,8 @@ function buildHeaderDetails(
       badges: [roleBadge, data.coachProfile?.open_to_new_role ? "Aperto a nuove panchine" : "Profilo attivo"],
       fullName,
       primaryMeta,
-      secondaryMeta: `${data.coachProfile?.coached_clubs[0] ?? "Squadra da completare"} · ${
-        data.coachProfile?.coached_categories[0] ?? "Categoria da definire"
+      secondaryMeta: `${data.coachProfile?.coached_clubs?.[0] ?? "Squadra da completare"} · ${
+        data.coachProfile?.coached_categories?.[0] ?? "Categoria da definire"
       }`,
     };
   }
@@ -440,7 +439,7 @@ function buildHeaderDetails(
       fullName,
       primaryMeta,
       secondaryMeta: `${formatSpecialization(data.staffProfile?.specialization ?? null)} · ${
-        data.staffProfile?.preferred_regions[0] ?? "Area da definire"
+        data.staffProfile?.preferred_regions?.[0] ?? "Area da definire"
       }`,
     };
   }
@@ -999,7 +998,7 @@ export default function ProfileScreen() {
               }
             : null,
         profile: {
-          avatar_url: withDefaultProfileAvatar(formState.avatarUrl),
+          avatar_url: parseOptionalText(formState.avatarUrl),
           bio: parseOptionalText(formState.bio),
           birth_date: birthDateValidation.isoValue,
           city: parseOptionalText(trimmedCity),

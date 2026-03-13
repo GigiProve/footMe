@@ -295,4 +295,68 @@ describe("getCompleteProfessionalProfile", () => {
       mocks.fromMock.mock.calls.some(([table]) => table === "player_career_entries"),
     ).toBe(false);
   });
+
+  it("normalizes legacy null and missing fields without crashing", async () => {
+    mocks.profileMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        avatar_url: null,
+        bio: null,
+        birth_date: null,
+        age: null,
+        city: null,
+        full_name: "Legacy Staff",
+        id: "profile-legacy",
+        is_available: null,
+        is_open_to_transfer: null,
+        nationality: null,
+        region: null,
+        role: "staff",
+      },
+      error: null,
+    });
+    mocks.playerMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
+    mocks.coachMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
+    mocks.staffMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        certifications: null,
+        experience_summary: null,
+        open_to_work: null,
+        preferred_regions: null,
+        profile_id: "profile-legacy",
+        specialization: null,
+      },
+      error: null,
+    });
+    mocks.clubMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
+    mocks.profileContactsMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
+    mocks.privateContactsMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
+
+    const result = await getCompleteProfessionalProfile("profile-legacy");
+
+    expect(result.profile).toMatchObject({
+      city: null,
+      is_available: false,
+      is_open_to_transfer: false,
+      nationality: null,
+      region: null,
+      role: "staff",
+    });
+    expect(result.staffProfile).toEqual({
+      certifications: [],
+      experience_summary: null,
+      open_to_work: false,
+      preferred_regions: [],
+      profile_id: "profile-legacy",
+      specialization: "fitness_coach",
+    });
+    expect(result.userContacts).toEqual({
+      email: "",
+      facebook: "",
+      instagram: "",
+      phone: "",
+      showEmail: false,
+      showFacebook: false,
+      showInstagram: false,
+    });
+  });
 });

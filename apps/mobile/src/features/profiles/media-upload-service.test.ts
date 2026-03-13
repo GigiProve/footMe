@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { pickAndUploadMedia } from "./media-upload-service";
+import {
+  pickAndUploadMedia,
+  ProfileMediaUploadError,
+  PROFILE_MEDIA_BUCKET,
+} from "./media-upload-service";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -70,6 +74,7 @@ describe("pickAndUploadMedia", () => {
     });
 
     expect(mocks.upload).toHaveBeenCalledTimes(1);
+    expect(mocks.from).toHaveBeenCalledWith(PROFILE_MEDIA_BUCKET);
     expect(mocks.upload.mock.calls[0]?.[0]).toContain("user-1/avatars/");
     expect(result).toEqual([
       {
@@ -93,6 +98,36 @@ describe("pickAndUploadMedia", () => {
       }),
     ).rejects.toThrow(
       "Consenti l'accesso alla libreria foto per caricare i media.",
+    );
+  });
+
+  it("maps missing bucket errors to a specific upload error", async () => {
+    mocks.launchImageLibraryAsync.mockResolvedValue({
+      assets: [
+        {
+          fileName: "avatar.jpg",
+          mimeType: "image/jpeg",
+          type: "image",
+          uri: "file:///avatar.jpg",
+        },
+      ],
+      canceled: false,
+    });
+    mocks.upload.mockResolvedValueOnce({
+      error: new Error("Bucket not found"),
+    });
+
+    await expect(
+      pickAndUploadMedia({
+        folder: "avatars",
+        mediaTypes: ["images"],
+        userId: "user-3",
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<ProfileMediaUploadError>>({
+        code: "bucket_not_found",
+        message: `Archivio media profilo non disponibile (${PROFILE_MEDIA_BUCKET}).`,
+      }),
     );
   });
 });
