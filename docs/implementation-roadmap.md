@@ -4,6 +4,61 @@
 
 Questo piano divide il lavoro in fasi come in un contesto aziendale, con obiettivi, task, dipendenze e risultati attesi. Il focus iniziale e' la consegna di una prima versione mobile iOS e Android, lasciando la versione web fuori scope.
 
+## Stato aggiornato del repository - 14 marzo 2026
+
+### Fase attuale
+
+Il repository non e' piu' in una fase di solo setup: la base MVP mobile e' gia' implementata e il lavoro reale si trova nella **chiusura delle fasi 3 e 4**, con una **parte della fase 6 gia' anticipata**.
+
+In pratica:
+
+- **Fase 0**: sostanzialmente completata a livello documentale
+- **Fase 1**: completata nella parte app, backend, schema dati e design system
+- **Fase 2**: molto avanzata e usabile, ma non del tutto chiusa
+- **Fase 3**: implementata per il flusso core, da completare nelle parti gestionali e notifiche
+- **Fase 4**: implementata per connessioni e chat 1:1, da completare nelle notifiche push e nel blocco utenti lato UX
+- **Fase 5**: non avviata
+- **Fase 6**: avviata in anticipo in forma essenziale tramite ricerca profili e annunci
+- **Fasi 7-9**: ancora da impostare come hardening, retention e release
+
+### Evidenze principali nel repository
+
+- app mobile con tab `Home`, `Profilo`, `Rete`, `Messaggi`, `Annunci`: `apps/mobile/app/(tabs)/_layout.tsx`
+- dashboard autenticata collegata a dati reali Supabase invece di puro placeholder: `apps/mobile/app/(tabs)/index.tsx`, `apps/mobile/src/features/home/home-dashboard-service.ts`
+- onboarding multi-ruolo e profili editabili: `apps/mobile/app/(onboarding)/profile.tsx`, `apps/mobile/app/(tabs)/profile.tsx`
+- recruiting attivo con creazione annunci, candidatura e salvataggio: `apps/mobile/app/(tabs)/announcements.tsx`, `apps/mobile/src/features/recruiting/recruiting-service.ts`
+- networking, richieste di collegamento e chat privata: `apps/mobile/app/(tabs)/network.tsx`, `apps/mobile/app/messages/[conversationId].tsx`, `apps/mobile/src/features/networking/networking-service.ts`, `apps/mobile/src/features/messaging/messaging-service.ts`
+- ricerca profili e annunci gia' presente in forma MVP: `apps/mobile/src/features/discovery/discovery-service.ts`
+- backend Supabase gia' strutturato con migrazioni per profili, recruiting, networking, messaging, media e helper di ricerca: `supabase/migrations/*.sql`
+
+### Gap da chiudere delle fasi precedenti prima di aprire nuove fasi
+
+- **Fase 0**
+  - formalizzare meglio vincoli legali e operativi ancora aperti: privacy policy, gestione minori, moderazione contenuti e ambienti staging/production
+- **Fase 1**
+  - rendere esplicita la pipeline CI/CD e la strategia ambienti, oggi non ancora documentate come deliverable realmente chiusi
+  - gli analytics events base previsti in fase 1 non risultano ancora implementati
+- **Fase 2**
+  - manca evidenza di reset password e verifica email o telefono nel flusso auth
+  - la moderazione base dei media non risulta ancora implementata
+  - la pagina societa' esiste nel perimetro profilo, ma restano da completare parti come rosa/staff in ottica esperienza prodotto completa
+- **Fase 3**
+  - gli annunci supportano creazione, discovery, salvataggio e candidatura, ma non emerge ancora un flusso completo di modifica e chiusura annuncio
+  - le notifiche recruiting previste non risultano ancora presenti
+- **Fase 4**
+  - la chat privata e le richieste di collegamento esistono, ma le notifiche push non sono ancora integrate
+  - il concetto di `blocked` esiste nel modello dati, ma manca una UX esplicita per gestione blocco utente
+
+### Sequenza aggiornata consigliata
+
+Dato lo stato reale del codice, la sequenza piu' corretta non e' aprire subito il feed sociale, ma:
+
+1. chiudere i gap residui di fasi 2-4
+2. consolidare la **fase 6** con ricerca e filtri davvero utili al recruiting MVP
+3. avviare la **fase 7** per notifiche e retention essenziali
+4. passare solo dopo a **fase 5** feed sociale
+5. lasciare **fase 8** shop al post-MVP
+
 ## Fase 0 - Product Discovery e Project Setup
 
 ### Obiettivo
@@ -287,11 +342,40 @@ Portare il prodotto a un livello di qualita' adatto alla pubblicazione mobile.
 
 Per una prima release credibile, la priorita' suggerita e':
 
-1. onboarding e profili professionali
-2. carriera e statistiche giocatori
-3. profili societa'
-4. annunci di recruiting e candidature
-5. networking base e messaggi
-6. ricerca avanzata essenziale
+1. chiusura dei gap su onboarding, profili professionali e auth
+2. completamento recruiting core: gestione annunci, candidature e stati operativi
+3. completamento networking base e messaggi con notifiche essenziali
+4. ricerca avanzata essenziale per profili e opportunita'
+5. hardening di qualita', sicurezza e beta readiness
 
 Feed social completo, shop e parte avanzata analytics possono entrare dopo il primo MVP se servono per ridurre rischio e time-to-market.
+
+## Prossimi passi prima di iniziare nuove implementazioni
+
+### 1. Chiudere quello che manca delle fasi 2-4
+
+- aggiungere reset password e definire chiaramente la verifica account
+- completare gestione annunci con modifica, chiusura e stati coerenti lato club
+- completare UX di blocco utente e regole privacy operative nella rete
+- definire la moderazione minima dei media gia' caricabili
+
+### 2. Consolidare la ricerca MVP prima del feed
+
+- estendere i filtri ricerca per ruolo, disponibilita', categoria e geografia in modo coerente col recruiting
+- completare la UX risultati/stati vuoti e preparare sorting e suggerimenti minimi
+- verificare che ricerca profili e annunci supporti davvero i due casi core: scouting e candidatura
+
+### 3. Introdurre notifiche e attivazione essenziali
+
+- notifiche per nuovi messaggi
+- notifiche per nuove candidature e aggiornamenti candidature
+- notifiche per richieste di collegamento
+- preferenze base e lettura stato notifiche in app
+
+### 4. Preparare il passaggio a beta interna
+
+- stabilizzare i flussi core end-to-end
+- rendere espliciti ambienti, pipeline e checklist di rilascio
+- chiudere i punti aperti di compliance minima e supporto operativo
+
+Solo dopo questi step ha senso aprire il lavoro sul feed sociale, per evitare di espandere il perimetro prima che il core MVP sia davvero solido.
