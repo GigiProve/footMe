@@ -8,27 +8,24 @@ Questo piano divide il lavoro in fasi come in un contesto aziendale, con obietti
 
 ### Fase attuale
 
-Il repository non e' piu' in una fase di solo setup: la base MVP mobile e' gia' implementata e il lavoro reale si trova nella **chiusura delle fasi 3 e 4**, con una **parte della fase 6 gia' anticipata**.
+Considerando lo stato reale di avanzamento condiviso dal team, il repository va trattato come una base tecnica con **una sola area semi-avanzata: Profilo**. Le altre sezioni mobile esistono soprattutto come **scaffolding di navigazione, layout e primi wiring**, ma **non sono ancora da considerare funzionanti come feature MVP**.
 
 In pratica:
 
 - **Fase 0**: sostanzialmente completata a livello documentale
-- **Fase 1**: completata nella parte app, backend, schema dati e design system
-- **Fase 2**: molto avanzata e usabile, ma non del tutto chiusa
-- **Fase 3**: implementata per il flusso core, da completare nelle parti gestionali e notifiche
-- **Fase 4**: implementata per connessioni e chat 1:1, da completare nelle notifiche push e nel blocco utenti lato UX
+- **Fase 1**: completata nella parte di scaffolding tecnico, design system e base Supabase
+- **Fase 2**: avviata davvero solo sul dominio profilo, oggi la parte piu' matura
+- **Fase 3**: da considerare ancora da implementare operativamente
+- **Fase 4**: da considerare ancora da implementare operativamente
 - **Fase 5**: non avviata
-- **Fase 6**: avviata in anticipo in forma essenziale tramite ricerca profili e annunci
+- **Fase 6**: eventuali parti presenti non vanno considerate pronte; resta successiva al recruiting core
 - **Fasi 7-9**: ancora da impostare come hardening, retention e release
 
 ### Evidenze principali nel repository
 
 - app mobile con tab `Home`, `Profilo`, `Rete`, `Messaggi`, `Annunci`: `apps/mobile/app/(tabs)/_layout.tsx`
-- dashboard autenticata collegata a dati reali Supabase invece di puro placeholder: `apps/mobile/app/(tabs)/index.tsx`, `apps/mobile/src/features/home/home-dashboard-service.ts`
-- onboarding multi-ruolo e profili editabili: `apps/mobile/app/(onboarding)/profile.tsx`, `apps/mobile/app/(tabs)/profile.tsx`
-- recruiting attivo con creazione annunci, candidatura e salvataggio: `apps/mobile/app/(tabs)/announcements.tsx`, `apps/mobile/src/features/recruiting/recruiting-service.ts`
-- networking, richieste di collegamento e chat privata: `apps/mobile/app/(tabs)/network.tsx`, `apps/mobile/app/messages/[conversationId].tsx`, `apps/mobile/src/features/networking/networking-service.ts`, `apps/mobile/src/features/messaging/messaging-service.ts`
-- ricerca profili e annunci gia' presente in forma MVP: `apps/mobile/src/features/discovery/discovery-service.ts`
+- area profilo/onboarding nettamente piu' sviluppata delle altre: `apps/mobile/app/(onboarding)/profile.tsx`, `apps/mobile/app/(tabs)/profile.tsx`, `apps/mobile/src/features/profiles/*`
+- Home, Rete, Messaggi e Annunci hanno gia' struttura route/UI ma non vanno trattate come feature chiuse: `apps/mobile/app/(tabs)/index.tsx`, `apps/mobile/app/(tabs)/network.tsx`, `apps/mobile/app/(tabs)/messages.tsx`, `apps/mobile/app/(tabs)/announcements.tsx`
 - backend Supabase gia' strutturato con migrazioni per profili, recruiting, networking, messaging, media e helper di ricerca: `supabase/migrations/*.sql`
 
 ### Gap da chiudere delle fasi precedenti prima di aprire nuove fasi
@@ -39,25 +36,28 @@ In pratica:
   - rendere esplicita la pipeline CI/CD e la strategia ambienti, oggi non ancora documentate come deliverable realmente chiusi
   - gli analytics events base previsti in fase 1 non risultano ancora implementati
 - **Fase 2**
+  - completare e stabilizzare profilo, onboarding e auth prima di estendere le altre aree
   - manca evidenza di reset password e verifica email o telefono nel flusso auth
   - la moderazione base dei media non risulta ancora implementata
-  - la pagina societa' esiste nel perimetro profilo, ma restano da completare parti come rosa/staff in ottica esperienza prodotto completa
+  - la pagina societa' resta da completare come esperienza reale, non solo come struttura dati/UI
 - **Fase 3**
-  - gli annunci supportano creazione, discovery, salvataggio e candidatura, ma non emerge ancora un flusso completo di modifica e chiusura annuncio
+  - Annunci va trattata come area da costruire davvero in MVP: creazione, modifica, chiusura, candidatura e dashboard club
   - le notifiche recruiting previste non risultano ancora presenti
 - **Fase 4**
-  - la chat privata e le richieste di collegamento esistono, ma le notifiche push non sono ancora integrate
+  - Rete e Messaggi vanno trattate come aree da costruire davvero in MVP: connessioni, inbox, conversazioni e privacy
   - il concetto di `blocked` esiste nel modello dati, ma manca una UX esplicita per gestione blocco utente
 
 ### Sequenza aggiornata consigliata
 
 Dato lo stato reale del codice, la sequenza piu' corretta non e' aprire subito il feed sociale, ma:
 
-1. chiudere i gap residui di fasi 2-4
-2. consolidare la **fase 6** con ricerca e filtri davvero utili al recruiting MVP
-3. avviare la **fase 7** per notifiche e retention essenziali
-4. passare solo dopo a **fase 5** feed sociale
-5. lasciare **fase 8** shop al post-MVP
+1. completare e stabilizzare **Profilo/Auth/Onboarding**
+2. implementare davvero **Recruiting e Annunci**
+3. implementare davvero **Networking e Messaggistica base**
+4. completare **Ricerca e scoperta** a supporto del recruiting
+5. fare **hardening MVP e beta readiness**
+6. passare solo dopo a **fase 5** feed sociale
+7. lasciare **fase 8** shop al post-MVP
 
 ## Fase 0 - Product Discovery e Project Setup
 
@@ -352,27 +352,32 @@ Feed social completo, shop e parte avanzata analytics possono entrare dopo il pr
 
 ## Prossimi passi prima di iniziare nuove implementazioni
 
-### 1. Chiudere quello che manca delle fasi 2-4
+### 1. Chiudere il dominio Profilo prima di usarlo come base per tutto il resto
 
 - aggiungere reset password e definire chiaramente la verifica account
-- completare gestione annunci con modifica, chiusura e stati coerenti lato club
-- completare UX di blocco utente e regole privacy operative nella rete
 - definire la moderazione minima dei media gia' caricabili
+- chiudere i flussi di onboarding multi-ruolo con salvataggi affidabili e profilo pubblico coerente
 
-### 2. Consolidare la ricerca MVP prima del feed
+### 2. Costruire davvero Recruiting e Annunci come prima area nuova dopo Profilo
+
+- creare il flusso club: crea annuncio, modifica, chiudi, vedi candidature
+- creare il flusso player: esplora annunci, salva, candidati, controlla stato candidatura
+- aggiungere stati vuoti, error handling e test dei casi core
+
+### 3. Costruire Networking e Messaggi solo dopo che Recruiting funziona
+
+- richieste di collegamento
+- lista connessioni
+- chat privata 1:1 affidabile
+- regole privacy e blocco utente minime
+
+### 4. Portare Ricerca come acceleratore del core MVP, non come anticipo di fase
 
 - estendere i filtri ricerca per ruolo, disponibilita', categoria e geografia in modo coerente col recruiting
 - completare la UX risultati/stati vuoti e preparare sorting e suggerimenti minimi
-- verificare che ricerca profili e annunci supporti davvero i due casi core: scouting e candidatura
+- verificare che ricerca profili e annunci supporti davvero scouting e candidatura
 
-### 3. Introdurre notifiche e attivazione essenziali
-
-- notifiche per nuovi messaggi
-- notifiche per nuove candidature e aggiornamenti candidature
-- notifiche per richieste di collegamento
-- preferenze base e lettura stato notifiche in app
-
-### 4. Preparare il passaggio a beta interna
+### 5. Preparare il passaggio a beta interna
 
 - stabilizzare i flussi core end-to-end
 - rendere espliciti ambienti, pipeline e checklist di rilascio
