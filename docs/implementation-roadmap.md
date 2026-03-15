@@ -4,6 +4,61 @@
 
 Questo piano divide il lavoro in fasi come in un contesto aziendale, con obiettivi, task, dipendenze e risultati attesi. Il focus iniziale e' la consegna di una prima versione mobile iOS e Android, lasciando la versione web fuori scope.
 
+## Stato aggiornato del repository - 14 marzo 2026
+
+### Fase attuale
+
+Considerando lo stato reale di avanzamento condiviso dal team, il repository va trattato come una base tecnica con **una sola area semi-avanzata: Profilo**. Le altre sezioni mobile esistono soprattutto come **scaffolding di navigazione, layout e primi wiring**, ma **non sono ancora da considerare funzionanti come feature MVP**.
+
+In pratica:
+
+- **Fase 0**: sostanzialmente completata a livello documentale
+- **Fase 1**: completata nella parte di scaffolding tecnico, design system e base Supabase
+- **Fase 2**: avviata davvero solo sul dominio profilo, oggi la parte piu' matura
+- **Fase 3**: da considerare ancora da implementare operativamente
+- **Fase 4**: da considerare ancora da implementare operativamente
+- **Fase 5**: non avviata
+- **Fase 6**: eventuali parti presenti non vanno considerate pronte; resta successiva al recruiting core
+- **Fasi 7-9**: ancora da impostare come hardening, retention e release
+
+### Evidenze principali nel repository
+
+- app mobile con tab `Home`, `Profilo`, `Rete`, `Messaggi`, `Annunci`: `apps/mobile/app/(tabs)/_layout.tsx`
+- area profilo/onboarding nettamente piu' sviluppata delle altre: `apps/mobile/app/(onboarding)/profile.tsx`, `apps/mobile/app/(tabs)/profile.tsx`, `apps/mobile/src/features/profiles/*`
+- Home, Rete, Messaggi e Annunci hanno gia' struttura route/UI ma non vanno trattate come feature chiuse: `apps/mobile/app/(tabs)/index.tsx`, `apps/mobile/app/(tabs)/network.tsx`, `apps/mobile/app/(tabs)/messages.tsx`, `apps/mobile/app/(tabs)/announcements.tsx`
+- backend Supabase gia' strutturato con migrazioni per profili, recruiting, networking, messaging, media e helper di ricerca: `supabase/migrations/*.sql`
+
+### Gap da chiudere delle fasi precedenti prima di aprire nuove fasi
+
+- **Fase 0**
+  - formalizzare meglio vincoli legali e operativi ancora aperti: privacy policy, gestione minori, moderazione contenuti e ambienti staging/production
+- **Fase 1**
+  - rendere esplicita la pipeline CI/CD e la strategia ambienti, oggi non ancora documentate come deliverable realmente chiusi
+  - gli analytics events base previsti in fase 1 non risultano ancora implementati
+- **Fase 2**
+  - completare e stabilizzare profilo, onboarding e auth prima di estendere le altre aree
+  - manca evidenza di reset password e verifica email o telefono nel flusso auth
+  - la moderazione base dei media non risulta ancora implementata
+  - la pagina societa' resta da completare come esperienza reale, non solo come struttura dati/UI
+- **Fase 3**
+  - Annunci va trattata come area da costruire davvero in MVP: creazione, modifica, chiusura, candidatura e dashboard club
+  - le notifiche recruiting previste non risultano ancora presenti
+- **Fase 4**
+  - Rete e Messaggi vanno trattate come aree da costruire davvero in MVP: connessioni, inbox, conversazioni e privacy
+  - il concetto di `blocked` esiste nel modello dati, ma manca una UX esplicita per gestione blocco utente
+
+### Sequenza aggiornata consigliata
+
+Dato lo stato reale del codice, la sequenza piu' corretta non e' aprire subito il feed sociale, ma:
+
+1. completare e stabilizzare **Profilo/Auth/Onboarding**
+2. implementare davvero **Recruiting e Annunci**
+3. implementare davvero **Networking e Messaggistica base**
+4. completare **Ricerca e scoperta** a supporto del recruiting
+5. fare **hardening MVP e beta readiness**
+6. passare solo dopo a **fase 5** feed sociale
+7. lasciare **fase 8** shop al post-MVP
+
 ## Fase 0 - Product Discovery e Project Setup
 
 ### Obiettivo
@@ -287,11 +342,45 @@ Portare il prodotto a un livello di qualita' adatto alla pubblicazione mobile.
 
 Per una prima release credibile, la priorita' suggerita e':
 
-1. onboarding e profili professionali
-2. carriera e statistiche giocatori
-3. profili societa'
-4. annunci di recruiting e candidature
-5. networking base e messaggi
-6. ricerca avanzata essenziale
+1. chiusura dei gap su onboarding, profili professionali e auth
+2. completamento recruiting core: gestione annunci, candidature e stati operativi
+3. completamento networking base e messaggi con notifiche essenziali
+4. ricerca avanzata essenziale per profili e opportunita'
+5. hardening di qualita', sicurezza e beta readiness
 
 Feed social completo, shop e parte avanzata analytics possono entrare dopo il primo MVP se servono per ridurre rischio e time-to-market.
+
+## Prossimi passi prima di iniziare nuove implementazioni
+
+### 1. Chiudere il dominio Profilo prima di usarlo come base per tutto il resto
+
+- aggiungere reset password e definire chiaramente la verifica account
+- definire la moderazione minima dei media gia' caricabili
+- chiudere i flussi di onboarding multi-ruolo con salvataggi affidabili e profilo pubblico coerente
+
+### 2. Costruire davvero Recruiting e Annunci come prima area nuova dopo Profilo
+
+- creare il flusso club: crea annuncio, modifica, chiudi, vedi candidature
+- creare il flusso player: esplora annunci, salva, candidati, controlla stato candidatura
+- aggiungere stati vuoti, error handling e test dei casi core
+
+### 3. Costruire Networking e Messaggi solo dopo che Recruiting funziona
+
+- richieste di collegamento
+- lista connessioni
+- chat privata 1:1 affidabile
+- regole privacy e blocco utente minime
+
+### 4. Portare Ricerca come acceleratore del core MVP, non come anticipo di fase
+
+- estendere i filtri ricerca per ruolo, disponibilita', categoria e geografia in modo coerente col recruiting
+- completare la UX risultati/stati vuoti e preparare sorting e suggerimenti minimi
+- verificare che ricerca profili e annunci supporti davvero scouting e candidatura
+
+### 5. Preparare il passaggio a beta interna
+
+- stabilizzare i flussi core end-to-end
+- rendere espliciti ambienti, pipeline e checklist di rilascio
+- chiudere i punti aperti di compliance minima e supporto operativo
+
+Solo dopo questi step ha senso aprire il lavoro sul feed sociale, per evitare di espandere il perimetro prima che il core MVP sia davvero solido.

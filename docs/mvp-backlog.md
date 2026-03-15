@@ -19,6 +19,25 @@ L'MVP deve permettere a:
 - una societa' di creare la propria pagina e pubblicare annunci di ricerca
 - utenti selezionati di cercarsi, connettersi e scambiarsi messaggi privati base
 
+## Premessa esecutiva aggiornata - 14 marzo 2026
+
+Per la pianificazione esecutiva va assunto che:
+
+- **Profilo** e' oggi l'unica area semi-avanzata
+- **Home**, **Annunci**, **Rete** e **Messaggi** hanno soprattutto scaffolding di route/UI e non vanno considerate feature MVP gia' funzionanti
+- il piano operativo va quindi costruito come completamento del dominio profilo e implementazione progressiva delle altre aree core
+
+## Ordine epic da eseguire davvero
+
+1. **EPIC A - Stabilizzazione Profilo, Auth e Onboarding**
+2. **EPIC B - Recruiting e Annunci MVP**
+3. **EPIC C - Networking e Messaggistica base**
+4. **EPIC D - Ricerca e scoperta per recruiting**
+5. **EPIC E - Notifiche in-app e attivazione essenziale**
+6. **EPIC F - Qualita', sicurezza e beta readiness**
+
+Le epic sotto descritte restano la mappa funzionale di riferimento; l'ordine operativo reale per il team e' quello sopra.
+
 ## Epic MVP
 
 ### EPIC 0 - Discovery, governance e setup
@@ -190,6 +209,217 @@ Acceptance criteria:
 5. EPIC 4
 6. EPIC 5
 7. EPIC 6
+
+## Piano sprint operativo pronto da eseguire
+
+### Sprint 1 - Stabilizzare il dominio Profilo
+
+**Epic principale**
+
+- EPIC A - Stabilizzazione Profilo, Auth e Onboarding
+
+**Obiettivo**
+
+Portare Profilo da area semi-avanzata a prima feature davvero affidabile e riusabile dal resto dell'MVP.
+
+**Deliverable**
+
+- onboarding multi-ruolo stabile
+- profilo giocatore affidabile in lettura e modifica
+- auth con reset password e verifica account chiarita
+- upload media profilo stabile
+
+**Task**
+
+- chiudere bug e incoerenze nei salvataggi profilo
+- completare reset password
+- definire e completare verifica account
+- consolidare profilo societa', allenatore e staff almeno a livello MVP
+- aggiungere test mirati sui flussi profilo/auth/onboarding
+
+**Dipendenze**
+
+- EPIC 1 gia' disponibile
+
+**Exit criteria**
+
+- un utente puo' registrarsi, completare onboarding, modificare il profilo e rientrare senza perdita dati
+- il profilo diventa base affidabile per candidatura, ricerca e networking
+
+### Sprint 2 - Costruire Recruiting e Annunci MVP
+
+**Epic principale**
+
+- EPIC B - Recruiting e Annunci MVP
+
+**Obiettivo**
+
+Rendere reale il primo flusso di valore tra societa' e giocatori.
+
+**Deliverable**
+
+- creazione, modifica e chiusura annuncio lato societa'
+- lista annunci esplorabile lato giocatore
+- candidatura con stato base
+- dashboard societa' con candidature ricevute
+
+**Task**
+
+- implementare form annuncio e persistenza completa
+- implementare lista annunci con stato vuoto ed error state
+- implementare candidatura e storico candidature
+- implementare gestione annunci per club
+- aggiungere test del flusso annuncio-candidatura
+
+**Dipendenze**
+
+- Sprint 1 completato
+
+**Exit criteria**
+
+- una societa' pubblica e gestisce un annuncio
+- un giocatore trova un annuncio e si candida con il proprio profilo
+
+### Sprint 3 - Costruire Networking e Messaggistica base
+
+**Epic principale**
+
+- EPIC C - Networking e Messaggistica base
+
+**Obiettivo**
+
+Abilitare il contatto diretto tra utenti rilevanti dopo profilo e recruiting.
+
+**Deliverable**
+
+- richieste di collegamento
+- lista connessioni
+- conversazione 1:1 affidabile
+- unread count e blocco utente minimo
+
+**Task**
+
+- implementare UX richieste inviate/ricevute
+- implementare lista connessioni accettate
+- implementare inbox e dettaglio conversazione
+- implementare blocco utente e regole privacy minime
+- aggiungere test dei flussi connessione-chat
+
+**Dipendenze**
+
+- Sprint 1 completato
+- Sprint 2 almeno sul flusso candidatura base
+
+**Exit criteria**
+
+- due utenti possono collegarsi e scambiarsi messaggi in modo affidabile
+
+### Sprint 4 - Ricerca e scoperta a supporto del core MVP
+
+**Epic principale**
+
+- EPIC D - Ricerca e scoperta per recruiting
+
+**Obiettivo**
+
+Fare della ricerca un acceleratore del recruiting, non una feature isolata.
+
+**Deliverable**
+
+- ricerca profili essenziale
+- ricerca annunci essenziale
+- filtri utili per recruiting MVP
+- risultati, sorting e stati vuoti coerenti
+
+**Task**
+
+- implementare filtri ruolo, posizione, regione, categoria e disponibilita'
+- migliorare ranking e ordinamento minimo
+- rifinire risultati profilo/annuncio
+- aggiungere test su ricerca e filtri
+
+**Dipendenze**
+
+- Sprint 2 completato
+- Sprint 3 abbastanza stabile da collegare ricerca e networking
+
+**Exit criteria**
+
+- scouting e recruiting sono eseguibili tramite ricerca senza dipendere da workaround manuali
+
+### Sprint 5 - Notifiche in-app e attivazione essenziale
+
+**Epic principale**
+
+- EPIC E - Notifiche in-app e attivazione essenziale
+
+**Obiettivo**
+
+Chiudere il loop dei flussi core con segnali e rientro in app.
+
+**Deliverable**
+
+- notifiche in-app per messaggi, candidature e richieste di collegamento
+- stato letto/non letto
+- preferenze base utente
+
+**Task**
+
+- modellare eventi core
+- costruire inbox notifiche minima
+- collegare badge e stato lettura
+- testare i trigger dei flussi principali
+
+**Dipendenze**
+
+- Sprint 2 e Sprint 3 completati
+
+**Exit criteria**
+
+- i principali eventi MVP generano notifiche leggibili e consultabili in app
+
+### Sprint 6 - Qualita', sicurezza e beta readiness
+
+**Epic principale**
+
+- EPIC F - Qualita', sicurezza e beta readiness
+
+**Obiettivo**
+
+Preparare una beta interna del core MVP mobile.
+
+**Deliverable**
+
+- test sui flussi core
+- hardening error handling e autorizzazioni
+- checklist beta
+- build interna pronta
+
+**Task**
+
+- coprire con test i flussi profilo, recruiting, networking e messaggi
+- verificare ruoli, accessi e dati sensibili
+- preparare checklist go-live interna
+- validare ambienti, release e raccolta feedback
+
+**Dipendenze**
+
+- Sprint 1-5 completati
+
+**Exit criteria**
+
+- build beta installabile
+- flussi core validati
+- backlog post-beta pronto
+
+## Fuori scope esplicito fino alla beta MVP
+
+- feed sociale completo
+- shop e pagamenti
+- analytics avanzate
+- push notifications complete
+- web app
+- funzionalita' avanzate non necessarie per recruiting, networking e profilo
 
 ## Sprint 0 suggerito
 
