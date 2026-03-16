@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@babel/plugin-syntax-export-default-from": "^7.27.1",
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
     "eslint": "^8.57.1"
   },
   "scripts": {
