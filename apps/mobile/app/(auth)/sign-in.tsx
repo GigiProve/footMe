@@ -66,29 +66,6 @@ export default function SignInScreen() {
           </Text>
         </View>
         <Card style={styles.formCard}>
-          <Input
-            autoCapitalize="none"
-            keyboardType="email-address"
-            onChangeText={setEmail}
-            placeholder="Email"
-            value={email}
-          />
-          <Input
-            onChangeText={setPassword}
-            placeholder="Password"
-            secureTextEntry
-            value={password}
-          />
-          <Button
-            disabled={isSubmitting}
-            label={isSubmitting ? "Accesso in corso..." : "Accedi"}
-            onPress={handleSignIn}
-          />
-          <View style={styles.socialDivider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerLabel}>oppure continua con</Text>
-            <View style={styles.dividerLine} />
-          </View>
           <Button
             disabled={oauthProvider !== null}
             label={
@@ -111,6 +88,29 @@ export default function SignInScreen() {
               variant="secondary"
             />
           ) : null}
+          <View style={styles.socialDivider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerLabel}>oppure con email</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          <Input
+            autoCapitalize="none"
+            keyboardType="email-address"
+            onChangeText={setEmail}
+            placeholder="Email"
+            value={email}
+          />
+          <Input
+            onChangeText={setPassword}
+            placeholder="Password"
+            secureTextEntry
+            value={password}
+          />
+          <Button
+            disabled={isSubmitting}
+            label={isSubmitting ? "Accesso in corso..." : "Accedi"}
+            onPress={handleSignIn}
+          />
         </Card>
         <Link href="/(auth)/sign-up" asChild>
           <Button

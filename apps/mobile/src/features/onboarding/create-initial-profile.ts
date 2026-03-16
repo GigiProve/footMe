@@ -3,7 +3,7 @@ import { supabase } from "../../lib/supabase";
 import type { PlayerPosition } from "../profiles/player-sports";
 export type { PlayerPosition } from "../profiles/player-sports";
 
-export type AppRole = "player" | "coach" | "staff" | "club_admin";
+export type AppRole = "player" | "coach" | "staff" | "club_admin" | "agent" | "director";
 export type ProfileGender =
   | "male"
   | "female"
@@ -18,6 +18,7 @@ export type StaffSpecialization =
   | "other";
 
 type CreateInitialProfileInput = {
+  authProvider?: "email" | "google" | "apple" | null;
   avatarUrl: string;
   birthDate: string;
   clubCity: string;
@@ -27,6 +28,7 @@ type CreateInitialProfileInput = {
   fullName: string;
   gender: ProfileGender;
   nationality: string;
+  phoneCountryCode?: string;
   phoneNumber: string;
   primaryPosition: PlayerPosition;
   residence: string;
@@ -120,7 +122,12 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
   const { avatarUrl, birthDate, domicile, fullName, nationality, phoneNumber, residence } =
     validateBaseProfileStep(input);
 
+  const fullPhone = input.phoneCountryCode && phoneNumber
+    ? `${input.phoneCountryCode}${phoneNumber}`
+    : phoneNumber || null;
+
   const { error: profileError } = await supabase.from("profiles").upsert({
+    auth_provider: input.authProvider ?? null,
     avatar_url: avatarUrl,
     birth_date: birthDate,
     domicile,
@@ -140,7 +147,7 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
   const { error: privateContactError } = await supabase
     .from("profile_private_contacts")
     .upsert({
-      phone: phoneNumber || null,
+      phone: fullPhone,
       profile_id: input.userId,
     });
 

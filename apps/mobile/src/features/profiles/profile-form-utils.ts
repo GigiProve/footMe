@@ -631,3 +631,12 @@ function normalizeLookupValue(value: string) {
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
+
+export function formatPersonName(value: string): string {
+  const trimmed = value.trimStart();
+  if (!trimmed) return value;
+  return trimmed
+    .split(" ")
+    .map((word) => (word ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word))
+    .join(" ");
+}

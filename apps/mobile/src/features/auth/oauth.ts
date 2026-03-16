@@ -1,9 +1,23 @@
-import type { Provider } from "@supabase/supabase-js";
+import type { Session, Provider } from "@supabase/supabase-js";
 import { Linking } from "react-native";
 
 import { supabase } from "../../lib/supabase";
 
 export const OAUTH_REDIRECT_URL = "footme://auth/callback";
+
+/**
+ * Detects the auth provider from the Supabase session metadata.
+ * Returns null for legacy users or unknown/missing providers.
+ */
+export function detectAuthProvider(
+  session: Session | null | undefined,
+): "email" | "google" | "apple" | null {
+  const raw = session?.user?.app_metadata?.provider;
+  if (raw === "google" || raw === "apple" || raw === "email") {
+    return raw;
+  }
+  return null;
+}
 
 export function extractOAuthCallbackParams(url: string) {
   const parsedUrl = new URL(url);

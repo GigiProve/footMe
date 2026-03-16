@@ -79,6 +79,7 @@ describe("createInitialProfile", () => {
     });
 
     expect(upsertMocks.profiles).toHaveBeenCalledWith({
+      auth_provider: null,
       avatar_url: "https://example.com/avatar.jpg",
       birth_date: "1998-05-12",
       domicile: "Assisi",

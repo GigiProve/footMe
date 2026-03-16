@@ -99,6 +99,33 @@ export default function SignUpScreen() {
           ) : null}
         </View>
         <Card style={styles.formCard}>
+          <Button
+            disabled={oauthProvider !== null}
+            label={
+              oauthProvider === "google"
+                ? "Connessione a Google..."
+                : "Continua con Google"
+            }
+            onPress={() => handleOAuthSignIn("google")}
+            variant="secondary"
+          />
+          {Platform.OS === "ios" ? (
+            <Button
+              disabled={oauthProvider !== null}
+              label={
+                oauthProvider === "apple"
+                  ? "Connessione ad Apple..."
+                  : "Continua con Apple"
+              }
+              onPress={() => handleOAuthSignIn("apple")}
+              variant="secondary"
+            />
+          ) : null}
+          <View style={styles.socialDivider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerLabel}>oppure con email</Text>
+            <View style={styles.dividerLine} />
+          </View>
           <Input
             autoCapitalize="none"
             keyboardType="email-address"
@@ -123,33 +150,6 @@ export default function SignUpScreen() {
             label={isSubmitting ? "Creazione account..." : "Registrati"}
             onPress={handleSignUp}
           />
-          <View style={styles.socialDivider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerLabel}>oppure registrati con</Text>
-            <View style={styles.dividerLine} />
-          </View>
-          <Button
-            disabled={oauthProvider !== null}
-            label={
-              oauthProvider === "google"
-                ? "Connessione a Google..."
-                : "Continua con Google"
-            }
-            onPress={() => handleOAuthSignIn("google")}
-            variant="secondary"
-          />
-          {Platform.OS === "ios" ? (
-            <Button
-              disabled={oauthProvider !== null}
-              label={
-                oauthProvider === "apple"
-                  ? "Connessione ad Apple..."
-                  : "Continua con Apple"
-              }
-              onPress={() => handleOAuthSignIn("apple")}
-              variant="secondary"
-            />
-          ) : null}
         </Card>
         <Link href="/(auth)/sign-in" asChild>
           <Button
