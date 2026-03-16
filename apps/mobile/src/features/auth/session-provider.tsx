@@ -10,10 +10,11 @@ import { Linking } from "react-native";
 
 import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
-import { completeOAuthSessionFromUrl } from "./oauth";
+import { completeOAuthSessionFromUrl, detectAuthProvider } from "./oauth";
 import { supabase } from "../../lib/supabase";
 
 type AppProfile = {
+  authProvider: "email" | "google" | "apple" | null;
   avatar_url: string | null;
   club_name: string | null;
   city: string | null;
@@ -40,7 +41,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AppProfile | null>(null);
 
-  const loadProfile = useCallback(async (userId: string) => {
+  const loadProfile = useCallback(async (userId: string, currentSession?: Session | null) => {
     const { data } = await supabase
       .from("profiles")
       .select("id, full_name, role, avatar_url, region, city")
@@ -51,8 +52,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return null;
     }
 
+    const authProvider = detectAuthProvider(currentSession);
+
     const nextProfile: AppProfile = {
       ...data,
+      authProvider,
       club_name: null,
     };
 
@@ -79,15 +83,15 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    const nextProfile = await loadProfile(currentSession.user.id);
+    const nextProfile = await loadProfile(currentSession.user.id, currentSession);
     setProfile(nextProfile);
   }, [loadProfile]);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function hydrateProfile(userId: string) {
-      const nextProfile = await loadProfile(userId);
+    async function hydrateProfile(userId: string, currentSession?: Session | null) {
+      const nextProfile = await loadProfile(userId, currentSession);
 
       if (isMounted) {
         setProfile(nextProfile);
@@ -116,7 +120,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       setSession(initialSession);
 
       if (initialSession?.user) {
-        await hydrateProfile(initialSession.user.id);
+        await hydrateProfile(initialSession.user.id, initialSession);
       }
 
       setIsLoading(false);
@@ -136,7 +140,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           return;
         }
 
-        hydrateProfile(nextSession.user.id).finally(() => setIsLoading(false));
+        hydrateProfile(nextSession.user.id, nextSession).finally(() => setIsLoading(false));
       },
     );
 

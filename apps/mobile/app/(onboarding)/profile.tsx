@@ -4,9 +4,13 @@ import { useRouter } from "expo-router";
 
 import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { MediaPickerField } from "../../src/components/ui/media-picker-field";
+import { NationalityAutocompleteInput } from "../../src/components/ui/nationality-autocomplete-input";
+import { PhoneInputWithCountryCode } from "../../src/components/ui/phone-input-with-country-code";
+import { ResidenceCityInput } from "../../src/components/ui/residence-city-input";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
+import { detectAuthProvider } from "../../src/features/auth/oauth";
 import {
   createInitialProfile,
   BaseProfileValidationError,
@@ -28,6 +32,7 @@ import {
 import {
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
+  formatPersonName,
   normalizeProfileBioInput,
   validateProfileBio,
 } from "../../src/features/profiles/profile-form-utils";
@@ -83,6 +88,20 @@ const roleOptions: {
     emoji: "🏟️",
     label: "Societa' / squadra",
     value: "club_admin",
+  },
+  {
+    description:
+      "Gestisci il portafoglio clienti, cerca opportunita' e connettiti con club e calciatori.",
+    emoji: "🤝",
+    label: "Procuratore",
+    value: "agent",
+  },
+  {
+    description:
+      "Presenta il tuo ruolo dirigenziale, la societa' e le aree di responsabilita'.",
+    emoji: "👔",
+    label: "Dirigente",
+    value: "director",
   },
 ];
 
@@ -247,6 +266,7 @@ export default function OnboardingProfileScreen() {
   const [residence, setResidence] = useState("");
   const [useResidenceForDomicile, setUseResidenceForDomicile] = useState(true);
   const [domicile, setDomicile] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+39");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [clubName, setClubName] = useState("");
@@ -361,7 +381,10 @@ export default function OnboardingProfileScreen() {
       throw new Error("Sessione non disponibile.");
     }
 
+    const authProvider = detectAuthProvider(session);
+
     await createInitialProfile({
+      authProvider,
       avatarUrl,
       birthDate,
       clubCity,
@@ -371,6 +394,7 @@ export default function OnboardingProfileScreen() {
       fullName,
       gender,
       nationality,
+      phoneCountryCode,
       phoneNumber,
       primaryPosition,
       residence,
@@ -686,7 +710,7 @@ export default function OnboardingProfileScreen() {
               <View style={{ flex: 1 }}>
                 <Input
                   label="Nome"
-                  onChangeText={setFirstName}
+                  onChangeText={(text) => setFirstName(formatPersonName(text))}
                   placeholder="Es. Marco"
                   value={firstName}
                 />
@@ -694,7 +718,7 @@ export default function OnboardingProfileScreen() {
               <View style={{ flex: 1 }}>
                 <Input
                   label="Cognome"
-                  onChangeText={setLastName}
+                  onChangeText={(text) => setLastName(formatPersonName(text))}
                   placeholder="Es. Rossi"
                   value={lastName}
                 />
@@ -735,18 +759,18 @@ export default function OnboardingProfileScreen() {
               value={birthDate}
             />
 
-            <SelectField
+            <NationalityAutocompleteInput
               label="Nazionalita'"
               onChange={(value) => setNationality(value)}
               options={NATIONALITY_OPTIONS}
-              placeholder="Seleziona la nazionalita'"
+              placeholder="Cerca nazionalita'..."
               value={nationality}
             />
 
-            <Input
+            <ResidenceCityInput
               label="Residenza"
-              onChangeText={setResidence}
-              placeholder="Citta' e provincia di residenza"
+              onChange={setResidence}
+              placeholder="Inizia a digitare la citta'..."
               value={residence}
             />
 
@@ -788,12 +812,12 @@ export default function OnboardingProfileScreen() {
               />
             ) : null}
 
-            <Input
-              keyboardType="phone-pad"
+            <PhoneInputWithCountryCode
+              countryCode={phoneCountryCode}
               label="Numero di telefono (facoltativo)"
-              onChangeText={setPhoneNumber}
-              placeholder="Es. +39 333 1234567"
-              value={phoneNumber}
+              onChangeCountryCode={setPhoneCountryCode}
+              onChangeNumber={setPhoneNumber}
+              phoneNumber={phoneNumber}
             />
 
             <MediaPickerField
