@@ -14,6 +14,20 @@ export type ItalianCityOption = {
   region: string;
 };
 
+export type CountryOption = {
+  code: string;
+  flag: string;
+  name: string;
+  phoneCountryCode: string;
+};
+
+export type PhoneCountryCodeOption = {
+  countryCode: string;
+  countryName: string;
+  flag: string;
+  value: string;
+};
+
 export const PROFILE_BIO_MIN_LENGTH = 20;
 export const PROFILE_BIO_MAX_LENGTH = 400;
 export const PROFILE_BIO_WARNING_THRESHOLD = 360;
@@ -41,65 +55,118 @@ export const REGION_OPTIONS: SelectOption[] = [
   { label: "Veneto", value: "Veneto" },
 ];
 
-export const NATIONALITY_OPTIONS: SelectOption[] = [
-  { label: "Albania", value: "AL" },
-  { label: "Algeria", value: "DZ" },
-  { label: "Argentina", value: "AR" },
-  { label: "Australia", value: "AU" },
-  { label: "Austria", value: "AT" },
-  { label: "Belgio", value: "BE" },
-  { label: "Bosnia ed Erzegovina", value: "BA" },
-  { label: "Brasile", value: "BR" },
-  { label: "Bulgaria", value: "BG" },
-  { label: "Camerun", value: "CM" },
-  { label: "Canada", value: "CA" },
-  { label: "Cile", value: "CL" },
-  { label: "Cina", value: "CN" },
-  { label: "Colombia", value: "CO" },
-  { label: "Corea del Sud", value: "KR" },
-  { label: "Costa d'Avorio", value: "CI" },
-  { label: "Croazia", value: "HR" },
-  { label: "Danimarca", value: "DK" },
-  { label: "Ecuador", value: "EC" },
-  { label: "Egitto", value: "EG" },
-  { label: "Francia", value: "FR" },
-  { label: "Germania", value: "DE" },
-  { label: "Ghana", value: "GH" },
-  { label: "Giappone", value: "JP" },
-  { label: "Grecia", value: "GR" },
-  { label: "Inghilterra", value: "GB" },
-  { label: "Irlanda", value: "IE" },
-  { label: "Islanda", value: "IS" },
-  { label: "Israele", value: "IL" },
-  { label: "Italia", value: "IT" },
-  { label: "Marocco", value: "MA" },
-  { label: "Messico", value: "MX" },
-  { label: "Nigeria", value: "NG" },
-  { label: "Norvegia", value: "NO" },
-  { label: "Paesi Bassi", value: "NL" },
-  { label: "Paraguay", value: "PY" },
-  { label: "Perù", value: "PE" },
-  { label: "Polonia", value: "PL" },
-  { label: "Portogallo", value: "PT" },
-  { label: "Repubblica Ceca", value: "CZ" },
-  { label: "Romania", value: "RO" },
-  { label: "Scozia", value: "GB-SCT" },
-  { label: "Senegal", value: "SN" },
-  { label: "Serbia", value: "RS" },
-  { label: "Slovacchia", value: "SK" },
-  { label: "Slovenia", value: "SI" },
-  { label: "Spagna", value: "ES" },
-  { label: "Stati Uniti", value: "US" },
-  { label: "Svezia", value: "SE" },
-  { label: "Svizzera", value: "CH" },
-  { label: "Togo", value: "TG" },
-  { label: "Tunisia", value: "TN" },
-  { label: "Turchia", value: "TR" },
-  { label: "Ucraina", value: "UA" },
-  { label: "Ungheria", value: "HU" },
-  { label: "Uruguay", value: "UY" },
-  { label: "Venezuela", value: "VE" },
+const SPECIAL_FLAG_EMOJI: Record<string, string> = {
+  "GB-SCT": "🏴",
+};
+
+function countryCodeToFlagEmoji(countryCode: string) {
+  if (SPECIAL_FLAG_EMOJI[countryCode]) {
+    return SPECIAL_FLAG_EMOJI[countryCode];
+  }
+
+  if (!/^[A-Z]{2}$/.test(countryCode)) {
+    return "🏳️";
+  }
+
+  return countryCode
+    .split("")
+    .map((character) => String.fromCodePoint(127397 + character.charCodeAt(0)))
+    .join("");
+}
+
+export const COUNTRY_OPTIONS: CountryOption[] = [
+  { code: "AL", flag: countryCodeToFlagEmoji("AL"), name: "Albania", phoneCountryCode: "+355" },
+  { code: "DZ", flag: countryCodeToFlagEmoji("DZ"), name: "Algeria", phoneCountryCode: "+213" },
+  { code: "AR", flag: countryCodeToFlagEmoji("AR"), name: "Argentina", phoneCountryCode: "+54" },
+  { code: "AU", flag: countryCodeToFlagEmoji("AU"), name: "Australia", phoneCountryCode: "+61" },
+  { code: "AT", flag: countryCodeToFlagEmoji("AT"), name: "Austria", phoneCountryCode: "+43" },
+  { code: "BE", flag: countryCodeToFlagEmoji("BE"), name: "Belgio", phoneCountryCode: "+32" },
+  {
+    code: "BA",
+    flag: countryCodeToFlagEmoji("BA"),
+    name: "Bosnia ed Erzegovina",
+    phoneCountryCode: "+387",
+  },
+  { code: "BR", flag: countryCodeToFlagEmoji("BR"), name: "Brasile", phoneCountryCode: "+55" },
+  { code: "BG", flag: countryCodeToFlagEmoji("BG"), name: "Bulgaria", phoneCountryCode: "+359" },
+  { code: "CM", flag: countryCodeToFlagEmoji("CM"), name: "Camerun", phoneCountryCode: "+237" },
+  { code: "CA", flag: countryCodeToFlagEmoji("CA"), name: "Canada", phoneCountryCode: "+1" },
+  { code: "CL", flag: countryCodeToFlagEmoji("CL"), name: "Cile", phoneCountryCode: "+56" },
+  { code: "CN", flag: countryCodeToFlagEmoji("CN"), name: "Cina", phoneCountryCode: "+86" },
+  { code: "CO", flag: countryCodeToFlagEmoji("CO"), name: "Colombia", phoneCountryCode: "+57" },
+  { code: "KR", flag: countryCodeToFlagEmoji("KR"), name: "Corea del Sud", phoneCountryCode: "+82" },
+  {
+    code: "CI",
+    flag: countryCodeToFlagEmoji("CI"),
+    name: "Costa d'Avorio",
+    phoneCountryCode: "+225",
+  },
+  { code: "HR", flag: countryCodeToFlagEmoji("HR"), name: "Croazia", phoneCountryCode: "+385" },
+  { code: "DK", flag: countryCodeToFlagEmoji("DK"), name: "Danimarca", phoneCountryCode: "+45" },
+  { code: "EC", flag: countryCodeToFlagEmoji("EC"), name: "Ecuador", phoneCountryCode: "+593" },
+  { code: "EG", flag: countryCodeToFlagEmoji("EG"), name: "Egitto", phoneCountryCode: "+20" },
+  { code: "FR", flag: countryCodeToFlagEmoji("FR"), name: "Francia", phoneCountryCode: "+33" },
+  { code: "DE", flag: countryCodeToFlagEmoji("DE"), name: "Germania", phoneCountryCode: "+49" },
+  { code: "GH", flag: countryCodeToFlagEmoji("GH"), name: "Ghana", phoneCountryCode: "+233" },
+  { code: "JP", flag: countryCodeToFlagEmoji("JP"), name: "Giappone", phoneCountryCode: "+81" },
+  { code: "GR", flag: countryCodeToFlagEmoji("GR"), name: "Grecia", phoneCountryCode: "+30" },
+  { code: "GB", flag: countryCodeToFlagEmoji("GB"), name: "Inghilterra", phoneCountryCode: "+44" },
+  { code: "IE", flag: countryCodeToFlagEmoji("IE"), name: "Irlanda", phoneCountryCode: "+353" },
+  { code: "IS", flag: countryCodeToFlagEmoji("IS"), name: "Islanda", phoneCountryCode: "+354" },
+  { code: "IL", flag: countryCodeToFlagEmoji("IL"), name: "Israele", phoneCountryCode: "+972" },
+  { code: "IT", flag: countryCodeToFlagEmoji("IT"), name: "Italia", phoneCountryCode: "+39" },
+  { code: "MA", flag: countryCodeToFlagEmoji("MA"), name: "Marocco", phoneCountryCode: "+212" },
+  { code: "MX", flag: countryCodeToFlagEmoji("MX"), name: "Messico", phoneCountryCode: "+52" },
+  { code: "NG", flag: countryCodeToFlagEmoji("NG"), name: "Nigeria", phoneCountryCode: "+234" },
+  { code: "NO", flag: countryCodeToFlagEmoji("NO"), name: "Norvegia", phoneCountryCode: "+47" },
+  {
+    code: "NL",
+    flag: countryCodeToFlagEmoji("NL"),
+    name: "Paesi Bassi",
+    phoneCountryCode: "+31",
+  },
+  { code: "PY", flag: countryCodeToFlagEmoji("PY"), name: "Paraguay", phoneCountryCode: "+595" },
+  { code: "PE", flag: countryCodeToFlagEmoji("PE"), name: "Perù", phoneCountryCode: "+51" },
+  { code: "PL", flag: countryCodeToFlagEmoji("PL"), name: "Polonia", phoneCountryCode: "+48" },
+  { code: "PT", flag: countryCodeToFlagEmoji("PT"), name: "Portogallo", phoneCountryCode: "+351" },
+  {
+    code: "CZ",
+    flag: countryCodeToFlagEmoji("CZ"),
+    name: "Repubblica Ceca",
+    phoneCountryCode: "+420",
+  },
+  { code: "RO", flag: countryCodeToFlagEmoji("RO"), name: "Romania", phoneCountryCode: "+40" },
+  { code: "GB-SCT", flag: countryCodeToFlagEmoji("GB-SCT"), name: "Scozia", phoneCountryCode: "+44" },
+  { code: "SN", flag: countryCodeToFlagEmoji("SN"), name: "Senegal", phoneCountryCode: "+221" },
+  { code: "RS", flag: countryCodeToFlagEmoji("RS"), name: "Serbia", phoneCountryCode: "+381" },
+  { code: "SK", flag: countryCodeToFlagEmoji("SK"), name: "Slovacchia", phoneCountryCode: "+421" },
+  { code: "SI", flag: countryCodeToFlagEmoji("SI"), name: "Slovenia", phoneCountryCode: "+386" },
+  { code: "ES", flag: countryCodeToFlagEmoji("ES"), name: "Spagna", phoneCountryCode: "+34" },
+  { code: "US", flag: countryCodeToFlagEmoji("US"), name: "Stati Uniti", phoneCountryCode: "+1" },
+  { code: "SE", flag: countryCodeToFlagEmoji("SE"), name: "Svezia", phoneCountryCode: "+46" },
+  { code: "CH", flag: countryCodeToFlagEmoji("CH"), name: "Svizzera", phoneCountryCode: "+41" },
+  { code: "TG", flag: countryCodeToFlagEmoji("TG"), name: "Togo", phoneCountryCode: "+228" },
+  { code: "TN", flag: countryCodeToFlagEmoji("TN"), name: "Tunisia", phoneCountryCode: "+216" },
+  { code: "TR", flag: countryCodeToFlagEmoji("TR"), name: "Turchia", phoneCountryCode: "+90" },
+  { code: "UA", flag: countryCodeToFlagEmoji("UA"), name: "Ucraina", phoneCountryCode: "+380" },
+  { code: "HU", flag: countryCodeToFlagEmoji("HU"), name: "Ungheria", phoneCountryCode: "+36" },
+  { code: "UY", flag: countryCodeToFlagEmoji("UY"), name: "Uruguay", phoneCountryCode: "+598" },
+  { code: "VE", flag: countryCodeToFlagEmoji("VE"), name: "Venezuela", phoneCountryCode: "+58" },
 ];
+
+export const NATIONALITY_OPTIONS: SelectOption[] = COUNTRY_OPTIONS.map((country) => ({
+  label: country.name,
+  value: country.code,
+}));
+
+export const PHONE_COUNTRY_CODE_OPTIONS: PhoneCountryCodeOption[] = COUNTRY_OPTIONS.map(
+  (country) => ({
+    countryCode: country.code,
+    countryName: country.name,
+    flag: country.flag,
+    value: country.phoneCountryCode,
+  }),
+);
 
 export const BIRTH_MONTH_OPTIONS: SelectOption[] = [
   { label: "Gennaio", value: "01" },
@@ -123,6 +190,12 @@ const italianCityOptions = italianCities as ItalianCityOption[];
 const normalizedItalianCityOptions = italianCityOptions.map((entry) => ({
   ...entry,
   normalizedName: normalizeLookupValue(entry.name),
+}));
+const normalizedCountryOptions = COUNTRY_OPTIONS.map((entry) => ({
+  ...entry,
+  normalizedCode: normalizeLookupValue(entry.code),
+  normalizedName: normalizeLookupValue(entry.name),
+  normalizedPhoneCountryCode: entry.phoneCountryCode.replace(/\D/g, ""),
 }));
 
 export function ensureOption<T extends string>(
@@ -469,6 +542,64 @@ export function formatLocationSummary(
   return normalizedValues.length > 0 ? normalizedValues.join(", ") : "Da completare";
 }
 
+export function formatName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/(^|[\s'-])([a-zà-ÿ])/giu, (match) => match.toUpperCase());
+}
+
+export function getCountryByCode(countryCode: string | null | undefined) {
+  if (!countryCode) {
+    return null;
+  }
+
+  return COUNTRY_OPTIONS.find((entry) => entry.code === countryCode) ?? null;
+}
+
+export function getPhoneCountryCodeOption(phoneCountryCode: string | null | undefined) {
+  if (!phoneCountryCode) {
+    return null;
+  }
+
+  return PHONE_COUNTRY_CODE_OPTIONS.find((entry) => entry.value === phoneCountryCode) ?? null;
+}
+
+export function searchCountries(query: string, limit = 8) {
+  const normalizedQuery = normalizeLookupValue(query);
+  const numericQuery = query.replace(/\D/g, "");
+
+  if (!normalizedQuery && !numericQuery) {
+    return [];
+  }
+
+  const startsWithMatches: CountryOption[] = [];
+  const includesMatches: CountryOption[] = [];
+
+  for (const entry of normalizedCountryOptions) {
+    const matchesName = normalizedQuery
+      ? entry.normalizedName.startsWith(normalizedQuery) || entry.normalizedCode.startsWith(normalizedQuery)
+      : false;
+    const includesName = normalizedQuery
+      ? entry.normalizedName.includes(normalizedQuery) || entry.normalizedCode.includes(normalizedQuery)
+      : false;
+    const matchesPhoneCode = numericQuery
+      ? entry.normalizedPhoneCountryCode.startsWith(numericQuery)
+      : false;
+
+    if (matchesName || matchesPhoneCode) {
+      startsWithMatches.push(entry);
+      continue;
+    }
+
+    if (includesName) {
+      includesMatches.push(entry);
+    }
+  }
+
+  return [...startsWithMatches, ...includesMatches].slice(0, limit);
+}
+
 export function getRegionFromCity(cityName: string) {
   return (
     normalizedItalianCityOptions.find(
@@ -596,6 +727,66 @@ export function normalizePhoneInput(value: string) {
   }
 
   return compactValue.replace(/[^\d]/g, "");
+}
+
+export function normalizePhoneLocalNumber(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+export function composePhoneNumber(
+  phoneCountryCode: string | null | undefined,
+  phoneNumber: string | null | undefined,
+) {
+  const normalizedCountryCode = normalizePhoneInput(phoneCountryCode ?? "");
+  const normalizedPhoneNumber = normalizePhoneLocalNumber(phoneNumber ?? "");
+
+  if (!normalizedPhoneNumber) {
+    return "";
+  }
+
+  if (!normalizedCountryCode) {
+    return normalizedPhoneNumber;
+  }
+
+  return normalizePhoneInput(`${normalizedCountryCode}${normalizedPhoneNumber}`);
+}
+
+export function splitPhoneNumber(
+  value: string | null | undefined,
+  fallbackCountryCode = "+39",
+) {
+  const normalizedValue = normalizePhoneInput(value ?? "");
+  const normalizedFallbackCountryCode = normalizePhoneInput(fallbackCountryCode) || "+39";
+
+  if (!normalizedValue) {
+    return {
+      phoneCountryCode: normalizedFallbackCountryCode,
+      phoneNumber: "",
+    };
+  }
+
+  if (!normalizedValue.startsWith("+")) {
+    return {
+      phoneCountryCode: normalizedFallbackCountryCode,
+      phoneNumber: normalizePhoneLocalNumber(normalizedValue),
+    };
+  }
+
+  const matchingCountry = [...PHONE_COUNTRY_CODE_OPTIONS]
+    .sort((left, right) => right.value.length - left.value.length)
+    .find((entry) => normalizedValue.startsWith(entry.value));
+
+  if (!matchingCountry) {
+    return {
+      phoneCountryCode: normalizedFallbackCountryCode,
+      phoneNumber: normalizePhoneLocalNumber(normalizedValue),
+    };
+  }
+
+  return {
+    phoneCountryCode: matchingCountry.value,
+    phoneNumber: normalizePhoneLocalNumber(normalizedValue.slice(matchingCountry.value.length)),
+  };
 }
 
 export function isPhoneNumberValid(value: string) {

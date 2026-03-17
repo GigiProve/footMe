@@ -1,4 +1,9 @@
-import { validateProfileBio } from "../profiles/profile-form-utils";
+import {
+  composePhoneNumber,
+  isPhoneNumberValid,
+  splitPhoneNumber,
+  validateProfileBio,
+} from "../profiles/profile-form-utils";
 import type { PlayerExperienceForm, PlayerPosition, PreferredFoot } from "../profiles/player-sports";
 import { DEFAULT_PLAYER_PRIMARY_POSITION } from "../profiles/player-sports";
 import type { UploadedMediaItem } from "../profiles/media-upload-service";
@@ -30,7 +35,7 @@ export type OnboardingFormState = {
   experienceSummary: string;
   firstName: string;
   gamePhilosophy: string;
-  gender: ProfileGender;
+  gender: ProfileGender | "";
   hasCreatedProfile: boolean;
   heightCm: string;
   highlightVideoUrl: string;
@@ -42,13 +47,15 @@ export type OnboardingFormState = {
   nationality: string;
   openToNewRole: boolean;
   openToWork: boolean;
+  phoneCountryCode: string;
   phoneNumber: string;
   playerMediaItems: UploadedMediaItem[];
   preferredCategories: string;
   preferredFoot: PreferredFoot | "";
   primaryPosition: PlayerPosition;
   residence: string;
-  role: AppRole;
+  residenceRegion: string;
+  role: AppRole | "";
   secondaryPosition: PlayerPosition | "";
   staffPreferredRegions: string;
   staffSpecialization: StaffSpecialization;
@@ -122,7 +129,7 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   experienceSummary: "",
   firstName: "",
   gamePhilosophy: "",
-  gender: "male",
+  gender: "",
   hasCreatedProfile: false,
   heightCm: "",
   highlightVideoUrl: "",
@@ -134,13 +141,15 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   nationality: "",
   openToNewRole: false,
   openToWork: false,
+  phoneCountryCode: "+39",
   phoneNumber: "",
   playerMediaItems: [],
   preferredCategories: "",
   preferredFoot: "",
   primaryPosition: DEFAULT_PLAYER_PRIMARY_POSITION,
   residence: "",
-  role: "player",
+  residenceRegion: "",
+  role: "",
   secondaryPosition: "",
   staffPreferredRegions: "",
   staffSpecialization: "fitness_coach",
@@ -166,8 +175,48 @@ export function normalizeOnboardingDraft(
     lastCompletedStep:
       coerceOnboardingStep(value.lastCompletedStep) ??
       defaultOnboardingFormState.lastCompletedStep,
+    gender: coerceProfileGender(value.gender) ?? defaultOnboardingFormState.gender,
+    phoneCountryCode:
+      typeof value.phoneCountryCode === "string" && value.phoneCountryCode.trim()
+        ? value.phoneCountryCode
+        : splitPhoneNumber(value.phoneNumber).phoneCountryCode,
+    phoneNumber:
+      typeof value.phoneCountryCode === "string"
+        ? splitPhoneNumber(composePhoneNumber(value.phoneCountryCode, value.phoneNumber)).phoneNumber
+        : splitPhoneNumber(value.phoneNumber).phoneNumber,
+    residenceRegion:
+      typeof value.residenceRegion === "string" ? value.residenceRegion : defaultOnboardingFormState.residenceRegion,
+    role: coerceAppRole(value.role) ?? defaultOnboardingFormState.role,
     uploadingField: null,
   };
+}
+
+export function coerceAppRole(value: unknown): AppRole | null {
+  if (
+    value === "player" ||
+    value === "coach" ||
+    value === "staff" ||
+    value === "club_admin" ||
+    value === "agent" ||
+    value === "director"
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
+export function coerceProfileGender(value: unknown): ProfileGender | null {
+  if (
+    value === "male" ||
+    value === "female" ||
+    value === "non_binary" ||
+    value === "prefer_not_to_say"
+  ) {
+    return value;
+  }
+
+  return null;
 }
 
 export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
@@ -244,6 +293,10 @@ export function validateOnboardingStep(
   step: OnboardingStep,
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
+  if (step === "role") {
+    return mapRoleStepValidationError(form);
+  }
+
   if (step === "base") {
     return mapBaseStepValidationError(form);
   }
@@ -261,44 +314,56 @@ export function validateOnboardingStep(
   return {};
 }
 
+function mapRoleStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (form.role) {
+    return {};
+  }
+
+  return {
+    role: "Seleziona un ruolo per continuare.",
+  };
+}
+
 function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
   const errors: OnboardingValidationErrors = {};
 
   if (!form.firstName.trim()) {
-    errors.firstName = "Inserisci il nome.";
+    errors.firstName = "Questo campo è obbligatorio";
   }
 
   if (!form.lastName.trim()) {
-    errors.lastName = "Inserisci il cognome.";
+    errors.lastName = "Questo campo è obbligatorio";
+  }
+
+  if (!form.gender) {
+    errors.gender = "Questo campo è obbligatorio";
   }
 
   if (!form.birthDate.trim()) {
-    errors.birthDate = "Seleziona la data di nascita.";
+    errors.birthDate = "Questo campo è obbligatorio";
   }
 
-  if (!form.nationality.trim()) {
-    errors.nationality = "Seleziona la nazionalità.";
+  if (form.residence.trim() && !form.residenceRegion.trim()) {
+    errors.residence = "Seleziona una città valida dai suggerimenti.";
   }
 
-  if (!form.residence.trim()) {
-    errors.residence = "Inserisci la residenza.";
-  }
+  const phoneValue = composePhoneNumber(form.phoneCountryCode, form.phoneNumber);
 
-  if (!getEffectiveDomicile(form).trim()) {
-    errors.domicile = "Inserisci il domicilio.";
+  if (phoneValue && !isPhoneNumberValid(phoneValue)) {
+    errors.phoneNumber = "Inserisci un numero di cellulare valido.";
   }
 
   if (form.role === "club_admin") {
     if (!form.clubName.trim()) {
-      errors.clubName = "Inserisci il nome della società.";
+      errors.clubName = "Questo campo è obbligatorio";
     }
 
     if (!form.clubCity.trim()) {
-      errors.clubCity = "Inserisci la città della società.";
+      errors.clubCity = "Questo campo è obbligatorio";
     }
 
     if (!form.clubRegion.trim()) {
-      errors.clubRegion = "Seleziona la regione della società.";
+      errors.clubRegion = "Questo campo è obbligatorio";
     }
   }
 

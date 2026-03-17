@@ -9,6 +9,14 @@ import {
 } from "./onboarding-form";
 
 describe("onboarding-form", () => {
+  it("requires an explicit role selection before continuing", () => {
+    const errors = validateOnboardingStep("role", defaultOnboardingFormState);
+
+    expect(errors).toEqual({
+      role: "Seleziona un ruolo per continuare.",
+    });
+  });
+
   it("maps missing required base fields to field-level errors", () => {
     const errors = validateOnboardingStep("base", {
       ...defaultOnboardingFormState,
@@ -16,15 +24,33 @@ describe("onboarding-form", () => {
     });
 
     expect(errors).toMatchObject({
-      birthDate: "Seleziona la data di nascita.",
-      clubCity: "Inserisci la città della società.",
-      clubName: "Inserisci il nome della società.",
-      clubRegion: "Seleziona la regione della società.",
-      domicile: "Inserisci il domicilio.",
-      firstName: "Inserisci il nome.",
-      lastName: "Inserisci il cognome.",
-      nationality: "Seleziona la nazionalità.",
-      residence: "Inserisci la residenza.",
+      birthDate: "Questo campo è obbligatorio",
+      clubCity: "Questo campo è obbligatorio",
+      clubName: "Questo campo è obbligatorio",
+      clubRegion: "Questo campo è obbligatorio",
+      firstName: "Questo campo è obbligatorio",
+      gender: "Questo campo è obbligatorio",
+      lastName: "Questo campo è obbligatorio",
+    });
+  });
+
+  it("blocks invalid residence and phone values while allowing optional empty fields", () => {
+    const errors = validateOnboardingStep("base", {
+      ...defaultOnboardingFormState,
+      birthDate: "2001-03-11",
+      firstName: "Marco",
+      gender: "male",
+      lastName: "Rossi",
+      phoneCountryCode: "+39",
+      phoneNumber: "123",
+      residence: "Milx",
+      residenceRegion: "",
+      role: "player",
+    });
+
+    expect(errors).toMatchObject({
+      phoneNumber: "Inserisci un numero di cellulare valido.",
+      residence: "Seleziona una città valida dai suggerimenti.",
     });
   });
 

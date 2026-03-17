@@ -5,6 +5,9 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { MediaPickerField } from "../../src/components/ui/media-picker-field";
+import { NationalityAutocompleteInput } from "../../src/components/ui/nationality-autocomplete-input";
+import { PhoneInputWithCountryCode } from "../../src/components/ui/phone-input-with-country-code";
+import { ResidenceCityInput } from "../../src/components/ui/residence-city-input";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
@@ -23,7 +26,9 @@ import {
   parsePlayerExperienceForms,
 } from "../../src/features/profiles/player-sports";
 import {
-  NATIONALITY_OPTIONS,
+  composePhoneNumber,
+  formatName,
+  getCountryByCode,
   REGION_OPTIONS,
   normalizeProfileBioInput,
 } from "../../src/features/profiles/profile-form-utils";
@@ -36,7 +41,6 @@ import {
 } from "../../src/features/profiles/media-upload-service";
 import {
   coerceOnboardingStep,
-  getEffectiveDomicile,
   getOnboardingFullName,
   getOnboardingProgress,
   getPreviousOnboardingStep,
@@ -87,14 +91,30 @@ const roleOptions: {
     description:
       "Configura la pagina iniziale del club con i riferimenti essenziali per scouting e recruiting.",
     emoji: "🏟️",
-    label: "Societa' / squadra",
+    label: "Societa'",
     value: "club_admin",
+  },
+  {
+    description:
+      "Presenta i profili che segui e rendi immediata la tua disponibilita' verso opportunita' e contatti.",
+    emoji: "🤝",
+    label: "Procuratore",
+    value: "agent",
+  },
+  {
+    description:
+      "Condividi visione strategica, area di competenza e network professionale nel calcio dilettantistico.",
+    emoji: "📋",
+    label: "Dirigente",
+    value: "director",
   },
 ];
 
 const genderOptions: { label: string; value: ProfileGender }[] = [
   { label: "Uomo", value: "male" },
   { label: "Donna", value: "female" },
+  { label: "Non binary", value: "non_binary" },
+  { label: "Preferisco non dirlo", value: "prefer_not_to_say" },
 ];
 
 const staffSpecializationOptions: {
@@ -158,6 +178,53 @@ function StepChip({ isActive, label }: { isActive: boolean; label: string }) {
         {label}
       </Text>
     </View>
+  );
+}
+
+function SelectionCard({
+  active,
+  description,
+  label,
+  onPress,
+  testID,
+}: {
+  active: boolean;
+  description?: string;
+  label: string;
+  onPress: () => void;
+  testID?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        gap: spacing[6],
+        borderRadius: radius[20],
+        borderWidth: 1,
+        borderColor: active ? colors.hero : colors.border,
+        backgroundColor: active ? colors.heroSoft : colors.surface,
+        padding: spacing[16],
+        opacity: pressed ? 0.92 : 1,
+      })}
+      testID={testID}
+    >
+      <Text
+        style={{
+          color: colors.textPrimary,
+          fontSize: typography.fontSize[16],
+          fontWeight: typography.fontWeight.heavy,
+        }}
+      >
+        {label}
+      </Text>
+      {description ? (
+        <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>
+          {description}
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -328,7 +395,6 @@ export default function OnboardingProfileScreen() {
     coachedClubs,
     coachPreferredRegions,
     certifications,
-    domicile,
     experienceSummary,
     firstName,
     gamePhilosophy,
@@ -344,12 +410,14 @@ export default function OnboardingProfileScreen() {
     nationality,
     openToNewRole,
     openToWork,
+    phoneCountryCode,
     phoneNumber,
     playerMediaItems,
     preferredCategories,
     preferredFoot,
     primaryPosition,
     residence,
+    residenceRegion,
     role,
     secondaryPosition,
     staffPreferredRegions,
@@ -357,13 +425,11 @@ export default function OnboardingProfileScreen() {
     technicalVideoUrl,
     transferRegions,
     uploadingField,
-    useResidenceForDomicile,
     weightKg,
     willingToChangeClub,
   } = form;
 
   const fullName = getOnboardingFullName(form);
-  const effectiveDomicile = getEffectiveDomicile(form);
   const progress = getOnboardingProgress(step);
   const canGoBack = step !== "role";
   const isBusy = isSubmitting || uploadingField !== null;
@@ -390,6 +456,57 @@ export default function OnboardingProfileScreen() {
       clearValidationErrors(fieldsToClear);
     },
     [clearValidationErrors, setFormValue],
+  );
+
+  const handleFormattedNameBlur = useCallback(
+    (field: "firstName" | "lastName") => {
+      const currentValue = form[field];
+      const formattedValue = formatName(currentValue);
+
+      if (formattedValue && formattedValue !== currentValue) {
+        updateValue(field, formattedValue);
+      }
+    },
+    [form, updateValue],
+  );
+
+  const handleResidenceChange = useCallback(
+    (value: string) => {
+      patchForm({
+        residence: value,
+        residenceRegion:
+          value.trim().toLowerCase() === residence.trim().toLowerCase()
+            ? residenceRegion
+            : "",
+      });
+      clearValidationErrors(["residence"]);
+    },
+    [clearValidationErrors, patchForm, residence, residenceRegion],
+  );
+
+  const handleResidenceSelect = useCallback(
+    (value: { name: string; region: string }) => {
+      patchForm({
+        residence: value.name,
+        residenceRegion: value.region,
+      });
+      clearValidationErrors(["residence"]);
+    },
+    [clearValidationErrors, patchForm],
+  );
+
+  const handleNationalitySelect = useCallback(
+    (value: string) => {
+      const country = getCountryByCode(value);
+
+      patchForm({
+        nationality: value,
+        phoneCountryCode:
+          !phoneNumber.trim() && country ? country.phoneCountryCode : phoneCountryCode,
+      });
+      clearValidationErrors(["nationality", "phoneNumber"]);
+    },
+    [clearValidationErrors, patchForm, phoneCountryCode, phoneNumber],
   );
 
   const navigateToStep = useCallback(
@@ -508,14 +625,14 @@ export default function OnboardingProfileScreen() {
       clubCity,
       clubName,
       clubRegion,
-      domicile: effectiveDomicile,
+      domicile: residence,
       fullName,
-      gender,
+      gender: gender as ProfileGender,
       nationality,
-      phoneNumber,
+      phoneNumber: composePhoneNumber(phoneCountryCode, phoneNumber),
       primaryPosition,
       residence,
-      role,
+      role: role as AppRole,
       staffSpecialization,
       userId: session.user.id,
     });
@@ -523,6 +640,18 @@ export default function OnboardingProfileScreen() {
     patchForm({
       hasCreatedProfile: true,
     });
+  }
+
+  function handleContinueFromRole() {
+    const nextErrors = validateOnboardingStep("role", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    navigateToStep("base");
   }
 
   async function handleContinueToDecision() {
@@ -647,7 +776,7 @@ export default function OnboardingProfileScreen() {
           region: null,
         },
         profileId: session.user.id,
-        role,
+        role: role as AppRole,
         staffProfile:
           role === "staff"
             ? {
@@ -662,11 +791,11 @@ export default function OnboardingProfileScreen() {
           email: "",
           facebook: "",
           instagram: "",
-          phone: phoneNumber.trim(),
-          showEmail: false,
-          showFacebook: false,
-          showInstagram: false,
-        },
+           phone: composePhoneNumber(phoneCountryCode, phoneNumber),
+           showEmail: false,
+           showFacebook: false,
+           showInstagram: false,
+         },
       });
 
       if (role === "player") {
@@ -851,52 +980,36 @@ export default function OnboardingProfileScreen() {
                   fontWeight: typography.fontWeight.heavy,
                 }}
               >
-                1. Che profilo vuoi creare?
+                Seleziona il tuo ruolo nel calcio
               </Text>
               <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                Questa scelta definisce il percorso di onboarding e le
-                informazioni sportive che ti chiederemo in seguito.
+                Scegli il profilo che ti rappresenta meglio. Ti mostreremo solo
+                i campi davvero utili per iniziare in meno di un minuto.
               </Text>
+              {validationErrors.role ? (
+                <ValidationMessage>{validationErrors.role}</ValidationMessage>
+              ) : null}
             </View>
 
             {roleOptions.map((entry) => {
               const isActive = role === entry.value;
 
               return (
-                <Pressable
+                <SelectionCard
                   key={entry.value}
-                  accessibilityRole="button"
-                  onPress={() => updateValue("role", entry.value)}
-                  style={{
-                    gap: spacing[8],
-                    borderRadius: radius[20],
-                    borderWidth: 1,
-                    borderColor: isActive ? colors.hero : colors.border,
-                    backgroundColor: isActive
-                      ? colors.heroSoft
-                      : colors.surface,
-                    padding: spacing[16],
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontSize: typography.fontSize[18],
-                      fontWeight: typography.fontWeight.heavy,
-                    }}
-                  >
-                    {entry.emoji} {entry.label}
-                  </Text>
-                  <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                    {entry.description}
-                  </Text>
-                </Pressable>
+                  active={isActive}
+                  description={entry.description}
+                  label={`${entry.emoji} ${entry.label}`}
+                  onPress={() => updateValue("role", entry.value, ["role"])}
+                  testID={`role-card-${entry.value}`}
+                />
               );
             })}
 
             <Button
+              disabled={!role}
               label="Continua"
-              onPress={() => navigateToStep("base")}
+              onPress={handleContinueFromRole}
               variant="primary"
             />
           </Card>
@@ -912,42 +1025,45 @@ export default function OnboardingProfileScreen() {
                   fontWeight: typography.fontWeight.heavy,
                 }}
               >
-                2. Inserisci le informazioni essenziali
+                Informazioni essenziali
               </Text>
               <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
-                Completa il minimo necessario per attivare il profilo e farti
-                trovare in piattaforma.
+                Completa i dati minimi per attivare il profilo. I campi
+                obbligatori sono evidenziati e i suggerimenti automatici ti
+                aiutano a finire rapidamente.
               </Text>
               {validationErrors.form ? (
                 <ValidationMessage>{validationErrors.form}</ValidationMessage>
               ) : null}
             </View>
 
-            <View style={{ flexDirection: "row", gap: spacing[12] }}>
-              <View style={{ flex: 1 }}>
-                <Input
-                  label="Nome"
-                  onChangeText={(value) => updateValue("firstName", value)}
-                  placeholder="Es. Marco"
-                  style={validationErrors.firstName ? { borderColor: colors.danger } : undefined}
-                  value={firstName}
-                />
-                {validationErrors.firstName ? (
-                  <ValidationMessage>{validationErrors.firstName}</ValidationMessage>
-                ) : null}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Input
-                  label="Cognome"
-                  onChangeText={(value) => updateValue("lastName", value)}
-                  placeholder="Es. Rossi"
-                  style={validationErrors.lastName ? { borderColor: colors.danger } : undefined}
-                  value={lastName}
-                />
-                {validationErrors.lastName ? (
-                  <ValidationMessage>{validationErrors.lastName}</ValidationMessage>
-                ) : null}
-              </View>
+            <View style={{ gap: spacing[12] }}>
+              <Input
+                autoCapitalize="words"
+                autoCorrect={false}
+                label="Nome *"
+                onBlur={() => handleFormattedNameBlur("firstName")}
+                onChangeText={(value) => updateValue("firstName", value)}
+                placeholder="Es. Marco"
+                style={validationErrors.firstName ? { borderColor: colors.danger } : undefined}
+                value={firstName}
+              />
+              {validationErrors.firstName ? (
+                <ValidationMessage>{validationErrors.firstName}</ValidationMessage>
+              ) : null}
+              <Input
+                autoCapitalize="words"
+                autoCorrect={false}
+                label="Cognome *"
+                onBlur={() => handleFormattedNameBlur("lastName")}
+                onChangeText={(value) => updateValue("lastName", value)}
+                placeholder="Es. Rossi"
+                style={validationErrors.lastName ? { borderColor: colors.danger } : undefined}
+                value={lastName}
+              />
+              {validationErrors.lastName ? (
+                <ValidationMessage>{validationErrors.lastName}</ValidationMessage>
+              ) : null}
             </View>
 
             <View style={{ gap: spacing[8] }}>
@@ -957,28 +1073,27 @@ export default function OnboardingProfileScreen() {
                   fontWeight: typography.fontWeight.bold,
                 }}
               >
-                Sesso
+                Sesso *
               </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: spacing[8],
-                }}
-              >
+              <View style={{ gap: spacing[10] }}>
                 {genderOptions.map((entry) => (
-                  <OptionPill
+                  <SelectionCard
                     key={entry.value}
                     active={gender === entry.value}
+                    description={undefined}
                     label={entry.label}
-                    onPress={() => updateValue("gender", entry.value)}
+                    onPress={() => updateValue("gender", entry.value, ["gender"])}
+                    testID={`gender-card-${entry.value}`}
                   />
                 ))}
               </View>
+              {validationErrors.gender ? (
+                <ValidationMessage>{validationErrors.gender}</ValidationMessage>
+              ) : null}
             </View>
 
             <DatePickerField
-              label="Data di nascita"
+              label="Data di nascita *"
               onChange={(value) => updateValue("birthDate", value)}
               placeholder="Apri il calendario e seleziona la data"
               value={birthDate}
@@ -987,86 +1102,31 @@ export default function OnboardingProfileScreen() {
               <ValidationMessage>{validationErrors.birthDate}</ValidationMessage>
             ) : null}
 
-            <SelectField
+            <NationalityAutocompleteInput
               label="Nazionalità"
-              onChange={(value) => updateValue("nationality", value)}
-              options={NATIONALITY_OPTIONS}
-              placeholder="Seleziona la nazionalità"
+              onChange={handleNationalitySelect}
               value={nationality}
             />
-            {validationErrors.nationality ? (
-              <ValidationMessage>{validationErrors.nationality}</ValidationMessage>
-            ) : null}
 
-            <Input
-              label="Residenza"
-              onChangeText={(value) =>
-                updateValue(
-                  "residence",
-                  value,
-                  useResidenceForDomicile ? ["residence", "domicile"] : ["residence"],
-                )
+            <ResidenceCityInput
+              errorMessage={validationErrors.residence}
+              helperText={
+                residenceRegion
+                  ? `Città selezionata: ${residence} · ${residenceRegion}`
+                  : undefined
               }
-              placeholder="Citta' e provincia di residenza"
-              style={validationErrors.residence ? { borderColor: colors.danger } : undefined}
+              onChangeText={handleResidenceChange}
+              onSelectCity={handleResidenceSelect}
               value={residence}
             />
-            {validationErrors.residence ? (
-              <ValidationMessage>{validationErrors.residence}</ValidationMessage>
-            ) : null}
 
-            <View style={{ gap: spacing[8] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontWeight: typography.fontWeight.bold,
-                }}
-              >
-                Domicilio
-              </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: spacing[8],
-                }}
-              >
-                 <OptionPill
-                   active={useResidenceForDomicile}
-                   label="Uguale alla residenza"
-                   onPress={() =>
-                     updateValue("useResidenceForDomicile", true, ["domicile"])
-                   }
-                 />
-                 <OptionPill
-                   active={!useResidenceForDomicile}
-                   label="Diverso dalla residenza"
-                   onPress={() =>
-                     updateValue("useResidenceForDomicile", false, ["domicile"])
-                   }
-                 />
-               </View>
-             </View>
-
-            {!useResidenceForDomicile ? (
-              <Input
-                label="Domicilio effettivo"
-                onChangeText={(value) => updateValue("domicile", value)}
-                placeholder="Inserisci il domicilio"
-                style={validationErrors.domicile ? { borderColor: colors.danger } : undefined}
-                value={domicile}
-              />
-            ) : null}
-            {validationErrors.domicile ? (
-              <ValidationMessage>{validationErrors.domicile}</ValidationMessage>
-            ) : null}
-
-            <Input
-              keyboardType="phone-pad"
-              label="Numero di telefono (facoltativo)"
-              onChangeText={(value) => updateValue("phoneNumber", value)}
-              placeholder="Es. +39 333 1234567"
-              value={phoneNumber}
+            <PhoneInputWithCountryCode
+              countryCode={phoneCountryCode}
+              errorMessage={validationErrors.phoneNumber}
+              label="Numero di cellulare"
+              onChangeCountryCode={(value) => updateValue("phoneCountryCode", value, ["phoneNumber"])}
+              onChangePhoneNumber={(value) => updateValue("phoneNumber", value, ["phoneNumber"])}
+              phoneNumber={phoneNumber}
             />
 
             <MediaPickerField
@@ -1145,7 +1205,7 @@ export default function OnboardingProfileScreen() {
               <View style={{ flex: 1 }}>
                 <Button
                   disabled={isBusy}
-                  label={isBusy ? "Salvataggio..." : "Salva e continua"}
+                  label={isBusy ? "Salvataggio..." : "Continua"}
                   onPress={handleContinueToDecision}
                   variant="primary"
                 />

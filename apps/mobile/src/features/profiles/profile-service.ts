@@ -212,7 +212,13 @@ function normalizeStringArray(value: unknown) {
 }
 
 function normalizeRole(value: unknown): AppRole {
-  return value === "coach" || value === "staff" || value === "club_admin" ? value : "player";
+  return value === "coach" ||
+    value === "staff" ||
+    value === "club_admin" ||
+    value === "agent" ||
+    value === "director"
+    ? value
+    : "player";
 }
 
 function normalizeBaseProfileRecord(

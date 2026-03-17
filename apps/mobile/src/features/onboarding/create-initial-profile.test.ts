@@ -91,7 +91,7 @@ describe("createInitialProfile", () => {
       role: "player",
     });
     expect(upsertMocks.profile_private_contacts).toHaveBeenCalledWith({
-      phone: "+39 333 1234567",
+      phone: "+393331234567",
       profile_id: "user-2",
     });
     expect(upsertMocks.player_profiles).toHaveBeenCalledWith({
@@ -174,7 +174,7 @@ describe("createInitialProfile", () => {
         staffSpecialization: "fitness_coach",
         userId: "user-3",
       }),
-    ).rejects.toThrow("Completa i campi obbligatori: data di nascita, nazionalità, residenza, domicilio.");
+    ).rejects.toThrow("Completa i campi obbligatori: data di nascita.");
 
     expect(fromMock).not.toHaveBeenCalled();
   });
@@ -198,7 +198,64 @@ describe("createInitialProfile", () => {
         staffSpecialization: "fitness_coach",
         userId: "user-5",
       }),
-    ).toThrow("Completa i campi obbligatori: data di nascita, nazionalità, residenza, domicilio.");
+    ).toThrow("Completa i campi obbligatori: data di nascita.");
+  });
+
+  it("allows optional nationality and residence fields to stay empty", () => {
+    expect(
+      validateBaseProfileStep({
+        avatarUrl: "",
+        birthDate: "1998-05-12",
+        clubCity: "",
+        clubName: "",
+        clubRegion: "",
+        domicile: "",
+        fullName: "Marco Rossi",
+        gender: "male",
+        nationality: "",
+        phoneNumber: "",
+        primaryPosition: "forward",
+        residence: "",
+        role: "player",
+        staffSpecialization: "fitness_coach",
+        userId: "user-6",
+      }),
+    ).toMatchObject({
+      birthDate: "1998-05-12",
+      domicile: null,
+      nationality: null,
+      residence: null,
+    });
+  });
+
+  it("creates agent profiles without extra role-specific tables", async () => {
+    await createInitialProfile({
+      avatarUrl: "",
+      birthDate: "1990-01-01",
+      clubCity: "",
+      clubName: "",
+      clubRegion: "",
+      domicile: "",
+      fullName: "Agent Example",
+      gender: "female",
+      nationality: "IT",
+      phoneNumber: "+39 3331234567",
+      primaryPosition: "midfielder",
+      residence: "Roma",
+      role: "agent",
+      staffSpecialization: "fitness_coach",
+      userId: "agent-1",
+    });
+
+    expect(upsertMocks.profiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: "agent",
+      }),
+    );
+    expect(upsertMocks.player_profiles).not.toHaveBeenCalled();
+    expect(upsertMocks.coach_profiles).not.toHaveBeenCalled();
+    expect(upsertMocks.staff_profiles).not.toHaveBeenCalled();
+    expect(upsertMocks.clubs).not.toHaveBeenCalled();
   });
 
   it("saves a null avatar when no profile image is uploaded", async () => {

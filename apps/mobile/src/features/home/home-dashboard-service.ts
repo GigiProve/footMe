@@ -69,6 +69,10 @@ function formatRoleLabel(role: string) {
       return "Allenatore";
     case "staff":
       return "Staff";
+    case "agent":
+      return "Procuratore";
+    case "director":
+      return "Dirigente";
     case "club_admin":
       return "Societa'";
     default:

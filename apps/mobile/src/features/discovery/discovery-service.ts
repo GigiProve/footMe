@@ -7,7 +7,9 @@ export type SearchRoleFilter =
   | "player"
   | "coach"
   | "staff"
-  | "club_admin";
+  | "club_admin"
+  | "agent"
+  | "director";
 
 export type SearchPositionFilter =
   | "all"

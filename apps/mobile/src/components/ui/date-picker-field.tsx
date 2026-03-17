@@ -33,9 +33,7 @@ export function DatePickerField({
   const maximumDate = useMemo(() => new Date(), []);
 
   function handlePickerChange(event: DateTimePickerEvent, nextDate?: Date) {
-    if (Platform.OS === "android") {
-      setIsOpen(false);
-    }
+    setIsOpen(false);
 
     if (event.type === "dismissed" || !nextDate) {
       return;

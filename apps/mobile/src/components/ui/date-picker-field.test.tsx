@@ -51,4 +51,26 @@ describe("DatePickerField", () => {
       root.findByProps({ children: "Data selezionata: 11/03/2001" }),
     ).toBeTruthy();
   });
+
+  it("closes the picker after a date selection", () => {
+    const onChange = vi.fn();
+    const tree = renderDatePickerField(
+      <DatePickerField label="Data di nascita" onChange={onChange} value="" />,
+    );
+    const root = tree.root;
+
+    act(() => {
+      root.findByProps({ testID: "date-picker-trigger" }).props.onPress();
+    });
+
+    act(() => {
+      root.findByType("mock-date-time-picker" as never).props.onChange(
+        { type: "set" },
+        new Date(2001, 2, 11),
+      );
+    });
+
+    expect(onChange).toHaveBeenCalledWith("2001-03-11");
+    expect(root.findAllByProps({ testID: "date-picker-surface" })).toHaveLength(0);
+  });
 });
