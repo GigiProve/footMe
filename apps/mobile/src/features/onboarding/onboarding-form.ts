@@ -176,6 +176,9 @@ export function normalizeOnboardingDraft(
       coerceOnboardingStep(value.lastCompletedStep) ??
       defaultOnboardingFormState.lastCompletedStep,
     gender: coerceProfileGender(value.gender) ?? defaultOnboardingFormState.gender,
+    // Legacy drafts used a single phone string, so when the prefix has not been
+    // persisted yet we safely split the stored value to preserve what the user
+    // already entered without forcing them to recompile the field.
     phoneCountryCode:
       typeof value.phoneCountryCode === "string" && value.phoneCountryCode.trim()
         ? value.phoneCountryCode
@@ -343,6 +346,8 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.birthDate = "Questo campo è obbligatorio";
   }
 
+  // Residence becomes valid only when it comes from a suggestion selection,
+  // which also stores the derived region alongside the chosen city name.
   if (form.residence.trim() && !form.residenceRegion.trim()) {
     errors.residence = "Seleziona una città valida dai suggerimenti.";
   }

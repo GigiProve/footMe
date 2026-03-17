@@ -44,7 +44,7 @@ export function ResidenceCityInput({
       <Text style={{ color: errorMessage ? colors.danger : colors.textSecondary }}>
         {errorMessage ??
           helperText ??
-          "Seleziona una città reale dai suggerimenti per salvare una residenza valida."}
+          "Scrivi almeno 2 caratteri per vedere città reali e scegliere il suggerimento corretto."}
       </Text>
       {shouldShowSuggestions ? (
         <View

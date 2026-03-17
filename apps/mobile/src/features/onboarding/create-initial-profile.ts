@@ -118,12 +118,12 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
     birth_date: birthDate,
     domicile,
     id: input.userId,
-      gender: input.gender,
-      role: input.role,
-      full_name: fullName,
-      nationality,
-      phone_number: null,
-      residence,
+    gender: input.gender,
+    role: input.role,
+    full_name: fullName,
+    nationality,
+    phone_number: null,
+    residence,
   });
 
   if (profileError) {

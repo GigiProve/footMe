@@ -546,7 +546,7 @@ export function formatName(value: string) {
   return value
     .trim()
     .toLowerCase()
-    .replace(/(^|[\s'-])([a-zà-ÿ])/giu, (match) => match.toUpperCase());
+    .replace(/(^|[\s'-])(\p{L})/gu, (match) => match.toUpperCase());
 }
 
 export function getCountryByCode(countryCode: string | null | undefined) {

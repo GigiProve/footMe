@@ -791,11 +791,11 @@ export default function OnboardingProfileScreen() {
           email: "",
           facebook: "",
           instagram: "",
-           phone: composePhoneNumber(phoneCountryCode, phoneNumber),
-           showEmail: false,
-           showFacebook: false,
-           showInstagram: false,
-         },
+          phone: composePhoneNumber(phoneCountryCode, phoneNumber),
+          showEmail: false,
+          showFacebook: false,
+          showInstagram: false,
+        },
       });
 
       if (role === "player") {
