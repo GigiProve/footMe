@@ -1,5 +1,6 @@
 import { Redirect, Stack } from "expo-router";
 
+import { OnboardingFormProvider } from "../../src/features/onboarding/onboarding-form-provider";
 import { useSession } from "../../src/features/auth/use-session";
 
 export default function OnboardingLayout() {
@@ -17,5 +18,15 @@ export default function OnboardingLayout() {
     return <Redirect href="/(tabs)" />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <OnboardingFormProvider>
+      <Stack
+        screenOptions={{
+          fullScreenGestureEnabled: true,
+          gestureEnabled: true,
+          headerShown: false,
+        }}
+      />
+    </OnboardingFormProvider>
+  );
 }
