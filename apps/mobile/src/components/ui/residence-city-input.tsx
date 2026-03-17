@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import {
@@ -27,8 +27,9 @@ export function ResidenceCityInput({
   placeholder = "Cerca la tua città",
   value,
 }: ResidenceCityInputProps) {
+  const [isOpen, setIsOpen] = useState(false);
   const suggestions = useMemo(() => searchItalianCities(value, 6), [value]);
-  const shouldShowSuggestions = value.trim().length >= 2 && suggestions.length > 0;
+  const shouldShowSuggestions = isOpen && value.trim().length >= 2 && suggestions.length > 0;
 
   return (
     <View style={{ gap: spacing[8] }}>
@@ -36,7 +37,11 @@ export function ResidenceCityInput({
         autoCapitalize="words"
         autoCorrect={false}
         label={label}
-        onChangeText={onChangeText}
+        onChangeText={(nextValue) => {
+          setIsOpen(true);
+          onChangeText(nextValue);
+        }}
+        onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
         style={errorMessage ? { borderColor: colors.danger } : undefined}
         value={value}
@@ -63,7 +68,10 @@ export function ResidenceCityInput({
               <Pressable
                 accessibilityRole="button"
                 key={`${suggestion.name}-${suggestion.region}`}
-                onPress={() => onSelectCity(suggestion)}
+                onPress={() => {
+                  setIsOpen(false);
+                  onSelectCity(suggestion);
+                }}
                 style={({ pressed }) => ({
                   gap: spacing[4],
                   borderRadius: radius[16],

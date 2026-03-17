@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "plugins": ["expo-router", "@react-native-community/datetimepicker"],
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "experiments": {
       "typedRoutes": true
     },

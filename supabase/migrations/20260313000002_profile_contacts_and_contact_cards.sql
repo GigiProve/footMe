@@ -20,12 +20,14 @@ create table if not exists public.profile_private_contacts (
 alter table public.profile_contacts enable row level security;
 alter table public.profile_private_contacts enable row level security;
 
+drop policy if exists "users can read own profile contacts" on public.profile_contacts;
 create policy "users can read own profile contacts"
 on public.profile_contacts
 for select
 to authenticated
 using (public.is_current_user(profile_id));
 
+drop policy if exists "users can manage own profile contacts" on public.profile_contacts;
 create policy "users can manage own profile contacts"
 on public.profile_contacts
 for all
@@ -33,12 +35,14 @@ to authenticated
 using (public.is_current_user(profile_id))
 with check (public.is_current_user(profile_id));
 
+drop policy if exists "users can read own private contacts" on public.profile_private_contacts;
 create policy "users can read own private contacts"
 on public.profile_private_contacts
 for select
 to authenticated
 using (public.is_current_user(profile_id));
 
+drop policy if exists "users can manage own private contacts" on public.profile_private_contacts;
 create policy "users can manage own private contacts"
 on public.profile_private_contacts
 for all

@@ -2,12 +2,14 @@ insert into storage.buckets (id, name, public)
 values ('profile-media', 'profile-media', true)
 on conflict (id) do nothing;
 
+drop policy if exists "profile media readable by authenticated users" on storage.objects;
 create policy "profile media readable by authenticated users"
 on storage.objects
 for select
 to authenticated
 using (bucket_id = 'profile-media');
 
+drop policy if exists "profile media upload by owner" on storage.objects;
 create policy "profile media upload by owner"
 on storage.objects
 for insert
@@ -17,6 +19,7 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
+drop policy if exists "profile media update by owner" on storage.objects;
 create policy "profile media update by owner"
 on storage.objects
 for update
@@ -30,6 +33,7 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
+drop policy if exists "profile media delete by owner" on storage.objects;
 create policy "profile media delete by owner"
 on storage.objects
 for delete

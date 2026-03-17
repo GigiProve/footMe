@@ -13,3 +13,5 @@ apps/mobile/.env
 apps/mobile/.env.*
 !apps/mobile/.env.example
 supabase/.temp/cli-latest
+.claude
+supabase/config.toml

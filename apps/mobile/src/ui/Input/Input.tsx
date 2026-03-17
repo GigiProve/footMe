@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   },
   filledInput: {
     borderColor: colors.accentSoft,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.surface,
   },
   multiline: {
     minHeight: sizes.multilineFieldMinHeight,

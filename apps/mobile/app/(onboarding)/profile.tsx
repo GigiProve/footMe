@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, BackHandler, Platform, Pressable, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
@@ -358,6 +358,8 @@ function logMediaUploadFailure(payload: {
 
 export default function OnboardingProfileScreen() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const params = useLocalSearchParams<{ step?: string | string[] }>();
   const { refreshProfile, session } = useSession();
   const { form, isHydrated, patchForm, resetForm, setCurrentStep, setFormValue } =
@@ -507,6 +509,10 @@ export default function OnboardingProfileScreen() {
     [clearValidationErrors, patchForm, phoneCountryCode, phoneNumber],
   );
 
+  // Track whether the initial hydration navigation has been performed so we
+  // only restore the saved step once and never fight with later navigations.
+  const hasRestoredStepRef = useRef(false);
+
   const navigateToStep = useCallback(
     (nextStep: OnboardingStep, mode: "push" | "replace" = "push") => {
       setCurrentStep(nextStep);
@@ -516,13 +522,13 @@ export default function OnboardingProfileScreen() {
       };
 
       if (mode === "replace") {
-        router.replace(target);
+        routerRef.current.replace(target);
         return;
       }
 
-      router.push(target);
+      routerRef.current.push(target);
     },
-    [router, setCurrentStep],
+    [setCurrentStep],
   );
 
   const handleBackNavigation = useCallback(() => {
@@ -535,20 +541,33 @@ export default function OnboardingProfileScreen() {
     navigateToStep(previousStep, "replace");
   }, [lastCompletedStep, navigateToStep, step]);
 
+  // Hydration restore: navigate to the saved step once on first mount.
   useEffect(() => {
-    if (!isHydrated) {
+    if (!isHydrated || hasRestoredStepRef.current) {
       return;
     }
+
+    hasRestoredStepRef.current = true;
 
     if (!requestedStep && form.currentStep !== "role") {
       navigateToStep(form.currentStep, "replace");
+    }
+  }, [isHydrated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // URL→form sync: when the URL step changes (e.g. swipe-back gesture pops
+  // the screen), update the form step to match.  This must NOT depend on
+  // form.currentStep to avoid a two-way sync loop.
+  useEffect(() => {
+    if (!isHydrated || !hasRestoredStepRef.current) {
       return;
     }
 
-    if (requestedStep && requestedStep !== form.currentStep) {
-      setCurrentStep(requestedStep);
+    const urlStep = requestedStep ?? "role";
+
+    if (urlStep !== form.currentStep) {
+      setCurrentStep(urlStep);
     }
-  }, [form.currentStep, isHydrated, navigateToStep, requestedStep, setCurrentStep]);
+  }, [requestedStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (Platform.OS !== "android" || step === "role") {

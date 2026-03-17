@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Keyboard, Pressable, ScrollView, Text, View } from "react-native";
 
 import {
   getCountryByCode,
@@ -25,19 +25,19 @@ export function NationalityAutocompleteInput({
 }: NationalityAutocompleteInputProps) {
   const selectedCountry = useMemo(() => getCountryByCode(value), [value]);
   const [query, setQuery] = useState(selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "");
-  const [isFocused, setIsFocused] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     setQuery(selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "");
   }, [selectedCountry]);
 
   const suggestions = useMemo(() => {
-    if (!isFocused) {
+    if (!isOpen) {
       return [];
     }
 
     return searchCountries(query, 6);
-  }, [isFocused, query]);
+  }, [isOpen, query]);
 
   return (
     <View style={{ gap: spacing[8] }}>
@@ -46,22 +46,22 @@ export function NationalityAutocompleteInput({
         autoCorrect={false}
         label={label}
         onBlur={() => {
-          setIsFocused(false);
           setQuery(selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "");
         }}
         onChangeText={(nextValue) => {
           setQuery(nextValue);
+          setIsOpen(true);
 
           if (!nextValue.trim()) {
             onChange("");
           }
         }}
-        onFocus={() => setIsFocused(true)}
+        onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
         style={errorMessage ? { borderColor: colors.danger } : undefined}
         value={query}
       />
-      {isFocused && suggestions.length > 0 ? (
+      {isOpen && suggestions.length > 0 ? (
         <View
           style={{
             maxHeight: 220,
@@ -73,7 +73,11 @@ export function NationalityAutocompleteInput({
           }}
           testID="nationality-autocomplete-suggestions"
         >
-          <ScrollView contentContainerStyle={{ gap: spacing[8] }} nestedScrollEnabled>
+          <ScrollView
+            contentContainerStyle={{ gap: spacing[8] }}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
             {suggestions.map((suggestion) => (
               <Pressable
                 accessibilityRole="button"
@@ -81,7 +85,8 @@ export function NationalityAutocompleteInput({
                 onPress={() => {
                   onChange(suggestion.code);
                   setQuery(`${suggestion.flag} ${suggestion.name}`);
-                  setIsFocused(false);
+                  setIsOpen(false);
+                  Keyboard.dismiss();
                 }}
                 style={({ pressed }) => ({
                   gap: spacing[4],

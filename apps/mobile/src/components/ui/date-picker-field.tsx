@@ -33,9 +33,12 @@ export function DatePickerField({
   const maximumDate = useMemo(() => new Date(), []);
 
   function handlePickerChange(event: DateTimePickerEvent, nextDate?: Date) {
-    // The onboarding flow requires the calendar to dismiss immediately after a
-    // valid selection so the user can continue the form without extra taps.
-    setIsOpen(false);
+    // On Android the native dialog fires a single event on confirm/dismiss, so
+    // we can safely close immediately.  On iOS the spinner fires onChange on
+    // every scroll — closing here would slam the picker shut mid-interaction.
+    if (Platform.OS !== "ios") {
+      setIsOpen(false);
+    }
 
     if (event.type === "dismissed" || !nextDate) {
       return;
@@ -91,6 +94,27 @@ export function DatePickerField({
             themeVariant="light"
             value={selectedDate}
           />
+          {Platform.OS === "ios" ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsOpen(false)}
+              style={{
+                alignSelf: "flex-end",
+                paddingHorizontal: spacing[16],
+                paddingVertical: spacing[10],
+              }}
+              testID="date-picker-confirm"
+            >
+              <Text
+                style={{
+                  color: colors.hero,
+                  fontWeight: typography.fontWeight.heavy,
+                }}
+              >
+                Conferma
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
