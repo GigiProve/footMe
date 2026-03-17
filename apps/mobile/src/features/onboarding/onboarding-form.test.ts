@@ -17,13 +17,13 @@ describe("onboarding-form", () => {
 
     expect(errors).toMatchObject({
       birthDate: "Seleziona la data di nascita.",
-      clubCity: "Inserisci la citta' della societa'.",
-      clubName: "Inserisci il nome della societa'.",
-      clubRegion: "Seleziona la regione della societa'.",
+      clubCity: "Inserisci la città della società.",
+      clubName: "Inserisci il nome della società.",
+      clubRegion: "Seleziona la regione della società.",
       domicile: "Inserisci il domicilio.",
       firstName: "Inserisci il nome.",
       lastName: "Inserisci il cognome.",
-      nationality: "Seleziona la nazionalita'.",
+      nationality: "Seleziona la nazionalità.",
       residence: "Inserisci la residenza.",
     });
   });

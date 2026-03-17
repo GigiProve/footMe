@@ -277,7 +277,7 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
   }
 
   if (!form.nationality.trim()) {
-    errors.nationality = "Seleziona la nazionalita'.";
+    errors.nationality = "Seleziona la nazionalità.";
   }
 
   if (!form.residence.trim()) {
@@ -290,15 +290,15 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
 
   if (form.role === "club_admin") {
     if (!form.clubName.trim()) {
-      errors.clubName = "Inserisci il nome della societa'.";
+      errors.clubName = "Inserisci il nome della società.";
     }
 
     if (!form.clubCity.trim()) {
-      errors.clubCity = "Inserisci la citta' della societa'.";
+      errors.clubCity = "Inserisci la città della società.";
     }
 
     if (!form.clubRegion.trim()) {
-      errors.clubRegion = "Seleziona la regione della societa'.";
+      errors.clubRegion = "Seleziona la regione della società.";
     }
   }
 

@@ -588,7 +588,6 @@ export default function OnboardingProfileScreen() {
       }
 
       setValidationErrors({});
-      const bioValidation = validateProfileBio(bio);
 
       const normalizedCareerEntries = parsePlayerExperienceForms(careerEntries);
 
@@ -635,7 +634,7 @@ export default function OnboardingProfileScreen() {
             : null,
         profile: {
           avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(bioValidation.normalizedValue),
+          bio: parseOptionalText(bio),
           birth_date: birthDate,
           city: null,
           full_name: fullName,
@@ -974,10 +973,10 @@ export default function OnboardingProfileScreen() {
             ) : null}
 
             <SelectField
-              label="Nazionalita'"
+              label="Nazionalità"
               onChange={(value) => updateValue("nationality", value)}
               options={NATIONALITY_OPTIONS}
-              placeholder="Seleziona la nazionalita'"
+              placeholder="Seleziona la nazionalità"
               value={nationality}
             />
             {validationErrors.nationality ? (
@@ -1085,10 +1084,10 @@ export default function OnboardingProfileScreen() {
                     fontWeight: typography.fontWeight.heavy,
                   }}
                 >
-                  Dati iniziali della societa'
+                  Dati iniziali della società
                 </Text>
                 <Input
-                  label="Nome societa'"
+                  label="Nome società"
                   onChangeText={(value) => updateValue("clubName", value)}
                   placeholder="Es. ASD Example"
                   style={validationErrors.clubName ? { borderColor: colors.danger } : undefined}
@@ -1098,7 +1097,7 @@ export default function OnboardingProfileScreen() {
                   <ValidationMessage>{validationErrors.clubName}</ValidationMessage>
                 ) : null}
                 <Input
-                  label="Citta'"
+                  label="Città"
                   onChangeText={(value) => updateValue("clubCity", value)}
                   placeholder="Es. Perugia"
                   style={validationErrors.clubCity ? { borderColor: colors.danger } : undefined}
