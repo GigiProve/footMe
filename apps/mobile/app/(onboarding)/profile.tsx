@@ -113,8 +113,6 @@ const roleOptions: {
 const genderOptions: { label: string; value: ProfileGender }[] = [
   { label: "Uomo", value: "male" },
   { label: "Donna", value: "female" },
-  { label: "Non binary", value: "non_binary" },
-  { label: "Preferisco non dirlo", value: "prefer_not_to_say" },
 ];
 
 const staffSpecializationOptions: {
