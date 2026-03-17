@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { supabase } from "../../src/lib/supabase";
@@ -56,7 +57,10 @@ export default function SignInScreen() {
 
   return (
     <Screen>
-      <View style={styles.container}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
+        keyboardVerticalOffset={spacing[16]}
+      >
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Welcome Back</Text>
           <Text style={styles.title}>Accedi a footMe</Text>
@@ -120,14 +124,14 @@ export default function SignInScreen() {
             variant="link"
           />
         </Link>
-      </View>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     gap: spacing[18],
   },

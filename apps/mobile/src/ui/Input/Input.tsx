@@ -1,23 +1,45 @@
-import { ComponentProps, useState } from "react";
+import { ComponentProps, forwardRef, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
+import { useKeyboardAwareScroll } from "../../components/ui/keyboard-aware-scroll-view";
 import { colors, radius, sizes, spacing, typography } from "../../styles";
 
 type InputProps = {
   label?: string;
 } & ComponentProps<typeof TextInput>;
 
-export function Input({
-  label,
-  multiline,
-  onBlur,
-  onFocus,
-  style,
-  value,
-  ...props
-}: InputProps) {
+export const Input = forwardRef<TextInput, InputProps>(function Input(
+  {
+    label,
+    multiline,
+    onBlur,
+    onContentSizeChange,
+    onFocus,
+    style,
+    value,
+    ...props
+  },
+  forwardedRef,
+) {
   const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const keyboardAwareScroll = useKeyboardAwareScroll();
   const hasValue = typeof value === "string" && value.trim().length > 0;
+  const setRefs = useMemo(
+    () => (node: TextInput | null) => {
+      inputRef.current = node;
+
+      if (typeof forwardedRef === "function") {
+        forwardedRef(node);
+        return;
+      }
+
+      if (forwardedRef) {
+        forwardedRef.current = node;
+      }
+    },
+    [forwardedRef],
+  );
 
   return (
     <View style={styles.wrapper}>
@@ -28,11 +50,20 @@ export function Input({
           setIsFocused(false);
           onBlur?.(event);
         }}
+        onContentSizeChange={(event) => {
+          if (multiline && isFocused) {
+            keyboardAwareScroll?.scrollToFocusedInput(inputRef.current, false);
+          }
+
+          onContentSizeChange?.(event);
+        }}
         onFocus={(event) => {
           setIsFocused(true);
+          keyboardAwareScroll?.scrollToFocusedInput(inputRef.current, true);
           onFocus?.(event);
         }}
         placeholderTextColor={colors.textMuted}
+        ref={setRefs}
         style={[
           styles.input,
           multiline ? styles.multiline : null,
@@ -45,7 +76,7 @@ export function Input({
       />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrapper: {

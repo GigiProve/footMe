@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  ScrollView,
   Text,
   View,
 } from "react-native";
 
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
@@ -969,9 +969,8 @@ export default function ProfileScreen() {
 
   return (
     <Screen>
-      <ScrollView
+      <KeyboardAwareScrollView
         contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}
-        keyboardShouldPersistTaps="handled"
       >
         {completeProfile && headerDetails ? (
           <ProfileHeader
@@ -1509,7 +1508,7 @@ export default function ProfileScreen() {
 
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }

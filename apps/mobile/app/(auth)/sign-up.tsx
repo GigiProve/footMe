@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
@@ -79,7 +80,10 @@ export default function SignUpScreen() {
 
   return (
     <Screen>
-      <View style={styles.container}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
+        keyboardVerticalOffset={spacing[16]}
+      >
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Join The Network</Text>
           <Text style={styles.title}>Crea il tuo account</Text>
@@ -159,14 +163,14 @@ export default function SignUpScreen() {
             variant="link"
           />
         </Link>
-      </View>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     gap: spacing[18],
   },

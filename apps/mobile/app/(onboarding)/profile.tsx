@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { DatePickerField } from "../../src/components/ui/date-picker-field";
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { MediaPickerField } from "../../src/components/ui/media-picker-field";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
@@ -551,7 +552,7 @@ export default function OnboardingProfileScreen() {
 
   return (
     <Screen>
-      <ScrollView
+      <KeyboardAwareScrollView
         contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}
       >
         <View
@@ -1449,7 +1450,7 @@ export default function OnboardingProfileScreen() {
             />
           </Card>
         ) : null}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }

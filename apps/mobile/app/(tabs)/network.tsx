@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import {
   Alert,
-  ScrollView,
   Text,
   View,
 } from "react-native";
 
 import { useSession } from "../../src/features/auth/use-session";
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { PublicBioBlock } from "../../src/features/profiles/bio-section";
 import { Screen } from "../../src/components/ui/screen";
 import {
@@ -257,7 +257,7 @@ export default function NetworkScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
+      <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
         <View
           style={{
             gap: spacing[10],
@@ -793,7 +793,7 @@ export default function NetworkScreen() {
                 ) : null}
               </View>
             ))}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }
