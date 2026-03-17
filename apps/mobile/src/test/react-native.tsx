@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from "react";
 
-import { createElement } from "react";
+import { createElement, forwardRef } from "react";
 
 const createComponent = (name: string) =>
   function MockComponent({
@@ -10,17 +10,48 @@ const createComponent = (name: string) =>
     return createElement(name, props, children);
   };
 
+const createRefComponent = (name: string) =>
+  forwardRef(function MockRefComponent(
+    { children, ...props }: PropsWithChildren<Record<string, unknown>>,
+    ref,
+  ) {
+    return createElement(name, { ...props, ref }, children);
+  });
+
 export const SafeAreaView = createComponent("SafeAreaView");
 export const ActivityIndicator = createComponent("ActivityIndicator");
 export const Modal = createComponent("Modal");
 export const Image = createComponent("Image");
 export const Pressable = createComponent("Pressable");
-export const ScrollView = createComponent("ScrollView");
+export const ScrollView = createRefComponent("ScrollView");
 export const Text = createComponent("Text");
-export const TextInput = createComponent("TextInput");
+export const TextInput = Object.assign(createRefComponent("TextInput"), {
+  State: {
+    currentlyFocusedInput: () => null,
+  },
+});
+export const TouchableWithoutFeedback = createComponent("TouchableWithoutFeedback");
 export const View = createComponent("View");
 export const Alert = {
   alert: () => undefined,
+};
+const keyboardListeners = new Map<string, Set<(event: any) => void>>();
+export const Keyboard = {
+  addListener: (eventName: string, callback: (event: any) => void) => {
+    const listeners = keyboardListeners.get(eventName) ?? new Set();
+    listeners.add(callback);
+    keyboardListeners.set(eventName, listeners);
+
+    return {
+      remove: () => {
+        listeners.delete(callback);
+      },
+    };
+  },
+  dismiss: () => undefined,
+  __trigger: (eventName: string, payload: any) => {
+    keyboardListeners.get(eventName)?.forEach((callback) => callback(payload));
+  },
 };
 export const Dimensions = {
   get: () => ({
@@ -56,6 +87,10 @@ export const PanResponder = {
 };
 export const StyleSheet = {
   create: <T,>(styles: T) => styles,
+  flatten: (styles: any) =>
+    Array.isArray(styles)
+      ? styles.reduce((accumulator, style) => ({ ...accumulator, ...style }), {})
+      : styles,
   absoluteFillObject: {
     bottom: 0,
     left: 0,
@@ -67,3 +102,4 @@ export const StyleSheet = {
 export const Platform = {
   OS: "ios",
 };
+export const findNodeHandle = () => 1;

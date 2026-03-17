@@ -4,12 +4,12 @@ import * as Clipboard from "expo-clipboard";
 import {
   Alert,
   Linking,
-  ScrollView,
   Text,
   View,
 } from "react-native";
 
 import { useSession } from "../../src/features/auth/use-session";
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import {
   getShareablePhoneContact,
@@ -208,7 +208,9 @@ export default function ConversationScreen() {
 
   return (
     <Screen>
-      <View style={{ flex: 1, gap: 16 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ gap: 16, paddingBottom: spacing[16] }}
+      >
         <View
           style={{
             gap: 10,
@@ -239,92 +241,87 @@ export default function ConversationScreen() {
           </Text>
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ gap: 12, paddingBottom: 12 }}
-          style={{ flex: 1 }}
-        >
-          {isLoading ? (
-            <Card style={{ borderRadius: 20 }}>
-              <Text style={{ color: colors.textSecondary }}>
-                Caricamento conversazione in corso...
-              </Text>
-            </Card>
-          ) : null}
-          {!isLoading && messages.length === 0 ? (
-            <Card style={{ borderRadius: 20 }}>
-              <Text style={{ color: colors.textSecondary }}>
-                Nessun messaggio ancora inviato. Usa il box qui sotto per rompere
-                il ghiaccio.
-              </Text>
-            </Card>
-          ) : null}
-          {messages.map((message) => {
-            const isOwnMessage = message.sender_profile_id === session.user.id;
+        {isLoading ? (
+          <Card style={{ borderRadius: 20 }}>
+            <Text style={{ color: colors.textSecondary }}>
+              Caricamento conversazione in corso...
+            </Text>
+          </Card>
+        ) : null}
+        {!isLoading && messages.length === 0 ? (
+          <Card style={{ borderRadius: 20 }}>
+            <Text style={{ color: colors.textSecondary }}>
+              Nessun messaggio ancora inviato. Usa il box qui sotto per rompere
+              il ghiaccio.
+            </Text>
+          </Card>
+        ) : null}
+        {messages.map((message) => {
+          const isOwnMessage = message.sender_profile_id === session.user.id;
 
-            return message.message_kind === "contact_card" &&
-              message.shared_contact_name &&
-              message.shared_contact_phone ? (
-              <View
-                key={message.message_id}
+          return message.message_kind === "contact_card" &&
+            message.shared_contact_name &&
+            message.shared_contact_phone ? (
+            <View
+              key={message.message_id}
+              style={{
+                alignSelf: isOwnMessage ? "flex-end" : "flex-start",
+                maxWidth: "82%",
+              }}
+            >
+              <ContactCardMessage
+                isOwnMessage={isOwnMessage}
+                name={message.shared_contact_name}
+                onLongPress={() => void handleCopyPhone(message.shared_contact_phone ?? "")}
+                onPress={() => void Linking.openURL(`tel:${message.shared_contact_phone}`)}
+                phone={message.shared_contact_phone}
+                timestamp={formatTimestamp(message.sent_at)}
+              />
+            </View>
+          ) : (
+            <View
+              key={message.message_id}
+              style={{
+                alignSelf: isOwnMessage ? "flex-end" : "flex-start",
+                maxWidth: "82%",
+                gap: 6,
+                padding: 14,
+                borderRadius: 18,
+                backgroundColor: isOwnMessage
+                  ? colors.accent
+                  : colors.surface,
+                borderWidth: isOwnMessage ? 0 : 1,
+                borderColor: colors.border,
+              }}
+            >
+              <Text
                 style={{
-                  alignSelf: isOwnMessage ? "flex-end" : "flex-start",
-                  maxWidth: "82%",
+                  color: isOwnMessage ? colors.inkInvert : colors.textPrimary,
+                  fontWeight: "800",
                 }}
               >
-                <ContactCardMessage
-                  isOwnMessage={isOwnMessage}
-                  name={message.shared_contact_name}
-                  onLongPress={() => void handleCopyPhone(message.shared_contact_phone ?? "")}
-                  onPress={() => void Linking.openURL(`tel:${message.shared_contact_phone}`)}
-                  phone={message.shared_contact_phone}
-                  timestamp={formatTimestamp(message.sent_at)}
-                />
-              </View>
-            ) : (
-              <View
-                key={message.message_id}
+                {isOwnMessage ? "Tu" : message.sender_full_name}
+              </Text>
+              <Text
                 style={{
-                  alignSelf: isOwnMessage ? "flex-end" : "flex-start",
-                  maxWidth: "82%",
-                  gap: 6,
-                  padding: 14,
-                  borderRadius: 18,
-                  backgroundColor: isOwnMessage
-                    ? colors.accent
-                    : colors.surface,
-                  borderWidth: isOwnMessage ? 0 : 1,
-                  borderColor: colors.border,
+                  color: isOwnMessage ? colors.inkInvert : colors.textPrimary,
+                  lineHeight: 22,
                 }}
               >
-                <Text
-                  style={{
-                    color: isOwnMessage ? colors.inkInvert : colors.textPrimary,
-                    fontWeight: "800",
-                  }}
-                >
-                  {isOwnMessage ? "Tu" : message.sender_full_name}
-                </Text>
-                <Text
-                  style={{
-                    color: isOwnMessage ? colors.inkInvert : colors.textPrimary,
-                    lineHeight: 22,
-                  }}
-                >
-                  {message.body}
-                </Text>
-                <Text
-                  style={{
-                    color: isOwnMessage ? colors.textInverseMuted : colors.textMuted,
-                    fontSize: 12,
-                    fontWeight: "700",
-                  }}
-                >
-                  {formatTimestamp(message.sent_at)}
-                </Text>
-              </View>
-            );
-          })}
-        </ScrollView>
+                {message.body}
+              </Text>
+              <Text
+                style={{
+                  color: isOwnMessage ? colors.textInverseMuted : colors.textMuted,
+                  fontSize: 12,
+                  fontWeight: "700",
+                }}
+              >
+                {formatTimestamp(message.sent_at)}
+              </Text>
+            </View>
+          );
+        })}
 
         <Card
           style={{
@@ -363,7 +360,7 @@ export default function ConversationScreen() {
           phone={shareablePhone}
           visible={isShareModalVisible}
         />
-      </View>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }
