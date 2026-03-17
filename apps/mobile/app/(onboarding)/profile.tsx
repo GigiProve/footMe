@@ -26,7 +26,6 @@ import {
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
   normalizeProfileBioInput,
-  validateProfileBio,
 } from "../../src/features/profiles/profile-form-utils";
 import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
 import {
@@ -557,9 +556,13 @@ export default function OnboardingProfileScreen() {
         await ensureInitialProfileCreated();
       }
 
-      const nextStep = mode === "now" ? "details" : "complete";
-      patchForm({ lastCompletedStep: "decision" });
-      navigateToStep(nextStep);
+      if (mode === "now") {
+        patchForm({ lastCompletedStep: "decision" });
+        navigateToStep("details");
+        return;
+      }
+
+      goToCompletion("decision");
     } catch (error) {
       const alertCopy = getBaseStepAlert(error);
       Alert.alert(alertCopy.title, alertCopy.message);
@@ -634,7 +637,7 @@ export default function OnboardingProfileScreen() {
             : null,
         profile: {
           avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(bio),
+          bio: parseOptionalText(normalizeProfileBioInput(bio)),
           birth_date: birthDate,
           city: null,
           full_name: fullName,
@@ -677,8 +680,7 @@ export default function OnboardingProfileScreen() {
         }
       }
 
-      patchForm({ lastCompletedStep: "details" });
-      navigateToStep("complete");
+      goToCompletion("details");
     } catch (error) {
       const message =
         error instanceof Error
@@ -705,6 +707,19 @@ export default function OnboardingProfileScreen() {
     }
 
     router.replace("/(tabs)");
+  }
+
+  function goToCompletion(previousStep: "decision" | "details") {
+    patchForm({ lastCompletedStep: previousStep });
+    navigateToStep("complete");
+  }
+
+  function appendUploadedMedia(
+    field: "clubGalleryItems" | "playerMediaItems",
+    items: UploadedMediaItem[],
+  ) {
+    const currentItems = form[field];
+    updateValue(field, [...currentItems, ...items]);
   }
 
   if (!isHydrated) {
@@ -1410,10 +1425,7 @@ export default function OnboardingProfileScreen() {
                         folder: "player-media",
                         mediaTypes: ["images", "videos"],
                         onUploaded: (items) =>
-                          updateValue("playerMediaItems", [
-                            ...playerMediaItems,
-                            ...items,
-                          ]),
+                          appendUploadedMedia("playerMediaItems", items),
                       })
                     }
                     selectedCount={playerMediaItems.length}
@@ -1629,10 +1641,7 @@ export default function OnboardingProfileScreen() {
                         folder: "club-gallery",
                         mediaTypes: ["images", "videos"],
                         onUploaded: (items) =>
-                          updateValue("clubGalleryItems", [
-                            ...clubGalleryItems,
-                            ...items,
-                          ]),
+                          appendUploadedMedia("clubGalleryItems", items),
                       })
                     }
                   selectedCount={clubGalleryItems.length}
@@ -1677,10 +1686,7 @@ export default function OnboardingProfileScreen() {
               <View style={{ flex: 1 }}>
                 <Button
                   label="Piu' tardi"
-                  onPress={() => {
-                    patchForm({ lastCompletedStep: "details" });
-                    navigateToStep("complete");
-                  }}
+                  onPress={() => goToCompletion("details")}
                   variant="secondary"
                 />
               </View>

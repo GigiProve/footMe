@@ -49,7 +49,12 @@ export function OnboardingFormProvider({ children }: PropsWithChildren) {
           return;
         }
 
-        const parsedValue = JSON.parse(storedValue) as Partial<OnboardingFormState>;
+        const parsedValue = JSON.parse(storedValue) as unknown;
+
+        if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) {
+          return;
+        }
+
         setForm(normalizeOnboardingDraft(parsedValue));
       } catch (error) {
         console.warn("[onboarding] unable to restore draft", error);
