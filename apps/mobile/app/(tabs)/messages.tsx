@@ -18,8 +18,10 @@ import { colors, radius, spacing, typography } from "../../src/theme/tokens";
 import { Button } from "../../src/ui";
 
 const roleLabels: Record<string, string> = {
+  agent: "Procuratore",
   club_admin: "Societa'",
   coach: "Allenatore",
+  director: "Dirigente",
   player: "Calciatore",
   staff: "Staff",
 };

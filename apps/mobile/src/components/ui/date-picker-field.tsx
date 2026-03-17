@@ -33,9 +33,9 @@ export function DatePickerField({
   const maximumDate = useMemo(() => new Date(), []);
 
   function handlePickerChange(event: DateTimePickerEvent, nextDate?: Date) {
-    if (Platform.OS === "android") {
-      setIsOpen(false);
-    }
+    // The onboarding flow requires the calendar to dismiss immediately after a
+    // valid selection so the user can continue the form without extra taps.
+    setIsOpen(false);
 
     if (event.type === "dismissed" || !nextDate) {
       return;

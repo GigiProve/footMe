@@ -7,9 +7,12 @@ import {
   createBirthDayOptions,
   formatBirthDateValue,
   formatBirthDate,
+  formatName,
   formatBirthDateInputValue,
   formatLocationSummary,
   formatProfileDisplayName,
+  composePhoneNumber,
+  getCountryByCode,
   getSocialDisplayValue,
   getBirthDateParts,
   getRegionFromCity,
@@ -20,6 +23,7 @@ import {
   normalizeContactEmail,
   normalizeBirthDateInput,
   normalizeFacebookInput,
+  normalizePhoneLocalNumber,
   normalizeInstagramInput,
   normalizePhoneInput,
   normalizeProfileBioInput,
@@ -27,6 +31,8 @@ import {
   parseBirthDate,
   parseBirthDateInput,
   searchItalianCities,
+  searchCountries,
+  splitPhoneNumber,
   validateProfileBio,
   validateBirthDateInput,
 } from "./profile-form-utils";
@@ -103,6 +109,18 @@ describe("profile-form-utils", () => {
     expect(isRegionConsistentWithCity("Milano", "Lazio")).toBe(false);
   });
 
+  it("formats person names and country autocomplete results", () => {
+    expect(formatName("gIUseppe d'angelo")).toBe("Giuseppe D'Angelo");
+    expect(searchCountries("ita", 3)[0]).toMatchObject({
+      code: "IT",
+      name: "Italia",
+    });
+    expect(getCountryByCode("IT")).toMatchObject({
+      code: "IT",
+      phoneCountryCode: "+39",
+    });
+  });
+
   it("normalizes and validates public contact fields", () => {
     expect(normalizeInstagramInput("@mario.rossi")).toBe(
       "https://instagram.com/mario.rossi",
@@ -118,6 +136,12 @@ describe("profile-form-utils", () => {
     expect(isEmailValid("mario@example")).toBe(false);
     expect(normalizePhoneInput("+39 333 123 4567")).toBe("+393331234567");
     expect(normalizePhoneInput("0039 3331234567")).toBe("+393331234567");
+    expect(normalizePhoneLocalNumber("333 12a34")).toBe("3331234");
+    expect(composePhoneNumber("+39", "3331234567")).toBe("+393331234567");
+    expect(splitPhoneNumber("+393331234567")).toEqual({
+      phoneCountryCode: "+39",
+      phoneNumber: "3331234567",
+    });
     expect(isPhoneNumberValid("+393331234567")).toBe(true);
     expect(isPhoneNumberValid("+1234567")).toBe(true);
     expect(isPhoneNumberValid("3331234567")).toBe(false);

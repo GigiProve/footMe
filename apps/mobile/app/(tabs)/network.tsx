@@ -40,6 +40,8 @@ const roleOptions: { label: string; value: SearchRoleFilter }[] = [
   { label: "Calciatori", value: "player" },
   { label: "Allenatori", value: "coach" },
   { label: "Staff", value: "staff" },
+  { label: "Procuratori", value: "agent" },
+  { label: "Dirigenti", value: "director" },
   { label: "Societa'", value: "club_admin" },
 ];
 
@@ -52,8 +54,10 @@ const positionOptions: { label: string; value: SearchPositionFilter }[] = [
 ];
 
 const roleLabels: Record<string, string> = {
+  agent: "Procuratore",
   club_admin: "Societa'",
   coach: "Allenatore",
+  director: "Dirigente",
   player: "Calciatore",
   staff: "Staff",
 };

@@ -1,3 +1,4 @@
+import { isPhoneNumberValid, normalizePhoneInput } from "../profiles/profile-form-utils";
 import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
 import type { PlayerPosition } from "../profiles/player-sports";
@@ -27,11 +28,11 @@ type CreateInitialProfileInput = {
 type ValidatedBaseProfileStep = {
   avatarUrl: string | null;
   birthDate: string;
-  domicile: string;
+  domicile: string | null;
   fullName: string;
-  nationality: string;
-  phoneNumber: string;
-  residence: string;
+  nationality: string | null;
+  phoneNumber: string | null;
+  residence: string | null;
 };
 
 export class BaseProfileValidationError extends Error {
@@ -52,11 +53,11 @@ function parseOptionalText(value: string) {
 export function validateBaseProfileStep(input: CreateInitialProfileInput): ValidatedBaseProfileStep {
   const avatarUrl = parseOptionalText(input.avatarUrl);
   const birthDate = input.birthDate.trim();
-  const domicile = input.domicile.trim();
+  const domicile = parseOptionalText(input.domicile);
   const fullName = input.fullName.trim();
-  const nationality = input.nationality.trim();
-  const phoneNumber = input.phoneNumber.trim();
-  const residence = input.residence.trim();
+  const nationality = parseOptionalText(input.nationality);
+  const phoneNumber = parseOptionalText(normalizePhoneInput(input.phoneNumber));
+  const residence = parseOptionalText(input.residence);
 
   if (!fullName) {
     throw new BaseProfileValidationError("Inserisci nome e cognome prima di continuare.", [
@@ -67,9 +68,6 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
   const missingFields = [
     !input.gender ? "sesso" : null,
     !birthDate ? "data di nascita" : null,
-    !nationality ? "nazionalità" : null,
-    !residence ? "residenza" : null,
-    !domicile ? "domicilio" : null,
   ].filter(Boolean) as string[];
 
   if (missingFields.length > 0) {
@@ -77,6 +75,12 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
       `Completa i campi obbligatori: ${missingFields.join(", ")}.`,
       missingFields,
     );
+  }
+
+  if (phoneNumber && !isPhoneNumberValid(phoneNumber)) {
+    throw new BaseProfileValidationError("Inserisci un numero di cellulare valido.", [
+      "numero di cellulare",
+    ]);
   }
 
   if (input.role === "club_admin") {
@@ -129,7 +133,7 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
   const { error: privateContactError } = await supabase
     .from("profile_private_contacts")
     .upsert({
-      phone: phoneNumber || null,
+      phone: phoneNumber,
       profile_id: input.userId,
     });
 

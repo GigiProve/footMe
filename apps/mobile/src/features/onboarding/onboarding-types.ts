@@ -1,4 +1,10 @@
-export type AppRole = "player" | "coach" | "staff" | "club_admin";
+export type AppRole =
+  | "player"
+  | "coach"
+  | "staff"
+  | "club_admin"
+  | "agent"
+  | "director";
 
 export type ProfileGender =
   | "male"
