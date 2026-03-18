@@ -691,14 +691,10 @@ export async function searchTeams(query: string, limit = 5) {
     return [] as TeamAutocompleteOption[];
   }
 
-  const escapedQuery = trimmedQuery.replace(/[\\%_]/g, (match) => `\\${match}`);
-
-  const { data, error } = await supabase
-    .from("clubs")
-    .select("id, name, city, logo_url")
-    .ilike("name", `%${escapedQuery}%`)
-    .order("name", { ascending: true })
-    .limit(limit);
+  const { data, error } = await supabase.rpc("search_teams", {
+    p_query: trimmedQuery,
+    p_limit: limit,
+  });
 
   if (error) {
     throw error;
@@ -706,13 +702,15 @@ export async function searchTeams(query: string, limit = 5) {
 
   return ((data ?? []) as {
     city: string | null;
-    id: string;
+    id: string | null;
+    is_community: boolean;
     logo_url: string | null;
     name: string;
-  }[]).map((club) => ({
-    city: club.city,
-    id: club.id,
-    logoUrl: club.logo_url,
-    name: club.name,
+  }[]).map((row) => ({
+    city: row.city,
+    id: row.id,
+    isCustom: row.is_community,
+    logoUrl: row.logo_url,
+    name: row.name,
   }));
 }

@@ -76,6 +76,7 @@ type AddPlayerExperienceFormProps = {
   saveLabel?: string;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
   title?: string;
+  usedSeasons?: Set<string>;
 };
 
 type PlayerCharacteristicsSectionProps = {
@@ -194,8 +195,13 @@ export function TeamAutocompleteInput({
   value,
 }: TeamAutocompleteInputProps) {
   const [suggestions, setSuggestions] = useState<TeamAutocompleteOption[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
     let isMounted = true;
     const debounceTimeout = setTimeout(() => {
       async function loadSuggestions() {
@@ -227,20 +233,30 @@ export function TeamAutocompleteInput({
       isMounted = false;
       clearTimeout(debounceTimeout);
     };
-  }, [searchTeams, value]);
+  }, [isOpen, searchTeams, value]);
 
   const normalizedQuery = value.trim().toLowerCase();
-  const shouldShowSuggestions = normalizedQuery.length >= 2;
+  const shouldShowSuggestions = isOpen && normalizedQuery.length >= 2;
   const hasExactMatch = suggestions.some(
     (suggestion) => suggestion.name.trim().toLowerCase() === normalizedQuery,
   );
+
+  function handleSelectTeam(team: TeamAutocompleteOption) {
+    setIsOpen(false);
+    setSuggestions([]);
+    onSelectTeam(team);
+  }
 
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.subsectionLabel}>{label}</Text>
       <Input
         autoCapitalize="words"
-        onChangeText={onChangeText}
+        onChangeText={(nextValue) => {
+          setIsOpen(true);
+          onChangeText(nextValue);
+        }}
+        onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
         value={value}
       />
@@ -252,7 +268,7 @@ export function TeamAutocompleteInput({
               <Pressable
                 accessibilityRole="button"
                 key={suggestion.id ?? `${suggestion.name}-${suggestion.city ?? "na"}`}
-                onPress={() => onSelectTeam(suggestion)}
+                onPress={() => handleSelectTeam(suggestion)}
                 style={({ pressed }) => [
                   styles.suggestionButton,
                   pressed ? styles.suggestionButtonPressed : null,
@@ -263,7 +279,8 @@ export function TeamAutocompleteInput({
                 <View style={styles.suggestionCopy}>
                   <Text style={styles.suggestionName}>{suggestion.name}</Text>
                   <Text style={styles.suggestionMeta}>
-                    {suggestion.city?.trim() || "Città non disponibile"}
+                    {suggestion.city?.trim()
+                      || (suggestion.isCustom ? "Aggiunta da altri giocatori" : "Città non disponibile")}
                   </Text>
                 </View>
               </Pressable>
@@ -273,7 +290,7 @@ export function TeamAutocompleteInput({
               <Pressable
                 accessibilityRole="button"
                 onPress={() =>
-                  onSelectTeam({
+                  handleSelectTeam({
                     city: null,
                     id: null,
                     isCustom: true,
@@ -333,14 +350,24 @@ export function ExperienceCard({
 
         {editable ? (
           <View style={styles.experienceActions}>
-            <Button label="Modifica" onPress={onEdit} size="sm" variant="secondary" />
-            <Button
-              destructive
-              label="Elimina"
+            <Pressable
+              accessibilityLabel="Modifica esperienza"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onEdit}
+              style={styles.experienceIconButton}
+            >
+              <Ionicons color={colors.textSecondary} name="pencil" size={16} />
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Elimina esperienza"
+              accessibilityRole="button"
+              hitSlop={8}
               onPress={onDelete}
-              size="sm"
-              variant="link"
-            />
+              style={styles.experienceIconButton}
+            >
+              <Ionicons color={colors.danger} name="trash-outline" size={16} />
+            </Pressable>
           </View>
         ) : null}
       </View>
@@ -370,6 +397,7 @@ export function AddPlayerExperienceForm({
   saveLabel = "Salva esperienza",
   searchTeams,
   title = "Aggiungi esperienza calcistica",
+  usedSeasons = new Set(),
 }: AddPlayerExperienceFormProps) {
   return (
     <View style={styles.modalBody}>
@@ -402,13 +430,38 @@ export function AddPlayerExperienceForm({
         value={experience.clubName}
       />
 
-      <SelectField
-        label="Stagione"
-        onChange={(value) => onChange({ ...experience, seasonLabel: value })}
-        options={PLAYER_SEASON_OPTIONS}
-        placeholder="Seleziona la stagione"
-        value={experience.seasonLabel}
-      />
+      <View style={styles.fieldGroup}>
+        <Text style={styles.subsectionLabel}>Stagione</Text>
+        <View style={styles.seasonGrid}>
+          {PLAYER_SEASON_OPTIONS.map((option) => {
+            const isSelected = experience.seasonLabel === option.value;
+            const isUsed = usedSeasons.has(option.value) && !isSelected;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isUsed}
+                key={option.value}
+                onPress={() => onChange({ ...experience, seasonLabel: option.value })}
+                style={[
+                  styles.seasonChip,
+                  isSelected ? styles.seasonChipSelected : null,
+                  isUsed ? styles.seasonChipDisabled : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.seasonChipText,
+                    isSelected ? styles.seasonChipTextSelected : null,
+                    isUsed ? styles.seasonChipTextDisabled : null,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
       <SelectField
         label="Categoria"
@@ -544,6 +597,16 @@ export function PlayerExperiencesSection({
     [experiences],
   );
 
+  const usedSeasons = useMemo(() => {
+    const seasons = new Set<string>();
+    for (const experience of sortedExperiences) {
+      if (experience.seasonLabel.trim()) {
+        seasons.add(experience.seasonLabel);
+      }
+    }
+    return seasons;
+  }, [sortedExperiences]);
+
   function closeModal() {
     setDraft(createEmptyPlayerExperienceForm());
     setEditingIndex(null);
@@ -641,6 +704,7 @@ export function PlayerExperiencesSection({
                     ? "Aggiungi esperienza calcistica"
                     : "Modifica esperienza calcistica"
                 }
+                usedSeasons={usedSeasons}
               />
             </ScrollView>
           </Pressable>
@@ -677,8 +741,15 @@ const styles = StyleSheet.create({
   experienceActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing[6],
-    flexWrap: "wrap",
+    gap: spacing[8],
+  },
+  experienceIconButton: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
   },
   experienceCard: {
     gap: spacing[10],
@@ -692,7 +763,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: spacing[10],
-    alignItems: "center",
+    alignItems: "flex-start",
   },
   experienceIdentity: {
     flexDirection: "row",
@@ -766,6 +837,38 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: typography.fontSize[16],
     fontWeight: typography.fontWeight.bold,
+  },
+  seasonChip: {
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[8],
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  seasonChipDisabled: {
+    opacity: 0.35,
+  },
+  seasonChipSelected: {
+    borderColor: colors.hero,
+    backgroundColor: colors.heroSoft,
+  },
+  seasonChipText: {
+    color: colors.textPrimary,
+    fontSize: typography.fontSize[14],
+    fontWeight: typography.fontWeight.regular,
+  },
+  seasonChipTextDisabled: {
+    color: colors.textMuted,
+  },
+  seasonChipTextSelected: {
+    color: colors.hero,
+    fontWeight: typography.fontWeight.bold,
+  },
+  seasonGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
   },
   sectionDescription: {
     color: colors.textSecondary,

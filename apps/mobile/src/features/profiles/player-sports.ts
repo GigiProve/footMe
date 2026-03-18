@@ -139,7 +139,14 @@ export const INTEREST_CATEGORY_OPTIONS: SportsSelectOption[] = [
   { label: "Terza categoria", value: "Terza categoria" },
 ];
 
-export function createPlayerSeasonOptions(startYear = 2024, totalSeasons = 4) {
+const FIRST_SEASON_START_YEAR = 2010;
+
+export function createPlayerSeasonOptions(
+  startYear = new Date().getFullYear(),
+  firstYear = FIRST_SEASON_START_YEAR,
+) {
+  const totalSeasons = startYear - firstYear + 1;
+
   return Array.from({ length: totalSeasons }, (_, index) => {
     const currentStartYear = startYear - index;
     const currentEndYear = currentStartYear + 1;
