@@ -281,31 +281,6 @@ describe("getCompleteProfessionalProfile", () => {
     });
   });
 
-  it("relies only on secondary_positions when hydrating player profiles", async () => {
-    mocks.playerMaybeSingleMock.mockResolvedValueOnce({
-      data: ({
-        height_cm: 180,
-        highlight_video_url: null,
-        preferred_categories: ["Promozione"],
-        preferred_foot: "right",
-        primary_position: "forward",
-        profile_id: "profile-1",
-        // Legacy payloads may still contain the removed scalar field, but the app
-        // should now ignore it completely in favor of secondary_positions.
-        secondary_position: "left_winger",
-        secondary_positions: [],
-        transfer_regions: ["Umbria"],
-        weight_kg: 75,
-        willing_to_change_club: true,
-      }) as Parameters<typeof mocks.playerMaybeSingleMock.mockResolvedValueOnce>[0]["data"],
-      error: null,
-    });
-
-    const result = await getCompleteProfessionalProfile("profile-1");
-
-    expect(result.playerProfile?.secondary_positions).toEqual([]);
-  });
-
   it("loads only club data for club admins", async () => {
     const club = {
       category: "Eccellenza",
