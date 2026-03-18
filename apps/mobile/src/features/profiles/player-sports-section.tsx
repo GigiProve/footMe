@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -15,10 +16,13 @@ import { colors, radius, spacing, typography } from "../../theme/tokens";
 import { Button, Card, Input } from "../../ui";
 import { FootballPositionPicker } from "./football-position-picker";
 import {
+  MONTH_OPTIONS,
   PLAYER_CATEGORY_OPTIONS,
   PLAYER_SEASON_OPTIONS,
   PREFERRED_FOOT_OPTIONS,
+  SEASON_PERIOD_OPTIONS,
   createEmptyPlayerExperienceForm,
+  getMonthShortLabel,
   getPlayerExperienceBadges,
   getPlayerPositionLabel,
   getPlayerPositionLabels,
@@ -28,6 +32,7 @@ import {
   type PlayerExperienceForm,
   type PlayerPosition,
   type PreferredFoot,
+  type SeasonPeriod,
   type TeamAutocompleteOption,
 } from "./player-sports";
 
@@ -153,34 +158,88 @@ export function StatsInputRow({
   return (
     <View style={styles.statsInputsWrapper}>
       <Text style={styles.subsectionLabel}>Statistiche</Text>
-      <View style={styles.statsGrid}>
-        <View style={styles.statsCell}>
-          <Text style={styles.statsLabel}>Presenze</Text>
-          <Input
-            keyboardType="number-pad"
-            onChangeText={(value) => onAppearancesChange(normalizeNumericInput(value))}
-            placeholder="0"
-            value={appearances}
-          />
-        </View>
-        <View style={styles.statsCell}>
-          <Text style={styles.statsLabel}>Gol</Text>
-          <Input
-            keyboardType="number-pad"
-            onChangeText={(value) => onGoalsChange(normalizeNumericInput(value))}
-            placeholder="0"
-            value={goals}
-          />
-        </View>
-        <View style={styles.statsCell}>
-          <Text style={styles.statsLabel}>Assist</Text>
-          <Input
-            keyboardType="number-pad"
-            onChangeText={(value) => onAssistsChange(normalizeNumericInput(value))}
-            placeholder="0"
-            value={assists}
-          />
-        </View>
+      <View style={styles.statsWheelRow}>
+        <StatStepper
+          label="Presenze"
+          onChange={onAppearancesChange}
+          value={appearances}
+        />
+        <StatStepper
+          label="Gol"
+          onChange={onGoalsChange}
+          value={goals}
+        />
+        <StatStepper
+          label="Assist"
+          onChange={onAssistsChange}
+          value={assists}
+        />
+      </View>
+    </View>
+  );
+}
+
+function StatStepper({
+  label,
+  max = 99,
+  onChange,
+  value,
+}: {
+  label: string;
+  max?: number;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const numericValue = Number(value) || 0;
+
+  function increment() {
+    if (numericValue < max) {
+      onChange(String(numericValue + 1));
+    }
+  }
+
+  function decrement() {
+    if (numericValue > 0) {
+      onChange(String(numericValue - 1));
+    }
+  }
+
+  function handleTextChange(text: string) {
+    const digits = normalizeNumericInput(text);
+    if (!digits) {
+      onChange("0");
+      return;
+    }
+    const clamped = Math.min(Number(digits), max);
+    onChange(String(clamped));
+  }
+
+  return (
+    <View style={styles.stepperCell}>
+      <Text style={styles.stepperLabel}>{label}</Text>
+      <View style={styles.stepperSurface}>
+        <Pressable
+          accessibilityLabel={`Aumenta ${label}`}
+          onPress={increment}
+          style={styles.stepperButton}
+        >
+          <Ionicons color={colors.textSecondary} name="chevron-up" size={18} />
+        </Pressable>
+        <TextInput
+          keyboardType="number-pad"
+          maxLength={String(max).length}
+          onChangeText={handleTextChange}
+          selectTextOnFocus
+          style={styles.stepperValue}
+          value={String(numericValue)}
+        />
+        <Pressable
+          accessibilityLabel={`Diminuisci ${label}`}
+          onPress={decrement}
+          style={styles.stepperButton}
+        >
+          <Ionicons color={colors.textSecondary} name="chevron-down" size={18} />
+        </Pressable>
       </View>
     </View>
   );
@@ -343,7 +402,12 @@ export function ExperienceCard({
             <Text style={styles.experienceMeta}>
               {(experience.category.trim() || "Categoria da definire") +
                 " • " +
-                (experience.seasonLabel.trim() || "Stagione da completare")}
+                (experience.seasonLabel.trim() || "Stagione da completare") +
+                (experience.seasonPeriod === "partial" &&
+                experience.periodStartMonth &&
+                experience.periodEndMonth
+                  ? ` (${getMonthShortLabel(experience.periodStartMonth)} – ${getMonthShortLabel(experience.periodEndMonth)})`
+                  : "")}
             </Text>
           </View>
         </View>
@@ -389,6 +453,17 @@ export function ExperienceCard({
   );
 }
 
+function isExperienceFormValid(experience: PlayerExperienceForm) {
+  const hasClub = Boolean(experience.clubName.trim());
+  const hasSeason = Boolean(experience.seasonLabel.trim());
+  const hasCategory = Boolean(experience.category.trim());
+  const hasPartialMonths =
+    experience.seasonPeriod !== "partial" ||
+    (Boolean(experience.periodStartMonth) && Boolean(experience.periodEndMonth));
+
+  return hasClub && hasSeason && hasCategory && hasPartialMonths;
+}
+
 export function AddPlayerExperienceForm({
   experience,
   onCancel,
@@ -399,6 +474,29 @@ export function AddPlayerExperienceForm({
   title = "Aggiungi esperienza calcistica",
   usedSeasons = new Set(),
 }: AddPlayerExperienceFormProps) {
+  const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
+  const isValid = isExperienceFormValid(experience);
+
+  const missingClub = hasAttemptedSave && !experience.clubName.trim();
+  const missingSeason = hasAttemptedSave && !experience.seasonLabel.trim();
+  const missingCategory = hasAttemptedSave && !experience.category.trim();
+  const missingStartMonth =
+    hasAttemptedSave &&
+    experience.seasonPeriod === "partial" &&
+    !experience.periodStartMonth;
+  const missingEndMonth =
+    hasAttemptedSave &&
+    experience.seasonPeriod === "partial" &&
+    !experience.periodEndMonth;
+
+  function handleSave() {
+    if (!isValid) {
+      setHasAttemptedSave(true);
+      return;
+    }
+    onSave();
+  }
+
   return (
     <View style={styles.modalBody}>
       <Text style={styles.modalTitle}>{title}</Text>
@@ -407,7 +505,7 @@ export function AddPlayerExperienceForm({
       </Text>
 
       <TeamAutocompleteInput
-        label="Squadra"
+        label="Squadra *"
         onChangeText={(value) =>
           onChange({
             ...experience,
@@ -429,9 +527,12 @@ export function AddPlayerExperienceForm({
         searchTeams={searchTeams}
         value={experience.clubName}
       />
+      {missingClub ? (
+        <Text style={styles.fieldError}>Inserisci la squadra.</Text>
+      ) : null}
 
       <View style={styles.fieldGroup}>
-        <Text style={styles.subsectionLabel}>Stagione</Text>
+        <Text style={styles.subsectionLabel}>Stagione *</Text>
         <View style={styles.seasonGrid}>
           {PLAYER_SEASON_OPTIONS.map((option) => {
             const isSelected = experience.seasonLabel === option.value;
@@ -461,15 +562,89 @@ export function AddPlayerExperienceForm({
             );
           })}
         </View>
+        {missingSeason ? (
+          <Text style={styles.fieldError}>Seleziona una stagione.</Text>
+        ) : null}
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.subsectionLabel}>Periodo *</Text>
+        <View style={styles.periodToggleRow}>
+          {SEASON_PERIOD_OPTIONS.map((option) => {
+            const isSelected = experience.seasonPeriod === option.value;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                key={option.value}
+                onPress={() =>
+                  onChange({
+                    ...experience,
+                    seasonPeriod: option.value as SeasonPeriod,
+                    ...(option.value === "full"
+                      ? { periodStartMonth: "", periodEndMonth: "" }
+                      : {}),
+                  })
+                }
+                style={[
+                  styles.periodChip,
+                  isSelected ? styles.periodChipSelected : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.periodChipText,
+                    isSelected ? styles.periodChipTextSelected : null,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {experience.seasonPeriod === "partial" ? (
+          <View style={styles.periodMonthsRow}>
+            <View style={styles.periodMonthField}>
+              <SelectField
+                label="Mese inizio *"
+                onChange={(value) => onChange({ ...experience, periodStartMonth: value })}
+                options={MONTH_OPTIONS}
+                placeholder="Mese"
+                value={experience.periodStartMonth}
+              />
+              {missingStartMonth ? (
+                <Text style={styles.fieldError}>Obbligatorio.</Text>
+              ) : null}
+            </View>
+            <View style={styles.periodMonthField}>
+              <SelectField
+                label="Mese fine *"
+                onChange={(value) => onChange({ ...experience, periodEndMonth: value })}
+                options={MONTH_OPTIONS}
+                placeholder="Mese"
+                value={experience.periodEndMonth}
+              />
+              {missingEndMonth ? (
+                <Text style={styles.fieldError}>Obbligatorio.</Text>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
       </View>
 
       <SelectField
-        label="Categoria"
+        label="Categoria *"
         onChange={(value) => onChange({ ...experience, category: value })}
         options={PLAYER_CATEGORY_OPTIONS}
         placeholder="Seleziona la categoria"
+        searchable
+        searchPlaceholder="Cerca categoria..."
         value={experience.category}
       />
+      {missingCategory ? (
+        <Text style={styles.fieldError}>Seleziona una categoria.</Text>
+      ) : null}
 
       <StatsInputRow
         appearances={experience.appearances}
@@ -500,7 +675,7 @@ export function AddPlayerExperienceForm({
 
       <View style={styles.modalActions}>
         <Button label="Annulla" onPress={onCancel} variant="secondary" />
-        <Button label={saveLabel} onPress={onSave} variant="primary" />
+        <Button label={saveLabel} onPress={handleSave} variant="primary" />
       </View>
     </View>
   );
@@ -781,7 +956,45 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize[16],
     fontWeight: typography.fontWeight.heavy,
   },
+  fieldError: {
+    color: colors.danger,
+    fontSize: typography.fontSize[12],
+    fontWeight: typography.fontWeight.bold,
+  },
   fieldGroup: {
+    gap: spacing[8],
+  },
+  periodChip: {
+    flex: 1,
+    paddingVertical: spacing[10],
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+  },
+  periodChipSelected: {
+    borderColor: colors.hero,
+    backgroundColor: colors.heroSoft,
+  },
+  periodChipText: {
+    color: colors.textPrimary,
+    fontSize: typography.fontSize[14],
+    fontWeight: typography.fontWeight.regular,
+  },
+  periodChipTextSelected: {
+    color: colors.hero,
+    fontWeight: typography.fontWeight.bold,
+  },
+  periodMonthField: {
+    flex: 1,
+  },
+  periodMonthsRow: {
+    flexDirection: "row",
+    gap: spacing[10],
+  },
+  periodToggleRow: {
+    flexDirection: "row",
     gap: spacing[8],
   },
   modalActions: {
@@ -885,26 +1098,48 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize[18],
     fontWeight: typography.fontWeight.heavy,
   },
-  statsCell: {
+  stepperButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing[6],
+  },
+  stepperCell: {
     flex: 1,
-    minWidth: 80,
+    alignItems: "center",
     gap: spacing[6],
   },
-  statsGrid: {
-    flexDirection: "row",
-    gap: spacing[10],
-    flexWrap: "wrap",
-  },
-  statsInputsWrapper: {
-    gap: spacing[8],
-  },
-  statsLabel: {
+  stepperLabel: {
     color: colors.textSecondary,
     fontSize: typography.fontSize[12],
     fontWeight: typography.fontWeight.bold,
     textTransform: "uppercase",
   },
-  statsInlineRow: {
+  stepperSurface: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radius[16],
+    borderWidth: 1,
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[4],
+    width: 72,
+  },
+  stepperValue: {
+    color: colors.textPrimary,
+    fontSize: typography.fontSize[24],
+    fontWeight: typography.fontWeight.heavy,
+    textAlign: "center",
+    minWidth: 40,
+    padding: 0,
+  },
+  statsWheelRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  statsInputsWrapper: {
+    gap: spacing[8],
+  },
+statsInlineRow: {
     paddingHorizontal: spacing[4],
   },
   statsInlineText: {

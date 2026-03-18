@@ -15,7 +15,7 @@ type WheelPickerProps = {
   min: number;
   onChange: (value: number) => void;
   step?: number;
-  unit: "cm" | "kg";
+  unit?: string;
   value: number | null | undefined;
 };
 
@@ -92,7 +92,7 @@ export function WheelPicker({
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           snapToInterval={ITEM_HEIGHT}
-          testID={`wheel-picker-${unit}`}
+          testID={unit ? `wheel-picker-${unit}` : undefined}
         >
           {values.map((entry, index) => {
             const distanceFromCenter = Math.abs(scrollOffset - index * ITEM_HEIGHT);
@@ -122,7 +122,7 @@ export function WheelPicker({
                       transform: [{ scale }],
                     },
                   ]}
-                  testID={`wheel-picker-value-${unit}-${entry}`}
+                  testID={unit ? `wheel-picker-value-${unit}-${entry}` : undefined}
                 >
                   {entry}
                 </Text>
@@ -130,9 +130,11 @@ export function WheelPicker({
             );
           })}
         </ScrollView>
-        <View style={styles.unitBadge} testID={`wheel-picker-unit-${unit}`}>
-          <Text style={styles.unitBadgeText}>{unit}</Text>
-        </View>
+        {unit ? (
+          <View style={styles.unitBadge} testID={`wheel-picker-unit-${unit}`}>
+            <Text style={styles.unitBadgeText}>{unit}</Text>
+          </View>
+        ) : null}
       </View>
       {value === null || value === undefined ? (
         <Text style={styles.helperText}>Scorri la rotella per impostare il valore.</Text>

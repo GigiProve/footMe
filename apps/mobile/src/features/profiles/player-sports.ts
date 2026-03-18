@@ -40,6 +40,8 @@ export type TeamAutocompleteOption = {
   name: string;
 };
 
+export type SeasonPeriod = "full" | "partial";
+
 export type PlayerExperienceForm = {
   appearances: string;
   assists: string;
@@ -50,7 +52,10 @@ export type PlayerExperienceForm = {
   goals: string;
   id?: string;
   minutesPlayed: string;
+  periodEndMonth: string;
+  periodStartMonth: string;
   seasonLabel: string;
+  seasonPeriod: SeasonPeriod;
   teamCity: string;
   teamLogoUrl: string;
 };
@@ -65,7 +70,10 @@ export type PlayerExperiencePayload = {
   goals: number;
   id?: string;
   minutes_played: number;
+  period_end_month: number | null;
+  period_start_month: number | null;
   season_label: string;
+  season_period: SeasonPeriod;
   sort_order: number;
   team_logo_url: string | null;
 };
@@ -80,7 +88,10 @@ type PlayerExperienceSource = {
   goals: number;
   id?: string;
   minutes_played?: number;
+  period_end_month?: number | null;
+  period_start_month?: number | null;
   season_label: string;
+  season_period?: string | null;
   team_logo_url?: string | null;
 };
 
@@ -119,25 +130,78 @@ export const PREFERRED_FOOT_OPTIONS: SportsSelectOption<PreferredFoot>[] = [
 ];
 
 export const PLAYER_CATEGORY_OPTIONS: SportsSelectOption[] = [
+  { label: "Serie A", value: "Serie A" },
+  { label: "Serie B", value: "Serie B" },
   { label: "Serie C", value: "Serie C" },
   { label: "Serie D", value: "Serie D" },
   { label: "Eccellenza", value: "Eccellenza" },
   { label: "Promozione", value: "Promozione" },
-  { label: "Prima categoria", value: "Prima categoria" },
-  { label: "Seconda categoria", value: "Seconda categoria" },
-  { label: "Terza categoria", value: "Terza categoria" },
+  { label: "Prima Categoria", value: "Prima Categoria" },
+  { label: "Seconda Categoria", value: "Seconda Categoria" },
+  { label: "Terza Categoria", value: "Terza Categoria" },
+  { label: "Primavera", value: "Primavera" },
   { label: "Juniores", value: "Juniores" },
+  { label: "Allievi", value: "Allievi" },
+  { label: "Giovanissimi", value: "Giovanissimi" },
+  { label: "Esordienti", value: "Esordienti" },
 ];
 
 export const INTEREST_CATEGORY_OPTIONS: SportsSelectOption[] = [
+  { label: "Serie A", value: "Serie A" },
+  { label: "Serie B", value: "Serie B" },
   { label: "Serie C", value: "Serie C" },
   { label: "Serie D", value: "Serie D" },
   { label: "Eccellenza", value: "Eccellenza" },
   { label: "Promozione", value: "Promozione" },
-  { label: "Prima categoria", value: "Prima categoria" },
-  { label: "Seconda categoria", value: "Seconda categoria" },
-  { label: "Terza categoria", value: "Terza categoria" },
+  { label: "Prima Categoria", value: "Prima Categoria" },
+  { label: "Seconda Categoria", value: "Seconda Categoria" },
+  { label: "Terza Categoria", value: "Terza Categoria" },
+  { label: "Primavera", value: "Primavera" },
+  { label: "Juniores", value: "Juniores" },
+  { label: "Allievi", value: "Allievi" },
+  { label: "Giovanissimi", value: "Giovanissimi" },
+  { label: "Esordienti", value: "Esordienti" },
 ];
+
+export const SEASON_PERIOD_OPTIONS: SportsSelectOption<SeasonPeriod>[] = [
+  { label: "Intera stagione", value: "full" },
+  { label: "Solo un periodo", value: "partial" },
+];
+
+export const MONTH_OPTIONS: SportsSelectOption[] = [
+  { label: "Gennaio", value: "1" },
+  { label: "Febbraio", value: "2" },
+  { label: "Marzo", value: "3" },
+  { label: "Aprile", value: "4" },
+  { label: "Maggio", value: "5" },
+  { label: "Giugno", value: "6" },
+  { label: "Luglio", value: "7" },
+  { label: "Agosto", value: "8" },
+  { label: "Settembre", value: "9" },
+  { label: "Ottobre", value: "10" },
+  { label: "Novembre", value: "11" },
+  { label: "Dicembre", value: "12" },
+];
+
+const monthLabels: Record<string, string> = {
+  "1": "Gen",
+  "2": "Feb",
+  "3": "Mar",
+  "4": "Apr",
+  "5": "Mag",
+  "6": "Giu",
+  "7": "Lug",
+  "8": "Ago",
+  "9": "Set",
+  "10": "Ott",
+  "11": "Nov",
+  "12": "Dic",
+};
+
+export function getMonthShortLabel(value: string | number | null | undefined) {
+  if (value == null) return null;
+  return monthLabels[String(value)] ?? null;
+}
 
 const FIRST_SEASON_START_YEAR = 2010;
 
@@ -266,7 +330,10 @@ export function createEmptyPlayerExperienceForm(): PlayerExperienceForm {
     clubName: "",
     goals: "",
     minutesPlayed: "",
+    periodEndMonth: "",
+    periodStartMonth: "",
     seasonLabel: "",
+    seasonPeriod: "full",
     teamCity: "",
     teamLogoUrl: "",
   };
@@ -416,7 +483,10 @@ export function toPlayerExperienceForm(
     goals: String(entry.goals ?? 0),
     id: entry.id,
     minutesPlayed: String(entry.minutes_played ?? 0),
+    periodEndMonth: entry.period_end_month != null ? String(entry.period_end_month) : "",
+    periodStartMonth: entry.period_start_month != null ? String(entry.period_start_month) : "",
     seasonLabel: normalizeSeasonLabelInput(entry.season_label),
+    seasonPeriod: entry.season_period === "partial" ? "partial" : "full",
     teamCity: "",
     teamLogoUrl: entry.team_logo_url ?? "",
   };
@@ -443,6 +513,14 @@ export function parsePlayerExperienceForms(entries: PlayerExperienceForm[]) {
         throw new Error(`Seleziona la categoria per l'esperienza ${index + 1}.`);
       }
 
+      const isPartial = entry.seasonPeriod === "partial";
+      const periodStartMonth = isPartial && entry.periodStartMonth
+        ? Number(entry.periodStartMonth)
+        : null;
+      const periodEndMonth = isPartial && entry.periodEndMonth
+        ? Number(entry.periodEndMonth)
+        : null;
+
       return {
         appearances: parseNonNegativeStat(entry.appearances, "Presenze"),
         assists: parseNonNegativeStat(entry.assists, "Assist"),
@@ -453,7 +531,10 @@ export function parsePlayerExperienceForms(entries: PlayerExperienceForm[]) {
         goals: parseNonNegativeStat(entry.goals, "Gol"),
         id: entry.id,
         minutes_played: parseNonNegativeStat(entry.minutesPlayed, "Minuti giocati"),
+        period_end_month: periodEndMonth,
+        period_start_month: periodStartMonth,
         season_label: seasonLabel,
+        season_period: entry.seasonPeriod,
         sort_order: index,
         team_logo_url: parseOptionalText(entry.teamLogoUrl),
       };
