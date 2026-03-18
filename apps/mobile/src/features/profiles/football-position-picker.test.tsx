@@ -21,10 +21,39 @@ describe("football-position-picker", () => {
     });
 
     act(() => {
-      tree!.root.findByProps({ testID: "football-position-central_midfielder" }).props.onPress();
+      tree!.root.findByProps({ testID: "football-position-central-midfielder" }).props.onPress();
     });
 
     expect(onSelect).toHaveBeenCalledWith(["central_midfielder"]);
+  });
+
+  it("renders two center-back dots that map to the same role", () => {
+    const onSelect = vi.fn();
+    let tree: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(
+        <FootballPositionPicker
+          mode="single"
+          onSelect={onSelect}
+          selectedPositions={[]}
+          title="Ruolo principale"
+        />,
+      );
+    });
+
+    expect(
+      tree!.root.findByProps({ testID: "football-position-center-back-left" }),
+    ).toBeTruthy();
+    expect(
+      tree!.root.findByProps({ testID: "football-position-center-back-right" }),
+    ).toBeTruthy();
+
+    act(() => {
+      tree!.root.findByProps({ testID: "football-position-center-back-right" }).props.onPress();
+    });
+
+    expect(onSelect).toHaveBeenCalledWith(["center_back"]);
   });
 
   it("toggles multiple secondary roles independently", () => {
@@ -43,13 +72,13 @@ describe("football-position-picker", () => {
     });
 
     act(() => {
-      tree!.root.findByProps({ testID: "football-position-right_winger" }).props.onPress();
+      tree!.root.findByProps({ testID: "football-position-right-winger" }).props.onPress();
     });
 
     expect(onSelect).toHaveBeenCalledWith(["left_back", "right_winger"]);
 
     act(() => {
-      tree!.root.findByProps({ testID: "football-position-left_back" }).props.onPress();
+      tree!.root.findByProps({ testID: "football-position-left-back" }).props.onPress();
     });
 
     expect(onSelect).toHaveBeenCalledWith([]);

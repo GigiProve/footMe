@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { colors, radius, sizes, spacing, typography } from "../../theme/tokens";
+import { colors, radius, spacing, typography } from "../../theme/tokens";
 
 const ITEM_HEIGHT = 52;
 const VISIBLE_ITEMS = 5;
@@ -32,6 +32,7 @@ export function WheelPicker({
   value,
 }: WheelPickerProps) {
   const scrollViewRef = useRef<ScrollView>(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
   const values = useMemo(() => {
     return Array.from({ length: Math.floor((max - min) / step) + 1 }, (_, index) => {
       return min + index * step;
@@ -56,9 +57,12 @@ export function WheelPicker({
       return;
     }
 
+    const nextOffset = selectedIndex * ITEM_HEIGHT;
+    setScrollOffset(nextOffset);
+
     scrollViewRef.current?.scrollTo({
       animated: false,
-      y: selectedIndex * ITEM_HEIGHT,
+      y: nextOffset,
     });
   }, [selectedValue, values]);
 
@@ -81,6 +85,7 @@ export function WheelPicker({
           contentContainerStyle={styles.scrollContent}
           decelerationRate="fast"
           onMomentumScrollEnd={(event) => commitOffset(event.nativeEvent.contentOffset.y)}
+          onScroll={(event) => setScrollOffset(event.nativeEvent.contentOffset.y)}
           onScrollEndDrag={(event) => commitOffset(event.nativeEvent.contentOffset.y)}
           ref={scrollViewRef}
           scrollEventThrottle={16}
@@ -88,19 +93,38 @@ export function WheelPicker({
           snapToInterval={ITEM_HEIGHT}
           testID={`wheel-picker-${unit}`}
         >
-          {values.map((entry) => {
-            const isSelected = entry === selectedValue;
+          {values.map((entry, index) => {
+            const distanceFromCenter = Math.abs(scrollOffset - index * ITEM_HEIGHT);
+            const interpolationStep = Math.min(distanceFromCenter / ITEM_HEIGHT, 2);
+            const opacity = Math.max(0.32, 1 - interpolationStep * 0.28);
+            const scale = Math.max(0.82, 1.08 - interpolationStep * 0.14);
+            const fontSize = Math.max(
+              typography.fontSize[16],
+              typography.fontSize[24] - interpolationStep * 4,
+            );
+            const isSelected = distanceFromCenter < ITEM_HEIGHT / 2;
 
             return (
               <View key={entry} style={styles.valueRow}>
-                <Text style={[styles.valueText, isSelected ? styles.valueTextSelected : null]}>
+                <Text
+                  style={[
+                    styles.valueText,
+                    isSelected ? styles.valueTextSelected : null,
+                    {
+                      fontSize,
+                      opacity,
+                      transform: [{ scale }],
+                    },
+                  ]}
+                  testID={`wheel-picker-value-${unit}-${entry}`}
+                >
                   {entry}
                 </Text>
               </View>
             );
           })}
         </ScrollView>
-        <View style={styles.unitBadge}>
+        <View style={styles.unitBadge} testID={`wheel-picker-unit-${unit}`}>
           <Text style={styles.unitBadgeText}>{unit}</Text>
         </View>
       </View>
@@ -158,19 +182,21 @@ const styles = StyleSheet.create({
   },
   unitBadge: {
     position: "absolute",
-    top: EDGE_PADDING + spacing[8],
-    right: spacing[16],
-    minWidth: sizes.touchTarget,
+    top: EDGE_PADDING + spacing[14],
+    right: spacing[12],
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.full,
-    backgroundColor: colors.hero,
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[8],
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "rgba(255,255,255,0.86)",
+    paddingHorizontal: spacing[8],
+    paddingVertical: spacing[4],
   },
   unitBadgeText: {
-    color: colors.inkInvert,
-    fontWeight: typography.fontWeight.bold,
+    color: colors.textSecondary,
+    fontSize: typography.fontSize[12],
+    fontWeight: typography.fontWeight.medium,
   },
   helperText: {
     color: colors.textSecondary,

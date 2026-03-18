@@ -12,19 +12,21 @@ import {
 
 const pitchSlots: {
   abbreviation: string;
+  id: string;
   key: FootballPositionSlot;
   row: number;
 }[] = [
-  { abbreviation: "AS", key: "left_winger", row: 0 },
-  { abbreviation: "ATT", key: "striker", row: 0 },
-  { abbreviation: "AD", key: "right_winger", row: 0 },
-  { abbreviation: "TRQ", key: "attacking_midfielder", row: 1 },
-  { abbreviation: "CEN", key: "central_midfielder", row: 2 },
-  { abbreviation: "MED", key: "defensive_midfielder", row: 2 },
-  { abbreviation: "TS", key: "left_back", row: 3 },
-  { abbreviation: "DIF", key: "center_back", row: 3 },
-  { abbreviation: "TD", key: "right_back", row: 3 },
-  { abbreviation: "POR", key: "goalkeeper", row: 4 },
+  { abbreviation: "AS", id: "left-winger", key: "left_winger", row: 0 },
+  { abbreviation: "ATT", id: "striker", key: "striker", row: 0 },
+  { abbreviation: "AD", id: "right-winger", key: "right_winger", row: 0 },
+  { abbreviation: "TRQ", id: "attacking-midfielder", key: "attacking_midfielder", row: 1 },
+  { abbreviation: "CEN", id: "central-midfielder", key: "central_midfielder", row: 2 },
+  { abbreviation: "MED", id: "defensive-midfielder", key: "defensive_midfielder", row: 2 },
+  { abbreviation: "TS", id: "left-back", key: "left_back", row: 3 },
+  { abbreviation: "DIF", id: "center-back-left", key: "center_back", row: 3 },
+  { abbreviation: "DIF", id: "center-back-right", key: "center_back", row: 3 },
+  { abbreviation: "TD", id: "right-back", key: "right_back", row: 3 },
+  { abbreviation: "POR", id: "goalkeeper", key: "goalkeeper", row: 4 },
 ];
 
 type FootballPositionPickerProps = {
@@ -103,7 +105,7 @@ export function FootballPositionPicker({
 
   const slotsByRow = useMemo(() => {
     return pitchSlots.reduce<Record<number, typeof pitchSlots>>((accumulator, slot) => {
-      accumulator[slot.row] = [...(accumulator[slot.row] ?? []), slot];
+      (accumulator[slot.row] = accumulator[slot.row] ?? []).push(slot);
       return accumulator;
     }, {});
   }, []);
@@ -147,11 +149,11 @@ export function FootballPositionPicker({
                 return (
                   <FootballNode
                     abbreviation={slot.abbreviation}
-                    key={slot.key}
+                    key={slot.id}
                     onPress={() => handleSlotPress(slot.key)}
                     roleLabel={getPlayerPositionLabel(role)}
                     selected={selected}
-                    testID={`football-position-${slot.key}`}
+                    testID={`football-position-${slot.id}`}
                   />
                 );
               })}
