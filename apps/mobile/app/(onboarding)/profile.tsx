@@ -3,6 +3,7 @@ import { Alert, BackHandler, Platform, Pressable, Text, View } from "react-nativ
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
+import { InterestCategoriesSelector } from "../../src/components/ui/interest-categories-selector";
 import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { MediaPickerField } from "../../src/components/ui/media-picker-field";
@@ -1413,11 +1414,9 @@ export default function OnboardingProfileScreen() {
                     onChange={(regions) => updateValue("transferRegions", regions.join(", "))}
                     value={fromDelimitedString(transferRegions)}
                   />
-                  <Input
-                    label="Categorie di interesse"
-                    onChangeText={(value) => updateValue("preferredCategories", value)}
-                    placeholder="Es. Promozione, Eccellenza"
-                    value={preferredCategories}
+                  <InterestCategoriesSelector
+                    onChange={(categories) => updateValue("preferredCategories", categories.join(", "))}
+                    value={fromDelimitedString(preferredCategories)}
                   />
                   <View style={{ gap: spacing[8] }}>
                     <Text

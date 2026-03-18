@@ -6,6 +6,7 @@ import {
 } from "react-native";
 
 import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
+import { InterestCategoriesSelector } from "../../src/components/ui/interest-categories-selector";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
@@ -1041,7 +1042,21 @@ export default function ProfileScreen() {
               section.title === "Informazioni personali" ? null : (
                 <Section key={section.title} description={section.subtitle} title={section.title}>
                   {section.items.map((item) =>
-                    item.label === "Regioni di interesse" ? (
+                    item.label === "Categorie preferite" ? (
+                      <Field
+                        key={`${section.title}-${item.label}`}
+                        label={item.label}
+                        renderInput={() => (
+                          <InterestCategoriesSelector
+                            editable={false}
+                            hideLabel
+                            onChange={() => {}}
+                            value={completeProfile?.playerProfile?.preferred_categories ?? []}
+                          />
+                        )}
+                        value={item.value}
+                      />
+                    ) : item.label === "Regioni di interesse" ? (
                       <Field
                         key={`${section.title}-${item.label}`}
                         label={item.label}
@@ -1242,15 +1257,14 @@ export default function ProfileScreen() {
                     primaryPosition={formState.primaryPosition}
                     secondaryPositions={formState.secondaryPositions}
                   />
-                  <Field
+                  <InterestCategoriesSelector
                     label="Categorie preferite"
-                    onChangeText={(value) =>
+                    onChange={(categories) =>
                       setFormState((current) =>
-                        current ? { ...current, preferredCategories: value } : current,
+                        current ? { ...current, preferredCategories: categories.join(", ") } : current,
                       )
                     }
-                    placeholder="Eccellenza, Promozione, Serie D"
-                    value={formState.preferredCategories}
+                    value={fromDelimitedString(formState.preferredCategories)}
                   />
                   <AvailabilityRegionsSelector
                     label="Regioni di interesse"

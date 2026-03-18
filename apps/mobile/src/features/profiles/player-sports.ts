@@ -119,6 +119,7 @@ export const PREFERRED_FOOT_OPTIONS: SportsSelectOption<PreferredFoot>[] = [
 ];
 
 export const PLAYER_CATEGORY_OPTIONS: SportsSelectOption[] = [
+  { label: "Serie C", value: "Serie C" },
   { label: "Serie D", value: "Serie D" },
   { label: "Eccellenza", value: "Eccellenza" },
   { label: "Promozione", value: "Promozione" },
@@ -126,6 +127,16 @@ export const PLAYER_CATEGORY_OPTIONS: SportsSelectOption[] = [
   { label: "Seconda categoria", value: "Seconda categoria" },
   { label: "Terza categoria", value: "Terza categoria" },
   { label: "Juniores", value: "Juniores" },
+];
+
+export const INTEREST_CATEGORY_OPTIONS: SportsSelectOption[] = [
+  { label: "Serie C", value: "Serie C" },
+  { label: "Serie D", value: "Serie D" },
+  { label: "Eccellenza", value: "Eccellenza" },
+  { label: "Promozione", value: "Promozione" },
+  { label: "Prima categoria", value: "Prima categoria" },
+  { label: "Seconda categoria", value: "Seconda categoria" },
+  { label: "Terza categoria", value: "Terza categoria" },
 ];
 
 export function createPlayerSeasonOptions(startYear = 2024, totalSeasons = 4) {
