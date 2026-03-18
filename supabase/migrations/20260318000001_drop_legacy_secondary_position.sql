@@ -13,7 +13,7 @@ begin
     update public.player_profiles
     set secondary_positions =
       case
-        when secondary_position = any(secondary_positions) then secondary_positions
+        when secondary_positions @> array[secondary_position] then secondary_positions
         when cardinality(secondary_positions) = 0 then array[secondary_position]
         else array_append(secondary_positions, secondary_position)
       end
