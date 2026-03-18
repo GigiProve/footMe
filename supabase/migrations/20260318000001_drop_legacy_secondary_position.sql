@@ -1,14 +1,26 @@
 alter table public.player_profiles
 add column if not exists secondary_positions public.player_position[] not null default '{}';
 
-update public.player_profiles
-set secondary_positions =
-  case
-    when secondary_position = any(secondary_positions) then secondary_positions
-    when cardinality(secondary_positions) = 0 then array[secondary_position]
-    else array_append(secondary_positions, secondary_position)
-  end
-where secondary_position is not null;
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'player_profiles'
+      and column_name = 'secondary_position'
+  ) then
+    update public.player_profiles
+    set secondary_positions =
+      case
+        when secondary_position = any(secondary_positions) then secondary_positions
+        when cardinality(secondary_positions) = 0 then array[secondary_position]
+        else array_append(secondary_positions, secondary_position)
+      end
+    where secondary_position is not null;
+  end if;
+end;
+$$;
 
 create or replace function public.save_player_profile_details(
   p_profile_id uuid,

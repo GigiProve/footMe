@@ -1,14 +1,6 @@
 alter table public.player_profiles
 add column if not exists secondary_positions public.player_position[] not null default '{}';
 
-update public.player_profiles
-set secondary_positions =
-  case
-    when secondary_position is null then '{}'::public.player_position[]
-    else array[secondary_position]
-  end
-where cardinality(coalesce(secondary_positions, '{}'::public.player_position[])) = 0;
-
 create or replace function public.save_player_profile_details(
   p_profile_id uuid,
   p_player_profile jsonb,
@@ -36,7 +28,6 @@ begin
     height_cm,
     weight_kg,
     primary_position,
-    secondary_position,
     secondary_positions,
     willing_to_change_club,
     transfer_regions,
@@ -49,9 +40,6 @@ begin
     payload.height_cm,
     payload.weight_kg,
     coalesce(payload.primary_position, 'central_midfielder'::public.player_position),
-    -- Keep the legacy single-value column synchronized while the app migrates,
-    -- but treat secondary_positions as the forward-looking source for new reads/writes.
-    payload.secondary_positions[1],
     coalesce(payload.secondary_positions, '{}'::public.player_position[]),
     coalesce(payload.willing_to_change_club, false),
     coalesce(payload.transfer_regions, '{}'::text[]),
@@ -74,7 +62,6 @@ begin
     height_cm = excluded.height_cm,
     weight_kg = excluded.weight_kg,
     primary_position = excluded.primary_position,
-    secondary_position = excluded.secondary_position,
     secondary_positions = excluded.secondary_positions,
     willing_to_change_club = excluded.willing_to_change_club,
     transfer_regions = excluded.transfer_regions,

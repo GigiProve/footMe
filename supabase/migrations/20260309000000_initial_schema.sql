@@ -37,7 +37,7 @@ create table public.player_profiles (
   height_cm integer,
   weight_kg integer,
   primary_position public.player_position not null,
-  secondary_position public.player_position,
+  secondary_positions public.player_position[] not null default '{}',
   willing_to_change_club boolean not null default false,
   transfer_regions text[] not null default '{}',
   preferred_categories text[] not null default '{}',
