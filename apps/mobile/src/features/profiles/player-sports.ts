@@ -188,12 +188,19 @@ export function isPlayerPosition(value: unknown): value is PlayerPosition {
 
 export function normalizePlayerPositions(value: unknown): PlayerPosition[] {
   if (Array.isArray(value)) {
-    return value.filter(isPlayerPosition).filter((entry, index, collection) => {
-      return collection.indexOf(entry) === index;
-    });
+    return [...new Set(value.filter(isPlayerPosition))];
   }
 
   return isPlayerPosition(value) ? [value] : [];
+}
+
+export function excludePrimaryFromSecondaryPositions(
+  secondaryPositions: PlayerPosition[],
+  primaryPosition: PlayerPosition | "" | null | undefined,
+) {
+  return primaryPosition
+    ? secondaryPositions.filter((entry) => entry !== primaryPosition)
+    : secondaryPositions;
 }
 
 export function getPlayerPositionLabel(

@@ -25,6 +25,7 @@ import {
 } from "../../src/features/profiles/player-sports-section";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
+  excludePrimaryFromSecondaryPositions,
   parsePlayerExperienceForms,
 } from "../../src/features/profiles/player-sports";
 import {
@@ -1331,13 +1332,19 @@ export default function OnboardingProfileScreen() {
                     onPrimaryPositionChange={(value) => {
                       patchForm({
                         primaryPosition: value,
-                        secondaryPositions: secondaryPositions.filter((entry) => entry !== value),
+                        secondaryPositions: excludePrimaryFromSecondaryPositions(
+                          secondaryPositions,
+                          value,
+                        ),
                       });
                       clearValidationErrors(["primaryPosition", "secondaryPositions"]);
                     }}
                     onSecondaryPositionsChange={(value) => {
                       patchForm({
-                        secondaryPositions: value.filter((entry) => entry !== primaryPosition),
+                        secondaryPositions: excludePrimaryFromSecondaryPositions(
+                          value,
+                          primaryPosition,
+                        ),
                       });
                       clearValidationErrors(["secondaryPositions"]);
                     }}

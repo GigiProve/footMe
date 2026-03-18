@@ -24,6 +24,7 @@ import {
 } from "../../src/features/profiles/profile-screen-components";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
+  excludePrimaryFromSecondaryPositions,
   getLatestPlayerExperience,
   getPlayerPositionLabel,
   parsePlayerExperienceForms,
@@ -1199,8 +1200,9 @@ export default function ProfileScreen() {
                           ? {
                               ...current,
                               primaryPosition: value,
-                              secondaryPositions: current.secondaryPositions.filter(
-                                (entry) => entry !== value,
+                              secondaryPositions: excludePrimaryFromSecondaryPositions(
+                                current.secondaryPositions,
+                                value,
                               ),
                             }
                           : current,
@@ -1211,8 +1213,9 @@ export default function ProfileScreen() {
                         current
                           ? {
                               ...current,
-                              secondaryPositions: value.filter(
-                                (entry) => entry !== current.primaryPosition,
+                              secondaryPositions: excludePrimaryFromSecondaryPositions(
+                                value,
+                                current.primaryPosition,
                               ),
                             }
                           : current,

@@ -49,6 +49,8 @@ begin
     payload.height_cm,
     payload.weight_kg,
     coalesce(payload.primary_position, 'central_midfielder'::public.player_position),
+    -- Keep the legacy single-value column synchronized while the app migrates to
+    -- the authoritative secondary_positions array.
     payload.secondary_positions[1],
     coalesce(payload.secondary_positions, '{}'::public.player_position[]),
     coalesce(payload.willing_to_change_club, false),

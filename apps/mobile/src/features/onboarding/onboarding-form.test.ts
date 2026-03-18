@@ -80,6 +80,7 @@ describe("onboarding-form", () => {
   });
 
   it("normalizes invalid persisted steps and clears transient upload state", () => {
+    // Backward compatibility: older drafts persisted one secondaryPosition string.
     const draft = normalizeOnboardingDraft({
       currentStep: "unexpected-step" as never,
       firstName: "Marco",

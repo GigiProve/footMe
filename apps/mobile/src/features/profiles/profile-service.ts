@@ -250,6 +250,11 @@ function normalizePlayerProfileRecord(
     return null;
   }
 
+  const normalizedSecondaryPositions = normalizePlayerPositions(rawProfile.secondary_positions);
+  const legacySecondaryPosition = normalizePlayerPositions(
+    (rawProfile as Partial<{ secondary_position: PlayerPosition | null }>).secondary_position,
+  );
+
   return {
     height_cm: normalizeNumber(rawProfile.height_cm),
     highlight_video_url: normalizeOptionalText(rawProfile.highlight_video_url),
@@ -265,11 +270,9 @@ function normalizePlayerProfileRecord(
       : DEFAULT_PLAYER_PRIMARY_POSITION,
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
     secondary_positions:
-      normalizePlayerPositions(rawProfile.secondary_positions).length > 0
-        ? normalizePlayerPositions(rawProfile.secondary_positions)
-        : normalizePlayerPositions(
-            (rawProfile as Partial<{ secondary_position: PlayerPosition | null }>).secondary_position,
-          ),
+      normalizedSecondaryPositions.length > 0
+        ? normalizedSecondaryPositions
+        : legacySecondaryPosition,
     transfer_regions: normalizeStringArray(rawProfile.transfer_regions),
     weight_kg: normalizeNumber(rawProfile.weight_kg),
     willing_to_change_club: normalizeBoolean(rawProfile.willing_to_change_club),
@@ -430,6 +433,8 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("player_profiles")
           .select(
+            // Read both fields during the migration window so existing rows with only
+            // the legacy single-value column still hydrate correctly in the app.
             "profile_id, preferred_foot, height_cm, weight_kg, primary_position, secondary_positions, secondary_position, willing_to_change_club, transfer_regions, preferred_categories, highlight_video_url",
           )
           .eq("profile_id", profileId)

@@ -97,10 +97,7 @@ export function FootballPositionPicker({
   title,
 }: FootballPositionPickerProps) {
   const normalizedSelected = useMemo(
-    () =>
-      selectedPositions.filter((entry, index, collection) => {
-        return collection.indexOf(entry) === index;
-      }),
+    () => [...new Set(selectedPositions)],
     [selectedPositions],
   );
 

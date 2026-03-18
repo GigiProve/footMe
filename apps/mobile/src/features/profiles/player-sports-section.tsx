@@ -99,6 +99,8 @@ type PlayerExperiencesSectionProps = {
   showHeader?: boolean;
 };
 
+const noop = () => undefined;
+
 function TeamLogo({
   name,
   teamLogoUrl,
@@ -483,7 +485,7 @@ export function PlayerCharacteristicsSection({
           />
           <FootballPositionPicker
             mode="multiple"
-            onSelect={onSecondaryPositionsChange ?? (() => undefined)}
+            onSelect={onSecondaryPositionsChange ?? noop}
             selectedPositions={secondaryPositions}
             title="Ruoli secondari"
           />

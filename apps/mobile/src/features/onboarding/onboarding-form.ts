@@ -168,6 +168,8 @@ export function normalizeOnboardingDraft(
     return defaultOnboardingFormState;
   }
 
+  const normalizedSecondaryPositions = normalizePlayerPositions(value.secondaryPositions);
+
   return {
     ...defaultOnboardingFormState,
     ...value,
@@ -193,8 +195,10 @@ export function normalizeOnboardingDraft(
       typeof value.residenceRegion === "string" ? value.residenceRegion : defaultOnboardingFormState.residenceRegion,
     role: coerceAppRole(value.role) ?? defaultOnboardingFormState.role,
     secondaryPositions:
-      normalizePlayerPositions(value.secondaryPositions).length > 0
-        ? normalizePlayerPositions(value.secondaryPositions)
+      normalizedSecondaryPositions.length > 0
+        ? normalizedSecondaryPositions
+        // Legacy onboarding drafts stored a single secondaryPosition value, so we
+        // still hydrate it into the new array format when found.
         : normalizePlayerPositions((value as { secondaryPosition?: unknown }).secondaryPosition),
     uploadingField: null,
   };
