@@ -181,7 +181,7 @@ describe("getCompleteProfessionalProfile", () => {
         preferred_foot: "right",
         primary_position: "forward",
         profile_id: "profile-1",
-        secondary_position: null,
+        secondary_positions: ["left_winger", "right_winger"],
         transfer_regions: ["Umbria"],
         weight_kg: 75,
         willing_to_change_club: true,
@@ -254,6 +254,7 @@ describe("getCompleteProfessionalProfile", () => {
 
     expect(result.profile.role).toBe("player");
     expect(result.playerProfile?.primary_position).toBe("forward");
+    expect(result.playerProfile?.secondary_positions).toEqual(["left_winger", "right_winger"]);
     expect(result.playerCareerEntries).toHaveLength(1);
     expect(result.playerCareerEntries[0]).toMatchObject({
       club_id: "club-1",

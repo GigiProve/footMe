@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabase";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
   isPlayerPosition,
+  normalizePlayerPositions,
   type PlayerExperiencePayload,
   type PlayerPosition,
   type PreferredFoot,
@@ -43,7 +44,7 @@ type PlayerProfileRecord = {
   preferred_foot: PreferredFoot | null;
   primary_position: PlayerPosition;
   profile_id: string;
-  secondary_position: PlayerPosition | null;
+  secondary_positions: PlayerPosition[];
   transfer_regions: string[];
   weight_kg: number | null;
   willing_to_change_club: boolean;
@@ -138,7 +139,7 @@ export type CompleteProfessionalProfileUpdate = {
     preferred_categories: string[];
     preferred_foot: PreferredFoot | null;
     primary_position: PlayerPosition;
-    secondary_position: PlayerPosition | null;
+    secondary_positions: PlayerPosition[];
     transfer_regions: string[];
     weight_kg: number | null;
     willing_to_change_club: boolean;
@@ -263,9 +264,12 @@ function normalizePlayerProfileRecord(
       ? rawProfile.primary_position
       : DEFAULT_PLAYER_PRIMARY_POSITION,
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
-    secondary_position: isPlayerPosition(rawProfile.secondary_position)
-      ? rawProfile.secondary_position
-      : null,
+    secondary_positions:
+      normalizePlayerPositions(rawProfile.secondary_positions).length > 0
+        ? normalizePlayerPositions(rawProfile.secondary_positions)
+        : normalizePlayerPositions(
+            (rawProfile as Partial<{ secondary_position: PlayerPosition | null }>).secondary_position,
+          ),
     transfer_regions: normalizeStringArray(rawProfile.transfer_regions),
     weight_kg: normalizeNumber(rawProfile.weight_kg),
     willing_to_change_club: normalizeBoolean(rawProfile.willing_to_change_club),
@@ -426,7 +430,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("player_profiles")
           .select(
-            "profile_id, preferred_foot, height_cm, weight_kg, primary_position, secondary_position, willing_to_change_club, transfer_regions, preferred_categories, highlight_video_url",
+            "profile_id, preferred_foot, height_cm, weight_kg, primary_position, secondary_positions, secondary_position, willing_to_change_club, transfer_regions, preferred_categories, highlight_video_url",
           )
           .eq("profile_id", profileId)
           .maybeSingle()

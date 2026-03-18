@@ -8,6 +8,7 @@ import {
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
+import { WheelPicker } from "../../src/components/ui/wheel-picker";
 import { useSession } from "../../src/features/auth/use-session";
 import { BioSection } from "../../src/features/profiles/bio-section";
 import { ContactSection } from "../../src/features/profiles/contact-section";
@@ -111,7 +112,7 @@ type ProfileFormState = {
   showContactEmail: boolean;
   showContactFacebook: boolean;
   showContactInstagram: boolean;
-  secondaryPosition: PlayerPosition | "";
+  secondaryPositions: PlayerPosition[];
   specialization: StaffSpecialization;
   technicalVideoUrl: string;
   transferRegions: string;
@@ -169,6 +170,15 @@ function parseOptionalNumber(value: string) {
   }
 
   return parsed;
+}
+
+function parseWheelValue(value: string) {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function formatSpecialization(value: StaffSpecialization | null) {
@@ -235,7 +245,7 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
     showContactEmail: data.userContacts.showEmail,
     showContactFacebook: data.userContacts.showFacebook,
     showContactInstagram: data.userContacts.showInstagram,
-    secondaryPosition: playerProfile?.secondary_position ?? "",
+    secondaryPositions: playerProfile?.secondary_positions ?? [],
     specialization: staffProfile?.specialization ?? "fitness_coach",
     technicalVideoUrl: coachProfile?.technical_video_url ?? "",
     transferRegions: toDelimitedString(playerProfile?.transfer_regions),
@@ -917,7 +927,7 @@ export default function ProfileScreen() {
                 preferred_categories: fromDelimitedString(formState.preferredCategories),
                 preferred_foot: formState.preferredFoot || null,
                 primary_position: formState.primaryPosition,
-                secondary_position: formState.secondaryPosition || null,
+                secondary_positions: formState.secondaryPositions,
                 transfer_regions: fromDelimitedString(formState.transferRegions),
                 weight_kg: parseOptionalNumber(formState.weightKg),
                 willing_to_change_club: formState.willingToChangeClub,
@@ -1046,7 +1056,7 @@ export default function ProfileScreen() {
                     completeProfile?.playerProfile?.primary_position ??
                     DEFAULT_PLAYER_PRIMARY_POSITION
                   }
-                  secondaryPosition={completeProfile?.playerProfile?.secondary_position ?? ""}
+                  secondaryPositions={completeProfile?.playerProfile?.secondary_positions ?? []}
                 />
               </Section>
             ) : null}
@@ -1185,17 +1195,32 @@ export default function ProfileScreen() {
                     }
                     onPrimaryPositionChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, primaryPosition: value } : current,
+                        current
+                          ? {
+                              ...current,
+                              primaryPosition: value,
+                              secondaryPositions: current.secondaryPositions.filter(
+                                (entry) => entry !== value,
+                              ),
+                            }
+                          : current,
                       )
                     }
-                    onSecondaryPositionChange={(value) =>
+                    onSecondaryPositionsChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, secondaryPosition: value } : current,
+                        current
+                          ? {
+                              ...current,
+                              secondaryPositions: value.filter(
+                                (entry) => entry !== current.primaryPosition,
+                              ),
+                            }
+                          : current,
                       )
                     }
                     preferredFoot={formState.preferredFoot}
                     primaryPosition={formState.primaryPosition}
-                    secondaryPosition={formState.secondaryPosition}
+                    secondaryPositions={formState.secondaryPositions}
                   />
                   <Field
                     label="Categorie preferite"
@@ -1258,23 +1283,29 @@ export default function ProfileScreen() {
                   description="Altezza e peso restano separati per una lettura più chiara."
                   title="Informazioni fisiche"
                 >
-                  <Field
+                  <WheelPicker
                     label="Altezza (cm)"
-                    onChangeText={(value) =>
+                    max={220}
+                    min={140}
+                    onChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, heightCm: value } : current,
+                        current ? { ...current, heightCm: String(value) } : current,
                       )
                     }
-                    value={formState.heightCm}
+                    unit="cm"
+                    value={parseWheelValue(formState.heightCm)}
                   />
-                  <Field
+                  <WheelPicker
                     label="Peso (kg)"
-                    onChangeText={(value) =>
+                    max={130}
+                    min={40}
+                    onChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, weightKg: value } : current,
+                        current ? { ...current, weightKg: String(value) } : current,
                       )
                     }
-                    value={formState.weightKg}
+                    unit="kg"
+                    value={parseWheelValue(formState.weightKg)}
                   />
                 </Section>
               </>

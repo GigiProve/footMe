@@ -58,6 +58,8 @@ describe("onboarding-form", () => {
     const errors = validateOnboardingStep("details", {
       ...defaultOnboardingFormState,
       bio: "Troppo corta",
+      primaryPosition: "striker",
+      role: "player",
     });
 
     expect(errors).toEqual({
@@ -65,15 +67,29 @@ describe("onboarding-form", () => {
     });
   });
 
+  it("requires an explicit primary position selection for player details", () => {
+    const errors = validateOnboardingStep("details", {
+      ...defaultOnboardingFormState,
+      bio: "Sono un centrocampista dinamico con esperienza tra prima squadra e juniores.",
+      role: "player",
+    });
+
+    expect(errors).toEqual({
+      primaryPosition: "Seleziona il ruolo principale per continuare.",
+    });
+  });
+
   it("normalizes invalid persisted steps and clears transient upload state", () => {
     const draft = normalizeOnboardingDraft({
       currentStep: "unexpected-step" as never,
       firstName: "Marco",
+      secondaryPosition: "left_winger",
       uploadingField: "avatar",
-    });
+    } as Partial<typeof defaultOnboardingFormState> & { secondaryPosition: string });
 
     expect(draft.currentStep).toBe("role");
     expect(draft.firstName).toBe("Marco");
+    expect(draft.secondaryPositions).toEqual(["left_winger"]);
     expect(draft.uploadingField).toBeNull();
   });
 

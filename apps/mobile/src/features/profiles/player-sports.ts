@@ -20,6 +20,18 @@ export type PlayerPosition =
   | "left_winger"
   | "striker";
 
+export type FootballPositionSlot =
+  | "goalkeeper"
+  | "left_back"
+  | "center_back"
+  | "right_back"
+  | "defensive_midfielder"
+  | "central_midfielder"
+  | "attacking_midfielder"
+  | "left_winger"
+  | "right_winger"
+  | "striker";
+
 export type TeamAutocompleteOption = {
   city: string | null;
   id: string | null;
@@ -73,6 +85,19 @@ type PlayerExperienceSource = {
 };
 
 export const DEFAULT_PLAYER_PRIMARY_POSITION: PlayerPosition = "central_midfielder";
+
+export const POSITION_ROLE_MAP: Record<FootballPositionSlot, PlayerPosition> = {
+  attacking_midfielder: "attacking_midfielder",
+  center_back: "center_back",
+  central_midfielder: "central_midfielder",
+  defensive_midfielder: "defensive_midfielder",
+  goalkeeper: "goalkeeper",
+  left_back: "left_back",
+  left_winger: "left_winger",
+  right_back: "right_back",
+  right_winger: "right_winger",
+  striker: "striker",
+};
 
 export const PLAYER_POSITION_OPTIONS: SportsSelectOption<PlayerPosition>[] = [
   { label: "Portiere", value: "goalkeeper" },
@@ -161,6 +186,16 @@ export function isPlayerPosition(value: unknown): value is PlayerPosition {
   return typeof value === "string" && value in playerPositionLabels;
 }
 
+export function normalizePlayerPositions(value: unknown): PlayerPosition[] {
+  if (Array.isArray(value)) {
+    return value.filter(isPlayerPosition).filter((entry, index, collection) => {
+      return collection.indexOf(entry) === index;
+    });
+  }
+
+  return isPlayerPosition(value) ? [value] : [];
+}
+
 export function getPlayerPositionLabel(
   value: PlayerPosition | string | null | undefined,
   fallback = "Da completare",
@@ -170,6 +205,19 @@ export function getPlayerPositionLabel(
   }
 
   return playerPositionLabels[value];
+}
+
+export function getPlayerPositionLabels(
+  values: PlayerPosition[] | null | undefined,
+  fallback: string[] = [],
+) {
+  const normalizedValues = normalizePlayerPositions(values);
+
+  if (normalizedValues.length === 0) {
+    return fallback;
+  }
+
+  return normalizedValues.map((value) => getPlayerPositionLabel(value, value));
 }
 
 export function getPreferredFootLabel(
