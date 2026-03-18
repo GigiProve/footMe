@@ -13,14 +13,15 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { SelectField } from "../../components/ui/select-field";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
 import { Button, Card, Input } from "../../ui";
+import { FootballPositionPicker } from "./football-position-picker";
 import {
   PLAYER_CATEGORY_OPTIONS,
-  PLAYER_POSITION_OPTIONS,
   PLAYER_SEASON_OPTIONS,
   PREFERRED_FOOT_OPTIONS,
   createEmptyPlayerExperienceForm,
   getPlayerExperienceBadges,
   getPlayerPositionLabel,
+  getPlayerPositionLabels,
   getPreferredFootLabel,
   normalizeNumericInput,
   sortPlayerExperiencesBySeason,
@@ -81,10 +82,11 @@ type PlayerCharacteristicsSectionProps = {
   editable?: boolean;
   onPreferredFootChange?: (value: PreferredFoot | "") => void;
   onPrimaryPositionChange?: (value: PlayerPosition) => void;
-  onSecondaryPositionChange?: (value: PlayerPosition | "") => void;
+  onSecondaryPositionsChange?: (value: PlayerPosition[]) => void;
+  primaryPositionError?: string;
   preferredFoot: PreferredFoot | "";
-  primaryPosition: PlayerPosition;
-  secondaryPosition: PlayerPosition | "";
+  primaryPosition: PlayerPosition | "";
+  secondaryPositions: PlayerPosition[];
 };
 
 type PlayerExperiencesSectionProps = {
@@ -96,6 +98,8 @@ type PlayerExperiencesSectionProps = {
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
   showHeader?: boolean;
 };
+
+const noop = () => {};
 
 function TeamLogo({
   name,
@@ -453,11 +457,14 @@ export function PlayerCharacteristicsSection({
   editable = false,
   onPreferredFootChange,
   onPrimaryPositionChange,
-  onSecondaryPositionChange,
+  onSecondaryPositionsChange,
+  primaryPositionError,
   preferredFoot,
   primaryPosition,
-  secondaryPosition,
+  secondaryPositions,
 }: PlayerCharacteristicsSectionProps) {
+  const secondaryPositionLabels = getPlayerPositionLabels(secondaryPositions);
+
   return (
     <View style={styles.sectionStack}>
       <View style={styles.sectionHeader}>
@@ -469,21 +476,18 @@ export function PlayerCharacteristicsSection({
 
       {editable ? (
         <>
-          <SelectField
-            label="Ruolo principale"
-            onChange={(value) => onPrimaryPositionChange?.(value as PlayerPosition)}
-            options={PLAYER_POSITION_OPTIONS}
-            placeholder="Seleziona il ruolo principale"
-            value={primaryPosition}
+          <FootballPositionPicker
+            errorMessage={primaryPositionError}
+            mode="single"
+            onSelect={(values) => onPrimaryPositionChange?.(values[0] as PlayerPosition)}
+            selectedPositions={primaryPosition ? [primaryPosition] : []}
+            title="Ruolo principale"
           />
-          <SelectField
-            allowClear
-            clearLabel="Nessun ruolo secondario"
-            label="Ruolo secondario"
-            onChange={(value) => onSecondaryPositionChange?.(value as PlayerPosition | "")}
-            options={PLAYER_POSITION_OPTIONS}
-            placeholder="Seleziona il ruolo secondario"
-            value={secondaryPosition}
+          <FootballPositionPicker
+            mode="multiple"
+            onSelect={onSecondaryPositionsChange ?? noop}
+            selectedPositions={secondaryPositions}
+            title="Ruoli secondari"
           />
           <SelectField
             allowClear
@@ -503,10 +507,8 @@ export function PlayerCharacteristicsSection({
               value: getPlayerPositionLabel(primaryPosition),
             },
             {
-              label: "Ruolo secondario",
-              value: secondaryPosition
-                ? getPlayerPositionLabel(secondaryPosition)
-                : "Nessuno",
+              label: "Ruoli secondari",
+              value: secondaryPositionLabels.length > 0 ? secondaryPositionLabels.join(", ") : "Nessuno",
             },
             {
               label: "Piede preferito",

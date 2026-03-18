@@ -5,7 +5,7 @@ import {
   validateProfileBio,
 } from "../profiles/profile-form-utils";
 import type { PlayerExperienceForm, PlayerPosition, PreferredFoot } from "../profiles/player-sports";
-import { DEFAULT_PLAYER_PRIMARY_POSITION } from "../profiles/player-sports";
+import { normalizePlayerPositions } from "../profiles/player-sports";
 import type { UploadedMediaItem } from "../profiles/media-upload-service";
 import type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
 
@@ -52,11 +52,11 @@ export type OnboardingFormState = {
   playerMediaItems: UploadedMediaItem[];
   preferredCategories: string;
   preferredFoot: PreferredFoot | "";
-  primaryPosition: PlayerPosition;
+  primaryPosition: PlayerPosition | "";
   residence: string;
   residenceRegion: string;
   role: AppRole | "";
-  secondaryPosition: PlayerPosition | "";
+  secondaryPositions: PlayerPosition[];
   staffPreferredRegions: string;
   staffSpecialization: StaffSpecialization;
   technicalVideoUrl: string;
@@ -146,11 +146,11 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   playerMediaItems: [],
   preferredCategories: "",
   preferredFoot: "",
-  primaryPosition: DEFAULT_PLAYER_PRIMARY_POSITION,
+  primaryPosition: "",
   residence: "",
   residenceRegion: "",
   role: "",
-  secondaryPosition: "",
+  secondaryPositions: [],
   staffPreferredRegions: "",
   staffSpecialization: "fitness_coach",
   technicalVideoUrl: "",
@@ -167,6 +167,8 @@ export function normalizeOnboardingDraft(
   if (!value) {
     return defaultOnboardingFormState;
   }
+
+  const normalizedSecondaryPositions = normalizePlayerPositions(value.secondaryPositions);
 
   return {
     ...defaultOnboardingFormState,
@@ -187,9 +189,17 @@ export function normalizeOnboardingDraft(
       typeof value.phoneCountryCode === "string"
         ? splitPhoneNumber(composePhoneNumber(value.phoneCountryCode, value.phoneNumber)).phoneNumber
         : splitPhoneNumber(value.phoneNumber).phoneNumber,
+    primaryPosition:
+      normalizePlayerPositions(value.primaryPosition)[0] ?? defaultOnboardingFormState.primaryPosition,
     residenceRegion:
       typeof value.residenceRegion === "string" ? value.residenceRegion : defaultOnboardingFormState.residenceRegion,
     role: coerceAppRole(value.role) ?? defaultOnboardingFormState.role,
+    secondaryPositions:
+      normalizedSecondaryPositions.length > 0
+        ? normalizedSecondaryPositions
+        // Legacy onboarding drafts stored a single secondaryPosition value, so we
+        // still hydrate it into the new array format when found.
+        : normalizePlayerPositions((value as { secondaryPosition?: unknown }).secondaryPosition),
     uploadingField: null,
   };
 }
@@ -305,6 +315,12 @@ export function validateOnboardingStep(
   }
 
   if (step === "details") {
+    if (form.role === "player" && !form.primaryPosition) {
+      return {
+        primaryPosition: "Seleziona il ruolo principale per continuare.",
+      };
+    }
+
     const bioValidation = validateProfileBio(form.bio);
 
     if (!bioValidation.isValid) {
