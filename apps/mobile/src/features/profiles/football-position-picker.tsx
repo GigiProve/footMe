@@ -23,6 +23,8 @@ const pitchSlots: {
   { abbreviation: "CEN", id: "central-midfielder", key: "central_midfielder", row: 2 },
   { abbreviation: "MED", id: "defensive-midfielder", key: "defensive_midfielder", row: 2 },
   { abbreviation: "TS", id: "left-back", key: "left_back", row: 3 },
+  // Two center-back dots share the same stored role so the pitch keeps a more
+  // natural back-four visual layout without changing persistence semantics.
   { abbreviation: "DIF", id: "center-back-left", key: "center_back", row: 3 },
   { abbreviation: "DIF", id: "center-back-right", key: "center_back", row: 3 },
   { abbreviation: "TD", id: "right-back", key: "right_back", row: 3 },
@@ -54,16 +56,18 @@ function FootballNode({
   const opacity = useRef(new Animated.Value(1)).current;
 
   function animate(toValue: number, nextOpacity: number) {
-    Animated.timing(scale, {
-      duration: 120,
-      toValue,
-      useNativeDriver: true,
-    }).start();
-    Animated.timing(opacity, {
-      duration: 120,
-      toValue: nextOpacity,
-      useNativeDriver: true,
-    }).start();
+    Animated.parallel([
+      Animated.timing(scale, {
+        duration: 120,
+        toValue,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        duration: 120,
+        toValue: nextOpacity,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }
 
   return (

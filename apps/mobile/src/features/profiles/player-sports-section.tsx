@@ -99,7 +99,7 @@ type PlayerExperiencesSectionProps = {
   showHeader?: boolean;
 };
 
-const noop = () => undefined;
+const noop = () => {};
 
 function TeamLogo({
   name,

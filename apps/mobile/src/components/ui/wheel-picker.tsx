@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
 
 const ITEM_HEIGHT = 52;
+const MAX_INTERPOLATION_DISTANCE = 2;
 const VISIBLE_ITEMS = 5;
 const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 const EDGE_PADDING = ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2);
@@ -95,7 +96,12 @@ export function WheelPicker({
         >
           {values.map((entry, index) => {
             const distanceFromCenter = Math.abs(scrollOffset - index * ITEM_HEIGHT);
-            const interpolationStep = Math.min(distanceFromCenter / ITEM_HEIGHT, 2);
+            // Beyond two rows away the peripheral values should feel equally de-emphasized,
+            // so we cap the interpolation distance to avoid over-attenuating far items.
+            const interpolationStep = Math.min(
+              distanceFromCenter / ITEM_HEIGHT,
+              MAX_INTERPOLATION_DISTANCE,
+            );
             const opacity = Math.max(0.32, 1 - interpolationStep * 0.28);
             const scale = Math.max(0.82, 1.08 - interpolationStep * 0.14);
             const fontSize = Math.max(
