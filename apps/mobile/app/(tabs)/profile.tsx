@@ -5,6 +5,7 @@ import {
   View,
 } from "react-native";
 
+import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
@@ -1039,9 +1040,25 @@ export default function ProfileScreen() {
               section.title === "Presentazione" ||
               section.title === "Informazioni personali" ? null : (
                 <Section key={section.title} description={section.subtitle} title={section.title}>
-                  {section.items.map((item) => (
-                    <Field key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
-                  ))}
+                  {section.items.map((item) =>
+                    item.label === "Regioni di interesse" ? (
+                      <Field
+                        key={`${section.title}-${item.label}`}
+                        label={item.label}
+                        renderInput={() => (
+                          <AvailabilityRegionsSelector
+                            editable={false}
+                            hideLabel
+                            onChange={() => {}}
+                            value={completeProfile?.playerProfile?.transfer_regions ?? []}
+                          />
+                        )}
+                        value={item.value}
+                      />
+                    ) : (
+                      <Field key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
+                    ),
+                  )}
                 </Section>
               )
             ))}
@@ -1235,15 +1252,14 @@ export default function ProfileScreen() {
                     placeholder="Eccellenza, Promozione, Serie D"
                     value={formState.preferredCategories}
                   />
-                  <Field
+                  <AvailabilityRegionsSelector
                     label="Regioni di interesse"
-                    onChangeText={(value) =>
+                    onChange={(regions) =>
                       setFormState((current) =>
-                        current ? { ...current, transferRegions: value } : current,
+                        current ? { ...current, transferRegions: regions.join(", ") } : current,
                       )
                     }
-                    placeholder="Lombardia, Veneto"
-                    value={formState.transferRegions}
+                    value={fromDelimitedString(formState.transferRegions)}
                   />
                   <Field
                     label="URL highlights video"

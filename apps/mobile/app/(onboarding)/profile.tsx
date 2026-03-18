@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, BackHandler, Platform, Pressable, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
+import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
 import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { MediaPickerField } from "../../src/components/ui/media-picker-field";
@@ -1408,11 +1409,9 @@ export default function OnboardingProfileScreen() {
                       />
                     </View>
                   </View>
-                  <Input
-                    label="Regioni in cui sei disponibile a giocare"
-                    onChangeText={(value) => updateValue("transferRegions", value)}
-                    placeholder="Es. Lombardia, Veneto"
-                    value={transferRegions}
+                  <AvailabilityRegionsSelector
+                    onChange={(regions) => updateValue("transferRegions", regions.join(", "))}
+                    value={fromDelimitedString(transferRegions)}
                   />
                   <Input
                     label="Categorie di interesse"
