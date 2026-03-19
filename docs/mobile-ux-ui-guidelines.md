@@ -295,6 +295,41 @@ Per onboarding e recruiting:
 - salvare bozze
 - precompilare dal profilo quando possibile
 
+#### Gestione tastiera nei form — KeyboardAwareForm
+
+L'utente deve **sempre** vedere il campo in cui sta scrivendo.
+Mai coprire un input con la tastiera: e' una regola UX di base, non una feature opzionale.
+
+Ogni schermata che contiene input di testo deve essere wrappata con il componente `KeyboardAwareForm` (`src/components/ui/keyboard-aware-form.tsx`).
+
+Questo componente:
+
+- rileva l'apertura e la chiusura della tastiera su iOS e Android
+- aggiunge padding dinamico in fondo alla schermata
+- scrolla automaticamente verso il campo attivo
+- tiene i pulsanti (Salva, Continua, Conferma) sempre visibili sopra la tastiera
+- chiude la tastiera con tap fuori dall'input
+- supporta campi singoli, multilinea (bio, descrizioni) e form complessi
+
+Esempio di utilizzo:
+
+```tsx
+<Screen>
+  <KeyboardAwareForm contentContainerStyle={styles.container}>
+    <Input label="Nome" value={name} onChangeText={setName} />
+    <Input label="Bio" multiline value={bio} onChangeText={setBio} />
+    <Button label="Salva" onPress={handleSave} />
+  </KeyboardAwareForm>
+</Screen>
+```
+
+Regole operative:
+
+- **usare sempre `KeyboardAwareForm`** per schermate con input: onboarding, profilo, bio, esperienze, contatti, annunci, chat composer
+- **non usare `ScrollView` o `View` nudi** come contenitore di form
+- per schermate di sola lettura o liste senza input, usare `KeyboardAwareScrollView` direttamente
+- non fare fix locali per la tastiera nelle singole schermate: la soluzione e' centralizzata
+
 ### 5. Bottom sheet pattern
 
 Da usare per:
