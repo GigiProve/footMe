@@ -3,13 +3,14 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { colors, radius, spacing, typography } from "../../theme/tokens";
 
-const ITEM_HEIGHT = 52;
+const ITEM_HEIGHT_DEFAULT = 52;
+const ITEM_HEIGHT_COMPACT = 40;
+const VISIBLE_ITEMS_DEFAULT = 5;
+const VISIBLE_ITEMS_COMPACT = 3;
 const MAX_INTERPOLATION_DISTANCE = 2;
-const VISIBLE_ITEMS = 5;
-const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
-const EDGE_PADDING = ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2);
 
 type WheelPickerProps = {
+  compact?: boolean;
   label: string;
   max: number;
   min: number;
@@ -24,6 +25,7 @@ function clampValue(value: number, min: number, max: number) {
 }
 
 export function WheelPicker({
+  compact = false,
   label,
   max,
   min,
@@ -32,6 +34,11 @@ export function WheelPicker({
   unit,
   value,
 }: WheelPickerProps) {
+  const itemHeight = compact ? ITEM_HEIGHT_COMPACT : ITEM_HEIGHT_DEFAULT;
+  const visibleItems = compact ? VISIBLE_ITEMS_COMPACT : VISIBLE_ITEMS_DEFAULT;
+  const pickerHeight = itemHeight * visibleItems;
+  const edgePadding = itemHeight * Math.floor(visibleItems / 2);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
   const values = useMemo(() => {
@@ -58,17 +65,17 @@ export function WheelPicker({
       return;
     }
 
-    const nextOffset = selectedIndex * ITEM_HEIGHT;
+    const nextOffset = selectedIndex * itemHeight;
     setScrollOffset(nextOffset);
 
     scrollViewRef.current?.scrollTo({
       animated: false,
       y: nextOffset,
     });
-  }, [selectedValue, values]);
+  }, [itemHeight, selectedValue, values]);
 
   function commitOffset(offsetY: number) {
-    const rawIndex = Math.round(offsetY / ITEM_HEIGHT);
+    const rawIndex = Math.round(offsetY / itemHeight);
     const safeIndex = clampValue(rawIndex, 0, values.length - 1);
     const nextValue = values[safeIndex];
 
@@ -77,13 +84,23 @@ export function WheelPicker({
     }
   }
 
+  const selectedFontSize = compact ? typography.fontSize[20] : typography.fontSize[24];
+  const baseFontSize = compact ? typography.fontSize[14] : typography.fontSize[16];
+
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.surface}>
-        <View pointerEvents="none" style={styles.selectionWindow} />
+      <Text style={compact ? styles.labelCompact : styles.label}>{label}</Text>
+      <View style={[styles.surface, { height: pickerHeight }, compact ? styles.surfaceCompact : null]}>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.selectionWindow,
+            { top: edgePadding, height: itemHeight },
+            compact ? styles.selectionWindowCompact : null,
+          ]}
+        />
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={{ paddingVertical: edgePadding }}
           decelerationRate="fast"
           onMomentumScrollEnd={(event) => commitOffset(event.nativeEvent.contentOffset.y)}
           onScroll={(event) => setScrollOffset(event.nativeEvent.contentOffset.y)}
@@ -91,31 +108,31 @@ export function WheelPicker({
           ref={scrollViewRef}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          snapToInterval={ITEM_HEIGHT}
+          snapToInterval={itemHeight}
           testID={unit ? `wheel-picker-${unit}` : undefined}
         >
           {values.map((entry, index) => {
-            const distanceFromCenter = Math.abs(scrollOffset - index * ITEM_HEIGHT);
+            const distanceFromCenter = Math.abs(scrollOffset - index * itemHeight);
             // Beyond two rows away the peripheral values should feel equally de-emphasized,
             // so we cap the interpolation distance to avoid over-attenuating far items.
             const interpolationStep = Math.min(
-              distanceFromCenter / ITEM_HEIGHT,
+              distanceFromCenter / itemHeight,
               MAX_INTERPOLATION_DISTANCE,
             );
             const opacity = Math.max(0.32, 1 - interpolationStep * 0.28);
             const scale = Math.max(0.82, 1.08 - interpolationStep * 0.14);
             const fontSize = Math.max(
-              typography.fontSize[16],
-              typography.fontSize[24] - interpolationStep * 4,
+              baseFontSize,
+              selectedFontSize - interpolationStep * 4,
             );
-            const isSelected = distanceFromCenter < ITEM_HEIGHT / 2;
+            const isSelected = distanceFromCenter < itemHeight / 2;
 
             return (
-              <View key={entry} style={styles.valueRow}>
+              <View key={entry} style={{ height: itemHeight, alignItems: "center", justifyContent: "center" }}>
                 <Text
                   style={[
                     styles.valueText,
-                    isSelected ? styles.valueTextSelected : null,
+                    isSelected ? (compact ? styles.valueTextSelectedCompact : styles.valueTextSelected) : null,
                     {
                       fontSize,
                       opacity,
@@ -131,7 +148,7 @@ export function WheelPicker({
           })}
         </ScrollView>
         {unit ? (
-          <View style={styles.unitBadge} testID={`wheel-picker-unit-${unit}`}>
+          <View style={[styles.unitBadge, { top: edgePadding + spacing[14] }]} testID={`wheel-picker-unit-${unit}`}>
             <Text style={styles.unitBadgeText}>{unit}</Text>
           </View>
         ) : null}
@@ -151,32 +168,35 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: typography.fontWeight.bold,
   },
+  labelCompact: {
+    color: colors.textPrimary,
+    fontSize: typography.fontSize[12],
+    fontWeight: typography.fontWeight.bold,
+    textTransform: "uppercase",
+  },
   surface: {
-    height: PICKER_HEIGHT,
     overflow: "hidden",
     borderRadius: radius[20],
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  surfaceCompact: {
+    borderRadius: radius[16],
+  },
   selectionWindow: {
     position: "absolute",
     left: spacing[12],
     right: spacing[12],
-    top: EDGE_PADDING,
-    height: ITEM_HEIGHT,
     borderRadius: radius[16],
     borderWidth: 1,
     borderColor: colors.accentStrong,
     backgroundColor: colors.accentSoft,
   },
-  scrollContent: {
-    paddingVertical: EDGE_PADDING,
-  },
-  valueRow: {
-    height: ITEM_HEIGHT,
-    alignItems: "center",
-    justifyContent: "center",
+  selectionWindowCompact: {
+    left: spacing[8],
+    right: spacing[8],
+    borderRadius: radius[14],
   },
   valueText: {
     color: colors.textMuted,
@@ -188,9 +208,13 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize[24],
     fontWeight: typography.fontWeight.heavy,
   },
+  valueTextSelectedCompact: {
+    color: colors.textPrimary,
+    fontSize: typography.fontSize[20],
+    fontWeight: typography.fontWeight.heavy,
+  },
   unitBadge: {
     position: "absolute",
-    top: EDGE_PADDING + spacing[14],
     right: spacing[12],
     alignItems: "center",
     justifyContent: "center",

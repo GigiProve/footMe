@@ -3,15 +3,17 @@ import {
   Image,
   Modal,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
+import { KeyboardAwareScrollView } from "../../components/ui/keyboard-aware-scroll-view";
 import { SelectField } from "../../components/ui/select-field";
+import { WheelPicker } from "../../components/ui/wheel-picker";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
 import { Button, Card, Input } from "../../ui";
 import { FootballPositionPicker } from "./football-position-picker";
@@ -21,17 +23,23 @@ import {
   PLAYER_SEASON_OPTIONS,
   PREFERRED_FOOT_OPTIONS,
   SEASON_PERIOD_OPTIONS,
-  createEmptyPlayerExperienceForm,
+  createEmptyMultiSeasonDraft,
+  createEmptySeasonEntry,
+  experienceToMultiSeasonDraft,
   getMonthShortLabel,
   getPlayerExperienceBadges,
   getPlayerPositionLabel,
   getPlayerPositionLabels,
   getPreferredFootLabel,
+  isMultiSeasonDraftValid,
+  multiSeasonDraftToExperiences,
   normalizeNumericInput,
   sortPlayerExperiencesBySeason,
+  type MultiSeasonDraft,
   type PlayerExperienceForm,
   type PlayerPosition,
   type PreferredFoot,
+  type SeasonEntry,
   type SeasonPeriod,
   type TeamAutocompleteOption,
 } from "./player-sports";
@@ -73,15 +81,23 @@ type ExperienceCardProps = {
   onEdit?: () => void;
 };
 
-type AddPlayerExperienceFormProps = {
-  experience: PlayerExperienceForm;
-  onCancel: () => void;
-  onChange: (experience: PlayerExperienceForm) => void;
+type SeasonEntryCardProps = {
+  hasAttemptedSave: boolean;
+  index: number;
+  onChange: (season: SeasonEntry) => void;
+  onDelete?: () => void;
+  season: SeasonEntry;
+  usedSeasons: Set<string>;
+};
+
+type AddExperienceScreenProps = {
+  draft: MultiSeasonDraft;
+  editingIndex: number | null;
+  onClose: () => void;
+  onDraftChange: (draft: MultiSeasonDraft) => void;
   onSave: () => void;
-  saveLabel?: string;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
-  title?: string;
-  usedSeasons?: Set<string>;
+  usedSeasons: Set<string>;
 };
 
 type PlayerCharacteristicsSectionProps = {
@@ -159,87 +175,36 @@ export function StatsInputRow({
     <View style={styles.statsInputsWrapper}>
       <Text style={styles.subsectionLabel}>Statistiche</Text>
       <View style={styles.statsWheelRow}>
-        <StatStepper
-          label="Presenze"
-          onChange={onAppearancesChange}
-          value={appearances}
-        />
-        <StatStepper
-          label="Gol"
-          onChange={onGoalsChange}
-          value={goals}
-        />
-        <StatStepper
-          label="Assist"
-          onChange={onAssistsChange}
-          value={assists}
-        />
-      </View>
-    </View>
-  );
-}
-
-function StatStepper({
-  label,
-  max = 99,
-  onChange,
-  value,
-}: {
-  label: string;
-  max?: number;
-  onChange: (value: string) => void;
-  value: string;
-}) {
-  const numericValue = Number(value) || 0;
-
-  function increment() {
-    if (numericValue < max) {
-      onChange(String(numericValue + 1));
-    }
-  }
-
-  function decrement() {
-    if (numericValue > 0) {
-      onChange(String(numericValue - 1));
-    }
-  }
-
-  function handleTextChange(text: string) {
-    const digits = normalizeNumericInput(text);
-    if (!digits) {
-      onChange("0");
-      return;
-    }
-    const clamped = Math.min(Number(digits), max);
-    onChange(String(clamped));
-  }
-
-  return (
-    <View style={styles.stepperCell}>
-      <Text style={styles.stepperLabel}>{label}</Text>
-      <View style={styles.stepperSurface}>
-        <Pressable
-          accessibilityLabel={`Aumenta ${label}`}
-          onPress={increment}
-          style={styles.stepperButton}
-        >
-          <Ionicons color={colors.textSecondary} name="chevron-up" size={18} />
-        </Pressable>
-        <TextInput
-          keyboardType="number-pad"
-          maxLength={String(max).length}
-          onChangeText={handleTextChange}
-          selectTextOnFocus
-          style={styles.stepperValue}
-          value={String(numericValue)}
-        />
-        <Pressable
-          accessibilityLabel={`Diminuisci ${label}`}
-          onPress={decrement}
-          style={styles.stepperButton}
-        >
-          <Ionicons color={colors.textSecondary} name="chevron-down" size={18} />
-        </Pressable>
+        <View style={styles.statsWheelCell}>
+          <WheelPicker
+            compact
+            label="Presenze"
+            max={99}
+            min={0}
+            onChange={(value) => onAppearancesChange(String(value))}
+            value={Number(appearances) || 0}
+          />
+        </View>
+        <View style={styles.statsWheelCell}>
+          <WheelPicker
+            compact
+            label="Gol"
+            max={99}
+            min={0}
+            onChange={(value) => onGoalsChange(String(value))}
+            value={Number(goals) || 0}
+          />
+        </View>
+        <View style={styles.statsWheelCell}>
+          <WheelPicker
+            compact
+            label="Assist"
+            max={99}
+            min={0}
+            onChange={(value) => onAssistsChange(String(value))}
+            value={Number(assists) || 0}
+          />
+        </View>
       </View>
     </View>
   );
@@ -321,12 +286,21 @@ export function TeamAutocompleteInput({
       />
 
       {shouldShowSuggestions ? (
-        <View style={styles.suggestionsSurface} testID="team-autocomplete-suggestions">
-          <ScrollView contentContainerStyle={styles.suggestionsContent} nestedScrollEnabled>
+        <View
+          style={styles.suggestionsSurface}
+          testID="team-autocomplete-suggestions"
+        >
+          <ScrollView
+            contentContainerStyle={styles.suggestionsContent}
+            nestedScrollEnabled
+          >
             {suggestions.map((suggestion) => (
               <Pressable
                 accessibilityRole="button"
-                key={suggestion.id ?? `${suggestion.name}-${suggestion.city ?? "na"}`}
+                key={
+                  suggestion.id ??
+                  `${suggestion.name}-${suggestion.city ?? "na"}`
+                }
                 onPress={() => handleSelectTeam(suggestion)}
                 style={({ pressed }) => [
                   styles.suggestionButton,
@@ -334,12 +308,17 @@ export function TeamAutocompleteInput({
                 ]}
                 testID={`team-autocomplete-suggestion-${suggestion.name}`}
               >
-                <TeamLogo name={suggestion.name} teamLogoUrl={suggestion.logoUrl ?? ""} />
+                <TeamLogo
+                  name={suggestion.name}
+                  teamLogoUrl={suggestion.logoUrl ?? ""}
+                />
                 <View style={styles.suggestionCopy}>
                   <Text style={styles.suggestionName}>{suggestion.name}</Text>
                   <Text style={styles.suggestionMeta}>
-                    {suggestion.city?.trim()
-                      || (suggestion.isCustom ? "Aggiunta da altri giocatori" : "Città non disponibile")}
+                    {suggestion.city?.trim() ||
+                      (suggestion.isCustom
+                        ? "Aggiunta da altri giocatori"
+                        : "Città non disponibile")}
                   </Text>
                 </View>
               </Pressable>
@@ -367,7 +346,9 @@ export function TeamAutocompleteInput({
                   <Ionicons color={colors.accentStrong} name="add" size={24} />
                 </View>
                 <View style={styles.suggestionCopy}>
-                  <Text style={styles.suggestionName}>Aggiungi nuova squadra</Text>
+                  <Text style={styles.suggestionName}>
+                    Aggiungi nuova squadra
+                  </Text>
                   <Text style={styles.suggestionMeta}>{value.trim()}</Text>
                 </View>
               </Pressable>
@@ -394,7 +375,10 @@ export function ExperienceCard({
     <Card style={styles.experienceCard} variant="muted">
       <View style={styles.experienceHeader}>
         <View style={styles.experienceIdentity}>
-          <TeamLogo name={experience.clubName} teamLogoUrl={experience.teamLogoUrl} />
+          <TeamLogo
+            name={experience.clubName}
+            teamLogoUrl={experience.teamLogoUrl}
+          />
           <View style={styles.experienceCopy}>
             <Text style={styles.experienceTeamName}>
               {experience.clubName.trim() || "Squadra da completare"}
@@ -453,96 +437,58 @@ export function ExperienceCard({
   );
 }
 
-function isExperienceFormValid(experience: PlayerExperienceForm) {
-  const hasClub = Boolean(experience.clubName.trim());
-  const hasSeason = Boolean(experience.seasonLabel.trim());
-  const hasCategory = Boolean(experience.category.trim());
-  const hasPartialMonths =
-    experience.seasonPeriod !== "partial" ||
-    (Boolean(experience.periodStartMonth) && Boolean(experience.periodEndMonth));
-
-  return hasClub && hasSeason && hasCategory && hasPartialMonths;
-}
-
-export function AddPlayerExperienceForm({
-  experience,
-  onCancel,
+function SeasonEntryCard({
+  hasAttemptedSave,
+  index,
   onChange,
-  onSave,
-  saveLabel = "Salva esperienza",
-  searchTeams,
-  title = "Aggiungi esperienza calcistica",
-  usedSeasons = new Set(),
-}: AddPlayerExperienceFormProps) {
-  const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
-  const isValid = isExperienceFormValid(experience);
-
-  const missingClub = hasAttemptedSave && !experience.clubName.trim();
-  const missingSeason = hasAttemptedSave && !experience.seasonLabel.trim();
-  const missingCategory = hasAttemptedSave && !experience.category.trim();
+  onDelete,
+  season,
+  usedSeasons,
+}: SeasonEntryCardProps) {
+  const missingSeason = hasAttemptedSave && !season.seasonLabel.trim();
+  const missingCategory = hasAttemptedSave && !season.category.trim();
   const missingStartMonth =
     hasAttemptedSave &&
-    experience.seasonPeriod === "partial" &&
-    !experience.periodStartMonth;
+    season.seasonPeriod === "partial" &&
+    !season.periodStartMonth;
   const missingEndMonth =
     hasAttemptedSave &&
-    experience.seasonPeriod === "partial" &&
-    !experience.periodEndMonth;
-
-  function handleSave() {
-    if (!isValid) {
-      setHasAttemptedSave(true);
-      return;
-    }
-    onSave();
-  }
+    season.seasonPeriod === "partial" &&
+    !season.periodEndMonth;
 
   return (
-    <View style={styles.modalBody}>
-      <Text style={styles.modalTitle}>{title}</Text>
-      <Text style={styles.modalDescription}>
-        Compila una stagione alla volta con squadra, categoria e numeri chiave.
-      </Text>
-
-      <TeamAutocompleteInput
-        label="Squadra *"
-        onChangeText={(value) =>
-          onChange({
-            ...experience,
-            clubId: null,
-            clubName: value,
-            teamCity: "",
-            teamLogoUrl: "",
-          })
-        }
-        onSelectTeam={(team) =>
-          onChange({
-            ...experience,
-            clubId: team.id,
-            clubName: team.name,
-            teamCity: team.city ?? "",
-            teamLogoUrl: team.logoUrl ?? "",
-          })
-        }
-        searchTeams={searchTeams}
-        value={experience.clubName}
-      />
-      {missingClub ? (
-        <Text style={styles.fieldError}>Inserisci la squadra.</Text>
-      ) : null}
+    <Card style={styles.seasonEntryCard}>
+      <View style={styles.seasonEntryHeader}>
+        <Text style={styles.seasonEntryTitle}>
+          {season.seasonLabel.trim() || `Stagione ${index + 1}`}
+        </Text>
+        {onDelete ? (
+          <Pressable
+            accessibilityLabel="Rimuovi stagione"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onDelete}
+            style={styles.experienceIconButton}
+          >
+            <Ionicons color={colors.danger} name="trash-outline" size={16} />
+          </Pressable>
+        ) : null}
+      </View>
 
       <View style={styles.fieldGroup}>
         <Text style={styles.subsectionLabel}>Stagione *</Text>
         <View style={styles.seasonGrid}>
           {PLAYER_SEASON_OPTIONS.map((option) => {
-            const isSelected = experience.seasonLabel === option.value;
+            const isSelected = season.seasonLabel === option.value;
             const isUsed = usedSeasons.has(option.value) && !isSelected;
             return (
               <Pressable
                 accessibilityRole="button"
                 disabled={isUsed}
                 key={option.value}
-                onPress={() => onChange({ ...experience, seasonLabel: option.value })}
+                onPress={() =>
+                  onChange({ ...season, seasonLabel: option.value })
+                }
                 style={[
                   styles.seasonChip,
                   isSelected ? styles.seasonChipSelected : null,
@@ -571,14 +517,14 @@ export function AddPlayerExperienceForm({
         <Text style={styles.subsectionLabel}>Periodo *</Text>
         <View style={styles.periodToggleRow}>
           {SEASON_PERIOD_OPTIONS.map((option) => {
-            const isSelected = experience.seasonPeriod === option.value;
+            const isSelected = season.seasonPeriod === option.value;
             return (
               <Pressable
                 accessibilityRole="button"
                 key={option.value}
                 onPress={() =>
                   onChange({
-                    ...experience,
+                    ...season,
                     seasonPeriod: option.value as SeasonPeriod,
                     ...(option.value === "full"
                       ? { periodStartMonth: "", periodEndMonth: "" }
@@ -603,15 +549,17 @@ export function AddPlayerExperienceForm({
           })}
         </View>
 
-        {experience.seasonPeriod === "partial" ? (
+        {season.seasonPeriod === "partial" ? (
           <View style={styles.periodMonthsRow}>
             <View style={styles.periodMonthField}>
               <SelectField
                 label="Mese inizio *"
-                onChange={(value) => onChange({ ...experience, periodStartMonth: value })}
+                onChange={(value) =>
+                  onChange({ ...season, periodStartMonth: value })
+                }
                 options={MONTH_OPTIONS}
                 placeholder="Mese"
-                value={experience.periodStartMonth}
+                value={season.periodStartMonth}
               />
               {missingStartMonth ? (
                 <Text style={styles.fieldError}>Obbligatorio.</Text>
@@ -620,10 +568,12 @@ export function AddPlayerExperienceForm({
             <View style={styles.periodMonthField}>
               <SelectField
                 label="Mese fine *"
-                onChange={(value) => onChange({ ...experience, periodEndMonth: value })}
+                onChange={(value) =>
+                  onChange({ ...season, periodEndMonth: value })
+                }
                 options={MONTH_OPTIONS}
                 placeholder="Mese"
-                value={experience.periodEndMonth}
+                value={season.periodEndMonth}
               />
               {missingEndMonth ? (
                 <Text style={styles.fieldError}>Obbligatorio.</Text>
@@ -635,49 +585,191 @@ export function AddPlayerExperienceForm({
 
       <SelectField
         label="Categoria *"
-        onChange={(value) => onChange({ ...experience, category: value })}
+        onChange={(value) => onChange({ ...season, category: value })}
         options={PLAYER_CATEGORY_OPTIONS}
         placeholder="Seleziona la categoria"
         searchable
         searchPlaceholder="Cerca categoria..."
-        value={experience.category}
+        value={season.category}
       />
       {missingCategory ? (
         <Text style={styles.fieldError}>Seleziona una categoria.</Text>
       ) : null}
 
       <StatsInputRow
-        appearances={experience.appearances}
-        assists={experience.assists}
-        goals={experience.goals}
-        onAppearancesChange={(value) => onChange({ ...experience, appearances: value })}
-        onAssistsChange={(value) => onChange({ ...experience, assists: value })}
-        onGoalsChange={(value) => onChange({ ...experience, goals: value })}
+        appearances={season.appearances}
+        assists={season.assists}
+        goals={season.goals}
+        onAppearancesChange={(value) =>
+          onChange({ ...season, appearances: value })
+        }
+        onAssistsChange={(value) => onChange({ ...season, assists: value })}
+        onGoalsChange={(value) => onChange({ ...season, goals: value })}
       />
 
       <Input
         keyboardType="number-pad"
         label="Minuti giocati (facoltativo)"
         onChangeText={(value) =>
-          onChange({ ...experience, minutesPlayed: normalizeNumericInput(value) })
+          onChange({ ...season, minutesPlayed: normalizeNumericInput(value) })
         }
         placeholder="0"
-        value={experience.minutesPlayed}
+        value={season.minutesPlayed}
       />
 
       <Input
         label="Note o premi (facoltativo)"
         multiline
-        onChangeText={(value) => onChange({ ...experience, awards: value })}
+        onChangeText={(value) => onChange({ ...season, awards: value })}
         placeholder="Es. playoff vinti, miglior marcatore"
-        value={experience.awards}
+        value={season.awards}
       />
+    </Card>
+  );
+}
 
-      <View style={styles.modalActions}>
-        <Button label="Annulla" onPress={onCancel} variant="secondary" />
-        <Button label={saveLabel} onPress={handleSave} variant="primary" />
-      </View>
-    </View>
+function AddExperienceScreen({
+  draft,
+  editingIndex,
+  onClose,
+  onDraftChange,
+  onSave,
+  searchTeams,
+  usedSeasons,
+}: AddExperienceScreenProps) {
+  const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
+
+  const missingClub = hasAttemptedSave && !draft.clubName.trim();
+
+  function handleSave() {
+    if (!isMultiSeasonDraftValid(draft)) {
+      setHasAttemptedSave(true);
+      return;
+    }
+    onSave();
+  }
+
+  function updateSeason(seasonIndex: number, updated: SeasonEntry) {
+    onDraftChange({
+      ...draft,
+      seasons: draft.seasons.map((s, i) => (i === seasonIndex ? updated : s)),
+    });
+  }
+
+  function addSeason() {
+    onDraftChange({
+      ...draft,
+      seasons: [...draft.seasons, createEmptySeasonEntry()],
+    });
+  }
+
+  function removeSeason(seasonIndex: number) {
+    const nextSeasons = draft.seasons.filter((_, i) => i !== seasonIndex);
+    if (nextSeasons.length === 0) {
+      onClose();
+      return;
+    }
+    onDraftChange({ ...draft, seasons: nextSeasons });
+  }
+
+  function getUsedSeasonsForCard(cardIndex: number) {
+    const combined = new Set(usedSeasons);
+    for (let i = 0; i < draft.seasons.length; i++) {
+      if (i !== cardIndex && draft.seasons[i].seasonLabel.trim()) {
+        combined.add(draft.seasons[i].seasonLabel);
+      }
+    }
+    return combined;
+  }
+
+  const title =
+    editingIndex !== null
+      ? "Modifica esperienza calcistica"
+      : "Aggiungi esperienza calcistica";
+
+  const saveLabel =
+    editingIndex !== null ? "Aggiorna esperienze" : "Salva esperienze";
+
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} visible>
+      <SafeAreaView style={styles.fullScreenRoot}>
+        <View style={styles.fullScreenHeader}>
+          <Pressable
+            accessibilityLabel="Chiudi"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onClose}
+            style={styles.closeButton}
+          >
+            <Ionicons color={colors.textPrimary} name="close" size={24} />
+          </Pressable>
+          <Text style={styles.fullScreenTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <KeyboardAwareScrollView
+          contentContainerStyle={styles.fullScreenScrollContent}
+        >
+          <Text style={styles.fullScreenDescription}>
+            Seleziona la squadra e aggiungi una o più stagioni con categoria e
+            statistiche.
+          </Text>
+
+          <TeamAutocompleteInput
+            label="Squadra *"
+            onChangeText={(value) =>
+              onDraftChange({
+                ...draft,
+                clubId: null,
+                clubName: value,
+                teamCity: "",
+                teamLogoUrl: "",
+              })
+            }
+            onSelectTeam={(team) =>
+              onDraftChange({
+                ...draft,
+                clubId: team.id,
+                clubName: team.name,
+                teamCity: team.city ?? "",
+                teamLogoUrl: team.logoUrl ?? "",
+              })
+            }
+            searchTeams={searchTeams}
+            value={draft.clubName}
+          />
+          {missingClub ? (
+            <Text style={styles.fieldError}>Inserisci la squadra.</Text>
+          ) : null}
+
+          {draft.seasons.map((season, index) => (
+            <SeasonEntryCard
+              hasAttemptedSave={hasAttemptedSave}
+              index={index}
+              key={index}
+              onChange={(updated) => updateSeason(index, updated)}
+              onDelete={
+                draft.seasons.length > 1 ? () => removeSeason(index) : undefined
+              }
+              season={season}
+              usedSeasons={getUsedSeasonsForCard(index)}
+            />
+          ))}
+
+          <Button
+            label="Aggiungi un'altra stagione"
+            onPress={addSeason}
+            variant="secondary"
+          />
+        </KeyboardAwareScrollView>
+
+        <View style={styles.fullScreenFooter}>
+          <Button label={saveLabel} onPress={handleSave} variant="primary" />
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
@@ -707,7 +799,9 @@ export function PlayerCharacteristicsSection({
           <FootballPositionPicker
             errorMessage={primaryPositionError}
             mode="single"
-            onSelect={(values) => onPrimaryPositionChange?.(values[0] as PlayerPosition)}
+            onSelect={(values) =>
+              onPrimaryPositionChange?.(values[0] as PlayerPosition)
+            }
             selectedPositions={primaryPosition ? [primaryPosition] : []}
             title="Ruolo principale"
           />
@@ -721,7 +815,9 @@ export function PlayerCharacteristicsSection({
             allowClear
             clearLabel="Rimuovi piede preferito"
             label="Piede preferito"
-            onChange={(value) => onPreferredFootChange?.(value as PreferredFoot | "")}
+            onChange={(value) =>
+              onPreferredFootChange?.(value as PreferredFoot | "")
+            }
             options={PREFERRED_FOOT_OPTIONS}
             placeholder="Seleziona il piede preferito"
             value={preferredFoot}
@@ -736,11 +832,16 @@ export function PlayerCharacteristicsSection({
             },
             {
               label: "Ruoli secondari",
-              value: secondaryPositionLabels.length > 0 ? secondaryPositionLabels.join(", ") : "Nessuno",
+              value:
+                secondaryPositionLabels.length > 0
+                  ? secondaryPositionLabels.join(", ")
+                  : "Nessuno",
             },
             {
               label: "Piede preferito",
-              value: preferredFoot ? getPreferredFootLabel(preferredFoot) : "Da completare",
+              value: preferredFoot
+                ? getPreferredFootLabel(preferredFoot)
+                : "Da completare",
             },
           ].map((item) => (
             <View key={item.label} style={styles.readonlyItem}>
@@ -763,9 +864,9 @@ export function PlayerExperiencesSection({
   searchTeams,
   showHeader = true,
 }: PlayerExperiencesSectionProps) {
-  const [draft, setDraft] = useState<PlayerExperienceForm>(createEmptyPlayerExperienceForm());
+  const [draft, setDraft] = useState<MultiSeasonDraft | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const isScreenOpen = draft !== null;
 
   const sortedExperiences = useMemo(
     () => sortPlayerExperiencesBySeason(experiences),
@@ -779,42 +880,47 @@ export function PlayerExperiencesSection({
         seasons.add(experience.seasonLabel);
       }
     }
+    // When editing, remove the edited entry's season so it can be re-selected
+    if (editingIndex !== null && sortedExperiences[editingIndex]) {
+      seasons.delete(sortedExperiences[editingIndex].seasonLabel);
+    }
     return seasons;
-  }, [sortedExperiences]);
+  }, [editingIndex, sortedExperiences]);
 
-  function closeModal() {
-    setDraft(createEmptyPlayerExperienceForm());
+  function closeScreen() {
+    setDraft(null);
     setEditingIndex(null);
-    setIsModalOpen(false);
   }
 
   function openNewExperience() {
-    setDraft(createEmptyPlayerExperienceForm());
+    setDraft(createEmptyMultiSeasonDraft());
     setEditingIndex(null);
-    setIsModalOpen(true);
   }
 
   function openExistingExperience(index: number) {
-    setDraft(sortedExperiences[index]);
+    setDraft(experienceToMultiSeasonDraft(sortedExperiences[index]));
     setEditingIndex(index);
-    setIsModalOpen(true);
   }
 
   function handleSave() {
-    if (!onChange) {
-      closeModal();
+    if (!onChange || !draft) {
+      closeScreen();
       return;
     }
 
+    const newEntries = multiSeasonDraftToExperiences(draft);
+
     const nextExperiences =
       editingIndex === null
-        ? [...sortedExperiences, draft]
-        : sortedExperiences.map((experience, index) =>
-            index === editingIndex ? draft : experience,
-          );
+        ? [...sortedExperiences, ...newEntries]
+        : [
+            ...sortedExperiences.slice(0, editingIndex),
+            ...newEntries,
+            ...sortedExperiences.slice(editingIndex + 1),
+          ];
 
     onChange(sortPlayerExperiencesBySeason(nextExperiences));
-    closeModal();
+    closeScreen();
   }
 
   function handleDelete(index: number) {
@@ -822,7 +928,9 @@ export function PlayerExperiencesSection({
       return;
     }
 
-    onChange(sortedExperiences.filter((_, currentIndex) => currentIndex !== index));
+    onChange(
+      sortedExperiences.filter((_, currentIndex) => currentIndex !== index),
+    );
   }
 
   return (
@@ -831,13 +939,18 @@ export function PlayerExperiencesSection({
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Esperienze calcistiche</Text>
           <Text style={styles.sectionDescription}>
-            Timeline ordinata dalla stagione più recente, con squadra, categoria e statistiche.
+            Timeline ordinata dalla stagione più recente, con squadra, categoria
+            e statistiche.
           </Text>
         </View>
       ) : null}
 
       {editable ? (
-        <Button label={addButtonLabel} onPress={openNewExperience} variant="secondary" />
+        <Button
+          label={addButtonLabel}
+          onPress={openNewExperience}
+          variant="secondary"
+        />
       ) : null}
 
       {sortedExperiences.length > 0 ? (
@@ -846,9 +959,14 @@ export function PlayerExperiencesSection({
             <ExperienceCard
               editable={editable}
               experience={experience}
-              key={experience.id ?? `${experience.seasonLabel}-${experience.clubName}-${index}`}
+              key={
+                experience.id ??
+                `${experience.seasonLabel}-${experience.clubName}-${index}`
+              }
               onDelete={editable ? () => handleDelete(index) : undefined}
-              onEdit={editable ? () => openExistingExperience(index) : undefined}
+              onEdit={
+                editable ? () => openExistingExperience(index) : undefined
+              }
             />
           ))}
         </View>
@@ -858,33 +976,17 @@ export function PlayerExperiencesSection({
         </Card>
       )}
 
-      <Modal
-        animationType="slide"
-        onRequestClose={closeModal}
-        transparent
-        visible={isModalOpen}
-      >
-        <Pressable onPress={closeModal} style={styles.modalOverlay}>
-          <Pressable onPress={(event) => event.stopPropagation()} style={styles.modalCard}>
-            <ScrollView contentContainerStyle={styles.modalScrollContent}>
-              <AddPlayerExperienceForm
-                experience={draft}
-                onCancel={closeModal}
-                onChange={setDraft}
-                onSave={handleSave}
-                saveLabel={editingIndex === null ? "Aggiungi esperienza" : "Aggiorna esperienza"}
-                searchTeams={searchTeams}
-                title={
-                  editingIndex === null
-                    ? "Aggiungi esperienza calcistica"
-                    : "Modifica esperienza calcistica"
-                }
-                usedSeasons={usedSeasons}
-              />
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {isScreenOpen ? (
+        <AddExperienceScreen
+          draft={draft}
+          editingIndex={editingIndex}
+          onClose={closeScreen}
+          onDraftChange={setDraft}
+          onSave={handleSave}
+          searchTeams={searchTeams}
+          usedSeasons={usedSeasons}
+        />
+      ) : null}
     </View>
   );
 }
@@ -997,38 +1099,64 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing[8],
   },
-  modalActions: {
-    flexDirection: "row",
-    gap: spacing[10],
-    flexWrap: "wrap",
+  closeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  modalBody: {
-    gap: spacing[16],
-  },
-  modalCard: {
-    maxHeight: "88%",
-    borderRadius: radius[24],
-    backgroundColor: colors.surface,
-    padding: spacing[18],
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalDescription: {
+  fullScreenDescription: {
     color: colors.textSecondary,
     lineHeight: typography.lineHeight[22],
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(15, 23, 42, 0.45)",
-    padding: spacing[16],
+  fullScreenFooter: {
+    paddingHorizontal: spacing[20],
+    paddingVertical: spacing[12],
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
   },
-  modalScrollContent: {
+  fullScreenHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[12],
+    paddingHorizontal: spacing[20],
+    paddingVertical: spacing[12],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  fullScreenRoot: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  fullScreenScrollContent: {
+    padding: spacing[20],
     gap: spacing[16],
   },
-  modalTitle: {
+  fullScreenTitle: {
+    flex: 1,
     color: colors.textPrimary,
-    fontSize: typography.fontSize[20],
+    fontSize: typography.fontSize[18],
+    fontWeight: typography.fontWeight.heavy,
+    textAlign: "center",
+  },
+  headerSpacer: {
+    width: 44,
+  },
+  seasonEntryCard: {
+    gap: spacing[16],
+    padding: spacing[16],
+  },
+  seasonEntryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  seasonEntryTitle: {
+    color: colors.textPrimary,
+    fontSize: typography.fontSize[16],
     fontWeight: typography.fontWeight.heavy,
   },
   readonlyGrid: {
@@ -1098,48 +1226,17 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize[18],
     fontWeight: typography.fontWeight.heavy,
   },
-  stepperButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing[6],
-  },
-  stepperCell: {
+  statsWheelCell: {
     flex: 1,
-    alignItems: "center",
-    gap: spacing[6],
-  },
-  stepperLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
-  },
-  stepperSurface: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: radius[16],
-    borderWidth: 1,
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[4],
-    width: 72,
-  },
-  stepperValue: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[24],
-    fontWeight: typography.fontWeight.heavy,
-    textAlign: "center",
-    minWidth: 40,
-    padding: 0,
   },
   statsWheelRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    gap: spacing[10],
   },
   statsInputsWrapper: {
     gap: spacing[8],
   },
-statsInlineRow: {
+  statsInlineRow: {
     paddingHorizontal: spacing[4],
   },
   statsInlineText: {

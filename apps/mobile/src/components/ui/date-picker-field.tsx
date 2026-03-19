@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Keyboard, Platform, Pressable, Text, View } from "react-native";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -54,7 +54,10 @@ export function DatePickerField({
       </Text>
       <Pressable
         accessibilityRole="button"
-        onPress={() => setIsOpen((current) => !current)}
+        onPress={() => {
+          Keyboard.dismiss();
+          setIsOpen((current) => !current);
+        }}
         style={{
           minHeight: 54,
           justifyContent: "center",

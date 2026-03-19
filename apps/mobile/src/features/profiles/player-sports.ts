@@ -320,6 +320,112 @@ export function getPreferredFootLabel(
   return preferredFootLabels[value] ?? fallback;
 }
 
+export type SeasonEntry = {
+  appearances: string;
+  assists: string;
+  awards: string;
+  category: string;
+  goals: string;
+  minutesPlayed: string;
+  periodEndMonth: string;
+  periodStartMonth: string;
+  seasonLabel: string;
+  seasonPeriod: SeasonPeriod;
+};
+
+export type MultiSeasonDraft = {
+  clubId: string | null;
+  clubName: string;
+  teamCity: string;
+  teamLogoUrl: string;
+  seasons: SeasonEntry[];
+};
+
+export function createEmptySeasonEntry(): SeasonEntry {
+  return {
+    appearances: "",
+    assists: "",
+    awards: "",
+    category: "",
+    goals: "",
+    minutesPlayed: "",
+    periodEndMonth: "",
+    periodStartMonth: "",
+    seasonLabel: "",
+    seasonPeriod: "full",
+  };
+}
+
+export function createEmptyMultiSeasonDraft(): MultiSeasonDraft {
+  return {
+    clubId: null,
+    clubName: "",
+    teamCity: "",
+    teamLogoUrl: "",
+    seasons: [createEmptySeasonEntry()],
+  };
+}
+
+export function experienceToMultiSeasonDraft(
+  experience: PlayerExperienceForm,
+): MultiSeasonDraft {
+  return {
+    clubId: experience.clubId,
+    clubName: experience.clubName,
+    teamCity: experience.teamCity,
+    teamLogoUrl: experience.teamLogoUrl,
+    seasons: [
+      {
+        appearances: experience.appearances,
+        assists: experience.assists,
+        awards: experience.awards,
+        category: experience.category,
+        goals: experience.goals,
+        minutesPlayed: experience.minutesPlayed,
+        periodEndMonth: experience.periodEndMonth,
+        periodStartMonth: experience.periodStartMonth,
+        seasonLabel: experience.seasonLabel,
+        seasonPeriod: experience.seasonPeriod,
+      },
+    ],
+  };
+}
+
+export function multiSeasonDraftToExperiences(
+  draft: MultiSeasonDraft,
+): PlayerExperienceForm[] {
+  return draft.seasons.map((season) => ({
+    appearances: season.appearances,
+    assists: season.assists,
+    awards: season.awards,
+    category: season.category,
+    clubId: draft.clubId,
+    clubName: draft.clubName,
+    goals: season.goals,
+    minutesPlayed: season.minutesPlayed,
+    periodEndMonth: season.periodEndMonth,
+    periodStartMonth: season.periodStartMonth,
+    seasonLabel: season.seasonLabel,
+    seasonPeriod: season.seasonPeriod,
+    teamCity: draft.teamCity,
+    teamLogoUrl: draft.teamLogoUrl,
+  }));
+}
+
+export function isSeasonEntryValid(entry: SeasonEntry): boolean {
+  const hasSeason = Boolean(entry.seasonLabel.trim());
+  const hasCategory = Boolean(entry.category.trim());
+  const hasPartialMonths =
+    entry.seasonPeriod !== "partial" ||
+    (Boolean(entry.periodStartMonth) && Boolean(entry.periodEndMonth));
+  return hasSeason && hasCategory && hasPartialMonths;
+}
+
+export function isMultiSeasonDraftValid(draft: MultiSeasonDraft): boolean {
+  const hasTeam = Boolean(draft.clubName.trim());
+  return hasTeam && draft.seasons.length > 0 && draft.seasons.every(isSeasonEntryValid);
+}
+
 export function createEmptyPlayerExperienceForm(): PlayerExperienceForm {
   return {
     appearances: "",
