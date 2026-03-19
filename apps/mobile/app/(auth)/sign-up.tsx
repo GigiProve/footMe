@@ -2,7 +2,7 @@ import { Link } from "expo-router";
 import { useState } from "react";
 import { Alert, Platform, StyleSheet, Text, View } from "react-native";
 
-import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
+import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
 import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { supabase } from "../../src/lib/supabase";
@@ -74,7 +74,7 @@ export default function SignUpScreen() {
 
   return (
     <Screen>
-      <KeyboardAwareScrollView
+      <KeyboardAwareForm
         contentContainerStyle={styles.container}
         keyboardVerticalOffset={spacing[16]}
       >
@@ -147,7 +147,7 @@ export default function SignUpScreen() {
             variant="link"
           />
         </Link>
-      </KeyboardAwareScrollView>
+      </KeyboardAwareForm>
     </Screen>
   );
 }

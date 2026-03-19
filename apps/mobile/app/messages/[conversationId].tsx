@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import { useSession } from "../../src/features/auth/use-session";
-import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
+import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
 import {
   getShareablePhoneContact,
@@ -208,7 +208,7 @@ export default function ConversationScreen() {
 
   return (
     <Screen>
-      <KeyboardAwareScrollView
+      <KeyboardAwareForm
         contentContainerStyle={{ gap: 16, paddingBottom: spacing[16] }}
       >
         <View
@@ -360,7 +360,7 @@ export default function ConversationScreen() {
           phone={shareablePhone}
           visible={isShareModalVisible}
         />
-      </KeyboardAwareScrollView>
+      </KeyboardAwareForm>
     </Screen>
   );
 }

@@ -7,7 +7,7 @@ import {
 } from "react-native";
 
 import { useSession } from "../../src/features/auth/use-session";
-import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
+import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { PublicBioBlock } from "../../src/features/profiles/bio-section";
 import { Screen } from "../../src/components/ui/screen";
 import {
@@ -261,7 +261,7 @@ export default function NetworkScreen() {
 
   return (
     <Screen>
-      <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
+      <KeyboardAwareForm contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
         <View
           style={{
             gap: spacing[10],
@@ -797,7 +797,7 @@ export default function NetworkScreen() {
                 ) : null}
               </View>
             ))}
-      </KeyboardAwareScrollView>
+      </KeyboardAwareForm>
     </Screen>
   );
 }

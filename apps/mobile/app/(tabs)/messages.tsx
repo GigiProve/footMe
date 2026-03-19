@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 
 import { useSession } from "../../src/features/auth/use-session";
+import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import {
   getConversationSummaries,
@@ -118,7 +119,7 @@ export default function MessagesScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
+      <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
         <View
           style={{
             gap: spacing[10],
@@ -401,7 +402,7 @@ export default function MessagesScreen() {
             </Pressable>
           ))}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }

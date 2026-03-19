@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { KeyboardAwareScrollView } from "../../components/ui/keyboard-aware-scroll-view";
+import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
 import { SelectField } from "../../components/ui/select-field";
 import { WheelPicker } from "../../components/ui/wheel-picker";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
@@ -709,7 +709,7 @@ function AddExperienceScreen({
           <View style={styles.headerSpacer} />
         </View>
 
-        <KeyboardAwareScrollView
+        <KeyboardAwareForm
           contentContainerStyle={styles.fullScreenScrollContent}
         >
           <Text style={styles.fullScreenDescription}>
@@ -763,7 +763,7 @@ function AddExperienceScreen({
             onPress={addSeason}
             variant="secondary"
           />
-        </KeyboardAwareScrollView>
+        </KeyboardAwareForm>
 
         <View style={styles.fullScreenFooter}>
           <Button label={saveLabel} onPress={handleSave} variant="primary" />
