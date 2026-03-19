@@ -19,6 +19,11 @@ describe("ResidenceCityInput", () => {
       );
     });
 
+    // Trigger onFocus to open the suggestions dropdown (isOpen starts as false).
+    act(() => {
+      tree.root.findByType("TextInput" as never).props.onFocus({});
+    });
+
     const suggestion = tree.root.findByProps({
       testID: "residence-city-suggestion-Milano-Lombardia",
     });

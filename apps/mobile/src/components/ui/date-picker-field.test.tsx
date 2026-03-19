@@ -71,6 +71,13 @@ describe("DatePickerField", () => {
     });
 
     expect(onChange).toHaveBeenCalledWith("2001-03-11");
+
+    // Platform.OS is "ios" in the test mock, so the picker stays open until
+    // the user taps "Conferma" rather than closing on every onChange event.
+    act(() => {
+      root.findByProps({ testID: "date-picker-confirm" }).props.onPress();
+    });
+
     expect(root.findAllByProps({ testID: "date-picker-surface" })).toHaveLength(0);
   });
 });

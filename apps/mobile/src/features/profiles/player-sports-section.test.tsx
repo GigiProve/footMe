@@ -39,6 +39,11 @@ describe("player-sports-section", () => {
       );
     });
 
+    // Trigger onFocus to open the suggestions dropdown (isOpen starts as false).
+    await act(async () => {
+      tree!.root.findByType("TextInput" as never).props.onFocus({});
+    });
+
     await act(async () => {
       vi.advanceTimersByTime(300);
       await Promise.resolve();
@@ -149,7 +154,7 @@ describe("player-sports-section", () => {
     const teamNameNodes = tree!.root.findAllByType("Text" as never);
     expect(teamNameNodes.some((node) => node.props.children === "Club 2024")).toBe(true);
 
-    const deleteButtons = tree!.root.findAllByProps({ accessibilityLabel: "Elimina" });
+    const deleteButtons = tree!.root.findAllByProps({ accessibilityLabel: "Elimina esperienza" });
 
     act(() => {
       deleteButtons[0].props.onPress();

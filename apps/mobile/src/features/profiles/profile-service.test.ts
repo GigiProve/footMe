@@ -4,9 +4,6 @@ import { getCompleteProfessionalProfile, searchTeams } from "./profile-service";
 
 const mocks = vi.hoisted(() => {
   const clubMaybeSingleMock = vi.fn();
-  const clubSearchIlikeMock = vi.fn();
-  const clubSearchLimitMock = vi.fn();
-  const clubSearchOrderMock = vi.fn();
   const coachMaybeSingleMock = vi.fn();
   const playerCareerEqMock = vi.fn();
   const playerCareerFirstOrderMock = vi.fn();
@@ -15,6 +12,7 @@ const mocks = vi.hoisted(() => {
   const profileContactsMaybeSingleMock = vi.fn();
   const privateContactsMaybeSingleMock = vi.fn();
   const profileMaybeSingleMock = vi.fn();
+  const rpcMock = vi.fn();
   const staffMaybeSingleMock = vi.fn();
 
   const playerCareerSecondOrderChain = {
@@ -23,20 +21,9 @@ const mocks = vi.hoisted(() => {
   const playerCareerFirstOrderChain = {
     order: playerCareerFirstOrderMock,
   };
-  const clubSearchOrderChain = {
-    limit: clubSearchLimitMock,
-  };
-  const clubSearchIlikeChain = {
-    order: clubSearchOrderMock,
-  };
 
   return {
     clubMaybeSingleMock,
-    clubSearchIlikeMock,
-    clubSearchIlikeChain,
-    clubSearchLimitMock,
-    clubSearchOrderChain,
-    clubSearchOrderMock,
     coachMaybeSingleMock,
     fromMock: vi.fn((table: string) => {
       if (table === "profiles_with_age") {
@@ -85,7 +72,6 @@ const mocks = vi.hoisted(() => {
             eq: vi.fn(() => ({
               maybeSingle: clubMaybeSingleMock,
             })),
-            ilike: clubSearchIlikeMock,
           })),
         };
       }
@@ -129,6 +115,7 @@ const mocks = vi.hoisted(() => {
     privateContactsMaybeSingleMock,
     profileContactsMaybeSingleMock,
     profileMaybeSingleMock,
+    rpcMock,
     staffMaybeSingleMock,
   };
 });
@@ -136,6 +123,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("../../lib/supabase", () => ({
   supabase: {
     from: mocks.fromMock,
+    rpc: mocks.rpcMock,
   },
 }));
 
@@ -147,9 +135,7 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.coachMaybeSingleMock.mockReset();
     mocks.staffMaybeSingleMock.mockReset();
     mocks.clubMaybeSingleMock.mockReset();
-    mocks.clubSearchIlikeMock.mockReset();
-    mocks.clubSearchOrderMock.mockReset();
-    mocks.clubSearchLimitMock.mockReset();
+    mocks.rpcMock.mockReset();
     mocks.profileContactsMaybeSingleMock.mockReset();
     mocks.privateContactsMaybeSingleMock.mockReset();
     mocks.playerCareerEqMock.mockReset();
@@ -212,8 +198,6 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.playerCareerFirstOrderMock.mockImplementation(
       () => mocks.playerCareerSecondOrderChain,
     );
-    mocks.clubSearchIlikeMock.mockImplementation(() => mocks.clubSearchIlikeChain);
-    mocks.clubSearchOrderMock.mockImplementation(() => mocks.clubSearchOrderChain);
     mocks.playerCareerSecondOrderMock.mockResolvedValue({
       data: [
         {
@@ -390,11 +374,12 @@ describe("getCompleteProfessionalProfile", () => {
 
 describe("searchTeams", () => {
   it("returns club suggestions for team autocomplete", async () => {
-    mocks.clubSearchLimitMock.mockResolvedValueOnce({
+    mocks.rpcMock.mockResolvedValueOnce({
       data: [
         {
           city: "Milano",
           id: "club-1",
+          is_community: false,
           logo_url: "https://example.com/logo.png",
           name: "ASD Real Milano",
         },
@@ -404,15 +389,15 @@ describe("searchTeams", () => {
 
     const result = await searchTeams("Mil");
 
-    expect(mocks.clubSearchIlikeMock).toHaveBeenCalledWith("name", "%Mil%");
-    expect(mocks.clubSearchOrderMock).toHaveBeenCalledWith("name", {
-      ascending: true,
+    expect(mocks.rpcMock).toHaveBeenCalledWith("search_teams", {
+      p_query: "Mil",
+      p_limit: 5,
     });
-    expect(mocks.clubSearchLimitMock).toHaveBeenCalledWith(5);
     expect(result).toEqual([
       {
         city: "Milano",
         id: "club-1",
+        isCustom: false,
         logoUrl: "https://example.com/logo.png",
         name: "ASD Real Milano",
       },
