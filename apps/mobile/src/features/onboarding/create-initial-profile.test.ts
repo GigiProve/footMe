@@ -35,9 +35,23 @@ describe("createInitialProfile", () => {
     });
   });
 
+  const defaultClubFields = {
+    clubCategory: "",
+    clubColors: "",
+    clubCountry: "IT",
+    clubEmail: "",
+    clubFieldAddress: "",
+    clubFoundingYear: "",
+    clubHeadquartersAddress: "",
+    clubLogoUrl: "",
+    clubPhone: "",
+    clubWebsite: "",
+  };
+
   it("rejects empty full name before calling Supabase", async () => {
     await expect(
       createInitialProfile({
+        ...defaultClubFields,
         avatarUrl: "https://example.com/avatar.jpg",
         birthDate: "1998-05-12",
         clubCity: "",
@@ -61,6 +75,7 @@ describe("createInitialProfile", () => {
 
   it("creates a player profile with trimmed base profile data", async () => {
     await createInitialProfile({
+      ...defaultClubFields,
       avatarUrl: " https://example.com/avatar.jpg ",
       birthDate: "1998-05-12",
       clubCity: "",
@@ -103,9 +118,11 @@ describe("createInitialProfile", () => {
 
   it("creates a club profile with an accent-safe slug", async () => {
     await createInitialProfile({
+      ...defaultClubFields,
       avatarUrl: "https://example.com/avatar.jpg",
       birthDate: "1988-03-17",
       clubCity: "  Città di Castello ",
+      clubEmail: "info@elite.it",
       clubName: "  Città Élite Naïve FC ",
       clubRegion: " Umbria ",
       domicile: "Città di Castello",
@@ -120,21 +137,37 @@ describe("createInitialProfile", () => {
       userId: "club-1",
     });
 
-    expect(upsertMocks.clubs).toHaveBeenCalledWith({
-      city: "Città di Castello",
-      name: "Città Élite Naïve FC",
-      owner_profile_id: "club-1",
-      region: "Umbria",
-      slug: "citta-elite-naive-fc",
-    });
+    expect(upsertMocks.clubs).toHaveBeenCalledWith(
+      {
+        category: null,
+        city: "Città di Castello",
+        club_colors: null,
+        club_email: "info@elite.it",
+        club_phone: null,
+        country: "IT",
+        field_address: null,
+        founding_year: null,
+        headquarters_address: null,
+        logo_url: null,
+        name: "Città Élite Naïve FC",
+        owner_profile_id: "club-1",
+        region: "Umbria",
+        slug: "citta-elite-naive-fc",
+        verification_status: "pending_review",
+        website_url: null,
+      },
+      { onConflict: "owner_profile_id" },
+    );
   });
 
   it("requires club identity fields for club admins", async () => {
     await expect(
       createInitialProfile({
+        ...defaultClubFields,
         avatarUrl: "https://example.com/avatar.jpg",
         birthDate: "1988-03-17",
         clubCity: " ",
+        clubEmail: "",
         clubName: "Club",
         clubRegion: "",
         domicile: "Roma",
@@ -149,7 +182,7 @@ describe("createInitialProfile", () => {
         userId: "club-2",
       }),
     ).rejects.toThrow(
-      "Completa i dati obbligatori della società: città società, regione società.",
+      "Completa i dati obbligatori della società: città società, regione società, email società.",
     );
 
     expect(upsertMocks.clubs).not.toHaveBeenCalled();
@@ -158,6 +191,7 @@ describe("createInitialProfile", () => {
   it("requires the mandatory base onboarding fields", async () => {
     await expect(
       createInitialProfile({
+        ...defaultClubFields,
         avatarUrl: " ",
         birthDate: "",
         clubCity: "",
@@ -182,6 +216,7 @@ describe("createInitialProfile", () => {
   it("reports the exact required fields that are missing", () => {
     expect(() =>
       validateBaseProfileStep({
+        ...defaultClubFields,
         avatarUrl: "",
         birthDate: "",
         clubCity: "",
@@ -204,6 +239,7 @@ describe("createInitialProfile", () => {
   it("allows optional nationality and residence fields to stay empty", () => {
     expect(
       validateBaseProfileStep({
+        ...defaultClubFields,
         avatarUrl: "",
         birthDate: "1998-05-12",
         clubCity: "",
@@ -230,6 +266,7 @@ describe("createInitialProfile", () => {
 
   it("creates agent profiles without extra role-specific tables", async () => {
     await createInitialProfile({
+      ...defaultClubFields,
       avatarUrl: "",
       birthDate: "1990-01-01",
       clubCity: "",
@@ -260,6 +297,7 @@ describe("createInitialProfile", () => {
 
   it("saves a null avatar when no profile image is uploaded", async () => {
     await createInitialProfile({
+      ...defaultClubFields,
       avatarUrl: " ",
       birthDate: "1998-05-12",
       clubCity: "",

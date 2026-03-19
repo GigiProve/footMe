@@ -9,7 +9,7 @@ import { normalizePlayerPositions } from "../profiles/player-sports";
 import type { UploadedMediaItem } from "../profiles/media-upload-service";
 import type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
 
-export type OnboardingStep = "role" | "base" | "decision" | "details" | "complete";
+export type OnboardingStep = "role" | "base" | "decision" | "details" | "club" | "complete";
 
 export type OnboardingValidationErrors = Partial<Record<string, string>>;
 
@@ -20,12 +20,21 @@ export type OnboardingFormState = {
   careerEntries: PlayerExperienceForm[];
   clubCategory: string;
   clubCity: string;
+  clubColors: string;
+  clubCountry: string;
   clubDescription: string;
+  clubEmail: string;
+  clubFieldAddress: string;
+  clubFoundingYear: string;
   clubGalleryItems: UploadedMediaItem[];
+  clubHeadquartersAddress: string;
   clubLeague: string;
   clubLogoUrl: string;
   clubName: string;
+  clubPhone: string;
+  clubPhoneCountryCode: string;
   clubRegion: string;
+  clubWebsite: string;
   coachedCategories: string;
   coachedClubs: string;
   coachPreferredRegions: string;
@@ -67,12 +76,14 @@ export type OnboardingFormState = {
   willingToChangeClub: boolean;
 };
 
-export const onboardingVisibleSteps: {
+export type OnboardingVisibleStep = {
   description: string;
   index: number;
   label: string;
   step: Exclude<OnboardingStep, "complete">;
-}[] = [
+};
+
+const defaultVisibleSteps: OnboardingVisibleStep[] = [
   {
     description: "Seleziona il tipo di profilo da creare",
     index: 1,
@@ -99,13 +110,48 @@ export const onboardingVisibleSteps: {
   },
 ];
 
-export const onboardingStepOrder: OnboardingStep[] = [
+const clubVisibleSteps: OnboardingVisibleStep[] = [
+  {
+    description: "Seleziona il tipo di profilo da creare",
+    index: 1,
+    label: "Ruolo",
+    step: "role",
+  },
+  {
+    description: "Inserisci i dati della tua societa'",
+    index: 2,
+    label: "Il tuo club",
+    step: "club",
+  },
+];
+
+const defaultStepOrder: OnboardingStep[] = [
   "role",
   "base",
   "decision",
   "details",
   "complete",
 ];
+
+const clubStepOrder: OnboardingStep[] = [
+  "role",
+  "club",
+  "complete",
+];
+
+export function getOnboardingVisibleSteps(role: AppRole | ""): OnboardingVisibleStep[] {
+  return role === "club_admin" ? clubVisibleSteps : defaultVisibleSteps;
+}
+
+export function getOnboardingStepOrder(role: AppRole | ""): OnboardingStep[] {
+  return role === "club_admin" ? clubStepOrder : defaultStepOrder;
+}
+
+/** @deprecated Use getOnboardingVisibleSteps(role) instead */
+export const onboardingVisibleSteps = defaultVisibleSteps;
+
+/** @deprecated Use getOnboardingStepOrder(role) instead */
+export const onboardingStepOrder = defaultStepOrder;
 
 export const defaultOnboardingFormState: OnboardingFormState = {
   avatarUrl: "",
@@ -114,12 +160,21 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   careerEntries: [],
   clubCategory: "",
   clubCity: "",
+  clubColors: "",
+  clubCountry: "IT",
   clubDescription: "",
+  clubEmail: "",
+  clubFieldAddress: "",
+  clubFoundingYear: "",
   clubGalleryItems: [],
+  clubHeadquartersAddress: "",
   clubLeague: "",
   clubLogoUrl: "",
   clubName: "",
+  clubPhone: "",
+  clubPhoneCountryCode: "+39",
   clubRegion: "",
+  clubWebsite: "",
   coachedCategories: "",
   coachedClubs: "",
   coachPreferredRegions: "",
@@ -237,30 +292,33 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     return null;
   }
 
-  return onboardingStepOrder.includes(value as OnboardingStep)
+  const allSteps: OnboardingStep[] = ["role", "base", "decision", "details", "club", "complete"];
+  return allSteps.includes(value as OnboardingStep)
     ? (value as OnboardingStep)
     : null;
 }
 
-export function getOnboardingStepIndex(step: OnboardingStep) {
-  const visibleIndex = onboardingVisibleSteps.findIndex((entry) => entry.step === step);
+export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" = "") {
+  const visibleSteps = getOnboardingVisibleSteps(role);
+  const visibleIndex = visibleSteps.findIndex((entry) => entry.step === step);
 
   if (visibleIndex >= 0) {
     return visibleIndex;
   }
 
-  return onboardingVisibleSteps.length - 1;
+  return visibleSteps.length - 1;
 }
 
-export function getOnboardingProgress(step: OnboardingStep) {
-  const stepIndex = getOnboardingStepIndex(step);
-  const completedSteps = step === "complete" ? onboardingVisibleSteps.length : stepIndex + 1;
-  const totalSteps = onboardingVisibleSteps.length;
+export function getOnboardingProgress(step: OnboardingStep, role: AppRole | "" = "") {
+  const visibleSteps = getOnboardingVisibleSteps(role);
+  const stepIndex = getOnboardingStepIndex(step, role);
+  const completedSteps = step === "complete" ? visibleSteps.length : stepIndex + 1;
+  const totalSteps = visibleSteps.length;
   const percentage = Math.round((completedSteps / totalSteps) * 100);
   const currentStep =
     step === "complete"
-      ? onboardingVisibleSteps[onboardingVisibleSteps.length - 1]
-      : onboardingVisibleSteps[stepIndex];
+      ? visibleSteps[visibleSteps.length - 1]
+      : visibleSteps[stepIndex];
 
   return {
     currentStep,
@@ -270,19 +328,27 @@ export function getOnboardingProgress(step: OnboardingStep) {
   };
 }
 
-export function getNextOnboardingStep(step: OnboardingStep) {
+export function getNextOnboardingStep(step: OnboardingStep, role: AppRole | "" = "") {
   if (step === "complete") {
     return null;
   }
 
-  return onboardingStepOrder[onboardingStepOrder.indexOf(step) + 1] ?? null;
+  const stepOrder = getOnboardingStepOrder(role);
+  return stepOrder[stepOrder.indexOf(step) + 1] ?? null;
 }
 
 export function getPreviousOnboardingStep(
   step: OnboardingStep,
   lastCompletedStep: OnboardingStep | null = null,
+  role: AppRole | "" = "",
 ) {
+  const stepOrder = getOnboardingStepOrder(role);
+
   if (step === "complete") {
+    if (role === "club_admin") {
+      return "club";
+    }
+
     if (lastCompletedStep === "details") {
       return "details";
     }
@@ -290,8 +356,8 @@ export function getPreviousOnboardingStep(
     return "decision";
   }
 
-  const previousIndex = onboardingStepOrder.indexOf(step) - 1;
-  return previousIndex >= 0 ? onboardingStepOrder[previousIndex] : null;
+  const previousIndex = stepOrder.indexOf(step) - 1;
+  return previousIndex >= 0 ? stepOrder[previousIndex] : null;
 }
 
 export function getOnboardingFullName(form: OnboardingFormState) {
@@ -312,6 +378,10 @@ export function validateOnboardingStep(
 
   if (step === "base") {
     return mapBaseStepValidationError(form);
+  }
+
+  if (step === "club") {
+    return mapClubStepValidationError(form);
   }
 
   if (step === "details") {
@@ -341,6 +411,65 @@ function mapRoleStepValidationError(form: OnboardingFormState): OnboardingValida
   return {
     role: "Seleziona un ruolo per continuare.",
   };
+}
+
+function isBasicEmailFormat(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function mapClubStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
+  if (!form.firstName.trim()) {
+    errors.firstName = "Questo campo è obbligatorio";
+  }
+
+  if (!form.lastName.trim()) {
+    errors.lastName = "Questo campo è obbligatorio";
+  }
+
+  if (!form.clubName.trim()) {
+    errors.clubName = "Questo campo è obbligatorio";
+  }
+
+  if (!form.clubCity.trim()) {
+    errors.clubCity = "Questo campo è obbligatorio";
+  }
+
+  if (!form.clubRegion.trim()) {
+    errors.clubRegion = "Questo campo è obbligatorio";
+  }
+
+  if (!form.clubEmail.trim()) {
+    errors.clubEmail = "Questo campo è obbligatorio";
+  } else if (!isBasicEmailFormat(form.clubEmail.trim())) {
+    errors.clubEmail = "Inserisci un indirizzo email valido.";
+  }
+
+  if (form.clubFoundingYear.trim()) {
+    const year = parseInt(form.clubFoundingYear.trim(), 10);
+    const currentYear = new Date().getFullYear();
+
+    if (isNaN(year) || year < 1850 || year > currentYear) {
+      errors.clubFoundingYear = `Inserisci un anno tra 1850 e ${currentYear}.`;
+    }
+  }
+
+  if (form.clubWebsite.trim()) {
+    const website = form.clubWebsite.trim();
+
+    if (!/^https?:\/\/.+\..+/.test(website) && !/^[a-zA-Z0-9].*\..+/.test(website)) {
+      errors.clubWebsite = "Inserisci un indirizzo web valido.";
+    }
+  }
+
+  const phoneValue = composePhoneNumber(form.clubPhoneCountryCode, form.clubPhone);
+
+  if (phoneValue && !isPhoneNumberValid(phoneValue)) {
+    errors.clubPhone = "Inserisci un numero di telefono valido.";
+  }
+
+  return errors;
 }
 
 function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {

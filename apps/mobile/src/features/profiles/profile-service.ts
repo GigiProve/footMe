@@ -73,14 +73,23 @@ type StaffProfileRecord = {
 type ClubRecord = {
   category: string | null;
   city: string;
+  club_colors: string | null;
+  club_email: string | null;
+  club_phone: string | null;
+  country: string;
   description: string | null;
+  field_address: string | null;
+  founding_year: number | null;
   gallery_urls: string[];
+  headquarters_address: string | null;
   id: string;
   league: string | null;
   logo_url: string | null;
   name: string;
   owner_profile_id: string;
   region: string;
+  verification_status: string;
+  website_url: string | null;
 };
 
 export type PlayerCareerEntryRecord = {
@@ -102,8 +111,20 @@ export type PlayerCareerEntryRecord = {
   team_logo_url: string | null;
 };
 
+export type ClubSeasonEntryRecord = {
+  category: string;
+  club_id: string;
+  end_year: number | null;
+  id: string;
+  league: string | null;
+  notes: string | null;
+  sort_order: number;
+  start_year: number;
+};
+
 export type CompleteProfessionalProfile = {
   club: ClubRecord | null;
+  clubSeasonEntries: ClubSeasonEntryRecord[];
   coachProfile: CoachProfileRecord | null;
   playerCareerEntries: PlayerCareerEntryRecord[];
   playerProfile: PlayerProfileRecord | null;
@@ -114,18 +135,37 @@ export type CompleteProfessionalProfile = {
 
 export type PlayerCareerEntryInput = PlayerExperiencePayload;
 
+export type ClubSeasonEntryInput = {
+  category: string;
+  end_year: number | null;
+  id?: string;
+  league: string | null;
+  notes: string | null;
+  sort_order: number;
+  start_year: number;
+};
+
 export type CompleteProfessionalProfileUpdate = {
   club: {
     category: string | null;
     city: string;
+    club_colors: string | null;
+    club_email: string | null;
+    club_phone: string | null;
+    country: string;
     description: string | null;
+    field_address: string | null;
+    founding_year: number | null;
     gallery_urls: string[];
+    headquarters_address: string | null;
     id?: string;
     league: string | null;
     logo_url: string | null;
     name: string;
     region: string;
+    website_url: string | null;
   } | null;
+  clubSeasonEntries: ClubSeasonEntryInput[];
   coachProfile: {
     coached_categories: string[];
     coached_clubs: string[];
@@ -332,14 +372,23 @@ function normalizeClubRecord(profileId: string, rawClub: Partial<ClubRecord> | n
   return {
     category: normalizeOptionalText(rawClub.category),
     city: normalizeRequiredText(rawClub.city, ""),
+    club_colors: normalizeOptionalText(rawClub.club_colors),
+    club_email: normalizeOptionalText(rawClub.club_email),
+    club_phone: normalizeOptionalText(rawClub.club_phone),
+    country: normalizeRequiredText(rawClub.country, "IT"),
     description: normalizeOptionalText(rawClub.description),
+    field_address: normalizeOptionalText(rawClub.field_address),
+    founding_year: normalizeNumber(rawClub.founding_year),
     gallery_urls: normalizeStringArray(rawClub.gallery_urls),
+    headquarters_address: normalizeOptionalText(rawClub.headquarters_address),
     id: normalizeRequiredText(rawClub.id, profileId),
     league: normalizeOptionalText(rawClub.league),
     logo_url: normalizeOptionalText(rawClub.logo_url),
     name: normalizeRequiredText(rawClub.name, ""),
     owner_profile_id: normalizeRequiredText(rawClub.owner_profile_id, profileId),
     region: normalizeRequiredText(rawClub.region, ""),
+    verification_status: normalizeRequiredText(rawClub.verification_status, "unverified"),
+    website_url: normalizeOptionalText(rawClub.website_url),
   } satisfies ClubRecord;
 }
 
@@ -373,6 +422,7 @@ function normalizePlayerCareerEntryRecord(
 
 export function normalizeUserProfile(input: {
   club?: Partial<ClubRecord> | null;
+  clubSeasonEntries?: ClubSeasonEntryRecord[];
   coachProfile?: Partial<CoachProfileRecord> | null;
   playerCareerEntries?: Partial<PlayerCareerEntryRecord>[] | null;
   playerProfile?: Partial<PlayerProfileRecord> | null;
@@ -393,6 +443,7 @@ export function normalizeUserProfile(input: {
 }): CompleteProfessionalProfile {
   return {
     club: normalizeClubRecord(input.profileId, input.club),
+    clubSeasonEntries: input.clubSeasonEntries ?? [],
     coachProfile: normalizeCoachProfileRecord(input.profileId, input.coachProfile),
     playerCareerEntries: (input.playerCareerEntries ?? []).map((entry, index) =>
       normalizePlayerCareerEntryRecord(input.profileId, entry, index),
@@ -463,7 +514,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("clubs")
           .select(
-            "id, owner_profile_id, name, city, region, category, league, description, logo_url, gallery_urls",
+            "id, owner_profile_id, name, city, region, category, league, description, logo_url, gallery_urls, founding_year, club_colors, country, headquarters_address, club_email, club_phone, website_url, field_address, verification_status",
           )
           .eq("owner_profile_id", profileId)
           .maybeSingle()
@@ -525,8 +576,26 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     );
   }
 
+  let clubSeasonEntries: ClubSeasonEntryRecord[] = [];
+
+  if (profile.role === "club_admin" && club.data) {
+    const clubId = (club.data as { id: string }).id;
+    const { data: seasonData, error: seasonError } = await supabase
+      .from("club_season_entries")
+      .select("id, club_id, start_year, end_year, category, league, notes, sort_order")
+      .eq("club_id", clubId)
+      .order("start_year", { ascending: false });
+
+    if (seasonError) {
+      throw seasonError;
+    }
+
+    clubSeasonEntries = (seasonData ?? []) as ClubSeasonEntryRecord[];
+  }
+
   return normalizeUserProfile({
     club: (club.data as Partial<ClubRecord> | null) ?? null,
+    clubSeasonEntries,
     coachProfile: (coachProfile.data as Partial<CoachProfileRecord> | null) ?? null,
     playerCareerEntries,
     playerProfile: (playerProfile.data as Partial<PlayerProfileRecord> | null) ?? null,
@@ -659,12 +728,20 @@ export async function updateCompleteProfessionalProfile(
         .update({
           category: input.club.category,
           city: input.club.city,
+          club_colors: input.club.club_colors,
+          club_email: input.club.club_email,
+          club_phone: input.club.club_phone,
+          country: input.club.country,
           description: input.club.description,
+          field_address: input.club.field_address,
+          founding_year: input.club.founding_year,
           gallery_urls: input.club.gallery_urls,
+          headquarters_address: input.club.headquarters_address,
           league: input.club.league,
           logo_url: input.club.logo_url,
           name: input.club.name,
           region: input.club.region,
+          website_url: input.club.website_url,
         })
         .eq("id", clubId)
         .eq("owner_profile_id", input.profileId);
@@ -676,18 +753,69 @@ export async function updateCompleteProfessionalProfile(
       const { error } = await supabase.from("clubs").insert({
         category: input.club.category,
         city: input.club.city,
+        club_colors: input.club.club_colors,
+        club_email: input.club.club_email,
+        club_phone: input.club.club_phone,
+        country: input.club.country,
         description: input.club.description,
+        field_address: input.club.field_address,
+        founding_year: input.club.founding_year,
         gallery_urls: input.club.gallery_urls,
+        headquarters_address: input.club.headquarters_address,
         league: input.club.league,
         logo_url: input.club.logo_url,
         name: input.club.name,
         owner_profile_id: input.profileId,
         region: input.club.region,
         slug: slugify(input.club.name),
+        verification_status: "pending_review",
+        website_url: input.club.website_url,
       });
 
       if (error) {
         throw error;
+      }
+    }
+  }
+
+  // Sync club season entries
+  if (input.clubSeasonEntries.length > 0 || input.club) {
+    const { data: clubRow } = await supabase
+      .from("clubs")
+      .select("id")
+      .eq("owner_profile_id", input.profileId)
+      .maybeSingle();
+
+    if (clubRow) {
+      // Delete existing entries
+      const { error: deleteError } = await supabase
+        .from("club_season_entries")
+        .delete()
+        .eq("club_id", clubRow.id);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      // Insert new entries
+      if (input.clubSeasonEntries.length > 0) {
+        const { error: insertError } = await supabase
+          .from("club_season_entries")
+          .insert(
+            input.clubSeasonEntries.map((entry, index) => ({
+              category: entry.category,
+              club_id: clubRow.id,
+              end_year: entry.end_year,
+              league: entry.league,
+              notes: entry.notes,
+              sort_order: entry.sort_order ?? index,
+              start_year: entry.start_year,
+            })),
+          );
+
+        if (insertError) {
+          throw insertError;
+        }
       }
     }
   }
@@ -722,4 +850,24 @@ export async function searchTeams(query: string, limit = 5) {
     logoUrl: row.logo_url,
     name: row.name,
   }));
+}
+
+export async function checkDuplicateClubs(clubName: string, city: string) {
+  const normalizedName = slugify(clubName);
+
+  if (!normalizedName) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("clubs")
+    .select("id, name, city")
+    .eq("normalized_name", normalizedName)
+    .limit(3);
+
+  if (error) {
+    return [];
+  }
+
+  return (data ?? []) as { id: string; name: string; city: string }[];
 }

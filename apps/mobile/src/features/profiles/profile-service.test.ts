@@ -84,6 +84,19 @@ const mocks = vi.hoisted(() => {
         };
       }
 
+      if (table === "club_season_entries") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => ({
+                data: [],
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
       if (table === "profile_contacts") {
         return {
           select: vi.fn(() => ({
@@ -269,14 +282,23 @@ describe("getCompleteProfessionalProfile", () => {
     const club = {
       category: "Eccellenza",
       city: "Roma",
+      club_colors: null,
+      club_email: null,
+      club_phone: null,
+      country: "IT",
       description: null,
+      field_address: null,
+      founding_year: null,
       gallery_urls: [],
+      headquarters_address: null,
       id: "club-77",
       league: "Serie D",
       logo_url: null,
       name: "FC Roma",
       owner_profile_id: "profile-9",
       region: "Lazio",
+      verification_status: "unverified",
+      website_url: null,
     };
     mocks.profileMaybeSingleMock.mockResolvedValueOnce({
       data: {

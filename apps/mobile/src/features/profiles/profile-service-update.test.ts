@@ -49,6 +49,7 @@ vi.mock("../../lib/supabase", () => ({
 function buildUpdateInput() {
   return {
     club: null,
+    clubSeasonEntries: [],
     coachProfile: null,
     playerCareerEntries: [],
     playerProfile: {

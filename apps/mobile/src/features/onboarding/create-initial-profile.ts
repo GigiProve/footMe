@@ -10,9 +10,19 @@ export type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-t
 type CreateInitialProfileInput = {
   avatarUrl: string;
   birthDate: string;
+  clubCategory: string;
   clubCity: string;
+  clubColors: string;
+  clubCountry: string;
+  clubEmail: string;
+  clubFieldAddress: string;
+  clubFoundingYear: string;
+  clubHeadquartersAddress: string;
+  clubLogoUrl: string;
   clubName: string;
+  clubPhone: string;
   clubRegion: string;
+  clubWebsite: string;
   domicile: string;
   fullName: string;
   gender: ProfileGender;
@@ -50,6 +60,17 @@ function parseOptionalText(value: string) {
   return trimmed ? trimmed : null;
 }
 
+function parseOptionalInteger(value: string): number | null {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = parseInt(trimmed, 10);
+  return isNaN(parsed) ? null : parsed;
+}
+
 export function validateBaseProfileStep(input: CreateInitialProfileInput): ValidatedBaseProfileStep {
   const avatarUrl = parseOptionalText(input.avatarUrl);
   const birthDate = input.birthDate.trim();
@@ -65,16 +86,20 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
     ]);
   }
 
-  const missingFields = [
-    !input.gender ? "sesso" : null,
-    !birthDate ? "data di nascita" : null,
-  ].filter(Boolean) as string[];
+  // Club admins skip gender and birth date during onboarding — these are
+  // personal fields that can be filled later from the profile settings.
+  if (input.role !== "club_admin") {
+    const missingFields = [
+      !input.gender ? "sesso" : null,
+      !birthDate ? "data di nascita" : null,
+    ].filter(Boolean) as string[];
 
-  if (missingFields.length > 0) {
-    throw new BaseProfileValidationError(
-      `Completa i campi obbligatori: ${missingFields.join(", ")}.`,
-      missingFields,
-    );
+    if (missingFields.length > 0) {
+      throw new BaseProfileValidationError(
+        `Completa i campi obbligatori: ${missingFields.join(", ")}.`,
+        missingFields,
+      );
+    }
   }
 
   if (phoneNumber && !isPhoneNumberValid(phoneNumber)) {
@@ -88,6 +113,7 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
       !input.clubName.trim() ? "nome società" : null,
       !input.clubCity.trim() ? "città società" : null,
       !input.clubRegion.trim() ? "regione società" : null,
+      !input.clubEmail.trim() ? "email società" : null,
     ].filter(Boolean) as string[];
 
     if (missingClubFields.length > 0) {
@@ -115,10 +141,10 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
 
   const { error: profileError } = await supabase.from("profiles").upsert({
     avatar_url: avatarUrl,
-    birth_date: birthDate,
+    birth_date: birthDate || null,
     domicile,
     id: input.userId,
-    gender: input.gender,
+    gender: input.gender || null,
     role: input.role,
     full_name: fullName,
     nationality,
@@ -174,13 +200,27 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
   }
 
   if (input.role === "club_admin") {
-    const { error } = await supabase.from("clubs").upsert({
-      owner_profile_id: input.userId,
-      name: input.clubName.trim(),
-      slug: slugify(input.clubName),
-      city: input.clubCity.trim(),
-      region: input.clubRegion.trim(),
-    });
+    const { error } = await supabase.from("clubs").upsert(
+      {
+        owner_profile_id: input.userId,
+        name: input.clubName.trim(),
+        slug: slugify(input.clubName),
+        category: parseOptionalText(input.clubCategory),
+        city: input.clubCity.trim(),
+        region: input.clubRegion.trim(),
+        club_colors: parseOptionalText(input.clubColors),
+        club_email: input.clubEmail.trim().toLowerCase(),
+        club_phone: parseOptionalText(input.clubPhone),
+        country: input.clubCountry || "IT",
+        field_address: parseOptionalText(input.clubFieldAddress),
+        founding_year: parseOptionalInteger(input.clubFoundingYear),
+        headquarters_address: parseOptionalText(input.clubHeadquartersAddress),
+        logo_url: parseOptionalText(input.clubLogoUrl),
+        verification_status: "pending_review",
+        website_url: parseOptionalText(input.clubWebsite),
+      },
+      { onConflict: "owner_profile_id" },
+    );
 
     if (error) {
       throw error;

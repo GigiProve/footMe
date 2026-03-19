@@ -9,6 +9,8 @@ import { Input } from "../../ui";
 type ProfileHeaderProps = {
   avatarUrl: string | null | undefined;
   badges?: string[];
+  clubLogoUrl?: string | null;
+  clubMode?: boolean;
   fullName: string;
   isEditing?: boolean;
   onEditPress: () => void;
@@ -36,6 +38,8 @@ type ProfileFieldProps = {
 export function ProfileHeader({
   avatarUrl,
   badges = [],
+  clubLogoUrl,
+  clubMode = false,
   fullName,
   isEditing = false,
   onEditPress,
@@ -43,6 +47,10 @@ export function ProfileHeader({
   secondaryMeta,
 }: ProfileHeaderProps) {
   const actionLabel = isEditing ? "Esci dalla modifica profilo" : "Modifica profilo";
+  const displayImageUrl = clubMode && clubLogoUrl
+    ? clubLogoUrl
+    : withDefaultProfileAvatar(avatarUrl);
+  const imageLabel = clubMode ? "Logo club" : "Foto profilo";
 
   return (
     <View style={styles.headerCard}>
@@ -52,11 +60,17 @@ export function ProfileHeader({
 
       <View style={styles.identityBlock}>
         <View style={styles.identityTopRow}>
-          <Image
-            accessibilityLabel="Foto profilo"
-            source={{ uri: withDefaultProfileAvatar(avatarUrl) }}
-            style={styles.avatar}
-          />
+          {clubMode && !clubLogoUrl ? (
+            <View style={[styles.avatar, styles.clubLogoPlaceholder]}>
+              <Ionicons color={colors.textMuted} name="shield-outline" size={40} />
+            </View>
+          ) : (
+            <Image
+              accessibilityLabel={imageLabel}
+              source={{ uri: displayImageUrl }}
+              style={clubMode ? [styles.avatar, styles.clubLogoAvatar] : styles.avatar}
+            />
+          )}
           <Pressable
             accessibilityLabel={actionLabel}
             accessibilityRole="button"
@@ -161,6 +175,14 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
     backgroundColor: colors.surfaceMuted,
     marginTop: -52,
+  },
+  clubLogoAvatar: {
+    borderRadius: radius[24],
+  },
+  clubLogoPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius[24],
   },
   badge: {
     paddingHorizontal: spacing[10],
