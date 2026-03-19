@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Ensure rollup native binary
+        run: npm rebuild rollup
+
       - name: Lint mobile workspace
         run: npm run lint:mobile
 
