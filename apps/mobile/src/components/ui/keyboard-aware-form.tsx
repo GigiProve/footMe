@@ -8,7 +8,7 @@ import { KeyboardAwareScrollView } from "./keyboard-aware-scroll-view";
  * Extra bottom space added by default so CTA buttons
  * (Salva / Continua / Conferma) remain visible above the keyboard.
  */
-const DEFAULT_FORM_EXTRA_BOTTOM_OFFSET = spacing[24];
+const DEFAULT_EXTRA_BOTTOM_OFFSET = spacing[24];
 
 type KeyboardAwareFormProps = PropsWithChildren<
   Omit<ScrollViewProps, "keyboardShouldPersistTaps"> & {
@@ -47,7 +47,7 @@ type KeyboardAwareFormProps = PropsWithChildren<
  */
 export function KeyboardAwareForm({
   children,
-  extraBottomOffset = DEFAULT_FORM_EXTRA_BOTTOM_OFFSET,
+  extraBottomOffset = DEFAULT_EXTRA_BOTTOM_OFFSET,
   ...props
 }: KeyboardAwareFormProps) {
   return (
