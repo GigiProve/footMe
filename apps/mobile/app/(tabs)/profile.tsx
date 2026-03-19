@@ -13,6 +13,12 @@ import { SelectField } from "../../src/components/ui/select-field";
 import { WheelPicker } from "../../src/components/ui/wheel-picker";
 import { useSession } from "../../src/features/auth/use-session";
 import { BioSection } from "../../src/features/profiles/bio-section";
+import {
+  ClubSeasonsSection,
+  formToInput,
+  recordToForm,
+  type ClubSeasonForm,
+} from "../../src/features/profiles/club-season-section";
 import { ContactSection } from "../../src/features/profiles/contact-section";
 import { PersonalInfoSection } from "../../src/features/profiles/personal-info-section";
 import {
@@ -29,6 +35,7 @@ import {
   excludePrimaryFromSecondaryPositions,
   getLatestPlayerExperience,
   getPlayerPositionLabel,
+  PLAYER_CATEGORY_OPTIONS,
   parsePlayerExperienceForms,
   sortPlayerExperiencesBySeason,
   toPlayerExperienceForm,
@@ -88,13 +95,22 @@ type ProfileFormState = {
   contactPhone: string;
   clubCategory: string;
   clubCity: string;
+  clubSeasonEntries: ClubSeasonForm[];
+  clubColors: string;
+  clubCountry: string;
   clubDescription: string;
+  clubEmail: string;
+  clubFieldAddress: string;
+  clubFoundingYear: string;
   clubGalleryUrls: string;
+  clubHeadquartersAddress: string;
   clubId: string | null;
   clubLeague: string;
   clubLogoUrl: string;
   clubName: string;
+  clubPhone: string;
   clubRegion: string;
+  clubWebsite: string;
   coachedCategories: string;
   coachedClubs: string;
   fullName: string;
@@ -218,13 +234,22 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
     contactPhone: data.userContacts.phone,
     clubCategory: club?.category ?? "",
     clubCity: club?.city ?? "",
+    clubSeasonEntries: data.clubSeasonEntries.map(recordToForm),
+    clubColors: club?.club_colors ?? "",
+    clubCountry: club?.country ?? "IT",
     clubDescription: club?.description ?? "",
+    clubEmail: club?.club_email ?? "",
+    clubFieldAddress: club?.field_address ?? "",
+    clubFoundingYear: club?.founding_year ? String(club.founding_year) : "",
     clubGalleryUrls: toDelimitedString(club?.gallery_urls),
+    clubHeadquartersAddress: club?.headquarters_address ?? "",
     clubId: club?.id ?? null,
     clubLeague: club?.league ?? "",
     clubLogoUrl: club?.logo_url ?? "",
     clubName: club?.name ?? "",
+    clubPhone: club?.club_phone ?? "",
     clubRegion: club?.region ?? "",
+    clubWebsite: club?.website_url ?? "",
     coachedCategories: toDelimitedString(coachProfile?.coached_categories),
     coachedClubs: toDelimitedString(coachProfile?.coached_clubs),
     experienceSummary: staffProfile?.experience_summary ?? "",
@@ -400,13 +425,25 @@ function buildHeaderDetails(
     };
   }
 
+  if (data.profile.role === "club_admin") {
+    const clubName = data.club?.name ?? "Società da completare";
+    const clubCity = data.club?.city ?? "";
+    const clubRegion = data.club?.region ?? "";
+    const clubLocationMeta = formatLocationSummary(clubCity, clubRegion);
+
+    return {
+      badges: [roleBadge],
+      fullName: clubName,
+      primaryMeta: clubLocationMeta,
+      secondaryMeta: data.club?.category ?? "Categoria da definire",
+    };
+  }
+
   return {
     badges: [roleBadge],
     fullName,
     primaryMeta,
-    secondaryMeta: `${data.club?.name ?? "Società da completare"} · ${
-      data.club?.category ?? "Categoria da definire"
-    }`,
+    secondaryMeta: undefined,
   };
 }
 
@@ -694,6 +731,14 @@ export default function ProfileScreen() {
         title: "Informazioni sportive",
         subtitle: "Dati pubblici del club organizzati come pagina profilo.",
         items: [
+          {
+            label: "Stato verifica",
+            value: completeProfile.club?.verification_status === "verified"
+              ? "Verificato"
+              : completeProfile.club?.verification_status === "pending_review"
+                ? "In revisione"
+                : "Non verificato",
+          },
           { label: "Nome club", value: formatOptionalSummary(completeProfile.club?.name) },
           { label: "Città club", value: formatOptionalSummary(completeProfile.club?.city) },
           {
@@ -897,17 +942,30 @@ export default function ProfileScreen() {
         club:
           completeProfile.profile.role === "club_admin"
             ? {
+
                 category: parseOptionalText(formState.clubCategory),
                 city: formState.clubCity.trim(),
+                club_colors: parseOptionalText(formState.clubColors),
+                club_email: formState.clubEmail.trim().toLowerCase() || null,
+                club_phone: parseOptionalText(formState.clubPhone),
+                country: formState.clubCountry || "IT",
                 description: parseOptionalText(formState.clubDescription),
+                field_address: parseOptionalText(formState.clubFieldAddress),
+                founding_year: parseOptionalNumber(formState.clubFoundingYear),
                 gallery_urls: fromDelimitedString(formState.clubGalleryUrls),
+                headquarters_address: parseOptionalText(formState.clubHeadquartersAddress),
                 id: formState.clubId ?? undefined,
                 league: parseOptionalText(formState.clubLeague),
                 logo_url: parseOptionalText(formState.clubLogoUrl),
                 name: formState.clubName.trim(),
                 region: formState.clubRegion.trim(),
+                website_url: parseOptionalText(formState.clubWebsite),
               }
             : null,
+        clubSeasonEntries:
+          completeProfile.profile.role === "club_admin"
+            ? formState.clubSeasonEntries.map((entry, index) => formToInput(entry, index))
+            : [],
         coachProfile:
           completeProfile.profile.role === "coach"
             ? {
@@ -991,6 +1049,8 @@ export default function ProfileScreen() {
           <ProfileHeader
             avatarUrl={formState?.avatarUrl ?? completeProfile.profile.avatar_url}
             badges={headerDetails.badges}
+            clubLogoUrl={completeProfile.club?.logo_url}
+            clubMode={completeProfile.profile.role === "club_admin"}
             fullName={headerDetails.fullName}
             isEditing={isEditing}
             onEditPress={isEditing ? handleStopEditing : handleStartEditing}
@@ -1007,16 +1067,26 @@ export default function ProfileScreen() {
           </Section>
         ) : !isEditing ? (
           <>
-            <PersonalInfoSection
-              birthDate={formatBirthDateInputValue(completeProfile?.profile.birth_date)}
-              city={completeProfile?.profile.city ?? ""}
-              citySuggestions={[]}
-              fullName={completeProfile?.profile.full_name ?? ""}
-              nationality={completeProfile?.profile.nationality ?? ""}
-              nationalityOptions={nationalityOptions}
-              region={completeProfile?.profile.region ?? ""}
-              regionOptions={regionOptions}
-            />
+            {(profile.role as AppRole) !== "club_admin" ? (
+              <PersonalInfoSection
+                birthDate={formatBirthDateInputValue(completeProfile?.profile.birth_date)}
+                city={completeProfile?.profile.city ?? ""}
+                citySuggestions={[]}
+                fullName={completeProfile?.profile.full_name ?? ""}
+                nationality={completeProfile?.profile.nationality ?? ""}
+                nationalityOptions={nationalityOptions}
+                region={completeProfile?.profile.region ?? ""}
+                regionOptions={regionOptions}
+              />
+            ) : null}
+            {(profile.role as AppRole) === "club_admin" ? (
+              <Section
+                description="Storico delle categorie in cui il club ha militato."
+                title="Storico stagioni"
+              >
+                <ClubSeasonsSection seasons={formState?.clubSeasonEntries ?? []} />
+              </Section>
+            ) : null}
             {(profile.role as AppRole) === "player" ? (
               <Section
                 description="Squadra, categoria, stagione e numeri chiave del percorso calcistico."
@@ -1098,6 +1168,7 @@ export default function ProfileScreen() {
           </>
         ) : (
           <>
+            {(profile.role as AppRole) !== "club_admin" ? (
             <PersonalInfoSection
               birthDate={formState.birthDate}
               birthDateHelperText={birthDateHelperText}
@@ -1123,6 +1194,7 @@ export default function ProfileScreen() {
               region={formState.region}
               regionOptions={regionOptions}
             />
+            ) : null}
             <BioSection
               bio={formState.bio}
               editable
@@ -1475,85 +1547,103 @@ export default function ProfileScreen() {
             ) : null}
 
             {(profile.role as AppRole) === "club_admin" ? (
-              <Section
-                description="Pagina ufficiale del club con informazioni pubbliche, gallery e contesto competitivo."
-                title="Informazioni sportive"
-              >
-                <Field
-                  label="Nome club"
-                  onChangeText={(value) =>
-                    setFormState((current) => (current ? { ...current, clubName: value } : current))
-                  }
-                  value={formState.clubName}
-                />
-                <Field
-                  label="Città club"
-                  onChangeText={(value) =>
-                    setFormState((current) => (current ? { ...current, clubCity: value } : current))
-                  }
-                  value={formState.clubCity}
-                />
-                <SelectField
-                  allowClear
-                  clearLabel="Rimuovi la regione del club"
-                  label="Regione club"
-                  onChange={(value) =>
-                    setFormState((current) =>
-                      current ? { ...current, clubRegion: value } : current,
-                    )
-                  }
-                  options={clubRegionOptions}
-                  placeholder="Seleziona la regione del club"
-                  value={formState.clubRegion}
-                />
-                <Field
-                  label="Categoria"
-                  onChangeText={(value) =>
-                    setFormState((current) =>
-                      current ? { ...current, clubCategory: value } : current,
-                    )
-                  }
-                  value={formState.clubCategory}
-                />
-                <Field
-                  label="Campionato"
-                  onChangeText={(value) =>
-                    setFormState((current) =>
-                      current ? { ...current, clubLeague: value } : current,
-                    )
-                  }
-                  value={formState.clubLeague}
-                />
-                <Field
-                  label="Descrizione club"
-                  multiline
-                  onChangeText={(value) =>
-                    setFormState((current) =>
-                      current ? { ...current, clubDescription: value } : current,
-                    )
-                  }
-                  value={formState.clubDescription}
-                />
-                <Field
-                  label="URL logo"
-                  onChangeText={(value) =>
-                    setFormState((current) =>
-                      current ? { ...current, clubLogoUrl: value } : current,
-                    )
-                  }
-                  value={formState.clubLogoUrl}
-                />
-                <Field
-                  label="Gallery media"
-                  onChangeText={(value) =>
-                    setFormState((current) =>
-                      current ? { ...current, clubGalleryUrls: value } : current,
-                    )
-                  }
-                  placeholder="https://..., https://..."
-                  value={formState.clubGalleryUrls}
-                />
-              </Section>
+              <>
+                <Section
+                  description="Informazioni principali del club."
+                  title="Dati club"
+                >
+                  <Field
+                    label="Nome club"
+                    onChangeText={(value) =>
+                      setFormState((current) => (current ? { ...current, clubName: value } : current))
+                    }
+                    value={formState.clubName}
+                  />
+                  <Field
+                    label="Città club"
+                    onChangeText={(value) =>
+                      setFormState((current) => (current ? { ...current, clubCity: value } : current))
+                    }
+                    value={formState.clubCity}
+                  />
+                  <SelectField
+                    allowClear
+                    clearLabel="Rimuovi la regione del club"
+                    label="Regione club"
+                    onChange={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, clubRegion: value } : current,
+                      )
+                    }
+                    options={clubRegionOptions}
+                    placeholder="Seleziona la regione del club"
+                    value={formState.clubRegion}
+                  />
+                  <SelectField
+                    label="Categoria attuale"
+                    onChange={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, clubCategory: value } : current,
+                      )
+                    }
+                    options={PLAYER_CATEGORY_OPTIONS}
+                    placeholder="Seleziona la categoria"
+                    value={formState.clubCategory}
+                  />
+                  <Field
+                    label="Campionato"
+                    onChangeText={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, clubLeague: value } : current,
+                      )
+                    }
+                    value={formState.clubLeague}
+                  />
+                  <Field
+                    label="Descrizione club"
+                    multiline
+                    onChangeText={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, clubDescription: value } : current,
+                      )
+                    }
+                    value={formState.clubDescription}
+                  />
+                  <Field
+                    label="URL logo"
+                    onChangeText={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, clubLogoUrl: value } : current,
+                      )
+                    }
+                    value={formState.clubLogoUrl}
+                  />
+                  <Field
+                    label="Gallery media"
+                    onChangeText={(value) =>
+                      setFormState((current) =>
+                        current ? { ...current, clubGalleryUrls: value } : current,
+                      )
+                    }
+                    placeholder="https://..., https://..."
+                    value={formState.clubGalleryUrls}
+                  />
+                </Section>
+                <Section
+                  description="Storico delle categorie in cui il club ha militato."
+                  title="Storico stagioni"
+                >
+                  <ClubSeasonsSection
+                    editable
+                    onChange={(seasons) =>
+                      setFormState((current) =>
+                        current ? { ...current, clubSeasonEntries: seasons } : current,
+                      )
+                    }
+                    seasons={formState.clubSeasonEntries}
+                  />
+                </Section>
+              </>
             ) : null}
 
             <View style={{ flexDirection: "row", gap: spacing[12] }}>

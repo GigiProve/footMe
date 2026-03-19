@@ -19,6 +19,7 @@ type AppProfile = {
   city: string | null;
   id: string;
   full_name: string | null;
+  is_admin: boolean;
   region: string | null;
   role: string | null;
 };
@@ -43,7 +44,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const loadProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, role, avatar_url, region, city")
+      .select("id, full_name, role, avatar_url, region, city, is_admin")
       .eq("id", userId)
       .maybeSingle();
 
@@ -54,6 +55,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     const nextProfile: AppProfile = {
       ...data,
       club_name: null,
+      is_admin: data.is_admin ?? false,
     };
 
     if (nextProfile.role === "club_admin") {

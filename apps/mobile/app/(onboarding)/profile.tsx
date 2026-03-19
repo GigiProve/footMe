@@ -29,6 +29,7 @@ import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
   excludePrimaryFromSecondaryPositions,
   parsePlayerExperienceForms,
+  PLAYER_CATEGORY_OPTIONS,
 } from "../../src/features/profiles/player-sports";
 import {
   composePhoneNumber,
@@ -56,6 +57,7 @@ import {
 } from "../../src/features/onboarding/onboarding-form";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
 import {
+  checkDuplicateClubs,
   searchTeams,
   updateCompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
@@ -399,12 +401,21 @@ export default function OnboardingProfileScreen() {
     careerEntries,
     clubCategory,
     clubCity,
+    clubColors,
+    clubCountry,
     clubDescription,
+    clubEmail,
+    clubFieldAddress,
+    clubFoundingYear,
     clubGalleryItems,
+    clubHeadquartersAddress,
     clubLeague,
     clubLogoUrl,
     clubName,
+    clubPhone,
+    clubPhoneCountryCode,
     clubRegion,
+    clubWebsite,
     coachedCategories,
     coachedClubs,
     coachPreferredRegions,
@@ -444,7 +455,7 @@ export default function OnboardingProfileScreen() {
   } = form;
 
   const fullName = getOnboardingFullName(form);
-  const progress = getOnboardingProgress(step);
+  const progress = getOnboardingProgress(step, role as AppRole | "");
   const canGoBack = step !== "role";
   const isBusy = isSubmitting || uploadingField !== null;
 
@@ -482,6 +493,45 @@ export default function OnboardingProfileScreen() {
       }
     },
     [form, updateValue],
+  );
+
+  const handleClubCityChange = useCallback(
+    (value: string) => {
+      patchForm({
+        clubCity: value,
+        clubRegion:
+          value.trim().toLowerCase() === clubCity.trim().toLowerCase()
+            ? clubRegion
+            : "",
+      });
+      clearValidationErrors(["clubCity", "clubRegion"]);
+    },
+    [clearValidationErrors, clubCity, clubRegion, patchForm],
+  );
+
+  const handleClubCitySelect = useCallback(
+    (value: { name: string; region: string }) => {
+      patchForm({
+        clubCity: value.name,
+        clubRegion: value.region,
+      });
+      clearValidationErrors(["clubCity", "clubRegion"]);
+    },
+    [clearValidationErrors, patchForm],
+  );
+
+  const handleClubCountrySelect = useCallback(
+    (value: string) => {
+      const country = getCountryByCode(value);
+
+      patchForm({
+        clubCountry: value,
+        clubPhoneCountryCode:
+          !clubPhone.trim() && country ? country.phoneCountryCode : clubPhoneCountryCode,
+      });
+      clearValidationErrors(["clubCountry"]);
+    },
+    [clearValidationErrors, clubPhone, clubPhoneCountryCode, patchForm],
   );
 
   const handleResidenceChange = useCallback(
@@ -546,14 +596,14 @@ export default function OnboardingProfileScreen() {
   );
 
   const handleBackNavigation = useCallback(() => {
-    const previousStep = getPreviousOnboardingStep(step, lastCompletedStep);
+    const previousStep = getPreviousOnboardingStep(step, lastCompletedStep, role as AppRole | "");
 
     if (!previousStep) {
       return;
     }
 
     navigateToStep(previousStep, "replace");
-  }, [lastCompletedStep, navigateToStep, step]);
+  }, [lastCompletedStep, navigateToStep, role, step]);
 
   // Hydration restore: navigate to the saved step once on first mount.
   useEffect(() => {
@@ -653,9 +703,19 @@ export default function OnboardingProfileScreen() {
     await createInitialProfile({
       avatarUrl,
       birthDate,
+      clubCategory,
       clubCity,
+      clubColors,
+      clubCountry,
+      clubEmail,
+      clubFieldAddress,
+      clubFoundingYear,
+      clubHeadquartersAddress,
+      clubLogoUrl,
       clubName,
+      clubPhone: composePhoneNumber(clubPhoneCountryCode, clubPhone),
       clubRegion,
+      clubWebsite,
       domicile: residence,
       fullName,
       gender: gender as ProfileGender,
@@ -682,7 +742,51 @@ export default function OnboardingProfileScreen() {
     }
 
     setValidationErrors({});
-    navigateToStep("base");
+    navigateToStep(form.role === "club_admin" ? "club" : "base");
+  }
+
+  async function handleSubmitClub() {
+    const nextErrors = validateOnboardingStep("club", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setValidationErrors({});
+
+      const duplicates = await checkDuplicateClubs(clubName, clubCity);
+
+      if (duplicates.length > 0) {
+        const names = duplicates.map((d) => `• ${d.name} (${d.city})`).join("\n");
+
+        const confirmed = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            "Società simile già presente",
+            `Esiste già una società con un nome simile:\n\n${names}\n\nVuoi continuare comunque?`,
+            [
+              { text: "Annulla", style: "cancel", onPress: () => resolve(false) },
+              { text: "Continua comunque", onPress: () => resolve(true) },
+            ],
+          );
+        });
+
+        if (!confirmed) {
+          return;
+        }
+      }
+
+      await ensureInitialProfileCreated();
+      goToCompletion("club");
+    } catch (error) {
+      const alertCopy = getBaseStepAlert(error);
+      setValidationErrors(validateOnboardingStep("club", form));
+      Alert.alert(alertCopy.title, alertCopy.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   async function handleContinueToDecision() {
@@ -760,14 +864,23 @@ export default function OnboardingProfileScreen() {
             ? {
                 category: parseOptionalText(clubCategory),
                 city: clubCity.trim(),
+                club_colors: parseOptionalText(clubColors),
+                club_email: clubEmail.trim().toLowerCase() || null,
+                club_phone: parseOptionalText(composePhoneNumber(clubPhoneCountryCode, clubPhone)),
+                country: clubCountry || "IT",
                 description: parseOptionalText(clubDescription),
+                field_address: parseOptionalText(clubFieldAddress),
+                founding_year: parseOptionalNumber(clubFoundingYear),
                 gallery_urls: clubGalleryItems.map((item) => item.url),
+                headquarters_address: parseOptionalText(clubHeadquartersAddress),
                 league: parseOptionalText(clubLeague),
                 logo_url: parseOptionalText(clubLogoUrl),
                 name: clubName.trim(),
                 region: clubRegion.trim(),
+                website_url: parseOptionalText(clubWebsite),
               }
             : null,
+        clubSeasonEntries: [],
         coachProfile:
           role === "coach"
             ? {
@@ -869,7 +982,7 @@ export default function OnboardingProfileScreen() {
     router.replace("/(tabs)");
   }
 
-  function goToCompletion(previousStep: "decision" | "details") {
+  function goToCompletion(previousStep: "club" | "decision" | "details") {
     patchForm({ lastCompletedStep: previousStep });
     navigateToStep("complete");
   }
@@ -1238,6 +1351,225 @@ export default function OnboardingProfileScreen() {
                   disabled={isBusy}
                   label={isBusy ? "Salvataggio..." : "Continua"}
                   onPress={handleContinueToDecision}
+                  variant="primary"
+                />
+              </View>
+            </View>
+          </Card>
+        ) : null}
+
+        {step === "club" ? (
+          <Card style={{ gap: spacing[16] }}>
+            <View style={{ gap: spacing[8] }}>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: typography.fontSize[24],
+                  fontWeight: typography.fontWeight.heavy,
+                }}
+              >
+                Il tuo club
+              </Text>
+              <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+                Inserisci le informazioni della tua società. I campi
+                obbligatori sono contrassegnati con *.
+              </Text>
+            </View>
+
+            <View style={{ gap: spacing[8] }}>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: typography.fontSize[18],
+                  fontWeight: typography.fontWeight.heavy,
+                }}
+              >
+                Dati del responsabile
+              </Text>
+              <View style={{ gap: spacing[12] }}>
+                <Input
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  label="Nome *"
+                  onBlur={() => handleFormattedNameBlur("firstName")}
+                  onChangeText={(value) => updateValue("firstName", value)}
+                  placeholder="Es. Marco"
+                  style={validationErrors.firstName ? { borderColor: colors.danger } : undefined}
+                  value={firstName}
+                />
+                {validationErrors.firstName ? (
+                  <ValidationMessage>{validationErrors.firstName}</ValidationMessage>
+                ) : null}
+                <Input
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  label="Cognome *"
+                  onBlur={() => handleFormattedNameBlur("lastName")}
+                  onChangeText={(value) => updateValue("lastName", value)}
+                  placeholder="Es. Rossi"
+                  style={validationErrors.lastName ? { borderColor: colors.danger } : undefined}
+                  value={lastName}
+                />
+                {validationErrors.lastName ? (
+                  <ValidationMessage>{validationErrors.lastName}</ValidationMessage>
+                ) : null}
+              </View>
+            </View>
+
+            <View style={{ gap: spacing[8] }}>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: typography.fontSize[18],
+                  fontWeight: typography.fontWeight.heavy,
+                }}
+              >
+                Dati della società
+              </Text>
+              <View style={{ gap: spacing[12] }}>
+                <Input
+                  label="Nome società *"
+                  onChangeText={(value) => updateValue("clubName", value)}
+                  placeholder="Es. ASD Example"
+                  style={validationErrors.clubName ? { borderColor: colors.danger } : undefined}
+                  value={clubName}
+                />
+                {validationErrors.clubName ? (
+                  <ValidationMessage>{validationErrors.clubName}</ValidationMessage>
+                ) : null}
+
+                <MediaPickerField
+                  buttonLabel="Carica logo società"
+                  helperText="Carica il logo della tua società."
+                  isUploading={uploadingField === "clubLogo"}
+                  label="Logo"
+                  onPick={() =>
+                    handleMediaUpload({
+                      field: "clubLogo",
+                      folder: "club-logos",
+                      mediaTypes: ["images"],
+                      onUploaded: (items) => updateValue("clubLogoUrl", items[0]?.url ?? ""),
+                    })
+                  }
+                  previewUrl={clubLogoUrl || undefined}
+                  selectedLabel={
+                    clubLogoUrl
+                      ? "Logo caricato correttamente"
+                      : undefined
+                  }
+                />
+
+                <Input
+                  keyboardType="number-pad"
+                  label="Anno di fondazione"
+                  maxLength={4}
+                  onChangeText={(value) => updateValue("clubFoundingYear", value)}
+                  placeholder="Es. 1920"
+                  style={validationErrors.clubFoundingYear ? { borderColor: colors.danger } : undefined}
+                  value={clubFoundingYear}
+                />
+                {validationErrors.clubFoundingYear ? (
+                  <ValidationMessage>{validationErrors.clubFoundingYear}</ValidationMessage>
+                ) : null}
+
+                <Input
+                  label="Colori sociali"
+                  onChangeText={(value) => updateValue("clubColors", value)}
+                  placeholder="Es. Biancorosso"
+                  value={clubColors}
+                />
+
+                <SelectField
+                  label="Categoria attuale"
+                  onChange={(value) => updateValue("clubCategory", value)}
+                  options={PLAYER_CATEGORY_OPTIONS}
+                  placeholder="Seleziona la categoria"
+                  value={clubCategory}
+                />
+
+                <ResidenceCityInput
+                  errorMessage={validationErrors.clubCity}
+                  helperText={
+                    clubRegion
+                      ? `Città selezionata: ${clubCity} · ${clubRegion}`
+                      : undefined
+                  }
+                  label="Città *"
+                  onChangeText={handleClubCityChange}
+                  onSelectCity={handleClubCitySelect}
+                  value={clubCity}
+                />
+
+                <NationalityAutocompleteInput
+                  label="Nazione"
+                  onChange={handleClubCountrySelect}
+                  value={clubCountry}
+                />
+
+                <Input
+                  label="Indirizzo sede"
+                  onChangeText={(value) => updateValue("clubHeadquartersAddress", value)}
+                  placeholder="Es. Via Roma 1"
+                  value={clubHeadquartersAddress}
+                />
+
+                <Input
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  label="Email società *"
+                  onChangeText={(value) => updateValue("clubEmail", value)}
+                  placeholder="Es. info@asdesempio.it"
+                  style={validationErrors.clubEmail ? { borderColor: colors.danger } : undefined}
+                  value={clubEmail}
+                />
+                {validationErrors.clubEmail ? (
+                  <ValidationMessage>{validationErrors.clubEmail}</ValidationMessage>
+                ) : null}
+
+                <PhoneInputWithCountryCode
+                  countryCode={clubPhoneCountryCode}
+                  errorMessage={validationErrors.clubPhone}
+                  label="Telefono società"
+                  onChangeCountryCode={(value) => updateValue("clubPhoneCountryCode", value, ["clubPhone"])}
+                  onChangePhoneNumber={(value) => updateValue("clubPhone", value, ["clubPhone"])}
+                  phoneNumber={clubPhone}
+                />
+
+                <Input
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  label="Sito web"
+                  onChangeText={(value) => updateValue("clubWebsite", value)}
+                  placeholder="Es. https://www.asdesempio.it"
+                  style={validationErrors.clubWebsite ? { borderColor: colors.danger } : undefined}
+                  value={clubWebsite}
+                />
+                {validationErrors.clubWebsite ? (
+                  <ValidationMessage>{validationErrors.clubWebsite}</ValidationMessage>
+                ) : null}
+
+                <Input
+                  label="Indirizzo campo"
+                  onChangeText={(value) => updateValue("clubFieldAddress", value)}
+                  placeholder="Es. Stadio Comunale, Via dello Sport 5"
+                  value={clubFieldAddress}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", gap: spacing[12] }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Indietro"
+                  onPress={handleBackNavigation}
+                  variant="secondary"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  disabled={isBusy}
+                  label={isBusy ? "Salvataggio..." : "Crea la pagina del club"}
+                  onPress={handleSubmitClub}
                   variant="primary"
                 />
               </View>

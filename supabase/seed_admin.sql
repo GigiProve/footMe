@@ -1,0 +1,40 @@
+-- Seed script: create the admin user.
+--
+-- Run this AFTER the admin user has been created in Supabase Auth
+-- (via Dashboard > Authentication > Users > Add user):
+--
+--   Email:    admin@footme.app
+--   Password: footMe2025!
+--
+-- Then run this script to mark the profile as admin:
+--
+--   UPDATE public.profiles
+--   SET is_admin = true, full_name = 'Admin', role = 'staff'
+--   WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@footme.app');
+--
+-- Alternatively, if running locally with supabase CLI and you have access
+-- to auth.users, you can insert directly:
+
+-- Step 1: Create user in auth.users (only works with service role / local dev)
+-- INSERT INTO auth.users (
+--   id, instance_id, email, encrypted_password, email_confirmed_at,
+--   aud, role, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+-- ) VALUES (
+--   gen_random_uuid(),
+--   '00000000-0000-0000-0000-000000000000',
+--   'admin@footme.app',
+--   crypt('footMe2025!', gen_salt('bf')),
+--   now(),
+--   'authenticated',
+--   'authenticated',
+--   '{"provider":"email","providers":["email"]}',
+--   '{}',
+--   now(),
+--   now()
+-- );
+
+-- Step 2: Create the profile and mark as admin
+-- INSERT INTO public.profiles (id, full_name, role, is_admin)
+-- SELECT id, 'Admin', 'staff', true
+-- FROM auth.users WHERE email = 'admin@footme.app'
+-- ON CONFLICT (id) DO UPDATE SET is_admin = true, full_name = 'Admin';

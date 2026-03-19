@@ -3,7 +3,7 @@ import { Redirect } from "expo-router";
 import { useSession } from "../src/features/auth/use-session";
 
 export default function IndexScreen() {
-  const { isLoading, needsOnboarding, session } = useSession();
+  const { isLoading, needsOnboarding, profile, session } = useSession();
 
   if (isLoading) {
     return null;
@@ -13,7 +13,13 @@ export default function IndexScreen() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  return (
-    <Redirect href={needsOnboarding ? "/(onboarding)/profile" : "/(tabs)"} />
-  );
+  if (needsOnboarding) {
+    return <Redirect href="/(onboarding)/profile" />;
+  }
+
+  if (profile?.is_admin) {
+    return <Redirect href="/(admin)/dashboard" />;
+  }
+
+  return <Redirect href="/(tabs)" />;
 }
