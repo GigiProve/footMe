@@ -7,7 +7,7 @@ import {
 
 import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
 import { InterestCategoriesSelector } from "../../src/components/ui/interest-categories-selector";
-import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
+import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { WheelPicker } from "../../src/components/ui/wheel-picker";
@@ -1042,7 +1042,7 @@ export default function ProfileScreen() {
 
   return (
     <Screen>
-      <KeyboardAwareScrollView
+      <KeyboardAwareForm
         contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}
       >
         {completeProfile && headerDetails ? (
@@ -1664,7 +1664,7 @@ export default function ProfileScreen() {
 
           </>
         )}
-      </KeyboardAwareScrollView>
+      </KeyboardAwareForm>
     </Screen>
   );
 }

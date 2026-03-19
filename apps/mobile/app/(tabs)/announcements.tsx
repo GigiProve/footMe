@@ -5,7 +5,7 @@ import {
   View,
 } from "react-native";
 
-import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
+import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
 import { useSession } from "../../src/features/auth/use-session";
 import {
@@ -244,7 +244,7 @@ export default function AnnouncementsScreen() {
   if (profile?.role !== "club_admin") {
     return (
       <Screen>
-        <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
+        <KeyboardAwareForm contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
           <View
             style={{
               gap: spacing[10],
@@ -459,14 +459,14 @@ export default function AnnouncementsScreen() {
               </View>
             );
           })}
-        </KeyboardAwareScrollView>
+        </KeyboardAwareForm>
       </Screen>
     );
   }
 
   return (
     <Screen>
-      <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
+      <KeyboardAwareForm contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
         <View style={{ gap: spacing[8] }}>
           <Text
             style={{
@@ -697,7 +697,7 @@ export default function AnnouncementsScreen() {
             </View>
           ))}
         </View>
-      </KeyboardAwareScrollView>
+      </KeyboardAwareForm>
     </Screen>
   );
 }
