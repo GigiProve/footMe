@@ -600,6 +600,44 @@ export function searchCountries(query: string, limit = 8) {
   return [...startsWithMatches, ...includesMatches].slice(0, limit);
 }
 
+const normalizedRegionOptions = REGION_OPTIONS.map((entry) => ({
+  ...entry,
+  normalizedValue: normalizeLookupValue(entry.value),
+}));
+
+export function searchRegions(query: string, exclude: string[] = [], limit = 6) {
+  const normalizedQuery = normalizeLookupValue(query);
+
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const excludeSet = new Set(exclude);
+  const startsWithMatches: SelectOption[] = [];
+  const includesMatches: SelectOption[] = [];
+
+  for (const entry of normalizedRegionOptions) {
+    if (excludeSet.has(entry.value)) {
+      continue;
+    }
+
+    if (entry.normalizedValue.startsWith(normalizedQuery)) {
+      startsWithMatches.push({ label: entry.label, value: entry.value });
+      continue;
+    }
+
+    if (entry.normalizedValue.includes(normalizedQuery)) {
+      includesMatches.push({ label: entry.label, value: entry.value });
+    }
+  }
+
+  return [...startsWithMatches, ...includesMatches].slice(0, limit);
+}
+
+export function isValidRegion(value: string) {
+  return REGION_OPTIONS.some((option) => option.value === value);
+}
+
 export function getRegionFromCity(cityName: string) {
   return (
     normalizedItalianCityOptions.find(

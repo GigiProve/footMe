@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -17,6 +18,8 @@ export function SelectField<T extends string>({
   onChange,
   options,
   placeholder,
+  searchable = false,
+  searchPlaceholder = "Cerca...",
   value,
 }: {
   allowClear?: boolean;
@@ -25,14 +28,33 @@ export function SelectField<T extends string>({
   onChange: (value: T | "") => void;
   options: SelectOption<T>[];
   placeholder: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
   value: T | "";
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const selectedLabel = useMemo(
     () => options.find((option) => option.value === value)?.label,
     [options, value],
   );
+
+  const filteredOptions = useMemo(() => {
+    if (!searchable || !searchQuery.trim()) return options;
+    const query = searchQuery.trim().toLowerCase();
+    return options.filter((option) => option.label.toLowerCase().includes(query));
+  }, [options, searchable, searchQuery]);
+
+  function handleOpen() {
+    setSearchQuery("");
+    setIsOpen(true);
+  }
+
+  function handleClose() {
+    setSearchQuery("");
+    setIsOpen(false);
+  }
 
   return (
     <View style={{ gap: spacing[8] }}>
@@ -43,7 +65,7 @@ export function SelectField<T extends string>({
       </Text>
       <Pressable
         accessibilityRole="button"
-        onPress={() => setIsOpen(true)}
+        onPress={handleOpen}
         style={{
           minHeight: 52,
           justifyContent: "center",
@@ -69,12 +91,12 @@ export function SelectField<T extends string>({
 
       <Modal
         animationType="slide"
-        onRequestClose={() => setIsOpen(false)}
+        onRequestClose={handleClose}
         transparent
         visible={isOpen}
       >
         <Pressable
-          onPress={() => setIsOpen(false)}
+          onPress={handleClose}
           style={{
             flex: 1,
             justifyContent: "flex-end",
@@ -111,7 +133,7 @@ export function SelectField<T extends string>({
               >
                 {label}
               </Text>
-              <Pressable accessibilityRole="button" onPress={() => setIsOpen(false)}>
+              <Pressable accessibilityRole="button" onPress={handleClose}>
                 <Text
                   style={{
                     color: colors.accentStrong,
@@ -123,12 +145,33 @@ export function SelectField<T extends string>({
               </Pressable>
             </View>
 
+            {searchable ? (
+              <TextInput
+                autoFocus
+                onChangeText={setSearchQuery}
+                placeholder={searchPlaceholder}
+                placeholderTextColor={colors.textMuted}
+                style={{
+                  minHeight: 48,
+                  paddingHorizontal: spacing[16],
+                  paddingVertical: spacing[12],
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: radius[16],
+                  backgroundColor: colors.background,
+                  color: colors.textPrimary,
+                  fontSize: typography.fontSize[16],
+                }}
+                value={searchQuery}
+              />
+            ) : null}
+
             {allowClear ? (
               <Pressable
                 accessibilityRole="button"
                 onPress={() => {
                   onChange("");
-                  setIsOpen(false);
+                  handleClose();
                 }}
                 style={{
                   borderRadius: radius[16],
@@ -145,8 +188,8 @@ export function SelectField<T extends string>({
               </Pressable>
             ) : null}
 
-            <ScrollView contentContainerStyle={{ gap: spacing[8] }}>
-              {options.map((option) => {
+            <ScrollView contentContainerStyle={{ gap: spacing[8] }} keyboardShouldPersistTaps="handled">
+              {filteredOptions.map((option) => {
                 const isSelected = option.value === value;
 
                 return (
@@ -155,7 +198,7 @@ export function SelectField<T extends string>({
                     accessibilityRole="button"
                     onPress={() => {
                       onChange(option.value);
-                      setIsOpen(false);
+                      handleClose();
                     }}
                     style={{
                       borderRadius: radius[16],

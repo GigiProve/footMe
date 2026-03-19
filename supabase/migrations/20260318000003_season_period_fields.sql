@@ -1,3 +1,13 @@
+-- Add season period fields to player_career_entries.
+-- Allows players to indicate whether they played the full season
+-- or only a specific period (e.g. mid-season transfer).
+
+alter table public.player_career_entries
+add column if not exists season_period text not null default 'full',
+add column if not exists period_start_month smallint,
+add column if not exists period_end_month smallint;
+
+-- Update the save RPC to handle the new fields.
 create or replace function public.save_player_profile_details(
   p_profile_id uuid,
   p_player_profile jsonb,
@@ -80,7 +90,10 @@ begin
       minutes_played integer,
       season_label text,
       sort_order integer,
-      team_logo_url text
+      team_logo_url text,
+      season_period text,
+      period_start_month smallint,
+      period_end_month smallint
     )
   )
   delete from public.player_career_entries career
@@ -106,7 +119,10 @@ begin
       minutes_played integer,
       season_label text,
       sort_order integer,
-      team_logo_url text
+      team_logo_url text,
+      season_period text,
+      period_start_month smallint,
+      period_end_month smallint
     )
   )
   insert into public.player_career_entries (
@@ -121,11 +137,14 @@ begin
     minutes_played,
     awards,
     sort_order,
+    team_logo_url,
     club_id,
-    team_logo_url
+    season_period,
+    period_start_month,
+    period_end_month
   )
   select
-    entry.id,
+    coalesce(entry.id, gen_random_uuid()),
     p_profile_id,
     entry.season_label,
     entry.club_name,
@@ -136,13 +155,14 @@ begin
     coalesce(entry.minutes_played, 0),
     entry.awards,
     coalesce(entry.sort_order, 0),
+    entry.team_logo_url,
     entry.club_id,
-    entry.team_logo_url
+    coalesce(entry.season_period, 'full'),
+    entry.period_start_month,
+    entry.period_end_month
   from provided_entries entry
-  where entry.id is not null
   on conflict (id) do update
   set
-    player_profile_id = excluded.player_profile_id,
     season_label = excluded.season_label,
     club_name = excluded.club_name,
     competition_name = excluded.competition_name,
@@ -153,54 +173,10 @@ begin
     awards = excluded.awards,
     sort_order = excluded.sort_order,
     club_id = excluded.club_id,
-    team_logo_url = excluded.team_logo_url;
-
-  with provided_entries as (
-    select *
-    from jsonb_to_recordset(coalesce(p_career_entries, '[]'::jsonb)) as entry(
-      id uuid,
-      appearances integer,
-      assists integer,
-      awards text,
-      club_id uuid,
-      club_name text,
-      competition_name text,
-      goals integer,
-      minutes_played integer,
-      season_label text,
-      sort_order integer,
-      team_logo_url text
-    )
-  )
-  insert into public.player_career_entries (
-    player_profile_id,
-    season_label,
-    club_name,
-    competition_name,
-    appearances,
-    goals,
-    assists,
-    minutes_played,
-    awards,
-    sort_order,
-    club_id,
-    team_logo_url
-  )
-  select
-    p_profile_id,
-    entry.season_label,
-    entry.club_name,
-    entry.competition_name,
-    coalesce(entry.appearances, 0),
-    coalesce(entry.goals, 0),
-    coalesce(entry.assists, 0),
-    coalesce(entry.minutes_played, 0),
-    entry.awards,
-    coalesce(entry.sort_order, 0),
-    entry.club_id,
-    entry.team_logo_url
-  from provided_entries entry
-  where entry.id is null;
+    team_logo_url = excluded.team_logo_url,
+    season_period = excluded.season_period,
+    period_start_month = excluded.period_start_month,
+    period_end_month = excluded.period_end_month;
 end;
 $$;
 

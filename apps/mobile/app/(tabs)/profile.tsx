@@ -5,9 +5,12 @@ import {
   View,
 } from "react-native";
 
+import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
+import { InterestCategoriesSelector } from "../../src/components/ui/interest-categories-selector";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
+import { WheelPicker } from "../../src/components/ui/wheel-picker";
 import { useSession } from "../../src/features/auth/use-session";
 import { BioSection } from "../../src/features/profiles/bio-section";
 import { ContactSection } from "../../src/features/profiles/contact-section";
@@ -23,6 +26,7 @@ import {
 } from "../../src/features/profiles/profile-screen-components";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
+  excludePrimaryFromSecondaryPositions,
   getLatestPlayerExperience,
   getPlayerPositionLabel,
   parsePlayerExperienceForms,
@@ -111,7 +115,7 @@ type ProfileFormState = {
   showContactEmail: boolean;
   showContactFacebook: boolean;
   showContactInstagram: boolean;
-  secondaryPosition: PlayerPosition | "";
+  secondaryPositions: PlayerPosition[];
   specialization: StaffSpecialization;
   technicalVideoUrl: string;
   transferRegions: string;
@@ -169,6 +173,15 @@ function parseOptionalNumber(value: string) {
   }
 
   return parsed;
+}
+
+function parseWheelValue(value: string) {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function formatSpecialization(value: StaffSpecialization | null) {
@@ -235,7 +248,7 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
     showContactEmail: data.userContacts.showEmail,
     showContactFacebook: data.userContacts.showFacebook,
     showContactInstagram: data.userContacts.showInstagram,
-    secondaryPosition: playerProfile?.secondary_position ?? "",
+    secondaryPositions: playerProfile?.secondary_positions ?? [],
     specialization: staffProfile?.specialization ?? "fitness_coach",
     technicalVideoUrl: coachProfile?.technical_video_url ?? "",
     transferRegions: toDelimitedString(playerProfile?.transfer_regions),
@@ -917,7 +930,7 @@ export default function ProfileScreen() {
                 preferred_categories: fromDelimitedString(formState.preferredCategories),
                 preferred_foot: formState.preferredFoot || null,
                 primary_position: formState.primaryPosition,
-                secondary_position: formState.secondaryPosition || null,
+                secondary_positions: formState.secondaryPositions,
                 transfer_regions: fromDelimitedString(formState.transferRegions),
                 weight_kg: parseOptionalNumber(formState.weightKg),
                 willing_to_change_club: formState.willingToChangeClub,
@@ -1028,9 +1041,39 @@ export default function ProfileScreen() {
               section.title === "Presentazione" ||
               section.title === "Informazioni personali" ? null : (
                 <Section key={section.title} description={section.subtitle} title={section.title}>
-                  {section.items.map((item) => (
-                    <Field key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
-                  ))}
+                  {section.items.map((item) =>
+                    item.label === "Categorie preferite" ? (
+                      <Field
+                        key={`${section.title}-${item.label}`}
+                        label={item.label}
+                        renderInput={() => (
+                          <InterestCategoriesSelector
+                            editable={false}
+                            hideLabel
+                            onChange={() => {}}
+                            value={completeProfile?.playerProfile?.preferred_categories ?? []}
+                          />
+                        )}
+                        value={item.value}
+                      />
+                    ) : item.label === "Regioni di interesse" ? (
+                      <Field
+                        key={`${section.title}-${item.label}`}
+                        label={item.label}
+                        renderInput={() => (
+                          <AvailabilityRegionsSelector
+                            editable={false}
+                            hideLabel
+                            onChange={() => {}}
+                            value={completeProfile?.playerProfile?.transfer_regions ?? []}
+                          />
+                        )}
+                        value={item.value}
+                      />
+                    ) : (
+                      <Field key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
+                    ),
+                  )}
                 </Section>
               )
             ))}
@@ -1046,7 +1089,7 @@ export default function ProfileScreen() {
                     completeProfile?.playerProfile?.primary_position ??
                     DEFAULT_PLAYER_PRIMARY_POSITION
                   }
-                  secondaryPosition={completeProfile?.playerProfile?.secondary_position ?? ""}
+                  secondaryPositions={completeProfile?.playerProfile?.secondary_positions ?? []}
                 />
               </Section>
             ) : null}
@@ -1185,37 +1228,52 @@ export default function ProfileScreen() {
                     }
                     onPrimaryPositionChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, primaryPosition: value } : current,
+                        current
+                          ? {
+                              ...current,
+                              primaryPosition: value,
+                              secondaryPositions: excludePrimaryFromSecondaryPositions(
+                                current.secondaryPositions,
+                                value,
+                              ),
+                            }
+                          : current,
                       )
                     }
-                    onSecondaryPositionChange={(value) =>
+                    onSecondaryPositionsChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, secondaryPosition: value } : current,
+                        current
+                          ? {
+                              ...current,
+                              secondaryPositions: excludePrimaryFromSecondaryPositions(
+                                value,
+                                current.primaryPosition,
+                              ),
+                            }
+                          : current,
                       )
                     }
                     preferredFoot={formState.preferredFoot}
                     primaryPosition={formState.primaryPosition}
-                    secondaryPosition={formState.secondaryPosition}
+                    secondaryPositions={formState.secondaryPositions}
                   />
-                  <Field
+                  <InterestCategoriesSelector
                     label="Categorie preferite"
-                    onChangeText={(value) =>
+                    onChange={(categories) =>
                       setFormState((current) =>
-                        current ? { ...current, preferredCategories: value } : current,
+                        current ? { ...current, preferredCategories: categories.join(", ") } : current,
                       )
                     }
-                    placeholder="Eccellenza, Promozione, Serie D"
-                    value={formState.preferredCategories}
+                    value={fromDelimitedString(formState.preferredCategories)}
                   />
-                  <Field
+                  <AvailabilityRegionsSelector
                     label="Regioni di interesse"
-                    onChangeText={(value) =>
+                    onChange={(regions) =>
                       setFormState((current) =>
-                        current ? { ...current, transferRegions: value } : current,
+                        current ? { ...current, transferRegions: regions.join(", ") } : current,
                       )
                     }
-                    placeholder="Lombardia, Veneto"
-                    value={formState.transferRegions}
+                    value={fromDelimitedString(formState.transferRegions)}
                   />
                   <Field
                     label="URL highlights video"
@@ -1258,23 +1316,29 @@ export default function ProfileScreen() {
                   description="Altezza e peso restano separati per una lettura più chiara."
                   title="Informazioni fisiche"
                 >
-                  <Field
+                  <WheelPicker
                     label="Altezza (cm)"
-                    onChangeText={(value) =>
+                    max={220}
+                    min={140}
+                    onChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, heightCm: value } : current,
+                        current ? { ...current, heightCm: String(value) } : current,
                       )
                     }
-                    value={formState.heightCm}
+                    unit="cm"
+                    value={parseWheelValue(formState.heightCm)}
                   />
-                  <Field
+                  <WheelPicker
                     label="Peso (kg)"
-                    onChangeText={(value) =>
+                    max={130}
+                    min={40}
+                    onChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, weightKg: value } : current,
+                        current ? { ...current, weightKg: String(value) } : current,
                       )
                     }
-                    value={formState.weightKg}
+                    unit="kg"
+                    value={parseWheelValue(formState.weightKg)}
                   />
                 </Section>
               </>

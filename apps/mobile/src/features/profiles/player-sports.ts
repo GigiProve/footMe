@@ -20,6 +20,18 @@ export type PlayerPosition =
   | "left_winger"
   | "striker";
 
+export type FootballPositionSlot =
+  | "goalkeeper"
+  | "left_back"
+  | "center_back"
+  | "right_back"
+  | "defensive_midfielder"
+  | "central_midfielder"
+  | "attacking_midfielder"
+  | "left_winger"
+  | "right_winger"
+  | "striker";
+
 export type TeamAutocompleteOption = {
   city: string | null;
   id: string | null;
@@ -27,6 +39,8 @@ export type TeamAutocompleteOption = {
   logoUrl: string | null;
   name: string;
 };
+
+export type SeasonPeriod = "full" | "partial";
 
 export type PlayerExperienceForm = {
   appearances: string;
@@ -38,7 +52,10 @@ export type PlayerExperienceForm = {
   goals: string;
   id?: string;
   minutesPlayed: string;
+  periodEndMonth: string;
+  periodStartMonth: string;
   seasonLabel: string;
+  seasonPeriod: SeasonPeriod;
   teamCity: string;
   teamLogoUrl: string;
 };
@@ -53,7 +70,10 @@ export type PlayerExperiencePayload = {
   goals: number;
   id?: string;
   minutes_played: number;
+  period_end_month: number | null;
+  period_start_month: number | null;
   season_label: string;
+  season_period: SeasonPeriod;
   sort_order: number;
   team_logo_url: string | null;
 };
@@ -68,11 +88,27 @@ type PlayerExperienceSource = {
   goals: number;
   id?: string;
   minutes_played?: number;
+  period_end_month?: number | null;
+  period_start_month?: number | null;
   season_label: string;
+  season_period?: string | null;
   team_logo_url?: string | null;
 };
 
 export const DEFAULT_PLAYER_PRIMARY_POSITION: PlayerPosition = "central_midfielder";
+
+export const POSITION_ROLE_MAP: Record<FootballPositionSlot, PlayerPosition> = {
+  attacking_midfielder: "attacking_midfielder",
+  center_back: "center_back",
+  central_midfielder: "central_midfielder",
+  defensive_midfielder: "defensive_midfielder",
+  goalkeeper: "goalkeeper",
+  left_back: "left_back",
+  left_winger: "left_winger",
+  right_back: "right_back",
+  right_winger: "right_winger",
+  striker: "striker",
+};
 
 export const PLAYER_POSITION_OPTIONS: SportsSelectOption<PlayerPosition>[] = [
   { label: "Portiere", value: "goalkeeper" },
@@ -94,16 +130,87 @@ export const PREFERRED_FOOT_OPTIONS: SportsSelectOption<PreferredFoot>[] = [
 ];
 
 export const PLAYER_CATEGORY_OPTIONS: SportsSelectOption[] = [
+  { label: "Serie A", value: "Serie A" },
+  { label: "Serie B", value: "Serie B" },
+  { label: "Serie C", value: "Serie C" },
   { label: "Serie D", value: "Serie D" },
   { label: "Eccellenza", value: "Eccellenza" },
   { label: "Promozione", value: "Promozione" },
-  { label: "Prima categoria", value: "Prima categoria" },
-  { label: "Seconda categoria", value: "Seconda categoria" },
-  { label: "Terza categoria", value: "Terza categoria" },
+  { label: "Prima Categoria", value: "Prima Categoria" },
+  { label: "Seconda Categoria", value: "Seconda Categoria" },
+  { label: "Terza Categoria", value: "Terza Categoria" },
+  { label: "Primavera", value: "Primavera" },
   { label: "Juniores", value: "Juniores" },
+  { label: "Allievi", value: "Allievi" },
+  { label: "Giovanissimi", value: "Giovanissimi" },
+  { label: "Esordienti", value: "Esordienti" },
 ];
 
-export function createPlayerSeasonOptions(startYear = 2024, totalSeasons = 4) {
+export const INTEREST_CATEGORY_OPTIONS: SportsSelectOption[] = [
+  { label: "Serie A", value: "Serie A" },
+  { label: "Serie B", value: "Serie B" },
+  { label: "Serie C", value: "Serie C" },
+  { label: "Serie D", value: "Serie D" },
+  { label: "Eccellenza", value: "Eccellenza" },
+  { label: "Promozione", value: "Promozione" },
+  { label: "Prima Categoria", value: "Prima Categoria" },
+  { label: "Seconda Categoria", value: "Seconda Categoria" },
+  { label: "Terza Categoria", value: "Terza Categoria" },
+  { label: "Primavera", value: "Primavera" },
+  { label: "Juniores", value: "Juniores" },
+  { label: "Allievi", value: "Allievi" },
+  { label: "Giovanissimi", value: "Giovanissimi" },
+  { label: "Esordienti", value: "Esordienti" },
+];
+
+export const SEASON_PERIOD_OPTIONS: SportsSelectOption<SeasonPeriod>[] = [
+  { label: "Intera stagione", value: "full" },
+  { label: "Solo un periodo", value: "partial" },
+];
+
+export const MONTH_OPTIONS: SportsSelectOption[] = [
+  { label: "Gennaio", value: "1" },
+  { label: "Febbraio", value: "2" },
+  { label: "Marzo", value: "3" },
+  { label: "Aprile", value: "4" },
+  { label: "Maggio", value: "5" },
+  { label: "Giugno", value: "6" },
+  { label: "Luglio", value: "7" },
+  { label: "Agosto", value: "8" },
+  { label: "Settembre", value: "9" },
+  { label: "Ottobre", value: "10" },
+  { label: "Novembre", value: "11" },
+  { label: "Dicembre", value: "12" },
+];
+
+const monthLabels: Record<string, string> = {
+  "1": "Gen",
+  "2": "Feb",
+  "3": "Mar",
+  "4": "Apr",
+  "5": "Mag",
+  "6": "Giu",
+  "7": "Lug",
+  "8": "Ago",
+  "9": "Set",
+  "10": "Ott",
+  "11": "Nov",
+  "12": "Dic",
+};
+
+export function getMonthShortLabel(value: string | number | null | undefined) {
+  if (value == null) return null;
+  return monthLabels[String(value)] ?? null;
+}
+
+const FIRST_SEASON_START_YEAR = 2010;
+
+export function createPlayerSeasonOptions(
+  startYear = new Date().getFullYear(),
+  firstYear = FIRST_SEASON_START_YEAR,
+) {
+  const totalSeasons = startYear - firstYear + 1;
+
   return Array.from({ length: totalSeasons }, (_, index) => {
     const currentStartYear = startYear - index;
     const currentEndYear = currentStartYear + 1;
@@ -161,6 +268,23 @@ export function isPlayerPosition(value: unknown): value is PlayerPosition {
   return typeof value === "string" && value in playerPositionLabels;
 }
 
+export function normalizePlayerPositions(value: unknown): PlayerPosition[] {
+  if (Array.isArray(value)) {
+    return [...new Set(value.filter(isPlayerPosition))];
+  }
+
+  return isPlayerPosition(value) ? [value] : [];
+}
+
+export function excludePrimaryFromSecondaryPositions(
+  secondaryPositions: PlayerPosition[],
+  primaryPosition: PlayerPosition | "" | null | undefined,
+) {
+  return primaryPosition
+    ? secondaryPositions.filter((entry) => entry !== primaryPosition)
+    : secondaryPositions;
+}
+
 export function getPlayerPositionLabel(
   value: PlayerPosition | string | null | undefined,
   fallback = "Da completare",
@@ -170,6 +294,19 @@ export function getPlayerPositionLabel(
   }
 
   return playerPositionLabels[value];
+}
+
+export function getPlayerPositionLabels(
+  values: PlayerPosition[] | null | undefined,
+  fallback: string[] = [],
+) {
+  const normalizedValues = normalizePlayerPositions(values);
+
+  if (normalizedValues.length === 0) {
+    return fallback;
+  }
+
+  return normalizedValues.map((value) => getPlayerPositionLabel(value, value));
 }
 
 export function getPreferredFootLabel(
@@ -183,6 +320,112 @@ export function getPreferredFootLabel(
   return preferredFootLabels[value] ?? fallback;
 }
 
+export type SeasonEntry = {
+  appearances: string;
+  assists: string;
+  awards: string;
+  category: string;
+  goals: string;
+  minutesPlayed: string;
+  periodEndMonth: string;
+  periodStartMonth: string;
+  seasonLabel: string;
+  seasonPeriod: SeasonPeriod;
+};
+
+export type MultiSeasonDraft = {
+  clubId: string | null;
+  clubName: string;
+  teamCity: string;
+  teamLogoUrl: string;
+  seasons: SeasonEntry[];
+};
+
+export function createEmptySeasonEntry(): SeasonEntry {
+  return {
+    appearances: "",
+    assists: "",
+    awards: "",
+    category: "",
+    goals: "",
+    minutesPlayed: "",
+    periodEndMonth: "",
+    periodStartMonth: "",
+    seasonLabel: "",
+    seasonPeriod: "full",
+  };
+}
+
+export function createEmptyMultiSeasonDraft(): MultiSeasonDraft {
+  return {
+    clubId: null,
+    clubName: "",
+    teamCity: "",
+    teamLogoUrl: "",
+    seasons: [createEmptySeasonEntry()],
+  };
+}
+
+export function experienceToMultiSeasonDraft(
+  experience: PlayerExperienceForm,
+): MultiSeasonDraft {
+  return {
+    clubId: experience.clubId,
+    clubName: experience.clubName,
+    teamCity: experience.teamCity,
+    teamLogoUrl: experience.teamLogoUrl,
+    seasons: [
+      {
+        appearances: experience.appearances,
+        assists: experience.assists,
+        awards: experience.awards,
+        category: experience.category,
+        goals: experience.goals,
+        minutesPlayed: experience.minutesPlayed,
+        periodEndMonth: experience.periodEndMonth,
+        periodStartMonth: experience.periodStartMonth,
+        seasonLabel: experience.seasonLabel,
+        seasonPeriod: experience.seasonPeriod,
+      },
+    ],
+  };
+}
+
+export function multiSeasonDraftToExperiences(
+  draft: MultiSeasonDraft,
+): PlayerExperienceForm[] {
+  return draft.seasons.map((season) => ({
+    appearances: season.appearances,
+    assists: season.assists,
+    awards: season.awards,
+    category: season.category,
+    clubId: draft.clubId,
+    clubName: draft.clubName,
+    goals: season.goals,
+    minutesPlayed: season.minutesPlayed,
+    periodEndMonth: season.periodEndMonth,
+    periodStartMonth: season.periodStartMonth,
+    seasonLabel: season.seasonLabel,
+    seasonPeriod: season.seasonPeriod,
+    teamCity: draft.teamCity,
+    teamLogoUrl: draft.teamLogoUrl,
+  }));
+}
+
+export function isSeasonEntryValid(entry: SeasonEntry): boolean {
+  const hasSeason = Boolean(entry.seasonLabel.trim());
+  const hasCategory = Boolean(entry.category.trim());
+  const hasPartialMonths =
+    entry.seasonPeriod !== "partial" ||
+    (Boolean(entry.periodStartMonth) && Boolean(entry.periodEndMonth));
+  return hasSeason && hasCategory && hasPartialMonths;
+}
+
+export function isMultiSeasonDraftValid(draft: MultiSeasonDraft): boolean {
+  const hasTeam = Boolean(draft.clubName.trim());
+  return hasTeam && draft.seasons.length > 0 && draft.seasons.every(isSeasonEntryValid);
+}
+
 export function createEmptyPlayerExperienceForm(): PlayerExperienceForm {
   return {
     appearances: "",
@@ -193,7 +436,10 @@ export function createEmptyPlayerExperienceForm(): PlayerExperienceForm {
     clubName: "",
     goals: "",
     minutesPlayed: "",
+    periodEndMonth: "",
+    periodStartMonth: "",
     seasonLabel: "",
+    seasonPeriod: "full",
     teamCity: "",
     teamLogoUrl: "",
   };
@@ -343,7 +589,10 @@ export function toPlayerExperienceForm(
     goals: String(entry.goals ?? 0),
     id: entry.id,
     minutesPlayed: String(entry.minutes_played ?? 0),
+    periodEndMonth: entry.period_end_month != null ? String(entry.period_end_month) : "",
+    periodStartMonth: entry.period_start_month != null ? String(entry.period_start_month) : "",
     seasonLabel: normalizeSeasonLabelInput(entry.season_label),
+    seasonPeriod: entry.season_period === "partial" ? "partial" : "full",
     teamCity: "",
     teamLogoUrl: entry.team_logo_url ?? "",
   };
@@ -370,6 +619,14 @@ export function parsePlayerExperienceForms(entries: PlayerExperienceForm[]) {
         throw new Error(`Seleziona la categoria per l'esperienza ${index + 1}.`);
       }
 
+      const isPartial = entry.seasonPeriod === "partial";
+      const periodStartMonth = isPartial && entry.periodStartMonth
+        ? Number(entry.periodStartMonth)
+        : null;
+      const periodEndMonth = isPartial && entry.periodEndMonth
+        ? Number(entry.periodEndMonth)
+        : null;
+
       return {
         appearances: parseNonNegativeStat(entry.appearances, "Presenze"),
         assists: parseNonNegativeStat(entry.assists, "Assist"),
@@ -380,7 +637,10 @@ export function parsePlayerExperienceForms(entries: PlayerExperienceForm[]) {
         goals: parseNonNegativeStat(entry.goals, "Gol"),
         id: entry.id,
         minutes_played: parseNonNegativeStat(entry.minutesPlayed, "Minuti giocati"),
+        period_end_month: periodEndMonth,
+        period_start_month: periodStartMonth,
         season_label: seasonLabel,
+        season_period: entry.seasonPeriod,
         sort_order: index,
         team_logo_url: parseOptionalText(entry.teamLogoUrl),
       };

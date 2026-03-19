@@ -1,3 +1,6 @@
+alter table public.player_profiles
+add column if not exists secondary_positions public.player_position[] not null default '{}';
+
 create or replace function public.save_player_profile_details(
   p_profile_id uuid,
   p_player_profile jsonb,
@@ -125,7 +128,7 @@ begin
     team_logo_url
   )
   select
-    entry.id,
+    coalesce(entry.id, gen_random_uuid()),
     p_profile_id,
     entry.season_label,
     entry.club_name,
@@ -139,10 +142,8 @@ begin
     entry.club_id,
     entry.team_logo_url
   from provided_entries entry
-  where entry.id is not null
   on conflict (id) do update
   set
-    player_profile_id = excluded.player_profile_id,
     season_label = excluded.season_label,
     club_name = excluded.club_name,
     competition_name = excluded.competition_name,
@@ -154,55 +155,5 @@ begin
     sort_order = excluded.sort_order,
     club_id = excluded.club_id,
     team_logo_url = excluded.team_logo_url;
-
-  with provided_entries as (
-    select *
-    from jsonb_to_recordset(coalesce(p_career_entries, '[]'::jsonb)) as entry(
-      id uuid,
-      appearances integer,
-      assists integer,
-      awards text,
-      club_id uuid,
-      club_name text,
-      competition_name text,
-      goals integer,
-      minutes_played integer,
-      season_label text,
-      sort_order integer,
-      team_logo_url text
-    )
-  )
-  insert into public.player_career_entries (
-    player_profile_id,
-    season_label,
-    club_name,
-    competition_name,
-    appearances,
-    goals,
-    assists,
-    minutes_played,
-    awards,
-    sort_order,
-    club_id,
-    team_logo_url
-  )
-  select
-    p_profile_id,
-    entry.season_label,
-    entry.club_name,
-    entry.competition_name,
-    coalesce(entry.appearances, 0),
-    coalesce(entry.goals, 0),
-    coalesce(entry.assists, 0),
-    coalesce(entry.minutes_played, 0),
-    entry.awards,
-    coalesce(entry.sort_order, 0),
-    entry.club_id,
-    entry.team_logo_url
-  from provided_entries entry
-  where entry.id is null;
 end;
 $$;
-
-revoke all on function public.save_player_profile_details(uuid, jsonb, jsonb) from public;
-grant execute on function public.save_player_profile_details(uuid, jsonb, jsonb) to authenticated;

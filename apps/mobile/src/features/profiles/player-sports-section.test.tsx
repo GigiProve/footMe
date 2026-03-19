@@ -39,6 +39,11 @@ describe("player-sports-section", () => {
       );
     });
 
+    // Trigger onFocus to open the suggestions dropdown (isOpen starts as false).
+    await act(async () => {
+      tree!.root.findByType("TextInput" as never).props.onFocus({});
+    });
+
     await act(async () => {
       vi.advanceTimersByTime(300);
       await Promise.resolve();
@@ -79,7 +84,10 @@ describe("player-sports-section", () => {
             clubName: "ASD Real Milano",
             goals: "10",
             minutesPlayed: "1800",
+            periodEndMonth: "",
+            periodStartMonth: "",
             seasonLabel: "2024/2025",
+            seasonPeriod: "full",
             teamCity: "Milano",
             teamLogoUrl: "",
           }}
@@ -113,7 +121,10 @@ describe("player-sports-section", () => {
               clubName: "Club 2022",
               goals: "2",
               minutesPlayed: "600",
+              periodEndMonth: "",
+              periodStartMonth: "",
               seasonLabel: "2022/2023",
+              seasonPeriod: "full",
               teamCity: "",
               teamLogoUrl: "",
             },
@@ -126,7 +137,10 @@ describe("player-sports-section", () => {
               clubName: "Club 2024",
               goals: "6",
               minutesPlayed: "1440",
+              periodEndMonth: "",
+              periodStartMonth: "",
               seasonLabel: "2024/2025",
+              seasonPeriod: "full",
               teamCity: "",
               teamLogoUrl: "",
             },
@@ -140,7 +154,7 @@ describe("player-sports-section", () => {
     const teamNameNodes = tree!.root.findAllByType("Text" as never);
     expect(teamNameNodes.some((node) => node.props.children === "Club 2024")).toBe(true);
 
-    const deleteButtons = tree!.root.findAllByProps({ accessibilityLabel: "Elimina" });
+    const deleteButtons = tree!.root.findAllByProps({ accessibilityLabel: "Elimina esperienza" });
 
     act(() => {
       deleteButtons[0].props.onPress();
@@ -156,7 +170,10 @@ describe("player-sports-section", () => {
         clubName: "Club 2022",
         goals: "2",
         minutesPlayed: "600",
+        periodEndMonth: "",
+        periodStartMonth: "",
         seasonLabel: "2022/2023",
+        seasonPeriod: "full",
         teamCity: "",
         teamLogoUrl: "",
       },

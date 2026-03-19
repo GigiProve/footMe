@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, BackHandler, Platform, Pressable, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
+import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
+import { InterestCategoriesSelector } from "../../src/components/ui/interest-categories-selector";
 import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { MediaPickerField } from "../../src/components/ui/media-picker-field";
@@ -10,6 +12,7 @@ import { PhoneInputWithCountryCode } from "../../src/components/ui/phone-input-w
 import { ResidenceCityInput } from "../../src/components/ui/residence-city-input";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
+import { WheelPicker } from "../../src/components/ui/wheel-picker";
 import { useSession } from "../../src/features/auth/use-session";
 import {
   createInitialProfile,
@@ -23,6 +26,8 @@ import {
   PlayerExperiencesSection,
 } from "../../src/features/profiles/player-sports-section";
 import {
+  DEFAULT_PLAYER_PRIMARY_POSITION,
+  excludePrimaryFromSecondaryPositions,
   parsePlayerExperienceForms,
 } from "../../src/features/profiles/player-sports";
 import {
@@ -146,6 +151,15 @@ function parseOptionalNumber(value: string) {
   }
 
   return parsed;
+}
+
+function parseWheelValue(value: string) {
+  if (!value.trim()) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function fromDelimitedString(value: string) {
@@ -419,7 +433,7 @@ export default function OnboardingProfileScreen() {
     residence,
     residenceRegion,
     role,
-    secondaryPosition,
+    secondaryPositions,
     staffPreferredRegions,
     staffSpecialization,
     technicalVideoUrl,
@@ -647,7 +661,7 @@ export default function OnboardingProfileScreen() {
       gender: gender as ProfileGender,
       nationality,
       phoneNumber: composePhoneNumber(phoneCountryCode, phoneNumber),
-      primaryPosition,
+      primaryPosition: primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
       residence,
       role: role as AppRole,
       staffSpecialization,
@@ -774,8 +788,8 @@ export default function OnboardingProfileScreen() {
                 highlight_video_url: parseOptionalText(highlightVideoUrl),
                 preferred_categories: fromDelimitedString(preferredCategories),
                 preferred_foot: preferredFoot || null,
-                primary_position: primaryPosition,
-                secondary_position: secondaryPosition || null,
+                primary_position: primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
+                secondary_positions: secondaryPositions,
                 transfer_regions: fromDelimitedString(transferRegions),
                 weight_kg: parseOptionalNumber(weightKg),
                 willing_to_change_club: willingToChangeClub,
@@ -1315,32 +1329,50 @@ export default function OnboardingProfileScreen() {
                   </Text>
                   <PlayerCharacteristicsSection
                     editable
+                    primaryPositionError={validationErrors.primaryPosition}
                     onPreferredFootChange={(value) => updateValue("preferredFoot", value)}
-                    onPrimaryPositionChange={(value) => updateValue("primaryPosition", value)}
-                    onSecondaryPositionChange={(value) =>
-                      updateValue("secondaryPosition", value)
-                    }
+                    onPrimaryPositionChange={(value) => {
+                      patchForm({
+                        primaryPosition: value,
+                        secondaryPositions: excludePrimaryFromSecondaryPositions(
+                          secondaryPositions,
+                          value,
+                        ),
+                      });
+                      clearValidationErrors(["primaryPosition", "secondaryPositions"]);
+                    }}
+                    onSecondaryPositionsChange={(value) => {
+                      patchForm({
+                        secondaryPositions: excludePrimaryFromSecondaryPositions(
+                          value,
+                          primaryPosition,
+                        ),
+                      });
+                      clearValidationErrors(["secondaryPositions"]);
+                    }}
                     preferredFoot={preferredFoot}
                     primaryPosition={primaryPosition}
-                    secondaryPosition={secondaryPosition}
+                    secondaryPositions={secondaryPositions}
                   />
                   <View style={{ flexDirection: "row", gap: spacing[12] }}>
                     <View style={{ flex: 1 }}>
-                      <Input
-                        keyboardType="number-pad"
+                      <WheelPicker
                         label="Altezza (cm)"
-                        onChangeText={(value) => updateValue("heightCm", value)}
-                        placeholder="Es. 182"
-                        value={heightCm}
+                        max={220}
+                        min={140}
+                        onChange={(value) => updateValue("heightCm", String(value))}
+                        unit="cm"
+                        value={parseWheelValue(heightCm)}
                       />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Input
-                        keyboardType="number-pad"
+                      <WheelPicker
                         label="Peso (kg)"
-                        onChangeText={(value) => updateValue("weightKg", value)}
-                        placeholder="Es. 76"
-                        value={weightKg}
+                        max={130}
+                        min={40}
+                        onChange={(value) => updateValue("weightKg", String(value))}
+                        unit="kg"
+                        value={parseWheelValue(weightKg)}
                       />
                     </View>
                   </View>
@@ -1378,17 +1410,13 @@ export default function OnboardingProfileScreen() {
                       />
                     </View>
                   </View>
-                  <Input
-                    label="Regioni in cui sei disponibile a giocare"
-                    onChangeText={(value) => updateValue("transferRegions", value)}
-                    placeholder="Es. Lombardia, Veneto"
-                    value={transferRegions}
+                  <AvailabilityRegionsSelector
+                    onChange={(regions) => updateValue("transferRegions", regions.join(", "))}
+                    value={fromDelimitedString(transferRegions)}
                   />
-                  <Input
-                    label="Categorie di interesse"
-                    onChangeText={(value) => updateValue("preferredCategories", value)}
-                    placeholder="Es. Promozione, Eccellenza"
-                    value={preferredCategories}
+                  <InterestCategoriesSelector
+                    onChange={(categories) => updateValue("preferredCategories", categories.join(", "))}
+                    value={fromDelimitedString(preferredCategories)}
                   />
                   <View style={{ gap: spacing[8] }}>
                     <Text
