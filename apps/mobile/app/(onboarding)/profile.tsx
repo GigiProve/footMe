@@ -5,7 +5,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
 import { InterestCategoriesSelector } from "../../src/components/ui/interest-categories-selector";
 import { DatePickerField } from "../../src/components/ui/date-picker-field";
-import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
+import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { MediaPickerField } from "../../src/components/ui/media-picker-field";
 import { NationalityAutocompleteInput } from "../../src/components/ui/nationality-autocomplete-input";
 import { PhoneInputWithCountryCode } from "../../src/components/ui/phone-input-with-country-code";
@@ -895,7 +895,7 @@ export default function OnboardingProfileScreen() {
           headerShown: false,
         }}
       />
-      <KeyboardAwareScrollView
+      <KeyboardAwareForm
         contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}
       >
         <View
@@ -1840,7 +1840,7 @@ export default function OnboardingProfileScreen() {
             />
           </Card>
         ) : null}
-      </KeyboardAwareScrollView>
+      </KeyboardAwareForm>
     </Screen>
   );
 }
