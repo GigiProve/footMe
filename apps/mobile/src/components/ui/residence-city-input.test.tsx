@@ -7,16 +7,22 @@ import { ResidenceCityInput } from "./residence-city-input";
 describe("ResidenceCityInput", () => {
   it("shows italian city suggestions and propagates the selected city", () => {
     const onSelectCity = vi.fn();
+    const onChangeText = vi.fn();
     let tree!: TestRenderer.ReactTestRenderer;
 
     act(() => {
       tree = TestRenderer.create(
         <ResidenceCityInput
-          onChangeText={() => undefined}
+          onChangeText={onChangeText}
           onSelectCity={onSelectCity}
           value="Mil"
         />,
       );
+    });
+
+    // Trigger onFocus to open the suggestions dropdown (isOpen starts as false).
+    act(() => {
+      tree.root.findByType("TextInput" as never).props.onFocus({});
     });
 
     const suggestion = tree.root.findByProps({
