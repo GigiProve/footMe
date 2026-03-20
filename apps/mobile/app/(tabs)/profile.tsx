@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  Text,
-  View,
-} from "react-native";
+import { Alert, Text, View } from "react-native";
 
 import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
 import { InterestCategoriesSelector } from "../../src/components/ui/interest-categories-selector";
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
+import { MediaPickerField } from "../../src/components/ui/media-picker-field";
+import {
+  MediaPreview,
+  MediaGalleryPreview,
+} from "../../src/components/ui/media-preview";
 import { Screen } from "../../src/components/ui/screen";
 import { SelectField } from "../../src/components/ui/select-field";
 import { WheelPicker } from "../../src/components/ui/wheel-picker";
@@ -80,6 +81,13 @@ import {
   type AppRole,
   type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
+import {
+  pickAndUploadMedia,
+  ProfileMediaUploadError,
+  removeMediaFromStorage,
+  type UploadedMediaItem,
+} from "../../src/features/profiles/media-upload-service";
+import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
 import { colors, spacing, typography } from "../../src/theme/tokens";
 import { Button } from "../../src/ui";
 
@@ -206,11 +214,14 @@ function formatSpecialization(value: StaffSpecialization | null) {
   }
 
   return (
-    specializationOptions.find((option) => option.value === value)?.label ?? value
+    specializationOptions.find((option) => option.value === value)?.label ??
+    value
   );
 }
 
-function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState {
+function buildInitialState(
+  data: CompleteProfessionalProfile,
+): ProfileFormState {
   const playerProfile = data.playerProfile;
   const coachProfile = data.coachProfile;
   const staffProfile = data.staffProfile;
@@ -223,7 +234,9 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
     careerEntries:
       data.playerCareerEntries.length > 0
         ? sortPlayerExperiencesBySeason(
-            data.playerCareerEntries.map((entry) => toPlayerExperienceForm(entry)),
+            data.playerCareerEntries.map((entry) =>
+              toPlayerExperienceForm(entry),
+            ),
           )
         : [],
     certifications: toDelimitedString(staffProfile?.certifications),
@@ -267,7 +280,8 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
     preferredRegions: toDelimitedString(
       coachProfile?.preferred_regions ?? staffProfile?.preferred_regions,
     ),
-    primaryPosition: playerProfile?.primary_position ?? DEFAULT_PLAYER_PRIMARY_POSITION,
+    primaryPosition:
+      playerProfile?.primary_position ?? DEFAULT_PLAYER_PRIMARY_POSITION,
     region: data.profile.region ?? "",
     showContactEmail: data.userContacts.showEmail,
     showContactFacebook: data.userContacts.showFacebook,
@@ -296,7 +310,14 @@ function BooleanField({
 }) {
   return (
     <View style={{ gap: spacing[8] }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>{label}</Text>
+      <Text
+        style={{
+          color: colors.textPrimary,
+          fontWeight: typography.fontWeight.bold,
+        }}
+      >
+        {label}
+      </Text>
       <View style={{ flexDirection: "row", gap: spacing[10] }}>
         {[
           { active: true, label: trueLabel },
@@ -333,7 +354,14 @@ function PillSelector<T extends string>({
 }) {
   return (
     <View style={{ gap: spacing[8] }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>{label}</Text>
+      <Text
+        style={{
+          color: colors.textPrimary,
+          fontWeight: typography.fontWeight.bold,
+        }}
+      >
+        {label}
+      </Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
         {options.map((option) => {
           const isActive = option.value === value;
@@ -403,7 +431,12 @@ function buildHeaderDetails(
 
   if (data.profile.role === "coach") {
     return {
-      badges: [roleBadge, data.coachProfile?.open_to_new_role ? "Aperto a nuove panchine" : "Profilo attivo"],
+      badges: [
+        roleBadge,
+        data.coachProfile?.open_to_new_role
+          ? "Aperto a nuove panchine"
+          : "Profilo attivo",
+      ],
       fullName,
       primaryMeta,
       secondaryMeta: `${data.coachProfile?.coached_clubs?.[0] ?? "Squadra da completare"} · ${
@@ -414,7 +447,10 @@ function buildHeaderDetails(
 
   if (data.profile.role === "staff") {
     return {
-      badges: [roleBadge, data.staffProfile?.open_to_work ? "Open to work" : "Profilo attivo"],
+      badges: [
+        roleBadge,
+        data.staffProfile?.open_to_work ? "Open to work" : "Profilo attivo",
+      ],
       fullName,
       primaryMeta,
       secondaryMeta: `${formatSpecialization(data.staffProfile?.specialization ?? null)} · ${
@@ -455,6 +491,7 @@ export default function ProfileScreen() {
   const [isBioTouched, setIsBioTouched] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
     if (!userId) {
@@ -520,7 +557,9 @@ export default function ProfileScreen() {
   const playerExperienceCards = useMemo(
     () =>
       sortPlayerExperiencesBySeason(
-        (completeProfile?.playerCareerEntries ?? []).map((entry) => toPlayerExperienceForm(entry)),
+        (completeProfile?.playerCareerEntries ?? []).map((entry) =>
+          toPlayerExperienceForm(entry),
+        ),
       ),
     [completeProfile?.playerCareerEntries],
   );
@@ -588,7 +627,10 @@ export default function ProfileScreen() {
           },
           {
             label: "Regione",
-            value: getOptionLabel(REGION_OPTIONS, completeProfile.profile.region),
+            value: getOptionLabel(
+              REGION_OPTIONS,
+              completeProfile.profile.region,
+            ),
           },
         ],
       },
@@ -597,7 +639,8 @@ export default function ProfileScreen() {
     if (completeProfile.profile.role === "player") {
       sections.push({
         title: "Preferenze sportive",
-        subtitle: "Disponibilità, aree di interesse e contenuti extra del profilo giocatore.",
+        subtitle:
+          "Disponibilità, aree di interesse e contenuti extra del profilo giocatore.",
         items: [
           {
             label: "Aperto al trasferimento",
@@ -605,21 +648,21 @@ export default function ProfileScreen() {
           },
           {
             label: "Categorie preferite",
-            value: formatListSummary(completeProfile.playerProfile?.preferred_categories),
+            value: formatListSummary(
+              completeProfile.playerProfile?.preferred_categories,
+            ),
           },
           {
             label: "Regioni di interesse",
-            value: formatListSummary(completeProfile.playerProfile?.transfer_regions),
+            value: formatListSummary(
+              completeProfile.playerProfile?.transfer_regions,
+            ),
           },
           {
             label: "Disponibile a cambiare squadra",
-            value: completeProfile.playerProfile?.willing_to_change_club ? "Sì" : "No",
-          },
-          {
-            label: "Video highlights",
-            value: formatOptionalSummary(
-              completeProfile.playerProfile?.highlight_video_url,
-            ),
+            value: completeProfile.playerProfile?.willing_to_change_club
+              ? "Sì"
+              : "No",
           },
         ],
       });
@@ -655,23 +698,27 @@ export default function ProfileScreen() {
           },
           {
             label: "Squadre allenate",
-            value: formatListSummary(completeProfile.coachProfile?.coached_clubs),
+            value: formatListSummary(
+              completeProfile.coachProfile?.coached_clubs,
+            ),
           },
           {
             label: "Categorie allenate",
-            value: formatListSummary(completeProfile.coachProfile?.coached_categories),
+            value: formatListSummary(
+              completeProfile.coachProfile?.coached_categories,
+            ),
           },
           {
             label: "Filosofia di gioco",
-            value: formatOptionalSummary(completeProfile.coachProfile?.game_philosophy),
-          },
-          {
-            label: "Video tecnico",
-            value: formatOptionalSummary(completeProfile.coachProfile?.technical_video_url),
+            value: formatOptionalSummary(
+              completeProfile.coachProfile?.game_philosophy,
+            ),
           },
           {
             label: "Aree di interesse",
-            value: formatListSummary(completeProfile.coachProfile?.preferred_regions),
+            value: formatListSummary(
+              completeProfile.coachProfile?.preferred_regions,
+            ),
           },
           {
             label: "Disponibile per nuove panchine",
@@ -684,11 +731,14 @@ export default function ProfileScreen() {
     if (completeProfile.profile.role === "staff") {
       sections.push({
         title: "Informazioni sportive",
-        subtitle: "Specializzazione, esperienza e aree operative del profilo staff.",
+        subtitle:
+          "Specializzazione, esperienza e aree operative del profilo staff.",
         items: [
           {
             label: "Specializzazione",
-            value: formatSpecialization(completeProfile.staffProfile?.specialization ?? null),
+            value: formatSpecialization(
+              completeProfile.staffProfile?.specialization ?? null,
+            ),
           },
           {
             label: "Esperienza",
@@ -698,11 +748,15 @@ export default function ProfileScreen() {
           },
           {
             label: "Certificazioni",
-            value: formatListSummary(completeProfile.staffProfile?.certifications),
+            value: formatListSummary(
+              completeProfile.staffProfile?.certifications,
+            ),
           },
           {
             label: "Aree di interesse",
-            value: formatListSummary(completeProfile.staffProfile?.preferred_regions),
+            value: formatListSummary(
+              completeProfile.staffProfile?.preferred_regions,
+            ),
           },
           {
             label: "Disponibile a lavorare",
@@ -719,14 +773,21 @@ export default function ProfileScreen() {
         items: [
           {
             label: "Stato verifica",
-            value: completeProfile.club?.verification_status === "verified"
-              ? "Verificato"
-              : completeProfile.club?.verification_status === "pending_review"
-                ? "In revisione"
-                : "Non verificato",
+            value:
+              completeProfile.club?.verification_status === "verified"
+                ? "Verificato"
+                : completeProfile.club?.verification_status === "pending_review"
+                  ? "In revisione"
+                  : "Non verificato",
           },
-          { label: "Nome club", value: formatOptionalSummary(completeProfile.club?.name) },
-          { label: "Città club", value: formatOptionalSummary(completeProfile.club?.city) },
+          {
+            label: "Nome club",
+            value: formatOptionalSummary(completeProfile.club?.name),
+          },
+          {
+            label: "Città club",
+            value: formatOptionalSummary(completeProfile.club?.city),
+          },
           {
             label: "Regione club",
             value: getOptionLabel(REGION_OPTIONS, completeProfile.club?.region),
@@ -743,14 +804,6 @@ export default function ProfileScreen() {
             label: "Descrizione club",
             value: formatOptionalSummary(completeProfile.club?.description),
           },
-          {
-            label: "Logo",
-            value: formatOptionalSummary(completeProfile.club?.logo_url),
-          },
-          {
-            label: "Gallery media",
-            value: formatListSummary(completeProfile.club?.gallery_urls),
-          },
         ],
       });
     }
@@ -760,6 +813,45 @@ export default function ProfileScreen() {
 
   if (!userId || !profile) {
     return null;
+  }
+
+  async function handleMediaUpload(options: {
+    field: string;
+    folder: string;
+    mediaTypes: ("images" | "videos")[];
+    onUploaded: (items: UploadedMediaItem[]) => void;
+  }) {
+    if (!userId) {
+      return;
+    }
+
+    try {
+      setUploadingField(options.field);
+      const items = await pickAndUploadMedia({
+        folder: options.folder,
+        mediaTypes: options.mediaTypes,
+        userId,
+      });
+
+      if (items.length > 0) {
+        options.onUploaded(items);
+      }
+    } catch (error) {
+      if (error instanceof ProfileMediaUploadError) {
+        Alert.alert("Caricamento non riuscito", error.message);
+      }
+    } finally {
+      setUploadingField(null);
+    }
+  }
+
+  async function handleMediaRemove(currentUrl: string, onRemoved: () => void) {
+    try {
+      await removeMediaFromStorage(currentUrl);
+    } catch {
+      // Best-effort: if storage removal fails, still clear the reference
+    }
+    onRemoved();
   }
 
   function handleStartEditing() {
@@ -815,10 +907,15 @@ export default function ProfileScreen() {
   }
 
   function handleCityChange(value: string) {
-    setFormState((current) => (current ? { ...current, city: value } : current));
+    setFormState((current) =>
+      current ? { ...current, city: value } : current,
+    );
   }
 
-  function handleCitySuggestionPress(selection: { name: string; region: string }) {
+  function handleCitySuggestionPress(selection: {
+    name: string;
+    region: string;
+  }) {
     setFormState((current) =>
       current
         ? {
@@ -843,8 +940,12 @@ export default function ProfileScreen() {
       const trimmedCity = formState.city.trim();
       const inferredRegion = trimmedCity ? getRegionFromCity(trimmedCity) : "";
       const trimmedRegion = (formState.region.trim() || inferredRegion).trim();
-      const normalizedInstagram = normalizeInstagramInput(formState.contactInstagram);
-      const normalizedFacebook = normalizeFacebookInput(formState.contactFacebook);
+      const normalizedInstagram = normalizeInstagramInput(
+        formState.contactInstagram,
+      );
+      const normalizedFacebook = normalizeFacebookInput(
+        formState.contactFacebook,
+      );
       const normalizedEmail = normalizeContactEmail(formState.contactEmail);
       const normalizedPhone = normalizePhoneInput(formState.contactPhone);
 
@@ -868,7 +969,9 @@ export default function ProfileScreen() {
       }
 
       if (trimmedCity && !inferredRegion) {
-        throw new Error("Seleziona una città italiana valida dai suggerimenti.");
+        throw new Error(
+          "Seleziona una città italiana valida dai suggerimenti.",
+        );
       }
 
       if (
@@ -876,7 +979,9 @@ export default function ProfileScreen() {
         inferredRegion &&
         !isRegionConsistentWithCity(trimmedCity, trimmedRegion)
       ) {
-        throw new Error("La regione deve essere coerente con la città selezionata.");
+        throw new Error(
+          "La regione deve essere coerente con la città selezionata.",
+        );
       }
 
       if (formState.contactInstagram.trim() && !normalizedInstagram) {
@@ -895,7 +1000,10 @@ export default function ProfileScreen() {
         throw new Error("Inserisci un indirizzo email valido.");
       }
 
-      if (formState.contactPhone.trim() && !isPhoneNumberValid(normalizedPhone)) {
+      if (
+        formState.contactPhone.trim() &&
+        !isPhoneNumberValid(normalizedPhone)
+      ) {
         throw new Error(
           "Inserisci un numero di cellulare valido in formato internazionale, ad esempio +393331234567.",
         );
@@ -904,13 +1012,13 @@ export default function ProfileScreen() {
       if (!bioValidation.isValid) {
         setIsBioTouched(true);
         throw new Error(
-          bioValidation.message ?? "Inserisci una descrizione valida del tuo profilo.",
+          bioValidation.message ??
+            "Inserisci una descrizione valida del tuo profilo.",
         );
       }
 
-      const parsedCareerEntries: PlayerCareerEntryInput[] = parsePlayerExperienceForms(
-        formState.careerEntries,
-      );
+      const parsedCareerEntries: PlayerCareerEntryInput[] =
+        parsePlayerExperienceForms(formState.careerEntries);
 
       if (completeProfile.profile.role === "club_admin") {
         const clubName = formState.clubName.trim();
@@ -928,7 +1036,6 @@ export default function ProfileScreen() {
         club:
           completeProfile.profile.role === "club_admin"
             ? {
-
                 category: parseOptionalText(formState.clubCategory),
                 city: formState.clubCity.trim(),
                 club_colors: parseOptionalText(formState.clubColors),
@@ -939,7 +1046,9 @@ export default function ProfileScreen() {
                 field_address: parseOptionalText(formState.clubFieldAddress),
                 founding_year: parseOptionalNumber(formState.clubFoundingYear),
                 gallery_urls: fromDelimitedString(formState.clubGalleryUrls),
-                headquarters_address: parseOptionalText(formState.clubHeadquartersAddress),
+                headquarters_address: parseOptionalText(
+                  formState.clubHeadquartersAddress,
+                ),
                 id: formState.clubId ?? undefined,
                 league: parseOptionalText(formState.clubLeague),
                 logo_url: parseOptionalText(formState.clubLogoUrl),
@@ -950,18 +1059,26 @@ export default function ProfileScreen() {
             : null,
         clubSeasonEntries:
           completeProfile.profile.role === "club_admin"
-            ? formState.clubSeasonEntries.map((entry, index) => formToInput(entry, index))
+            ? formState.clubSeasonEntries.map((entry, index) =>
+                formToInput(entry, index),
+              )
             : [],
         coachProfile:
           completeProfile.profile.role === "coach"
             ? {
-                coached_categories: fromDelimitedString(formState.coachedCategories),
+                coached_categories: fromDelimitedString(
+                  formState.coachedCategories,
+                ),
                 coached_clubs: fromDelimitedString(formState.coachedClubs),
                 game_philosophy: parseOptionalText(formState.gamePhilosophy),
                 licenses: fromDelimitedString(formState.licenses),
                 open_to_new_role: formState.openToNewRole,
-                preferred_regions: fromDelimitedString(formState.preferredRegions),
-                technical_video_url: parseOptionalText(formState.technicalVideoUrl),
+                preferred_regions: fromDelimitedString(
+                  formState.preferredRegions,
+                ),
+                technical_video_url: parseOptionalText(
+                  formState.technicalVideoUrl,
+                ),
               }
             : null,
         playerCareerEntries:
@@ -970,12 +1087,18 @@ export default function ProfileScreen() {
           completeProfile.profile.role === "player"
             ? {
                 height_cm: parseOptionalNumber(formState.heightCm),
-                highlight_video_url: parseOptionalText(formState.highlightVideoUrl),
-                preferred_categories: fromDelimitedString(formState.preferredCategories),
+                highlight_video_url: parseOptionalText(
+                  formState.highlightVideoUrl,
+                ),
+                preferred_categories: fromDelimitedString(
+                  formState.preferredCategories,
+                ),
                 preferred_foot: formState.preferredFoot || null,
                 primary_position: formState.primaryPosition,
                 secondary_positions: formState.secondaryPositions,
-                transfer_regions: fromDelimitedString(formState.transferRegions),
+                transfer_regions: fromDelimitedString(
+                  formState.transferRegions,
+                ),
                 weight_kg: parseOptionalNumber(formState.weightKg),
                 willing_to_change_club: formState.willingToChangeClub,
               }
@@ -996,9 +1119,13 @@ export default function ProfileScreen() {
           completeProfile.profile.role === "staff"
             ? {
                 certifications: fromDelimitedString(formState.certifications),
-                experience_summary: parseOptionalText(formState.experienceSummary),
+                experience_summary: parseOptionalText(
+                  formState.experienceSummary,
+                ),
                 open_to_work: formState.openToWork,
-                preferred_regions: fromDelimitedString(formState.preferredRegions),
+                preferred_regions: fromDelimitedString(
+                  formState.preferredRegions,
+                ),
                 specialization: formState.specialization,
               }
             : null,
@@ -1015,10 +1142,15 @@ export default function ProfileScreen() {
 
       await Promise.all([loadProfile(), refreshProfile()]);
       setIsEditing(false);
-      Alert.alert("Profilo aggiornato", "Le informazioni professionali sono state salvate.");
+      Alert.alert(
+        "Profilo aggiornato",
+        "Le informazioni professionali sono state salvate.",
+      );
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Errore durante il salvataggio.";
+        error instanceof Error
+          ? error.message
+          : "Errore durante il salvataggio.";
       Alert.alert("Salvataggio non completato", message);
     } finally {
       setIsSaving(false);
@@ -1032,7 +1164,9 @@ export default function ProfileScreen() {
       >
         {completeProfile && headerDetails ? (
           <ProfileHeader
-            avatarUrl={formState?.avatarUrl ?? completeProfile.profile.avatar_url}
+            avatarUrl={
+              formState?.avatarUrl ?? completeProfile.profile.avatar_url
+            }
             badges={headerDetails.badges}
             clubLogoUrl={completeProfile.club?.logo_url}
             clubMode={completeProfile.profile.role === "club_admin"}
@@ -1054,7 +1188,9 @@ export default function ProfileScreen() {
           <>
             {(profile.role as AppRole) !== "club_admin" ? (
               <PersonalInfoSection
-                birthDate={formatBirthDateInputValue(completeProfile?.profile.birth_date)}
+                birthDate={formatBirthDateInputValue(
+                  completeProfile?.profile.birth_date,
+                )}
                 city={completeProfile?.profile.city ?? ""}
                 citySuggestions={[]}
                 fullName={completeProfile?.profile.full_name ?? ""}
@@ -1069,7 +1205,9 @@ export default function ProfileScreen() {
                 description="Storico delle categorie in cui il club ha militato."
                 title="Storico stagioni"
               >
-                <ClubSeasonsSection seasons={formState?.clubSeasonEntries ?? []} />
+                <ClubSeasonsSection
+                  seasons={formState?.clubSeasonEntries ?? []}
+                />
               </Section>
             ) : null}
             {(profile.role as AppRole) === "player" ? (
@@ -1089,13 +1227,21 @@ export default function ProfileScreen() {
               {summarySections
                 .find((section) => section.title === "Presentazione")
                 ?.items.map((item) => (
-                  <Field key={`presentation-${item.label}`} label={item.label} value={item.value} />
+                  <Field
+                    key={`presentation-${item.label}`}
+                    label={item.label}
+                    value={item.value}
+                  />
                 ))}
             </BioSection>
-            {summarySections.map((section) => (
+            {summarySections.map((section) =>
               section.title === "Presentazione" ||
               section.title === "Informazioni personali" ? null : (
-                <Section key={section.title} description={section.subtitle} title={section.title}>
+                <Section
+                  key={section.title}
+                  description={section.subtitle}
+                  title={section.title}
+                >
                   {section.items.map((item) =>
                     item.label === "Categorie preferite" ? (
                       <Field
@@ -1106,7 +1252,10 @@ export default function ProfileScreen() {
                             editable={false}
                             hideLabel
                             onChange={() => {}}
-                            value={completeProfile?.playerProfile?.preferred_categories ?? []}
+                            value={
+                              completeProfile?.playerProfile
+                                ?.preferred_categories ?? []
+                            }
                           />
                         )}
                         value={item.value}
@@ -1120,65 +1269,115 @@ export default function ProfileScreen() {
                             editable={false}
                             hideLabel
                             onChange={() => {}}
-                            value={completeProfile?.playerProfile?.transfer_regions ?? []}
+                            value={
+                              completeProfile?.playerProfile
+                                ?.transfer_regions ?? []
+                            }
                           />
                         )}
                         value={item.value}
                       />
                     ) : (
-                      <Field key={`${section.title}-${item.label}`} label={item.label} value={item.value} />
+                      <Field
+                        key={`${section.title}-${item.label}`}
+                        label={item.label}
+                        value={item.value}
+                      />
                     ),
                   )}
                 </Section>
-              )
-            ))}
+              ),
+            )}
 
             {(profile.role as AppRole) === "player" ? (
-              <Section
-                description="Ruolo e piede preferito leggibili rapidamente anche in consultazione."
-                title="Profilo sportivo"
-              >
-                <PlayerCharacteristicsSection
-                  preferredFoot={completeProfile?.playerProfile?.preferred_foot ?? ""}
-                  primaryPosition={
-                    completeProfile?.playerProfile?.primary_position ??
-                    DEFAULT_PLAYER_PRIMARY_POSITION
-                  }
-                  secondaryPositions={completeProfile?.playerProfile?.secondary_positions ?? []}
+              <>
+                <Section
+                  description="Ruolo e piede preferito leggibili rapidamente anche in consultazione."
+                  title="Profilo sportivo"
+                >
+                  <PlayerCharacteristicsSection
+                    preferredFoot={
+                      completeProfile?.playerProfile?.preferred_foot ?? ""
+                    }
+                    primaryPosition={
+                      completeProfile?.playerProfile?.primary_position ??
+                      DEFAULT_PLAYER_PRIMARY_POSITION
+                    }
+                    secondaryPositions={
+                      completeProfile?.playerProfile?.secondary_positions ?? []
+                    }
+                  />
+                </Section>
+                <Section title="Media">
+                  <MediaPreview
+                    emptyLabel="Nessun video highlights caricato"
+                    label="Video highlights"
+                    mediaType="video"
+                    url={completeProfile?.playerProfile?.highlight_video_url}
+                  />
+                </Section>
+              </>
+            ) : null}
+
+            {(profile.role as AppRole) === "coach" ? (
+              <Section title="Media">
+                <MediaPreview
+                  emptyLabel="Nessun video tecnico caricato"
+                  label="Video tecnico"
+                  mediaType="video"
+                  url={completeProfile?.coachProfile?.technical_video_url}
                 />
               </Section>
             ) : null}
 
-            {completeProfile ? <ContactSection contacts={completeProfile.userContacts} /> : null}
+            {(profile.role as AppRole) === "club_admin" ? (
+              <Section title="Media">
+                <MediaPreview
+                  emptyLabel="Nessun logo caricato"
+                  label="Logo società"
+                  url={completeProfile?.club?.logo_url}
+                />
+                <MediaGalleryPreview
+                  label="Gallery media"
+                  urls={completeProfile?.club?.gallery_urls ?? []}
+                />
+              </Section>
+            ) : null}
+
+            {completeProfile ? (
+              <ContactSection contacts={completeProfile.userContacts} />
+            ) : null}
           </>
         ) : (
           <>
             {(profile.role as AppRole) !== "club_admin" ? (
-            <PersonalInfoSection
-              birthDate={formState.birthDate}
-              birthDateHelperText={birthDateHelperText}
-              city={formState.city}
-              cityHelperText={cityHelperText}
-              citySuggestions={citySuggestions}
-              editable
-              fullName={formState.fullName}
-              nationality={formState.nationality}
-              nationalityOptions={nationalityOptions}
-              onBirthDateChange={handleBirthDateChange}
-              onCityChange={handleCityChange}
-              onCitySuggestionPress={handleCitySuggestionPress}
-              onFullNameChange={handleFullNameChange}
-              onNationalityChange={(value) =>
-                setFormState((current) =>
-                  current ? { ...current, nationality: value } : current,
-                )
-              }
-              onRegionChange={(value) =>
-                setFormState((current) => (current ? { ...current, region: value } : current))
-              }
-              region={formState.region}
-              regionOptions={regionOptions}
-            />
+              <PersonalInfoSection
+                birthDate={formState.birthDate}
+                birthDateHelperText={birthDateHelperText}
+                city={formState.city}
+                cityHelperText={cityHelperText}
+                citySuggestions={citySuggestions}
+                editable
+                fullName={formState.fullName}
+                nationality={formState.nationality}
+                nationalityOptions={nationalityOptions}
+                onBirthDateChange={handleBirthDateChange}
+                onCityChange={handleCityChange}
+                onCitySuggestionPress={handleCitySuggestionPress}
+                onFullNameChange={handleFullNameChange}
+                onNationalityChange={(value) =>
+                  setFormState((current) =>
+                    current ? { ...current, nationality: value } : current,
+                  )
+                }
+                onRegionChange={(value) =>
+                  setFormState((current) =>
+                    current ? { ...current, region: value } : current,
+                  )
+                }
+                region={formState.region}
+                regionOptions={regionOptions}
+              />
             ) : null}
             <BioSection
               bio={formState.bio}
@@ -1186,15 +1385,42 @@ export default function ProfileScreen() {
               errorMessage={bioErrorMessage}
               onChangeText={handleBioChange}
             >
-              <Field
-                label="URL foto profilo (facoltativo)"
-                onChangeText={(value) =>
-                  setFormState((current) =>
-                    current ? { ...current, avatarUrl: value } : current,
+              <MediaPickerField
+                buttonLabel={
+                  formState.avatarUrl
+                    ? "Sostituisci foto"
+                    : "Carica foto profilo"
+                }
+                helperText="Se non la carichi useremo un'immagine profilo blank di default."
+                isUploading={uploadingField === "avatar"}
+                label="Foto profilo"
+                onPick={() =>
+                  handleMediaUpload({
+                    field: "avatar",
+                    folder: "avatars",
+                    mediaTypes: ["images"],
+                    onUploaded: (items) =>
+                      setFormState((current) =>
+                        current
+                          ? { ...current, avatarUrl: items[0]?.url ?? "" }
+                          : current,
+                      ),
+                  })
+                }
+                onRemove={() =>
+                  handleMediaRemove(formState.avatarUrl, () =>
+                    setFormState((current) =>
+                      current ? { ...current, avatarUrl: "" } : current,
+                    ),
                   )
                 }
-                placeholder="Lascia vuoto per usare l'immagine blank di default"
-                value={formState.avatarUrl}
+                previewUrl={withDefaultProfileAvatar(formState.avatarUrl)}
+                removable
+                selectedLabel={
+                  formState.avatarUrl
+                    ? "Foto profilo caricata"
+                    : "Immagine di default attiva"
+                }
               />
               {(profile.role as AppRole) === "player" ? (
                 <BooleanField
@@ -1202,13 +1428,15 @@ export default function ProfileScreen() {
                   label="Aperto al trasferimento"
                   onChange={(value) =>
                     setFormState((current) =>
-                      current ? { ...current, isOpenToTransfer: value } : current,
+                      current
+                        ? { ...current, isOpenToTransfer: value }
+                        : current,
                     )
                   }
                   trueLabel="Sì"
                   value={formState.isOpenToTransfer}
-                  />
-                ) : null}
+                />
+              ) : null}
             </BioSection>
 
             <ContactSection
@@ -1249,12 +1477,16 @@ export default function ProfileScreen() {
               }
               onShowFacebookChange={(value) =>
                 setFormState((current) =>
-                  current ? { ...current, showContactFacebook: value } : current,
+                  current
+                    ? { ...current, showContactFacebook: value }
+                    : current,
                 )
               }
               onShowInstagramChange={(value) =>
                 setFormState((current) =>
-                  current ? { ...current, showContactInstagram: value } : current,
+                  current
+                    ? { ...current, showContactInstagram: value }
+                    : current,
                 )
               }
             />
@@ -1269,7 +1501,9 @@ export default function ProfileScreen() {
                     editable
                     onPreferredFootChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, preferredFoot: value } : current,
+                        current
+                          ? { ...current, preferredFoot: value }
+                          : current,
                       )
                     }
                     onPrimaryPositionChange={(value) =>
@@ -1278,10 +1512,11 @@ export default function ProfileScreen() {
                           ? {
                               ...current,
                               primaryPosition: value,
-                              secondaryPositions: excludePrimaryFromSecondaryPositions(
-                                current.secondaryPositions,
-                                value,
-                              ),
+                              secondaryPositions:
+                                excludePrimaryFromSecondaryPositions(
+                                  current.secondaryPositions,
+                                  value,
+                                ),
                             }
                           : current,
                       )
@@ -1291,10 +1526,11 @@ export default function ProfileScreen() {
                         current
                           ? {
                               ...current,
-                              secondaryPositions: excludePrimaryFromSecondaryPositions(
-                                value,
-                                current.primaryPosition,
-                              ),
+                              secondaryPositions:
+                                excludePrimaryFromSecondaryPositions(
+                                  value,
+                                  current.primaryPosition,
+                                ),
                             }
                           : current,
                       )
@@ -1307,7 +1543,12 @@ export default function ProfileScreen() {
                     label="Categorie preferite"
                     onChange={(categories) =>
                       setFormState((current) =>
-                        current ? { ...current, preferredCategories: categories.join(", ") } : current,
+                        current
+                          ? {
+                              ...current,
+                              preferredCategories: categories.join(", "),
+                            }
+                          : current,
                       )
                     }
                     value={fromDelimitedString(formState.preferredCategories)}
@@ -1316,19 +1557,55 @@ export default function ProfileScreen() {
                     label="Regioni di interesse"
                     onChange={(regions) =>
                       setFormState((current) =>
-                        current ? { ...current, transferRegions: regions.join(", ") } : current,
+                        current
+                          ? { ...current, transferRegions: regions.join(", ") }
+                          : current,
                       )
                     }
                     value={fromDelimitedString(formState.transferRegions)}
                   />
-                  <Field
-                    label="URL highlights video"
-                    onChangeText={(value) =>
-                      setFormState((current) =>
-                        current ? { ...current, highlightVideoUrl: value } : current,
+                  <MediaPickerField
+                    buttonLabel={
+                      formState.highlightVideoUrl
+                        ? "Sostituisci video"
+                        : "Carica video highlights"
+                    }
+                    helperText="Seleziona un video dal telefono per mostrare i tuoi highlights."
+                    isUploading={uploadingField === "highlight-video"}
+                    label="Video highlights"
+                    mediaType="video"
+                    onPick={() =>
+                      handleMediaUpload({
+                        field: "highlight-video",
+                        folder: "highlight-videos",
+                        mediaTypes: ["videos"],
+                        onUploaded: (items) =>
+                          setFormState((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  highlightVideoUrl: items[0]?.url ?? "",
+                                }
+                              : current,
+                          ),
+                      })
+                    }
+                    onRemove={() =>
+                      handleMediaRemove(formState.highlightVideoUrl, () =>
+                        setFormState((current) =>
+                          current
+                            ? { ...current, highlightVideoUrl: "" }
+                            : current,
+                        ),
                       )
                     }
-                    value={formState.highlightVideoUrl}
+                    previewUrl={formState.highlightVideoUrl || undefined}
+                    removable
+                    selectedLabel={
+                      formState.highlightVideoUrl
+                        ? "Video highlights caricato"
+                        : undefined
+                    }
                   />
                   <BooleanField
                     falseLabel="No"
@@ -1350,7 +1627,9 @@ export default function ProfileScreen() {
                     experiences={formState.careerEntries}
                     onChange={(experiences) =>
                       setFormState((current) =>
-                        current ? { ...current, careerEntries: experiences } : current,
+                        current
+                          ? { ...current, careerEntries: experiences }
+                          : current,
                       )
                     }
                     searchTeams={searchTeams}
@@ -1368,7 +1647,9 @@ export default function ProfileScreen() {
                     min={140}
                     onChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, heightCm: String(value) } : current,
+                        current
+                          ? { ...current, heightCm: String(value) }
+                          : current,
                       )
                     }
                     unit="cm"
@@ -1380,7 +1661,9 @@ export default function ProfileScreen() {
                     min={40}
                     onChange={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, weightKg: String(value) } : current,
+                        current
+                          ? { ...current, weightKg: String(value) }
+                          : current,
                       )
                     }
                     unit="kg"
@@ -1398,7 +1681,9 @@ export default function ProfileScreen() {
                 <Field
                   label="Licenze"
                   onChangeText={(value) =>
-                    setFormState((current) => (current ? { ...current, licenses: value } : current))
+                    setFormState((current) =>
+                      current ? { ...current, licenses: value } : current,
+                    )
                   }
                   placeholder="UEFA B, UEFA A"
                   value={formState.licenses}
@@ -1416,7 +1701,9 @@ export default function ProfileScreen() {
                   label="Categorie allenate"
                   onChangeText={(value) =>
                     setFormState((current) =>
-                      current ? { ...current, coachedCategories: value } : current,
+                      current
+                        ? { ...current, coachedCategories: value }
+                        : current,
                     )
                   }
                   value={formState.coachedCategories}
@@ -1431,20 +1718,56 @@ export default function ProfileScreen() {
                   }
                   value={formState.gamePhilosophy}
                 />
-                <Field
-                  label="URL video tecnico"
-                  onChangeText={(value) =>
-                    setFormState((current) =>
-                      current ? { ...current, technicalVideoUrl: value } : current,
+                <MediaPickerField
+                  buttonLabel={
+                    formState.technicalVideoUrl
+                      ? "Sostituisci video"
+                      : "Carica video tecnico"
+                  }
+                  helperText="Carica dal telefono una clip tecnica o una presentazione video."
+                  isUploading={uploadingField === "coach-video"}
+                  label="Video tecnico"
+                  mediaType="video"
+                  onPick={() =>
+                    handleMediaUpload({
+                      field: "coach-video",
+                      folder: "coach-videos",
+                      mediaTypes: ["videos"],
+                      onUploaded: (items) =>
+                        setFormState((current) =>
+                          current
+                            ? {
+                                ...current,
+                                technicalVideoUrl: items[0]?.url ?? "",
+                              }
+                            : current,
+                        ),
+                    })
+                  }
+                  onRemove={() =>
+                    handleMediaRemove(formState.technicalVideoUrl, () =>
+                      setFormState((current) =>
+                        current
+                          ? { ...current, technicalVideoUrl: "" }
+                          : current,
+                      ),
                     )
                   }
-                  value={formState.technicalVideoUrl}
+                  previewUrl={formState.technicalVideoUrl || undefined}
+                  removable
+                  selectedLabel={
+                    formState.technicalVideoUrl
+                      ? "Video tecnico caricato"
+                      : undefined
+                  }
                 />
                 <Field
                   label="Aree geografiche di interesse"
                   onChangeText={(value) =>
                     setFormState((current) =>
-                      current ? { ...current, preferredRegions: value } : current,
+                      current
+                        ? { ...current, preferredRegions: value }
+                        : current,
                     )
                   }
                   value={formState.preferredRegions}
@@ -1483,7 +1806,9 @@ export default function ProfileScreen() {
                   multiline
                   onChangeText={(value) =>
                     setFormState((current) =>
-                      current ? { ...current, experienceSummary: value } : current,
+                      current
+                        ? { ...current, experienceSummary: value }
+                        : current,
                     )
                   }
                   value={formState.experienceSummary}
@@ -1501,7 +1826,9 @@ export default function ProfileScreen() {
                   label="Aree geografiche di interesse"
                   onChangeText={(value) =>
                     setFormState((current) =>
-                      current ? { ...current, preferredRegions: value } : current,
+                      current
+                        ? { ...current, preferredRegions: value }
+                        : current,
                     )
                   }
                   value={formState.preferredRegions}
@@ -1529,14 +1856,18 @@ export default function ProfileScreen() {
                   <Field
                     label="Nome club"
                     onChangeText={(value) =>
-                      setFormState((current) => (current ? { ...current, clubName: value } : current))
+                      setFormState((current) =>
+                        current ? { ...current, clubName: value } : current,
+                      )
                     }
                     value={formState.clubName}
                   />
                   <Field
                     label="Città club"
                     onChangeText={(value) =>
-                      setFormState((current) => (current ? { ...current, clubCity: value } : current))
+                      setFormState((current) =>
+                        current ? { ...current, clubCity: value } : current,
+                      )
                     }
                     value={formState.clubCity}
                   />
@@ -1578,29 +1909,85 @@ export default function ProfileScreen() {
                     multiline
                     onChangeText={(value) =>
                       setFormState((current) =>
-                        current ? { ...current, clubDescription: value } : current,
+                        current
+                          ? { ...current, clubDescription: value }
+                          : current,
                       )
                     }
                     value={formState.clubDescription}
                   />
-                  <Field
-                    label="URL logo"
-                    onChangeText={(value) =>
-                      setFormState((current) =>
-                        current ? { ...current, clubLogoUrl: value } : current,
+                  <MediaPickerField
+                    buttonLabel={
+                      formState.clubLogoUrl ? "Sostituisci logo" : "Carica logo"
+                    }
+                    helperText="Seleziona il logo della società dal telefono."
+                    isUploading={uploadingField === "club-logo"}
+                    label="Logo società"
+                    onPick={() =>
+                      handleMediaUpload({
+                        field: "club-logo",
+                        folder: "club-logos",
+                        mediaTypes: ["images"],
+                        onUploaded: (items) =>
+                          setFormState((current) =>
+                            current
+                              ? { ...current, clubLogoUrl: items[0]?.url ?? "" }
+                              : current,
+                          ),
+                      })
+                    }
+                    onRemove={() =>
+                      handleMediaRemove(formState.clubLogoUrl, () =>
+                        setFormState((current) =>
+                          current ? { ...current, clubLogoUrl: "" } : current,
+                        ),
                       )
                     }
-                    value={formState.clubLogoUrl}
+                    previewUrl={formState.clubLogoUrl || undefined}
+                    removable
+                    selectedLabel={
+                      formState.clubLogoUrl ? "Logo caricato" : undefined
+                    }
                   />
-                  <Field
+                  <MediaPickerField
+                    buttonLabel="Aggiungi media alla gallery"
+                    helperText="Aggiungi foto e video della società dalla libreria del telefono."
+                    isUploading={uploadingField === "club-gallery"}
                     label="Gallery media"
-                    onChangeText={(value) =>
+                    onPick={() =>
+                      handleMediaUpload({
+                        field: "club-gallery",
+                        folder: "club-gallery",
+                        mediaTypes: ["images", "videos"],
+                        onUploaded: (items) =>
+                          setFormState((current) => {
+                            if (!current) {
+                              return current;
+                            }
+                            const existingUrls = fromDelimitedString(
+                              current.clubGalleryUrls,
+                            );
+                            const newUrls = items.map((item) => item.url);
+                            return {
+                              ...current,
+                              clubGalleryUrls: [
+                                ...existingUrls,
+                                ...newUrls,
+                              ].join(", "),
+                            };
+                          }),
+                      })
+                    }
+                    onRemove={() =>
                       setFormState((current) =>
-                        current ? { ...current, clubGalleryUrls: value } : current,
+                        current ? { ...current, clubGalleryUrls: "" } : current,
                       )
                     }
-                    placeholder="https://..., https://..."
-                    value={formState.clubGalleryUrls}
+                    removable
+                    removeLabel="Svuota gallery"
+                    selectedCount={
+                      fromDelimitedString(formState.clubGalleryUrls).length
+                    }
                   />
                 </Section>
                 <Section
@@ -1611,7 +1998,9 @@ export default function ProfileScreen() {
                     editable
                     onChange={(seasons) =>
                       setFormState((current) =>
-                        current ? { ...current, clubSeasonEntries: seasons } : current,
+                        current
+                          ? { ...current, clubSeasonEntries: seasons }
+                          : current,
                       )
                     }
                     seasons={formState.clubSeasonEntries}
@@ -1635,7 +2024,6 @@ export default function ProfileScreen() {
                 variant="primary"
               />
             </View>
-
           </>
         )}
       </KeyboardAwareForm>

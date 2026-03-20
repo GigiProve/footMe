@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   Text,
@@ -120,7 +121,9 @@ export default function AdminClubRequestDetailScreen() {
         {/* Logo + Nome */}
         <View style={{ alignItems: "center", gap: spacing[12], flexDirection: "row" }}>
           {club.logo_url ? (
-            <View
+            <Image
+              accessibilityLabel={`Logo ${club.name}`}
+              source={{ uri: club.logo_url }}
               style={{
                 backgroundColor: colors.surfaceMuted,
                 borderRadius: radius[14],

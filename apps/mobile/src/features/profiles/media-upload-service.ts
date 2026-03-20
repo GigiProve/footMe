@@ -136,6 +136,37 @@ async function uploadAsset(
   } satisfies UploadedMediaItem;
 }
 
+export function extractStoragePath(publicUrl: string): string | null {
+  const marker = `/object/public/${PROFILE_MEDIA_BUCKET}/`;
+  const index = publicUrl.indexOf(marker);
+
+  if (index === -1) {
+    return null;
+  }
+
+  return publicUrl.slice(index + marker.length);
+}
+
+export async function removeMediaFromStorage(publicUrl: string) {
+  const path = extractStoragePath(publicUrl);
+
+  if (!path) {
+    return;
+  }
+
+  const { error } = await supabase.storage
+    .from(PROFILE_MEDIA_BUCKET)
+    .remove([path]);
+
+  if (error) {
+    throw new ProfileMediaUploadError(
+      "upload_failed",
+      "Rimozione del file non riuscita.",
+      { cause: error },
+    );
+  }
+}
+
 export async function pickAndUploadMedia(input: PickAndUploadMediaInput) {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
