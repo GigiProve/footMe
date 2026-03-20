@@ -1,7 +1,7 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable } from "react-native";
 
-import { colors, spacing, typography } from "../../../theme/tokens";
-import { Card } from "../../../ui";
+import { spacing } from "../../../theme/tokens";
+import { AppText, Card } from "../../../ui";
 import type { AdminClubEntry } from "../admin-service";
 import { StatusBadge } from "./status-badge";
 
@@ -14,38 +14,21 @@ export function ClubRegistrationRequestCard({ club, onPress }: Props) {
   return (
     <Pressable onPress={() => onPress(club.id)}>
       <Card style={{ gap: spacing[4], marginBottom: spacing[12] }}>
-        <Text style={styles.name}>{club.name}</Text>
-        <Text style={styles.detail}>
+        <AppText preset="title">{club.name}</AppText>
+        <AppText preset="bodySmall">
           {club.city}, {club.region}
-        </Text>
+        </AppText>
         {club.club_email ? (
-          <Text style={styles.detail}>{club.club_email}</Text>
+          <AppText preset="bodySmall">{club.club_email}</AppText>
         ) : null}
-        <Text style={styles.detail}>
+        <AppText preset="bodySmall">
           Responsabile: {club.owner_full_name ?? "N/D"}
-        </Text>
-        <Text style={styles.meta}>
+        </AppText>
+        <AppText preset="caption">
           Registrato il {new Date(club.created_at).toLocaleDateString("it-IT")}
-        </Text>
+        </AppText>
         <StatusBadge status={club.verification_status} />
       </Card>
     </Pressable>
   );
 }
-
-const styles = {
-  name: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[16],
-    fontWeight: typography.fontWeight.heavy,
-  },
-  detail: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[14],
-    lineHeight: 20,
-  },
-  meta: {
-    color: colors.textMuted,
-    fontSize: typography.fontSize[12],
-  },
-} as const;
