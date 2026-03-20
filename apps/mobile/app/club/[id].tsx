@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Modal, Pressable, SafeAreaView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Modal, Pressable, SafeAreaView, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -149,7 +149,9 @@ export default function ClubProfileScreen() {
         <Card style={{ gap: spacing[12] }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[12] }}>
             {club.logo_url ? (
-              <View
+              <Image
+                accessibilityLabel={`Logo ${club.name}`}
+                source={{ uri: club.logo_url }}
                 style={{
                   backgroundColor: colors.surfaceMuted,
                   borderRadius: radius[14],

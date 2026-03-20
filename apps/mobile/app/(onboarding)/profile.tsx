@@ -1272,7 +1272,7 @@ export default function OnboardingProfileScreen() {
             />
 
             <MediaPickerField
-              buttonLabel="Carica foto profilo"
+              buttonLabel={avatarUrl ? "Sostituisci foto" : "Carica foto profilo"}
               helperText="Se non la carichi ora useremo un'immagine profilo blank di default."
               isUploading={uploadingField === "avatar"}
               label="Foto profilo"
@@ -1284,7 +1284,9 @@ export default function OnboardingProfileScreen() {
                    onUploaded: (items) => updateValue("avatarUrl", items[0]?.url ?? ""),
                  })
                }
+              onRemove={() => updateValue("avatarUrl", "")}
               previewUrl={withDefaultProfileAvatar(avatarUrl)}
+              removable
               selectedLabel={
                 avatarUrl
                   ? "Immagine profilo caricata correttamente"
@@ -1437,7 +1439,7 @@ export default function OnboardingProfileScreen() {
                 ) : null}
 
                 <MediaPickerField
-                  buttonLabel="Carica logo società"
+                  buttonLabel={clubLogoUrl ? "Sostituisci logo" : "Carica logo società"}
                   helperText="Carica il logo della tua società."
                   isUploading={uploadingField === "clubLogo"}
                   label="Logo"
@@ -1449,7 +1451,9 @@ export default function OnboardingProfileScreen() {
                       onUploaded: (items) => updateValue("clubLogoUrl", items[0]?.url ?? ""),
                     })
                   }
+                  onRemove={() => updateValue("clubLogoUrl", "")}
                   previewUrl={clubLogoUrl || undefined}
+                  removable
                   selectedLabel={
                     clubLogoUrl
                       ? "Logo caricato correttamente"
@@ -1807,10 +1811,11 @@ export default function OnboardingProfileScreen() {
                     Media e contenuti
                   </Text>
                   <MediaPickerField
-                    buttonLabel="Carica video highlights"
+                    buttonLabel={highlightVideoUrl ? "Sostituisci video" : "Carica video highlights"}
                     helperText="Seleziona un video dal cellulare per mostrare i tuoi highlights."
                     isUploading={uploadingField === "highlight-video"}
                     label="Video highlights"
+                    mediaType="video"
                     onPick={() =>
                       handleMediaUpload({
                         field: "highlight-video",
@@ -1820,6 +1825,9 @@ export default function OnboardingProfileScreen() {
                           updateValue("highlightVideoUrl", items[0]?.url ?? ""),
                       })
                     }
+                    onRemove={() => updateValue("highlightVideoUrl", "")}
+                    previewUrl={highlightVideoUrl || undefined}
+                    removable
                     selectedLabel={
                       highlightVideoUrl
                         ? "Video highlights caricato correttamente"
@@ -1841,6 +1849,9 @@ export default function OnboardingProfileScreen() {
                           appendUploadedMedia("playerMediaItems", items),
                       })
                     }
+                    onRemove={() => updateValue("playerMediaItems", [])}
+                    removable
+                    removeLabel="Svuota gallery"
                     selectedCount={playerMediaItems.length}
                   />
                 </View>
@@ -1884,10 +1895,11 @@ export default function OnboardingProfileScreen() {
                   value={gamePhilosophy}
                 />
                 <MediaPickerField
-                  buttonLabel="Carica video tecnico"
+                  buttonLabel={technicalVideoUrl ? "Sostituisci video" : "Carica video tecnico"}
                   helperText="Carica dal telefono una clip tecnica o una presentazione video."
                   isUploading={uploadingField === "coach-video"}
                   label="Video tecnico"
+                  mediaType="video"
                   onPick={() =>
                     handleMediaUpload({
                         field: "coach-video",
@@ -1897,6 +1909,9 @@ export default function OnboardingProfileScreen() {
                           updateValue("technicalVideoUrl", items[0]?.url ?? ""),
                       })
                     }
+                  onRemove={() => updateValue("technicalVideoUrl", "")}
+                  previewUrl={technicalVideoUrl || undefined}
+                  removable
                   selectedLabel={
                     technicalVideoUrl
                       ? "Video tecnico caricato correttamente"
@@ -2022,7 +2037,7 @@ export default function OnboardingProfileScreen() {
                   value={clubLeague}
                 />
                 <MediaPickerField
-                  buttonLabel="Carica logo societa'"
+                  buttonLabel={clubLogoUrl ? "Sostituisci logo" : "Carica logo societa'"}
                   helperText="Seleziona il logo direttamente dal telefono."
                   isUploading={uploadingField === "club-logo"}
                   label="Logo societa'"
@@ -2035,7 +2050,9 @@ export default function OnboardingProfileScreen() {
                           updateValue("clubLogoUrl", items[0]?.url ?? ""),
                       })
                     }
+                  onRemove={() => updateValue("clubLogoUrl", "")}
                   previewUrl={clubLogoUrl}
+                  removable
                   selectedLabel={
                     clubLogoUrl
                       ? "Logo societa' caricato correttamente"
@@ -2057,6 +2074,9 @@ export default function OnboardingProfileScreen() {
                           appendUploadedMedia("clubGalleryItems", items),
                       })
                     }
+                  onRemove={() => updateValue("clubGalleryItems", [])}
+                  removable
+                  removeLabel="Svuota gallery"
                   selectedCount={clubGalleryItems.length}
                 />
                 <Input
