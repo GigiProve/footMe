@@ -5,6 +5,15 @@ import { describe, expect, it, vi } from "vitest";
 import { colors, radius } from "../../theme/tokens";
 import { MediaPickerField } from "./media-picker-field";
 
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: (props: Record<string, unknown>) => React.createElement("Ionicon", props),
+}));
+
+vi.mock("./video-player-modal", () => ({
+  VideoPlayerModal: (props: Record<string, unknown>) =>
+    React.createElement("mock-video-player-modal", props),
+}));
+
 vi.mock("../../ui", () => ({
   Button: (props: Record<string, unknown>) => React.createElement("mock-button", props),
   Card: ({
