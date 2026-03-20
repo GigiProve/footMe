@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { withDefaultProfileAvatar } from "./profile-avatar";
-import { colors, opacity, radius, sizes, spacing } from "../../theme/tokens";
+import { colors, opacity, radius, sizes, spacing, typography } from "../../theme/tokens";
 import { AppChip, AppDivider, AppText, Input } from "../../ui";
 
 type ProfileHeaderProps = {
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     gap: spacing[8],
   },
   fullName: {
-    fontSize: 30,
+    fontSize: typography.fontSize[30],
   },
   headerCard: {
     gap: spacing[12],
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[14],
   },
   readonlyValue: {
-    lineHeight: 22,
+    lineHeight: typography.lineHeight[22],
   },
   sectionCard: {
     gap: spacing[12],
