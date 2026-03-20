@@ -6,4 +6,12 @@ export const sizes = {
   recruitingDescriptionMinHeight: 120,
   orbHero: 220,
   orbAccent: 260,
+  avatarSm: 32,
+  avatarMd: 48,
+  avatarLg: 72,
+  avatarXl: 104,
+  iconSm: 16,
+  iconMd: 20,
+  iconLg: 24,
+  iconXl: 32,
 } as const;
