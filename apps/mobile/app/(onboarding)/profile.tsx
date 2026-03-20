@@ -427,7 +427,6 @@ export default function OnboardingProfileScreen() {
     hasCreatedProfile,
     heightCm,
     highlightVideoUrl,
-    isAvailable,
     isOpenToTransfer,
     lastCompletedStep,
     lastName,
@@ -914,7 +913,6 @@ export default function OnboardingProfileScreen() {
           birth_date: birthDate,
           city: null,
           full_name: fullName,
-          is_available: isAvailable,
           is_open_to_transfer: isOpenToTransfer,
           nationality,
           region: null,
@@ -1720,28 +1718,6 @@ export default function OnboardingProfileScreen() {
                   >
                     Disponibilita'
                   </Text>
-                  <View style={{ gap: spacing[8] }}>
-                    <Text
-                      style={{
-                        color: colors.textPrimary,
-                        fontWeight: typography.fontWeight.bold,
-                      }}
-                    >
-                      Disponibile per una nuova squadra?
-                    </Text>
-                    <View style={{ flexDirection: "row", gap: spacing[8] }}>
-                      <OptionPill
-                        active={isAvailable}
-                        label="Si'"
-                        onPress={() => updateValue("isAvailable", true)}
-                      />
-                      <OptionPill
-                        active={!isAvailable}
-                        label="No"
-                        onPress={() => updateValue("isAvailable", false)}
-                      />
-                    </View>
-                  </View>
                   <AvailabilityRegionsSelector
                     onChange={(regions) => updateValue("transferRegions", regions.join(", "))}
                     value={fromDelimitedString(transferRegions)}

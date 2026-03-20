@@ -5,7 +5,6 @@ type ProfileRow = {
   city: string | null;
   full_name: string | null;
   id: string;
-  is_available: boolean;
   is_open_to_transfer: boolean;
   region: string | null;
   role: string | null;
@@ -32,7 +31,6 @@ export type HomeDashboardData = {
     clubName: string | null;
     email: string | null;
     fullName: string;
-    isAvailable: boolean;
     isOpenToTransfer: boolean;
     primaryPosition: string | null;
     region: string | null;
@@ -91,7 +89,7 @@ export async function getHomeDashboard(
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "id, full_name, role, region, city, is_available, is_open_to_transfer",
+      "id, full_name, role, region, city, is_open_to_transfer",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -177,7 +175,6 @@ export async function getHomeDashboard(
         clubName: club?.name ?? null,
         email,
         fullName: profile.full_name ?? club?.name ?? "Societa' footMe",
-        isAvailable: profile.is_available,
         isOpenToTransfer: profile.is_open_to_transfer,
         primaryPosition: null,
         region: club?.region ?? profile.region,
@@ -268,7 +265,6 @@ export async function getHomeDashboard(
       clubName: null,
       email,
       fullName: profile.full_name ?? "Utente footMe",
-      isAvailable: profile.is_available,
       isOpenToTransfer: profile.is_open_to_transfer,
       primaryPosition,
       region: profile.region,

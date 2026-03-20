@@ -164,7 +164,6 @@ describe("getCompleteProfessionalProfile", () => {
         city: "Perugia",
         full_name: "Marco Rossi",
         id: "profile-1",
-        is_available: true,
         is_open_to_transfer: true,
         nationality: "IT",
         region: "Umbria",
@@ -309,7 +308,6 @@ describe("getCompleteProfessionalProfile", () => {
         city: "Roma",
         full_name: "Club Admin",
         id: "profile-9",
-        is_available: false,
         is_open_to_transfer: false,
         nationality: null,
         region: "Lazio",
@@ -339,7 +337,6 @@ describe("getCompleteProfessionalProfile", () => {
         city: null,
         full_name: "Legacy Staff",
         id: "profile-legacy",
-        is_available: null,
         is_open_to_transfer: null,
         nationality: null,
         region: null,
@@ -368,7 +365,6 @@ describe("getCompleteProfessionalProfile", () => {
 
     expect(result.profile).toMatchObject({
       city: null,
-      is_available: false,
       is_open_to_transfer: false,
       nationality: null,
       region: null,

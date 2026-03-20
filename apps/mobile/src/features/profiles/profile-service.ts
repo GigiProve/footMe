@@ -20,7 +20,6 @@ type BaseProfileRecord = {
   city: string | null;
   full_name: string;
   id: string;
-  is_available: boolean;
   is_open_to_transfer: boolean;
   nationality: string | null;
   region: string | null;
@@ -193,7 +192,6 @@ export type CompleteProfessionalProfileUpdate = {
     birth_date: string | null;
     city: string | null;
     full_name: string;
-    is_available: boolean;
     is_open_to_transfer: boolean;
     nationality: string | null;
     region: string | null;
@@ -280,7 +278,6 @@ function normalizeBaseProfileRecord(
     city: normalizeOptionalText(rawProfile?.city),
     full_name: normalizeRequiredText(rawProfile?.full_name, "Profilo FootMe"),
     id: normalizeRequiredText(rawProfile?.id, profileId),
-    is_available: normalizeBoolean(rawProfile?.is_available),
     is_open_to_transfer: normalizeBoolean(rawProfile?.is_open_to_transfer),
     nationality: normalizeOptionalText(rawProfile?.nationality),
     region: normalizeOptionalText(rawProfile?.region),
@@ -467,7 +464,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   const { data: profileData, error: profileError } = await supabase
     .from("profiles_with_age")
     .select(
-      "id, full_name, role, birth_date, age, nationality, bio, avatar_url, region, city, is_available, is_open_to_transfer",
+      "id, full_name, role, birth_date, age, nationality, bio, avatar_url, region, city, is_open_to_transfer",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -618,7 +615,6 @@ export async function updateCompleteProfessionalProfile(
       birth_date: input.profile.birth_date,
       city: input.profile.city,
       full_name: input.profile.full_name,
-      is_available: input.profile.is_available,
       is_open_to_transfer: input.profile.is_open_to_transfer,
       nationality: input.profile.nationality,
       region: input.profile.region,

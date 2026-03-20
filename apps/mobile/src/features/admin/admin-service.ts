@@ -5,7 +5,8 @@ export type ClubVerificationStatus =
   | "pending_review"
   | "verified"
   | "flagged"
-  | "suspended";
+  | "suspended"
+  | "rejected";
 
 export type AdminClubEntry = {
   city: string;
@@ -39,6 +40,66 @@ export type ClubReportEntry = {
   reason: string | null;
   reporter_profile_id: string;
 };
+
+export type AdminClubDetail = {
+  category: string | null;
+  city: string;
+  club_colors: string | null;
+  club_email: string | null;
+  club_phone: string | null;
+  country: string;
+  created_at: string;
+  field_address: string | null;
+  founding_year: number | null;
+  headquarters_address: string | null;
+  id: string;
+  logo_url: string | null;
+  name: string;
+  owner_full_name: string | null;
+  owner_profile_id: string;
+  region: string;
+  verification_status: ClubVerificationStatus;
+  website_url: string | null;
+};
+
+export async function fetchClubDetail(clubId: string): Promise<AdminClubDetail> {
+  const { data, error } = await supabase
+    .from("clubs")
+    .select("id, name, city, region, country, category, club_colors, club_email, club_phone, field_address, founding_year, headquarters_address, logo_url, owner_profile_id, verification_status, website_url, created_at")
+    .eq("id", clubId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw error ?? new Error("Club not found");
+  }
+
+  const { data: owner } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", data.owner_profile_id)
+    .maybeSingle();
+
+  return {
+    category: data.category ?? null,
+    city: data.city,
+    club_colors: data.club_colors ?? null,
+    club_email: data.club_email ?? null,
+    club_phone: data.club_phone ?? null,
+    country: data.country ?? "IT",
+    created_at: data.created_at,
+    field_address: data.field_address ?? null,
+    founding_year: data.founding_year ?? null,
+    headquarters_address: data.headquarters_address ?? null,
+    id: data.id,
+    logo_url: data.logo_url ?? null,
+    name: data.name,
+    owner_full_name: owner?.full_name ?? null,
+    owner_profile_id: data.owner_profile_id,
+    region: data.region,
+    verification_status: data.verification_status as ClubVerificationStatus,
+    website_url: data.website_url ?? null,
+  };
+}
 
 export async function fetchPendingClubs(): Promise<AdminClubEntry[]> {
   const { data, error } = await supabase
@@ -79,6 +140,8 @@ export async function updateClubVerificationStatus(
 ) {
   const updatePayload: Record<string, unknown> = {
     verification_status: status,
+    reviewed_by: adminUserId,
+    reviewed_at: new Date().toISOString(),
   };
 
   if (status === "verified") {

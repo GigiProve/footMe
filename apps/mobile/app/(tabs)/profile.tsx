@@ -117,7 +117,6 @@ type ProfileFormState = {
   gamePhilosophy: string;
   heightCm: string;
   highlightVideoUrl: string;
-  isAvailable: boolean;
   isOpenToTransfer: boolean;
   licenses: string;
   nationality: string;
@@ -142,6 +141,7 @@ type ProfileFormState = {
 };
 
 const roleLabels: Record<AppRole, string> = {
+  admin: "Amministratore",
   agent: "Procuratore",
   club_admin: "Societa'",
   coach: "Allenatore",
@@ -257,7 +257,6 @@ function buildInitialState(data: CompleteProfessionalProfile): ProfileFormState 
     gamePhilosophy: coachProfile?.game_philosophy ?? "",
     heightCm: playerProfile?.height_cm ? String(playerProfile.height_cm) : "",
     highlightVideoUrl: playerProfile?.highlight_video_url ?? "",
-    isAvailable: data.profile.is_available,
     isOpenToTransfer: data.profile.is_open_to_transfer,
     licenses: toDelimitedString(coachProfile?.licenses),
     nationality: data.profile.nationality ?? "",
@@ -371,7 +370,6 @@ function buildHeaderDetails(
   },
 ) {
   const roleBadge = roleLabels[data.profile.role];
-  const availabilityBadge = data.profile.is_available ? "Disponibile" : "Non disponibile";
   const age =
     calculateAge(overrides?.birthDate ?? undefined) ??
     data.profile.age ??
@@ -391,7 +389,7 @@ function buildHeaderDetails(
     );
 
     return {
-      badges: [roleBadge, availabilityBadge],
+      badges: [roleBadge],
       fullName,
       primaryMeta,
       secondaryMeta: `${getPlayerPositionLabel(
@@ -594,22 +592,6 @@ export default function ProfileScreen() {
           },
         ],
       },
-      {
-        title: "Presentazione",
-        subtitle: "Disponibilità e descrizione pubblica del profilo.",
-        items: [
-          {
-            label: "Disponibile a nuove opportunità",
-            value: completeProfile.profile.is_available ? "Sì" : "No",
-          },
-          completeProfile.profile.role === "player"
-            ? {
-                label: "Aperto al trasferimento",
-                value: completeProfile.profile.is_open_to_transfer ? "Sì" : "No",
-              }
-            : null,
-        ].filter((item): item is { label: string; value: string } => item !== null),
-      },
     ];
 
     if (completeProfile.profile.role === "player") {
@@ -617,6 +599,10 @@ export default function ProfileScreen() {
         title: "Preferenze sportive",
         subtitle: "Disponibilità, aree di interesse e contenuti extra del profilo giocatore.",
         items: [
+          {
+            label: "Aperto al trasferimento",
+            value: completeProfile.profile.is_open_to_transfer ? "Sì" : "No",
+          },
           {
             label: "Categorie preferite",
             value: formatListSummary(completeProfile.playerProfile?.preferred_categories),
@@ -1000,7 +986,6 @@ export default function ProfileScreen() {
           birth_date: birthDateValidation.isoValue,
           city: parseOptionalText(trimmedCity),
           full_name: trimmedFullName,
-          is_available: formState.isAvailable,
           is_open_to_transfer: formState.isOpenToTransfer,
           nationality: parseOptionalText(formState.nationality),
           region: parseOptionalText(trimmedRegion),
@@ -1210,17 +1195,6 @@ export default function ProfileScreen() {
                 }
                 placeholder="Lascia vuoto per usare l'immagine blank di default"
                 value={formState.avatarUrl}
-              />
-              <BooleanField
-                falseLabel="Non disponibile"
-                label="Disponibile a nuove opportunità"
-                onChange={(value) =>
-                  setFormState((current) =>
-                    current ? { ...current, isAvailable: value } : current,
-                  )
-                }
-                trueLabel="Disponibile"
-                value={formState.isAvailable}
               />
               {(profile.role as AppRole) === "player" ? (
                 <BooleanField

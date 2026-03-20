@@ -52,10 +52,27 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return null;
     }
 
+    const isAdmin = data.is_admin ?? data.role === "admin";
+
+    // Admin profiles skip onboarding — return a minimal profile even if
+    // fields like full_name are not yet filled in.
+    if (isAdmin) {
+      return {
+        avatar_url: data.avatar_url ?? null,
+        city: data.city ?? null,
+        club_name: null,
+        full_name: data.full_name ?? null,
+        id: data.id,
+        is_admin: true,
+        region: data.region ?? null,
+        role: data.role ?? "admin",
+      } satisfies AppProfile;
+    }
+
     const nextProfile: AppProfile = {
       ...data,
       club_name: null,
-      is_admin: data.is_admin ?? false,
+      is_admin: false,
     };
 
     if (nextProfile.role === "club_admin") {
@@ -138,6 +155,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           return;
         }
 
+        setIsLoading(true);
         hydrateProfile(nextSession.user.id).finally(() => setIsLoading(false));
       },
     );
