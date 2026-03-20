@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { colors, radius, spacing, typography } from "../../styles";
 import { AppText } from "../Text/AppText";
@@ -84,9 +84,9 @@ export function AppChip({
   }
 
   return (
-    <Pressable style={containerStyle} testID={testID}>
+    <View style={containerStyle} testID={testID}>
       {content}
-    </Pressable>
+    </View>
   );
 }
 
