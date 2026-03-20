@@ -12,7 +12,6 @@ export type NetworkOverviewItem = {
   other_region: string | null;
   other_city: string | null;
   other_primary_position: string | null;
-  other_is_available: boolean;
   created_at: string;
   updated_at: string;
 };

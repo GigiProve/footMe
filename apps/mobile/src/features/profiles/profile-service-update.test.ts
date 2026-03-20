@@ -69,7 +69,6 @@ function buildUpdateInput() {
       birth_date: "2000-01-01",
       city: "Perugia",
       full_name: "Marco Rossi",
-      is_available: true,
       is_open_to_transfer: true,
       nationality: "IT",
       region: "Umbria",

@@ -1,4 +1,5 @@
 export type AppRole =
+  | "admin"
   | "player"
   | "coach"
   | "staff"

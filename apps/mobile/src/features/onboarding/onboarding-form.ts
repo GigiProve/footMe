@@ -48,7 +48,6 @@ export type OnboardingFormState = {
   hasCreatedProfile: boolean;
   heightCm: string;
   highlightVideoUrl: string;
-  isAvailable: boolean;
   isOpenToTransfer: boolean;
   lastCompletedStep: OnboardingStep | null;
   lastName: string;
@@ -188,7 +187,6 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   hasCreatedProfile: false,
   heightCm: "",
   highlightVideoUrl: "",
-  isAvailable: false,
   isOpenToTransfer: false,
   lastCompletedStep: null,
   lastName: "",

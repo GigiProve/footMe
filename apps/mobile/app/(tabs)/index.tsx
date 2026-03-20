@@ -276,26 +276,6 @@ export default function HomeScreen() {
                 "I dati reali del profilo sono arrivati da Supabase."
               : "Questa schermata e' il punto di ingresso del feed, del recruiting e della rete contatti. Collega Supabase reale per sostituire i placeholder."}
           </Text>
-          {dashboard?.profile.isAvailable ? (
-            <View
-              style={{
-                alignSelf: "flex-start",
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderRadius: radius.full,
-                backgroundColor: colors.accentSoft,
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.accentStrong,
-                  fontWeight: typography.fontWeight.bold,
-                }}
-              >
-                Disponibile ora
-              </Text>
-            </View>
-          ) : null}
           {dashboard?.profile.isOpenToTransfer ? (
             <View
               style={{

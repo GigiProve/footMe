@@ -13,12 +13,12 @@ export default function IndexScreen() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  if (needsOnboarding) {
-    return <Redirect href="/(onboarding)/profile" />;
-  }
-
   if (profile?.is_admin) {
     return <Redirect href="/(admin)/dashboard" />;
+  }
+
+  if (needsOnboarding) {
+    return <Redirect href="/(onboarding)/profile" />;
   }
 
   return <Redirect href="/(tabs)" />;

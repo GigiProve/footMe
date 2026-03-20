@@ -653,28 +653,6 @@ export default function NetworkScreen() {
                   <Text style={{ color: colors.textSecondary }}>
                     {formatLocation(result.city, result.region)}
                   </Text>
-                  <View
-                    style={{
-                      alignSelf: "flex-start",
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: radius.full,
-                      backgroundColor: result.is_available
-                        ? colors.accentSoft
-                        : colors.surfaceMuted,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: result.is_available
-                          ? colors.accentStrong
-                          : colors.textSecondary,
-                        fontWeight: typography.fontWeight.bold,
-                      }}
-                    >
-                      {result.is_available ? "Disponibile" : "Non disponibile"}
-                    </Text>
-                  </View>
                   {statusLabel ? (
                     <Text style={{ color: colors.textSecondary }}>{statusLabel}</Text>
                   ) : null}

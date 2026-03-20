@@ -22,7 +22,6 @@ export type ProfileSearchResult = {
   bio: string | null;
   city: string | null;
   full_name: string;
-  is_available: boolean;
   primary_position: string | null;
   profile_id: string;
   region: string | null;
