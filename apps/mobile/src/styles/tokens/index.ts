@@ -1,7 +1,10 @@
+export { borders } from "./borders";
 export { colors } from "./colors";
+export { opacity } from "./opacity";
 export { radius } from "./radius";
 export { shadows } from "./shadows";
 export { sizes } from "./sizes";
 export { spacing } from "./spacing";
+export { textPresets, type TextPreset } from "./textPresets";
 export { typography } from "./typography";
 export { zIndex } from "./zIndex";

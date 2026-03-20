@@ -1,10 +1,10 @@
 import { type ReactNode } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { withDefaultProfileAvatar } from "./profile-avatar";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
-import { Input } from "../../ui";
+import { colors, opacity, radius, sizes, spacing, typography } from "../../theme/tokens";
+import { AppChip, AppDivider, AppText, Input } from "../../ui";
 
 type ProfileHeaderProps = {
   avatarUrl: string | null | undefined;
@@ -82,20 +82,18 @@ export function ProfileHeader({
             <Ionicons
               color={colors.textSecondary}
               name={isEditing ? "close-outline" : "create-outline"}
-              size={18}
+              size={sizes.iconMd}
             />
           </Pressable>
         </View>
         <View style={styles.identityCopy}>
-          <Text style={styles.fullName}>{fullName}</Text>
-          <Text style={styles.primaryMeta}>{primaryMeta}</Text>
-          {secondaryMeta ? <Text style={styles.secondaryMeta}>{secondaryMeta}</Text> : null}
+          <AppText preset="h1" style={styles.fullName}>{fullName}</AppText>
+          <AppText preset="title">{primaryMeta}</AppText>
+          {secondaryMeta ? <AppText preset="bodySmall">{secondaryMeta}</AppText> : null}
           {badges.length > 0 ? (
             <View style={styles.badgesRow}>
               {badges.map((badge) => (
-                <View key={badge} style={styles.badge}>
-                  <Text style={styles.badgeText}>{badge}</Text>
-                </View>
+                <AppChip key={badge} label={badge} variant="accent" />
               ))}
             </View>
           ) : null}
@@ -109,10 +107,10 @@ export function ProfileSection({ children, description, title }: ProfileSectionP
   return (
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
+        <AppText preset="h3">{title}</AppText>
+        {description ? <AppText preset="bodySmall">{description}</AppText> : null}
       </View>
-      <View style={styles.sectionDivider} />
+      <AppDivider />
       <View style={styles.sectionContent}>{children}</View>
     </View>
   );
@@ -135,7 +133,7 @@ export function ProfileField({
 
   return (
     <View style={styles.fieldContainer}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <AppText preset="meta">{label}</AppText>
       {isEditable ? (
         renderInput ? (
           renderInput()
@@ -154,22 +152,24 @@ export function ProfileField({
             hasValue ? styles.completedReadonlySurface : styles.emptyReadonlySurface,
           ]}
         >
-          <Text
-            style={[styles.readonlyValue, hasValue ? null : styles.readonlyPlaceholder]}
+          <AppText
+            color={hasValue ? "textPrimary" : "textSecondary"}
+            preset="body"
+            style={styles.readonlyValue}
           >
             {hasValue ? value : "Da completare"}
-          </Text>
+          </AppText>
         </View>
       )}
-      {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
+      {helperText ? <AppText preset="bodySmall">{helperText}</AppText> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   avatar: {
-    width: 104,
-    height: 104,
+    width: sizes.avatarXl,
+    height: sizes.avatarXl,
     borderRadius: radius.full,
     borderWidth: 4,
     borderColor: colors.surface,
@@ -183,17 +183,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius[24],
-  },
-  badge: {
-    paddingHorizontal: spacing[10],
-    paddingVertical: spacing[6],
-    borderRadius: radius.full,
-    backgroundColor: colors.accentSoft,
-  },
-  badgeText: {
-    color: colors.accentStrong,
-    fontWeight: typography.fontWeight.bold,
-    fontSize: typography.fontSize[12],
   },
   badgesRow: {
     flexDirection: "row",
@@ -239,25 +228,11 @@ const styles = StyleSheet.create({
   fieldContainer: {
     gap: spacing[8],
   },
-  fieldLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
-    letterSpacing: typography.letterSpacing.md,
-  },
   fullName: {
-    color: colors.textPrimary,
     fontSize: typography.fontSize[30],
-    lineHeight: typography.lineHeight[34],
-    fontWeight: typography.fontWeight.heavy,
   },
   headerCard: {
     gap: spacing[12],
-  },
-  helperText: {
-    color: colors.textSecondary,
-    lineHeight: typography.lineHeight[22],
   },
   identityBlock: {
     paddingHorizontal: spacing[20],
@@ -273,13 +248,7 @@ const styles = StyleSheet.create({
     gap: spacing[6],
   },
   pressed: {
-    opacity: 0.82,
-  },
-  primaryMeta: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[17],
-    lineHeight: typography.lineHeight[24],
-    fontWeight: typography.fontWeight.bold,
+    opacity: opacity.pressed,
   },
   readonlySurface: {
     borderRadius: radius[18],
@@ -287,15 +256,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[14],
   },
-  readonlyPlaceholder: {
-    color: colors.textSecondary,
-  },
   readonlyValue: {
-    color: colors.textPrimary,
-    lineHeight: typography.lineHeight[22],
-  },
-  secondaryMeta: {
-    color: colors.textSecondary,
     lineHeight: typography.lineHeight[22],
   },
   sectionCard: {
@@ -309,20 +270,7 @@ const styles = StyleSheet.create({
   sectionContent: {
     gap: spacing[14],
   },
-  sectionDescription: {
-    color: colors.textSecondary,
-    lineHeight: typography.lineHeight[22],
-  },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-  },
   sectionHeader: {
     gap: spacing[4],
-  },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[20],
-    fontWeight: typography.fontWeight.heavy,
   },
 });
