@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 
 import { Screen } from "../../src/components/ui/screen";
 import {
@@ -8,14 +8,15 @@ import {
 } from "../../src/features/home/home-dashboard-service";
 import { useSession } from "../../src/features/auth/use-session";
 import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
-import {
-  colors,
-  radius,
-  shadows,
-  spacing,
-  typography,
-} from "../../src/theme/tokens";
-import { Button } from "../../src/ui";
+import { colors, radius, spacing } from "../../src/theme/tokens";
+import { AppText, Badge, Button, Card, StatCard } from "../../src/ui";
+
+type HighlightTone = "accent" | "hero" | "muted";
+
+const toneMap: Record<string, HighlightTone> = {
+  accent: "accent",
+  hero: "hero",
+};
 
 export default function HomeScreen() {
   const { profile, session } = useSession();
@@ -65,206 +66,55 @@ export default function HomeScreen() {
 
   return (
     <Screen>
-      <View style={{ flex: 1, gap: spacing[18] }}>
-        <View
-          style={{
-            gap: spacing[12],
-            padding: 24,
-            borderRadius: radius[28],
-            backgroundColor: colors.textPrimary,
-          }}
-        >
-          <Text
-            style={{
-              alignSelf: "flex-start",
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: radius.full,
-              overflow: "hidden",
-              backgroundColor: colors.surfaceOverlay,
-              color: colors.inkInvert,
-              fontSize: typography.fontSize[12],
-              fontWeight: typography.fontWeight.bold,
-              letterSpacing: typography.letterSpacing.sm,
-              textTransform: "uppercase",
-            }}
-          >
+      <View style={styles.container}>
+        <View style={styles.heroBanner}>
+          <AppText variant="overline" color="inverseSoft" style={styles.heroBadge}>
             Amateur Football Network
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.fontSize[34],
-              lineHeight: typography.lineHeight[38],
-              fontWeight: typography.fontWeight.heavy,
-              color: colors.inkInvert,
-            }}
-          >
+          </AppText>
+          <AppText variant="displayLg" color="inverse">
             footMe
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.fontSize[18],
-              lineHeight: typography.lineHeight[28],
-              color: colors.textInverseSoft,
-            }}
-          >
+          </AppText>
+          <AppText variant="bodyLg" color="inverseSoft">
             {dashboard?.summary.body ??
               "Il tuo profilo sportivo, la tua rete di contatti e le opportunita' giuste nello stesso posto."}
-          </Text>
+          </AppText>
         </View>
 
-        <View style={{ flexDirection: "row", gap: spacing[12] }}>
-          <View
-            style={{
-              flex: 1,
-              padding: 16,
-              borderRadius: radius[22],
-              backgroundColor: colors.surface,
-              ...shadows.card,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.textMuted,
-                fontSize: typography.fontSize[12],
-                fontWeight: typography.fontWeight.bold,
-                textTransform: "uppercase",
-              }}
-            >
+        <View style={styles.statRow}>
+          <Card elevated style={styles.profileCard}>
+            <AppText variant="overline" color="muted">
               Profilo
-            </Text>
-            <Text
-              style={{
-                marginTop: 8,
-                color: colors.textPrimary,
-                fontSize: typography.fontSize[17],
-                fontWeight: typography.fontWeight.bold,
-              }}
-            >
-              {displayName}
-            </Text>
-            <Text style={{ marginTop: 4, color: colors.textSecondary }}>
+            </AppText>
+            <AppText variant="titleMd">{displayName}</AppText>
+            <AppText variant="bodySm" color="secondary">
               {displayRole}
-            </Text>
-          </View>
-          <View
-            style={{
-              flex: 1,
-              padding: 16,
-              borderRadius: radius[22],
-              backgroundColor: colors.surfaceMuted,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.textMuted,
-                fontSize: typography.fontSize[12],
-                fontWeight: typography.fontWeight.bold,
-                textTransform: "uppercase",
-              }}
-            >
-              Stato backend
-            </Text>
-            <Text
-              style={{
-                marginTop: 8,
-                color: colors.textPrimary,
-                fontSize: typography.fontSize[17],
-                fontWeight: typography.fontWeight.bold,
-              }}
-            >
-              {backendLabel}
-            </Text>
-            <Text style={{ marginTop: 4, color: colors.textSecondary }}>
-              {session?.user.email ?? "Auth non disponibile"}
-            </Text>
-          </View>
+            </AppText>
+          </Card>
+          <StatCard
+            label="Stato backend"
+            tone="muted"
+            value={backendLabel}
+          />
         </View>
 
-        <View style={{ flexDirection: "row", gap: spacing[12] }}>
-          {(dashboard?.highlights ?? []).map((highlight) => {
-            const backgroundColor =
-              highlight.tone === "accent"
-                ? colors.accentSoft
-                : highlight.tone === "hero"
-                  ? colors.heroSoft
-                  : colors.surfaceMuted;
-
-            const textColor =
-              highlight.tone === "hero" ? colors.hero : colors.textPrimary;
-
-            return (
-              <View
-                key={highlight.label}
-                style={{
-                  flex: 1,
-                  padding: 16,
-                  borderRadius: radius[20],
-                  backgroundColor,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.textMuted,
-                    fontSize: typography.fontSize[12],
-                    fontWeight: typography.fontWeight.bold,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {highlight.label}
-                </Text>
-                <Text
-                  style={{
-                    marginTop: 10,
-                    color: textColor,
-                    fontSize: typography.fontSize[26],
-                    fontWeight: typography.fontWeight.heavy,
-                  }}
-                >
-                  {isLoadingDashboard ? "..." : highlight.value}
-                </Text>
-              </View>
-            );
-          })}
+        <View style={styles.statRow}>
+          {(dashboard?.highlights ?? []).map((highlight) => (
+            <StatCard
+              key={highlight.label}
+              label={highlight.label}
+              tone={toneMap[highlight.tone] ?? "muted"}
+              value={isLoadingDashboard ? "..." : highlight.value}
+            />
+          ))}
         </View>
 
-        <View
-          style={{
-            gap: spacing[12],
-            padding: 18,
-            borderRadius: radius[24],
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: typography.fontSize[12],
-              fontWeight: typography.fontWeight.heavy,
-              color: colors.textPrimary,
-              letterSpacing: typography.letterSpacing.sm,
-              textTransform: "uppercase",
-            }}
-          >
-            Landing autenticata
-          </Text>
-          <Text
-            style={{
-              color: colors.textPrimary,
-              fontSize: typography.fontSize[18],
-              fontWeight: typography.fontWeight.bold,
-            }}
-          >
+        <Card>
+          <AppText variant="overline">Landing autenticata</AppText>
+          <AppText variant="headingSm">
             {dashboard?.summary.kicker ??
               "Dashboard iniziale del network calcistico"}
-          </Text>
-          <Text
-            style={{
-              color: colors.textSecondary,
-              lineHeight: typography.lineHeight[22],
-            }}
-          >
+          </AppText>
+          <AppText variant="bodySm" color="secondary">
             {dashboard
               ? [
                   dashboard.profile.region,
@@ -275,55 +125,64 @@ export default function HomeScreen() {
                   .join(" · ") ||
                 "I dati reali del profilo sono arrivati da Supabase."
               : "Questa schermata e' il punto di ingresso del feed, del recruiting e della rete contatti. Collega Supabase reale per sostituire i placeholder."}
-          </Text>
+          </AppText>
           {dashboard?.profile.isOpenToTransfer ? (
-            <View
-              style={{
-                alignSelf: "flex-start",
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderRadius: radius.full,
-                backgroundColor: colors.heroSoft,
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.hero,
-                  fontWeight: typography.fontWeight.bold,
-                }}
-              >
-                Aperto a nuove opportunita'
-              </Text>
-            </View>
+            <Badge label="Aperto a nuove opportunita'" variant="hero" />
           ) : null}
           {!hasSupabaseEnv ? (
-            <Text
-              style={{
-                color: colors.hero,
-                lineHeight: typography.lineHeight[22],
-              }}
-            >
+            <AppText variant="bodySm" color="hero">
               Configura `apps/mobile/.env.local` con URL e anon key del progetto
               Supabase per usare auth e dashboard reali.
-            </Text>
+            </AppText>
           ) : null}
           <Button
             label="Aggiorna dati reali"
             onPress={loadDashboard}
             size="sm"
-            style={{ alignSelf: "flex-start" }}
+            style={styles.selfStart}
             variant="secondary"
           />
-        </View>
+        </Card>
 
         <Button
           label="Esci"
           onPress={handleSignOut}
           size="sm"
-          style={{ alignSelf: "flex-start" }}
+          style={styles.selfStart}
           variant="secondary"
         />
       </View>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    gap: spacing[18],
+  },
+  heroBanner: {
+    gap: spacing[12],
+    padding: spacing[24],
+    borderRadius: radius[28],
+    backgroundColor: colors.surfaceInverse,
+  },
+  heroBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: spacing[10],
+    paddingVertical: spacing[6],
+    borderRadius: radius.full,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceOverlay,
+  },
+  statRow: {
+    flexDirection: "row",
+    gap: spacing[12],
+  },
+  profileCard: {
+    flex: 1,
+  },
+  selfStart: {
+    alignSelf: "flex-start",
+  },
+});

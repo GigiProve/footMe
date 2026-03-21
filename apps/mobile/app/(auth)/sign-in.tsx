@@ -4,7 +4,6 @@ import {
   Alert,
   Platform,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 
@@ -12,8 +11,8 @@ import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
 import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { supabase } from "../../src/lib/supabase";
-import { colors, spacing, typography } from "../../src/theme/tokens";
-import { Button, Card, Input } from "../../src/ui";
+import { colors, spacing } from "../../src/theme/tokens";
+import { AppText, Button, Card, Divider, Input } from "../../src/ui";
 
 export default function SignInScreen() {
   const [email, setEmail] = useState("");
@@ -62,12 +61,14 @@ export default function SignInScreen() {
         keyboardVerticalOffset={spacing[16]}
       >
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>Welcome Back</Text>
-          <Text style={styles.title}>Accedi a footMe</Text>
-          <Text style={styles.description}>
+          <AppText variant="overline" color="hero">
+            Welcome Back
+          </AppText>
+          <AppText variant="displayLg">Accedi a footMe</AppText>
+          <AppText variant="bodyLg" color="secondary">
             Entra nel network del calcio dilettantistico con un accesso pulito,
             rapido e orientato alla tua identita' sportiva.
-          </Text>
+          </AppText>
         </View>
         <Card style={styles.formCard}>
           <Input
@@ -89,9 +90,11 @@ export default function SignInScreen() {
             onPress={handleSignIn}
           />
           <View style={styles.socialDivider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerLabel}>oppure continua con</Text>
-            <View style={styles.dividerLine} />
+            <Divider style={styles.dividerLine} />
+            <AppText variant="overline" color="muted">
+              oppure continua con
+            </AppText>
+            <Divider style={styles.dividerLine} />
           </View>
           <Button
             disabled={oauthProvider !== null}
@@ -138,24 +141,6 @@ const styles = StyleSheet.create({
   header: {
     gap: spacing[10],
   },
-  eyebrow: {
-    color: colors.hero,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.heavy,
-    textTransform: "uppercase",
-    letterSpacing: typography.letterSpacing.md,
-  },
-  title: {
-    fontSize: typography.fontSize[34],
-    lineHeight: typography.lineHeight[38],
-    fontWeight: typography.fontWeight.heavy,
-    color: colors.textPrimary,
-  },
-  description: {
-    fontSize: typography.fontSize[16],
-    lineHeight: typography.lineHeight[24],
-    color: colors.textSecondary,
-  },
   formCard: {
     gap: spacing[14],
   },
@@ -165,15 +150,7 @@ const styles = StyleSheet.create({
     gap: spacing[10],
   },
   dividerLine: {
-    backgroundColor: colors.border,
     flex: 1,
-    height: 1,
-  },
-  dividerLabel: {
-    color: colors.textMuted,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
   },
   linkButton: {
     alignSelf: "center",

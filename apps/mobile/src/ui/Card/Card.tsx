@@ -49,6 +49,6 @@ const styles = StyleSheet.create({
   base: {
     gap: spacing[12],
     padding: spacing[18],
-    borderRadius: radius[24],
+    borderRadius: radius[12],
   },
 });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
-  Text,
+  StyleSheet,
   View,
 } from "react-native";
 
@@ -20,13 +20,22 @@ import {
   type RecruitingAdForm,
   type RecruitingAdSummary,
 } from "../../src/features/recruiting/recruiting-service";
-import { colors, radius, sizes, spacing, typography } from "../../src/theme/tokens";
-import { Button, Input } from "../../src/ui";
+import { sizes, spacing } from "../../src/theme/tokens";
+import {
+  AppText,
+  Badge,
+  Button,
+  Card,
+  ChipGroup,
+  EmptyState,
+  Input,
+  ScreenHeader,
+} from "../../src/ui";
 
-const positions: Array<{
+const positions: readonly {
   label: string;
   value: RecruitingAdForm["roleRequired"];
-}> = [
+}[] = [
   { label: "Portiere", value: "goalkeeper" },
   { label: "Difensore", value: "defender" },
   { label: "Centrocampista", value: "midfielder" },
@@ -244,78 +253,28 @@ export default function AnnouncementsScreen() {
   if (profile?.role !== "club_admin") {
     return (
       <Screen>
-        <KeyboardAwareForm contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
-          <View
-            style={{
-              gap: spacing[10],
-              padding: 22,
-              borderRadius: radius[26],
-              backgroundColor: colors.textPrimary,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.heroSoft,
-                fontSize: typography.fontSize[12],
-                fontWeight: typography.fontWeight.heavy,
-                textTransform: "uppercase",
-                letterSpacing: typography.letterSpacing.sm,
-              }}
-            >
-              Recruiting Market
-            </Text>
-            <Text
-              style={{
-                fontSize: typography.fontSize[30],
-                lineHeight: typography.lineHeight[34],
-                fontWeight: typography.fontWeight.heavy,
-                color: colors.inkInvert,
-              }}
-            >
-              Annunci aperti delle societa'
-            </Text>
-            <Text
-              style={{
-                fontSize: typography.fontSize[16],
-                lineHeight: typography.lineHeight[24],
-                color: colors.textInverseMuted,
-              }}
-            >
-              Da qui un giocatore puo' consultare le opportunita' attive,
-              salvare quelle rilevanti e candidarsi con un messaggio mirato.
-            </Text>
-          </View>
+        <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
+          <ScreenHeader
+            title="Opportunita'"
+            subtitle="Consulta le opportunita' attive, salva e candidati"
+          />
 
           {profile?.role !== "player" ? (
-            <View
-              style={{
-                padding: 16,
-                borderRadius: radius[18],
-                backgroundColor: colors.surfaceMuted,
-              }}
-            >
-              <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
+            <Card variant="muted">
+              <AppText variant="bodyLg">
                 In questa fase la candidatura e' disponibile per i profili
                 giocatore. Gli altri ruoli possono comunque esplorare il
                 mercato.
-              </Text>
-            </View>
+              </AppText>
+            </Card>
           ) : null}
 
           {publicAds.length === 0 && !isLoading ? (
-            <View
-              style={{
-                padding: 18,
-                borderRadius: radius[20],
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={{ color: colors.textSecondary }}>
-                Nessun annuncio pubblicato al momento.
-              </Text>
-            </View>
+            <EmptyState
+              icon="megaphone-outline"
+              title="Nessun annuncio"
+              description="Nessun annuncio pubblicato al momento."
+            />
           ) : null}
 
           {publicAds.map((ad) => {
@@ -323,81 +282,34 @@ export default function AnnouncementsScreen() {
             const isSubmittingAd = isActionLoading === ad.id;
 
             return (
-              <View
-                key={ad.id}
-                style={{
-                  gap: spacing[12],
-                  padding: 18,
-                  borderRadius: radius[22],
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <View style={{ gap: spacing[6] }}>
-                  <Text
-                    style={{
-                      fontSize: typography.fontSize[18],
-                      fontWeight: typography.fontWeight.heavy,
-                      color: colors.textPrimary,
-                    }}
-                  >
-                    {ad.title}
-                  </Text>
-                  <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>
+              <Card key={ad.id}>
+                <View style={styles.adHeader}>
+                  <AppText variant="headingSm">{ad.title}</AppText>
+                  <AppText variant="bodySm" color="secondary">
                     {ad.club?.name ?? "Societa' non disponibile"} ·{" "}
                     {formatRoleLabel(ad.role_required)}
-                  </Text>
-                  <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>
+                  </AppText>
+                  <AppText variant="bodySm" color="secondary">
                     {ad.region ?? ad.club?.region ?? "Regione da definire"}
                     {ad.age_min || ad.age_max
                       ? ` · Eta' ${ad.age_min ?? "?"}-${ad.age_max ?? "?"}`
                       : ""}
-                  </Text>
+                  </AppText>
                 </View>
 
-                <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
-                  {ad.description}
-                </Text>
+                <AppText variant="bodyLg">{ad.description}</AppText>
 
                 {ad.compensation_summary ? (
-                  <View
-                    style={{
-                      alignSelf: "flex-start",
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: radius.full,
-                      backgroundColor: colors.accentSoft,
-                    }}
-                  >
-                    <Text
-                      style={{ color: colors.accentStrong, fontWeight: typography.fontWeight.bold }}
-                    >
-                      {ad.compensation_summary}
-                    </Text>
-                  </View>
+                  <Badge label={ad.compensation_summary} variant="accent" />
                 ) : null}
 
                 {ad.application_status ? (
-                  <View
-                    style={{
-                      alignSelf: "flex-start",
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: radius.full,
-                      backgroundColor: colors.surfaceMuted,
-                    }}
-                  >
-                    <Text
-                      style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
-                    >
-                      Candidatura:{" "}
-                      {formatApplicationStatus(ad.application_status)}
-                    </Text>
-                  </View>
+                  <Badge
+                    label={`Candidatura: ${formatApplicationStatus(ad.application_status)}`}
+                  />
                 ) : null}
 
-                <View style={{ flexDirection: "row", gap: spacing[10] }}>
+                <View style={styles.actionRow}>
                   <Button
                     disabled={isSubmittingAd}
                     label={ad.is_saved ? "Salvato" : "Salva"}
@@ -420,24 +332,15 @@ export default function AnnouncementsScreen() {
                 </View>
 
                 {isSelected ? (
-                  <View
-                    style={{
-                      gap: spacing[10],
-                      paddingTop: 6,
-                    }}
-                  >
-                    <Text
-                      style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
-                    >
-                      Messaggio di presentazione
-                    </Text>
+                  <View style={styles.applySection}>
+                    <AppText variant="titleSm">Messaggio di presentazione</AppText>
                     <Input
                       multiline
                       onChangeText={setCoverMessage}
                       placeholder="Scrivi in poche righe il tuo profilo e perche' sei adatto all'annuncio"
                       value={coverMessage}
                     />
-                    <View style={{ flexDirection: "row", gap: spacing[10] }}>
+                    <View style={styles.actionRow}>
                       <Button
                         disabled={isSubmittingAd}
                         label="Annulla"
@@ -456,7 +359,7 @@ export default function AnnouncementsScreen() {
                     </View>
                   </View>
                 ) : null}
-              </View>
+              </Card>
             );
           })}
         </KeyboardAwareForm>
@@ -466,87 +369,41 @@ export default function AnnouncementsScreen() {
 
   return (
     <Screen>
-      <KeyboardAwareForm contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
-        <View style={{ gap: spacing[8] }}>
-          <Text
-            style={{
-              fontSize: typography.fontSize[28],
-              fontWeight: typography.fontWeight.bold,
-              color: colors.textPrimary,
-            }}
-          >
-            Annunci societa'
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.fontSize[16],
-              lineHeight: typography.lineHeight[24],
-              color: colors.textSecondary,
-            }}
-          >
-            {clubName
+      <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
+        <ScreenHeader
+          title="Annunci societa'"
+          subtitle={
+            clubName
               ? `Stai pubblicando per ${clubName}.`
-              : "Completa l'onboarding societa' per pubblicare annunci."}
-          </Text>
-        </View>
+              : "Completa l'onboarding societa' per pubblicare annunci."
+          }
+        />
 
-        <View
-          style={{
-            gap: spacing[12],
-            padding: 16,
-            borderRadius: radius[16],
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: typography.fontSize[18],
-              fontWeight: typography.fontWeight.bold,
-              color: colors.textPrimary,
-            }}
-          >
-            Nuovo annuncio
-          </Text>
+        <Card>
+          <AppText variant="headingSm">Nuovo annuncio</AppText>
           <Input
             onChangeText={(value) => patchForm("title", value)}
             placeholder="Titolo annuncio"
             value={form.title}
           />
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
-            {positions.map((entry) => {
-              const isActive = form.roleRequired === entry.value;
-
-              return (
-                <Button
-                  key={entry.value}
-                  label={entry.label}
-                  onPress={() => patchForm("roleRequired", entry.value)}
-                  selected={isActive}
-                  size="sm"
-                  variant="chipAction"
-                />
-              );
-            })}
-          </View>
-          <View style={{ flexDirection: "row", gap: spacing[12] }}>
+          <ChipGroup
+            onChange={(value) => patchForm("roleRequired", value)}
+            options={positions}
+            value={form.roleRequired}
+          />
+          <View style={styles.ageRow}>
             <Input
               keyboardType="number-pad"
               onChangeText={(value) => patchForm("ageMin", value)}
               placeholder="Eta' min"
-              style={{
-                flex: 1,
-              }}
+              style={styles.flex1}
               value={form.ageMin}
             />
             <Input
               keyboardType="number-pad"
               onChangeText={(value) => patchForm("ageMax", value)}
               placeholder="Eta' max"
-              style={{
-                flex: 1,
-              }}
+              style={styles.flex1}
               value={form.ageMax}
             />
           </View>
@@ -577,127 +434,91 @@ export default function AnnouncementsScreen() {
             label={isSubmitting ? "Pubblicazione..." : "Pubblica annuncio"}
             onPress={handleCreateAd}
           />
-        </View>
+        </Card>
 
-        <View style={{ gap: spacing[12] }}>
-          <Text
-            style={{
-              fontSize: typography.fontSize[18],
-              fontWeight: typography.fontWeight.bold,
-              color: colors.textPrimary,
-            }}
-          >
-            Annunci pubblicati
-          </Text>
+        <View style={styles.sectionGap}>
+          <AppText variant="headingSm">Annunci pubblicati</AppText>
           {ads.length === 0 && !isLoading ? (
-            <View
-              style={{
-                padding: 16,
-                borderRadius: radius[16],
-                backgroundColor: colors.surface,
-              }}
-            >
-              <Text style={{ color: colors.textSecondary }}>
-                Nessun annuncio pubblicato finora.
-              </Text>
-            </View>
+            <EmptyState
+              icon="megaphone-outline"
+              title="Nessun annuncio"
+              description="Nessun annuncio pubblicato finora."
+            />
           ) : null}
           {ads.map((ad) => (
-            <View
-              key={ad.id}
-              style={{
-                gap: spacing[6],
-                padding: 16,
-                borderRadius: radius[16],
-                backgroundColor: colors.surface,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.fontSize[16],
-                  fontWeight: typography.fontWeight.bold,
-                  color: colors.textPrimary,
-                }}
-              >
-                {ad.title}
-              </Text>
-              <Text style={{ color: colors.textSecondary }}>
+            <Card key={ad.id} variant="muted">
+              <AppText variant="titleSm">{ad.title}</AppText>
+              <AppText variant="bodySm" color="secondary">
                 {formatRoleLabel(ad.role_required)} ·{" "}
                 {ad.region ?? "Regione non definita"}
-              </Text>
-              <Text style={{ color: colors.textSecondary }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 Stato: {ad.status}
-              </Text>
-            </View>
+              </AppText>
+            </Card>
           ))}
         </View>
 
-        <View style={{ gap: spacing[12] }}>
-          <Text
-            style={{
-              fontSize: typography.fontSize[18],
-              fontWeight: typography.fontWeight.bold,
-              color: colors.textPrimary,
-            }}
-          >
-            Candidature ricevute
-          </Text>
+        <View style={styles.sectionGap}>
+          <AppText variant="headingSm">Candidature ricevute</AppText>
           {applications.length === 0 && !isLoading ? (
-            <View
-              style={{
-                padding: 16,
-                borderRadius: radius[16],
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={{ color: colors.textSecondary }}>
-                Nessuna candidatura ricevuta finora.
-              </Text>
-            </View>
+            <EmptyState
+              icon="people-outline"
+              title="Nessuna candidatura"
+              description="Nessuna candidatura ricevuta finora."
+            />
           ) : null}
           {applications.map((application) => (
-            <View
-              key={application.id}
-              style={{
-                gap: spacing[8],
-                padding: 16,
-                borderRadius: radius[16],
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: typography.fontSize[16],
-                  fontWeight: typography.fontWeight.bold,
-                  color: colors.textPrimary,
-                }}
-              >
+            <Card key={application.id}>
+              <AppText variant="titleSm">
                 {application.applicant?.full_name ?? "Profilo candidato"}
-              </Text>
-              <Text style={{ color: colors.textSecondary }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 Annuncio: {application.ad.title}
-              </Text>
-              <Text style={{ color: colors.textSecondary }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 Ricerca: {formatRoleLabel(application.ad.role_required)} · Stato{" "}
                 {formatApplicationStatus(application.status)}
-              </Text>
+              </AppText>
               {application.cover_message ? (
-                <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
-                  {application.cover_message}
-                </Text>
+                <AppText variant="bodyLg">{application.cover_message}</AppText>
               ) : (
-                <Text style={{ color: colors.textMuted }}>
+                <AppText variant="bodySm" color="muted">
                   Nessun messaggio allegato.
-                </Text>
+                </AppText>
               )}
-            </View>
+            </Card>
           ))}
         </View>
       </KeyboardAwareForm>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    gap: spacing[16],
+    paddingBottom: spacing[24],
+  },
+  adHeader: {
+    gap: spacing[6],
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: spacing[10],
+  },
+  applySection: {
+    gap: spacing[10],
+    paddingTop: spacing[6],
+  },
+  ageRow: {
+    flexDirection: "row",
+    gap: spacing[12],
+  },
+  flex1: {
+    flex: 1,
+  },
+  sectionGap: {
+    gap: spacing[12],
+  },
+});

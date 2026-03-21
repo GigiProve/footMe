@@ -1,13 +1,13 @@
 import { Link } from "expo-router";
 import { useState } from "react";
-import { Alert, Platform, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, StyleSheet, View } from "react-native";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
 import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { supabase } from "../../src/lib/supabase";
-import { colors, spacing, typography } from "../../src/theme/tokens";
-import { Button, Card, Input } from "../../src/ui";
+import { spacing } from "../../src/theme/tokens";
+import { AppText, Button, Card, Divider, Input } from "../../src/ui";
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState("");
@@ -79,12 +79,14 @@ export default function SignUpScreen() {
         keyboardVerticalOffset={spacing[16]}
       >
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>Join The Network</Text>
-          <Text style={styles.title}>Crea il tuo account</Text>
-          <Text style={styles.description}>
+          <AppText variant="overline" color="hero">
+            Join The Network
+          </AppText>
+          <AppText variant="displayLg">Crea il tuo account</AppText>
+          <AppText variant="bodyLg" color="secondary">
             Entra nel portale con una registrazione essenziale e completa il tuo
             posizionamento sportivo nel passo successivo.
-          </Text>
+          </AppText>
         </View>
         <Card style={styles.formCard}>
           <Input
@@ -112,9 +114,11 @@ export default function SignUpScreen() {
             onPress={handleSignUp}
           />
           <View style={styles.socialDivider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerLabel}>oppure registrati con</Text>
-            <View style={styles.dividerLine} />
+            <Divider style={styles.dividerLine} />
+            <AppText variant="overline" color="muted">
+              oppure registrati con
+            </AppText>
+            <Divider style={styles.dividerLine} />
           </View>
           <Button
             disabled={oauthProvider !== null}
@@ -161,29 +165,6 @@ const styles = StyleSheet.create({
   header: {
     gap: spacing[10],
   },
-  eyebrow: {
-    color: colors.hero,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.heavy,
-    textTransform: "uppercase",
-    letterSpacing: typography.letterSpacing.md,
-  },
-  title: {
-    fontSize: typography.fontSize[34],
-    lineHeight: typography.lineHeight[38],
-    fontWeight: typography.fontWeight.heavy,
-    color: colors.textPrimary,
-  },
-  description: {
-    fontSize: typography.fontSize[16],
-    lineHeight: typography.lineHeight[24],
-    color: colors.textSecondary,
-  },
-  debugText: {
-    fontSize: typography.fontSize[12],
-    lineHeight: 18,
-    color: colors.textMuted,
-  },
   formCard: {
     gap: spacing[14],
   },
@@ -193,15 +174,7 @@ const styles = StyleSheet.create({
     gap: spacing[10],
   },
   dividerLine: {
-    backgroundColor: colors.border,
     flex: 1,
-    height: 1,
-  },
-  dividerLabel: {
-    color: colors.textMuted,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
   },
   linkButton: {
     alignSelf: "center",

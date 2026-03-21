@@ -21,6 +21,10 @@ export const colors = {
   inkInvert: "#FFFFFF",
   surfaceInverse: "#1D2226",
   surfaceOverlay: "rgba(255,255,255,0.16)",
+  success: "#16A34A",
+  successSoft: "#DCFCE7",
+  warning: "#D97706",
+  warningSoft: "#FEF3C7",
   buttonDisabled: "#A7C6E6",
   shadow: "rgba(15, 23, 42, 0.08)",
 } as const;
