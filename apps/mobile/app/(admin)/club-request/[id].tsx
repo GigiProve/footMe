@@ -5,11 +5,12 @@ import {
   Image,
   Pressable,
   ScrollView,
-  Text,
+  StyleSheet,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { useSession } from "../../../src/features/auth/use-session";
 import {
@@ -18,10 +19,8 @@ import {
   type AdminClubDetail,
 } from "../../../src/features/admin/admin-service";
 import { StatusBadge } from "../../../src/features/admin/components/status-badge";
-import Ionicons from "@expo/vector-icons/Ionicons";
-
-import { colors, radius, spacing, typography } from "../../../src/theme/tokens";
-import { Button, Card } from "../../../src/ui";
+import { colors, radius, spacing } from "../../../src/theme/tokens";
+import { AppText, Button, Card } from "../../../src/ui";
 
 export default function AdminClubRequestDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -86,9 +85,9 @@ export default function AdminClubRequestDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={{ backgroundColor: colors.background, flex: 1 }}>
+      <SafeAreaView style={styles.root}>
         <Header onBack={() => router.back()} />
-        <View style={{ alignItems: "center", flex: 1, justifyContent: "center" }}>
+        <View style={styles.centered}>
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
       </SafeAreaView>
@@ -97,12 +96,12 @@ export default function AdminClubRequestDetailScreen() {
 
   if (error || !club) {
     return (
-      <SafeAreaView style={{ backgroundColor: colors.background, flex: 1 }}>
+      <SafeAreaView style={styles.root}>
         <Header onBack={() => router.back()} />
-        <View style={{ alignItems: "center", flex: 1, gap: spacing[16], justifyContent: "center", paddingHorizontal: spacing[20] }}>
-          <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize[16], textAlign: "center" }}>
+        <View style={styles.errorContainer}>
+          <AppText variant="bodyLg" color="secondary" align="center">
             {error ?? "Richiesta non trovata."}
-          </Text>
+          </AppText>
           <Button label="Riprova" onPress={loadDetail} size="sm" variant="secondary" />
         </View>
       </SafeAreaView>
@@ -112,38 +111,34 @@ export default function AdminClubRequestDetailScreen() {
   const isPending = club.verification_status === "pending_review" || club.verification_status === "unverified";
 
   return (
-    <SafeAreaView style={{ backgroundColor: colors.background, flex: 1 }}>
+    <SafeAreaView style={styles.root}>
       <Header onBack={() => router.back()} />
 
       <ScrollView
-        contentContainerStyle={{ gap: spacing[16], padding: spacing[20], paddingBottom: isPending ? 100 : spacing[20] }}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isPending ? styles.scrollContentWithFooter : undefined,
+        ]}
       >
         {/* Logo + Nome */}
-        <View style={{ alignItems: "center", gap: spacing[12], flexDirection: "row" }}>
+        <View style={styles.clubHeader}>
           {club.logo_url ? (
             <Image
               accessibilityLabel={`Logo ${club.name}`}
               source={{ uri: club.logo_url }}
-              style={{
-                backgroundColor: colors.surfaceMuted,
-                borderRadius: radius[14],
-                height: 56,
-                width: 56,
-              }}
+              style={styles.logo}
             />
           ) : null}
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[20], fontWeight: typography.fontWeight.heavy }}>
-              {club.name}
-            </Text>
+          <View style={styles.clubHeaderText}>
+            <AppText variant="headingMd">{club.name}</AppText>
             <StatusBadge status={club.verification_status} />
           </View>
         </View>
 
         {/* Informazioni generali */}
         <Card>
-          <Text style={styles.sectionTitle}>Informazioni generali</Text>
-          <View style={{ gap: spacing[12] }}>
+          <AppText variant="titleSm">Informazioni generali</AppText>
+          <View style={styles.detailGroup}>
             <DetailRow label="Anno di fondazione" value={club.founding_year?.toString() ?? null} />
             <DetailRow label="Categoria" value={club.category} />
             <DetailRow label="Colori sociali" value={club.club_colors} />
@@ -152,8 +147,8 @@ export default function AdminClubRequestDetailScreen() {
 
         {/* Contatti */}
         <Card>
-          <Text style={styles.sectionTitle}>Contatti</Text>
-          <View style={{ gap: spacing[12] }}>
+          <AppText variant="titleSm">Contatti</AppText>
+          <View style={styles.detailGroup}>
             <DetailRow label="Email" value={club.club_email} />
             <DetailRow label="Telefono" value={club.club_phone} />
             <DetailRow label="Sito web" value={club.website_url} />
@@ -162,8 +157,8 @@ export default function AdminClubRequestDetailScreen() {
 
         {/* Sedi */}
         <Card>
-          <Text style={styles.sectionTitle}>Sedi</Text>
-          <View style={{ gap: spacing[12] }}>
+          <AppText variant="titleSm">Sedi</AppText>
+          <View style={styles.detailGroup}>
             <DetailRow label="Citta" value={club.city} />
             <DetailRow label="Regione" value={club.region} />
             <DetailRow label="Paese" value={club.country} />
@@ -174,7 +169,7 @@ export default function AdminClubRequestDetailScreen() {
 
         {/* Responsabile */}
         <Card>
-          <Text style={styles.sectionTitle}>Responsabile</Text>
+          <AppText variant="titleSm">Responsabile</AppText>
           <DetailRow label="Nome" value={club.owner_full_name} />
         </Card>
 
@@ -194,7 +189,7 @@ export default function AdminClubRequestDetailScreen() {
       {/* Footer azioni */}
       {isPending ? (
         <View style={styles.footer}>
-          <View style={{ flex: 1 }}>
+          <View style={styles.footerButton}>
             <Button
               disabled={isUpdating}
               label="Rifiuta iscrizione"
@@ -203,7 +198,7 @@ export default function AdminClubRequestDetailScreen() {
               variant="danger"
             />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={styles.footerButton}>
             <Button
               disabled={isUpdating}
               label="Approva iscrizione"
@@ -224,8 +219,8 @@ function Header({ onBack }: { onBack: () => void }) {
       <Pressable hitSlop={8} onPress={onBack}>
         <Ionicons color={colors.textPrimary} name="arrow-back" size={24} />
       </Pressable>
-      <Text style={styles.headerTitle}>Dettaglio richiesta</Text>
-      <View style={{ width: 24 }} />
+      <AppText variant="titleMd">Dettaglio richiesta</AppText>
+      <View style={styles.headerSpacer} />
     </View>
   );
 }
@@ -236,18 +231,30 @@ function DetailRow({ label, value }: { label: string; value: string | null }) {
   }
 
   return (
-    <View style={{ gap: spacing[4] }}>
-      <Text style={{ color: colors.textMuted, fontSize: typography.fontSize[12] }}>
-        {label}
-      </Text>
-      <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[14] }}>
-        {value}
-      </Text>
+    <View style={styles.detailRow}>
+      <AppText variant="caption" color="muted">{label}</AppText>
+      <AppText variant="bodySm">{value}</AppText>
     </View>
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
+  root: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  centered: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  errorContainer: {
+    alignItems: "center",
+    flex: 1,
+    gap: spacing[16],
+    justifyContent: "center",
+    paddingHorizontal: spacing[20],
+  },
   header: {
     alignItems: "center",
     flexDirection: "row",
@@ -255,15 +262,35 @@ const styles = {
     paddingHorizontal: spacing[20],
     paddingVertical: spacing[12],
   },
-  headerTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[17],
-    fontWeight: typography.fontWeight.semibold,
+  headerSpacer: {
+    width: 24,
   },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[16],
-    fontWeight: typography.fontWeight.bold,
+  scrollContent: {
+    gap: spacing[16],
+    padding: spacing[20],
+  },
+  scrollContentWithFooter: {
+    paddingBottom: 100,
+  },
+  clubHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[12],
+  },
+  clubHeaderText: {
+    flex: 1,
+  },
+  logo: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius[14],
+    height: 56,
+    width: 56,
+  },
+  detailGroup: {
+    gap: spacing[12],
+  },
+  detailRow: {
+    gap: spacing[4],
   },
   footer: {
     backgroundColor: colors.surface,
@@ -279,4 +306,7 @@ const styles = {
     position: "absolute",
     right: 0,
   },
-} as const;
+  footerButton: {
+    flex: 1,
+  },
+});

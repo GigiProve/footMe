@@ -1,12 +1,12 @@
 import { useCallback, useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 
 import { fetchPendingClubs, type AdminClubEntry } from "../../src/features/admin/admin-service";
 import { ClubRegistrationRequestList } from "../../src/features/admin/components/club-registration-request-list";
 import { supabase } from "../../src/lib/supabase";
-import { colors, spacing, typography } from "../../src/theme/tokens";
-import { Badge, Button } from "../../src/ui";
+import { colors, spacing } from "../../src/theme/tokens";
+import { AppText, Badge, Button } from "../../src/ui";
 
 export default function AdminDashboardScreen() {
   const router = useRouter();
@@ -55,24 +55,21 @@ export default function AdminDashboardScreen() {
   }
 
   return (
-    <View style={{ backgroundColor: colors.background, flex: 1 }}>
+    <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Dashboard</Text>
+        <AppText variant="headingLg">Dashboard</AppText>
         <Button label="Esci" onPress={handleSignOut} size="sm" variant="secondary" />
       </View>
 
-      {/* Section header */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Richieste di iscrizione</Text>
+        <AppText variant="titleSm">Richieste di iscrizione</AppText>
         {clubs.length > 0 ? (
           <Badge label={clubs.length.toString()} />
         ) : null}
       </View>
 
-      {/* List */}
       <ClubRegistrationRequestList
         clubs={clubs}
         error={error}
@@ -85,7 +82,11 @@ export default function AdminDashboardScreen() {
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
+  root: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
   header: {
     alignItems: "center",
     flexDirection: "row",
@@ -93,11 +94,6 @@ const styles = {
     paddingBottom: spacing[16],
     paddingHorizontal: spacing[20],
     paddingTop: 60,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[24],
-    fontWeight: typography.fontWeight.heavy,
   },
   sectionHeader: {
     alignItems: "center",
@@ -108,9 +104,4 @@ const styles = {
     paddingBottom: spacing[12],
     paddingHorizontal: spacing[20],
   },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[16],
-    fontWeight: typography.fontWeight.bold,
-  },
-} as const;
+});

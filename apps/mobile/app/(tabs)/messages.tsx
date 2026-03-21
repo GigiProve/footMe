@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 
 import { useSession } from "../../src/features/auth/use-session";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
@@ -14,34 +14,21 @@ import {
   startDirectConversation,
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
-import { getPlayerPositionLabel } from "../../src/features/profiles/player-sports";
-import { colors, radius, spacing, typography } from "../../src/theme/tokens";
-import { Button } from "../../src/ui";
-
-const roleLabels: Record<string, string> = {
-  agent: "Procuratore",
-  club_admin: "Societa'",
-  coach: "Allenatore",
-  director: "Dirigente",
-  player: "Calciatore",
-  staff: "Staff",
-};
-
-function formatRole(value: string | null) {
-  if (!value) {
-    return "Ruolo non definito";
-  }
-
-  return roleLabels[value] ?? value;
-}
-
-function formatPosition(value: string | null) {
-  return getPlayerPositionLabel(value, "Posizione non definita");
-}
-
-function formatLocation(city: string | null, region: string | null) {
-  return [city, region].filter(Boolean).join(" · ") || "Localita' non definita";
-}
+import {
+  formatLocation,
+  formatPosition,
+  formatRole,
+} from "../../src/features/profiles/profile-display-helpers";
+import { colors, radius, spacing } from "../../src/theme/tokens";
+import {
+  AppText,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ScreenHeader,
+  StatCard,
+} from "../../src/ui";
 
 export default function MessagesScreen() {
   const router = useRouter();
@@ -119,174 +106,57 @@ export default function MessagesScreen() {
 
   return (
     <Screen>
-      <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
-        <View
-          style={{
-            gap: spacing[10],
-            padding: 22,
-            borderRadius: radius[26],
-            backgroundColor: colors.textPrimary,
-          }}
-        >
-          <Text
-            style={{
-              color: colors.heroSoft,
-              fontSize: typography.fontSize[12],
-              fontWeight: typography.fontWeight.heavy,
-              textTransform: "uppercase",
-              letterSpacing: typography.letterSpacing.sm,
-            }}
-          >
-            Messaging MVP
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.fontSize[30],
-              lineHeight: typography.lineHeight[34],
-              fontWeight: typography.fontWeight.heavy,
-              color: colors.inkInvert,
-            }}
-          >
-            Inbox privata e primi contatti diretti
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.fontSize[16],
-              lineHeight: typography.lineHeight[24],
-              color: colors.textInverseMuted,
-            }}
-          >
-            Le connessioni accettate possono trasformarsi in conversazioni 1:1.
-            Da qui controlli le chat, i messaggi non letti e chi è pronto per
-            il primo contatto.
-          </Text>
-        </View>
-
-        <View style={{ flexDirection: "row", gap: spacing[12] }}>
-          <View
-            style={{
-              flex: 1,
-              padding: 16,
-              borderRadius: radius[22],
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.textMuted,
-                fontSize: typography.fontSize[12],
-                fontWeight: typography.fontWeight.bold,
-                textTransform: "uppercase",
-              }}
-            >
-              Conversazioni
-            </Text>
-            <Text
-              style={{
-                marginTop: 8,
-                color: colors.textPrimary,
-                fontSize: typography.fontSize[24],
-                fontWeight: typography.fontWeight.heavy,
-              }}
-            >
-              {summaries.length}
-            </Text>
-          </View>
-          <View
-            style={{
-              flex: 1,
-              padding: 16,
-              borderRadius: radius[22],
-              backgroundColor: colors.surfaceMuted,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.textMuted,
-                fontSize: typography.fontSize[12],
-                fontWeight: typography.fontWeight.bold,
-                textTransform: "uppercase",
-              }}
-            >
-              Non letti
-            </Text>
-            <Text
-              style={{
-                marginTop: 8,
-                color: colors.textPrimary,
-                fontSize: typography.fontSize[24],
-                fontWeight: typography.fontWeight.heavy,
-              }}
-            >
-              {unreadCount}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={{
-            gap: spacing[14],
-            padding: 18,
-            borderRadius: radius[22],
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[18], fontWeight: typography.fontWeight.heavy }}>
-              Pronti a scriverti
-            </Text>
+      <KeyboardAwareScrollView contentContainerStyle={styles.scrollContent}>
+        <ScreenHeader
+          title="Messaggi"
+          subtitle="Gestisci le tue conversazioni e contatta le connessioni"
+          action={
             <Button
               label="Aggiorna"
               onPress={() => void loadInbox()}
               size="sm"
               variant="link"
             />
-          </View>
+          }
+        />
+
+        <View style={styles.statRow}>
+          <StatCard
+            label="Conversazioni"
+            value={String(summaries.length)}
+          />
+          <StatCard
+            label="Non letti"
+            tone="muted"
+            value={String(unreadCount)}
+          />
+        </View>
+
+        <Card>
+          <AppText variant="headingSm">Pronti a scriverti</AppText>
           {isLoading ? (
-            <Text style={{ color: colors.textSecondary }}>
+            <AppText variant="bodySm" color="secondary">
               Caricamento inbox in corso...
-            </Text>
+            </AppText>
           ) : null}
           {!isLoading && connectedWithoutConversation.length === 0 ? (
-            <Text style={{ color: colors.textSecondary }}>
+            <AppText variant="bodySm" color="secondary">
               Nessuna connessione pronta per una nuova chat. Vai in Rete per
               ampliare il tuo network professionale.
-            </Text>
+            </AppText>
           ) : null}
           {connectedWithoutConversation.slice(0, 3).map((entry) => (
-            <View
-              key={entry.connection_id}
-              style={{
-                gap: spacing[8],
-                padding: 16,
-                borderRadius: radius[18],
-                backgroundColor: colors.background,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[16], fontWeight: typography.fontWeight.heavy }}>
-                {entry.other_full_name}
-              </Text>
-              <Text style={{ color: colors.textSecondary }}>
+            <Card key={entry.connection_id} variant="muted">
+              <AppText variant="titleSm">{entry.other_full_name}</AppText>
+              <AppText variant="bodySm" color="secondary">
                 {formatRole(entry.other_role)}
                 {entry.other_role === "player"
                   ? ` · ${formatPosition(entry.other_primary_position)}`
                   : ""}
-              </Text>
-              <Text style={{ color: colors.textSecondary }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 {formatLocation(entry.other_city, entry.other_region)}
-              </Text>
+              </AppText>
               <Button
                 disabled={actionProfileId === entry.other_profile_id}
                 fullWidth
@@ -300,29 +170,18 @@ export default function MessagesScreen() {
                 }
                 variant="secondary"
               />
-            </View>
+            </Card>
           ))}
-        </View>
+        </Card>
 
-        <View style={{ gap: spacing[12] }}>
-          <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[18], fontWeight: typography.fontWeight.heavy }}>
-            Conversazioni recenti
-          </Text>
+        <View style={styles.sectionGap}>
+          <AppText variant="headingSm">Conversazioni recenti</AppText>
           {!isLoading && summaries.length === 0 ? (
-            <View
-              style={{
-                padding: 18,
-                borderRadius: radius[20],
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={{ color: colors.textSecondary }}>
-                La tua inbox è vuota. Accetta una connessione o avvia una chat
-                dalla tab Rete.
-              </Text>
-            </View>
+            <EmptyState
+              icon="chatbubbles-outline"
+              title="Inbox vuota"
+              description="Accetta una connessione o avvia una chat dalla tab Rete."
+            />
           ) : null}
           {summaries.map((summary) => (
             <Pressable
@@ -336,69 +195,41 @@ export default function MessagesScreen() {
                   },
                 })
               }
-              style={{
-                gap: spacing[8],
-                padding: 18,
-                borderRadius: radius[22],
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
+              style={({ pressed }) => [
+                styles.conversationCard,
+                pressed ? styles.pressed : null,
+              ]}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: spacing[12],
-                }}
-              >
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontSize: typography.fontSize[18],
-                      fontWeight: typography.fontWeight.heavy,
-                    }}
-                  >
-                    {summary.other_full_name}
-                  </Text>
-                  <Text style={{ color: colors.textSecondary }}>
+              <View style={styles.conversationHeader}>
+                <View style={styles.flex1}>
+                  <AppText variant="headingSm">{summary.other_full_name}</AppText>
+                  <AppText variant="bodySm" color="secondary">
                     {formatRole(summary.other_role)}
                     {summary.other_role === "player"
                       ? ` · ${formatPosition(summary.other_primary_position)}`
                       : ""}
-                  </Text>
+                  </AppText>
                 </View>
                 {summary.unread_count > 0 ? (
-                  <View
-                    style={{
-                      minWidth: 28,
-                      paddingHorizontal: 8,
-                      paddingVertical: 5,
-                      borderRadius: radius.full,
-                      backgroundColor: colors.hero,
-                      alignItems: "center",
-                    }}
-                  >
-                    <Text style={{ color: colors.inkInvert, fontWeight: typography.fontWeight.heavy }}>
+                  <View style={styles.unreadBadge}>
+                    <AppText variant="caption" color="inverse">
                       {summary.unread_count}
-                    </Text>
+                    </AppText>
                   </View>
                 ) : null}
               </View>
-              <Text style={{ color: colors.textSecondary }}>
+              <AppText variant="bodySm" color="secondary">
                 {formatLocation(summary.other_city, summary.other_region)}
-              </Text>
-              <Text style={{ color: colors.textPrimary, lineHeight: typography.lineHeight[22] }}>
+              </AppText>
+              <AppText variant="bodyLg" numberOfLines={2}>
                 {summary.last_message_body ??
                   "Nessun messaggio ancora inviato: apri la chat per iniziare."}
-              </Text>
-              <Text style={{ color: colors.textMuted, fontSize: typography.fontSize[12], fontWeight: typography.fontWeight.bold }}>
+              </AppText>
+              <AppText variant="caption" color="muted">
                 {summary.last_message_sent_at
                   ? new Date(summary.last_message_sent_at).toLocaleString("it-IT")
                   : "Conversazione pronta"}
-              </Text>
+              </AppText>
             </Pressable>
           ))}
         </View>
@@ -406,3 +237,46 @@ export default function MessagesScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    gap: spacing[16],
+    paddingBottom: spacing[24],
+  },
+  statRow: {
+    flexDirection: "row",
+    gap: spacing[12],
+  },
+  sectionGap: {
+    gap: spacing[12],
+  },
+  conversationCard: {
+    gap: spacing[8],
+    padding: spacing[18],
+    borderRadius: radius[12],
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  conversationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing[12],
+  },
+  flex1: {
+    flex: 1,
+    gap: spacing[4],
+  },
+  unreadBadge: {
+    minWidth: 28,
+    paddingHorizontal: spacing[8],
+    paddingVertical: 5,
+    borderRadius: radius.full,
+    backgroundColor: colors.hero,
+    alignItems: "center",
+  },
+  pressed: {
+    opacity: 0.82,
+  },
+});

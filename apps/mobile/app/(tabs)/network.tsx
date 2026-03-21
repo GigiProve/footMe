@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import {
   Alert,
-  Text,
+  StyleSheet,
   View,
 } from "react-native";
 
@@ -26,16 +26,30 @@ import {
   updateConnectionStatus,
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
-import { getPlayerPositionLabel } from "../../src/features/profiles/player-sports";
-import { colors, radius, spacing, typography } from "../../src/theme/tokens";
-import { Button, Input } from "../../src/ui";
+import {
+  formatLocation,
+  formatPosition,
+  formatRole,
+} from "../../src/features/profiles/profile-display-helpers";
+import { spacing } from "../../src/theme/tokens";
+import {
+  AppText,
+  Badge,
+  Button,
+  Card,
+  ChipGroup,
+  EmptyState,
+  Input,
+  ScreenHeader,
+  StatCard,
+} from "../../src/ui";
 
 const modeOptions: { label: string; value: SearchMode }[] = [
   { label: "Profili", value: "profiles" },
   { label: "Opportunita'", value: "ads" },
 ];
 
-const roleOptions: { label: string; value: SearchRoleFilter }[] = [
+const roleOptions: readonly { label: string; value: SearchRoleFilter }[] = [
   { label: "Tutti", value: "all" },
   { label: "Calciatori", value: "player" },
   { label: "Allenatori", value: "coach" },
@@ -45,38 +59,13 @@ const roleOptions: { label: string; value: SearchRoleFilter }[] = [
   { label: "Societa'", value: "club_admin" },
 ];
 
-const positionOptions: { label: string; value: SearchPositionFilter }[] = [
+const positionOptions: readonly { label: string; value: SearchPositionFilter }[] = [
   { label: "Tutte", value: "all" },
   { label: "Portiere", value: "goalkeeper" },
   { label: "Difensore", value: "defender" },
   { label: "Centrocampista", value: "midfielder" },
   { label: "Attaccante", value: "forward" },
 ];
-
-const roleLabels: Record<string, string> = {
-  agent: "Procuratore",
-  club_admin: "Societa'",
-  coach: "Allenatore",
-  director: "Dirigente",
-  player: "Calciatore",
-  staff: "Staff",
-};
-
-function formatRole(value: string | null) {
-  if (!value) {
-    return "Ruolo non definito";
-  }
-
-  return roleLabels[value] ?? value;
-}
-
-function formatPosition(value: string | null) {
-  return getPlayerPositionLabel(value, "Posizione non definita");
-}
-
-function formatLocation(city: string | null, region: string | null) {
-  return [city, region].filter(Boolean).join(" · ") || "Localita' non definita";
-}
 
 function getConnectionStatusLabel(connection: NetworkOverviewItem | undefined) {
   if (!connection) {
@@ -261,167 +250,57 @@ export default function NetworkScreen() {
 
   return (
     <Screen>
-      <KeyboardAwareForm contentContainerStyle={{ gap: spacing[16], paddingBottom: 24 }}>
-        <View
-          style={{
-            gap: spacing[10],
-            padding: 22,
-            borderRadius: radius[26],
-            backgroundColor: colors.textPrimary,
-          }}
-        >
-          <Text
-            style={{
-              color: colors.heroSoft,
-              fontSize: typography.fontSize[12],
-              fontWeight: typography.fontWeight.heavy,
-              textTransform: "uppercase",
-              letterSpacing: typography.letterSpacing.sm,
-            }}
-          >
-            Networking MVP
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.fontSize[30],
-              lineHeight: typography.lineHeight[34],
-              fontWeight: typography.fontWeight.heavy,
-              color: colors.inkInvert,
-            }}
-          >
-            Costruisci la tua rete e apri conversazioni dirette
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.fontSize[16],
-              lineHeight: typography.lineHeight[24],
-              color: colors.textInverseMuted,
-            }}
-          >
-            Ora la sezione rete non è più solo discovery: puoi gestire
-            richieste, vedere connessioni attive e passare subito alla chat.
-          </Text>
+      <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
+        <ScreenHeader
+          title="Rete"
+          subtitle="Gestisci connessioni e cerca profili e opportunita'"
+        />
+
+        <View style={styles.statRow}>
+          <StatCard
+            label="Connessioni attive"
+            value={String(acceptedConnections.length)}
+          />
+          <StatCard
+            label="Da gestire"
+            tone="muted"
+            value={String(incomingRequests.length)}
+          />
         </View>
 
-        <View style={{ flexDirection: "row", gap: spacing[12] }}>
-          <View
-            style={{
-              flex: 1,
-              padding: 16,
-              borderRadius: radius[22],
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.textMuted,
-                fontSize: typography.fontSize[12],
-                fontWeight: typography.fontWeight.bold,
-                textTransform: "uppercase",
-              }}
-            >
-              Connessioni attive
-            </Text>
-            <Text
-              style={{
-                marginTop: 8,
-                color: colors.textPrimary,
-                fontSize: typography.fontSize[24],
-                fontWeight: typography.fontWeight.heavy,
-              }}
-            >
-              {acceptedConnections.length}
-            </Text>
-          </View>
-          <View
-            style={{
-              flex: 1,
-              padding: 16,
-              borderRadius: radius[22],
-              backgroundColor: colors.surfaceMuted,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.textMuted,
-                fontSize: typography.fontSize[12],
-                fontWeight: typography.fontWeight.bold,
-                textTransform: "uppercase",
-              }}
-            >
-              Da gestire
-            </Text>
-            <Text
-              style={{
-                marginTop: 8,
-                color: colors.textPrimary,
-                fontSize: typography.fontSize[24],
-                fontWeight: typography.fontWeight.heavy,
-              }}
-            >
-              {incomingRequests.length}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={{
-            gap: spacing[14],
-            padding: 18,
-            borderRadius: radius[22],
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}
-        >
-          <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[18], fontWeight: typography.fontWeight.heavy }}>
-            Stato della rete
-          </Text>
+        <Card>
+          <AppText variant="headingSm">Stato della rete</AppText>
           {isNetworkLoading ? (
-            <Text style={{ color: colors.textSecondary }}>
+            <AppText variant="bodySm" color="secondary">
               Caricamento connessioni in corso...
-            </Text>
+            </AppText>
           ) : null}
           {!isNetworkLoading && incomingRequests.length === 0 ? (
-            <Text style={{ color: colors.textSecondary }}>
+            <AppText variant="bodySm" color="secondary">
               Nessuna richiesta in attesa. Usa la ricerca qui sotto per ampliare
               il tuo network.
-            </Text>
+            </AppText>
           ) : null}
           {incomingRequests.map((entry) => (
-            <View
-              key={entry.connection_id}
-              style={{
-                gap: spacing[10],
-                padding: 16,
-                borderRadius: radius[18],
-                backgroundColor: colors.background,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={{ color: colors.textPrimary, fontSize: typography.fontSize[16], fontWeight: typography.fontWeight.heavy }}>
-                {entry.other_full_name}
-              </Text>
-              <Text style={{ color: colors.textSecondary }}>
+            <Card key={entry.connection_id} variant="muted">
+              <AppText variant="titleSm">{entry.other_full_name}</AppText>
+              <AppText variant="bodySm" color="secondary">
                 {formatRole(entry.other_role)}
                 {entry.other_role === "player"
                   ? ` · ${formatPosition(entry.other_primary_position)}`
                   : ""}
-              </Text>
-              <Text style={{ color: colors.textSecondary }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 {formatLocation(entry.other_city, entry.other_region)}
-              </Text>
-              <View style={{ flexDirection: "row", gap: spacing[10] }}>
+              </AppText>
+              <View style={styles.actionRow}>
                 <Button
                   disabled={actionConnectionId === entry.connection_id}
                   label="Accetta"
                   onPress={() =>
                     handleUpdateConnectionStatus(entry.connection_id, "accepted")
                   }
-                  style={{ flex: 1 }}
+                  style={styles.flex1}
                 />
                 <Button
                   disabled={actionConnectionId === entry.connection_id}
@@ -429,44 +308,24 @@ export default function NetworkScreen() {
                   onPress={() =>
                     handleUpdateConnectionStatus(entry.connection_id, "rejected")
                   }
-                  style={{ flex: 1 }}
+                  style={styles.flex1}
                   variant="secondary"
                 />
               </View>
-            </View>
+            </Card>
           ))}
           {!isNetworkLoading && acceptedConnections.length > 0 ? (
-            <View style={{ gap: spacing[10] }}>
-              <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.heavy }}>
-                Connessioni pronte per la chat
-              </Text>
+            <View style={styles.sectionGap}>
+              <AppText variant="titleSm">Connessioni pronte per la chat</AppText>
               {acceptedConnections.slice(0, 3).map((entry) => (
-                <View
-                  key={entry.connection_id}
-                  style={{
-                    gap: spacing[8],
-                    padding: 16,
-                    borderRadius: radius[18],
-                    backgroundColor: colors.background,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontSize: typography.fontSize[16],
-                      fontWeight: typography.fontWeight.heavy,
-                    }}
-                  >
-                    {entry.other_full_name}
-                  </Text>
-                  <Text style={{ color: colors.textSecondary }}>
+                <Card key={entry.connection_id} variant="muted">
+                  <AppText variant="titleSm">{entry.other_full_name}</AppText>
+                  <AppText variant="bodySm" color="secondary">
                     {formatRole(entry.other_role)}
                     {entry.other_role === "player"
                       ? ` · ${formatPosition(entry.other_primary_position)}`
                       : ""}
-                  </Text>
+                  </AppText>
                   <Button
                     disabled={actionProfileId === entry.other_profile_id}
                     fullWidth
@@ -483,43 +342,23 @@ export default function NetworkScreen() {
                     }
                     variant="secondary"
                   />
-                </View>
+                </Card>
               ))}
             </View>
           ) : null}
           {!isNetworkLoading && outgoingRequests.length > 0 ? (
-            <Text style={{ color: colors.textSecondary }}>
+            <AppText variant="bodySm" color="secondary">
               Richieste inviate in attesa: {outgoingRequests.length}
-            </Text>
+            </AppText>
           ) : null}
-        </View>
+        </Card>
 
-        <View
-          style={{
-            gap: spacing[14],
-            padding: 18,
-            borderRadius: radius[22],
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-          }}
-        >
-          <View style={{ flexDirection: "row", gap: spacing[10] }}>
-            {modeOptions.map((option) => {
-              const isActive = option.value === mode;
-
-              return (
-                <Button
-                  key={option.value}
-                  label={option.label}
-                  onPress={() => setMode(option.value)}
-                  selected={isActive}
-                  size="sm"
-                  variant="chipAction"
-                />
-              );
-            })}
-          </View>
+        <Card>
+          <ChipGroup
+            onChange={setMode}
+            options={modeOptions}
+            value={mode}
+          />
 
           <Input
             onChangeText={setQuery}
@@ -538,82 +377,40 @@ export default function NetworkScreen() {
           />
 
           {mode === "profiles" ? (
-            <View style={{ gap: spacing[8] }}>
-              <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-                Ruolo
-              </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
-                {roleOptions.map((option) => {
-                  const isActive = option.value === roleFilter;
-
-                  return (
-                    <Button
-                      key={option.value}
-                      label={option.label}
-                      onPress={() => setRoleFilter(option.value)}
-                      selected={isActive}
-                      size="sm"
-                      variant="chipAction"
-                    />
-                  );
-                })}
-              </View>
+            <View style={styles.filterSection}>
+              <AppText variant="caption">Ruolo</AppText>
+              <ChipGroup
+                onChange={setRoleFilter}
+                options={roleOptions}
+                value={roleFilter}
+              />
             </View>
           ) : null}
 
-          <View style={{ gap: spacing[8] }}>
-            <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-              Posizione
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}>
-              {positionOptions.map((option) => {
-                const isActive = option.value === positionFilter;
-
-                return (
-                  <Button
-                    key={option.value}
-                    label={option.label}
-                    onPress={() => setPositionFilter(option.value)}
-                    selected={isActive}
-                    size="sm"
-                    variant="chipAction"
-                  />
-                );
-              })}
-            </View>
+          <View style={styles.filterSection}>
+            <AppText variant="caption">Posizione</AppText>
+            <ChipGroup
+              onChange={setPositionFilter}
+              options={positionOptions}
+              value={positionFilter}
+            />
           </View>
-        </View>
+        </Card>
 
         {mode === "profiles" && profiles.length === 0 && !isSearchLoading ? (
-          <View
-            style={{
-              padding: 18,
-              borderRadius: radius[20],
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Text style={{ color: colors.textSecondary }}>
-              Nessun profilo trovato con i filtri attuali.
-            </Text>
-          </View>
+          <EmptyState
+            icon="search-outline"
+            title="Nessun profilo trovato"
+            description="Nessun profilo trovato con i filtri attuali."
+          />
         ) : null}
 
         {mode === "ads" && ads.length === 0 && !isSearchLoading ? (
-          <View
-            style={{
-              padding: 18,
-              borderRadius: radius[20],
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Text style={{ color: colors.textSecondary }}>
-              Nessuna opportunita' trovata con i filtri attuali.
-            </Text>
-          </View>
+          <EmptyState
+            icon="megaphone-outline"
+            title="Nessuna opportunita'"
+            description="Nessuna opportunita' trovata con i filtri attuali."
+          />
         ) : null}
 
         {mode === "profiles"
@@ -623,38 +420,20 @@ export default function NetworkScreen() {
               const statusLabel = getConnectionStatusLabel(connection);
 
               return (
-                <View
-                  key={result.profile_id}
-                  style={{
-                    gap: spacing[10],
-                    padding: 18,
-                    borderRadius: radius[22],
-                    backgroundColor: colors.surface,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: typography.fontSize[18],
-                      fontWeight: typography.fontWeight.heavy,
-                      color: colors.textPrimary,
-                    }}
-                  >
-                    {result.full_name}
-                  </Text>
+                <Card key={result.profile_id}>
+                  <AppText variant="headingSm">{result.full_name}</AppText>
                   <PublicBioBlock bio={result.bio} />
-                  <Text style={{ color: colors.textSecondary }}>
+                  <AppText variant="bodySm" color="secondary">
                     {formatRole(result.role)}
                     {result.role === "player"
                       ? ` · ${formatPosition(result.primary_position)}`
                       : ""}
-                  </Text>
-                  <Text style={{ color: colors.textSecondary }}>
+                  </AppText>
+                  <AppText variant="bodySm" color="secondary">
                     {formatLocation(result.city, result.region)}
-                  </Text>
+                  </AppText>
                   {statusLabel ? (
-                    <Text style={{ color: colors.textSecondary }}>{statusLabel}</Text>
+                    <AppText variant="bodySm" color="secondary">{statusLabel}</AppText>
                   ) : null}
                   {connection?.status === "accepted" ? (
                     <Button
@@ -667,7 +446,7 @@ export default function NetworkScreen() {
                       variant="secondary"
                     />
                   ) : connection?.status === "pending" && !connection.is_requester ? (
-                    <View style={{ flexDirection: "row", gap: spacing[10] }}>
+                    <View style={styles.actionRow}>
                       <Button
                         disabled={actionConnectionId === connection.connection_id}
                         label="Accetta"
@@ -677,7 +456,7 @@ export default function NetworkScreen() {
                             "accepted",
                           )
                         }
-                        style={{ flex: 1 }}
+                        style={styles.flex1}
                       />
                       <Button
                         disabled={actionConnectionId === connection.connection_id}
@@ -688,94 +467,66 @@ export default function NetworkScreen() {
                             "rejected",
                           )
                         }
-                        style={{ flex: 1 }}
+                        style={styles.flex1}
                         variant="secondary"
                       />
                     </View>
                   ) : connection?.status === "pending" && connection.is_requester ? (
-                    <View
-                      style={{
-                        paddingVertical: 12,
-                        borderRadius: radius[14],
-                        alignItems: "center",
-                        backgroundColor: colors.surfaceMuted,
-                      }}
-                    >
-                      <Text style={{ color: colors.textSecondary, fontWeight: typography.fontWeight.bold }}>
-                        Richiesta in attesa
-                      </Text>
-                    </View>
+                    <Badge label="Richiesta in attesa" />
                   ) : connection?.status === "blocked" ? (
-                    <View
-                      style={{
-                        paddingVertical: 12,
-                        borderRadius: radius[14],
-                        alignItems: "center",
-                        backgroundColor: colors.surfaceMuted,
-                      }}
-                    >
-                      <Text style={{ color: colors.textSecondary, fontWeight: typography.fontWeight.bold }}>
-                        Connessione bloccata
-                      </Text>
-                    </View>
+                    <Badge label="Connessione bloccata" />
                   ) : (
-                      <Button
-                        disabled={isBusy}
-                        fullWidth
-                        label={isBusy ? "Invio richiesta..." : "Connettiti"}
-                        onPress={() => handleRequestConnection(result.profile_id)}
-                        variant="secondary"
-                      />
-                    )}
-                </View>
+                    <Button
+                      disabled={isBusy}
+                      fullWidth
+                      label={isBusy ? "Invio richiesta..." : "Connettiti"}
+                      onPress={() => handleRequestConnection(result.profile_id)}
+                      variant="secondary"
+                    />
+                  )}
+                </Card>
               );
             })
           : ads.map((result) => (
-              <View
-                key={result.ad_id}
-                style={{
-                  gap: spacing[8],
-                  padding: 18,
-                  borderRadius: radius[22],
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: typography.fontSize[18],
-                    fontWeight: typography.fontWeight.heavy,
-                    color: colors.textPrimary,
-                  }}
-                >
-                  {result.title}
-                </Text>
-                <Text style={{ color: colors.textSecondary }}>
+              <Card key={result.ad_id}>
+                <AppText variant="headingSm">{result.title}</AppText>
+                <AppText variant="bodySm" color="secondary">
                   {result.club_name} · {formatPosition(result.role_required)}
-                </Text>
-                <Text style={{ color: colors.textSecondary }}>
+                </AppText>
+                <AppText variant="bodySm" color="secondary">
                   {[result.region, result.category].filter(Boolean).join(" · ") ||
                     "Dettagli da definire"}
-                </Text>
+                </AppText>
                 {result.compensation_summary ? (
-                  <View
-                    style={{
-                      alignSelf: "flex-start",
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: radius.full,
-                      backgroundColor: colors.accentSoft,
-                    }}
-                  >
-                    <Text style={{ color: colors.accentStrong, fontWeight: typography.fontWeight.bold }}>
-                      {result.compensation_summary}
-                    </Text>
-                  </View>
+                  <Badge label={result.compensation_summary} variant="accent" />
                 ) : null}
-              </View>
+              </Card>
             ))}
       </KeyboardAwareForm>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    gap: spacing[16],
+    paddingBottom: spacing[24],
+  },
+  statRow: {
+    flexDirection: "row",
+    gap: spacing[12],
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: spacing[10],
+  },
+  flex1: {
+    flex: 1,
+  },
+  sectionGap: {
+    gap: spacing[10],
+  },
+  filterSection: {
+    gap: spacing[8],
+  },
+});

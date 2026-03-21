@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Linking, Modal, Pressable, SafeAreaView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Modal, Pressable, SafeAreaView, StyleSheet, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -14,8 +14,8 @@ import {
 import { VerificationBadge } from "../../src/features/clubs/verification-badge";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
-import { colors, radius, spacing, typography } from "../../src/theme/tokens";
-import { Button, Card, Input } from "../../src/ui";
+import { colors, radius, spacing } from "../../src/theme/tokens";
+import { AppText, Button, Card, Input, ModalHeader } from "../../src/ui";
 
 type ReportClaimMode = "claim" | "report" | null;
 
@@ -113,7 +113,7 @@ export default function ClubProfileScreen() {
     return (
       <Screen>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={{ alignItems: "center", flex: 1, justifyContent: "center" }}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
       </Screen>
@@ -124,10 +124,10 @@ export default function ClubProfileScreen() {
     return (
       <Screen>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={{ alignItems: "center", flex: 1, gap: spacing[16], justifyContent: "center" }}>
-          <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize[16] }}>
+        <View style={styles.centerContainer}>
+          <AppText variant="bodyLg" color="secondary">
             Società non trovata.
-          </Text>
+          </AppText>
           <Button label="Torna indietro" onPress={() => router.back()} variant="secondary" />
         </View>
       </Screen>
@@ -147,7 +147,7 @@ export default function ClubProfileScreen() {
         </Pressable>
 
         <Card style={{ gap: spacing[12] }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[12] }}>
+          <View style={styles.clubHeaderRow}>
             {club.logo_url ? (
               <Image
                 accessibilityLabel={`Logo ${club.name}`}
@@ -160,19 +160,13 @@ export default function ClubProfileScreen() {
                 }}
               />
             ) : null}
-            <View style={{ flex: 1, gap: spacing[4] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: typography.fontSize[20],
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+            <View style={styles.clubNameContainer}>
+              <AppText variant="headingMd">
                 {club.name}
-              </Text>
-              <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize[14] }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 {club.city}, {club.region}
-              </Text>
+              </AppText>
             </View>
           </View>
           <VerificationBadge status={club.verification_status} />
@@ -180,13 +174,13 @@ export default function ClubProfileScreen() {
 
         {club.description ? (
           <Card style={{ gap: spacing[8] }}>
-            <Text style={styles.sectionTitle}>Descrizione</Text>
-            <Text style={styles.bodyText}>{club.description}</Text>
+            <AppText variant="titleMd">Descrizione</AppText>
+            <AppText variant="bodySm" color="secondary">{club.description}</AppText>
           </Card>
         ) : null}
 
         <Card style={{ gap: spacing[10] }}>
-          <Text style={styles.sectionTitle}>Informazioni</Text>
+          <AppText variant="titleMd">Informazioni</AppText>
           {club.founding_year ? (
             <InfoRow label="Anno di fondazione" value={String(club.founding_year)} />
           ) : null}
@@ -199,7 +193,7 @@ export default function ClubProfileScreen() {
         </Card>
 
         <Card style={{ gap: spacing[10] }}>
-          <Text style={styles.sectionTitle}>Contatti</Text>
+          <AppText variant="titleMd">Contatti</AppText>
           {club.club_email ? (
             <Pressable onPress={() => Linking.openURL(`mailto:${club.club_email}`)}>
               <InfoRow label="Email" value={club.club_email!} />
@@ -216,14 +210,14 @@ export default function ClubProfileScreen() {
             </Pressable>
           ) : null}
           {!club.club_email && !club.club_phone && !club.website_url ? (
-            <Text style={styles.emptyText}>Nessun contatto disponibile.</Text>
+            <AppText variant="bodySm" color="muted">Nessun contatto disponibile.</AppText>
           ) : null}
         </Card>
 
         {club.owner_full_name ? (
           <Card style={{ gap: spacing[8] }}>
-            <Text style={styles.sectionTitle}>Responsabile</Text>
-            <Text style={styles.bodyText}>{club.owner_full_name}</Text>
+            <AppText variant="titleMd">Responsabile</AppText>
+            <AppText variant="bodySm" color="secondary">{club.owner_full_name}</AppText>
           </Card>
         ) : null}
 
@@ -235,11 +229,11 @@ export default function ClubProfileScreen() {
               { text: "Segnala come falsa", style: "destructive", onPress: () => setModalMode("report") },
             ])
           }
-          style={{ alignItems: "center", paddingVertical: spacing[12] }}
+          style={styles.reportLink}
         >
-          <Text style={{ color: colors.textMuted, fontSize: typography.fontSize[14] }}>
+          <AppText variant="bodySm" color="muted">
             Segnala o rivendica questa società
-          </Text>
+          </AppText>
         </Pressable>
       </KeyboardAwareScrollView>
 
@@ -249,19 +243,13 @@ export default function ClubProfileScreen() {
         presentationStyle="pageSheet"
         visible={modalMode === "claim"}
       >
-        <SafeAreaView style={{ backgroundColor: colors.background, flex: 1 }}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => setModalMode(null)}>
-              <Ionicons color={colors.textPrimary} name="close" size={24} />
-            </Pressable>
-            <Text style={styles.modalTitle}>Rivendica società</Text>
-            <View style={{ width: 24 }} />
-          </View>
-          <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], padding: spacing[20] }}>
-            <Text style={styles.bodyText}>
+        <SafeAreaView style={styles.modalSafeArea}>
+          <ModalHeader title="Rivendica società" onClose={() => setModalMode(null)} />
+          <KeyboardAwareScrollView contentContainerStyle={styles.modalContent}>
+            <AppText variant="bodySm" color="secondary">
               Se questa è la tua società, compila il modulo e il nostro team
               verificherà la tua richiesta.
-            </Text>
+            </AppText>
             <Input
               label="Il tuo ruolo nella società *"
               onChangeText={setClaimRole}
@@ -299,19 +287,13 @@ export default function ClubProfileScreen() {
         presentationStyle="pageSheet"
         visible={modalMode === "report"}
       >
-        <SafeAreaView style={{ backgroundColor: colors.background, flex: 1 }}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => setModalMode(null)}>
-              <Ionicons color={colors.textPrimary} name="close" size={24} />
-            </Pressable>
-            <Text style={styles.modalTitle}>Segnala società</Text>
-            <View style={{ width: 24 }} />
-          </View>
-          <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], padding: spacing[20] }}>
-            <Text style={styles.bodyText}>
+        <SafeAreaView style={styles.modalSafeArea}>
+          <ModalHeader title="Segnala società" onClose={() => setModalMode(null)} />
+          <KeyboardAwareScrollView contentContainerStyle={styles.modalContent}>
+            <AppText variant="bodySm" color="secondary">
               Se ritieni che questa pagina non rappresenti una società reale,
               invia una segnalazione.
-            </Text>
+            </AppText>
             <Input
               label="Motivo della segnalazione *"
               multiline
@@ -334,52 +316,53 @@ export default function ClubProfileScreen() {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing[8] }}>
-      <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize[14] }}>
+    <View style={styles.infoRow}>
+      <AppText variant="bodySm" color="secondary">
         {label}
-      </Text>
-      <Text
-        style={{
-          color: colors.textPrimary,
-          flex: 1,
-          fontSize: typography.fontSize[14],
-          fontWeight: typography.fontWeight.bold,
-          textAlign: "right",
-        }}
-      >
+      </AppText>
+      <AppText variant="bodySm" style={{ fontWeight: "700", textAlign: "right", flex: 1 }}>
         {value}
-      </Text>
+      </AppText>
     </View>
   );
 }
 
-const styles = {
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[16],
-    fontWeight: typography.fontWeight.heavy,
-  },
-  bodyText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[14],
-    lineHeight: 22,
-  },
-  emptyText: {
-    color: colors.textMuted,
-    fontSize: typography.fontSize[14],
-  },
-  modalHeader: {
+const styles = StyleSheet.create({
+  loadingContainer: {
     alignItems: "center",
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
+    flex: 1,
+    justifyContent: "center",
+  },
+  centerContainer: {
+    alignItems: "center",
+    flex: 1,
+    gap: spacing[16],
+    justifyContent: "center",
+  },
+  clubHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[12],
+  },
+  clubNameContainer: {
+    flex: 1,
+    gap: spacing[4],
+  },
+  infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: spacing[20],
-    paddingVertical: spacing[16],
+    gap: spacing[8],
   },
-  modalTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[18],
-    fontWeight: typography.fontWeight.heavy,
+  reportLink: {
+    alignItems: "center",
+    paddingVertical: spacing[12],
   },
-} as const;
+  modalSafeArea: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  modalContent: {
+    gap: spacing[16],
+    padding: spacing[20],
+  },
+});

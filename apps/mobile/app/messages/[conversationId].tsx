@@ -4,7 +4,7 @@ import * as Clipboard from "expo-clipboard";
 import {
   Alert,
   Linking,
-  Text,
+  StyleSheet,
   View,
 } from "react-native";
 
@@ -24,7 +24,7 @@ import {
 import { ContactCardMessage } from "../../src/features/messaging/contact-card-message";
 import { ShareContactModal } from "../../src/features/messaging/share-contact-modal";
 import { colors, radius, spacing, sizes } from "../../src/theme/tokens";
-import { Button, Card, Input } from "../../src/ui";
+import { AppText, Button, Card, Input } from "../../src/ui";
 
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString("it-IT", {
@@ -211,49 +211,35 @@ export default function ConversationScreen() {
       <KeyboardAwareForm
         contentContainerStyle={{ gap: 16, paddingBottom: spacing[16] }}
       >
-        <View
-          style={{
-            gap: 10,
-            padding: 20,
-            borderRadius: 24,
-            backgroundColor: colors.textPrimary,
-          }}
-        >
+        <View style={styles.header}>
           <Button
             label="← Torna ai messaggi"
             onPress={() => router.back()}
             size="sm"
-            style={{ alignSelf: "flex-start" }}
+            style={styles.backButton}
             variant="link"
           />
-          <Text
-            style={{
-              fontSize: 28,
-              lineHeight: 32,
-              fontWeight: "800",
-              color: colors.inkInvert,
-            }}
-          >
+          <AppText variant="displaySm" color="inverse">
             {otherName}
-          </Text>
-          <Text style={{ color: colors.textInverseMuted, lineHeight: 22 }}>
+          </AppText>
+          <AppText variant="bodySm" color="inverseMuted">
             Conversazione privata 1:1 del network footMe.
-          </Text>
+          </AppText>
         </View>
 
         {isLoading ? (
-          <Card style={{ borderRadius: 20 }}>
-            <Text style={{ color: colors.textSecondary }}>
+          <Card style={styles.statusCard}>
+            <AppText color="secondary">
               Caricamento conversazione in corso...
-            </Text>
+            </AppText>
           </Card>
         ) : null}
         {!isLoading && messages.length === 0 ? (
-          <Card style={{ borderRadius: 20 }}>
-            <Text style={{ color: colors.textSecondary }}>
+          <Card style={styles.statusCard}>
+            <AppText color="secondary">
               Nessun messaggio ancora inviato. Usa il box qui sotto per rompere
               il ghiaccio.
-            </Text>
+            </AppText>
           </Card>
         ) : null}
         {messages.map((message) => {
@@ -281,44 +267,35 @@ export default function ConversationScreen() {
           ) : (
             <View
               key={message.message_id}
-              style={{
-                alignSelf: isOwnMessage ? "flex-end" : "flex-start",
-                maxWidth: "82%",
-                gap: 6,
-                padding: 14,
-                borderRadius: 18,
-                backgroundColor: isOwnMessage
-                  ? colors.accent
-                  : colors.surface,
-                borderWidth: isOwnMessage ? 0 : 1,
-                borderColor: colors.border,
-              }}
+              style={[
+                styles.messageBubble,
+                {
+                  alignSelf: isOwnMessage ? "flex-end" : "flex-start",
+                  backgroundColor: isOwnMessage
+                    ? colors.accent
+                    : colors.surface,
+                  borderWidth: isOwnMessage ? 0 : 1,
+                },
+              ]}
             >
-              <Text
-                style={{
-                  color: isOwnMessage ? colors.inkInvert : colors.textPrimary,
-                  fontWeight: "800",
-                }}
+              <AppText
+                variant="titleSm"
+                style={{ color: isOwnMessage ? colors.inkInvert : colors.textPrimary }}
               >
                 {isOwnMessage ? "Tu" : message.sender_full_name}
-              </Text>
-              <Text
-                style={{
-                  color: isOwnMessage ? colors.inkInvert : colors.textPrimary,
-                  lineHeight: 22,
-                }}
+              </AppText>
+              <AppText
+                variant="bodySm"
+                style={{ color: isOwnMessage ? colors.inkInvert : colors.textPrimary }}
               >
                 {message.body}
-              </Text>
-              <Text
-                style={{
-                  color: isOwnMessage ? colors.textInverseMuted : colors.textMuted,
-                  fontSize: 12,
-                  fontWeight: "700",
-                }}
+              </AppText>
+              <AppText
+                variant="caption"
+                style={{ color: isOwnMessage ? colors.textInverseMuted : colors.textMuted }}
               >
                 {formatTimestamp(message.sent_at)}
-              </Text>
+              </AppText>
             </View>
           );
         })}
@@ -364,3 +341,25 @@ export default function ConversationScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    gap: 10,
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: colors.textPrimary,
+  },
+  backButton: {
+    alignSelf: "flex-start",
+  },
+  statusCard: {
+    borderRadius: 20,
+  },
+  messageBubble: {
+    maxWidth: "82%",
+    gap: 6,
+    padding: 14,
+    borderRadius: 18,
+    borderColor: colors.border,
+  },
+});

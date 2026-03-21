@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, BackHandler, Platform, Pressable, Text, View } from "react-native";
+import {
+  Alert,
+  BackHandler,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
@@ -62,8 +69,8 @@ import {
   updateCompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
 import { supabase } from "../../src/lib/supabase";
-import { colors, radius, spacing, typography } from "../../src/theme/tokens";
-import { Button, Card, Input } from "../../src/ui";
+import { colors, radius, spacing } from "../../src/theme/tokens";
+import { AppText, Button, Card, Input } from "../../src/ui";
 
 type CompletionDestination = "feed" | "network" | "profile";
 
@@ -174,23 +181,14 @@ function fromDelimitedString(value: string) {
 function StepChip({ isActive, label }: { isActive: boolean; label: string }) {
   return (
     <View
-      style={{
-        paddingHorizontal: spacing[12],
-        paddingVertical: spacing[8],
-        borderRadius: radius.full,
-        backgroundColor: isActive ? colors.hero : colors.surfaceMuted,
-      }}
+      style={[
+        styles.stepChip,
+        { backgroundColor: isActive ? colors.hero : colors.surfaceMuted },
+      ]}
     >
-      <Text
-        style={{
-          color: isActive ? colors.inkInvert : colors.textSecondary,
-          fontSize: typography.fontSize[12],
-          fontWeight: typography.fontWeight.bold,
-          textTransform: "uppercase",
-        }}
-      >
+      <AppText variant="overline" color={isActive ? "inverse" : "secondary"}>
         {label}
-      </Text>
+      </AppText>
     </View>
   );
 }
@@ -213,30 +211,21 @@ function SelectionCard({
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={({ pressed }) => ({
-        gap: spacing[6],
-        borderRadius: radius[20],
-        borderWidth: 1,
-        borderColor: active ? colors.hero : colors.border,
-        backgroundColor: active ? colors.heroSoft : colors.surface,
-        padding: spacing[16],
-        opacity: pressed ? 0.92 : 1,
-      })}
+      style={({ pressed }) => [
+        styles.selectionCard,
+        {
+          borderColor: active ? colors.hero : colors.border,
+          backgroundColor: active ? colors.heroSoft : colors.surface,
+          opacity: pressed ? 0.92 : 1,
+        },
+      ]}
       testID={testID}
     >
-      <Text
-        style={{
-          color: colors.textPrimary,
-          fontSize: typography.fontSize[16],
-          fontWeight: typography.fontWeight.heavy,
-        }}
-      >
-        {label}
-      </Text>
+      <AppText variant="titleMd">{label}</AppText>
       {description ? (
-        <Text style={{ color: colors.textSecondary, lineHeight: typography.lineHeight[22] }}>
+        <AppText variant="bodySm" color="secondary">
           {description}
-        </Text>
+        </AppText>
       ) : null}
     </Pressable>
   );
@@ -268,28 +257,14 @@ function OnboardingBackButton({ onPress }: { onPress: () => void }) {
       accessibilityLabel="Torna allo step precedente"
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => ({
-        alignItems: "center",
-        alignSelf: "flex-start",
-        backgroundColor: pressed ? colors.surfaceMuted : colors.surface,
-        borderColor: colors.border,
-        borderRadius: radius.full,
-        borderWidth: 1,
-        height: 44,
-        justifyContent: "center",
-        width: 44,
-      })}
+      style={({ pressed }) => [
+        styles.backButton,
+        { backgroundColor: pressed ? colors.surfaceMuted : colors.surface },
+      ]}
     >
-      <Text
-        style={{
-          color: colors.textPrimary,
-          fontSize: typography.fontSize[24],
-          fontWeight: typography.fontWeight.heavy,
-          lineHeight: typography.lineHeight[28],
-        }}
-      >
+      <AppText variant="headingLg" color="primary">
         ←
-      </Text>
+      </AppText>
     </Pressable>
   );
 }
@@ -302,14 +277,9 @@ function ValidationMessage({
   tone?: "danger" | "muted";
 }) {
   return (
-    <Text
-      style={{
-        color: tone === "danger" ? colors.danger : colors.textSecondary,
-        lineHeight: typography.lineHeight[22],
-      }}
-    >
+    <AppText variant="bodySm" color={tone === "danger" ? "danger" : "secondary"}>
       {children}
-    </Text>
+    </AppText>
   );
 }
 
@@ -1007,101 +977,42 @@ export default function OnboardingProfileScreen() {
         }}
       />
       <KeyboardAwareForm
-        contentContainerStyle={{ gap: spacing[18], paddingBottom: 28 }}
+        contentContainerStyle={styles.formContent}
       >
-        <View
-          style={{
-            gap: spacing[10],
-            padding: spacing[22],
-            borderRadius: radius[24],
-            backgroundColor: colors.textPrimary,
-          }}
-        >
+        <View style={styles.heroContainer}>
           {canGoBack ? <OnboardingBackButton onPress={handleBackNavigation} /> : null}
-          <Text
-            style={{
-              color: colors.heroSoft,
-              fontSize: typography.fontSize[12],
-              fontWeight: typography.fontWeight.heavy,
-              letterSpacing: 1.2,
-              textTransform: "uppercase",
-            }}
-          >
+          <AppText variant="overline" color="inverseSoft">
             Primo accesso
-          </Text>
-          <Text
-            style={{
-              color: colors.inkInvert,
-              fontSize: typography.fontSize[32],
-              fontWeight: typography.fontWeight.heavy,
-              lineHeight: typography.lineHeight[38],
-            }}
-          >
+          </AppText>
+          <AppText variant="displayLg" color="inverse">
             Costruisci il tuo profilo sportivo in pochi minuti
-          </Text>
-          <Text
-            style={{
-              color: colors.textInverseMuted,
-              fontSize: typography.fontSize[16],
-              lineHeight: typography.lineHeight[24],
-            }}
-          >
+          </AppText>
+          <AppText variant="bodyLg" color="inverseMuted">
             Un percorso guidato, rapido e flessibile: inserisci i dati
             essenziali ora e completa i dettagli quando vuoi.
-          </Text>
-          <View style={{ gap: spacing[8] }}>
-            <View
-              style={{
-                alignItems: "center",
-                flexDirection: "row",
-                justifyContent: "space-between",
-                gap: spacing[12],
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.inkInvert,
-                  fontSize: typography.fontSize[14],
-                  fontWeight: typography.fontWeight.bold,
-                }}
-              >
+          </AppText>
+          <View style={styles.progressSection}>
+            <View style={styles.progressRow}>
+              <AppText variant="bodySm" color="inverse" style={styles.progressLabel}>
                 Profilo {progress.percentage}% completato
-              </Text>
-              <Text
-                style={{
-                  color: colors.textInverseMuted,
-                  fontSize: typography.fontSize[12],
-                  fontWeight: typography.fontWeight.bold,
-                  textTransform: "uppercase",
-                }}
-              >
+              </AppText>
+              <AppText variant="overline" color="inverseMuted">
                 Step {progress.stepIndex + 1} di {progress.totalSteps}
-              </Text>
+              </AppText>
             </View>
-            <View
-              style={{
-                backgroundColor: "rgba(255,255,255,0.16)",
-                borderRadius: radius.full,
-                height: 8,
-                overflow: "hidden",
-              }}
-            >
+            <View style={styles.progressTrack}>
               <View
-                style={{
-                  backgroundColor: colors.heroSoft,
-                  borderRadius: radius.full,
-                  height: "100%",
-                  width: `${progress.percentage}%`,
-                }}
+                style={[
+                  styles.progressFill,
+                  { width: `${progress.percentage}%` },
+                ]}
               />
             </View>
             <ValidationMessage tone="muted">
               {progress.currentStep.description}
             </ValidationMessage>
           </View>
-          <View
-            style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[8] }}
-          >
+          <View style={styles.stepChipsRow}>
             {onboardingVisibleSteps.map((entry, index) => (
               <StepChip
                 key={entry.step}
@@ -1113,21 +1024,15 @@ export default function OnboardingProfileScreen() {
         </View>
 
         {step === "role" ? (
-          <Card style={{ gap: spacing[16] }}>
-            <View style={{ gap: spacing[8] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: typography.fontSize[24],
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+          <Card style={styles.cardGap}>
+            <View style={styles.sectionHeaderGap}>
+              <AppText variant="headingLg">
                 Seleziona il tuo ruolo nel calcio
-              </Text>
-              <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 Scegli il profilo che ti rappresenta meglio. Ti mostreremo solo
                 i campi davvero utili per iniziare in meno di un minuto.
-              </Text>
+              </AppText>
               {validationErrors.role ? (
                 <ValidationMessage>{validationErrors.role}</ValidationMessage>
               ) : null}
@@ -1158,28 +1063,22 @@ export default function OnboardingProfileScreen() {
         ) : null}
 
         {step === "base" ? (
-          <Card style={{ gap: spacing[16] }}>
-            <View style={{ gap: spacing[8] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: typography.fontSize[24],
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+          <Card style={styles.cardGap}>
+            <View style={styles.sectionHeaderGap}>
+              <AppText variant="headingLg">
                 Informazioni essenziali
-              </Text>
-              <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 Completa i dati minimi per attivare il profilo. I campi
                 obbligatori sono evidenziati e i suggerimenti automatici ti
                 aiutano a finire rapidamente.
-              </Text>
+              </AppText>
               {validationErrors.form ? (
                 <ValidationMessage>{validationErrors.form}</ValidationMessage>
               ) : null}
             </View>
 
-            <View style={{ gap: spacing[12] }}>
+            <View style={styles.fieldGap12}>
               <Input
                 autoCapitalize="words"
                 autoCorrect={false}
@@ -1208,16 +1107,11 @@ export default function OnboardingProfileScreen() {
               ) : null}
             </View>
 
-            <View style={{ gap: spacing[8] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontWeight: typography.fontWeight.bold,
-                }}
-              >
+            <View style={styles.sectionHeaderGap}>
+              <AppText variant="titleSm">
                 Sesso *
-              </Text>
-              <View style={{ gap: spacing[10] }}>
+              </AppText>
+              <View style={styles.fieldGap10}>
                 {genderOptions.map((entry) => (
                   <SelectionCard
                     key={entry.value}
@@ -1295,16 +1189,10 @@ export default function OnboardingProfileScreen() {
             />
 
             {role === "club_admin" ? (
-              <View style={{ gap: spacing[12] }}>
-                <Text
-                  style={{
-                    color: colors.textPrimary,
-                    fontSize: typography.fontSize[18],
-                    fontWeight: typography.fontWeight.heavy,
-                  }}
-                >
+              <View style={styles.fieldGap12}>
+                <AppText variant="headingSm">
                   Dati iniziali della società
-                </Text>
+                </AppText>
                 <Input
                   label="Nome società"
                   onChangeText={(value) => updateValue("clubName", value)}
@@ -1338,15 +1226,15 @@ export default function OnboardingProfileScreen() {
               </View>
             ) : null}
 
-            <View style={{ flexDirection: "row", gap: spacing[12] }}>
-              <View style={{ flex: 1 }}>
+            <View style={styles.buttonRow}>
+              <View style={styles.flex1}>
                 <Button
                   label="Indietro"
                   onPress={handleBackNavigation}
                   variant="secondary"
                 />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.flex1}>
                 <Button
                   disabled={isBusy}
                   label={isBusy ? "Salvataggio..." : "Continua"}
@@ -1359,34 +1247,22 @@ export default function OnboardingProfileScreen() {
         ) : null}
 
         {step === "club" ? (
-          <Card style={{ gap: spacing[16] }}>
-            <View style={{ gap: spacing[8] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: typography.fontSize[24],
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+          <Card style={styles.cardGap}>
+            <View style={styles.sectionHeaderGap}>
+              <AppText variant="headingLg">
                 Il tuo club
-              </Text>
-              <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 Inserisci le informazioni della tua società. I campi
                 obbligatori sono contrassegnati con *.
-              </Text>
+              </AppText>
             </View>
 
-            <View style={{ gap: spacing[8] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: typography.fontSize[18],
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+            <View style={styles.sectionHeaderGap}>
+              <AppText variant="headingSm">
                 Dati del responsabile
-              </Text>
-              <View style={{ gap: spacing[12] }}>
+              </AppText>
+              <View style={styles.fieldGap12}>
                 <Input
                   autoCapitalize="words"
                   autoCorrect={false}
@@ -1416,17 +1292,11 @@ export default function OnboardingProfileScreen() {
               </View>
             </View>
 
-            <View style={{ gap: spacing[8] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: typography.fontSize[18],
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+            <View style={styles.sectionHeaderGap}>
+              <AppText variant="headingSm">
                 Dati della società
-              </Text>
-              <View style={{ gap: spacing[12] }}>
+              </AppText>
+              <View style={styles.fieldGap12}>
                 <Input
                   label="Nome società *"
                   onChangeText={(value) => updateValue("clubName", value)}
@@ -1559,15 +1429,15 @@ export default function OnboardingProfileScreen() {
               </View>
             </View>
 
-            <View style={{ flexDirection: "row", gap: spacing[12] }}>
-              <View style={{ flex: 1 }}>
+            <View style={styles.buttonRow}>
+              <View style={styles.flex1}>
                 <Button
                   label="Indietro"
                   onPress={handleBackNavigation}
                   variant="secondary"
                 />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.flex1}>
                 <Button
                   disabled={isBusy}
                   label={isBusy ? "Salvataggio..." : "Crea la pagina del club"}
@@ -1580,38 +1450,27 @@ export default function OnboardingProfileScreen() {
         ) : null}
 
         {step === "decision" ? (
-          <Card style={{ gap: spacing[16] }}>
-            <View style={{ gap: spacing[8] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: typography.fontSize[24],
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+          <Card style={styles.cardGap}>
+            <View style={styles.sectionHeaderGap}>
+              <AppText variant="headingLg">
                 3. Vuoi completare ora il profilo sportivo?
-              </Text>
-              <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 Un profilo completo aumenta la tua visibilita' verso squadre,
                 allenatori e dirigenti.
-              </Text>
+              </AppText>
             </View>
 
             <Card
-              style={{ gap: spacing[8], backgroundColor: colors.surfaceMuted }}
+              style={styles.decisionSummaryCard}
             >
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+              <AppText variant="titleSm">
                 Profilo selezionato
-              </Text>
-              <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 {roleOptions.find((entry) => entry.value === role)?.label} ·{" "}
                 {fullName}
-              </Text>
+              </AppText>
             </Card>
             <Button
               disabled={isBusy}
@@ -1629,21 +1488,15 @@ export default function OnboardingProfileScreen() {
         ) : null}
 
         {step === "details" ? (
-          <Card style={{ gap: spacing[16] }}>
-            <View style={{ gap: spacing[8] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: typography.fontSize[24],
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+          <Card style={styles.cardGap}>
+            <View style={styles.sectionHeaderGap}>
+              <AppText variant="headingLg">
                 4. Completa il tuo profilo sportivo
-              </Text>
-              <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+              </AppText>
+              <AppText variant="bodySm" color="secondary">
                 Aggiungi dettagli professionali, esperienze e contenuti media.
                 Puoi sempre aggiornare tutto in seguito.
-              </Text>
+              </AppText>
               {validationErrors.bio ? (
                 <ValidationMessage>{validationErrors.bio}</ValidationMessage>
               ) : null}
@@ -1651,16 +1504,10 @@ export default function OnboardingProfileScreen() {
 
             {role === "player" ? (
               <>
-                <View style={{ gap: spacing[10] }}>
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontSize: typography.fontSize[18],
-                      fontWeight: typography.fontWeight.heavy,
-                    }}
-                  >
+                <View style={styles.fieldGap10}>
+                  <AppText variant="headingSm">
                     Informazioni tecniche
-                  </Text>
+                  </AppText>
                   <PlayerCharacteristicsSection
                     editable
                     primaryPositionError={validationErrors.primaryPosition}
@@ -1688,8 +1535,8 @@ export default function OnboardingProfileScreen() {
                     primaryPosition={primaryPosition}
                     secondaryPositions={secondaryPositions}
                   />
-                  <View style={{ flexDirection: "row", gap: spacing[12] }}>
-                    <View style={{ flex: 1 }}>
+                  <View style={styles.buttonRow}>
+                    <View style={styles.flex1}>
                       <WheelPicker
                         label="Altezza (cm)"
                         max={220}
@@ -1699,7 +1546,7 @@ export default function OnboardingProfileScreen() {
                         value={parseWheelValue(heightCm)}
                       />
                     </View>
-                    <View style={{ flex: 1 }}>
+                    <View style={styles.flex1}>
                       <WheelPicker
                         label="Peso (kg)"
                         max={130}
@@ -1712,16 +1559,10 @@ export default function OnboardingProfileScreen() {
                   </View>
                 </View>
 
-                <View style={{ gap: spacing[10] }}>
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontSize: typography.fontSize[18],
-                      fontWeight: typography.fontWeight.heavy,
-                    }}
-                  >
+                <View style={styles.fieldGap10}>
+                  <AppText variant="headingSm">
                     Disponibilita'
-                  </Text>
+                  </AppText>
                   <AvailabilityRegionsSelector
                     onChange={(regions) => updateValue("transferRegions", regions.join(", "))}
                     value={fromDelimitedString(transferRegions)}
@@ -1730,16 +1571,11 @@ export default function OnboardingProfileScreen() {
                     onChange={(categories) => updateValue("preferredCategories", categories.join(", "))}
                     value={fromDelimitedString(preferredCategories)}
                   />
-                  <View style={{ gap: spacing[8] }}>
-                    <Text
-                      style={{
-                        color: colors.textPrimary,
-                        fontWeight: typography.fontWeight.bold,
-                      }}
-                    >
+                  <View style={styles.sectionHeaderGap}>
+                    <AppText variant="titleSm">
                       Disponibile al trasferimento?
-                    </Text>
-                    <View style={{ flexDirection: "row", gap: spacing[8] }}>
+                    </AppText>
+                    <View style={styles.optionPillRow}>
                       <OptionPill
                         active={isOpenToTransfer}
                         label="Si'"
@@ -1752,16 +1588,11 @@ export default function OnboardingProfileScreen() {
                       />
                     </View>
                   </View>
-                  <View style={{ gap: spacing[8] }}>
-                    <Text
-                      style={{
-                        color: colors.textPrimary,
-                        fontWeight: typography.fontWeight.bold,
-                      }}
-                    >
+                  <View style={styles.sectionHeaderGap}>
+                    <AppText variant="titleSm">
                       Disponibile a cambiare club subito?
-                    </Text>
-                    <View style={{ flexDirection: "row", gap: spacing[8] }}>
+                    </AppText>
+                    <View style={styles.optionPillRow}>
                       <OptionPill
                         active={willingToChangeClub}
                         label="Si'"
@@ -1776,20 +1607,14 @@ export default function OnboardingProfileScreen() {
                   </View>
                 </View>
 
-                <View style={{ gap: spacing[10] }}>
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontSize: typography.fontSize[18],
-                      fontWeight: typography.fontWeight.heavy,
-                    }}
-                  >
+                <View style={styles.fieldGap10}>
+                  <AppText variant="headingSm">
                     Carriera calcistica
-                  </Text>
-                  <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>
+                  </AppText>
+                  <AppText variant="bodySm" color="secondary">
                     Aggiungi una stagione per volta con squadra, categoria e
                     statistiche.
-                  </Text>
+                  </AppText>
                   <PlayerExperiencesSection
                     addButtonLabel="Aggiungi esperienza calcistica"
                     editable
@@ -1800,16 +1625,10 @@ export default function OnboardingProfileScreen() {
                   />
                 </View>
 
-                <View style={{ gap: spacing[10] }}>
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontSize: typography.fontSize[18],
-                      fontWeight: typography.fontWeight.heavy,
-                    }}
-                  >
+                <View style={styles.fieldGap10}>
+                  <AppText variant="headingSm">
                     Media e contenuti
-                  </Text>
+                  </AppText>
                   <MediaPickerField
                     buttonLabel={highlightVideoUrl ? "Sostituisci video" : "Carica video highlights"}
                     helperText="Seleziona un video dal cellulare per mostrare i tuoi highlights."
@@ -1859,16 +1678,10 @@ export default function OnboardingProfileScreen() {
             ) : null}
 
             {role === "coach" ? (
-              <View style={{ gap: spacing[10] }}>
-                <Text
-                  style={{
-                    color: colors.textPrimary,
-                    fontSize: typography.fontSize[18],
-                    fontWeight: typography.fontWeight.heavy,
-                  }}
-                >
+              <View style={styles.fieldGap10}>
+                <AppText variant="headingSm">
                   Profilo allenatore
-                </Text>
+                </AppText>
                 <Input
                   label="Licenze"
                   onChangeText={(value) => updateValue("licenses", value)}
@@ -1924,16 +1737,11 @@ export default function OnboardingProfileScreen() {
                   placeholder="Es. Lazio, Toscana"
                   value={coachPreferredRegions}
                 />
-                <View style={{ gap: spacing[8] }}>
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontWeight: typography.fontWeight.bold,
-                    }}
-                  >
+                <View style={styles.sectionHeaderGap}>
+                  <AppText variant="titleSm">
                     Disponibile a un nuovo incarico?
-                  </Text>
-                  <View style={{ flexDirection: "row", gap: spacing[8] }}>
+                  </AppText>
+                  <View style={styles.optionPillRow}>
                       <OptionPill
                         active={openToNewRole}
                         label="Si'"
@@ -1950,16 +1758,10 @@ export default function OnboardingProfileScreen() {
             ) : null}
 
             {role === "staff" ? (
-              <View style={{ gap: spacing[10] }}>
-                <Text
-                  style={{
-                    color: colors.textPrimary,
-                    fontSize: typography.fontSize[18],
-                    fontWeight: typography.fontWeight.heavy,
-                  }}
-                >
+              <View style={styles.fieldGap10}>
+                <AppText variant="headingSm">
                   Profilo staff tecnico
-                </Text>
+                </AppText>
                 <SelectField
                   label="Specializzazione"
                   onChange={(value) =>
@@ -1988,16 +1790,11 @@ export default function OnboardingProfileScreen() {
                   placeholder="Es. Lombardia, Emilia-Romagna"
                   value={staffPreferredRegions}
                 />
-                <View style={{ gap: spacing[8] }}>
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontWeight: typography.fontWeight.bold,
-                    }}
-                  >
+                <View style={styles.sectionHeaderGap}>
+                  <AppText variant="titleSm">
                     Disponibile a collaborare subito?
-                  </Text>
-                  <View style={{ flexDirection: "row", gap: spacing[8] }}>
+                  </AppText>
+                  <View style={styles.optionPillRow}>
                       <OptionPill
                         active={openToWork}
                         label="Si'"
@@ -2014,16 +1811,10 @@ export default function OnboardingProfileScreen() {
             ) : null}
 
             {role === "club_admin" ? (
-              <View style={{ gap: spacing[10] }}>
-                <Text
-                  style={{
-                    color: colors.textPrimary,
-                    fontSize: typography.fontSize[18],
-                    fontWeight: typography.fontWeight.heavy,
-                  }}
-                >
+              <View style={styles.fieldGap10}>
+                <AppText variant="headingSm">
                   Pagina societa'
-                </Text>
+                </AppText>
                 <Input
                   label="Categoria"
                   onChangeText={(value) => updateValue("clubCategory", value)}
@@ -2089,16 +1880,10 @@ export default function OnboardingProfileScreen() {
               </View>
             ) : null}
 
-            <View style={{ gap: spacing[10] }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: typography.fontSize[18],
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+            <View style={styles.fieldGap10}>
+              <AppText variant="headingSm">
                 Bio personale
-              </Text>
+              </AppText>
               <Input
                 label="Presentazione"
                 maxLength={400}
@@ -2115,15 +1900,15 @@ export default function OnboardingProfileScreen() {
               ) : null}
             </View>
 
-            <View style={{ flexDirection: "row", gap: spacing[12] }}>
-              <View style={{ flex: 1 }}>
+            <View style={styles.buttonRow}>
+              <View style={styles.flex1}>
                 <Button
                   label="Piu' tardi"
                   onPress={() => goToCompletion("details")}
                   variant="secondary"
                 />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.flex1}>
                 <Button
                   disabled={isBusy}
                   label={isBusy ? "Salvataggio..." : "Conferma profilo"}
@@ -2136,21 +1921,15 @@ export default function OnboardingProfileScreen() {
         ) : null}
 
         {step === "complete" ? (
-          <Card style={{ gap: spacing[16] }}>
-            <Text
-              style={{
-                color: colors.textPrimary,
-                fontSize: typography.fontSize[28],
-                fontWeight: typography.fontWeight.heavy,
-              }}
-            >
+          <Card style={styles.cardGap}>
+            <AppText variant="displaySm">
               Il tuo profilo e' pronto!
-            </Text>
-            <Text style={{ color: colors.textSecondary, lineHeight: 24 }}>
+            </AppText>
+            <AppText variant="bodySm" color="secondary">
               Ora puoi iniziare a connetterti con squadre, allenatori e
               giocatori. Se vuoi, potrai aggiungere altri dettagli in qualsiasi
               momento.
-            </Text>
+            </AppText>
             <Button
               label="Vai alla home feed"
               onPress={() => finishOnboarding("feed")}
@@ -2172,3 +1951,92 @@ export default function OnboardingProfileScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  backButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: spacing[12],
+  },
+  cardGap: {
+    gap: spacing[16],
+  },
+  decisionSummaryCard: {
+    backgroundColor: colors.surfaceMuted,
+    gap: spacing[8],
+  },
+  fieldGap10: {
+    gap: spacing[10],
+  },
+  fieldGap12: {
+    gap: spacing[12],
+  },
+  flex1: {
+    flex: 1,
+  },
+  formContent: {
+    gap: spacing[18],
+    paddingBottom: 28,
+  },
+  heroContainer: {
+    backgroundColor: colors.textPrimary,
+    borderRadius: radius[24],
+    gap: spacing[10],
+    padding: spacing[22],
+  },
+  optionPillRow: {
+    flexDirection: "row",
+    gap: spacing[8],
+  },
+  progressFill: {
+    backgroundColor: colors.heroSoft,
+    borderRadius: radius.full,
+    height: "100%",
+  },
+  progressLabel: {
+    fontWeight: "bold",
+  },
+  progressRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[12],
+    justifyContent: "space-between",
+  },
+  progressSection: {
+    gap: spacing[8],
+  },
+  progressTrack: {
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderRadius: radius.full,
+    height: 8,
+    overflow: "hidden",
+  },
+  sectionHeaderGap: {
+    gap: spacing[8],
+  },
+  selectionCard: {
+    borderRadius: radius[20],
+    borderWidth: 1,
+    gap: spacing[6],
+    padding: spacing[16],
+  },
+  stepChip: {
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[8],
+  },
+  stepChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
+  },
+});
