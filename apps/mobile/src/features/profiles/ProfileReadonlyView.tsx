@@ -42,6 +42,7 @@ type EditSection =
   | "bio"
   | "contact"
   | "playerSports"
+  | "playerExperiences"
   | "coachInfo"
   | "staffInfo"
   | "clubInfo"
@@ -137,7 +138,7 @@ export function ProfileReadonlyView({
       {role === "player" ? (
         <SectionCard
           description="Squadra, categoria, stagione e numeri chiave del percorso calcistico."
-          onEdit={() => onEdit("playerSports")}
+          onEdit={() => onEdit("playerExperiences")}
           title="Esperienze calcistiche"
         >
           <PlayerExperiencesSection

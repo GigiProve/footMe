@@ -15,13 +15,11 @@ import {
 } from "../media-upload-service";
 import {
   excludePrimaryFromSecondaryPositions,
-  type PlayerExperienceForm,
   type PlayerPosition,
   type PreferredFoot,
 } from "../player-sports";
 import {
   PlayerCharacteristicsSection,
-  PlayerExperiencesSection,
 } from "../player-sports-section";
 import {
   buildFullUpdatePayload,
@@ -32,13 +30,11 @@ import {
 import { validateBirthDateInput } from "../profile-form-utils";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import {
-  searchTeams,
   updateCompleteProfessionalProfile,
 } from "../profile-service";
 import { EditModalShell } from "./EditModalShell";
 
 type PlayerSportsFormState = {
-  careerEntries: PlayerExperienceForm[];
   heightCm: string;
   highlightVideoUrl: string;
   preferredCategories: string;
@@ -63,7 +59,6 @@ function buildFormFromProfile(
 ): PlayerSportsFormState {
   const state = buildInitialState(completeProfile);
   return {
-    careerEntries: state.careerEntries,
     heightCm: state.heightCm,
     highlightVideoUrl: state.highlightVideoUrl,
     preferredCategories: state.preferredCategories,
@@ -173,7 +168,6 @@ export function EditPlayerSportsModal({
       const baseState = buildInitialState(completeProfile);
       const mergedState = {
         ...baseState,
-        careerEntries: form.careerEntries,
         heightCm: form.heightCm,
         highlightVideoUrl: form.highlightVideoUrl,
         preferredCategories: form.preferredCategories,
@@ -274,16 +268,6 @@ export function EditPlayerSportsModal({
           />
         </View>
       </View>
-
-      <PlayerExperiencesSection
-        editable
-        experiences={form.careerEntries}
-        onChange={(entries) =>
-          setForm((prev) => ({ ...prev, careerEntries: entries }))
-        }
-        searchTeams={searchTeams}
-        showHeader={false}
-      />
 
       <View style={styles.physicalSection}>
         <AppText style={styles.physicalLabel}>Informazioni fisiche</AppText>

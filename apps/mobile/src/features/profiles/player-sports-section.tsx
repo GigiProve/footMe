@@ -16,6 +16,7 @@ import { SelectField } from "../../components/ui/select-field";
 import { WheelPicker } from "../../components/ui/wheel-picker";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
 import { Button, Card, Input } from "../../ui";
+import { ExperienceFlowScreen } from "./experience-flow-section";
 import { FootballPositionPicker } from "./football-position-picker";
 import {
   MONTH_OPTIONS,
@@ -23,7 +24,6 @@ import {
   PLAYER_SEASON_OPTIONS,
   PREFERRED_FOOT_OPTIONS,
   SEASON_PERIOD_OPTIONS,
-  createEmptyMultiSeasonDraft,
   createEmptySeasonEntry,
   experienceToMultiSeasonDraft,
   getMonthShortLabel,
@@ -866,7 +866,8 @@ export function PlayerExperiencesSection({
 }: PlayerExperiencesSectionProps) {
   const [draft, setDraft] = useState<MultiSeasonDraft | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const isScreenOpen = draft !== null;
+  const [flowOpen, setFlowOpen] = useState(false);
+  const isEditScreenOpen = draft !== null;
 
   const sortedExperiences = useMemo(
     () => sortPlayerExperiencesBySeason(experiences),
@@ -880,20 +881,14 @@ export function PlayerExperiencesSection({
         seasons.add(experience.seasonLabel);
       }
     }
-    // When editing, remove the edited entry's season so it can be re-selected
     if (editingIndex !== null && sortedExperiences[editingIndex]) {
       seasons.delete(sortedExperiences[editingIndex].seasonLabel);
     }
     return seasons;
   }, [editingIndex, sortedExperiences]);
 
-  function closeScreen() {
+  function closeEditScreen() {
     setDraft(null);
-    setEditingIndex(null);
-  }
-
-  function openNewExperience() {
-    setDraft(createEmptyMultiSeasonDraft());
     setEditingIndex(null);
   }
 
@@ -902,9 +897,9 @@ export function PlayerExperiencesSection({
     setEditingIndex(index);
   }
 
-  function handleSave() {
+  function handleEditSave() {
     if (!onChange || !draft) {
-      closeScreen();
+      closeEditScreen();
       return;
     }
 
@@ -920,7 +915,15 @@ export function PlayerExperiencesSection({
           ];
 
     onChange(sortPlayerExperiencesBySeason(nextExperiences));
-    closeScreen();
+    closeEditScreen();
+  }
+
+  function handleFlowSave(newExperiences: PlayerExperienceForm[]) {
+    if (!onChange) return;
+    onChange(
+      sortPlayerExperiencesBySeason([...sortedExperiences, ...newExperiences]),
+    );
+    setFlowOpen(false);
   }
 
   function handleDelete(index: number) {
@@ -948,7 +951,7 @@ export function PlayerExperiencesSection({
       {editable ? (
         <Button
           label={addButtonLabel}
-          onPress={openNewExperience}
+          onPress={() => setFlowOpen(true)}
           variant="secondary"
         />
       ) : null}
@@ -976,13 +979,23 @@ export function PlayerExperiencesSection({
         </Card>
       )}
 
-      {isScreenOpen ? (
+      {/* New flow for adding experiences */}
+      <ExperienceFlowScreen
+        existingExperiences={sortedExperiences}
+        onClose={() => setFlowOpen(false)}
+        onSave={handleFlowSave}
+        searchTeams={searchTeams}
+        visible={flowOpen}
+      />
+
+      {/* Legacy edit screen for existing experiences */}
+      {isEditScreenOpen ? (
         <AddExperienceScreen
           draft={draft}
           editingIndex={editingIndex}
-          onClose={closeScreen}
+          onClose={closeEditScreen}
           onDraftChange={setDraft}
-          onSave={handleSave}
+          onSave={handleEditSave}
           searchTeams={searchTeams}
           usedSeasons={usedSeasons}
         />

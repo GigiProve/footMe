@@ -5,6 +5,7 @@ import {
 } from "./player-sports";
 
 export type SelectOption<T extends string = string> = {
+  disabled?: boolean;
   label: string;
   value: T;
 };
