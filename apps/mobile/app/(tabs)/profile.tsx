@@ -11,6 +11,7 @@ import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/Ed
 import { EditCoachInfoModal } from "../../src/features/profiles/edit-modals/EditCoachInfoModal";
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
+import { EditPlayerExperiencesModal } from "../../src/features/profiles/edit-modals/EditPlayerExperiencesModal";
 import { EditPlayerSportsModal } from "../../src/features/profiles/edit-modals/EditPlayerSportsModal";
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
 import { buildHeaderDetails } from "../../src/features/profiles/profile-edit-helpers";
@@ -144,13 +145,21 @@ export default function ProfileScreen() {
             visible={activeModal === "contact"}
           />
           {role === "player" ? (
-            <EditPlayerSportsModal
-              completeProfile={completeProfile}
-              onClose={handleCloseModal}
-              onSaved={handleSaved}
-              userId={userId}
-              visible={activeModal === "playerSports"}
-            />
+            <>
+              <EditPlayerSportsModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "playerSports"}
+              />
+              <EditPlayerExperiencesModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                visible={activeModal === "playerExperiences"}
+              />
+            </>
           ) : null}
           {role === "coach" ? (
             <EditCoachInfoModal
