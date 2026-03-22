@@ -5,7 +5,12 @@ import type { ItalianCityOption } from "../profile-form-utils";
 import type { CompleteProfessionalProfile } from "../profile-service";
 
 import { PersonalInfoSection } from "../personal-info-section";
-import { buildFullUpdatePayload, buildInitialState } from "../profile-edit-helpers";
+import {
+  buildFullUpdatePayload,
+  buildInitialState,
+  fromDelimitedString,
+  toDelimitedString,
+} from "../profile-edit-helpers";
 import {
   ensureOption,
   getRegionFromCity,
@@ -22,6 +27,7 @@ type PersonalInfoFormState = {
   birthDate: string;
   city: string;
   fullName: string;
+  languages: string[];
   nationality: string;
   region: string;
 };
@@ -42,6 +48,7 @@ function getInitialFormState(
     birthDate: base.birthDate,
     city: base.city,
     fullName: base.fullName,
+    languages: fromDelimitedString(base.languages),
     nationality: base.nationality,
     region: base.region,
   };
@@ -163,6 +170,7 @@ export function EditPersonalInfoModal({
         fullName: trimmedName,
         birthDate: form.birthDate,
         city: form.city,
+        languages: toDelimitedString(form.languages),
         nationality: form.nationality,
         region: form.region,
       };
@@ -200,12 +208,14 @@ export function EditPersonalInfoModal({
         citySuggestions={citySuggestions}
         editable
         fullName={form.fullName}
+        languages={form.languages}
         nationality={form.nationality}
         nationalityOptions={nationalityOptions}
         onBirthDateChange={(value) => updateField("birthDate", value)}
         onCityChange={(value) => updateField("city", value)}
         onCitySuggestionPress={handleCitySuggestionPress}
         onFullNameChange={(value) => updateField("fullName", value)}
+        onLanguagesChange={(value) => updateField("languages", value)}
         onNationalityChange={(value) => updateField("nationality", value)}
         onRegionChange={(value) => updateField("region", value)}
         region={form.region}

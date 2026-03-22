@@ -29,6 +29,7 @@ describe("personal-info-section", () => {
           city="Milano"
           citySuggestions={citySuggestions}
           fullName="Mario Rossi"
+          languages={[]}
           nationality="IT"
           nationalityOptions={[{ label: "Italia", value: "IT" }]}
           region="Lombardia"

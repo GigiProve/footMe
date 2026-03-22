@@ -140,6 +140,7 @@ export type ProfileFormState = {
   heightCm: string;
   highlightVideoUrl: string;
   isOpenToTransfer: boolean;
+  languages: string;
   licenses: string;
   nationality: string;
   openToNewRole: boolean;
@@ -214,6 +215,7 @@ export function buildInitialState(
     heightCm: playerProfile?.height_cm ? String(playerProfile.height_cm) : "",
     highlightVideoUrl: playerProfile?.highlight_video_url ?? "",
     isOpenToTransfer: data.profile.is_open_to_transfer,
+    languages: toDelimitedString(data.profile.languages),
     licenses: toDelimitedString(coachProfile?.licenses),
     nationality: data.profile.nationality ?? "",
     openToNewRole: coachProfile?.open_to_new_role ?? false,
@@ -326,6 +328,7 @@ export function buildFullUpdatePayload(
       city: parseOptionalText(formState.city),
       full_name: formState.fullName.trim(),
       is_open_to_transfer: formState.isOpenToTransfer,
+      languages: fromDelimitedString(formState.languages),
       nationality: parseOptionalText(formState.nationality),
       region: parseOptionalText(formState.region),
     },

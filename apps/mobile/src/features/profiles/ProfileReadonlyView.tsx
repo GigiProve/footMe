@@ -29,6 +29,7 @@ import {
   formatBirthDateInputValue,
   formatOptionalSummary,
   getOptionLabel,
+  LANGUAGE_OPTIONS,
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
 } from "./profile-form-utils";
@@ -120,6 +121,14 @@ export function ProfileReadonlyView({
                 : ""
             }
           />
+          {completeProfile.profile.languages.length > 0 ? (
+            <Field
+              label="Lingue parlate"
+              value={completeProfile.profile.languages
+                .map((code) => getOptionLabel(LANGUAGE_OPTIONS, code))
+                .join(", ")}
+            />
+          ) : null}
         </SectionCard>
       ) : null}
 

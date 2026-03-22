@@ -21,6 +21,7 @@ type BaseProfileRecord = {
   full_name: string;
   id: string;
   is_open_to_transfer: boolean;
+  languages: string[];
   nationality: string | null;
   region: string | null;
   role: AppRole;
@@ -193,6 +194,7 @@ export type CompleteProfessionalProfileUpdate = {
     city: string | null;
     full_name: string;
     is_open_to_transfer: boolean;
+    languages: string[];
     nationality: string | null;
     region: string | null;
   };
@@ -279,6 +281,7 @@ function normalizeBaseProfileRecord(
     full_name: normalizeRequiredText(rawProfile?.full_name, "Profilo FootMe"),
     id: normalizeRequiredText(rawProfile?.id, profileId),
     is_open_to_transfer: normalizeBoolean(rawProfile?.is_open_to_transfer),
+    languages: normalizeStringArray(rawProfile?.languages),
     nationality: normalizeOptionalText(rawProfile?.nationality),
     region: normalizeOptionalText(rawProfile?.region),
     role: normalizeRole(rawProfile?.role),
@@ -464,7 +467,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   const { data: profileData, error: profileError } = await supabase
     .from("profiles_with_age")
     .select(
-      "id, full_name, role, birth_date, age, nationality, bio, avatar_url, region, city, is_open_to_transfer",
+      "id, full_name, role, birth_date, age, nationality, bio, avatar_url, region, city, is_open_to_transfer, languages",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -616,6 +619,7 @@ export async function updateCompleteProfessionalProfile(
       city: input.profile.city,
       full_name: input.profile.full_name,
       is_open_to_transfer: input.profile.is_open_to_transfer,
+      languages: input.profile.languages,
       nationality: input.profile.nationality,
       region: input.profile.region,
     })

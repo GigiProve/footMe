@@ -433,7 +433,7 @@ function SeasonDetailCard({
             max={200}
             min={0}
             onChange={(val) => onChange({ ...detail, appearances: String(val) })}
-            value={detail.appearances ? parseInt(detail.appearances, 10) : null}
+            value={detail.appearances ? parseInt(detail.appearances, 10) : 0}
           />
         </View>
         <View style={styles.statCell}>
@@ -443,7 +443,7 @@ function SeasonDetailCard({
             max={200}
             min={0}
             onChange={(val) => onChange({ ...detail, goals: String(val) })}
-            value={detail.goals ? parseInt(detail.goals, 10) : null}
+            value={detail.goals ? parseInt(detail.goals, 10) : 0}
           />
         </View>
         <View style={styles.statCell}>
@@ -453,7 +453,7 @@ function SeasonDetailCard({
             max={200}
             min={0}
             onChange={(val) => onChange({ ...detail, assists: String(val) })}
-            value={detail.assists ? parseInt(detail.assists, 10) : null}
+            value={detail.assists ? parseInt(detail.assists, 10) : 0}
           />
         </View>
       </View>

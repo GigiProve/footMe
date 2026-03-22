@@ -884,6 +884,7 @@ export default function OnboardingProfileScreen() {
           city: null,
           full_name: fullName,
           is_open_to_transfer: isOpenToTransfer,
+          languages: [],
           nationality,
           region: null,
         },

@@ -70,6 +70,7 @@ function buildUpdateInput() {
       city: "Perugia",
       full_name: "Marco Rossi",
       is_open_to_transfer: true,
+      languages: [],
       nationality: "IT",
       region: "Umbria",
     },
