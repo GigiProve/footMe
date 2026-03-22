@@ -277,7 +277,10 @@ function ValidationMessage({
   tone?: "danger" | "muted";
 }) {
   return (
-    <AppText variant="bodySm" color={tone === "danger" ? "danger" : "secondary"}>
+    <AppText
+      variant="bodySm"
+      color={tone === "danger" ? "danger" : "secondary"}
+    >
       {children}
     </AppText>
   );
@@ -348,12 +351,17 @@ export default function OnboardingProfileScreen() {
   routerRef.current = router;
   const params = useLocalSearchParams<{ step?: string | string[] }>();
   const { refreshProfile, session } = useSession();
-  const { form, isHydrated, patchForm, resetForm, setCurrentStep, setFormValue } =
-    useOnboardingForm();
+  const {
+    form,
+    isHydrated,
+    patchForm,
+    resetForm,
+    setCurrentStep,
+    setFormValue,
+  } = useOnboardingForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<OnboardingValidationErrors>(
-    {},
-  );
+  const [validationErrors, setValidationErrors] =
+    useState<OnboardingValidationErrors>({});
 
   const requestedStep = useMemo(() => {
     if (Array.isArray(params.step)) {
@@ -507,7 +515,9 @@ export default function OnboardingProfileScreen() {
       patchForm({
         clubCountry: value,
         clubPhoneCountryCode:
-          !clubPhone.trim() && country ? country.phoneCountryCode : clubPhoneCountryCode,
+          !clubPhone.trim() && country
+            ? country.phoneCountryCode
+            : clubPhoneCountryCode,
       });
       clearValidationErrors(["clubCountry"]);
     },
@@ -546,7 +556,9 @@ export default function OnboardingProfileScreen() {
       patchForm({
         nationality: value,
         phoneCountryCode:
-          !phoneNumber.trim() && country ? country.phoneCountryCode : phoneCountryCode,
+          !phoneNumber.trim() && country
+            ? country.phoneCountryCode
+            : phoneCountryCode,
       });
       clearValidationErrors(["nationality", "phoneNumber"]);
     },
@@ -576,7 +588,11 @@ export default function OnboardingProfileScreen() {
   );
 
   const handleBackNavigation = useCallback(() => {
-    const previousStep = getPreviousOnboardingStep(step, lastCompletedStep, role as AppRole | "");
+    const previousStep = getPreviousOnboardingStep(
+      step,
+      lastCompletedStep,
+      role as AppRole | "",
+    );
 
     if (!previousStep) {
       return;
@@ -741,14 +757,20 @@ export default function OnboardingProfileScreen() {
       const duplicates = await checkDuplicateClubs(clubName, clubCity);
 
       if (duplicates.length > 0) {
-        const names = duplicates.map((d) => `• ${d.name} (${d.city})`).join("\n");
+        const names = duplicates
+          .map((d) => `• ${d.name} (${d.city})`)
+          .join("\n");
 
         const confirmed = await new Promise<boolean>((resolve) => {
           Alert.alert(
             "Società simile già presente",
             `Esiste già una società con un nome simile:\n\n${names}\n\nVuoi continuare comunque?`,
             [
-              { text: "Annulla", style: "cancel", onPress: () => resolve(false) },
+              {
+                text: "Annulla",
+                style: "cancel",
+                onPress: () => resolve(false),
+              },
               { text: "Continua comunque", onPress: () => resolve(true) },
             ],
           );
@@ -847,13 +869,17 @@ export default function OnboardingProfileScreen() {
                 city: clubCity.trim(),
                 club_colors: parseOptionalText(clubColors),
                 club_email: clubEmail.trim().toLowerCase() || null,
-                club_phone: parseOptionalText(composePhoneNumber(clubPhoneCountryCode, clubPhone)),
+                club_phone: parseOptionalText(
+                  composePhoneNumber(clubPhoneCountryCode, clubPhone),
+                ),
                 country: clubCountry || "IT",
                 description: parseOptionalText(clubDescription),
                 field_address: parseOptionalText(clubFieldAddress),
                 founding_year: parseOptionalNumber(clubFoundingYear),
                 gallery_urls: clubGalleryItems.map((item) => item.url),
-                headquarters_address: parseOptionalText(clubHeadquartersAddress),
+                headquarters_address: parseOptionalText(
+                  clubHeadquartersAddress,
+                ),
                 league: parseOptionalText(clubLeague),
                 logo_url: parseOptionalText(clubLogoUrl),
                 name: clubName.trim(),
@@ -882,7 +908,8 @@ export default function OnboardingProfileScreen() {
                 highlight_video_url: parseOptionalText(highlightVideoUrl),
                 preferred_categories: fromDelimitedString(preferredCategories),
                 preferred_foot: preferredFoot || null,
-                primary_position: primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
+                primary_position:
+                  primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
                 secondary_positions: secondaryPositions,
                 transfer_regions: fromDelimitedString(transferRegions),
                 weight_kg: parseOptionalNumber(weightKg),
@@ -989,11 +1016,11 @@ export default function OnboardingProfileScreen() {
           headerShown: false,
         }}
       />
-      <KeyboardAwareForm
-        contentContainerStyle={styles.formContent}
-      >
+      <KeyboardAwareForm contentContainerStyle={styles.formContent}>
         <View style={styles.heroContainer}>
-          {canGoBack ? <OnboardingBackButton onPress={handleBackNavigation} /> : null}
+          {canGoBack ? (
+            <OnboardingBackButton onPress={handleBackNavigation} />
+          ) : null}
           <AppText variant="overline" color="inverseSoft">
             Primo accesso
           </AppText>
@@ -1006,7 +1033,11 @@ export default function OnboardingProfileScreen() {
           </AppText>
           <View style={styles.progressSection}>
             <View style={styles.progressRow}>
-              <AppText variant="bodySm" color="inverse" style={styles.progressLabel}>
+              <AppText
+                variant="bodySm"
+                color="inverse"
+                style={styles.progressLabel}
+              >
                 Profilo {progress.percentage}% completato
               </AppText>
               <AppText variant="overline" color="inverseMuted">
@@ -1078,9 +1109,7 @@ export default function OnboardingProfileScreen() {
         {step === "base" ? (
           <Card style={styles.cardGap}>
             <View style={styles.sectionHeaderGap}>
-              <AppText variant="headingLg">
-                Informazioni essenziali
-              </AppText>
+              <AppText variant="headingLg">Informazioni essenziali</AppText>
               <AppText variant="bodySm" color="secondary">
                 Completa i dati minimi per attivare il profilo. I campi
                 obbligatori sono evidenziati e i suggerimenti automatici ti
@@ -1099,11 +1128,17 @@ export default function OnboardingProfileScreen() {
                 onBlur={() => handleFormattedNameBlur("firstName")}
                 onChangeText={(value) => updateValue("firstName", value)}
                 placeholder="Es. Marco"
-                style={validationErrors.firstName ? { borderColor: colors.danger } : undefined}
+                style={
+                  validationErrors.firstName
+                    ? { borderColor: colors.danger }
+                    : undefined
+                }
                 value={firstName}
               />
               {validationErrors.firstName ? (
-                <ValidationMessage>{validationErrors.firstName}</ValidationMessage>
+                <ValidationMessage>
+                  {validationErrors.firstName}
+                </ValidationMessage>
               ) : null}
               <Input
                 autoCapitalize="words"
@@ -1112,18 +1147,22 @@ export default function OnboardingProfileScreen() {
                 onBlur={() => handleFormattedNameBlur("lastName")}
                 onChangeText={(value) => updateValue("lastName", value)}
                 placeholder="Es. Rossi"
-                style={validationErrors.lastName ? { borderColor: colors.danger } : undefined}
+                style={
+                  validationErrors.lastName
+                    ? { borderColor: colors.danger }
+                    : undefined
+                }
                 value={lastName}
               />
               {validationErrors.lastName ? (
-                <ValidationMessage>{validationErrors.lastName}</ValidationMessage>
+                <ValidationMessage>
+                  {validationErrors.lastName}
+                </ValidationMessage>
               ) : null}
             </View>
 
             <View style={styles.sectionHeaderGap}>
-              <AppText variant="titleSm">
-                Sesso *
-              </AppText>
+              <AppText variant="titleSm">Sesso *</AppText>
               <View style={styles.fieldGap10}>
                 {genderOptions.map((entry) => (
                   <SelectionCard
@@ -1131,7 +1170,9 @@ export default function OnboardingProfileScreen() {
                     active={gender === entry.value}
                     description={undefined}
                     label={entry.label}
-                    onPress={() => updateValue("gender", entry.value, ["gender"])}
+                    onPress={() =>
+                      updateValue("gender", entry.value, ["gender"])
+                    }
                     testID={`gender-card-${entry.value}`}
                   />
                 ))}
@@ -1148,7 +1189,9 @@ export default function OnboardingProfileScreen() {
               value={birthDate}
             />
             {validationErrors.birthDate ? (
-              <ValidationMessage>{validationErrors.birthDate}</ValidationMessage>
+              <ValidationMessage>
+                {validationErrors.birthDate}
+              </ValidationMessage>
             ) : null}
 
             <NationalityAutocompleteInput
@@ -1173,24 +1216,31 @@ export default function OnboardingProfileScreen() {
               countryCode={phoneCountryCode}
               errorMessage={validationErrors.phoneNumber}
               label="Numero di cellulare"
-              onChangeCountryCode={(value) => updateValue("phoneCountryCode", value, ["phoneNumber"])}
-              onChangePhoneNumber={(value) => updateValue("phoneNumber", value, ["phoneNumber"])}
+              onChangeCountryCode={(value) =>
+                updateValue("phoneCountryCode", value, ["phoneNumber"])
+              }
+              onChangePhoneNumber={(value) =>
+                updateValue("phoneNumber", value, ["phoneNumber"])
+              }
               phoneNumber={phoneNumber}
             />
 
             <MediaPickerField
-              buttonLabel={avatarUrl ? "Sostituisci foto" : "Carica foto profilo"}
+              buttonLabel={
+                avatarUrl ? "Sostituisci foto" : "Carica foto profilo"
+              }
               helperText="Se non la carichi ora useremo un'immagine profilo blank di default."
               isUploading={uploadingField === "avatar"}
               label="Foto profilo"
               onPick={() =>
                 handleMediaUpload({
-                   field: "avatar",
-                   folder: "avatars",
-                   mediaTypes: ["images"],
-                   onUploaded: (items) => updateValue("avatarUrl", items[0]?.url ?? ""),
-                 })
-               }
+                  field: "avatar",
+                  folder: "avatars",
+                  mediaTypes: ["images"],
+                  onUploaded: (items) =>
+                    updateValue("avatarUrl", items[0]?.url ?? ""),
+                })
+              }
               onRemove={() => updateValue("avatarUrl", "")}
               previewUrl={withDefaultProfileAvatar(avatarUrl)}
               removable
@@ -1210,21 +1260,33 @@ export default function OnboardingProfileScreen() {
                   label="Nome società"
                   onChangeText={(value) => updateValue("clubName", value)}
                   placeholder="Es. ASD Example"
-                  style={validationErrors.clubName ? { borderColor: colors.danger } : undefined}
+                  style={
+                    validationErrors.clubName
+                      ? { borderColor: colors.danger }
+                      : undefined
+                  }
                   value={clubName}
                 />
                 {validationErrors.clubName ? (
-                  <ValidationMessage>{validationErrors.clubName}</ValidationMessage>
+                  <ValidationMessage>
+                    {validationErrors.clubName}
+                  </ValidationMessage>
                 ) : null}
                 <Input
                   label="Città"
                   onChangeText={(value) => updateValue("clubCity", value)}
                   placeholder="Es. Perugia"
-                  style={validationErrors.clubCity ? { borderColor: colors.danger } : undefined}
+                  style={
+                    validationErrors.clubCity
+                      ? { borderColor: colors.danger }
+                      : undefined
+                  }
                   value={clubCity}
                 />
                 {validationErrors.clubCity ? (
-                  <ValidationMessage>{validationErrors.clubCity}</ValidationMessage>
+                  <ValidationMessage>
+                    {validationErrors.clubCity}
+                  </ValidationMessage>
                 ) : null}
                 <SelectField
                   label="Regione"
@@ -1234,7 +1296,9 @@ export default function OnboardingProfileScreen() {
                   value={clubRegion}
                 />
                 {validationErrors.clubRegion ? (
-                  <ValidationMessage>{validationErrors.clubRegion}</ValidationMessage>
+                  <ValidationMessage>
+                    {validationErrors.clubRegion}
+                  </ValidationMessage>
                 ) : null}
               </View>
             ) : null}
@@ -1262,19 +1326,15 @@ export default function OnboardingProfileScreen() {
         {step === "club" ? (
           <Card style={styles.cardGap}>
             <View style={styles.sectionHeaderGap}>
-              <AppText variant="headingLg">
-                Il tuo club
-              </AppText>
+              <AppText variant="headingLg">Il tuo club</AppText>
               <AppText variant="bodySm" color="secondary">
-                Inserisci le informazioni della tua società. I campi
-                obbligatori sono contrassegnati con *.
+                Inserisci le informazioni della tua società. I campi obbligatori
+                sono contrassegnati con *.
               </AppText>
             </View>
 
             <View style={styles.sectionHeaderGap}>
-              <AppText variant="headingSm">
-                Dati del responsabile
-              </AppText>
+              <AppText variant="headingSm">Dati del responsabile</AppText>
               <View style={styles.fieldGap12}>
                 <Input
                   autoCapitalize="words"
@@ -1283,11 +1343,17 @@ export default function OnboardingProfileScreen() {
                   onBlur={() => handleFormattedNameBlur("firstName")}
                   onChangeText={(value) => updateValue("firstName", value)}
                   placeholder="Es. Marco"
-                  style={validationErrors.firstName ? { borderColor: colors.danger } : undefined}
+                  style={
+                    validationErrors.firstName
+                      ? { borderColor: colors.danger }
+                      : undefined
+                  }
                   value={firstName}
                 />
                 {validationErrors.firstName ? (
-                  <ValidationMessage>{validationErrors.firstName}</ValidationMessage>
+                  <ValidationMessage>
+                    {validationErrors.firstName}
+                  </ValidationMessage>
                 ) : null}
                 <Input
                   autoCapitalize="words"
@@ -1296,33 +1362,45 @@ export default function OnboardingProfileScreen() {
                   onBlur={() => handleFormattedNameBlur("lastName")}
                   onChangeText={(value) => updateValue("lastName", value)}
                   placeholder="Es. Rossi"
-                  style={validationErrors.lastName ? { borderColor: colors.danger } : undefined}
+                  style={
+                    validationErrors.lastName
+                      ? { borderColor: colors.danger }
+                      : undefined
+                  }
                   value={lastName}
                 />
                 {validationErrors.lastName ? (
-                  <ValidationMessage>{validationErrors.lastName}</ValidationMessage>
+                  <ValidationMessage>
+                    {validationErrors.lastName}
+                  </ValidationMessage>
                 ) : null}
               </View>
             </View>
 
             <View style={styles.sectionHeaderGap}>
-              <AppText variant="headingSm">
-                Dati della società
-              </AppText>
+              <AppText variant="headingSm">Dati della società</AppText>
               <View style={styles.fieldGap12}>
                 <Input
                   label="Nome società *"
                   onChangeText={(value) => updateValue("clubName", value)}
                   placeholder="Es. ASD Example"
-                  style={validationErrors.clubName ? { borderColor: colors.danger } : undefined}
+                  style={
+                    validationErrors.clubName
+                      ? { borderColor: colors.danger }
+                      : undefined
+                  }
                   value={clubName}
                 />
                 {validationErrors.clubName ? (
-                  <ValidationMessage>{validationErrors.clubName}</ValidationMessage>
+                  <ValidationMessage>
+                    {validationErrors.clubName}
+                  </ValidationMessage>
                 ) : null}
 
                 <MediaPickerField
-                  buttonLabel={clubLogoUrl ? "Sostituisci logo" : "Carica logo società"}
+                  buttonLabel={
+                    clubLogoUrl ? "Sostituisci logo" : "Carica logo società"
+                  }
                   helperText="Carica il logo della tua società."
                   isUploading={uploadingField === "clubLogo"}
                   label="Logo"
@@ -1331,16 +1409,15 @@ export default function OnboardingProfileScreen() {
                       field: "clubLogo",
                       folder: "club-logos",
                       mediaTypes: ["images"],
-                      onUploaded: (items) => updateValue("clubLogoUrl", items[0]?.url ?? ""),
+                      onUploaded: (items) =>
+                        updateValue("clubLogoUrl", items[0]?.url ?? ""),
                     })
                   }
                   onRemove={() => updateValue("clubLogoUrl", "")}
                   previewUrl={clubLogoUrl || undefined}
                   removable
                   selectedLabel={
-                    clubLogoUrl
-                      ? "Logo caricato correttamente"
-                      : undefined
+                    clubLogoUrl ? "Logo caricato correttamente" : undefined
                   }
                 />
 
@@ -1348,13 +1425,21 @@ export default function OnboardingProfileScreen() {
                   keyboardType="number-pad"
                   label="Anno di fondazione"
                   maxLength={4}
-                  onChangeText={(value) => updateValue("clubFoundingYear", value)}
+                  onChangeText={(value) =>
+                    updateValue("clubFoundingYear", value)
+                  }
                   placeholder="Es. 1920"
-                  style={validationErrors.clubFoundingYear ? { borderColor: colors.danger } : undefined}
+                  style={
+                    validationErrors.clubFoundingYear
+                      ? { borderColor: colors.danger }
+                      : undefined
+                  }
                   value={clubFoundingYear}
                 />
                 {validationErrors.clubFoundingYear ? (
-                  <ValidationMessage>{validationErrors.clubFoundingYear}</ValidationMessage>
+                  <ValidationMessage>
+                    {validationErrors.clubFoundingYear}
+                  </ValidationMessage>
                 ) : null}
 
                 <Input
@@ -1393,7 +1478,9 @@ export default function OnboardingProfileScreen() {
 
                 <Input
                   label="Indirizzo sede"
-                  onChangeText={(value) => updateValue("clubHeadquartersAddress", value)}
+                  onChangeText={(value) =>
+                    updateValue("clubHeadquartersAddress", value)
+                  }
                   placeholder="Es. Via Roma 1"
                   value={clubHeadquartersAddress}
                 />
@@ -1404,19 +1491,29 @@ export default function OnboardingProfileScreen() {
                   label="Email società *"
                   onChangeText={(value) => updateValue("clubEmail", value)}
                   placeholder="Es. info@asdesempio.it"
-                  style={validationErrors.clubEmail ? { borderColor: colors.danger } : undefined}
+                  style={
+                    validationErrors.clubEmail
+                      ? { borderColor: colors.danger }
+                      : undefined
+                  }
                   value={clubEmail}
                 />
                 {validationErrors.clubEmail ? (
-                  <ValidationMessage>{validationErrors.clubEmail}</ValidationMessage>
+                  <ValidationMessage>
+                    {validationErrors.clubEmail}
+                  </ValidationMessage>
                 ) : null}
 
                 <PhoneInputWithCountryCode
                   countryCode={clubPhoneCountryCode}
                   errorMessage={validationErrors.clubPhone}
                   label="Telefono società"
-                  onChangeCountryCode={(value) => updateValue("clubPhoneCountryCode", value, ["clubPhone"])}
-                  onChangePhoneNumber={(value) => updateValue("clubPhone", value, ["clubPhone"])}
+                  onChangeCountryCode={(value) =>
+                    updateValue("clubPhoneCountryCode", value, ["clubPhone"])
+                  }
+                  onChangePhoneNumber={(value) =>
+                    updateValue("clubPhone", value, ["clubPhone"])
+                  }
                   phoneNumber={clubPhone}
                 />
 
@@ -1426,16 +1523,24 @@ export default function OnboardingProfileScreen() {
                   label="Sito web"
                   onChangeText={(value) => updateValue("clubWebsite", value)}
                   placeholder="Es. https://www.asdesempio.it"
-                  style={validationErrors.clubWebsite ? { borderColor: colors.danger } : undefined}
+                  style={
+                    validationErrors.clubWebsite
+                      ? { borderColor: colors.danger }
+                      : undefined
+                  }
                   value={clubWebsite}
                 />
                 {validationErrors.clubWebsite ? (
-                  <ValidationMessage>{validationErrors.clubWebsite}</ValidationMessage>
+                  <ValidationMessage>
+                    {validationErrors.clubWebsite}
+                  </ValidationMessage>
                 ) : null}
 
                 <Input
                   label="Indirizzo campo"
-                  onChangeText={(value) => updateValue("clubFieldAddress", value)}
+                  onChangeText={(value) =>
+                    updateValue("clubFieldAddress", value)
+                  }
                   placeholder="Es. Stadio Comunale, Via dello Sport 5"
                   value={clubFieldAddress}
                 />
@@ -1474,12 +1579,8 @@ export default function OnboardingProfileScreen() {
               </AppText>
             </View>
 
-            <Card
-              style={styles.decisionSummaryCard}
-            >
-              <AppText variant="titleSm">
-                Profilo selezionato
-              </AppText>
+            <Card style={styles.decisionSummaryCard}>
+              <AppText variant="titleSm">Profilo selezionato</AppText>
               <AppText variant="bodySm" color="secondary">
                 {roleOptions.find((entry) => entry.value === role)?.label} ·{" "}
                 {fullName}
@@ -1518,29 +1619,34 @@ export default function OnboardingProfileScreen() {
             {role === "player" ? (
               <>
                 <View style={styles.fieldGap10}>
-                  <AppText variant="headingSm">
-                    Informazioni tecniche
-                  </AppText>
+                  <AppText variant="headingSm">Informazioni tecniche</AppText>
                   <PlayerCharacteristicsSection
                     editable
                     primaryPositionError={validationErrors.primaryPosition}
-                    onPreferredFootChange={(value) => updateValue("preferredFoot", value)}
+                    onPreferredFootChange={(value) =>
+                      updateValue("preferredFoot", value)
+                    }
                     onPrimaryPositionChange={(value) => {
                       patchForm({
                         primaryPosition: value,
-                        secondaryPositions: excludePrimaryFromSecondaryPositions(
-                          secondaryPositions,
-                          value,
-                        ),
+                        secondaryPositions:
+                          excludePrimaryFromSecondaryPositions(
+                            secondaryPositions,
+                            value,
+                          ),
                       });
-                      clearValidationErrors(["primaryPosition", "secondaryPositions"]);
+                      clearValidationErrors([
+                        "primaryPosition",
+                        "secondaryPositions",
+                      ]);
                     }}
                     onSecondaryPositionsChange={(value) => {
                       patchForm({
-                        secondaryPositions: excludePrimaryFromSecondaryPositions(
-                          value,
-                          primaryPosition,
-                        ),
+                        secondaryPositions:
+                          excludePrimaryFromSecondaryPositions(
+                            value,
+                            primaryPosition,
+                          ),
                       });
                       clearValidationErrors(["secondaryPositions"]);
                     }}
@@ -1554,7 +1660,9 @@ export default function OnboardingProfileScreen() {
                         label="Altezza (cm)"
                         max={220}
                         min={140}
-                        onChange={(value) => updateValue("heightCm", String(value))}
+                        onChange={(value) =>
+                          updateValue("heightCm", String(value))
+                        }
                         unit="cm"
                         value={parseWheelValue(heightCm)}
                       />
@@ -1564,7 +1672,9 @@ export default function OnboardingProfileScreen() {
                         label="Peso (kg)"
                         max={130}
                         min={40}
-                        onChange={(value) => updateValue("weightKg", String(value))}
+                        onChange={(value) =>
+                          updateValue("weightKg", String(value))
+                        }
                         unit="kg"
                         value={parseWheelValue(weightKg)}
                       />
@@ -1573,15 +1683,17 @@ export default function OnboardingProfileScreen() {
                 </View>
 
                 <View style={styles.fieldGap10}>
-                  <AppText variant="headingSm">
-                    Disponibilita'
-                  </AppText>
+                  <AppText variant="headingSm">Disponibilita'</AppText>
                   <AvailabilityRegionsSelector
-                    onChange={(regions) => updateValue("transferRegions", regions.join(", "))}
+                    onChange={(regions) =>
+                      updateValue("transferRegions", regions.join(", "))
+                    }
                     value={fromDelimitedString(transferRegions)}
                   />
                   <InterestCategoriesSelector
-                    onChange={(categories) => updateValue("preferredCategories", categories.join(", "))}
+                    onChange={(categories) =>
+                      updateValue("preferredCategories", categories.join(", "))
+                    }
                     value={fromDelimitedString(preferredCategories)}
                   />
                   <View style={styles.sectionHeaderGap}>
@@ -1614,16 +1726,16 @@ export default function OnboardingProfileScreen() {
                       <OptionPill
                         active={!willingToChangeClub}
                         label="No"
-                        onPress={() => updateValue("willingToChangeClub", false)}
+                        onPress={() =>
+                          updateValue("willingToChangeClub", false)
+                        }
                       />
                     </View>
                   </View>
                 </View>
 
                 <View style={styles.fieldGap10}>
-                  <AppText variant="headingSm">
-                    Carriera calcistica
-                  </AppText>
+                  <AppText variant="headingSm">Carriera calcistica</AppText>
                   <AppText variant="bodySm" color="secondary">
                     Aggiungi una stagione per volta con squadra, categoria e
                     statistiche.
@@ -1639,11 +1751,13 @@ export default function OnboardingProfileScreen() {
                 </View>
 
                 <View style={styles.fieldGap10}>
-                  <AppText variant="headingSm">
-                    Media e contenuti
-                  </AppText>
+                  <AppText variant="headingSm">Media e contenuti</AppText>
                   <MediaPickerField
-                    buttonLabel={highlightVideoUrl ? "Sostituisci video" : "Carica video highlights"}
+                    buttonLabel={
+                      highlightVideoUrl
+                        ? "Sostituisci video"
+                        : "Carica video highlights"
+                    }
                     helperText="Seleziona un video dal cellulare per mostrare i tuoi highlights."
                     isUploading={uploadingField === "highlight-video"}
                     label="Video highlights"
@@ -1692,9 +1806,7 @@ export default function OnboardingProfileScreen() {
 
             {role === "coach" ? (
               <View style={styles.fieldGap10}>
-                <AppText variant="headingSm">
-                  Profilo allenatore
-                </AppText>
+                <AppText variant="headingSm">Profilo allenatore</AppText>
                 <Input
                   label="Licenze"
                   onChangeText={(value) => updateValue("licenses", value)}
@@ -1709,7 +1821,9 @@ export default function OnboardingProfileScreen() {
                 />
                 <Input
                   label="Categorie allenate"
-                  onChangeText={(value) => updateValue("coachedCategories", value)}
+                  onChangeText={(value) =>
+                    updateValue("coachedCategories", value)
+                  }
                   placeholder="Juniores, Promozione"
                   value={coachedCategories}
                 />
@@ -1721,20 +1835,24 @@ export default function OnboardingProfileScreen() {
                   value={gamePhilosophy}
                 />
                 <MediaPickerField
-                  buttonLabel={technicalVideoUrl ? "Sostituisci video" : "Carica video tecnico"}
+                  buttonLabel={
+                    technicalVideoUrl
+                      ? "Sostituisci video"
+                      : "Carica video tecnico"
+                  }
                   helperText="Carica dal telefono una clip tecnica o una presentazione video."
                   isUploading={uploadingField === "coach-video"}
                   label="Video tecnico"
                   mediaType="video"
                   onPick={() =>
                     handleMediaUpload({
-                        field: "coach-video",
-                        folder: "coach-videos",
-                        mediaTypes: ["videos"],
-                        onUploaded: (items) =>
-                          updateValue("technicalVideoUrl", items[0]?.url ?? ""),
-                      })
-                    }
+                      field: "coach-video",
+                      folder: "coach-videos",
+                      mediaTypes: ["videos"],
+                      onUploaded: (items) =>
+                        updateValue("technicalVideoUrl", items[0]?.url ?? ""),
+                    })
+                  }
                   onRemove={() => updateValue("technicalVideoUrl", "")}
                   previewUrl={technicalVideoUrl || undefined}
                   removable
@@ -1746,7 +1864,9 @@ export default function OnboardingProfileScreen() {
                 />
                 <Input
                   label="Regioni preferite"
-                  onChangeText={(value) => updateValue("coachPreferredRegions", value)}
+                  onChangeText={(value) =>
+                    updateValue("coachPreferredRegions", value)
+                  }
                   placeholder="Es. Lazio, Toscana"
                   value={coachPreferredRegions}
                 />
@@ -1755,30 +1875,31 @@ export default function OnboardingProfileScreen() {
                     Disponibile a un nuovo incarico?
                   </AppText>
                   <View style={styles.optionPillRow}>
-                      <OptionPill
-                        active={openToNewRole}
-                        label="Si'"
-                        onPress={() => updateValue("openToNewRole", true)}
-                      />
-                      <OptionPill
-                        active={!openToNewRole}
-                        label="No"
-                        onPress={() => updateValue("openToNewRole", false)}
-                      />
-                    </View>
+                    <OptionPill
+                      active={openToNewRole}
+                      label="Si'"
+                      onPress={() => updateValue("openToNewRole", true)}
+                    />
+                    <OptionPill
+                      active={!openToNewRole}
+                      label="No"
+                      onPress={() => updateValue("openToNewRole", false)}
+                    />
                   </View>
+                </View>
               </View>
             ) : null}
 
             {role === "staff" ? (
               <View style={styles.fieldGap10}>
-                <AppText variant="headingSm">
-                  Profilo staff tecnico
-                </AppText>
+                <AppText variant="headingSm">Profilo staff tecnico</AppText>
                 <SelectField
                   label="Specializzazione"
                   onChange={(value) =>
-                    updateValue("staffSpecialization", value as StaffSpecialization)
+                    updateValue(
+                      "staffSpecialization",
+                      value as StaffSpecialization,
+                    )
                   }
                   options={staffSpecializationOptions}
                   placeholder="Seleziona la specializzazione"
@@ -1793,13 +1914,17 @@ export default function OnboardingProfileScreen() {
                 <Input
                   label="Esperienza"
                   multiline
-                  onChangeText={(value) => updateValue("experienceSummary", value)}
+                  onChangeText={(value) =>
+                    updateValue("experienceSummary", value)
+                  }
                   placeholder="Ruoli, staff e contesti in cui hai lavorato"
                   value={experienceSummary}
                 />
                 <Input
                   label="Regioni preferite"
-                  onChangeText={(value) => updateValue("staffPreferredRegions", value)}
+                  onChangeText={(value) =>
+                    updateValue("staffPreferredRegions", value)
+                  }
                   placeholder="Es. Lombardia, Emilia-Romagna"
                   value={staffPreferredRegions}
                 />
@@ -1808,26 +1933,24 @@ export default function OnboardingProfileScreen() {
                     Disponibile a collaborare subito?
                   </AppText>
                   <View style={styles.optionPillRow}>
-                      <OptionPill
-                        active={openToWork}
-                        label="Si'"
-                        onPress={() => updateValue("openToWork", true)}
-                      />
-                      <OptionPill
-                        active={!openToWork}
-                        label="No"
-                        onPress={() => updateValue("openToWork", false)}
-                      />
-                    </View>
+                    <OptionPill
+                      active={openToWork}
+                      label="Si'"
+                      onPress={() => updateValue("openToWork", true)}
+                    />
+                    <OptionPill
+                      active={!openToWork}
+                      label="No"
+                      onPress={() => updateValue("openToWork", false)}
+                    />
                   </View>
+                </View>
               </View>
             ) : null}
 
             {role === "club_admin" ? (
               <View style={styles.fieldGap10}>
-                <AppText variant="headingSm">
-                  Pagina societa'
-                </AppText>
+                <AppText variant="headingSm">Pagina societa'</AppText>
                 <Input
                   label="Categoria"
                   onChangeText={(value) => updateValue("clubCategory", value)}
@@ -1835,25 +1958,27 @@ export default function OnboardingProfileScreen() {
                   value={clubCategory}
                 />
                 <Input
-                  label="Campionato / lega"
+                  label="Girone"
                   onChangeText={(value) => updateValue("clubLeague", value)}
                   placeholder="Es. Girone A"
                   value={clubLeague}
                 />
                 <MediaPickerField
-                  buttonLabel={clubLogoUrl ? "Sostituisci logo" : "Carica logo societa'"}
+                  buttonLabel={
+                    clubLogoUrl ? "Sostituisci logo" : "Carica logo societa'"
+                  }
                   helperText="Seleziona il logo direttamente dal telefono."
                   isUploading={uploadingField === "club-logo"}
                   label="Logo societa'"
                   onPick={() =>
                     handleMediaUpload({
-                        field: "club-logo",
-                        folder: "club-logos",
-                        mediaTypes: ["images"],
-                        onUploaded: (items) =>
-                          updateValue("clubLogoUrl", items[0]?.url ?? ""),
-                      })
-                    }
+                      field: "club-logo",
+                      folder: "club-logos",
+                      mediaTypes: ["images"],
+                      onUploaded: (items) =>
+                        updateValue("clubLogoUrl", items[0]?.url ?? ""),
+                    })
+                  }
                   onRemove={() => updateValue("clubLogoUrl", "")}
                   previewUrl={clubLogoUrl}
                   removable
@@ -1871,13 +1996,13 @@ export default function OnboardingProfileScreen() {
                   onPick={() =>
                     handleMediaUpload({
                       allowsMultipleSelection: true,
-                        field: "club-gallery",
-                        folder: "club-gallery",
-                        mediaTypes: ["images", "videos"],
-                        onUploaded: (items) =>
-                          appendUploadedMedia("clubGalleryItems", items),
-                      })
-                    }
+                      field: "club-gallery",
+                      folder: "club-gallery",
+                      mediaTypes: ["images", "videos"],
+                      onUploaded: (items) =>
+                        appendUploadedMedia("clubGalleryItems", items),
+                    })
+                  }
                   onRemove={() => updateValue("clubGalleryItems", [])}
                   removable
                   removeLabel="Svuota gallery"
@@ -1886,7 +2011,9 @@ export default function OnboardingProfileScreen() {
                 <Input
                   label="Descrizione"
                   multiline
-                  onChangeText={(value) => updateValue("clubDescription", value)}
+                  onChangeText={(value) =>
+                    updateValue("clubDescription", value)
+                  }
                   placeholder="Racconta identita', struttura e obiettivi del club"
                   value={clubDescription}
                 />
@@ -1894,9 +2021,7 @@ export default function OnboardingProfileScreen() {
             ) : null}
 
             <View style={styles.fieldGap10}>
-              <AppText variant="headingSm">
-                Bio personale
-              </AppText>
+              <AppText variant="headingSm">Bio personale</AppText>
               <Input
                 label="Presentazione"
                 maxLength={400}
@@ -1905,7 +2030,11 @@ export default function OnboardingProfileScreen() {
                   updateValue("bio", normalizeProfileBioInput(value), ["bio"])
                 }
                 placeholder="Racconta brevemente il tuo percorso calcistico, le tue caratteristiche e cosa cerchi per la prossima stagione."
-                style={validationErrors.bio ? { borderColor: colors.danger } : undefined}
+                style={
+                  validationErrors.bio
+                    ? { borderColor: colors.danger }
+                    : undefined
+                }
                 value={bio}
               />
               {validationErrors.bio ? (
@@ -1935,9 +2064,7 @@ export default function OnboardingProfileScreen() {
 
         {step === "complete" ? (
           <Card style={styles.cardGap}>
-            <AppText variant="displaySm">
-              Il tuo profilo e' pronto!
-            </AppText>
+            <AppText variant="displaySm">Il tuo profilo e' pronto!</AppText>
             <AppText variant="bodySm" color="secondary">
               Ora puoi iniziare a connetterti con squadre, allenatori e
               giocatori. Se vuoi, potrai aggiungere altri dettagli in qualsiasi

@@ -58,14 +58,25 @@ type ClubSeasonCardProps = {
   season: ClubSeasonForm;
 };
 
-function ClubSeasonCard({ editable = false, onDelete, onEdit, season }: ClubSeasonCardProps) {
+function ClubSeasonCard({
+  editable = false,
+  onDelete,
+  onEdit,
+  season,
+}: ClubSeasonCardProps) {
   const yearRange = season.endYear
     ? `${season.startYear} – ${season.endYear}`
     : `${season.startYear} – Attuale`;
 
   return (
     <Card style={{ gap: spacing[8] }} variant="muted">
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
         <View style={{ flex: 1, gap: spacing[4] }}>
           <Text
             style={{
@@ -76,12 +87,23 @@ function ClubSeasonCard({ editable = false, onDelete, onEdit, season }: ClubSeas
           >
             {season.category || "Categoria da definire"}
           </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize[14] }}>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: typography.fontSize[14],
+            }}
+          >
             {yearRange}
             {season.league ? ` · ${season.league}` : ""}
           </Text>
           {season.notes ? (
-            <Text style={{ color: colors.textMuted, fontSize: typography.fontSize[12], marginTop: spacing[4] }}>
+            <Text
+              style={{
+                color: colors.textMuted,
+                fontSize: typography.fontSize[12],
+                marginTop: spacing[4],
+              }}
+            >
               {season.notes}
             </Text>
           ) : null}
@@ -137,7 +159,13 @@ type ClubSeasonEditorModalProps = {
   visible: boolean;
 };
 
-function ClubSeasonEditorModal({ draft, isNew, onClose, onSave, visible }: ClubSeasonEditorModalProps) {
+function ClubSeasonEditorModal({
+  draft,
+  isNew,
+  onClose,
+  onSave,
+  visible,
+}: ClubSeasonEditorModalProps) {
   const [form, setForm] = useState(draft);
 
   const isValid = form.category.trim() && form.startYear.trim();
@@ -168,7 +196,9 @@ function ClubSeasonEditorModal({ draft, isNew, onClose, onSave, visible }: ClubS
           </Text>
           <View style={{ width: 24 }} />
         </View>
-        <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], padding: spacing[20] }}>
+        <KeyboardAwareScrollView
+          contentContainerStyle={{ gap: spacing[16], padding: spacing[20] }}
+        >
           <SelectField
             label="Categoria *"
             onChange={(value) => setForm((f) => ({ ...f, category: value }))}
@@ -193,7 +223,7 @@ function ClubSeasonEditorModal({ draft, isNew, onClose, onSave, visible }: ClubS
             value={form.endYear}
           />
           <Input
-            label="Campionato"
+            label="Girone"
             onChangeText={(value) => setForm((f) => ({ ...f, league: value }))}
             placeholder="Es. Girone A"
             value={form.league}
@@ -247,7 +277,8 @@ export function ClubSeasonsSection({
   const [modalVisible, setModalVisible] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const draft = editingIndex !== null ? seasons[editingIndex] : createEmptySeasonForm();
+  const draft =
+    editingIndex !== null ? seasons[editingIndex] : createEmptySeasonForm();
   const isNew = editingIndex === null;
 
   function handleAdd() {
@@ -278,7 +309,9 @@ export function ClubSeasonsSection({
   return (
     <View style={{ gap: spacing[12] }}>
       {seasons.length === 0 ? (
-        <Text style={{ color: colors.textMuted, fontSize: typography.fontSize[14] }}>
+        <Text
+          style={{ color: colors.textMuted, fontSize: typography.fontSize[14] }}
+        >
           {editable
             ? "Aggiungi una stagione per completare lo storico del club."
             : "Nessuna stagione registrata."}

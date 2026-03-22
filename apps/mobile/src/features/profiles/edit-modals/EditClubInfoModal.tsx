@@ -245,8 +245,9 @@ export function EditClubInfoModal({
         clubWebsite: formState.clubWebsite,
       };
       const payload = buildFullUpdatePayload(completeProfile, mergedState);
-      payload.profile.birth_date =
-        validateBirthDateInput(baseState.birthDate).isoValue;
+      payload.profile.birth_date = validateBirthDateInput(
+        baseState.birthDate,
+      ).isoValue;
 
       await updateCompleteProfessionalProfile(payload);
       onSaved();
@@ -301,7 +302,7 @@ export function EditClubInfoModal({
 
       <Field
         editable
-        label="Campionato"
+        label="Girone"
         onChangeText={(v) => updateField("clubLeague", v)}
         placeholder="Es. Eccellenza Girone A"
         value={formState.clubLeague}
