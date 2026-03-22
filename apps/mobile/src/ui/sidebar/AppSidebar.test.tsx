@@ -69,6 +69,7 @@ describe("AppSidebar", () => {
       profile: {
         avatar_url: null,
         city: "Milano",
+        club_id: null,
         club_name: "F.C. Internazionale",
         full_name: "Mario Rossi",
         id: "user-1",
@@ -106,6 +107,7 @@ describe("AppSidebar", () => {
       profile: {
         avatar_url: null,
         city: null,
+        club_id: null,
         club_name: null,
         full_name: "Mario Rossi",
         id: "user-1",
@@ -146,6 +148,7 @@ describe("AppSidebar", () => {
       profile: {
         avatar_url: null,
         city: null,
+        club_id: null,
         club_name: null,
         full_name: "Mario Rossi",
         id: "user-1",

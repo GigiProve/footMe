@@ -7,14 +7,13 @@ import {
   useState,
 } from "react";
 import { Linking } from "react-native";
-
 import { AuthChangeEvent, Session } from "@supabase/supabase-js";
-
 import { completeOAuthSessionFromUrl } from "./oauth";
 import { supabase } from "../../lib/supabase";
 
 type AppProfile = {
   avatar_url: string | null;
+  club_id: string | null;
   club_name: string | null;
   city: string | null;
   id: string;
@@ -60,6 +59,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return {
         avatar_url: data.avatar_url ?? null,
         city: data.city ?? null,
+        club_id: null,
         club_name: null,
         full_name: data.full_name ?? null,
         id: data.id,
@@ -71,6 +71,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     const nextProfile: AppProfile = {
       ...data,
+      club_id: null,
       club_name: null,
       is_admin: false,
     };
@@ -78,10 +79,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
     if (nextProfile.role === "club_admin") {
       const { data: club } = await supabase
         .from("clubs")
-        .select("name")
+        .select("id, name")
         .eq("owner_profile_id", userId)
         .maybeSingle();
 
+      nextProfile.club_id = club?.id ?? null;
       nextProfile.club_name = club?.name ?? null;
     }
 

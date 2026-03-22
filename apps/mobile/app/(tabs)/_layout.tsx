@@ -10,7 +10,7 @@ import { colors, radius, shadows, sizes, spacing, typography, zIndex } from "../
 import { Icon, type IconName } from "../../src/ui";
 
 export default function TabsLayout() {
-  const { isLoading, needsOnboarding, session } = useSession();
+  const { isLoading, needsOnboarding, profile, session } = useSession();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   if (isLoading) {
@@ -48,7 +48,10 @@ export default function TabsLayout() {
       >
         <Tabs.Screen
           name="index"
-          options={buildTabOptions("Home", "home")}
+          options={buildTabOptions(
+            profile?.role === "club_admin" ? "Dashboard" : "Home",
+            "home",
+          )}
         />
         <Tabs.Screen
           name="profile"

@@ -7,6 +7,7 @@ import {
   type HomeDashboardData,
 } from "../../src/features/home/home-dashboard-service";
 import { useSession } from "../../src/features/auth/use-session";
+import { ClubDashboard } from "../../src/features/clubs/components/ClubDashboard";
 import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
 import { colors, radius, spacing } from "../../src/theme/tokens";
 import { AppText, Badge, Button, Card, StatCard } from "../../src/ui";
@@ -20,6 +21,10 @@ const toneMap: Record<string, HighlightTone> = {
 
 export default function HomeScreen() {
   const { profile, session } = useSession();
+
+  if (profile?.role === "club_admin") {
+    return <ClubDashboard />;
+  }
   const userId = session?.user?.id;
   const userEmail = session?.user?.email ?? null;
   const [dashboard, setDashboard] = useState<HomeDashboardData | null>(null);
