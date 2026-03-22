@@ -5,7 +5,11 @@
     "scheme": "footme",
     "version": "1.0.0",
     "orientation": "portrait",
-    "plugins": ["expo-router", "@react-native-community/datetimepicker"],
+    "plugins": [
+      "expo-router",
+      "@react-native-community/datetimepicker",
+      "expo-secure-store"
+    ],
     "newArchEnabled": false,
     "experiments": {
       "typedRoutes": true
