@@ -7,6 +7,7 @@ const { fromMock, upsertMocks } = vi.hoisted(() => {
     clubs: vi.fn(),
     coach_profiles: vi.fn(),
     player_profiles: vi.fn(),
+    profile_contacts: vi.fn(),
     profile_private_contacts: vi.fn(),
     profiles: vi.fn(),
     staff_profiles: vi.fn(),
@@ -36,6 +37,7 @@ describe("createInitialProfile", () => {
   });
 
   const defaultClubFields = {
+    authEmail: "test@example.com",
     clubCategory: "",
     clubColors: "",
     clubCountry: "IT",

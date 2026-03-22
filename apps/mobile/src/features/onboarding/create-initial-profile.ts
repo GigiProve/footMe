@@ -8,6 +8,7 @@ export type { PlayerPosition } from "../profiles/player-sports";
 export type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
 
 type CreateInitialProfileInput = {
+  authEmail: string;
   avatarUrl: string;
   birthDate: string;
   clubCategory: string;
@@ -165,6 +166,19 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
 
   if (privateContactError) {
     throw privateContactError;
+  }
+
+  if (input.authEmail) {
+    const { error: contactError } = await supabase
+      .from("profile_contacts")
+      .upsert({
+        email: input.authEmail.trim().toLowerCase(),
+        profile_id: input.userId,
+      });
+
+    if (contactError) {
+      throw contactError;
+    }
   }
 
   if (input.role === "player") {

@@ -427,6 +427,17 @@ export default function OnboardingProfileScreen() {
   const progress = getOnboardingProgress(step, role as AppRole | "");
   const canGoBack = step !== "role";
   const isBusy = isSubmitting || uploadingField !== null;
+  const authEmail = session?.user?.email ?? "";
+
+  useEffect(() => {
+    if (!isHydrated || !authEmail) {
+      return;
+    }
+
+    if (step === "club" && !clubEmail) {
+      setFormValue("clubEmail", authEmail);
+    }
+  }, [authEmail, clubEmail, isHydrated, setFormValue, step]);
 
   const clearValidationErrors = useCallback((fields: string[]) => {
     setValidationErrors((current) => {
@@ -670,6 +681,7 @@ export default function OnboardingProfileScreen() {
     }
 
     await createInitialProfile({
+      authEmail: session.user.email ?? "",
       avatarUrl,
       birthDate,
       clubCategory,
