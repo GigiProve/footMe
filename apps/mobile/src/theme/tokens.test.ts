@@ -11,7 +11,7 @@ import {
 
 describe("theme tokens", () => {
   it("re-exports the shared color palette and semantic states", () => {
-    expect(colors.background).toBe("#F4F8FB");
+    expect(colors.background).toBe("#F3F2EF");
     expect(colors.surface).toBe("#FFFFFF");
     expect(colors.accent).toBe("#0A66C2");
     expect(colors.hero).toBe("#004182");
