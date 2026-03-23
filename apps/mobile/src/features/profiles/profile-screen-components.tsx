@@ -1,10 +1,10 @@
 import { type ReactNode } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { withDefaultProfileAvatar } from "./profile-avatar";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
-import { Input } from "../../ui";
+import { colors, radius, spacing } from "../../theme/tokens";
+import { AppText, Input } from "../../ui";
 
 type ProfileHeaderProps = {
   avatarUrl: string | null | undefined;
@@ -46,10 +46,11 @@ export function ProfileHeader({
   primaryMeta,
   secondaryMeta,
 }: ProfileHeaderProps) {
-  const actionLabel = isEditing ? "Esci dalla modifica profilo" : "Modifica profilo";
-  const displayImageUrl = clubMode && clubLogoUrl
-    ? clubLogoUrl
-    : withDefaultProfileAvatar(avatarUrl);
+  const actionLabel = isEditing
+    ? "Esci dalla modifica profilo"
+    : "Modifica profilo";
+  const displayImageUrl =
+    clubMode && clubLogoUrl ? clubLogoUrl : withDefaultProfileAvatar(avatarUrl);
   const imageLabel = clubMode ? "Logo club" : "Foto profilo";
 
   return (
@@ -62,13 +63,21 @@ export function ProfileHeader({
         <View style={styles.identityTopRow}>
           {clubMode && !clubLogoUrl ? (
             <View style={[styles.avatar, styles.clubLogoPlaceholder]}>
-              <Ionicons color={colors.textMuted} name="shield-outline" size={40} />
+              <Ionicons
+                color={colors.textMuted}
+                name="shield-outline"
+                size={40}
+              />
             </View>
           ) : (
             <Image
               accessibilityLabel={imageLabel}
               source={{ uri: displayImageUrl }}
-              style={clubMode ? [styles.avatar, styles.clubLogoAvatar] : styles.avatar}
+              style={
+                clubMode
+                  ? [styles.avatar, styles.clubLogoAvatar]
+                  : styles.avatar
+              }
             />
           )}
           <Pressable
@@ -77,7 +86,10 @@ export function ProfileHeader({
             accessibilityState={{ selected: isEditing }}
             hitSlop={12}
             onPress={onEditPress}
-            style={({ pressed }) => [styles.editButton, pressed ? styles.pressed : null]}
+            style={({ pressed }) => [
+              styles.editButton,
+              pressed ? styles.pressed : null,
+            ]}
           >
             <Ionicons
               color={colors.textSecondary}
@@ -87,14 +99,20 @@ export function ProfileHeader({
           </Pressable>
         </View>
         <View style={styles.identityCopy}>
-          <Text style={styles.fullName}>{fullName}</Text>
-          <Text style={styles.primaryMeta}>{primaryMeta}</Text>
-          {secondaryMeta ? <Text style={styles.secondaryMeta}>{secondaryMeta}</Text> : null}
+          <AppText variant="headingLg">{fullName}</AppText>
+          <AppText variant="titleSm">{primaryMeta}</AppText>
+          {secondaryMeta ? (
+            <AppText variant="bodySm" color="secondary">
+              {secondaryMeta}
+            </AppText>
+          ) : null}
           {badges.length > 0 ? (
             <View style={styles.badgesRow}>
               {badges.map((badge) => (
                 <View key={badge} style={styles.badge}>
-                  <Text style={styles.badgeText}>{badge}</Text>
+                  <AppText variant="caption" color="accent">
+                    {badge}
+                  </AppText>
                 </View>
               ))}
             </View>
@@ -105,12 +123,20 @@ export function ProfileHeader({
   );
 }
 
-export function ProfileSection({ children, description, title }: ProfileSectionProps) {
+export function ProfileSection({
+  children,
+  description,
+  title,
+}: ProfileSectionProps) {
   return (
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
+        <AppText variant="headingSm">{title}</AppText>
+        {description ? (
+          <AppText variant="bodySm" color="secondary">
+            {description}
+          </AppText>
+        ) : null}
       </View>
       <View style={styles.sectionDivider} />
       <View style={styles.sectionContent}>{children}</View>
@@ -135,7 +161,7 @@ export function ProfileField({
 
   return (
     <View style={styles.fieldContainer}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <AppText variant="overline">{label}</AppText>
       {isEditable ? (
         renderInput ? (
           renderInput()
@@ -151,17 +177,21 @@ export function ProfileField({
         <View
           style={[
             styles.readonlySurface,
-            hasValue ? styles.completedReadonlySurface : styles.emptyReadonlySurface,
+            hasValue
+              ? styles.completedReadonlySurface
+              : styles.emptyReadonlySurface,
           ]}
         >
-          <Text
-            style={[styles.readonlyValue, hasValue ? null : styles.readonlyPlaceholder]}
-          >
+          <AppText variant="bodySm" color={hasValue ? "primary" : "secondary"}>
             {hasValue ? value : "Da completare"}
-          </Text>
+          </AppText>
         </View>
       )}
-      {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
+      {helperText ? (
+        <AppText variant="bodySm" color="secondary">
+          {helperText}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -189,11 +219,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[6],
     borderRadius: radius.full,
     backgroundColor: colors.accentSoft,
-  },
-  badgeText: {
-    color: colors.accentStrong,
-    fontWeight: typography.fontWeight.bold,
-    fontSize: typography.fontSize[12],
   },
   badgesRow: {
     flexDirection: "row",
@@ -239,25 +264,8 @@ const styles = StyleSheet.create({
   fieldContainer: {
     gap: spacing[8],
   },
-  fieldLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
-    letterSpacing: typography.letterSpacing.md,
-  },
-  fullName: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[30],
-    lineHeight: typography.lineHeight[34],
-    fontWeight: typography.fontWeight.heavy,
-  },
   headerCard: {
     gap: spacing[12],
-  },
-  helperText: {
-    color: colors.textSecondary,
-    lineHeight: typography.lineHeight[22],
   },
   identityBlock: {
     paddingHorizontal: spacing[20],
@@ -275,28 +283,11 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.82,
   },
-  primaryMeta: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[17],
-    lineHeight: typography.lineHeight[24],
-    fontWeight: typography.fontWeight.bold,
-  },
   readonlySurface: {
     borderRadius: radius[18],
     borderWidth: 1,
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[14],
-  },
-  readonlyPlaceholder: {
-    color: colors.textSecondary,
-  },
-  readonlyValue: {
-    color: colors.textPrimary,
-    lineHeight: typography.lineHeight[22],
-  },
-  secondaryMeta: {
-    color: colors.textSecondary,
-    lineHeight: typography.lineHeight[22],
   },
   sectionCard: {
     gap: spacing[12],
@@ -309,20 +300,11 @@ const styles = StyleSheet.create({
   sectionContent: {
     gap: spacing[14],
   },
-  sectionDescription: {
-    color: colors.textSecondary,
-    lineHeight: typography.lineHeight[22],
-  },
   sectionDivider: {
     height: 1,
     backgroundColor: colors.border,
   },
   sectionHeader: {
     gap: spacing[4],
-  },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[20],
-    fontWeight: typography.fontWeight.heavy,
   },
 });

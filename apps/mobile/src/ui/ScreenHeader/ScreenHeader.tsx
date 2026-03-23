@@ -14,7 +14,7 @@ export function ScreenHeader({ action, subtitle, title }: ScreenHeaderProps) {
   return (
     <View style={styles.container}>
       <View style={styles.textBlock}>
-        <AppText variant="displaySm">{title}</AppText>
+        <AppText variant="headingMd">{title}</AppText>
         {subtitle ? (
           <AppText variant="bodySm" color="secondary">
             {subtitle}

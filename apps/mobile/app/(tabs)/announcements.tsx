@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  Alert,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
@@ -20,6 +16,7 @@ import {
   type RecruitingAdForm,
   type RecruitingAdSummary,
 } from "../../src/features/recruiting/recruiting-service";
+import { JobCard } from "../../src/features/recruiting/components/JobCard";
 import { sizes, spacing } from "../../src/theme/tokens";
 import {
   AppText,
@@ -280,28 +277,31 @@ export default function AnnouncementsScreen() {
           {publicAds.map((ad) => {
             const isSelected = selectedAdId === ad.id;
             const isSubmittingAd = isActionLoading === ad.id;
+            const regionLabel =
+              ad.region ?? ad.club?.region ?? "Regione da definire";
+            const categoryLabel =
+              ad.age_min || ad.age_max
+                ? `Eta' ${ad.age_min ?? "?"}-${ad.age_max ?? "?"}`
+                : formatRoleLabel(ad.role_required);
 
             return (
-              <Card key={ad.id}>
-                <View style={styles.adHeader}>
-                  <AppText variant="headingSm">{ad.title}</AppText>
-                  <AppText variant="bodySm" color="secondary">
-                    {ad.club?.name ?? "Societa' non disponibile"} ·{" "}
-                    {formatRoleLabel(ad.role_required)}
-                  </AppText>
-                  <AppText variant="bodySm" color="secondary">
-                    {ad.region ?? ad.club?.region ?? "Regione da definire"}
-                    {ad.age_min || ad.age_max
-                      ? ` · Eta' ${ad.age_min ?? "?"}-${ad.age_max ?? "?"}`
-                      : ""}
-                  </AppText>
-                </View>
-
-                <AppText variant="bodyLg">{ad.description}</AppText>
-
-                {ad.compensation_summary ? (
-                  <Badge label={ad.compensation_summary} variant="accent" />
-                ) : null}
+              <View key={ad.id} style={styles.adItem}>
+                <JobCard
+                  category={categoryLabel}
+                  club={ad.club?.name ?? "Societa' non disponibile"}
+                  description={ad.description}
+                  onApply={() =>
+                    setSelectedAdId((current) =>
+                      current === ad.id ? null : ad.id,
+                    )
+                  }
+                  onDetails={() => {}}
+                  onToggleSave={() => handleToggleSavedAd(ad.id, !ad.is_saved)}
+                  postedAt=""
+                  region={regionLabel}
+                  saved={ad.is_saved}
+                  title={ad.title}
+                />
 
                 {ad.application_status ? (
                   <Badge
@@ -309,31 +309,11 @@ export default function AnnouncementsScreen() {
                   />
                 ) : null}
 
-                <View style={styles.actionRow}>
-                  <Button
-                    disabled={isSubmittingAd}
-                    label={ad.is_saved ? "Salvato" : "Salva"}
-                    onPress={() => handleToggleSavedAd(ad.id, !ad.is_saved)}
-                    size="sm"
-                    variant={ad.is_saved ? "tertiary" : "secondary"}
-                  />
-
-                  {profile?.role === "player" ? (
-                    <Button
-                      disabled={isSubmittingAd || !!ad.application_status}
-                      label={ad.application_status ? "Gia' candidato" : "Candidati"}
-                      onPress={() =>
-                        setSelectedAdId((current) => (current === ad.id ? null : ad.id))
-                      }
-                      size="sm"
-                      variant={ad.application_status ? "secondary" : "primary"}
-                    />
-                  ) : null}
-                </View>
-
                 {isSelected ? (
-                  <View style={styles.applySection}>
-                    <AppText variant="titleSm">Messaggio di presentazione</AppText>
+                  <Card>
+                    <AppText variant="titleSm">
+                      Messaggio di presentazione
+                    </AppText>
                     <Input
                       multiline
                       onChangeText={setCoverMessage}
@@ -353,13 +333,16 @@ export default function AnnouncementsScreen() {
                       />
                       <Button
                         disabled={isSubmittingAd}
-                        label={isSubmittingAd ? "Invio..." : "Invia candidatura"}
+                        label={
+                          isSubmittingAd ? "Invio..." : "Invia candidatura"
+                        }
                         onPress={() => handleApplyToAd(ad.id)}
+                        size="sm"
                       />
                     </View>
-                  </View>
+                  </Card>
                 ) : null}
-              </Card>
+              </View>
             );
           })}
         </KeyboardAwareForm>
@@ -500,16 +483,12 @@ const styles = StyleSheet.create({
     gap: spacing[16],
     paddingBottom: spacing[24],
   },
-  adHeader: {
-    gap: spacing[6],
+  adItem: {
+    gap: spacing[8],
   },
   actionRow: {
     flexDirection: "row",
     gap: spacing[10],
-  },
-  applySection: {
-    gap: spacing[10],
-    paddingTop: spacing[6],
   },
   ageRow: {
     flexDirection: "row",

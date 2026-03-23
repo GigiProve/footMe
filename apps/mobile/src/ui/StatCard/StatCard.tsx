@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     padding: spacing[16],
-    borderRadius: radius[12],
+    borderRadius: radius[8],
     gap: spacing[10],
   },
 });

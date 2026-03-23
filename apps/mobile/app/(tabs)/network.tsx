@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import {
-  Alert,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 
 import { useSession } from "../../src/features/auth/use-session";
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
-import { PublicBioBlock } from "../../src/features/profiles/bio-section";
 import { Screen } from "../../src/components/ui/screen";
 import {
   searchProfiles,
@@ -26,6 +21,7 @@ import {
   updateConnectionStatus,
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
+import { PlayerSearchCard } from "../../src/features/networking/components/PlayerSearchCard";
 import {
   formatLocation,
   formatPosition,
@@ -59,7 +55,10 @@ const roleOptions: readonly { label: string; value: SearchRoleFilter }[] = [
   { label: "Societa'", value: "club_admin" },
 ];
 
-const positionOptions: readonly { label: string; value: SearchPositionFilter }[] = [
+const positionOptions: readonly {
+  label: string;
+  value: SearchPositionFilter;
+}[] = [
   { label: "Tutte", value: "all" },
   { label: "Portiere", value: "goalkeeper" },
   { label: "Difensore", value: "defender" },
@@ -98,11 +97,15 @@ export default function NetworkScreen() {
     useState<SearchPositionFilter>("all");
   const [profiles, setProfiles] = useState<ProfileSearchResult[]>([]);
   const [ads, setAds] = useState<RecruitingAdSearchResult[]>([]);
-  const [networkEntries, setNetworkEntries] = useState<NetworkOverviewItem[]>([]);
+  const [networkEntries, setNetworkEntries] = useState<NetworkOverviewItem[]>(
+    [],
+  );
   const [isSearchLoading, setIsSearchLoading] = useState(true);
   const [isNetworkLoading, setIsNetworkLoading] = useState(true);
   const [actionProfileId, setActionProfileId] = useState<string | null>(null);
-  const [actionConnectionId, setActionConnectionId] = useState<string | null>(null);
+  const [actionConnectionId, setActionConnectionId] = useState<string | null>(
+    null,
+  );
 
   const acceptedConnections = useMemo(
     () => networkEntries.filter((entry) => entry.status === "accepted"),
@@ -124,7 +127,9 @@ export default function NetworkScreen() {
   );
   const connectionMap = useMemo(
     () =>
-      new Map(networkEntries.map((entry) => [entry.other_profile_id, entry] as const)),
+      new Map(
+        networkEntries.map((entry) => [entry.other_profile_id, entry] as const),
+      ),
     [networkEntries],
   );
 
@@ -298,7 +303,10 @@ export default function NetworkScreen() {
                   disabled={actionConnectionId === entry.connection_id}
                   label="Accetta"
                   onPress={() =>
-                    handleUpdateConnectionStatus(entry.connection_id, "accepted")
+                    handleUpdateConnectionStatus(
+                      entry.connection_id,
+                      "accepted",
+                    )
                   }
                   style={styles.flex1}
                 />
@@ -306,7 +314,10 @@ export default function NetworkScreen() {
                   disabled={actionConnectionId === entry.connection_id}
                   label="Rifiuta"
                   onPress={() =>
-                    handleUpdateConnectionStatus(entry.connection_id, "rejected")
+                    handleUpdateConnectionStatus(
+                      entry.connection_id,
+                      "rejected",
+                    )
                   }
                   style={styles.flex1}
                   variant="secondary"
@@ -316,7 +327,9 @@ export default function NetworkScreen() {
           ))}
           {!isNetworkLoading && acceptedConnections.length > 0 ? (
             <View style={styles.sectionGap}>
-              <AppText variant="titleSm">Connessioni pronte per la chat</AppText>
+              <AppText variant="titleSm">
+                Connessioni pronte per la chat
+              </AppText>
               {acceptedConnections.slice(0, 3).map((entry) => (
                 <Card key={entry.connection_id} variant="muted">
                   <AppText variant="titleSm">{entry.other_full_name}</AppText>
@@ -354,11 +367,7 @@ export default function NetworkScreen() {
         </Card>
 
         <Card>
-          <ChipGroup
-            onChange={setMode}
-            options={modeOptions}
-            value={mode}
-          />
+          <ChipGroup onChange={setMode} options={modeOptions} value={mode} />
 
           <Input
             onChangeText={setQuery}
@@ -418,22 +427,36 @@ export default function NetworkScreen() {
               const connection = connectionMap.get(result.profile_id);
               const isBusy = actionProfileId === result.profile_id;
               const statusLabel = getConnectionStatusLabel(connection);
+              const roleLabel = formatRole(result.role);
+              const posLabel =
+                result.role === "player"
+                  ? formatPosition(result.primary_position)
+                  : "";
+              const subtitle = [roleLabel, posLabel]
+                .filter(Boolean)
+                .join(" · ");
+              const location = formatLocation(result.city, result.region);
 
               return (
-                <Card key={result.profile_id}>
-                  <AppText variant="headingSm">{result.full_name}</AppText>
-                  <PublicBioBlock bio={result.bio} />
-                  <AppText variant="bodySm" color="secondary">
-                    {formatRole(result.role)}
-                    {result.role === "player"
-                      ? ` · ${formatPosition(result.primary_position)}`
-                      : ""}
-                  </AppText>
-                  <AppText variant="bodySm" color="secondary">
-                    {formatLocation(result.city, result.region)}
-                  </AppText>
+                <View key={result.profile_id} style={styles.resultItem}>
+                  <PlayerSearchCard
+                    avatarUrl={null}
+                    category={location}
+                    name={result.full_name}
+                    onPress={() => {}}
+                    onViewProfile={() => {}}
+                    region={result.region ?? ""}
+                    role={result.role}
+                    subtitle={subtitle}
+                  />
                   {statusLabel ? (
-                    <AppText variant="bodySm" color="secondary">{statusLabel}</AppText>
+                    <AppText
+                      variant="bodySm"
+                      color="secondary"
+                      style={styles.statusLabel}
+                    >
+                      {statusLabel}
+                    </AppText>
                   ) : null}
                   {connection?.status === "accepted" ? (
                     <Button
@@ -441,14 +464,21 @@ export default function NetworkScreen() {
                       fullWidth
                       label={isBusy ? "Apertura chat..." : "Messaggia"}
                       onPress={() =>
-                        handleOpenConversation(result.profile_id, result.full_name)
+                        handleOpenConversation(
+                          result.profile_id,
+                          result.full_name,
+                        )
                       }
+                      size="sm"
                       variant="secondary"
                     />
-                  ) : connection?.status === "pending" && !connection.is_requester ? (
+                  ) : connection?.status === "pending" &&
+                    !connection.is_requester ? (
                     <View style={styles.actionRow}>
                       <Button
-                        disabled={actionConnectionId === connection.connection_id}
+                        disabled={
+                          actionConnectionId === connection.connection_id
+                        }
                         label="Accetta"
                         onPress={() =>
                           handleUpdateConnectionStatus(
@@ -456,10 +486,13 @@ export default function NetworkScreen() {
                             "accepted",
                           )
                         }
+                        size="sm"
                         style={styles.flex1}
                       />
                       <Button
-                        disabled={actionConnectionId === connection.connection_id}
+                        disabled={
+                          actionConnectionId === connection.connection_id
+                        }
                         label="Rifiuta"
                         onPress={() =>
                           handleUpdateConnectionStatus(
@@ -467,11 +500,13 @@ export default function NetworkScreen() {
                             "rejected",
                           )
                         }
+                        size="sm"
                         style={styles.flex1}
                         variant="secondary"
                       />
                     </View>
-                  ) : connection?.status === "pending" && connection.is_requester ? (
+                  ) : connection?.status === "pending" &&
+                    connection.is_requester ? (
                     <Badge label="Richiesta in attesa" />
                   ) : connection?.status === "blocked" ? (
                     <Badge label="Connessione bloccata" />
@@ -481,10 +516,11 @@ export default function NetworkScreen() {
                       fullWidth
                       label={isBusy ? "Invio richiesta..." : "Connettiti"}
                       onPress={() => handleRequestConnection(result.profile_id)}
+                      size="sm"
                       variant="secondary"
                     />
                   )}
-                </Card>
+                </View>
               );
             })
           : ads.map((result) => (
@@ -494,8 +530,9 @@ export default function NetworkScreen() {
                   {result.club_name} · {formatPosition(result.role_required)}
                 </AppText>
                 <AppText variant="bodySm" color="secondary">
-                  {[result.region, result.category].filter(Boolean).join(" · ") ||
-                    "Dettagli da definire"}
+                  {[result.region, result.category]
+                    .filter(Boolean)
+                    .join(" · ") || "Dettagli da definire"}
                 </AppText>
                 {result.compensation_summary ? (
                   <Badge label={result.compensation_summary} variant="accent" />
@@ -528,5 +565,11 @@ const styles = StyleSheet.create({
   },
   filterSection: {
     gap: spacing[8],
+  },
+  resultItem: {
+    gap: spacing[8],
+  },
+  statusLabel: {
+    paddingHorizontal: spacing[4],
   },
 });

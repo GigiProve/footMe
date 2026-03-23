@@ -127,13 +127,18 @@ export default function SignInScreen() {
         keyboardVerticalOffset={spacing[16]}
       >
         <View style={styles.header}>
-          <AppText variant="overline" color="hero">
-            Welcome Back
-          </AppText>
-          <AppText variant="displayLg">Accedi a footMe</AppText>
-          <AppText variant="bodyLg" color="secondary">
-            Entra nel network del calcio dilettantistico con un accesso pulito,
-            rapido e orientato alla tua identita' sportiva.
+          <View style={styles.brandRow}>
+            <View style={styles.brandIcon}>
+              <AppText variant="headingMd" color="inverse">
+                F
+              </AppText>
+            </View>
+            <AppText variant="displaySm" color="accent">
+              FootMe
+            </AppText>
+          </View>
+          <AppText variant="bodySm" color="secondary" style={styles.tagline}>
+            Il network professionale del calcio dilettantistico
           </AppText>
         </View>
 
@@ -151,7 +156,9 @@ export default function SignInScreen() {
             >
               <Image
                 accessibilityLabel="Avatar ultimo utente"
-                source={{ uri: withDefaultProfileAvatar(lastAccount.avatarUrl) }}
+                source={{
+                  uri: withDefaultProfileAvatar(lastAccount.avatarUrl),
+                }}
                 style={styles.quickLoginAvatar}
               />
               <View style={styles.quickLoginText}>
@@ -242,7 +249,25 @@ const styles = StyleSheet.create({
     gap: spacing[18],
   },
   header: {
-    gap: spacing[10],
+    alignItems: "center",
+    gap: spacing[8],
+    marginBottom: spacing[12],
+  },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[8],
+  },
+  brandIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius[10],
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tagline: {
+    textAlign: "center",
   },
   formCard: {
     gap: spacing[14],

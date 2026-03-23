@@ -1,14 +1,19 @@
+import { useState } from "react";
+import { Alert, StyleSheet, View } from "react-native";
+
 import { Redirect, useRouter } from "expo-router";
-import { StyleSheet, View } from "react-native";
 
 import { Screen } from "../src/components/ui/screen";
+import { KeyboardAwareForm } from "../src/components/ui/keyboard-aware-form";
 import { useSession } from "../src/features/auth/use-session";
+import { supabase } from "../src/lib/supabase";
 import { spacing } from "../src/theme/tokens";
-import { AppText, Badge, Button, Card } from "../src/ui";
+import { AppText, Badge, Button, Card, SectionCard } from "../src/ui";
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { isLoading, session } = useSession();
+  const { isLoading, profile, refreshProfile, session } = useSession();
+  const [isUnlinking, setIsUnlinking] = useState(false);
 
   if (isLoading) {
     return null;
@@ -18,24 +23,93 @@ export default function SettingsScreen() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
+  const isClubAdmin = profile?.role === "club_admin";
+  const hasClub = !!profile?.club_id;
+
+  async function handleUnlinkClub() {
+    if (!profile?.club_id) return;
+
+    Alert.alert(
+      "Scollega societa'",
+      "Sei sicuro di voler scollegare il tuo profilo dalla societa'? Potrai ricollegarti in seguito.",
+      [
+        { style: "cancel", text: "Annulla" },
+        {
+          onPress: async () => {
+            setIsUnlinking(true);
+            try {
+              const { error } = await supabase
+                .from("clubs")
+                .update({ owner_profile_id: profile.id })
+                .eq("id", profile.club_id!);
+
+              if (error) throw error;
+
+              await refreshProfile();
+              Alert.alert("Fatto", "Profilo scollegato dalla societa'.");
+            } catch {
+              Alert.alert("Errore", "Impossibile scollegare il profilo.");
+            } finally {
+              setIsUnlinking(false);
+            }
+          },
+          style: "destructive",
+          text: "Scollega",
+        },
+      ],
+    );
+  }
+
   return (
     <Screen>
-      <View style={styles.container}>
+      <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
         <Button
           label="Torna indietro"
           onPress={() => router.back()}
           size="sm"
           variant="link"
         />
+
+        <AppText variant="displaySm">Impostazioni</AppText>
+
+        {isClubAdmin ? (
+          <SectionCard
+            description="Gestisci il collegamento tra il tuo profilo e la societa'"
+            title="Societa'"
+          >
+            {hasClub ? (
+              <View style={styles.clubSection}>
+                <AppText variant="bodySm" color="secondary">
+                  Il tuo profilo e' attualmente collegato a: {profile?.club_name}
+                </AppText>
+                <Button
+                  disabled={isUnlinking}
+                  label={isUnlinking ? "Scollegamento..." : "Scollega profilo dalla societa'"}
+                  onPress={handleUnlinkClub}
+                  size="sm"
+                  variant="danger"
+                />
+              </View>
+            ) : (
+              <View style={styles.clubSection}>
+                <AppText variant="bodySm" color="secondary">
+                  Nessuna societa' collegata al tuo profilo.
+                </AppText>
+                <Button
+                  label="Vai alla home"
+                  onPress={() => router.replace("/(tabs)")}
+                  size="sm"
+                  variant="secondary"
+                />
+              </View>
+            )}
+          </SectionCard>
+        ) : null}
+
         <Card style={styles.card}>
-          <Badge label="Impostazioni" variant="accent" />
-          <AppText variant="displaySm">
-            Area impostazioni in preparazione
-          </AppText>
+          <Badge label="Generali" variant="accent" />
           <AppText variant="bodyLg" color="secondary">
-            Questa schermata e' pronta come destinazione del drawer. I controlli
-            di configurazione verranno aggiunti nei prossimi step senza rompere
-            la navigazione utente.
+            Altre impostazioni verranno aggiunte in questa sezione.
           </AppText>
           <Button
             label="Vai alla home"
@@ -43,7 +117,7 @@ export default function SettingsScreen() {
             variant="secondary"
           />
         </Card>
-      </View>
+      </KeyboardAwareForm>
     </Screen>
   );
 }
@@ -52,8 +126,10 @@ const styles = StyleSheet.create({
   card: {
     gap: spacing[16],
   },
-  container: {
-    flex: 1,
+  clubSection: {
+    gap: spacing[12],
+  },
+  scrollContent: {
     gap: spacing[18],
   },
 });

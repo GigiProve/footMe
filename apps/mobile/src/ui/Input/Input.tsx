@@ -92,8 +92,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[14],
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius[16],
-    backgroundColor: colors.background,
+    borderRadius: radius[8],
+    backgroundColor: colors.inputBackground,
   },
   focusedInput: {
     borderColor: colors.accentStrong,

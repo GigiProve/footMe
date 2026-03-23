@@ -11,13 +11,15 @@ import {
   submitClubReport,
   type PublicClubProfile,
 } from "../../src/features/clubs/club-service";
+import { requestClubMembership } from "../../src/features/clubs/membership-service";
+import type { MemberRole } from "../../src/features/clubs/membership-types";
 import { VerificationBadge } from "../../src/features/clubs/verification-badge";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
 import { colors, radius, spacing } from "../../src/theme/tokens";
 import { AppText, Button, Card, Input, ModalHeader } from "../../src/ui";
 
-type ReportClaimMode = "claim" | "report" | null;
+type ReportClaimMode = "claim" | "report" | "join" | null;
 
 export default function ClubProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,6 +38,9 @@ export default function ClubProfileScreen() {
 
   // Report form
   const [reportReason, setReportReason] = useState("");
+
+  // Join form
+  const [joinRole, setJoinRole] = useState<MemberRole | "">("");
 
   const loadClub = useCallback(async () => {
     if (!id) {
@@ -107,6 +112,32 @@ export default function ClubProfileScreen() {
     setClaimEmail("");
     setClaimMessage("");
     setReportReason("");
+    setJoinRole("");
+  }
+
+  async function handleJoinClub() {
+    if (!profile || !club || !joinRole) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await requestClubMembership({
+        clubId: club.id,
+        memberRole: joinRole,
+        profileId: profile.id,
+      });
+      setModalMode(null);
+      resetForms();
+      Alert.alert(
+        "Collegamento effettuato",
+        "Ti sei collegato alla societa'. L'amministratore puo' gestire la tua appartenenza.",
+      );
+    } catch {
+      Alert.alert("Errore", "Collegamento gia' effettuato oppure errore di rete.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (isLoading) {
@@ -221,6 +252,14 @@ export default function ClubProfileScreen() {
           </Card>
         ) : null}
 
+        {profile?.role !== "club_admin" ? (
+          <Button
+            label="Collegati a questa societa'"
+            onPress={() => setModalMode("join")}
+            variant="secondary"
+          />
+        ) : null}
+
         <Pressable
           onPress={() =>
             Alert.alert("Segnala o rivendica", "Cosa vuoi fare con questa società?", [
@@ -310,6 +349,46 @@ export default function ClubProfileScreen() {
           </KeyboardAwareScrollView>
         </SafeAreaView>
       </Modal>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setModalMode(null)}
+        presentationStyle="pageSheet"
+        visible={modalMode === "join"}
+      >
+        <SafeAreaView style={styles.modalSafeArea}>
+          <ModalHeader title="Collegati alla societa'" onClose={() => setModalMode(null)} />
+          <KeyboardAwareScrollView contentContainerStyle={styles.modalContent}>
+            <AppText variant="bodySm" color="secondary">
+              Seleziona il tuo ruolo e collegati a {club.name}. L'amministratore
+              ricevera' una notifica e potra' gestire il tuo collegamento.
+            </AppText>
+            <View style={styles.joinRoleOptions}>
+              {(
+                [
+                  { label: "Giocatore", value: "player" },
+                  { label: "Staff", value: "staff" },
+                  { label: "Allenatore", value: "coach" },
+                  { label: "Dirigente", value: "director" },
+                ] as const
+              ).map((option) => (
+                <Button
+                  key={option.value}
+                  label={option.label}
+                  onPress={() => setJoinRole(option.value)}
+                  size="sm"
+                  variant={joinRole === option.value ? "primary" : "secondary"}
+                />
+              ))}
+            </View>
+            <Button
+              disabled={isSubmitting || !joinRole}
+              label={isSubmitting ? "Collegamento..." : "Collegati"}
+              onPress={handleJoinClub}
+              variant="primary"
+            />
+          </KeyboardAwareScrollView>
+        </SafeAreaView>
+      </Modal>
     </Screen>
   );
 }
@@ -360,6 +439,11 @@ const styles = StyleSheet.create({
   modalSafeArea: {
     backgroundColor: colors.background,
     flex: 1,
+  },
+  joinRoleOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[10],
   },
   modalContent: {
     gap: spacing[16],

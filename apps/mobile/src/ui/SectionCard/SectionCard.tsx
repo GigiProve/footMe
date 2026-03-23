@@ -1,8 +1,14 @@
 import { type PropsWithChildren } from "react";
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, spacing } from "../../styles";
+import { colors, radius, shadows, spacing } from "../../styles";
 import { AppText } from "../AppText/AppText";
 import { Divider } from "../Divider/Divider";
 
@@ -24,7 +30,7 @@ export function SectionCard({
     <View style={[styles.card, style]}>
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <AppText variant="headingMd">{title}</AppText>
+          <AppText variant="titleSm">{title}</AppText>
           {description ? (
             <AppText variant="bodySm" color="secondary">
               {description}
@@ -42,7 +48,11 @@ export function SectionCard({
               pressed ? styles.pressed : null,
             ]}
           >
-            <Ionicons color={colors.textSecondary} name="create-outline" size={18} />
+            <Ionicons
+              color={colors.textSecondary}
+              name="create-outline"
+              size={18}
+            />
           </Pressable>
         ) : null}
       </View>
@@ -55,11 +65,12 @@ export function SectionCard({
 const styles = StyleSheet.create({
   card: {
     gap: spacing[12],
-    padding: spacing[18],
-    borderRadius: radius[12],
+    padding: spacing[16],
+    borderRadius: radius[8],
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.subtle,
   },
   header: {
     flexDirection: "row",
