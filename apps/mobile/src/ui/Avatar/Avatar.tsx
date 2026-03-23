@@ -35,7 +35,12 @@ type AvatarProps = {
   square?: boolean;
 };
 
-export function Avatar({ uri, name, size = "md", square = false }: AvatarProps) {
+export function Avatar({
+  uri,
+  name,
+  size = "md",
+  square = false,
+}: AvatarProps) {
   const dimension = sizeMap[size];
   const borderRadius = square ? radius[12] : dimension / 2;
 
@@ -63,12 +68,7 @@ export function Avatar({ uri, name, size = "md", square = false }: AvatarProps) 
       accessibilityLabel={name ?? "Avatar"}
     >
       {initials ? (
-        <Text
-          style={[
-            styles.initials,
-            { fontSize: fontSizeMap[size] },
-          ]}
-        >
+        <Text style={[styles.initials, { fontSize: fontSizeMap[size] }]}>
           {initials}
         </Text>
       ) : null}
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   initials: {
-    color: colors.accentStrong,
+    color: colors.accent,
     fontWeight: typography.fontWeight.bold,
   },
 });

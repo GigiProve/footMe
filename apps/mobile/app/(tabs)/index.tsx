@@ -9,8 +9,8 @@ import {
 import { useSession } from "../../src/features/auth/use-session";
 import { ClubDashboard } from "../../src/features/clubs/components/ClubDashboard";
 import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
-import { colors, radius, spacing } from "../../src/theme/tokens";
-import { AppText, Badge, Button, Card, StatCard } from "../../src/ui";
+import { spacing } from "../../src/theme/tokens";
+import { AppText, Badge, Button, Card, StatCard, TopBar } from "../../src/ui";
 
 type HighlightTone = "accent" | "hero" | "muted";
 
@@ -21,10 +21,6 @@ const toneMap: Record<string, HighlightTone> = {
 
 export default function HomeScreen() {
   const { profile, session } = useSession();
-
-  if (profile?.role === "club_admin") {
-    return <ClubDashboard />;
-  }
   const userId = session?.user?.id;
   const userEmail = session?.user?.email ?? null;
   const [dashboard, setDashboard] = useState<HomeDashboardData | null>(null);
@@ -60,11 +56,14 @@ export default function HomeScreen() {
     loadDashboard();
   }, [loadDashboard, profile?.id, userId]);
 
+  if (profile?.role === "club_admin") {
+    return <ClubDashboard />;
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut();
   }
 
-  const backendLabel = hasSupabaseEnv ? "Collegato" : "Da collegare";
   const displayName =
     dashboard?.profile.fullName ?? profile?.full_name ?? "Utente autenticato";
   const displayRole = dashboard?.summary.title ?? "Profilo in caricamento";
@@ -72,21 +71,10 @@ export default function HomeScreen() {
   return (
     <Screen>
       <View style={styles.container}>
-        <View style={styles.heroBanner}>
-          <AppText variant="overline" color="inverseSoft" style={styles.heroBadge}>
-            Amateur Football Network
-          </AppText>
-          <AppText variant="displayLg" color="inverse">
-            footMe
-          </AppText>
-          <AppText variant="bodyLg" color="inverseSoft">
-            {dashboard?.summary.body ??
-              "Il tuo profilo sportivo, la tua rete di contatti e le opportunita' giuste nello stesso posto."}
-          </AppText>
-        </View>
+        <TopBar searchPlaceholder="Cerca giocatori, squadre..." />
 
-        <View style={styles.statRow}>
-          <Card elevated style={styles.profileCard}>
+        <View style={styles.feedContent}>
+          <Card>
             <AppText variant="overline" color="muted">
               Profilo
             </AppText>
@@ -94,68 +82,54 @@ export default function HomeScreen() {
             <AppText variant="bodySm" color="secondary">
               {displayRole}
             </AppText>
+            {dashboard?.profile.isOpenToTransfer ? (
+              <Badge label="Aperto a nuove opportunita'" variant="hero" />
+            ) : null}
           </Card>
-          <StatCard
-            label="Stato backend"
-            tone="muted"
-            value={backendLabel}
-          />
-        </View>
 
-        <View style={styles.statRow}>
-          {(dashboard?.highlights ?? []).map((highlight) => (
-            <StatCard
-              key={highlight.label}
-              label={highlight.label}
-              tone={toneMap[highlight.tone] ?? "muted"}
-              value={isLoadingDashboard ? "..." : highlight.value}
-            />
-          ))}
-        </View>
+          <View style={styles.statRow}>
+            {(dashboard?.highlights ?? []).map((highlight) => (
+              <StatCard
+                key={highlight.label}
+                label={highlight.label}
+                tone={toneMap[highlight.tone] ?? "muted"}
+                value={isLoadingDashboard ? "..." : highlight.value}
+              />
+            ))}
+          </View>
 
-        <Card>
-          <AppText variant="overline">Landing autenticata</AppText>
-          <AppText variant="headingSm">
-            {dashboard?.summary.kicker ??
-              "Dashboard iniziale del network calcistico"}
-          </AppText>
-          <AppText variant="bodySm" color="secondary">
-            {dashboard
-              ? [
-                  dashboard.profile.region,
-                  dashboard.profile.city,
-                  dashboard.profile.clubName,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") ||
-                "I dati reali del profilo sono arrivati da Supabase."
-              : "Questa schermata e' il punto di ingresso del feed, del recruiting e della rete contatti. Collega Supabase reale per sostituire i placeholder."}
-          </AppText>
-          {dashboard?.profile.isOpenToTransfer ? (
-            <Badge label="Aperto a nuove opportunita'" variant="hero" />
-          ) : null}
-          {!hasSupabaseEnv ? (
-            <AppText variant="bodySm" color="hero">
-              Configura `apps/mobile/.env.local` con URL e anon key del progetto
-              Supabase per usare auth e dashboard reali.
+          <Card>
+            <AppText variant="titleSm">
+              {dashboard?.summary.kicker ??
+                "Dashboard iniziale del network calcistico"}
             </AppText>
-          ) : null}
+            <AppText variant="bodySm" color="secondary">
+              {dashboard?.summary.body ??
+                "Il tuo profilo sportivo, la tua rete di contatti e le opportunita' giuste nello stesso posto."}
+            </AppText>
+            {!hasSupabaseEnv ? (
+              <AppText variant="bodySm" color="hero">
+                Configura `apps/mobile/.env.local` con URL e anon key del
+                progetto Supabase per usare auth e dashboard reali.
+              </AppText>
+            ) : null}
+            <Button
+              label="Aggiorna dati reali"
+              onPress={loadDashboard}
+              size="sm"
+              style={styles.selfStart}
+              variant="secondary"
+            />
+          </Card>
+
           <Button
-            label="Aggiorna dati reali"
-            onPress={loadDashboard}
+            label="Esci"
+            onPress={handleSignOut}
             size="sm"
             style={styles.selfStart}
-            variant="secondary"
+            variant="tertiary"
           />
-        </Card>
-
-        <Button
-          label="Esci"
-          onPress={handleSignOut}
-          size="sm"
-          style={styles.selfStart}
-          variant="secondary"
-        />
+        </View>
       </View>
     </Screen>
   );
@@ -164,28 +138,14 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    gap: spacing[18],
   },
-  heroBanner: {
+  feedContent: {
     gap: spacing[12],
-    padding: spacing[24],
-    borderRadius: radius[28],
-    backgroundColor: colors.surfaceInverse,
-  },
-  heroBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: spacing[10],
-    paddingVertical: spacing[6],
-    borderRadius: radius.full,
-    overflow: "hidden",
-    backgroundColor: colors.surfaceOverlay,
+    padding: spacing[16],
   },
   statRow: {
     flexDirection: "row",
     gap: spacing[12],
-  },
-  profileCard: {
-    flex: 1,
   },
   selfStart: {
     alignSelf: "flex-start",

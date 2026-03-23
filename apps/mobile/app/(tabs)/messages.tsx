@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 
 import { useSession } from "../../src/features/auth/use-session";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
+import { ConversationRow } from "../../src/features/messaging/components/ConversationRow";
 import {
   getConversationSummaries,
   type ConversationSummary,
@@ -22,12 +23,11 @@ import {
 import { colors, radius, spacing } from "../../src/theme/tokens";
 import {
   AppText,
-  Badge,
   Button,
   Card,
   EmptyState,
+  Input,
   ScreenHeader,
-  StatCard,
 } from "../../src/ui";
 
 export default function MessagesScreen() {
@@ -109,133 +109,108 @@ export default function MessagesScreen() {
       <KeyboardAwareScrollView contentContainerStyle={styles.scrollContent}>
         <ScreenHeader
           title="Messaggi"
-          subtitle="Gestisci le tue conversazioni e contatta le connessioni"
-          action={
-            <Button
-              label="Aggiorna"
-              onPress={() => void loadInbox()}
-              size="sm"
-              variant="link"
-            />
-          }
+          subtitle={`${summaries.length} conversazioni · ${unreadCount} non letti`}
         />
 
-        <View style={styles.statRow}>
-          <StatCard
-            label="Conversazioni"
-            value={String(summaries.length)}
-          />
-          <StatCard
-            label="Non letti"
-            tone="muted"
-            value={String(unreadCount)}
-          />
+        <View style={styles.searchBox}>
+          <Input placeholder="Cerca conversazioni..." editable={false} />
         </View>
 
-        <Card>
-          <AppText variant="headingSm">Pronti a scriverti</AppText>
-          {isLoading ? (
-            <AppText variant="bodySm" color="secondary">
-              Caricamento inbox in corso...
-            </AppText>
-          ) : null}
-          {!isLoading && connectedWithoutConversation.length === 0 ? (
-            <AppText variant="bodySm" color="secondary">
-              Nessuna connessione pronta per una nuova chat. Vai in Rete per
-              ampliare il tuo network professionale.
-            </AppText>
-          ) : null}
-          {connectedWithoutConversation.slice(0, 3).map((entry) => (
-            <Card key={entry.connection_id} variant="muted">
-              <AppText variant="titleSm">{entry.other_full_name}</AppText>
-              <AppText variant="bodySm" color="secondary">
-                {formatRole(entry.other_role)}
-                {entry.other_role === "player"
-                  ? ` · ${formatPosition(entry.other_primary_position)}`
-                  : ""}
-              </AppText>
-              <AppText variant="bodySm" color="secondary">
-                {formatLocation(entry.other_city, entry.other_region)}
-              </AppText>
-              <Button
-                disabled={actionProfileId === entry.other_profile_id}
-                fullWidth
-                label={
-                  actionProfileId === entry.other_profile_id
-                    ? "Apertura chat..."
-                    : "Scrivi ora"
-                }
-                onPress={() =>
-                  handleOpenConversation(entry.other_profile_id, entry.other_full_name)
-                }
-                variant="secondary"
-              />
-            </Card>
-          ))}
-        </Card>
+        {!isLoading &&
+        summaries.length === 0 &&
+        connectedWithoutConversation.length === 0 ? (
+          <EmptyState
+            icon="chatbubbles-outline"
+            title="Inbox vuota"
+            description="Accetta una connessione o avvia una chat dalla tab Rete."
+          />
+        ) : null}
 
-        <View style={styles.sectionGap}>
-          <AppText variant="headingSm">Conversazioni recenti</AppText>
-          {!isLoading && summaries.length === 0 ? (
-            <EmptyState
-              icon="chatbubbles-outline"
-              title="Inbox vuota"
-              description="Accetta una connessione o avvia una chat dalla tab Rete."
-            />
-          ) : null}
-          {summaries.map((summary) => (
-            <Pressable
-              key={summary.conversation_id}
-              onPress={() =>
-                router.push({
-                  pathname: "/messages/[conversationId]",
-                  params: {
-                    conversationId: summary.conversation_id,
-                    otherName: summary.other_full_name,
-                  },
-                })
-              }
-              style={({ pressed }) => [
-                styles.conversationCard,
-                pressed ? styles.pressed : null,
-              ]}
-            >
-              <View style={styles.conversationHeader}>
-                <View style={styles.flex1}>
-                  <AppText variant="headingSm">{summary.other_full_name}</AppText>
-                  <AppText variant="bodySm" color="secondary">
-                    {formatRole(summary.other_role)}
-                    {summary.other_role === "player"
-                      ? ` · ${formatPosition(summary.other_primary_position)}`
-                      : ""}
-                  </AppText>
-                </View>
-                {summary.unread_count > 0 ? (
-                  <View style={styles.unreadBadge}>
-                    <AppText variant="caption" color="inverse">
-                      {summary.unread_count}
-                    </AppText>
-                  </View>
-                ) : null}
-              </View>
-              <AppText variant="bodySm" color="secondary">
-                {formatLocation(summary.other_city, summary.other_region)}
-              </AppText>
-              <AppText variant="bodyLg" numberOfLines={2}>
-                {summary.last_message_body ??
-                  "Nessun messaggio ancora inviato: apri la chat per iniziare."}
-              </AppText>
-              <AppText variant="caption" color="muted">
-                {summary.last_message_sent_at
-                  ? new Date(summary.last_message_sent_at).toLocaleString("it-IT")
-                  : "Conversazione pronta"}
-              </AppText>
-            </Pressable>
-          ))}
-        </View>
+        {connectedWithoutConversation.length > 0 ? (
+          <View style={styles.sectionGap}>
+            <AppText variant="titleSm">Pronti a scriverti</AppText>
+            {connectedWithoutConversation.slice(0, 3).map((entry) => (
+              <Card key={entry.connection_id} variant="muted">
+                <AppText variant="titleSm">{entry.other_full_name}</AppText>
+                <AppText variant="bodySm" color="secondary">
+                  {formatRole(entry.other_role)}
+                  {entry.other_role === "player"
+                    ? ` · ${formatPosition(entry.other_primary_position)}`
+                    : ""}
+                </AppText>
+                <Button
+                  disabled={actionProfileId === entry.other_profile_id}
+                  fullWidth
+                  label={
+                    actionProfileId === entry.other_profile_id
+                      ? "Apertura chat..."
+                      : "Scrivi ora"
+                  }
+                  onPress={() =>
+                    handleOpenConversation(
+                      entry.other_profile_id,
+                      entry.other_full_name,
+                    )
+                  }
+                  variant="secondary"
+                />
+              </Card>
+            ))}
+          </View>
+        ) : null}
+
+        {summaries.length > 0 ? (
+          <View style={styles.conversationList}>
+            {summaries.map((summary) => {
+              const roleLabel = formatRole(summary.other_role);
+              const posLabel =
+                summary.other_role === "player"
+                  ? formatPosition(summary.other_primary_position)
+                  : "";
+              const subtitle = [roleLabel, posLabel]
+                .filter(Boolean)
+                .join(" · ");
+              const lastMsg =
+                summary.last_message_body ?? "Apri la chat per iniziare.";
+              const timeLabel = summary.last_message_sent_at
+                ? formatRelativeTime(summary.last_message_sent_at)
+                : "";
+
+              return (
+                <ConversationRow
+                  key={summary.conversation_id}
+                  avatarUrl={null}
+                  lastMessage={lastMsg}
+                  name={summary.other_full_name}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/messages/[conversationId]",
+                      params: {
+                        conversationId: summary.conversation_id,
+                        otherName: summary.other_full_name,
+                      },
+                    })
+                  }
+                  timestamp={timeLabel}
+                  unreadCount={summary.unread_count}
+                />
+              );
+            })}
+          </View>
+        ) : null}
       </KeyboardAwareScrollView>
     </Screen>
   );
+}
+
+function formatRelativeTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 60) return `${minutes}min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}g`;
 }
 
 const styles = StyleSheet.create({
@@ -243,40 +218,17 @@ const styles = StyleSheet.create({
     gap: spacing[16],
     paddingBottom: spacing[24],
   },
-  statRow: {
-    flexDirection: "row",
-    gap: spacing[12],
+  searchBox: {
+    paddingHorizontal: spacing[0],
   },
   sectionGap: {
     gap: spacing[12],
   },
-  conversationCard: {
-    gap: spacing[8],
-    padding: spacing[18],
-    borderRadius: radius[12],
+  conversationList: {
     backgroundColor: colors.surface,
+    borderRadius: radius[8],
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  conversationHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: spacing[12],
-  },
-  flex1: {
-    flex: 1,
-    gap: spacing[4],
-  },
-  unreadBadge: {
-    minWidth: 28,
-    paddingHorizontal: spacing[8],
-    paddingVertical: 5,
-    borderRadius: radius.full,
-    backgroundColor: colors.hero,
-    alignItems: "center",
-  },
-  pressed: {
-    opacity: 0.82,
   },
 });

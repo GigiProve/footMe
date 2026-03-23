@@ -16,6 +16,7 @@ const variantStyles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
+    ...shadows.subtle,
   },
   inverse: {
     backgroundColor: colors.surfaceInverse,
@@ -48,7 +49,7 @@ export function Card({
 const styles = StyleSheet.create({
   base: {
     gap: spacing[12],
-    padding: spacing[18],
-    borderRadius: radius[12],
+    padding: spacing[16],
+    borderRadius: radius[8],
   },
 });
