@@ -1011,8 +1011,8 @@ export default function OnboardingProfileScreen() {
     <Screen>
       <Stack.Screen
         options={{
-          fullScreenGestureEnabled: canGoBack,
-          gestureEnabled: canGoBack,
+          fullScreenGestureEnabled: false,
+          gestureEnabled: false,
           headerShown: false,
         }}
       />

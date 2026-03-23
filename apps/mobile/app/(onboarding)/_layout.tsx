@@ -22,8 +22,8 @@ export default function OnboardingLayout() {
     <OnboardingFormProvider>
       <Stack
         screenOptions={{
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
+          fullScreenGestureEnabled: false,
+          gestureEnabled: false,
           headerShown: false,
         }}
       />
