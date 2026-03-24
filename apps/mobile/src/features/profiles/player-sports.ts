@@ -129,6 +129,28 @@ export const PREFERRED_FOOT_OPTIONS: SportsSelectOption<PreferredFoot>[] = [
   { label: "Ambidestro", value: "both" },
 ];
 
+export const SENIOR_CATEGORY_OPTIONS: SportsSelectOption[] = [
+  { label: "Serie A", value: "Serie A" },
+  { label: "Serie B", value: "Serie B" },
+  { label: "Serie C", value: "Serie C" },
+  { label: "Serie D", value: "Serie D" },
+  { label: "Eccellenza", value: "Eccellenza" },
+  { label: "Promozione", value: "Promozione" },
+  { label: "Prima Categoria", value: "Prima Categoria" },
+  { label: "Seconda Categoria", value: "Seconda Categoria" },
+  { label: "Terza Categoria", value: "Terza Categoria" },
+];
+
+export const YOUTH_CATEGORY_OPTIONS: SportsSelectOption[] = [
+  { label: "Primavera", value: "Primavera" },
+  { label: "Under 19", value: "Under 19" },
+  { label: "Under 17", value: "Under 17" },
+  { label: "Under 15", value: "Under 15" },
+  { label: "Under 14", value: "Under 14" },
+  { label: "Esordienti", value: "Esordienti" },
+  { label: "Pulcini", value: "Pulcini" },
+];
+
 export const PLAYER_CATEGORY_OPTIONS: SportsSelectOption[] = [
   { label: "Serie A", value: "Serie A" },
   { label: "Serie B", value: "Serie B" },

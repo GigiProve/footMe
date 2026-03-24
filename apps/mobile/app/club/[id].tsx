@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Linking, Modal, Pressable, SafeAreaView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -13,6 +13,7 @@ import {
 } from "../../src/features/clubs/club-service";
 import { requestClubMembership } from "../../src/features/clubs/membership-service";
 import type { MemberRole } from "../../src/features/clubs/membership-types";
+import { fetchClubTeams, type ClubTeam } from "../../src/features/clubs/team-service";
 import { VerificationBadge } from "../../src/features/clubs/verification-badge";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { Screen } from "../../src/components/ui/screen";
@@ -27,6 +28,7 @@ export default function ClubProfileScreen() {
   const router = useRouter();
 
   const [club, setClub] = useState<PublicClubProfile | null>(null);
+  const [teams, setTeams] = useState<ClubTeam[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [modalMode, setModalMode] = useState<ReportClaimMode>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,8 +52,12 @@ export default function ClubProfileScreen() {
     setIsLoading(true);
 
     try {
-      const data = await fetchPublicClubProfile(id);
-      setClub(data);
+      const [clubData, teamsData] = await Promise.all([
+        fetchPublicClubProfile(id),
+        fetchClubTeams(id),
+      ]);
+      setClub(clubData);
+      setTeams(teamsData);
     } finally {
       setIsLoading(false);
     }
@@ -222,6 +228,70 @@ export default function ClubProfileScreen() {
           ) : null}
           {club.field_address ? <InfoRow label="Campo" value={club.field_address} /> : null}
         </Card>
+
+        {teams.length > 0 ? (
+          <Card style={styles.teamsSection}>
+            <AppText variant="titleMd">Squadre</AppText>
+            <ScrollView
+              contentContainerStyle={styles.teamsScrollContent}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+            >
+              {teams.map((team) => {
+                const isSenior = team.team_type === "senior";
+                return (
+                  <View
+                    key={team.id}
+                    style={[
+                      styles.teamCard,
+                      isSenior ? styles.teamCardSenior : styles.teamCardYouth,
+                    ]}
+                  >
+                    {team.logo_url ? (
+                      <Image
+                        source={{ uri: team.logo_url }}
+                        style={styles.teamCardLogo}
+                      />
+                    ) : (
+                      <View style={styles.teamCardLogoPlaceholder}>
+                        <Ionicons
+                          color={isSenior ? colors.accent : colors.textMuted}
+                          name="shield-outline"
+                          size={24}
+                        />
+                      </View>
+                    )}
+                    <AppText variant="titleSm" numberOfLines={1}>
+                      {team.name}
+                    </AppText>
+                    <View
+                      style={[
+                        styles.teamCategoryBadge,
+                        isSenior
+                          ? styles.teamCategoryBadgeSenior
+                          : styles.teamCategoryBadgeYouth,
+                      ]}
+                    >
+                      <AppText
+                        variant="caption"
+                        style={{
+                          color: isSenior ? colors.accent : colors.textSecondary,
+                        }}
+                      >
+                        {team.category}
+                      </AppText>
+                    </View>
+                    {!isSenior ? (
+                      <AppText variant="caption" color="muted">
+                        Settore giovanile
+                      </AppText>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </Card>
+        ) : null}
 
         <Card style={{ gap: spacing[10] }}>
           <AppText variant="titleMd">Contatti</AppText>
@@ -448,5 +518,52 @@ const styles = StyleSheet.create({
   modalContent: {
     gap: spacing[16],
     padding: spacing[20],
+  },
+  teamsSection: {
+    gap: spacing[12],
+  },
+  teamsScrollContent: {
+    gap: spacing[10],
+    paddingRight: spacing[4],
+  },
+  teamCard: {
+    alignItems: "center",
+    borderRadius: radius[12],
+    borderWidth: 1,
+    gap: spacing[6],
+    padding: spacing[14],
+    width: 130,
+  },
+  teamCardSenior: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
+  },
+  teamCardYouth: {
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  teamCardLogo: {
+    borderRadius: radius[10],
+    height: 40,
+    width: 40,
+  },
+  teamCardLogoPlaceholder: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius[10],
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  teamCategoryBadge: {
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[8],
+    paddingVertical: spacing[4],
+  },
+  teamCategoryBadgeSenior: {
+    backgroundColor: colors.accentSoft,
+  },
+  teamCategoryBadgeYouth: {
+    backgroundColor: colors.surfaceMuted,
   },
 });

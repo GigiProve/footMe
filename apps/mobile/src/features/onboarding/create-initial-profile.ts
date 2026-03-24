@@ -14,6 +14,8 @@ type CreateInitialProfileInput = {
   clubCategory: string;
   clubCity: string;
   clubColors: string;
+  clubHasYouthSector: boolean;
+  clubYouthCategories: string[];
   clubCountry: string;
   clubEmail: string;
   clubFieldAddress: string;
@@ -214,30 +216,84 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
   }
 
   if (input.role === "club_admin") {
-    const { error } = await supabase.from("clubs").upsert(
-      {
-        owner_profile_id: input.userId,
-        name: input.clubName.trim(),
-        slug: slugify(input.clubName),
-        category: parseOptionalText(input.clubCategory),
-        city: input.clubCity.trim(),
-        region: input.clubRegion.trim(),
-        club_colors: parseOptionalText(input.clubColors),
-        club_email: input.clubEmail.trim().toLowerCase(),
-        club_phone: parseOptionalText(input.clubPhone),
-        country: input.clubCountry || "IT",
-        field_address: parseOptionalText(input.clubFieldAddress),
-        founding_year: parseOptionalInteger(input.clubFoundingYear),
-        headquarters_address: parseOptionalText(input.clubHeadquartersAddress),
-        logo_url: parseOptionalText(input.clubLogoUrl),
-        verification_status: "pending_review",
-        website_url: parseOptionalText(input.clubWebsite),
-      },
-      { onConflict: "owner_profile_id" },
-    );
+    const { data: clubData, error: clubError } = await supabase
+      .from("clubs")
+      .upsert(
+        {
+          owner_profile_id: input.userId,
+          name: input.clubName.trim(),
+          slug: slugify(input.clubName),
+          category: parseOptionalText(input.clubCategory),
+          city: input.clubCity.trim(),
+          region: input.clubRegion.trim(),
+          club_colors: parseOptionalText(input.clubColors),
+          club_email: input.clubEmail.trim().toLowerCase(),
+          club_phone: parseOptionalText(input.clubPhone),
+          country: input.clubCountry || "IT",
+          field_address: parseOptionalText(input.clubFieldAddress),
+          founding_year: parseOptionalInteger(input.clubFoundingYear),
+          headquarters_address: parseOptionalText(input.clubHeadquartersAddress),
+          logo_url: parseOptionalText(input.clubLogoUrl),
+          verification_status: "pending_review",
+          website_url: parseOptionalText(input.clubWebsite),
+        },
+        { onConflict: "owner_profile_id" },
+      )
+      .select("id")
+      .single();
 
-    if (error) {
-      throw error;
+    if (clubError) {
+      throw clubError;
+    }
+
+    if (clubData && input.clubCategory.trim()) {
+      const clubName = input.clubName.trim();
+      const logoUrl = parseOptionalText(input.clubLogoUrl);
+      const city = input.clubCity.trim();
+      const region = input.clubRegion.trim();
+
+      const { data: seniorTeam, error: seniorError } = await supabase
+        .from("club_teams")
+        .insert({
+          club_id: clubData.id,
+          name: clubName,
+          category: input.clubCategory.trim(),
+          team_type: "senior",
+          inherited: false,
+          logo_url: logoUrl,
+          city,
+          region,
+          sort_order: 0,
+        })
+        .select("id")
+        .single();
+
+      if (seniorError) {
+        throw seniorError;
+      }
+
+      if (input.clubHasYouthSector && input.clubYouthCategories.length > 0 && seniorTeam) {
+        const youthTeams = input.clubYouthCategories.map((category, index) => ({
+          club_id: clubData.id,
+          name: clubName,
+          category,
+          team_type: "youth" as const,
+          parent_team_id: seniorTeam.id,
+          inherited: true,
+          logo_url: logoUrl,
+          city,
+          region,
+          sort_order: index + 1,
+        }));
+
+        const { error: youthError } = await supabase
+          .from("club_teams")
+          .insert(youthTeams);
+
+        if (youthError) {
+          throw youthError;
+        }
+      }
     }
   }
 }

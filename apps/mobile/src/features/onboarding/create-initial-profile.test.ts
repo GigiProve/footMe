@@ -4,6 +4,7 @@ import { createInitialProfile, validateBaseProfileStep } from "./create-initial-
 
 const { fromMock, upsertMocks } = vi.hoisted(() => {
   const upsertMocks = {
+    club_teams: vi.fn(),
     clubs: vi.fn(),
     coach_profiles: vi.fn(),
     player_profiles: vi.fn(),
@@ -13,10 +14,46 @@ const { fromMock, upsertMocks } = vi.hoisted(() => {
     staff_profiles: vi.fn(),
   };
 
-  return {
-    fromMock: vi.fn((table: keyof typeof upsertMocks) => ({
-      upsert: upsertMocks[table],
+  const clubsChain = {
+    select: vi.fn(() => ({
+      single: vi.fn().mockResolvedValue({ data: { id: "club-uuid-1" }, error: null }),
     })),
+  };
+
+  const clubTeamsInsertChain = {
+    error: null,
+    select: vi.fn(() => ({
+      single: vi.fn().mockResolvedValue({ data: { id: "senior-team-uuid-1" }, error: null }),
+    })),
+  };
+
+  return {
+    clubTeamsInsertChain,
+    clubsChain,
+    fromMock: vi.fn((table: string) => {
+      if (table === "clubs") {
+        return {
+          upsert: vi.fn((...args: unknown[]) => {
+            upsertMocks.clubs(...args);
+            return clubsChain;
+          }),
+        };
+      }
+      if (table === "club_teams") {
+        return {
+          insert: vi.fn((...args: unknown[]) => {
+            upsertMocks.club_teams(...args);
+            return clubTeamsInsertChain;
+          }),
+          upsert: vi.fn((...args: unknown[]) => {
+            upsertMocks.club_teams(...args);
+            return clubTeamsInsertChain;
+          }),
+        };
+      }
+      const mock = upsertMocks[table as keyof typeof upsertMocks];
+      return mock ? { upsert: mock } : { upsert: vi.fn().mockResolvedValue({ error: null }) };
+    }),
     upsertMocks,
   };
 });
@@ -44,10 +81,12 @@ describe("createInitialProfile", () => {
     clubEmail: "",
     clubFieldAddress: "",
     clubFoundingYear: "",
+    clubHasYouthSector: false,
     clubHeadquartersAddress: "",
     clubLogoUrl: "",
     clubPhone: "",
     clubWebsite: "",
+    clubYouthCategories: [] as string[],
   };
 
   it("rejects empty full name before calling Supabase", async () => {

@@ -20,10 +20,11 @@ import {
   SectionCard,
   StatCard,
 } from "../../../ui";
-import { fetchClubMembers } from "../membership-service";
-import { removeMember, rejectMember } from "../membership-service";
+import { fetchClubMembers, removeMember, rejectMember } from "../membership-service";
+import { fetchClubTeams, type ClubTeam } from "../team-service";
 import { fetchNotifications, getUnreadCount, markNotificationRead } from "../notification-service";
 import type { AppNotification, ClubMember, MemberRole } from "../membership-types";
+import { EditTeamsModal } from "../../profiles/edit-modals/EditTeamsModal";
 import { AddMemberModal } from "./AddMemberModal";
 import { ClubMemberRow } from "./ClubMemberRow";
 import { InviteLinkModal } from "./InviteLinkModal";
@@ -45,6 +46,7 @@ export function ClubDashboard() {
 
   const [dashboard, setDashboard] = useState<HomeDashboardData | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
+  const [teams, setTeams] = useState<ClubTeam[]>([]);
   const [rosterFilter, setRosterFilter] = useState<RosterFilter>("all");
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
@@ -52,6 +54,7 @@ export function ClubDashboard() {
   // Modals
   const [addMemberRole, setAddMemberRole] = useState<MemberRole | null>(null);
   const [isInviteModalOpen, setInviteModalOpen] = useState(false);
+  const [isTeamsModalOpen, setTeamsModalOpen] = useState(false);
 
   // Notifications
   const [unreadCount, setUnreadCount] = useState(0);
@@ -86,6 +89,16 @@ export function ClubDashboard() {
     }
   }, [clubId]);
 
+  const loadTeams = useCallback(async () => {
+    if (!clubId) return;
+    try {
+      const data = await fetchClubTeams(clubId);
+      setTeams(data);
+    } catch {
+      // Non-blocking — teams section is optional
+    }
+  }, [clubId]);
+
   const loadUnreadCount = useCallback(async () => {
     if (!userId) return;
     try {
@@ -99,8 +112,9 @@ export function ClubDashboard() {
   useEffect(() => {
     loadDashboard();
     loadMembers();
+    loadTeams();
     loadUnreadCount();
-  }, [loadDashboard, loadMembers, loadUnreadCount]);
+  }, [loadDashboard, loadMembers, loadTeams, loadUnreadCount]);
 
   async function handleRemoveMember(memberId: string) {
     Alert.alert("Conferma", "Vuoi rimuovere questo membro dalla rosa?", [
@@ -219,6 +233,70 @@ export function ClubDashboard() {
         </View>
 
         <SectionCard
+          description="Prima squadra e settore giovanile"
+          title="Squadre"
+        >
+          {teams.length === 0 ? (
+            <EmptyState
+              description="Aggiungi la prima squadra e le squadre giovanili della tua societa'"
+              icon="shield-outline"
+              title="Nessuna squadra"
+            />
+          ) : (
+            <>
+              {teams
+                .filter((t) => t.team_type === "senior")
+                .map((team) => (
+                  <ListItem
+                    key={team.id}
+                    left={
+                      <Ionicons
+                        color={colors.accent}
+                        name="shield"
+                        size={22}
+                      />
+                    }
+                    right={
+                      <Badge label={team.category} variant="accent" />
+                    }
+                    subtitle="Prima squadra"
+                    title={team.name}
+                  />
+                ))}
+              {teams.filter((t) => t.team_type === "youth").length > 0 ? (
+                <AppText variant="overline" color="secondary">
+                  SETTORE GIOVANILE
+                </AppText>
+              ) : null}
+              {teams
+                .filter((t) => t.team_type === "youth")
+                .map((team) => (
+                  <ListItem
+                    key={team.id}
+                    left={
+                      <Ionicons
+                        color={colors.textMuted}
+                        name="shield-outline"
+                        size={20}
+                      />
+                    }
+                    right={
+                      <Badge label={team.category} variant="default" />
+                    }
+                    title={team.name}
+                  />
+                ))}
+            </>
+          )}
+          <Button
+            label="Gestisci squadre"
+            onPress={() => setTeamsModalOpen(true)}
+            size="sm"
+            variant="secondary"
+          />
+        </SectionCard>
+
+        <SectionCard
           description="Gestisci giocatori e staff della tua societa'"
           title="Rosa"
         >
@@ -276,6 +354,19 @@ export function ClubDashboard() {
           />
         </SectionCard>
       </KeyboardAwareForm>
+
+      {/* Edit Teams Modal */}
+      <EditTeamsModal
+        clubId={clubId ?? ""}
+        clubName={clubName}
+        onClose={() => setTeamsModalOpen(false)}
+        onSaved={() => {
+          setTeamsModalOpen(false);
+          loadTeams();
+        }}
+        teams={teams}
+        visible={isTeamsModalOpen}
+      />
 
       {/* Add Member Modal */}
       {addMemberRole ? (

@@ -36,7 +36,8 @@ import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
   excludePrimaryFromSecondaryPositions,
   parsePlayerExperienceForms,
-  PLAYER_CATEGORY_OPTIONS,
+  SENIOR_CATEGORY_OPTIONS,
+  YOUTH_CATEGORY_OPTIONS,
 } from "../../src/features/profiles/player-sports";
 import {
   composePhoneNumber,
@@ -383,6 +384,8 @@ export default function OnboardingProfileScreen() {
     clubCountry,
     clubDescription,
     clubEmail,
+    clubHasYouthSector,
+    clubYouthCategories,
     clubFieldAddress,
     clubFoundingYear,
     clubGalleryItems,
@@ -705,6 +708,8 @@ export default function OnboardingProfileScreen() {
       clubColors,
       clubCountry,
       clubEmail,
+      clubHasYouthSector,
+      clubYouthCategories,
       clubFieldAddress,
       clubFoundingYear,
       clubHeadquartersAddress,
@@ -1450,12 +1455,75 @@ export default function OnboardingProfileScreen() {
                 />
 
                 <SelectField
-                  label="Categoria attuale"
+                  label="Categoria prima squadra *"
                   onChange={(value) => updateValue("clubCategory", value)}
-                  options={PLAYER_CATEGORY_OPTIONS}
+                  options={SENIOR_CATEGORY_OPTIONS}
                   placeholder="Seleziona la categoria"
                   value={clubCategory}
                 />
+                {validationErrors.clubCategory ? (
+                  <ValidationMessage>
+                    {validationErrors.clubCategory}
+                  </ValidationMessage>
+                ) : null}
+
+                <View style={styles.sectionHeaderGap}>
+                  <AppText variant="titleSm">
+                    Aggiungi settore giovanile
+                  </AppText>
+                  <View style={styles.optionPillRow}>
+                    <OptionPill
+                      active={clubHasYouthSector}
+                      label="Si'"
+                      onPress={() => updateValue("clubHasYouthSector", true)}
+                    />
+                    <OptionPill
+                      active={!clubHasYouthSector}
+                      label="No"
+                      onPress={() => {
+                        patchForm({
+                          clubHasYouthSector: false,
+                          clubYouthCategories: [],
+                        });
+                      }}
+                    />
+                  </View>
+                </View>
+
+                {clubHasYouthSector ? (
+                  <View style={styles.sectionHeaderGap}>
+                    <AppText variant="titleSm">
+                      Seleziona le categorie giovanili
+                    </AppText>
+                    <View style={styles.youthCategoryGrid}>
+                      {YOUTH_CATEGORY_OPTIONS.map((option) => {
+                        const isSelected = clubYouthCategories.includes(
+                          option.value,
+                        );
+                        return (
+                          <OptionPill
+                            key={option.value}
+                            active={isSelected}
+                            label={option.label}
+                            onPress={() => {
+                              const updated = isSelected
+                                ? clubYouthCategories.filter(
+                                    (v) => v !== option.value,
+                                  )
+                                : [...clubYouthCategories, option.value];
+                              updateValue("clubYouthCategories", updated);
+                            }}
+                          />
+                        );
+                      })}
+                    </View>
+                    {validationErrors.clubYouthCategories ? (
+                      <ValidationMessage>
+                        {validationErrors.clubYouthCategories}
+                      </ValidationMessage>
+                    ) : null}
+                  </View>
+                ) : null}
 
                 <ResidenceCityInput
                   errorMessage={validationErrors.clubCity}
@@ -2135,6 +2203,11 @@ const styles = StyleSheet.create({
   },
   optionPillRow: {
     flexDirection: "row",
+    gap: spacing[8],
+  },
+  youthCategoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing[8],
   },
   progressFill: {

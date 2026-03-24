@@ -20,6 +20,8 @@ export type OnboardingFormState = {
   careerEntries: PlayerExperienceForm[];
   clubCategory: string;
   clubCity: string;
+  clubHasYouthSector: boolean;
+  clubYouthCategories: string[];
   clubColors: string;
   clubCountry: string;
   clubDescription: string;
@@ -159,6 +161,8 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   careerEntries: [],
   clubCategory: "",
   clubCity: "",
+  clubHasYouthSector: false,
+  clubYouthCategories: [],
   clubColors: "",
   clubCountry: "IT",
   clubDescription: "",
@@ -253,6 +257,10 @@ export function normalizeOnboardingDraft(
         // Legacy onboarding drafts stored a single secondaryPosition value, so we
         // still hydrate it into the new array format when found.
         : normalizePlayerPositions((value as { secondaryPosition?: unknown }).secondaryPosition),
+    clubHasYouthSector: value.clubHasYouthSector === true,
+    clubYouthCategories: Array.isArray(value.clubYouthCategories)
+      ? value.clubYouthCategories.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.clubYouthCategories,
     uploadingField: null,
   };
 }
@@ -459,6 +467,14 @@ function mapClubStepValidationError(form: OnboardingFormState): OnboardingValida
     if (!/^https?:\/\/.+\..+/.test(website) && !/^[a-zA-Z0-9].*\..+/.test(website)) {
       errors.clubWebsite = "Inserisci un indirizzo web valido.";
     }
+  }
+
+  if (!form.clubCategory.trim()) {
+    errors.clubCategory = "Seleziona la categoria della prima squadra";
+  }
+
+  if (form.clubHasYouthSector && form.clubYouthCategories.length === 0) {
+    errors.clubYouthCategories = "Seleziona almeno una categoria giovanile";
   }
 
   const phoneValue = composePhoneNumber(form.clubPhoneCountryCode, form.clubPhone);
