@@ -1,18 +1,25 @@
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Platform, StyleSheet, View } from "react-native";
+import { Alert, Pressable, SafeAreaView, StyleSheet, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
-import { Screen } from "../../src/components/ui/screen";
+import {
+  AuthDivider,
+  authStyles,
+  SocialButtons,
+} from "../../src/features/auth/components";
 import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { supabase } from "../../src/lib/supabase";
-import { spacing } from "../../src/theme/tokens";
-import { AppText, Button, Card, Divider, Input } from "../../src/ui";
+import { colors, spacing, typography } from "../../src/theme/tokens";
+import { AppText, Button, Input } from "../../src/ui";
 
 export default function SignUpScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oauthProvider, setOauthProvider] = useState<"apple" | "google" | null>(
     null,
@@ -73,110 +80,138 @@ export default function SignUpScreen() {
   }
 
   return (
-    <Screen>
+    <SafeAreaView style={authStyles.screen}>
+      <View style={authStyles.headerNav}>
+        <Pressable
+          accessibilityLabel="Torna indietro"
+          accessibilityRole="button"
+          onPress={() => router.replace("/(auth)/welcome")}
+          style={authStyles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+      </View>
+
       <KeyboardAwareForm
-        contentContainerStyle={styles.container}
+        contentContainerStyle={styles.scrollContent}
         keyboardVerticalOffset={spacing[16]}
       >
-        <View style={styles.header}>
-          <AppText variant="overline" color="hero">
-            Join The Network
+        <View style={authStyles.contentPad}>
+          <AppText variant="displaySm" style={authStyles.pageTitle}>
+            Crea il tuo account
           </AppText>
-          <AppText variant="displayLg">Crea il tuo account</AppText>
-          <AppText variant="bodyLg" color="secondary">
-            Entra nel portale con una registrazione essenziale e completa il tuo
+          <AppText style={authStyles.pageDesc}>
+            Entra nel network del calcio dilettantistico e completa il tuo
             posizionamento sportivo nel passo successivo.
           </AppText>
-        </View>
-        <Card style={styles.formCard}>
-          <Input
-            autoCapitalize="none"
-            keyboardType="email-address"
-            onChangeText={setEmail}
-            placeholder="Email"
-            value={email}
-          />
-          <Input
-            onChangeText={setPassword}
-            placeholder="Password"
-            secureTextEntry
-            value={password}
-          />
-          <Input
-            onChangeText={setConfirmPassword}
-            placeholder="Conferma password"
-            secureTextEntry
-            value={confirmPassword}
-          />
+
+          <View style={authStyles.inputGroup}>
+            <AppText style={authStyles.inputLabel}>Email</AppText>
+            <Input
+              autoCapitalize="none"
+              keyboardType="email-address"
+              onChangeText={setEmail}
+              placeholder="es. mario.rossi@email.com"
+              style={styles.inputField}
+              value={email}
+            />
+          </View>
+
+          <View style={authStyles.inputGroup}>
+            <AppText style={authStyles.inputLabel}>Password</AppText>
+            <View style={styles.passwordContainer}>
+              <Input
+                onChangeText={setPassword}
+                placeholder="Almeno 6 caratteri"
+                secureTextEntry={!showPassword}
+                style={styles.passwordInput}
+                value={password}
+              />
+              <Pressable
+                accessibilityLabel={showPassword ? "Nascondi password" : "Mostra password"}
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeButton}
+              >
+                <Ionicons
+                  name={showPassword ? "eye" : "eye-off"}
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={authStyles.inputGroup}>
+            <AppText style={authStyles.inputLabel}>Conferma password</AppText>
+            <Input
+              onChangeText={setConfirmPassword}
+              placeholder="Ripeti la password"
+              secureTextEntry={!showPassword}
+              style={styles.inputField}
+              value={confirmPassword}
+            />
+          </View>
+
           <Button
             disabled={isSubmitting}
             label={isSubmitting ? "Creazione account..." : "Registrati"}
+            loading={isSubmitting}
             onPress={handleSignUp}
+            size="lg"
+            style={authStyles.primaryButton}
           />
-          <View style={styles.socialDivider}>
-            <Divider style={styles.dividerLine} />
-            <AppText variant="overline" color="muted">
-              oppure registrati con
-            </AppText>
-            <Divider style={styles.dividerLine} />
-          </View>
-          <Button
-            disabled={oauthProvider !== null}
-            label={
-              oauthProvider === "google"
-                ? "Connessione a Google..."
-                : "Continua con Google"
-            }
-            onPress={() => handleOAuthSignIn("google")}
-            variant="secondary"
+
+          <AuthDivider />
+
+          <SocialButtons
+            loading={oauthProvider}
+            onApple={() => handleOAuthSignIn("apple")}
+            onGoogle={() => handleOAuthSignIn("google")}
           />
-          {Platform.OS === "ios" ? (
-            <Button
-              disabled={oauthProvider !== null}
-              label={
-                oauthProvider === "apple"
-                  ? "Connessione ad Apple..."
-                  : "Continua con Apple"
-              }
-              onPress={() => handleOAuthSignIn("apple")}
-              variant="secondary"
-            />
-          ) : null}
-        </Card>
-        <Link href="/(auth)/sign-in" asChild>
-          <Button
-            label="Hai gia' un account? Accedi"
-            size="sm"
-            style={styles.linkButton}
-            variant="link"
-          />
-        </Link>
+
+          <AppText variant="bodySm" color="muted" style={styles.bottomLink}>
+            Hai gia' un account?{" "}
+            <Link href="/(auth)/sign-in">
+              <AppText variant="bodySm" style={styles.loginLink}>
+                Accedi
+              </AppText>
+            </Link>
+          </AppText>
+        </View>
       </KeyboardAwareForm>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollContent: {
     flexGrow: 1,
+  },
+  inputField: {
+    minHeight: 56,
+  },
+  passwordContainer: {
+    position: "relative",
+  },
+  passwordInput: {
+    minHeight: 56,
+    paddingRight: spacing[48],
+  },
+  eyeButton: {
+    position: "absolute",
+    right: spacing[16],
+    top: 0,
+    bottom: 0,
     justifyContent: "center",
-    gap: spacing[18],
-  },
-  header: {
-    gap: spacing[10],
-  },
-  formCard: {
-    gap: spacing[14],
-  },
-  socialDivider: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[10],
+    width: 40,
   },
-  dividerLine: {
-    flex: 1,
+  bottomLink: {
+    textAlign: "center",
+    marginTop: spacing[32],
   },
-  linkButton: {
-    alignSelf: "center",
+  loginLink: {
+    color: colors.accent,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

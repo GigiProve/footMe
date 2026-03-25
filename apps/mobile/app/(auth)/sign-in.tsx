@@ -1,16 +1,21 @@
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
   Image,
-  Platform,
   Pressable,
+  SafeAreaView,
   StyleSheet,
   View,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
-import { Screen } from "../../src/components/ui/screen";
+import {
+  AuthDivider,
+  authStyles,
+  SocialButtons,
+} from "../../src/features/auth/components";
 import {
   clearLastAccount,
   LastAccount,
@@ -21,13 +26,16 @@ import {
 import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { withDefaultProfileAvatar } from "../../src/features/profiles/profile-avatar";
 import { supabase } from "../../src/lib/supabase";
-import { colors, radius, shadows, spacing } from "../../src/theme/tokens";
+import { colors, radius, shadows, spacing, typography } from "../../src/theme/tokens";
 import { AppText, Button, Card, Divider, Input } from "../../src/ui";
 
 export default function SignInScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [oauthProvider, setOauthProvider] = useState<"apple" | "google" | null>(
     null,
   );
@@ -59,6 +67,7 @@ export default function SignInScreen() {
 
     try {
       setIsSubmitting(true);
+      setErrorMessage(null);
 
       const { error } = await supabase.auth.signInWithPassword({
         email: credentials.email,
@@ -66,7 +75,7 @@ export default function SignInScreen() {
       });
 
       if (error) {
-        Alert.alert("Accesso non riuscito", error.message);
+        setErrorMessage("Credenziali errate. Riprova.");
         handleSwitchAccount();
       }
     } finally {
@@ -87,6 +96,7 @@ export default function SignInScreen() {
 
     try {
       setIsSubmitting(true);
+      setErrorMessage(null);
 
       const { error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
@@ -94,7 +104,7 @@ export default function SignInScreen() {
       });
 
       if (error) {
-        Alert.alert("Accesso non riuscito", error.message);
+        setErrorMessage("Credenziali errate. Riprova.");
       } else {
         await saveLastAccountCredentials(loginEmail, password);
       }
@@ -121,156 +131,210 @@ export default function SignInScreen() {
   const showQuickLogin = lastAccount !== null && hasCredentials && !dismissed;
 
   return (
-    <Screen>
+    <SafeAreaView style={authStyles.screen}>
+      <View style={authStyles.headerNav}>
+        <Pressable
+          accessibilityLabel="Torna indietro"
+          accessibilityRole="button"
+          onPress={() => router.replace("/(auth)/welcome")}
+          style={authStyles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+      </View>
+
       <KeyboardAwareForm
-        contentContainerStyle={styles.container}
+        contentContainerStyle={styles.scrollContent}
         keyboardVerticalOffset={spacing[16]}
       >
-        <View style={styles.header}>
-          <View style={styles.brandRow}>
-            <View style={styles.brandIcon}>
-              <AppText variant="headingMd" color="inverse">
-                F
-              </AppText>
-            </View>
-            <AppText variant="displaySm" color="accent">
-              FootMe
-            </AppText>
-          </View>
-          <AppText variant="bodySm" color="secondary" style={styles.tagline}>
-            Il network professionale del calcio dilettantistico
+        <View style={authStyles.contentPad}>
+          <AppText variant="displaySm" style={authStyles.pageTitle}>
+            Bentornato
           </AppText>
-        </View>
+          <AppText style={authStyles.pageDesc}>
+            Accedi per continuare a fare networking nel mondo del calcio.
+          </AppText>
 
-        {showQuickLogin ? (
-          <Card style={styles.quickLoginCard}>
-            <Pressable
-              accessibilityLabel={`Accedi come ${lastAccount.fullName ?? lastAccount.email}`}
-              accessibilityRole="button"
-              disabled={isSubmitting}
-              onPress={handleQuickLogin}
-              style={({ pressed }) => [
-                styles.quickLoginRow,
-                pressed ? styles.quickLoginPressed : null,
-              ]}
-            >
-              <Image
-                accessibilityLabel="Avatar ultimo utente"
-                source={{
-                  uri: withDefaultProfileAvatar(lastAccount.avatarUrl),
-                }}
-                style={styles.quickLoginAvatar}
-              />
-              <View style={styles.quickLoginText}>
-                <AppText variant="bodySm" color="secondary">
-                  {isSubmitting ? "Accesso in corso..." : "Accedi come"}
-                </AppText>
-                <AppText variant="titleMd">
-                  {lastAccount.fullName ?? lastAccount.email}
-                </AppText>
-              </View>
-            </Pressable>
-            <Divider />
-            <Button
-              label="Usa un altro account"
-              onPress={handleSwitchAccount}
-              size="sm"
-              variant="link"
-            />
-          </Card>
-        ) : (
-          <Card style={styles.formCard}>
-            <Input
-              autoCapitalize="none"
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="Email"
-              value={email}
-            />
-            <Input
-              onChangeText={setPassword}
-              placeholder="Password"
-              secureTextEntry
-              value={password}
-            />
-            <Button
-              disabled={isSubmitting}
-              label={isSubmitting ? "Accesso in corso..." : "Accedi"}
-              onPress={handleSignIn}
-            />
-            <View style={styles.socialDivider}>
-              <Divider style={styles.dividerLine} />
-              <AppText variant="overline" color="muted">
-                oppure continua con
-              </AppText>
-              <Divider style={styles.dividerLine} />
-            </View>
-            <Button
-              disabled={oauthProvider !== null}
-              label={
-                oauthProvider === "google"
-                  ? "Connessione a Google..."
-                  : "Continua con Google"
-              }
-              onPress={() => handleOAuthSignIn("google")}
-              variant="secondary"
-            />
-            {Platform.OS === "ios" ? (
+          {showQuickLogin ? (
+            <Card style={styles.quickLoginCard}>
+              <Pressable
+                accessibilityLabel={`Accedi come ${lastAccount.fullName ?? lastAccount.email}`}
+                accessibilityRole="button"
+                disabled={isSubmitting}
+                onPress={handleQuickLogin}
+                style={({ pressed }) => [
+                  styles.quickLoginRow,
+                  pressed ? styles.quickLoginPressed : null,
+                ]}
+              >
+                <Image
+                  accessibilityLabel="Avatar ultimo utente"
+                  source={{
+                    uri: withDefaultProfileAvatar(lastAccount.avatarUrl),
+                  }}
+                  style={styles.quickLoginAvatar}
+                />
+                <View style={styles.quickLoginText}>
+                  <AppText variant="bodySm" color="secondary">
+                    {isSubmitting ? "Accesso in corso..." : "Accedi come"}
+                  </AppText>
+                  <AppText variant="titleMd">
+                    {lastAccount.fullName ?? lastAccount.email}
+                  </AppText>
+                </View>
+              </Pressable>
+              <Divider />
               <Button
-                disabled={oauthProvider !== null}
-                label={
-                  oauthProvider === "apple"
-                    ? "Connessione ad Apple..."
-                    : "Continua con Apple"
-                }
-                onPress={() => handleOAuthSignIn("apple")}
-                variant="secondary"
+                label="Usa un altro account"
+                onPress={handleSwitchAccount}
+                size="sm"
+                variant="link"
               />
-            ) : null}
-          </Card>
-        )}
-        <Link href="/(auth)/sign-up" asChild>
-          <Button
-            label="Non hai un account? Crea il tuo profilo"
-            size="sm"
-            style={styles.linkButton}
-            variant="link"
-          />
-        </Link>
+            </Card>
+          ) : (
+            <>
+              <View style={authStyles.inputGroup}>
+                <AppText style={authStyles.inputLabel}>Email</AppText>
+                <Input
+                  autoCapitalize="none"
+                  error={errorMessage !== null}
+                  keyboardType="email-address"
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    setErrorMessage(null);
+                  }}
+                  placeholder="mario.rossi@email.com"
+                  style={styles.inputField}
+                  value={email}
+                />
+              </View>
+
+              <View style={authStyles.inputGroup}>
+                <AppText style={authStyles.inputLabel}>Password</AppText>
+                <View style={styles.passwordContainer}>
+                  <Input
+                    error={errorMessage !== null}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      setErrorMessage(null);
+                    }}
+                    placeholder="••••••••"
+                    secureTextEntry={!showPassword}
+                    style={styles.passwordInput}
+                    value={password}
+                  />
+                  <Pressable
+                    accessibilityLabel={showPassword ? "Nascondi password" : "Mostra password"}
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeButton}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye" : "eye-off"}
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </Pressable>
+                </View>
+                {errorMessage ? (
+                  <View style={styles.errorRow}>
+                    <Ionicons name="alert-circle" size={14} color={colors.danger} />
+                    <AppText variant="bodySm" color="danger">
+                      {errorMessage}
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
+
+              <Link href="/(auth)/forgot-password" asChild>
+                <Pressable style={styles.forgotLink}>
+                  <AppText variant="bodySm" style={styles.forgotText}>
+                    Password dimenticata?
+                  </AppText>
+                </Pressable>
+              </Link>
+
+              <Button
+                disabled={isSubmitting}
+                label={isSubmitting ? "Accesso in corso..." : "Accedi"}
+                loading={isSubmitting}
+                onPress={handleSignIn}
+                size="lg"
+                style={styles.loginButton}
+              />
+
+              <AuthDivider />
+
+              <SocialButtons
+                loading={oauthProvider}
+                onApple={() => handleOAuthSignIn("apple")}
+                onGoogle={() => handleOAuthSignIn("google")}
+              />
+
+              <AppText variant="bodySm" color="muted" style={styles.bottomLink}>
+                Non hai un account?{" "}
+                <Link href="/(auth)/sign-up">
+                  <AppText variant="bodySm" style={styles.registerLink}>
+                    Registrati
+                  </AppText>
+                </Link>
+              </AppText>
+            </>
+          )}
+        </View>
       </KeyboardAwareForm>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollContent: {
     flexGrow: 1,
+  },
+  inputField: {
+    minHeight: 56,
+  },
+  passwordContainer: {
+    position: "relative",
+  },
+  passwordInput: {
+    minHeight: 56,
+    paddingRight: spacing[48],
+  },
+  eyeButton: {
+    position: "absolute",
+    right: spacing[16],
+    top: 0,
+    bottom: 0,
     justifyContent: "center",
-    gap: spacing[18],
-  },
-  header: {
     alignItems: "center",
-    gap: spacing[8],
-    marginBottom: spacing[12],
+    width: 40,
   },
-  brandRow: {
+  errorRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing[8],
+    gap: spacing[6],
+    marginTop: spacing[8],
   },
-  brandIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius[10],
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
+  forgotLink: {
+    alignSelf: "flex-end",
+    marginTop: -spacing[4],
+    marginBottom: spacing[24],
   },
-  tagline: {
+  forgotText: {
+    color: colors.accent,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  loginButton: {
+    ...authStyles.primaryButton,
+    marginTop: spacing[8],
+  },
+  bottomLink: {
     textAlign: "center",
+    marginTop: spacing[32],
   },
-  formCard: {
-    gap: spacing[14],
+  registerLink: {
+    color: colors.accent,
+    fontWeight: typography.fontWeight.semibold,
   },
   quickLoginCard: {
     alignItems: "center",
@@ -300,16 +364,5 @@ const styles = StyleSheet.create({
   quickLoginText: {
     alignItems: "center",
     gap: spacing[4],
-  },
-  socialDivider: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[10],
-  },
-  dividerLine: {
-    flex: 1,
-  },
-  linkButton: {
-    alignSelf: "center",
   },
 });

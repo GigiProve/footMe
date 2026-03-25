@@ -1,16 +1,17 @@
 import { Redirect } from "expo-router";
 
+import { SplashScreen } from "../src/features/auth/components";
 import { useSession } from "../src/features/auth/use-session";
 
 export default function IndexScreen() {
   const { isLoading, needsOnboarding, profile, session } = useSession();
 
   if (isLoading) {
-    return null;
+    return <SplashScreen />;
   }
 
   if (!session) {
-    return <Redirect href="/(auth)/sign-in" />;
+    return <Redirect href="/(auth)/welcome" />;
   }
 
   if (profile?.is_admin) {
