@@ -51,8 +51,8 @@ describe("Button", () => {
     expect(styles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          backgroundColor: colors.accentStrong,
-          borderColor: colors.accentStrong,
+          backgroundColor: colors.accent,
+          borderColor: colors.accent,
         }),
       ]),
     );
