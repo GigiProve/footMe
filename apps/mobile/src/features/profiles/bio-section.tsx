@@ -2,7 +2,6 @@ import { type ReactNode, useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
-  Text,
   type TextLayoutEventData,
   View,
 } from "react-native";
@@ -16,7 +15,7 @@ import {
 } from "./profile-form-utils";
 import { ProfileSectionCard } from "./profile-screen-components";
 import { colors, radius, sizes, spacing, typography } from "../../theme/tokens";
-import { Input } from "../../ui";
+import { AppText, Button, Input } from "../../ui";
 
 const BIO_PLACEHOLDER =
   "Racconta brevemente il tuo percorso calcistico, le tue caratteristiche e cosa cerchi per la prossima stagione.";
@@ -52,15 +51,13 @@ export function CharacterCounter({
   const isNearLimit = currentLength >= PROFILE_BIO_WARNING_THRESHOLD;
 
   return (
-    <Text
-      style={[
-        styles.counterText,
-        isNearLimit ? styles.counterWarningText : null,
-        hasError ? styles.counterErrorText : null,
-      ]}
+    <AppText
+      variant="caption"
+      color={hasError ? "danger" : isNearLimit ? "accentStrong" : "secondary"}
+      style={styles.counterText}
     >
       {currentLength} / {PROFILE_BIO_MAX_LENGTH} caratteri
-    </Text>
+    </AppText>
   );
 }
 
@@ -73,6 +70,8 @@ export function BioInput({ errorMessage, onChangeText, value }: BioInputProps) {
         accessibilityLabel="Bio del profilo"
         autoCapitalize="sentences"
         autoCorrect
+        error={Boolean(errorMessage)}
+        helperText={errorMessage ?? undefined}
         maxLength={PROFILE_BIO_MAX_LENGTH}
         multiline
         onChangeText={(nextValue) => onChangeText(normalizeProfileBioInput(nextValue))}
@@ -80,17 +79,13 @@ export function BioInput({ errorMessage, onChangeText, value }: BioInputProps) {
         returnKeyType="default"
         scrollEnabled={false}
         spellCheck
-        style={[
-          styles.bioInput,
-          errorMessage ? styles.bioInputError : null,
-        ]}
+        style={styles.bioInput}
         value={normalizedValue}
       />
       <CharacterCounter
         currentLength={normalizedValue.length}
         hasError={Boolean(errorMessage)}
       />
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
     </View>
   );
 }
@@ -121,23 +116,21 @@ export function PublicBioBlock({
         hasValue ? styles.completedReadonlySurface : styles.emptyReadonlySurface,
       ]}
     >
-      <Text
+      <AppText
+        variant="bodyLg"
+        color={hasValue ? "primary" : "muted"}
         numberOfLines={hasValue && !isExpanded ? collapsedLines : undefined}
         onTextLayout={hasValue ? handleTextLayout : undefined}
-        style={[styles.readonlyValue, hasValue ? null : styles.readonlyPlaceholder]}
       >
         {formatOptionalSummary(normalizedBio)}
-      </Text>
+      </AppText>
       {hasValue && canExpand ? (
-        <Pressable
-          accessibilityRole="button"
+        <Button
+          label={isExpanded ? "Mostra meno" : "Mostra di più"}
           onPress={() => setIsExpanded((current) => !current)}
-          style={({ pressed }) => [styles.toggleButton, pressed ? styles.pressed : null]}
-        >
-          <Text style={styles.toggleButtonText}>
-            {isExpanded ? "Mostra meno" : "Mostra di più"}
-          </Text>
-        </Pressable>
+          size="sm"
+          variant="link"
+        />
       ) : null}
     </View>
   );
@@ -158,7 +151,9 @@ export function BioSection({
       title="Presentazione"
     >
       <View style={styles.fieldContainer}>
-        <Text style={styles.fieldLabel}>Bio</Text>
+        <AppText variant="overline" color="secondary">
+          Bio
+        </AppText>
         {editable && onChangeText ? (
           <BioInput errorMessage={errorMessage} onChangeText={onChangeText} value={normalizedBio} />
         ) : (
@@ -173,36 +168,17 @@ export function BioSection({
 const styles = StyleSheet.create({
   bioInput: {
     minHeight: sizes.multilineFieldMinHeight + spacing[24],
-    lineHeight: typography.lineHeight[24],
-    color: colors.textPrimary,
-  },
-  bioInputError: {
-    borderColor: colors.danger,
-    backgroundColor: colors.dangerSoft,
   },
   completedReadonlySurface: {
     backgroundColor: colors.accentSoft,
     borderColor: colors.accentSoft,
   },
-  counterErrorText: {
-    color: colors.danger,
-  },
   counterText: {
     alignSelf: "flex-end",
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
-  },
-  counterWarningText: {
-    color: colors.accentStrong,
   },
   emptyReadonlySurface: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
-  },
-  errorText: {
-    color: colors.danger,
-    lineHeight: typography.lineHeight[22],
   },
   extraContent: {
     gap: spacing[14],
@@ -210,41 +186,11 @@ const styles = StyleSheet.create({
   fieldContainer: {
     gap: spacing[8],
   },
-  fieldLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
-    letterSpacing: typography.letterSpacing.md,
-  },
-  pressed: {
-    opacity: 0.82,
-  },
-  readonlyPlaceholder: {
-    color: colors.textMuted,
-  },
   readonlySurface: {
     gap: spacing[10],
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[14],
-    borderRadius: radius[18],
+    borderRadius: radius[8],
     borderWidth: 1,
-  },
-  readonlyValue: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize[16],
-    lineHeight: typography.lineHeight[24],
-  },
-  toggleButton: {
-    alignSelf: "flex-start",
-    paddingHorizontal: spacing[10],
-    paddingVertical: spacing[6],
-    borderRadius: radius.full,
-    backgroundColor: colors.surface,
-  },
-  toggleButtonText: {
-    color: colors.accentStrong,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
   },
 });

@@ -174,27 +174,22 @@ export default function ClubProfileScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ headerShown: false }} />
-      <KeyboardAwareScrollView contentContainerStyle={{ gap: spacing[16], paddingBottom: 28 }}>
+      <KeyboardAwareScrollView contentContainerStyle={styles.scrollContent}>
         <Pressable
           accessibilityLabel="Torna indietro"
           onPress={() => router.back()}
-          style={{ alignSelf: "flex-start" }}
+          style={styles.backButton}
         >
           <Ionicons color={colors.textPrimary} name="arrow-back" size={24} />
         </Pressable>
 
-        <Card style={{ gap: spacing[12] }}>
+        <Card style={styles.clubHeaderCard}>
           <View style={styles.clubHeaderRow}>
             {club.logo_url ? (
               <Image
                 accessibilityLabel={`Logo ${club.name}`}
                 source={{ uri: club.logo_url }}
-                style={{
-                  backgroundColor: colors.surfaceMuted,
-                  borderRadius: radius[14],
-                  height: 56,
-                  width: 56,
-                }}
+                style={styles.clubLogo}
               />
             ) : null}
             <View style={styles.clubNameContainer}>
@@ -210,13 +205,13 @@ export default function ClubProfileScreen() {
         </Card>
 
         {club.description ? (
-          <Card style={{ gap: spacing[8] }}>
+          <Card style={styles.sectionCard}>
             <AppText variant="titleMd">Descrizione</AppText>
             <AppText variant="bodySm" color="secondary">{club.description}</AppText>
           </Card>
         ) : null}
 
-        <Card style={{ gap: spacing[10] }}>
+        <Card style={styles.infoCard}>
           <AppText variant="titleMd">Informazioni</AppText>
           {club.founding_year ? (
             <InfoRow label="Anno di fondazione" value={String(club.founding_year)} />
@@ -274,9 +269,7 @@ export default function ClubProfileScreen() {
                     >
                       <AppText
                         variant="caption"
-                        style={{
-                          color: isSenior ? colors.accent : colors.textSecondary,
-                        }}
+                        color={isSenior ? "accent" : "secondary"}
                       >
                         {team.category}
                       </AppText>
@@ -293,7 +286,7 @@ export default function ClubProfileScreen() {
           </Card>
         ) : null}
 
-        <Card style={{ gap: spacing[10] }}>
+        <Card style={styles.infoCard}>
           <AppText variant="titleMd">Contatti</AppText>
           {club.club_email ? (
             <Pressable onPress={() => Linking.openURL(`mailto:${club.club_email}`)}>
@@ -316,7 +309,7 @@ export default function ClubProfileScreen() {
         </Card>
 
         {club.owner_full_name ? (
-          <Card style={{ gap: spacing[8] }}>
+          <Card style={styles.sectionCard}>
             <AppText variant="titleMd">Responsabile</AppText>
             <AppText variant="bodySm" color="secondary">{club.owner_full_name}</AppText>
           </Card>
@@ -446,7 +439,7 @@ export default function ClubProfileScreen() {
                   label={option.label}
                   onPress={() => setJoinRole(option.value)}
                   size="sm"
-                  variant={joinRole === option.value ? "primary" : "secondary"}
+                  variant={joinRole === option.value ? "primary" : "outline"}
                 />
               ))}
             </View>
@@ -469,7 +462,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <AppText variant="bodySm" color="secondary">
         {label}
       </AppText>
-      <AppText variant="bodySm" style={{ fontWeight: "700", textAlign: "right", flex: 1 }}>
+      <AppText variant="titleSm" style={styles.infoRowValue}>
         {value}
       </AppText>
     </View>
@@ -477,6 +470,10 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    gap: spacing[16],
+    paddingBottom: spacing[28],
+  },
   loadingContainer: {
     alignItems: "center",
     flex: 1,
@@ -488,19 +485,41 @@ const styles = StyleSheet.create({
     gap: spacing[16],
     justifyContent: "center",
   },
+  backButton: {
+    alignSelf: "flex-start",
+  },
+  clubHeaderCard: {
+    gap: spacing[12],
+  },
   clubHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing[12],
   },
+  clubLogo: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius[6],
+    height: 48,
+    width: 48,
+  },
   clubNameContainer: {
     flex: 1,
     gap: spacing[4],
+  },
+  sectionCard: {
+    gap: spacing[8],
+  },
+  infoCard: {
+    gap: spacing[10],
   },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: spacing[8],
+  },
+  infoRowValue: {
+    textAlign: "right",
+    flex: 1,
   },
   reportLink: {
     alignItems: "center",
@@ -528,7 +547,7 @@ const styles = StyleSheet.create({
   },
   teamCard: {
     alignItems: "center",
-    borderRadius: radius[12],
+    borderRadius: radius[8],
     borderWidth: 1,
     gap: spacing[6],
     padding: spacing[14],
@@ -543,14 +562,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   teamCardLogo: {
-    borderRadius: radius[10],
+    borderRadius: radius[6],
     height: 40,
     width: 40,
   },
   teamCardLogoPlaceholder: {
     alignItems: "center",
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[10],
+    borderRadius: radius[6],
     height: 40,
     justifyContent: "center",
     width: 40,

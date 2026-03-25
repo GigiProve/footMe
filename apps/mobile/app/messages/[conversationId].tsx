@@ -209,7 +209,7 @@ export default function ConversationScreen() {
   return (
     <Screen>
       <KeyboardAwareForm
-        contentContainerStyle={{ gap: 16, paddingBottom: spacing[16] }}
+        contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.header}>
           <Button
@@ -250,10 +250,10 @@ export default function ConversationScreen() {
             message.shared_contact_phone ? (
             <View
               key={message.message_id}
-              style={{
-                alignSelf: isOwnMessage ? "flex-end" : "flex-start",
-                maxWidth: "82%",
-              }}
+              style={[
+                styles.contactCardWrapper,
+                isOwnMessage ? styles.alignEnd : styles.alignStart,
+              ]}
             >
               <ContactCardMessage
                 isOwnMessage={isOwnMessage}
@@ -269,30 +269,24 @@ export default function ConversationScreen() {
               key={message.message_id}
               style={[
                 styles.messageBubble,
-                {
-                  alignSelf: isOwnMessage ? "flex-end" : "flex-start",
-                  backgroundColor: isOwnMessage
-                    ? colors.accent
-                    : colors.surface,
-                  borderWidth: isOwnMessage ? 0 : 1,
-                },
+                isOwnMessage ? styles.ownBubble : styles.otherBubble,
               ]}
             >
               <AppText
                 variant="titleSm"
-                style={{ color: isOwnMessage ? colors.inkInvert : colors.textPrimary }}
+                color={isOwnMessage ? "inverse" : "primary"}
               >
                 {isOwnMessage ? "Tu" : message.sender_full_name}
               </AppText>
               <AppText
                 variant="bodySm"
-                style={{ color: isOwnMessage ? colors.inkInvert : colors.textPrimary }}
+                color={isOwnMessage ? "inverse" : "primary"}
               >
                 {message.body}
               </AppText>
               <AppText
                 variant="caption"
-                style={{ color: isOwnMessage ? colors.textInverseMuted : colors.textMuted }}
+                color={isOwnMessage ? "inverseMuted" : "muted"}
               >
                 {formatTimestamp(message.sent_at)}
               </AppText>
@@ -300,17 +294,12 @@ export default function ConversationScreen() {
           );
         })}
 
-        <Card
-          style={{
-            gap: spacing[12],
-            borderRadius: radius[22],
-          }}
-        >
+        <Card style={styles.composerCard}>
           <Input
             multiline
             onChangeText={setDraft}
             placeholder="Scrivi un messaggio professionale e diretto"
-            style={{ minHeight: sizes.messageComposerMinHeight }}
+            style={styles.composerInput}
             value={draft}
           />
           <Button
@@ -343,23 +332,51 @@ export default function ConversationScreen() {
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    gap: spacing[16],
+    paddingBottom: spacing[16],
+  },
   header: {
-    gap: 10,
-    padding: 20,
-    borderRadius: 24,
-    backgroundColor: colors.textPrimary,
+    gap: spacing[10],
+    padding: spacing[20],
+    borderRadius: radius[8],
+    backgroundColor: colors.surfaceInverse,
   },
   backButton: {
     alignSelf: "flex-start",
   },
   statusCard: {
-    borderRadius: 20,
+    borderRadius: radius[8],
+  },
+  contactCardWrapper: {
+    maxWidth: "82%",
+  },
+  alignEnd: {
+    alignSelf: "flex-end",
+  },
+  alignStart: {
+    alignSelf: "flex-start",
   },
   messageBubble: {
     maxWidth: "82%",
-    gap: 6,
-    padding: 14,
-    borderRadius: 18,
+    gap: spacing[6],
+    padding: spacing[14],
+    borderRadius: radius[8],
     borderColor: colors.border,
+  },
+  ownBubble: {
+    alignSelf: "flex-end",
+    backgroundColor: colors.accent,
+  },
+  otherBubble: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+  },
+  composerCard: {
+    gap: spacing[12],
+  },
+  composerInput: {
+    minHeight: sizes.messageComposerMinHeight,
   },
 });

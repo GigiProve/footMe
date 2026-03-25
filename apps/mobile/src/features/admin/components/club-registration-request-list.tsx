@@ -1,7 +1,7 @@
-import { ActivityIndicator, FlatList, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 
-import { colors, spacing, typography } from "../../../theme/tokens";
-import { Button } from "../../../ui";
+import { colors, spacing } from "../../../theme/tokens";
+import { AppText, Button, EmptyState as SharedEmptyState } from "../../../ui";
 import type { AdminClubEntry } from "../admin-service";
 import { ClubRegistrationRequestCard } from "./club-registration-request-card";
 import { EmptyState } from "./empty-state";
@@ -25,7 +25,7 @@ export function ClubRegistrationRequestList({
 }: Props) {
   if (isLoading) {
     return (
-      <View style={{ alignItems: "center", flex: 1, justifyContent: "center" }}>
+      <View style={styles.center}>
         <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
@@ -33,10 +33,10 @@ export function ClubRegistrationRequestList({
 
   if (error) {
     return (
-      <View style={{ alignItems: "center", flex: 1, justifyContent: "center", gap: spacing[16], paddingHorizontal: spacing[20] }}>
-        <Text style={{ color: colors.textSecondary, fontSize: typography.fontSize[16], textAlign: "center" }}>
+      <View style={styles.errorContainer}>
+        <AppText variant="bodyLg" color="secondary" align="center">
           {error}
-        </Text>
+        </AppText>
         <Button label="Riprova" onPress={onRefresh} size="sm" variant="secondary" />
       </View>
     );
@@ -44,7 +44,7 @@ export function ClubRegistrationRequestList({
 
   return (
     <FlatList
-      contentContainerStyle={{ padding: spacing[20] }}
+      contentContainerStyle={styles.listContent}
       data={clubs}
       keyExtractor={(item) => item.id}
       ListEmptyComponent={<EmptyState message="Nessuna richiesta di iscrizione in attesa." />}
@@ -56,3 +56,21 @@ export function ClubRegistrationRequestList({
     />
   );
 }
+
+const styles = StyleSheet.create({
+  center: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  errorContainer: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    gap: spacing[16],
+    paddingHorizontal: spacing[20],
+  },
+  listContent: {
+    padding: spacing[20],
+  },
+});

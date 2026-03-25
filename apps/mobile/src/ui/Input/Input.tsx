@@ -1,15 +1,22 @@
 import { ComponentProps, forwardRef, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, TextInput, View } from "react-native";
 
 import { useKeyboardAwareScroll } from "../../components/ui/keyboard-aware-scroll-view";
-import { colors, radius, sizes, spacing, typography } from "../../styles";
+import { colors, radius, spacing, typography } from "../../styles";
+import { AppText } from "../AppText/AppText";
 
 type InputProps = {
+  disabled?: boolean;
+  error?: boolean;
+  helperText?: string;
   label?: string;
 } & ComponentProps<typeof TextInput>;
 
 export const Input = forwardRef<TextInput, InputProps>(function Input(
   {
+    disabled = false,
+    error = false,
+    helperText,
     label,
     multiline,
     onBlur,
@@ -43,8 +50,9 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
 
   return (
     <View style={styles.wrapper}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label ? <AppText variant="caption" color="muted" style={styles.label}>{label}</AppText> : null}
       <TextInput
+        editable={!disabled}
         multiline={multiline}
         onBlur={(event) => {
           setIsFocused(false);
@@ -69,11 +77,22 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
           multiline ? styles.multiline : null,
           hasValue && !isFocused ? styles.filledInput : null,
           isFocused ? styles.focusedInput : null,
+          error ? styles.errorInput : null,
+          disabled ? styles.disabledInput : null,
           style,
         ]}
         value={value}
         {...props}
       />
+      {helperText ? (
+        <AppText
+          variant="caption"
+          color={error ? "danger" : "muted"}
+          style={styles.helperText}
+        >
+          {helperText}
+        </AppText>
+      ) : null}
     </View>
   );
 });
@@ -83,28 +102,43 @@ const styles = StyleSheet.create({
     gap: spacing[8],
   },
   label: {
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.medium,
+    fontSize: typography.fontSize[13],
   },
   input: {
-    minHeight: sizes.touchTarget,
+    minHeight: 52,
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[14],
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius[8],
+    borderRadius: radius[6],
     backgroundColor: colors.inputBackground,
+    fontSize: typography.fontSize[15],
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textPrimary,
   },
   focusedInput: {
-    borderColor: colors.accentStrong,
+    borderColor: colors.accent,
     backgroundColor: colors.surface,
   },
   filledInput: {
-    borderColor: colors.accentSoft,
-    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.inputBackground,
+  },
+  errorInput: {
+    borderColor: colors.danger,
+  },
+  disabledInput: {
+    opacity: 0.6,
+    backgroundColor: colors.surfaceMuted,
   },
   multiline: {
-    minHeight: sizes.multilineFieldMinHeight,
+    minHeight: 100,
     textAlignVertical: "top",
+    lineHeight: 22,
+  },
+  helperText: {
+    fontSize: typography.fontSize[13],
+    lineHeight: 18,
   },
 });

@@ -11,10 +11,10 @@ import {
 
 describe("theme tokens", () => {
   it("re-exports the shared color palette and semantic states", () => {
-    expect(colors.background).toBe("#F3F2EF");
+    expect(colors.background).toBe("#F5F8FB");
     expect(colors.surface).toBe("#FFFFFF");
     expect(colors.accent).toBe("#0A66C2");
-    expect(colors.hero).toBe("#004182");
+    expect(colors.hero).toBe("#05345E");
     expect(colors.surfaceOverlay).toBe("rgba(255,255,255,0.16)");
     expect(colors.buttonDisabled).toBe("#A7C6E6");
   });

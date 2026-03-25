@@ -28,6 +28,8 @@ export type ButtonVariant =
   | "primary"
   | "secondary"
   | "tertiary"
+  | "outline"
+  | "ghost"
   | "danger"
   | "link"
   | "icon"
@@ -181,7 +183,9 @@ export function Button({
               resolveLabelSize(size),
               { color: palette.textColor },
               variant === "link" ? styles.linkLabel : null,
-              variant === "tertiary" ? styles.tertiaryLabel : null,
+              variant === "tertiary" || variant === "outline" || variant === "ghost"
+                ? styles.tertiaryLabel
+                : null,
               variant === "chipAction" ? styles.chipLabel : null,
               textStyle,
             ]}

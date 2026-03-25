@@ -1,13 +1,21 @@
-import { Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
-import { colors, spacing, typography } from "../../../theme/tokens";
+import { spacing } from "../../../theme/tokens";
+import { AppText } from "../../../ui";
 
 export function EmptyState({ message }: { message: string }) {
   return (
-    <View style={{ alignItems: "center", paddingVertical: spacing[32] }}>
-      <Text style={{ color: colors.textMuted, fontSize: typography.fontSize[16] }}>
+    <View style={styles.container}>
+      <AppText variant="bodyLg" color="muted" align="center">
         {message}
-      </Text>
+      </AppText>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    paddingVertical: spacing[32],
+  },
+});

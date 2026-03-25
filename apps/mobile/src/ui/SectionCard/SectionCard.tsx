@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, shadows, spacing } from "../../styles";
+import { colors, radius, spacing } from "../../styles";
 import { AppText } from "../AppText/AppText";
 import { Divider } from "../Divider/Divider";
 
@@ -70,7 +70,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    ...shadows.subtle,
   },
   header: {
     flexDirection: "row",

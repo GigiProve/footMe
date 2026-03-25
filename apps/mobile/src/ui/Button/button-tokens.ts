@@ -7,9 +7,9 @@ export const buttonHeights = {
 } as const;
 
 export const buttonHorizontalPadding = {
-  sm: spacing[12],
-  md: spacing[16],
-  lg: spacing[18],
+  sm: spacing[14],
+  md: spacing[20],
+  lg: spacing[20],
 } as const;
 
 export const buttonIconSizes = {
@@ -21,23 +21,23 @@ export const buttonIconSizes = {
 export const buttonTypography = {
   sm: {
     fontSize: typography.fontSize[14],
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
     lineHeight: typography.lineHeight[22],
   },
   md: {
     fontSize: typography.fontSize[16],
-    fontWeight: typography.fontWeight.heavy,
+    fontWeight: typography.fontWeight.semibold,
     lineHeight: typography.lineHeight[24],
   },
   lg: {
-    fontSize: typography.fontSize[17],
-    fontWeight: typography.fontWeight.heavy,
+    fontSize: typography.fontSize[16],
+    fontWeight: typography.fontWeight.semibold,
     lineHeight: typography.lineHeight[24],
   },
 } as const;
 
 export const buttonRadius = {
-  default: radius[16],
+  default: radius.full,
   chip: radius.full,
   icon: radius.full,
 } as const;
@@ -45,14 +45,14 @@ export const buttonRadius = {
 export const buttonContentGap = spacing[8];
 
 export const buttonStateOpacity = {
-  disabled: 0.56,
+  disabled: 0.5,
   loading: 0.74,
   pressed: 0.88,
 } as const;
 
 export const buttonVariants = {
   chipAction: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.inputBackground,
     borderColor: colors.border,
     borderWidth: 1,
     textColor: colors.textPrimary,
@@ -61,19 +61,31 @@ export const buttonVariants = {
     backgroundColor: colors.danger,
     borderColor: colors.danger,
     borderWidth: 1,
-    textColor: colors.inkInvert,
+    textColor: colors.destructiveForeground,
   },
-  icon: {
+  ghost: {
     backgroundColor: "transparent",
     borderColor: "transparent",
-    borderWidth: 1,
+    borderWidth: 0,
+    textColor: colors.textPrimary,
+  },
+  icon: {
+    backgroundColor: colors.accentSoft,
+    borderColor: "transparent",
+    borderWidth: 0,
     textColor: colors.accentStrong,
   },
   link: {
     backgroundColor: "transparent",
     borderColor: "transparent",
+    borderWidth: 0,
+    textColor: colors.accent,
+  },
+  outline: {
+    backgroundColor: "transparent",
+    borderColor: colors.border,
     borderWidth: 1,
-    textColor: colors.accentStrong,
+    textColor: colors.textPrimary,
   },
   primary: {
     backgroundColor: colors.accent,
@@ -82,14 +94,14 @@ export const buttonVariants = {
     textColor: colors.inkInvert,
   },
   secondary: {
-    backgroundColor: colors.surface,
-    borderColor: colors.borderStrong,
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accentSoft,
     borderWidth: 1,
-    textColor: colors.textPrimary,
+    textColor: colors.accentStrong,
   },
   tertiary: {
     backgroundColor: "transparent",
-    borderColor: "transparent",
+    borderColor: colors.border,
     borderWidth: 1,
     textColor: colors.textPrimary,
   },
@@ -107,7 +119,12 @@ export const destructiveOverrides = {
   danger: {
     backgroundColor: colors.danger,
     borderColor: colors.danger,
-    textColor: colors.inkInvert,
+    textColor: colors.destructiveForeground,
+  },
+  ghost: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+    textColor: colors.dangerStrong,
   },
   icon: {
     backgroundColor: colors.dangerSoft,
@@ -119,10 +136,15 @@ export const destructiveOverrides = {
     borderColor: "transparent",
     textColor: colors.dangerStrong,
   },
+  outline: {
+    backgroundColor: "transparent",
+    borderColor: colors.danger,
+    textColor: colors.dangerStrong,
+  },
   primary: {
     backgroundColor: colors.danger,
     borderColor: colors.danger,
-    textColor: colors.inkInvert,
+    textColor: colors.destructiveForeground,
   },
   secondary: {
     backgroundColor: colors.dangerSoft,
@@ -131,13 +153,13 @@ export const destructiveOverrides = {
   },
   tertiary: {
     backgroundColor: "transparent",
-    borderColor: "transparent",
+    borderColor: colors.danger,
     textColor: colors.dangerStrong,
   },
 } as const;
 
 export const chipSelectedPalette = {
-  backgroundColor: colors.accentStrong,
-  borderColor: colors.accentStrong,
+  backgroundColor: colors.accent,
+  borderColor: colors.accent,
   textColor: colors.inkInvert,
 } as const;

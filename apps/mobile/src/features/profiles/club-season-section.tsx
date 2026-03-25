@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Modal, Pressable, SafeAreaView, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { KeyboardAwareScrollView } from "../../components/ui/keyboard-aware-scroll-view";
 import { SelectField } from "../../components/ui/select-field";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
-import { Button, Card, Input } from "../../ui";
+import { colors, radius, spacing } from "../../theme/tokens";
+import { AppText, Button, Card, Input, ModalHeader } from "../../ui";
+import { EditModalShell } from "./edit-modals/EditModalShell";
 import { PLAYER_CATEGORY_OPTIONS } from "./player-sports";
 import type { ClubSeasonEntryRecord } from "./profile-service";
 
@@ -69,80 +70,47 @@ function ClubSeasonCard({
     : `${season.startYear} – Attuale`;
 
   return (
-    <Card style={{ gap: spacing[8] }} variant="muted">
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <View style={{ flex: 1, gap: spacing[4] }}>
-          <Text
-            style={{
-              color: colors.textPrimary,
-              fontSize: typography.fontSize[16],
-              fontWeight: typography.fontWeight.heavy,
-            }}
-          >
+    <Card style={styles.seasonCard} variant="muted">
+      <View style={styles.seasonHeader}>
+        <View style={styles.seasonInfo}>
+          <AppText variant="titleSm">
             {season.category || "Categoria da definire"}
-          </Text>
-          <Text
-            style={{
-              color: colors.textSecondary,
-              fontSize: typography.fontSize[14],
-            }}
-          >
+          </AppText>
+          <AppText variant="bodySm" color="muted">
             {yearRange}
             {season.league ? ` · ${season.league}` : ""}
-          </Text>
+          </AppText>
           {season.notes ? (
-            <Text
-              style={{
-                color: colors.textMuted,
-                fontSize: typography.fontSize[12],
-                marginTop: spacing[4],
-              }}
-            >
+            <AppText variant="caption" color="muted" style={styles.notesText}>
               {season.notes}
-            </Text>
+            </AppText>
           ) : null}
         </View>
         {editable ? (
-          <View style={{ flexDirection: "row", gap: spacing[8] }}>
-            <Pressable
+          <View style={styles.seasonActions}>
+            <Button
               accessibilityLabel="Modifica stagione"
-              accessibilityRole="button"
-              hitSlop={8}
+              label=""
+              leftIcon={<Ionicons color={colors.textSecondary} name="pencil" size={16} />}
               onPress={onEdit}
-              style={iconButtonStyle}
-            >
-              <Ionicons color={colors.textSecondary} name="pencil" size={16} />
-            </Pressable>
-            <Pressable
+              size="sm"
+              variant="icon"
+            />
+            <Button
               accessibilityLabel="Elimina stagione"
-              accessibilityRole="button"
-              hitSlop={8}
+              destructive
+              label=""
+              leftIcon={<Ionicons color={colors.danger} name="trash-outline" size={16} />}
               onPress={onDelete}
-              style={iconButtonStyle}
-            >
-              <Ionicons color={colors.danger} name="trash-outline" size={16} />
-            </Pressable>
+              size="sm"
+              variant="icon"
+            />
           </View>
         ) : null}
       </View>
     </Card>
   );
 }
-
-const iconButtonStyle = {
-  width: 32,
-  height: 32,
-  borderRadius: radius.full,
-  backgroundColor: colors.surface,
-  alignItems: "center" as const,
-  justifyContent: "center" as const,
-};
 
 const currentYear = new Date().getFullYear();
 
@@ -179,89 +147,55 @@ function ClubSeasonEditorModal({
   }
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
+    <EditModalShell
+      isSaving={false}
+      onClose={onClose}
+      onSave={handleSave}
       onShow={() => setForm(draft)}
-      presentationStyle="pageSheet"
+      saveDisabled={!isValid}
+      saveLabel={isNew ? "Aggiungi" : "Salva modifiche"}
+      title={isNew ? "Aggiungi stagione" : "Modifica stagione"}
       visible={visible}
     >
-      <SafeAreaView style={{ backgroundColor: colors.background, flex: 1 }}>
-        <View style={modalHeaderStyle}>
-          <Pressable onPress={onClose}>
-            <Ionicons color={colors.textPrimary} name="close" size={24} />
-          </Pressable>
-          <Text style={modalTitleStyle}>
-            {isNew ? "Aggiungi stagione" : "Modifica stagione"}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <KeyboardAwareScrollView
-          contentContainerStyle={{ gap: spacing[16], padding: spacing[20] }}
-        >
-          <SelectField
-            label="Categoria *"
-            onChange={(value) => setForm((f) => ({ ...f, category: value }))}
-            options={PLAYER_CATEGORY_OPTIONS}
-            placeholder="Seleziona categoria"
-            value={form.category}
-          />
-          <SelectField
-            label="Anno inizio *"
-            onChange={(value) => setForm((f) => ({ ...f, startYear: value }))}
-            options={YEAR_OPTIONS}
-            placeholder="Seleziona anno"
-            value={form.startYear}
-          />
-          <SelectField
-            allowClear
-            clearLabel="In corso (attuale)"
-            label="Anno fine"
-            onChange={(value) => setForm((f) => ({ ...f, endYear: value }))}
-            options={YEAR_OPTIONS}
-            placeholder="In corso (attuale)"
-            value={form.endYear}
-          />
-          <Input
-            label="Girone"
-            onChangeText={(value) => setForm((f) => ({ ...f, league: value }))}
-            placeholder="Es. Girone A"
-            value={form.league}
-          />
-          <Input
-            label="Note"
-            multiline
-            onChangeText={(value) => setForm((f) => ({ ...f, notes: value }))}
-            placeholder="Es. Promozione, Campione regionale..."
-            value={form.notes}
-          />
-          <Button
-            disabled={!isValid}
-            label={isNew ? "Aggiungi" : "Salva modifiche"}
-            onPress={handleSave}
-            variant="primary"
-          />
-        </KeyboardAwareScrollView>
-      </SafeAreaView>
-    </Modal>
+      <SelectField
+        label="Categoria *"
+        onChange={(value) => setForm((f) => ({ ...f, category: value }))}
+        options={PLAYER_CATEGORY_OPTIONS}
+        placeholder="Seleziona categoria"
+        value={form.category}
+      />
+      <SelectField
+        label="Anno inizio *"
+        onChange={(value) => setForm((f) => ({ ...f, startYear: value }))}
+        options={YEAR_OPTIONS}
+        placeholder="Seleziona anno"
+        value={form.startYear}
+      />
+      <SelectField
+        allowClear
+        clearLabel="In corso (attuale)"
+        label="Anno fine"
+        onChange={(value) => setForm((f) => ({ ...f, endYear: value }))}
+        options={YEAR_OPTIONS}
+        placeholder="In corso (attuale)"
+        value={form.endYear}
+      />
+      <Input
+        label="Girone"
+        onChangeText={(value) => setForm((f) => ({ ...f, league: value }))}
+        placeholder="Es. Girone A"
+        value={form.league}
+      />
+      <Input
+        label="Note"
+        multiline
+        onChangeText={(value) => setForm((f) => ({ ...f, notes: value }))}
+        placeholder="Es. Promozione, Campione regionale..."
+        value={form.notes}
+      />
+    </EditModalShell>
   );
 }
-
-const modalHeaderStyle = {
-  alignItems: "center" as const,
-  borderBottomColor: colors.border,
-  borderBottomWidth: 1,
-  flexDirection: "row" as const,
-  justifyContent: "space-between" as const,
-  paddingHorizontal: spacing[20],
-  paddingVertical: spacing[16],
-};
-
-const modalTitleStyle = {
-  color: colors.textPrimary,
-  fontSize: typography.fontSize[18],
-  fontWeight: typography.fontWeight.heavy,
-};
 
 type ClubSeasonsSectionProps = {
   editable?: boolean;
@@ -307,15 +241,13 @@ export function ClubSeasonsSection({
   }
 
   return (
-    <View style={{ gap: spacing[12] }}>
+    <View style={styles.sectionContainer}>
       {seasons.length === 0 ? (
-        <Text
-          style={{ color: colors.textMuted, fontSize: typography.fontSize[14] }}
-        >
+        <AppText variant="bodySm" color="muted">
           {editable
             ? "Aggiungi una stagione per completare lo storico del club."
             : "Nessuna stagione registrata."}
-        </Text>
+        </AppText>
       ) : (
         seasons.map((season, index) => (
           <ClubSeasonCard
@@ -350,3 +282,28 @@ export function ClubSeasonsSection({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  notesText: {
+    marginTop: spacing[4],
+  },
+  seasonActions: {
+    flexDirection: "row",
+    gap: spacing[8],
+  },
+  seasonCard: {
+    gap: spacing[8],
+  },
+  seasonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  seasonInfo: {
+    flex: 1,
+    gap: spacing[4],
+  },
+  sectionContainer: {
+    gap: spacing[12],
+  },
+});

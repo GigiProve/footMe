@@ -10,6 +10,8 @@ type EditModalShellProps = {
   isSaving: boolean;
   onClose: () => void;
   onSave: () => void;
+  onShow?: () => void;
+  saveDisabled?: boolean;
   saveLabel?: string;
   title: string;
   visible: boolean;
@@ -20,12 +22,14 @@ export function EditModalShell({
   isSaving,
   onClose,
   onSave,
+  onShow,
+  saveDisabled = false,
   saveLabel = "Salva",
   title,
   visible,
 }: EditModalShellProps) {
   return (
-    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
+    <Modal animationType="slide" onRequestClose={onClose} onShow={onShow} visible={visible}>
       <SafeAreaView style={styles.root}>
         <ModalHeader onClose={onClose} title={title} />
 
@@ -35,7 +39,7 @@ export function EditModalShell({
 
         <View style={styles.footer}>
           <Button
-            disabled={isSaving}
+            disabled={isSaving || saveDisabled}
             label={isSaving ? "Salvataggio..." : saveLabel}
             onPress={onSave}
             variant="primary"

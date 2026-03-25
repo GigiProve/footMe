@@ -3,7 +3,6 @@ import {
   Linking,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -16,8 +15,8 @@ import {
   normalizeInstagramInput,
 } from "./profile-form-utils";
 import { ProfileSectionCard } from "./profile-screen-components";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
-import { Input } from "../../ui";
+import { colors, radius, spacing } from "../../theme/tokens";
+import { AppText, Input, Toggle } from "../../ui";
 
 type SocialInputProps = {
   iconName: ComponentProps<typeof Ionicons>["name"];
@@ -37,13 +36,6 @@ type ContactFieldProps = {
   onChangeText?: (value: string) => void;
   placeholder?: string;
   value: string;
-};
-
-type VisibilityToggleProps = {
-  description?: string;
-  label: string;
-  onValueChange: (value: boolean) => void;
-  value: boolean;
 };
 
 type ContactSectionProps = {
@@ -103,7 +95,9 @@ export function ContactField({
 
   return (
     <View style={styles.fieldContainer}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <AppText variant="overline" color="secondary">
+        {label}
+      </AppText>
       {editable ? (
         <SocialInput
           iconName={iconName}
@@ -129,44 +123,16 @@ export function ContactField({
           <View style={styles.iconBadge}>
             <Ionicons color={colors.textSecondary} name={iconName} size={18} />
           </View>
-          <Text style={styles.readonlyValue}>{trimmedValue || "Da completare"}</Text>
+          <AppText variant="titleSm" style={styles.readonlyValue}>
+            {trimmedValue || "Da completare"}
+          </AppText>
         </Pressable>
       )}
-      {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
-    </View>
-  );
-}
-
-export function VisibilityToggle({
-  description,
-  label,
-  onValueChange,
-  value,
-}: VisibilityToggleProps) {
-  return (
-    <View style={styles.visibilityRow}>
-      <View style={styles.visibilityCopy}>
-        <Text style={styles.visibilityLabel}>{label}</Text>
-        <Text style={styles.visibilityDescription}>
-          {description ?? "Mostra nel profilo pubblico"}
-        </Text>
-      </View>
-      <Pressable
-        accessibilityLabel={label}
-        accessibilityRole="switch"
-        accessibilityState={{ checked: value }}
-        onPress={() => onValueChange(!value)}
-        testID={`visibility-toggle-${label}`}
-        style={({ pressed }) => [
-          styles.toggleButton,
-          value ? styles.toggleButtonActive : null,
-          pressed ? styles.pressed : null,
-        ]}
-      >
-        <Text style={[styles.toggleLabel, value ? styles.toggleLabelActive : null]}>
-          {value ? "ON" : "OFF"}
-        </Text>
-      </Pressable>
+      {helperText ? (
+        <AppText variant="bodySm" color="secondary">
+          {helperText}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -233,7 +199,7 @@ export function ContactSection({
             placeholder="Da completare"
             value={contacts.instagram}
           />
-          <VisibilityToggle
+          <Toggle
             label="Mostra Instagram nel profilo pubblico"
             onValueChange={(value) => onShowInstagramChange?.(value)}
             value={contacts.showInstagram}
@@ -247,7 +213,7 @@ export function ContactSection({
             placeholder="Da completare"
             value={contacts.facebook}
           />
-          <VisibilityToggle
+          <Toggle
             label="Mostra Facebook nel profilo pubblico"
             onValueChange={(value) => onShowFacebookChange?.(value)}
             value={contacts.showFacebook}
@@ -262,7 +228,7 @@ export function ContactSection({
             placeholder="Da completare"
             value={contacts.email}
           />
-          <VisibilityToggle
+          <Toggle
             label="Mostra Email nel profilo pubblico"
             onValueChange={(value) => onShowEmailChange?.(value)}
             value={contacts.showEmail}
@@ -291,9 +257,9 @@ export function ContactSection({
       ) : (
         <View style={styles.emptyState}>
           <Ionicons color={colors.textSecondary} name="chatbubble-ellipses-outline" size={20} />
-          <Text style={styles.emptyStateText}>
+          <AppText variant="bodySm" color="secondary" style={styles.emptyStateText}>
             Nessun contatto pubblico condiviso. Usa la chat interna footMe per iniziare la conversazione.
-          </Text>
+          </AppText>
         </View>
       )}
     </ProfileSectionCard>
@@ -307,27 +273,14 @@ const styles = StyleSheet.create({
     gap: spacing[10],
     paddingHorizontal: spacing[14],
     paddingVertical: spacing[14],
-    borderRadius: radius[18],
+    borderRadius: radius[8],
     backgroundColor: colors.surfaceMuted,
   },
   emptyStateText: {
     flex: 1,
-    color: colors.textSecondary,
-    lineHeight: typography.lineHeight[22],
   },
   fieldContainer: {
     gap: spacing[8],
-  },
-  fieldLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
-    letterSpacing: typography.letterSpacing.md,
-  },
-  helperText: {
-    color: colors.textSecondary,
-    lineHeight: typography.lineHeight[22],
   },
   iconBadge: {
     width: 40,
@@ -335,7 +288,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.accentSoft,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -351,67 +304,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing[12],
-    minHeight: 58,
-    paddingHorizontal: spacing[14],
+    minHeight: 56,
+    paddingHorizontal: spacing[16],
     paddingVertical: spacing[10],
-    borderRadius: radius[18],
-    backgroundColor: colors.accentSoft,
+    borderRadius: radius[6],
+    backgroundColor: colors.inputBackground,
     borderWidth: 1,
-    borderColor: colors.accentSoft,
+    borderColor: colors.border,
   },
   readonlyValue: {
     flex: 1,
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.bold,
   },
   socialInput: {
     flex: 1,
-  },
-  toggleButton: {
-    minWidth: 64,
-    minHeight: 40,
-    paddingHorizontal: spacing[12],
-    borderRadius: radius.full,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  toggleButtonActive: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-  toggleLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.heavy,
-    letterSpacing: typography.letterSpacing.md,
-  },
-  toggleLabelActive: {
-    color: colors.accentStrong,
-  },
-  visibilityCopy: {
-    flex: 1,
-    gap: spacing[4],
-  },
-  visibilityDescription: {
-    color: colors.textSecondary,
-    lineHeight: typography.lineHeight[22],
-  },
-  visibilityLabel: {
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.bold,
-  },
-  visibilityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing[12],
-    paddingHorizontal: spacing[14],
-    paddingVertical: spacing[12],
-    borderRadius: radius[18],
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
 });

@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { colors, radius, spacing, typography } from "../../styles";
+import { AppText } from "../AppText/AppText";
 
-type BadgeVariant = "default" | "inverse" | "accent" | "hero" | "selected";
+type BadgeVariant = "default" | "info" | "success" | "warning" | "error" | "inverse" | "accent" | "hero" | "selected";
 
 export function Badge({
   label,
@@ -13,7 +14,12 @@ export function Badge({
 }) {
   return (
     <View style={[styles.base, variantStyles[variant]]}>
-      <Text style={[styles.label, textVariantStyles[variant]]}>{label}</Text>
+      <AppText
+        variant="caption"
+        style={[styles.label, textVariantStyles[variant]]}
+      >
+        {label}
+      </AppText>
     </View>
   );
 }
@@ -21,13 +27,15 @@ export function Badge({
 const styles = StyleSheet.create({
   base: {
     alignSelf: "flex-start",
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[8],
-    borderRadius: radius.full,
+    paddingHorizontal: spacing[8],
+    paddingVertical: spacing[4],
+    borderRadius: radius[4],
   },
   label: {
     fontSize: typography.fontSize[12],
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 });
 
@@ -36,12 +44,18 @@ const variantStyles = StyleSheet.create({
     backgroundColor: colors.accentSoft,
   },
   default: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
     borderWidth: 1,
   },
+  error: {
+    backgroundColor: colors.danger,
+  },
   hero: {
     backgroundColor: colors.heroSoft,
+  },
+  info: {
+    backgroundColor: colors.accentSoft,
   },
   inverse: {
     backgroundColor: colors.surfaceOverlay,
@@ -50,6 +64,12 @@ const variantStyles = StyleSheet.create({
     backgroundColor: colors.surfaceInverse,
     borderColor: colors.surfaceInverse,
     borderWidth: 1,
+  },
+  success: {
+    backgroundColor: colors.successSoft,
+  },
+  warning: {
+    backgroundColor: colors.warningSoft,
   },
 });
 
@@ -60,13 +80,25 @@ const textVariantStyles = StyleSheet.create({
   default: {
     color: colors.textPrimary,
   },
+  error: {
+    color: colors.destructiveForeground,
+  },
   hero: {
     color: colors.hero,
+  },
+  info: {
+    color: colors.accentStrong,
   },
   inverse: {
     color: colors.inkInvert,
   },
   selected: {
     color: colors.inkInvert,
+  },
+  success: {
+    color: colors.successForeground,
+  },
+  warning: {
+    color: colors.warningForeground,
   },
 });
