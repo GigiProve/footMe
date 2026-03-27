@@ -47,11 +47,7 @@ const TEAM_SEARCH_DEBOUNCE_MS = 250;
 // TeamLogo (inline – avoids circular import with player-sports-section)
 // ---------------------------------------------------------------------------
 
-function TeamLogo({
-  teamLogoUrl,
-}: {
-  teamLogoUrl: string | null | undefined;
-}) {
+function TeamLogo({ teamLogoUrl }: { teamLogoUrl: string | null | undefined }) {
   if (teamLogoUrl?.trim()) {
     return <Image source={{ uri: teamLogoUrl }} style={styles.teamLogo} />;
   }
@@ -190,11 +186,7 @@ function TeamSearchInput({
                 ]}
               >
                 <View style={[styles.teamLogo, styles.teamLogoFallback]}>
-                  <Ionicons
-                    color={colors.accentStrong}
-                    name="add"
-                    size={24}
-                  />
+                  <Ionicons color={colors.accentStrong} name="add" size={24} />
                 </View>
                 <View style={styles.suggestionCopy}>
                   <AppText variant="titleSm">Aggiungi nuova squadra</AppText>
@@ -264,8 +256,7 @@ function DateRangeSelector({
   hasAttemptedSave: boolean;
 }) {
   const missingStartYear = hasAttemptedSave && !block.startYear;
-  const missingEndYear =
-    hasAttemptedSave && !block.isOngoing && !block.endYear;
+  const missingEndYear = hasAttemptedSave && !block.isOngoing && !block.endYear;
 
   return (
     <View style={styles.dateRangeWrapper}>
@@ -274,13 +265,10 @@ function DateRangeSelector({
       <View style={styles.dateRow}>
         <View style={styles.dateField}>
           <SelectField
-            fullScreen
             label="Anno inizio *"
             onChange={(val) => onDateChange({ ...block, startYear: val })}
             options={startYearOptions}
             placeholder="Anno"
-            searchable
-            searchPlaceholder="Cerca anno..."
             value={block.startYear}
           />
           {missingStartYear ? (
@@ -306,13 +294,10 @@ function DateRangeSelector({
         <View style={styles.dateRow}>
           <View style={styles.dateField}>
             <SelectField
-              fullScreen
               label="Anno fine *"
               onChange={(val) => onDateChange({ ...block, endYear: val })}
               options={endYearOptions}
               placeholder="Anno"
-              searchable
-              searchPlaceholder="Cerca anno..."
               value={block.endYear}
             />
             {missingEndYear ? (
@@ -335,29 +320,35 @@ function DateRangeSelector({
         </View>
       ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={() =>
-          onDateChange({
-            ...block,
-            isOngoing: !block.isOngoing,
-            ...(block.isOngoing ? {} : { endYear: "", endMonth: "" }),
-          })
-        }
-        style={styles.ongoingToggle}
-      >
-        <View
-          style={[
-            styles.ongoingCheckbox,
-            block.isOngoing ? styles.ongoingCheckboxActive : null,
+      {!block.endYear || block.isOngoing ? (
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: block.isOngoing }}
+          onPress={() =>
+            onDateChange({
+              ...block,
+              isOngoing: !block.isOngoing,
+              ...(block.isOngoing ? {} : { endYear: "", endMonth: "" }),
+            })
+          }
+          style={({ pressed }) => [
+            styles.ongoingToggle,
+            pressed ? styles.ongoingTogglePressed : null,
           ]}
         >
-          {block.isOngoing ? (
-            <Ionicons color={colors.surface} name="checkmark" size={14} />
-          ) : null}
-        </View>
-        <AppText variant="bodySm">In corso (attuale)</AppText>
-      </Pressable>
+          <View
+            style={[
+              styles.ongoingCheckbox,
+              block.isOngoing ? styles.ongoingCheckboxActive : null,
+            ]}
+          >
+            {block.isOngoing ? (
+              <Ionicons color={colors.surface} name="checkmark" size={16} />
+            ) : null}
+          </View>
+          <AppText variant="bodySm">In corso (attuale)</AppText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -381,7 +372,14 @@ function SeasonDetailCard({
 
   if (hasConflict) {
     return (
-      <Card style={[styles.seasonCard, styles.seasonCardConflict, styles.seasonCardDisabled]} variant="muted">
+      <Card
+        style={[
+          styles.seasonCard,
+          styles.seasonCardConflict,
+          styles.seasonCardDisabled,
+        ]}
+        variant="muted"
+      >
         <View style={styles.seasonCardHeader}>
           <View style={styles.seasonLabelBadgeConflict}>
             <AppText variant="caption" style={styles.seasonLabelTextConflict}>
@@ -407,13 +405,10 @@ function SeasonDetailCard({
       </View>
 
       <SelectField
-        fullScreen
         label="Categoria *"
         onChange={(val) => onChange({ ...detail, category: val })}
         options={PLAYER_CATEGORY_OPTIONS}
         placeholder="Seleziona la categoria"
-        searchable
-        searchPlaceholder="Cerca categoria..."
         value={detail.category}
       />
       {missingCategory ? (
@@ -432,7 +427,9 @@ function SeasonDetailCard({
             label="Presenze"
             max={200}
             min={0}
-            onChange={(val) => onChange({ ...detail, appearances: String(val) })}
+            onChange={(val) =>
+              onChange({ ...detail, appearances: String(val) })
+            }
             value={detail.appearances ? parseInt(detail.appearances, 10) : 0}
           />
         </View>
@@ -681,9 +678,7 @@ export function ExperienceFlowScreen({
     lastBlock !== null && isBlockComplete(lastBlock, lastBlockConflicts);
 
   function updateBlock(index: number, updated: ExperienceBlockData) {
-    setBlocks((prev) =>
-      prev.map((b, i) => (i === index ? updated : b)),
-    );
+    setBlocks((prev) => prev.map((b, i) => (i === index ? updated : b)));
   }
 
   function deleteBlock(index: number) {
@@ -713,11 +708,7 @@ export function ExperienceFlowScreen({
   }
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      visible={visible}
-    >
+    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
       <SafeAreaView style={styles.screenRoot}>
         {/* Header */}
         <View style={styles.screenHeader}>
@@ -747,18 +738,24 @@ export function ExperienceFlowScreen({
         </View>
 
         {/* Scrollable content */}
-        <KeyboardAwareForm
-          contentContainerStyle={styles.screenScrollContent}
-        >
+        <KeyboardAwareForm contentContainerStyle={styles.screenScrollContent}>
           <AppText variant="bodySm" color="secondary">
             Aggiungi le tue esperienze calcistiche. Seleziona prima la squadra,
             poi il periodo: le stagioni vengono calcolate automaticamente.
           </AppText>
 
           {blocks.map((block, index) => {
-            const usedMap = getUsedSeasonsMap(blocks, block.localId, savedSeasons);
+            const usedMap = getUsedSeasonsMap(
+              blocks,
+              block.localId,
+              savedSeasons,
+            );
             const blockConflicts = getBlockConflicts(block, usedMap);
-            const fullyUsed = getFullyUsedSeasons(blocks, block.localId, savedSeasons);
+            const fullyUsed = getFullyUsedSeasons(
+              blocks,
+              block.localId,
+              savedSeasons,
+            );
             const startYearOpts = computeStartYearOptions(
               block.endYear,
               block.endMonth,
@@ -949,12 +946,21 @@ const styles = StyleSheet.create({
   ongoingToggle: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing[10],
-    paddingVertical: spacing[4],
+    gap: spacing[12],
+    minHeight: 48,
+    paddingHorizontal: spacing[14],
+    paddingVertical: spacing[12],
+    borderRadius: radius[12],
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  ongoingTogglePressed: {
+    backgroundColor: colors.surfaceMuted,
   },
   ongoingCheckbox: {
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     borderRadius: radius[8],
     borderWidth: 2,
     borderColor: colors.border,

@@ -11,7 +11,7 @@ import {
 } from "../../src/features/auth/components";
 import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { supabase } from "../../src/lib/supabase";
-import { colors, spacing, typography } from "../../src/theme/tokens";
+import { colors, radius, spacing, typography } from "../../src/theme/tokens";
 import { AppText, Button, Input } from "../../src/ui";
 
 export default function SignUpScreen() {
@@ -97,13 +97,38 @@ export default function SignUpScreen() {
         keyboardVerticalOffset={spacing[16]}
       >
         <View style={authStyles.contentPad}>
+          {/* Step indicator */}
+          <View style={styles.stepIndicator}>
+            <View style={styles.stepPillActive} />
+            <View style={styles.stepPillInactive} />
+            <View style={styles.stepPillInactive} />
+            <View style={styles.stepPillInactive} />
+          </View>
+
           <AppText variant="displaySm" style={authStyles.pageTitle}>
-            Crea il tuo account
+            Crea il tuo accesso
           </AppText>
           <AppText style={authStyles.pageDesc}>
-            Entra nel network del calcio dilettantistico e completa il tuo
-            posizionamento sportivo nel passo successivo.
+            Inserisci email e password per creare il tuo account. Dopo
+            completerai il profilo sportivo.
           </AppText>
+
+          {/* Info notice card */}
+          <View style={styles.infoNotice}>
+            <Ionicons
+              name="information-circle"
+              size={20}
+              color={colors.accent}
+            />
+            <AppText
+              variant="bodySm"
+              color="secondary"
+              style={styles.infoNoticeText}
+            >
+              I tuoi dati sono protetti e non verranno condivisi con terze
+              parti.
+            </AppText>
+          </View>
 
           <View style={authStyles.inputGroup}>
             <AppText style={authStyles.inputLabel}>Email</AppText>
@@ -128,7 +153,9 @@ export default function SignUpScreen() {
                 value={password}
               />
               <Pressable
-                accessibilityLabel={showPassword ? "Nascondi password" : "Mostra password"}
+                accessibilityLabel={
+                  showPassword ? "Nascondi password" : "Mostra password"
+                }
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeButton}
               >
@@ -186,6 +213,37 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
+  },
+  stepIndicator: {
+    flexDirection: "row",
+    gap: spacing[6],
+    marginBottom: spacing[24],
+  },
+  stepPillActive: {
+    flex: 1,
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.hero,
+    maxWidth: 48,
+  },
+  stepPillInactive: {
+    flex: 1,
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    maxWidth: 48,
+  },
+  infoNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing[10],
+    backgroundColor: colors.heroSoft,
+    borderRadius: radius[12],
+    padding: spacing[14],
+    marginBottom: spacing[24],
+  },
+  infoNoticeText: {
+    flex: 1,
   },
   inputField: {
     minHeight: 56,

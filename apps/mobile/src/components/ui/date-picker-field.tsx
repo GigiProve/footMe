@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Keyboard, Platform, Pressable, Text, View } from "react-native";
+import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -10,7 +10,8 @@ import {
   formatBirthDateValue,
   parseBirthDate,
 } from "../../features/profiles/profile-form-utils";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
+import { AppText } from "../../ui";
+import { colors, radius, spacing } from "../../theme/tokens";
 
 type DatePickerFieldProps = {
   label: string;
@@ -29,13 +30,13 @@ export function DatePickerField({
   value,
 }: DatePickerFieldProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const selectedDate = useMemo(() => parseBirthDate(value) ?? DEFAULT_PICKER_DATE, [value]);
+  const selectedDate = useMemo(
+    () => parseBirthDate(value) ?? DEFAULT_PICKER_DATE,
+    [value],
+  );
   const maximumDate = useMemo(() => new Date(), []);
 
   function handlePickerChange(event: DateTimePickerEvent, nextDate?: Date) {
-    // On Android the native dialog fires a single event on confirm/dismiss, so
-    // we can safely close immediately.  On iOS the spinner fires onChange on
-    // every scroll — closing here would slam the picker shut mid-interaction.
     if (Platform.OS !== "ios") {
       setIsOpen(false);
     }
@@ -48,48 +49,27 @@ export function DatePickerField({
   }
 
   return (
-    <View style={{ gap: spacing[8] }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-        {label}
-      </Text>
+    <View style={styles.container}>
+      <AppText variant="titleSm">{label}</AppText>
       <Pressable
         accessibilityRole="button"
         onPress={() => {
           Keyboard.dismiss();
           setIsOpen((current) => !current);
         }}
-        style={{
-          minHeight: 54,
-          justifyContent: "center",
-          borderRadius: radius[16],
-          borderWidth: 1,
-          borderColor: isOpen ? colors.hero : colors.border,
-          backgroundColor: colors.surface,
-          paddingHorizontal: spacing[16],
-          paddingVertical: spacing[14],
-        }}
+        style={[styles.trigger, isOpen ? styles.triggerOpen : null]}
         testID="date-picker-trigger"
       >
-        <Text style={{ color: value ? colors.textPrimary : colors.textSecondary }}>
+        <AppText variant="bodySm" color={value ? "primary" : "secondary"}>
           {value ? formatBirthDate(value) : placeholder}
-        </Text>
+        </AppText>
       </Pressable>
 
       {isOpen ? (
-        <View
-          style={{
-            borderRadius: radius[20],
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.surfaceMuted,
-            paddingHorizontal: spacing[12],
-            paddingVertical: spacing[8],
-          }}
-          testID="date-picker-surface"
-        >
+        <View style={styles.pickerSurface} testID="date-picker-surface">
           <DateTimePicker
             accentColor={colors.hero}
-            display={Platform.OS === "ios" ? "spinner" : "default"}
+            display={Platform.OS === "ios" ? "inline" : "default"}
             maximumDate={maximumDate}
             minimumDate={minimumBirthDate}
             mode="date"
@@ -101,29 +81,55 @@ export function DatePickerField({
             <Pressable
               accessibilityRole="button"
               onPress={() => setIsOpen(false)}
-              style={{
-                alignSelf: "flex-end",
-                paddingHorizontal: spacing[16],
-                paddingVertical: spacing[10],
-              }}
+              style={styles.confirmButton}
               testID="date-picker-confirm"
             >
-              <Text
-                style={{
-                  color: colors.hero,
-                  fontWeight: typography.fontWeight.heavy,
-                }}
-              >
+              <AppText variant="titleSm" color="hero">
                 Conferma
-              </Text>
+              </AppText>
             </Pressable>
           ) : null}
         </View>
       ) : null}
 
-      <Text style={{ color: colors.textSecondary }}>
-        {value ? `Data selezionata: ${formatBirthDate(value)}` : "Apri il calendario e scegli la data di nascita."}
-      </Text>
+      <AppText variant="bodySm" color="secondary">
+        {value
+          ? `Data selezionata: ${formatBirthDate(value)}`
+          : "Apri il calendario e scegli la data di nascita."}
+      </AppText>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  confirmButton: {
+    alignSelf: "flex-end",
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[10],
+  },
+  container: {
+    gap: spacing[8],
+  },
+  pickerSurface: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radius[20],
+    borderWidth: 1,
+    overflow: "hidden",
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[8],
+  },
+  trigger: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius[16],
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 54,
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[14],
+  },
+  triggerOpen: {
+    borderColor: colors.hero,
+  },
+});

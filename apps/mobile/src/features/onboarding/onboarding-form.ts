@@ -4,12 +4,29 @@ import {
   splitPhoneNumber,
   validateProfileBio,
 } from "../profiles/profile-form-utils";
-import type { PlayerExperienceForm, PlayerPosition, PreferredFoot } from "../profiles/player-sports";
+import type {
+  PlayerExperienceForm,
+  PlayerPosition,
+  PreferredFoot,
+} from "../profiles/player-sports";
 import { normalizePlayerPositions } from "../profiles/player-sports";
 import type { UploadedMediaItem } from "../profiles/media-upload-service";
-import type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
+import type {
+  AppRole,
+  ProfileGender,
+  StaffSpecialization,
+} from "./onboarding-types";
 
-export type OnboardingStep = "role" | "base" | "decision" | "details" | "club" | "complete";
+export type OnboardingStep =
+  | "role"
+  | "base"
+  | "photo"
+  | "technical"
+  | "experience"
+  | "decision"
+  | "details"
+  | "club"
+  | "complete";
 
 export type OnboardingValidationErrors = Partial<Record<string, string>>;
 
@@ -86,41 +103,35 @@ export type OnboardingVisibleStep = {
 
 const defaultVisibleSteps: OnboardingVisibleStep[] = [
   {
-    description: "Seleziona il tipo di profilo da creare",
+    description: "Completa le informazioni personali",
     index: 1,
-    label: "Ruolo",
-    step: "role",
-  },
-  {
-    description: "Completa le informazioni essenziali",
-    index: 2,
-    label: "Dati base",
+    label: "Dati",
     step: "base",
   },
   {
-    description: "Scegli come proseguire il tuo onboarding",
-    index: 3,
-    label: "Scelta",
-    step: "decision",
+    description: "Aggiungi una foto al tuo profilo",
+    index: 2,
+    label: "Foto",
+    step: "photo",
   },
   {
-    description: "Completa il profilo sportivo",
+    description: "Definisci il tuo profilo tecnico",
+    index: 3,
+    label: "Tecnico",
+    step: "technical",
+  },
+  {
+    description: "Aggiungi le tue esperienze calcistiche",
     index: 4,
-    label: "Profilo sportivo",
-    step: "details",
+    label: "Esperienze",
+    step: "experience",
   },
 ];
 
 const clubVisibleSteps: OnboardingVisibleStep[] = [
   {
-    description: "Seleziona il tipo di profilo da creare",
-    index: 1,
-    label: "Ruolo",
-    step: "role",
-  },
-  {
     description: "Inserisci i dati della tua societa'",
-    index: 2,
+    index: 1,
     label: "Il tuo club",
     step: "club",
   },
@@ -129,18 +140,17 @@ const clubVisibleSteps: OnboardingVisibleStep[] = [
 const defaultStepOrder: OnboardingStep[] = [
   "role",
   "base",
-  "decision",
-  "details",
+  "photo",
+  "technical",
+  "experience",
   "complete",
 ];
 
-const clubStepOrder: OnboardingStep[] = [
-  "role",
-  "club",
-  "complete",
-];
+const clubStepOrder: OnboardingStep[] = ["role", "club", "complete"];
 
-export function getOnboardingVisibleSteps(role: AppRole | ""): OnboardingVisibleStep[] {
+export function getOnboardingVisibleSteps(
+  role: AppRole | "",
+): OnboardingVisibleStep[] {
   return role === "club_admin" ? clubVisibleSteps : defaultVisibleSteps;
 }
 
@@ -225,41 +235,56 @@ export function normalizeOnboardingDraft(
     return defaultOnboardingFormState;
   }
 
-  const normalizedSecondaryPositions = normalizePlayerPositions(value.secondaryPositions);
+  const normalizedSecondaryPositions = normalizePlayerPositions(
+    value.secondaryPositions,
+  );
 
   return {
     ...defaultOnboardingFormState,
     ...value,
-    currentStep: coerceOnboardingStep(value.currentStep) ?? defaultOnboardingFormState.currentStep,
+    currentStep:
+      coerceOnboardingStep(value.currentStep) ??
+      defaultOnboardingFormState.currentStep,
     lastCompletedStep:
       coerceOnboardingStep(value.lastCompletedStep) ??
       defaultOnboardingFormState.lastCompletedStep,
-    gender: coerceProfileGender(value.gender) ?? defaultOnboardingFormState.gender,
+    gender:
+      coerceProfileGender(value.gender) ?? defaultOnboardingFormState.gender,
     // Legacy drafts used a single phone string, so when the prefix has not been
     // persisted yet we safely split the stored value to preserve what the user
     // already entered without forcing them to recompile the field.
     phoneCountryCode:
-      typeof value.phoneCountryCode === "string" && value.phoneCountryCode.trim()
+      typeof value.phoneCountryCode === "string" &&
+      value.phoneCountryCode.trim()
         ? value.phoneCountryCode
         : splitPhoneNumber(value.phoneNumber).phoneCountryCode,
     phoneNumber:
       typeof value.phoneCountryCode === "string"
-        ? splitPhoneNumber(composePhoneNumber(value.phoneCountryCode, value.phoneNumber)).phoneNumber
+        ? splitPhoneNumber(
+            composePhoneNumber(value.phoneCountryCode, value.phoneNumber),
+          ).phoneNumber
         : splitPhoneNumber(value.phoneNumber).phoneNumber,
     primaryPosition:
-      normalizePlayerPositions(value.primaryPosition)[0] ?? defaultOnboardingFormState.primaryPosition,
+      normalizePlayerPositions(value.primaryPosition)[0] ??
+      defaultOnboardingFormState.primaryPosition,
     residenceRegion:
-      typeof value.residenceRegion === "string" ? value.residenceRegion : defaultOnboardingFormState.residenceRegion,
+      typeof value.residenceRegion === "string"
+        ? value.residenceRegion
+        : defaultOnboardingFormState.residenceRegion,
     role: coerceAppRole(value.role) ?? defaultOnboardingFormState.role,
     secondaryPositions:
       normalizedSecondaryPositions.length > 0
         ? normalizedSecondaryPositions
-        // Legacy onboarding drafts stored a single secondaryPosition value, so we
-        // still hydrate it into the new array format when found.
-        : normalizePlayerPositions((value as { secondaryPosition?: unknown }).secondaryPosition),
+        : // Legacy onboarding drafts stored a single secondaryPosition value, so we
+          // still hydrate it into the new array format when found.
+          normalizePlayerPositions(
+            (value as { secondaryPosition?: unknown }).secondaryPosition,
+          ),
     clubHasYouthSector: value.clubHasYouthSector === true,
     clubYouthCategories: Array.isArray(value.clubYouthCategories)
-      ? value.clubYouthCategories.filter((v): v is string => typeof v === "string")
+      ? value.clubYouthCategories.filter(
+          (v): v is string => typeof v === "string",
+        )
       : defaultOnboardingFormState.clubYouthCategories,
     uploadingField: null,
   };
@@ -298,13 +323,26 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     return null;
   }
 
-  const allSteps: OnboardingStep[] = ["role", "base", "decision", "details", "club", "complete"];
+  const allSteps: OnboardingStep[] = [
+    "role",
+    "base",
+    "photo",
+    "technical",
+    "experience",
+    "decision",
+    "details",
+    "club",
+    "complete",
+  ];
   return allSteps.includes(value as OnboardingStep)
     ? (value as OnboardingStep)
     : null;
 }
 
-export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" = "") {
+export function getOnboardingStepIndex(
+  step: OnboardingStep,
+  role: AppRole | "" = "",
+) {
   const visibleSteps = getOnboardingVisibleSteps(role);
   const visibleIndex = visibleSteps.findIndex((entry) => entry.step === step);
 
@@ -315,10 +353,14 @@ export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" 
   return visibleSteps.length - 1;
 }
 
-export function getOnboardingProgress(step: OnboardingStep, role: AppRole | "" = "") {
+export function getOnboardingProgress(
+  step: OnboardingStep,
+  role: AppRole | "" = "",
+) {
   const visibleSteps = getOnboardingVisibleSteps(role);
   const stepIndex = getOnboardingStepIndex(step, role);
-  const completedSteps = step === "complete" ? visibleSteps.length : stepIndex + 1;
+  const completedSteps =
+    step === "complete" ? visibleSteps.length : stepIndex + 1;
   const totalSteps = visibleSteps.length;
   const percentage = Math.round((completedSteps / totalSteps) * 100);
   const currentStep =
@@ -334,7 +376,10 @@ export function getOnboardingProgress(step: OnboardingStep, role: AppRole | "" =
   };
 }
 
-export function getNextOnboardingStep(step: OnboardingStep, role: AppRole | "" = "") {
+export function getNextOnboardingStep(
+  step: OnboardingStep,
+  role: AppRole | "" = "",
+) {
   if (step === "complete") {
     return null;
   }
@@ -355,11 +400,19 @@ export function getPreviousOnboardingStep(
       return "club";
     }
 
+    // After experience or technical, go back to technical
+    if (
+      lastCompletedStep === "experience" ||
+      lastCompletedStep === "technical"
+    ) {
+      return "technical";
+    }
+
     if (lastCompletedStep === "details") {
       return "details";
     }
 
-    return "decision";
+    return "technical";
   }
 
   const previousIndex = stepOrder.indexOf(step) - 1;
@@ -367,7 +420,9 @@ export function getPreviousOnboardingStep(
 }
 
 export function getOnboardingFullName(form: OnboardingFormState) {
-  return [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(" ");
+  return [form.firstName.trim(), form.lastName.trim()]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function getEffectiveDomicile(form: OnboardingFormState) {
@@ -390,6 +445,14 @@ export function validateOnboardingStep(
     return mapClubStepValidationError(form);
   }
 
+  if (step === "technical") {
+    if (form.role === "player" && !form.primaryPosition) {
+      return {
+        primaryPosition: "Seleziona il ruolo principale per continuare.",
+      };
+    }
+  }
+
   if (step === "details") {
     if (form.role === "player" && !form.primaryPosition) {
       return {
@@ -401,7 +464,9 @@ export function validateOnboardingStep(
 
     if (!bioValidation.isValid) {
       return {
-        bio: bioValidation.message ?? "Inserisci una descrizione valida del tuo profilo.",
+        bio:
+          bioValidation.message ??
+          "Inserisci una descrizione valida del tuo profilo.",
       };
     }
   }
@@ -409,7 +474,9 @@ export function validateOnboardingStep(
   return {};
 }
 
-function mapRoleStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+function mapRoleStepValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
   if (form.role) {
     return {};
   }
@@ -423,7 +490,9 @@ function isBasicEmailFormat(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function mapClubStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+function mapClubStepValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
   const errors: OnboardingValidationErrors = {};
 
   if (!form.firstName.trim()) {
@@ -464,7 +533,10 @@ function mapClubStepValidationError(form: OnboardingFormState): OnboardingValida
   if (form.clubWebsite.trim()) {
     const website = form.clubWebsite.trim();
 
-    if (!/^https?:\/\/.+\..+/.test(website) && !/^[a-zA-Z0-9].*\..+/.test(website)) {
+    if (
+      !/^https?:\/\/.+\..+/.test(website) &&
+      !/^[a-zA-Z0-9].*\..+/.test(website)
+    ) {
       errors.clubWebsite = "Inserisci un indirizzo web valido.";
     }
   }
@@ -477,7 +549,10 @@ function mapClubStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.clubYouthCategories = "Seleziona almeno una categoria giovanile";
   }
 
-  const phoneValue = composePhoneNumber(form.clubPhoneCountryCode, form.clubPhone);
+  const phoneValue = composePhoneNumber(
+    form.clubPhoneCountryCode,
+    form.clubPhone,
+  );
 
   if (phoneValue && !isPhoneNumberValid(phoneValue)) {
     errors.clubPhone = "Inserisci un numero di telefono valido.";
@@ -486,7 +561,9 @@ function mapClubStepValidationError(form: OnboardingFormState): OnboardingValida
   return errors;
 }
 
-function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+function mapBaseStepValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
   const errors: OnboardingValidationErrors = {};
 
   if (!form.firstName.trim()) {
@@ -511,7 +588,10 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.residence = "Seleziona una città valida dai suggerimenti.";
   }
 
-  const phoneValue = composePhoneNumber(form.phoneCountryCode, form.phoneNumber);
+  const phoneValue = composePhoneNumber(
+    form.phoneCountryCode,
+    form.phoneNumber,
+  );
 
   if (phoneValue && !isPhoneNumberValid(phoneValue)) {
     errors.phoneNumber = "Inserisci un numero di cellulare valido.";

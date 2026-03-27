@@ -102,6 +102,8 @@ type AddExperienceScreenProps = {
 
 type PlayerCharacteristicsSectionProps = {
   editable?: boolean;
+  hideHeader?: boolean;
+  hidePreferredFoot?: boolean;
   onPreferredFootChange?: (value: PreferredFoot | "") => void;
   onPrimaryPositionChange?: (value: PlayerPosition) => void;
   onSecondaryPositionsChange?: (value: PlayerPosition[]) => void;
@@ -775,6 +777,8 @@ function AddExperienceScreen({
 
 export function PlayerCharacteristicsSection({
   editable = false,
+  hideHeader = false,
+  hidePreferredFoot = false,
   onPreferredFootChange,
   onPrimaryPositionChange,
   onSecondaryPositionsChange,
@@ -787,12 +791,14 @@ export function PlayerCharacteristicsSection({
 
   return (
     <View style={styles.sectionStack}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Caratteristiche del giocatore</Text>
-        <Text style={styles.sectionDescription}>
-          Ruolo e piede preferito leggibili in meno di 5 secondi.
-        </Text>
-      </View>
+      {!hideHeader ? (
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Caratteristiche del giocatore</Text>
+          <Text style={styles.sectionDescription}>
+            Ruolo e piede preferito leggibili in meno di 5 secondi.
+          </Text>
+        </View>
+      ) : null}
 
       {editable ? (
         <>
@@ -805,23 +811,27 @@ export function PlayerCharacteristicsSection({
             selectedPositions={primaryPosition ? [primaryPosition] : []}
             title="Ruolo principale"
           />
-          <FootballPositionPicker
-            mode="multiple"
-            onSelect={onSecondaryPositionsChange ?? noop}
-            selectedPositions={secondaryPositions}
-            title="Ruoli secondari"
-          />
-          <SelectField
-            allowClear
-            clearLabel="Rimuovi piede preferito"
-            label="Piede preferito"
-            onChange={(value) =>
-              onPreferredFootChange?.(value as PreferredFoot | "")
-            }
-            options={PREFERRED_FOOT_OPTIONS}
-            placeholder="Seleziona il piede preferito"
-            value={preferredFoot}
-          />
+          {primaryPosition && primaryPosition !== "goalkeeper" ? (
+            <FootballPositionPicker
+              mode="multiple"
+              onSelect={onSecondaryPositionsChange ?? noop}
+              selectedPositions={secondaryPositions}
+              title="Ruoli secondari"
+            />
+          ) : null}
+          {!hidePreferredFoot ? (
+            <SelectField
+              allowClear
+              clearLabel="Rimuovi piede preferito"
+              label="Piede preferito"
+              onChange={(value) =>
+                onPreferredFootChange?.(value as PreferredFoot | "")
+              }
+              options={PREFERRED_FOOT_OPTIONS}
+              placeholder="Seleziona il piede preferito"
+              value={preferredFoot}
+            />
+          ) : null}
         </>
       ) : (
         <View style={styles.readonlyGrid}>
