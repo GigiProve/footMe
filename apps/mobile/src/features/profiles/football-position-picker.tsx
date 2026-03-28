@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   },
   pitchSurface: {
     overflow: "hidden",
-    borderRadius: radius[24],
+    borderRadius: radius[12],
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
     backgroundColor: "#0F7A3D",
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   },
   feedbackBlock: {
     gap: spacing[6],
-    borderRadius: radius[16],
+    borderRadius: radius[12],
     backgroundColor: colors.surfaceMuted,
     padding: spacing[14],
   },

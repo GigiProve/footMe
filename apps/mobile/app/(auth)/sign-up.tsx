@@ -11,7 +11,7 @@ import {
 } from "../../src/features/auth/components";
 import { startOAuthSignIn } from "../../src/features/auth/oauth";
 import { supabase } from "../../src/lib/supabase";
-import { colors, spacing, typography } from "../../src/theme/tokens";
+import { colors, radius, spacing, typography } from "../../src/theme/tokens";
 import { AppText, Button, Input } from "../../src/ui";
 
 export default function SignUpScreen() {
@@ -97,6 +97,15 @@ export default function SignUpScreen() {
         keyboardVerticalOffset={spacing[16]}
       >
         <View style={authStyles.contentPad}>
+          <View style={styles.stepIndicator}>
+            <View style={styles.stepTrack}>
+              <View style={styles.stepFill} />
+            </View>
+            <AppText variant="caption" color="secondary">
+              Passo 1 di 6
+            </AppText>
+          </View>
+
           <AppText variant="displaySm" style={authStyles.pageTitle}>
             Crea il tuo account
           </AppText>
@@ -183,9 +192,31 @@ export default function SignUpScreen() {
   );
 }
 
+const TOTAL_ONBOARDING_STEPS = 6;
+const STEP_FILL_PERCENTAGE = Math.round((1 / TOTAL_ONBOARDING_STEPS) * 100);
+
 const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
+  },
+  stepIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[12],
+    marginBottom: spacing[24],
+  },
+  stepTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    overflow: "hidden",
+  },
+  stepFill: {
+    height: "100%",
+    width: `${STEP_FILL_PERCENTAGE}%`,
+    borderRadius: radius.full,
+    backgroundColor: colors.accent,
   },
   inputField: {
     minHeight: 56,

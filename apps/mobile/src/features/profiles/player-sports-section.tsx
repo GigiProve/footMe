@@ -15,7 +15,9 @@ import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
 import { SelectField } from "../../components/ui/select-field";
 import { WheelPicker } from "../../components/ui/wheel-picker";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
-import { Button, Card, Input } from "../../ui";
+import { AppText } from "../../ui/AppText/AppText";
+import { ChipGroup } from "../../ui/ChipGroup/ChipGroup";
+import { Button, Card, Input, Toggle } from "../../ui";
 import { ExperienceFlowScreen } from "./experience-flow-section";
 import { FootballPositionPicker } from "./football-position-picker";
 import {
@@ -113,6 +115,7 @@ type PlayerCharacteristicsSectionProps = {
 
 type PlayerExperiencesSectionProps = {
   addButtonLabel?: string;
+  autoOpenFlow?: boolean;
   editable?: boolean;
   emptyStateLabel?: string;
   experiences: PlayerExperienceForm[];
@@ -784,6 +787,16 @@ export function PlayerCharacteristicsSection({
   secondaryPositions,
 }: PlayerCharacteristicsSectionProps) {
   const secondaryPositionLabels = getPlayerPositionLabels(secondaryPositions);
+  const [showSecondaryRoles, setShowSecondaryRoles] = useState(
+    secondaryPositions.length > 0,
+  );
+
+  function handleToggleSecondaryRoles(value: boolean) {
+    setShowSecondaryRoles(value);
+    if (!value) {
+      onSecondaryPositionsChange?.([]);
+    }
+  }
 
   return (
     <View style={styles.sectionStack}>
@@ -805,23 +818,36 @@ export function PlayerCharacteristicsSection({
             selectedPositions={primaryPosition ? [primaryPosition] : []}
             title="Ruolo principale"
           />
-          <FootballPositionPicker
-            mode="multiple"
-            onSelect={onSecondaryPositionsChange ?? noop}
-            selectedPositions={secondaryPositions}
-            title="Ruoli secondari"
-          />
-          <SelectField
-            allowClear
-            clearLabel="Rimuovi piede preferito"
-            label="Piede preferito"
-            onChange={(value) =>
-              onPreferredFootChange?.(value as PreferredFoot | "")
-            }
-            options={PREFERRED_FOOT_OPTIONS}
-            placeholder="Seleziona il piede preferito"
-            value={preferredFoot}
-          />
+          {primaryPosition ? (
+            <>
+              <Toggle
+                label="Aggiungi altri ruoli"
+                subtitle="Seleziona i ruoli secondari in cui puoi giocare."
+                onValueChange={handleToggleSecondaryRoles}
+                value={showSecondaryRoles}
+              />
+              {showSecondaryRoles ? (
+                <FootballPositionPicker
+                  mode="multiple"
+                  onSelect={onSecondaryPositionsChange ?? noop}
+                  selectedPositions={secondaryPositions}
+                  title="Ruoli secondari"
+                />
+              ) : null}
+            </>
+          ) : null}
+          <View style={styles.footChipSection}>
+            <AppText variant="titleSm" color="primary">
+              Piede preferito
+            </AppText>
+            <ChipGroup
+              onChange={(value) =>
+                onPreferredFootChange?.(value as PreferredFoot | "")
+              }
+              options={PREFERRED_FOOT_OPTIONS}
+              value={preferredFoot}
+            />
+          </View>
         </>
       ) : (
         <View style={styles.readonlyGrid}>
@@ -857,6 +883,7 @@ export function PlayerCharacteristicsSection({
 
 export function PlayerExperiencesSection({
   addButtonLabel = "Aggiungi esperienza calcistica",
+  autoOpenFlow = false,
   editable = false,
   emptyStateLabel = "Nessuna esperienza calcistica salvata.",
   experiences,
@@ -866,7 +893,7 @@ export function PlayerExperiencesSection({
 }: PlayerExperiencesSectionProps) {
   const [draft, setDraft] = useState<MultiSeasonDraft | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [flowOpen, setFlowOpen] = useState(false);
+  const [flowOpen, setFlowOpen] = useState(autoOpenFlow);
   const isEditScreenOpen = draft !== null;
 
   const sortedExperiences = useMemo(
@@ -1178,7 +1205,7 @@ const styles = StyleSheet.create({
   readonlyItem: {
     gap: spacing[4],
     padding: spacing[14],
-    borderRadius: radius[18],
+    borderRadius: radius[12],
     backgroundColor: colors.surfaceMuted,
   },
   readonlyLabel: {
@@ -1231,6 +1258,9 @@ const styles = StyleSheet.create({
   sectionHeader: {
     gap: spacing[4],
   },
+  footChipSection: {
+    gap: spacing[8],
+  },
   sectionStack: {
     gap: spacing[12],
   },
@@ -1266,7 +1296,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing[12],
-    borderRadius: radius[16],
+    borderRadius: radius[12],
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -1292,7 +1322,7 @@ const styles = StyleSheet.create({
   },
   suggestionsSurface: {
     maxHeight: 220,
-    borderRadius: radius[20],
+    borderRadius: radius[12],
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceMuted,

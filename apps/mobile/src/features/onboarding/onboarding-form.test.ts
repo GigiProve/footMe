@@ -54,23 +54,64 @@ describe("onboarding-form", () => {
     });
   });
 
-  it("validates the details step through the centralized bio validator", () => {
-    const errors = validateOnboardingStep("details", {
+  it("validates domicile when user opts for a different domicile", () => {
+    const errors = validateOnboardingStep("base", {
       ...defaultOnboardingFormState,
-      bio: "Troppo corta",
-      primaryPosition: "striker",
+      birthDate: "2001-03-11",
+      firstName: "Marco",
+      gender: "male",
+      lastName: "Rossi",
+      role: "player",
+      useResidenceForDomicile: false,
+      domicile: "Milx",
+      domicileRegion: "",
+    });
+
+    expect(errors).toMatchObject({
+      domicile: "Seleziona una città valida dai suggerimenti.",
+    });
+  });
+
+  it("skips domicile validation when useResidenceForDomicile is true", () => {
+    const errors = validateOnboardingStep("base", {
+      ...defaultOnboardingFormState,
+      birthDate: "2001-03-11",
+      firstName: "Marco",
+      gender: "male",
+      lastName: "Rossi",
+      role: "player",
+      useResidenceForDomicile: true,
+      domicile: "Milx",
+      domicileRegion: "",
+    });
+
+    expect(errors).toEqual({});
+  });
+
+  it("requires primary position for player in technical step", () => {
+    const errors = validateOnboardingStep("technical", {
+      ...defaultOnboardingFormState,
       role: "player",
     });
 
     expect(errors).toEqual({
-      bio: "La bio deve contenere almeno 20 caratteri.",
+      primaryPosition: "Seleziona il ruolo principale per continuare.",
     });
   });
 
-  it("requires an explicit primary position selection for player details", () => {
+  it("passes technical validation when primary position is set", () => {
+    const errors = validateOnboardingStep("technical", {
+      ...defaultOnboardingFormState,
+      primaryPosition: "striker",
+      role: "player",
+    });
+
+    expect(errors).toEqual({});
+  });
+
+  it("still validates the legacy details step for backward compatibility", () => {
     const errors = validateOnboardingStep("details", {
       ...defaultOnboardingFormState,
-      bio: "Sono un centrocampista dinamico con esperienza tra prima squadra e juniores.",
       role: "player",
     });
 
@@ -97,10 +138,10 @@ describe("onboarding-form", () => {
   it("reports progress and previous-step fallback for the completion screen", () => {
     expect(getOnboardingProgress("complete")).toMatchObject({
       percentage: 100,
-      stepIndex: 3,
-      totalSteps: 4,
+      stepIndex: 4,
+      totalSteps: 5,
     });
-    expect(getPreviousOnboardingStep("complete", "details")).toBe("details");
-    expect(getPreviousOnboardingStep("complete", "decision")).toBe("decision");
+    expect(getPreviousOnboardingStep("complete")).toBe("experience");
+    expect(getPreviousOnboardingStep("complete", null, "club_admin")).toBe("club");
   });
 });

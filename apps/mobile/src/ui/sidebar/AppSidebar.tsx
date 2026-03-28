@@ -371,8 +371,8 @@ const styles = StyleSheet.create({
   },
   drawer: {
     backgroundColor: colors.surface,
-    borderBottomRightRadius: radius[28],
-    borderTopRightRadius: radius[28],
+    borderBottomRightRadius: radius[12],
+    borderTopRightRadius: radius[12],
     bottom: 0,
     left: 0,
     position: "absolute",
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   },
   item: {
     alignItems: "center",
-    borderRadius: radius[20],
+    borderRadius: radius[12],
     flexDirection: "row",
     gap: spacing[12],
     minHeight: sizes.touchTarget + spacing[12],

@@ -60,7 +60,7 @@ export function MediaPickerField({
                   {
                     alignItems: "center",
                     backgroundColor: colors.accentSoft,
-                    borderRadius: radius[20],
+                    borderRadius: radius[12],
                     gap: spacing[8],
                     justifyContent: "center",
                     paddingVertical: spacing[20],
@@ -81,7 +81,7 @@ export function MediaPickerField({
               style={{
                 width: 96,
                 height: 96,
-                borderRadius: radius[20],
+                borderRadius: radius[12],
                 overflow: "hidden",
                 backgroundColor: colors.surfaceMuted,
               }}

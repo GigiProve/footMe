@@ -7,6 +7,7 @@ type ToggleProps = {
   disabled?: boolean;
   label: string;
   onValueChange: (value: boolean) => void;
+  subtitle?: string;
   value: boolean;
 };
 
@@ -14,6 +15,7 @@ export function Toggle({
   disabled = false,
   label,
   onValueChange,
+  subtitle,
   value,
 }: ToggleProps) {
   return (
@@ -24,13 +26,20 @@ export function Toggle({
       onPress={() => onValueChange(!value)}
       style={[styles.container, disabled ? styles.disabled : null]}
     >
-      <AppText
-        variant="bodyLg"
-        color={disabled ? "muted" : "primary"}
-        style={styles.label}
-      >
-        {label}
-      </AppText>
+      <View style={styles.labelGroup}>
+        <AppText
+          variant="bodyLg"
+          color={disabled ? "muted" : "primary"}
+          style={styles.label}
+        >
+          {label}
+        </AppText>
+        {subtitle ? (
+          <AppText variant="bodySm" color="secondary">
+            {subtitle}
+          </AppText>
+        ) : null}
+      </View>
       <View style={[styles.track, value ? styles.trackOn : null]}>
         <View style={[styles.knob, value ? styles.knobOn : null]} />
       </View>
@@ -55,10 +64,13 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
-  label: {
+  labelGroup: {
     flex: 1,
+    gap: 2,
+  },
+  label: {
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   track: {
     width: 46,

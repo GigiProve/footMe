@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   card: {
     gap: spacing[8],
     padding: spacing[14],
-    borderRadius: radius[20],
+    borderRadius: radius[12],
     borderWidth: 1,
     maxWidth: "100%",
   },

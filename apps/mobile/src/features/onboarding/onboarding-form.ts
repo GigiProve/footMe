@@ -2,14 +2,23 @@ import {
   composePhoneNumber,
   isPhoneNumberValid,
   splitPhoneNumber,
-  validateProfileBio,
 } from "../profiles/profile-form-utils";
 import type { PlayerExperienceForm, PlayerPosition, PreferredFoot } from "../profiles/player-sports";
 import { normalizePlayerPositions } from "../profiles/player-sports";
 import type { UploadedMediaItem } from "../profiles/media-upload-service";
 import type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
 
-export type OnboardingStep = "role" | "base" | "decision" | "details" | "club" | "complete";
+export type OnboardingStep =
+  | "role"
+  | "base"
+  | "photo"
+  | "technical"
+  | "experience"
+  | "club"
+  | "complete"
+  // Legacy steps kept for draft migration
+  | "decision"
+  | "details";
 
 export type OnboardingValidationErrors = Partial<Record<string, string>>;
 
@@ -43,6 +52,7 @@ export type OnboardingFormState = {
   certifications: string;
   currentStep: OnboardingStep;
   domicile: string;
+  domicileRegion: string;
   experienceSummary: string;
   firstName: string;
   gamePhilosophy: string;
@@ -81,7 +91,7 @@ export type OnboardingVisibleStep = {
   description: string;
   index: number;
   label: string;
-  step: Exclude<OnboardingStep, "complete">;
+  step: Exclude<OnboardingStep, "complete" | "decision" | "details">;
 };
 
 const defaultVisibleSteps: OnboardingVisibleStep[] = [
@@ -92,22 +102,28 @@ const defaultVisibleSteps: OnboardingVisibleStep[] = [
     step: "role",
   },
   {
-    description: "Completa le informazioni essenziali",
+    description: "Completa le informazioni personali",
     index: 2,
-    label: "Dati base",
+    label: "Dati",
     step: "base",
   },
   {
-    description: "Scegli come proseguire il tuo onboarding",
+    description: "Aggiungi una foto al tuo profilo",
     index: 3,
-    label: "Scelta",
-    step: "decision",
+    label: "Foto",
+    step: "photo",
   },
   {
-    description: "Completa il profilo sportivo",
+    description: "Definisci il tuo profilo tecnico",
     index: 4,
-    label: "Profilo sportivo",
-    step: "details",
+    label: "Tecnico",
+    step: "technical",
+  },
+  {
+    description: "Aggiungi le tue esperienze calcistiche",
+    index: 5,
+    label: "Esperienze",
+    step: "experience",
   },
 ];
 
@@ -129,8 +145,9 @@ const clubVisibleSteps: OnboardingVisibleStep[] = [
 const defaultStepOrder: OnboardingStep[] = [
   "role",
   "base",
-  "decision",
-  "details",
+  "photo",
+  "technical",
+  "experience",
   "complete",
 ];
 
@@ -184,6 +201,7 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   certifications: "",
   currentStep: "role",
   domicile: "",
+  domicileRegion: "",
   experienceSummary: "",
   firstName: "",
   gamePhilosophy: "",
@@ -218,6 +236,17 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   willingToChangeClub: false,
 };
 
+/**
+ * Maps legacy step names from persisted drafts to current step names.
+ * "decision" was removed (flow no longer has a decision step).
+ * "details" was renamed to "technical".
+ */
+function migrateLegacyStep(step: OnboardingStep): OnboardingStep {
+  if (step === "decision") return "base";
+  if (step === "details") return "technical";
+  return step;
+}
+
 export function normalizeOnboardingDraft(
   value: Partial<OnboardingFormState> | null | undefined,
 ): OnboardingFormState {
@@ -227,17 +256,15 @@ export function normalizeOnboardingDraft(
 
   const normalizedSecondaryPositions = normalizePlayerPositions(value.secondaryPositions);
 
+  const rawCurrentStep = coerceOnboardingStep(value.currentStep) ?? defaultOnboardingFormState.currentStep;
+  const rawLastCompleted = coerceOnboardingStep(value.lastCompletedStep) ?? defaultOnboardingFormState.lastCompletedStep;
+
   return {
     ...defaultOnboardingFormState,
     ...value,
-    currentStep: coerceOnboardingStep(value.currentStep) ?? defaultOnboardingFormState.currentStep,
-    lastCompletedStep:
-      coerceOnboardingStep(value.lastCompletedStep) ??
-      defaultOnboardingFormState.lastCompletedStep,
+    currentStep: migrateLegacyStep(rawCurrentStep),
+    lastCompletedStep: rawLastCompleted ? migrateLegacyStep(rawLastCompleted) : null,
     gender: coerceProfileGender(value.gender) ?? defaultOnboardingFormState.gender,
-    // Legacy drafts used a single phone string, so when the prefix has not been
-    // persisted yet we safely split the stored value to preserve what the user
-    // already entered without forcing them to recompile the field.
     phoneCountryCode:
       typeof value.phoneCountryCode === "string" && value.phoneCountryCode.trim()
         ? value.phoneCountryCode
@@ -254,8 +281,6 @@ export function normalizeOnboardingDraft(
     secondaryPositions:
       normalizedSecondaryPositions.length > 0
         ? normalizedSecondaryPositions
-        // Legacy onboarding drafts stored a single secondaryPosition value, so we
-        // still hydrate it into the new array format when found.
         : normalizePlayerPositions((value as { secondaryPosition?: unknown }).secondaryPosition),
     clubHasYouthSector: value.clubHasYouthSector === true,
     clubYouthCategories: Array.isArray(value.clubYouthCategories)
@@ -298,7 +323,12 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     return null;
   }
 
-  const allSteps: OnboardingStep[] = ["role", "base", "decision", "details", "club", "complete"];
+  const allSteps: OnboardingStep[] = [
+    "role", "base", "photo", "technical", "experience",
+    "club", "complete",
+    // Legacy steps for draft migration
+    "decision", "details",
+  ];
   return allSteps.includes(value as OnboardingStep)
     ? (value as OnboardingStep)
     : null;
@@ -306,7 +336,8 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
 
 export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" = "") {
   const visibleSteps = getOnboardingVisibleSteps(role);
-  const visibleIndex = visibleSteps.findIndex((entry) => entry.step === step);
+  const effectiveStep = migrateLegacyStep(step);
+  const visibleIndex = visibleSteps.findIndex((entry) => entry.step === effectiveStep);
 
   if (visibleIndex >= 0) {
     return visibleIndex;
@@ -317,12 +348,13 @@ export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" 
 
 export function getOnboardingProgress(step: OnboardingStep, role: AppRole | "" = "") {
   const visibleSteps = getOnboardingVisibleSteps(role);
-  const stepIndex = getOnboardingStepIndex(step, role);
-  const completedSteps = step === "complete" ? visibleSteps.length : stepIndex + 1;
+  const effectiveStep = migrateLegacyStep(step);
+  const stepIndex = getOnboardingStepIndex(effectiveStep, role);
+  const completedSteps = effectiveStep === "complete" ? visibleSteps.length : stepIndex + 1;
   const totalSteps = visibleSteps.length;
   const percentage = Math.round((completedSteps / totalSteps) * 100);
   const currentStep =
-    step === "complete"
+    effectiveStep === "complete"
       ? visibleSteps[visibleSteps.length - 1]
       : visibleSteps[stepIndex];
 
@@ -340,29 +372,26 @@ export function getNextOnboardingStep(step: OnboardingStep, role: AppRole | "" =
   }
 
   const stepOrder = getOnboardingStepOrder(role);
-  return stepOrder[stepOrder.indexOf(step) + 1] ?? null;
+  const effectiveStep = migrateLegacyStep(step);
+  return stepOrder[stepOrder.indexOf(effectiveStep) + 1] ?? null;
 }
 
 export function getPreviousOnboardingStep(
   step: OnboardingStep,
-  lastCompletedStep: OnboardingStep | null = null,
+  _lastCompletedStep: OnboardingStep | null = null,
   role: AppRole | "" = "",
 ) {
   const stepOrder = getOnboardingStepOrder(role);
+  const effectiveStep = migrateLegacyStep(step);
 
-  if (step === "complete") {
+  if (effectiveStep === "complete") {
     if (role === "club_admin") {
       return "club";
     }
-
-    if (lastCompletedStep === "details") {
-      return "details";
-    }
-
-    return "decision";
+    return "experience";
   }
 
-  const previousIndex = stepOrder.indexOf(step) - 1;
+  const previousIndex = stepOrder.indexOf(effectiveStep) - 1;
   return previousIndex >= 0 ? stepOrder[previousIndex] : null;
 }
 
@@ -390,22 +419,15 @@ export function validateOnboardingStep(
     return mapClubStepValidationError(form);
   }
 
-  if (step === "details") {
+  if (step === "technical" || step === "details") {
     if (form.role === "player" && !form.primaryPosition) {
       return {
         primaryPosition: "Seleziona il ruolo principale per continuare.",
       };
     }
-
-    const bioValidation = validateProfileBio(form.bio);
-
-    if (!bioValidation.isValid) {
-      return {
-        bio: bioValidation.message ?? "Inserisci una descrizione valida del tuo profilo.",
-      };
-    }
   }
 
+  // photo and experience steps have no required validation
   return {};
 }
 
@@ -505,10 +527,12 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.birthDate = "Questo campo è obbligatorio";
   }
 
-  // Residence becomes valid only when it comes from a suggestion selection,
-  // which also stores the derived region alongside the chosen city name.
   if (form.residence.trim() && !form.residenceRegion.trim()) {
     errors.residence = "Seleziona una città valida dai suggerimenti.";
+  }
+
+  if (!form.useResidenceForDomicile && form.domicile.trim() && !form.domicileRegion.trim()) {
+    errors.domicile = "Seleziona una città valida dai suggerimenti.";
   }
 
   const phoneValue = composePhoneNumber(form.phoneCountryCode, form.phoneNumber);

@@ -13,7 +13,7 @@ const colorMap = {
   hero: colors.hero,
   danger: colors.danger,
   success: colors.success,
-  warning: colors.warning,
+  warning: colors.warningForeground,
   inverse: colors.inkInvert,
   inverseMuted: colors.textInverseMuted,
   inverseSoft: colors.textInverseSoft,

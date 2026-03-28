@@ -133,7 +133,7 @@ export function AvailabilityRegionsSelector({
             <View
               style={{
                 maxHeight: 220,
-                borderRadius: radius[20],
+                borderRadius: radius[12],
                 borderWidth: 1,
                 borderColor: colors.border,
                 backgroundColor: colors.surfaceMuted,
@@ -152,7 +152,7 @@ export function AvailabilityRegionsSelector({
                     key={suggestion.value}
                     onPress={() => handleSelect(suggestion.value)}
                     style={({ pressed }) => ({
-                      borderRadius: radius[16],
+                      borderRadius: radius[12],
                       borderWidth: 1,
                       borderColor: colors.border,
                       backgroundColor: pressed ? colors.heroSoft : colors.surface,

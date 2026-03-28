@@ -81,7 +81,7 @@ function ModalContent<T extends string>({
             paddingVertical: spacing[12],
             borderWidth: 1,
             borderColor: colors.border,
-            borderRadius: radius[16],
+            borderRadius: radius[12],
             backgroundColor: colors.background,
             color: colors.textPrimary,
             fontSize: typography.fontSize[16],
@@ -98,7 +98,7 @@ function ModalContent<T extends string>({
             onClose();
           }}
           style={{
-            borderRadius: radius[16],
+            borderRadius: radius[12],
             borderWidth: 1,
             borderColor: colors.border,
             backgroundColor: colors.surfaceMuted,
@@ -127,7 +127,7 @@ function ModalContent<T extends string>({
                 onClose();
               }}
               style={{
-                borderRadius: radius[16],
+                borderRadius: radius[12],
                 borderWidth: 1,
                 borderColor: isSelected ? colors.accentStrong : colors.border,
                 backgroundColor: isDisabled
@@ -223,7 +223,7 @@ export function SelectField<T extends string>({
           paddingVertical: spacing[14],
           borderWidth: 1,
           borderColor: isOpen ? colors.accentStrong : colors.border,
-          borderRadius: radius[16],
+          borderRadius: radius[12],
           backgroundColor: selectedLabel ? colors.accentSoft : colors.background,
         }}
       >
@@ -284,7 +284,7 @@ export function SelectField<T extends string>({
               style={{
                 maxHeight: "75%",
                 gap: spacing[12],
-                borderRadius: radius[24],
+                borderRadius: radius[12],
                 backgroundColor: colors.surface,
                 padding: spacing[18],
                 borderWidth: 1,

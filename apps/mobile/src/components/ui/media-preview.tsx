@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   emptyCard: {
     alignItems: "center",
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[18],
+    borderRadius: radius[12],
     gap: spacing[8],
     justifyContent: "center",
     paddingVertical: spacing[20],
@@ -136,13 +136,13 @@ const styles = StyleSheet.create({
   },
   galleryThumb: {
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[14],
+    borderRadius: radius[12],
     height: 80,
     width: 80,
   },
   imagePreview: {
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[18],
+    borderRadius: radius[12],
     height: 120,
     width: 120,
   },
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   videoCard: {
     alignItems: "center",
     backgroundColor: colors.accentSoft,
-    borderRadius: radius[18],
+    borderRadius: radius[12],
     gap: spacing[8],
     justifyContent: "center",
     paddingVertical: spacing[20],

@@ -45,7 +45,7 @@ export function PhoneInputWithCountryCode({
             minHeight: 54,
             minWidth: 120,
             justifyContent: "center",
-            borderRadius: radius[16],
+            borderRadius: radius[12],
             borderWidth: 1,
             borderColor: errorMessage ? colors.danger : colors.border,
             backgroundColor: colors.surface,
@@ -91,7 +91,7 @@ export function PhoneInputWithCountryCode({
             style={{
               maxHeight: "75%",
               gap: spacing[12],
-              borderRadius: radius[24],
+              borderRadius: radius[12],
               backgroundColor: colors.surface,
               padding: spacing[18],
               borderWidth: 1,
@@ -137,7 +137,7 @@ export function PhoneInputWithCountryCode({
                   }}
                   style={({ pressed }) => ({
                     gap: spacing[4],
-                    borderRadius: radius[16],
+                    borderRadius: radius[12],
                     borderWidth: 1,
                     borderColor: option.value === selectedCountry.value ? colors.hero : colors.border,
                     backgroundColor:
