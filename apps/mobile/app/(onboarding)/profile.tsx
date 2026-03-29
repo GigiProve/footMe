@@ -43,10 +43,13 @@ import {
   type OnboardingValidationErrors,
 } from "../../src/features/onboarding/onboarding-form";
 import {
+  OnboardingCheckboxRow,
+  OnboardingEyebrow,
   OnboardingInfoCard,
   OnboardingProgressBar,
   OnboardingScreenHeader,
   OnboardingSectionCard,
+  OnboardingToggleRow,
 } from "../../src/features/onboarding/onboarding-ui";
 import { WhereToPlaySection } from "../../src/features/onboarding/where-to-play-section";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
@@ -401,19 +404,23 @@ export default function OnboardingProfileScreen() {
     clubCountry,
     clubDescription,
     clubEmail,
-    clubHasYouthSector,
-    clubYouthCategories,
+    clubFacebook,
     clubFieldAddress,
     clubFoundingYear,
     clubGalleryItems,
+    clubHasYouthSector,
     clubHeadquartersAddress,
+    clubInstagram,
     clubLeague,
     clubLogoUrl,
     clubName,
     clubPhone,
     clubPhoneCountryCode,
     clubRegion,
+    clubStadium,
+    clubTotalMembers,
     clubWebsite,
+    clubYouthCategories,
     coachedCategories,
     coachedClubs,
     coachPreferredRegions,
@@ -440,6 +447,9 @@ export default function OnboardingProfileScreen() {
     preferredCategories,
     preferredFoot,
     primaryPosition,
+    repEmail,
+    repPhone,
+    repPhoneCountryCode,
     residence,
     residenceRegion,
     role,
@@ -467,10 +477,10 @@ export default function OnboardingProfileScreen() {
       return;
     }
 
-    if (step === "club" && !clubEmail) {
-      setFormValue("clubEmail", authEmail);
+    if (step === "club_representative" && !repEmail) {
+      setFormValue("repEmail", authEmail);
     }
-  }, [authEmail, clubEmail, isHydrated, setFormValue, step]);
+  }, [authEmail, isHydrated, repEmail, setFormValue, step]);
 
   const clearValidationErrors = useCallback((fields: string[]) => {
     setValidationErrors((current) => {
@@ -813,23 +823,30 @@ export default function OnboardingProfileScreen() {
       clubCity,
       clubColors,
       clubCountry,
+      clubDescription,
       clubEmail,
-      clubHasYouthSector,
-      clubYouthCategories,
+      clubFacebook,
       clubFieldAddress,
       clubFoundingYear,
+      clubHasYouthSector,
       clubHeadquartersAddress,
+      clubInstagram,
       clubLogoUrl,
       clubName,
       clubPhone: composePhoneNumber(clubPhoneCountryCode, clubPhone),
       clubRegion,
+      clubStadium,
+      clubTotalMembers,
       clubWebsite,
+      clubYouthCategories,
       domicile: getEffectiveDomicile(form),
       fullName,
       gender: gender as ProfileGender,
       nationality,
       phoneNumber: composePhoneNumber(phoneCountryCode, phoneNumber),
       primaryPosition: primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
+      repEmail,
+      repPhone: composePhoneNumber(repPhoneCountryCode, repPhone),
       residence,
       role: role as AppRole,
       staffSpecialization,
@@ -854,7 +871,7 @@ export default function OnboardingProfileScreen() {
     }
 
     setValidationErrors({});
-    navigateToStep(form.role === "club_admin" ? "club" : "base");
+    navigateToStep(form.role === "club_admin" ? "club_representative" : "base");
   }
 
   function handleContinueFromBase() {
@@ -1067,8 +1084,21 @@ export default function OnboardingProfileScreen() {
     }
   }
 
-  async function handleSubmitClub() {
-    const nextErrors = validateOnboardingStep("club", form);
+  function handleContinueFromClubRepresentative() {
+    const nextErrors = validateOnboardingStep("club_representative", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "club_representative" });
+    navigateToStep("club_data");
+  }
+
+  async function handleContinueFromClubData() {
+    const nextErrors = validateOnboardingStep("club_data", form);
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
@@ -1106,11 +1136,38 @@ export default function OnboardingProfileScreen() {
         }
       }
 
+      patchForm({ lastCompletedStep: "club_data" });
+      navigateToStep("club_youth");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Errore inatteso.";
+      Alert.alert("Verifica duplicati non riuscita", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleContinueFromClubYouth() {
+    const nextErrors = validateOnboardingStep("club_youth", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "club_youth" });
+    navigateToStep("club_profile");
+  }
+
+  async function handleSubmitClubProfile() {
+    try {
+      setIsSubmitting(true);
+
       await ensureInitialProfileCreated();
-      goToCompletion("club");
+      goToCompletion("club_profile");
     } catch (error) {
       const alertCopy = getBaseStepAlert(error);
-      setValidationErrors(validateOnboardingStep("club", form));
       Alert.alert(alertCopy.title, alertCopy.message);
     } finally {
       setIsSubmitting(false);
@@ -1837,24 +1894,28 @@ export default function OnboardingProfileScreen() {
         ) : null}
 
         {/* ============================================================= */}
-        {/* STEP: Club                                                     */}
+        {/* STEP: Club Representative (Referente società)                  */}
         {/* ============================================================= */}
-        {step === "club" ? (
+        {step === "club_representative" ? (
           <View style={styles.stepContainer}>
-            <OnboardingSectionCard
-              title="Il tuo club"
-              subtitle="Inserisci le informazioni della tua società. I campi obbligatori sono contrassegnati con *."
-            >
-              <View style={styles.sectionHeaderGap}>
-                <AppText variant="headingSm">Dati del responsabile</AppText>
-                <View style={styles.fieldGap12}>
+            <View style={styles.clubStepHeader}>
+              <OnboardingEyebrow>Il tuo club</OnboardingEyebrow>
+              <AppText variant="displaySm">Referente società</AppText>
+              <AppText variant="bodySm" color="secondary">
+                Inserisci i dati del responsabile della società sportiva.
+              </AppText>
+            </View>
+
+            <OnboardingSectionCard>
+              <View style={styles.clubFieldRow}>
+                <View style={styles.flex1}>
                   <Input
                     autoCapitalize="words"
                     autoCorrect={false}
-                    label="Nome *"
+                    label="Nome"
                     onBlur={() => handleFormattedNameBlur("firstName")}
                     onChangeText={(value) => updateValue("firstName", value)}
-                    placeholder="Es. Marco"
+                    placeholder="Es. Andrea"
                     style={
                       validationErrors.firstName
                         ? { borderColor: colors.danger }
@@ -1867,13 +1928,15 @@ export default function OnboardingProfileScreen() {
                       {validationErrors.firstName}
                     </ValidationMessage>
                   ) : null}
+                </View>
+                <View style={styles.flex1}>
                   <Input
                     autoCapitalize="words"
                     autoCorrect={false}
-                    label="Cognome *"
+                    label="Cognome"
                     onBlur={() => handleFormattedNameBlur("lastName")}
                     onChangeText={(value) => updateValue("lastName", value)}
-                    placeholder="Es. Rossi"
+                    placeholder="Es. Bianchi"
                     style={
                       validationErrors.lastName
                         ? { borderColor: colors.danger }
@@ -1889,50 +1952,129 @@ export default function OnboardingProfileScreen() {
                 </View>
               </View>
 
-              <View style={styles.sectionHeaderGap}>
-                <AppText variant="headingSm">Dati della società</AppText>
-                <View style={styles.fieldGap12}>
-                  <Input
-                    label="Nome società *"
-                    onChangeText={(value) => updateValue("clubName", value)}
-                    placeholder="Es. ASD Example"
-                    style={
-                      validationErrors.clubName
-                        ? { borderColor: colors.danger }
-                        : undefined
-                    }
-                    value={clubName}
-                  />
-                  {validationErrors.clubName ? (
-                    <ValidationMessage>
-                      {validationErrors.clubName}
-                    </ValidationMessage>
-                  ) : null}
+              <Input
+                autoCapitalize="none"
+                keyboardType="email-address"
+                label="Email responsabile"
+                onChangeText={(value) => updateValue("repEmail", value)}
+                placeholder="andrea.bianchi@email.com"
+                style={
+                  validationErrors.repEmail
+                    ? { borderColor: colors.danger }
+                    : undefined
+                }
+                value={repEmail}
+              />
+              {validationErrors.repEmail ? (
+                <ValidationMessage>
+                  {validationErrors.repEmail}
+                </ValidationMessage>
+              ) : null}
 
-                  <MediaPickerField
-                    buttonLabel={
-                      clubLogoUrl ? "Sostituisci logo" : "Carica logo società"
-                    }
-                    helperText="Carica il logo della tua società."
-                    isUploading={uploadingField === "clubLogo"}
-                    label="Logo"
-                    onPick={() =>
-                      handleMediaUpload({
-                        field: "clubLogo",
-                        folder: "club-logos",
-                        mediaTypes: ["images"],
-                        onUploaded: (items) =>
-                          updateValue("clubLogoUrl", items[0]?.url ?? ""),
-                      })
-                    }
-                    onRemove={() => updateValue("clubLogoUrl", "")}
-                    previewUrl={clubLogoUrl || undefined}
-                    removable
-                    selectedLabel={
-                      clubLogoUrl ? "Logo caricato correttamente" : undefined
-                    }
-                  />
+              <PhoneInputWithCountryCode
+                countryCode={repPhoneCountryCode}
+                errorMessage={validationErrors.repPhone}
+                label="Telefono responsabile"
+                onChangeCountryCode={(value) =>
+                  updateValue("repPhoneCountryCode", value, ["repPhone"])
+                }
+                onChangePhoneNumber={(value) =>
+                  updateValue("repPhone", value, ["repPhone"])
+                }
+                phoneNumber={repPhone}
+              />
+            </OnboardingSectionCard>
 
+            <Button
+              disabled={isBusy}
+              label="Continua"
+              onPress={handleContinueFromClubRepresentative}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Club Data (Dati della società)                           */}
+        {/* ============================================================= */}
+        {step === "club_data" ? (
+          <View style={styles.stepContainer}>
+            <View style={styles.clubStepHeader}>
+              <AppText variant="displaySm">Dati della società</AppText>
+              <AppText variant="bodySm" color="secondary">
+                Aggiungi le informazioni ufficiali del club sportivo.
+              </AppText>
+            </View>
+
+            <View style={styles.clubLogoStage}>
+              <Pressable
+                onPress={() =>
+                  handleMediaUpload({
+                    field: "clubLogo",
+                    folder: "club-logos",
+                    mediaTypes: ["images"],
+                    onUploaded: (items) =>
+                      updateValue("clubLogoUrl", items[0]?.url ?? ""),
+                  })
+                }
+                style={[
+                  styles.clubLogoShell,
+                  clubLogoUrl ? styles.clubLogoShellFilled : null,
+                ]}
+              >
+                {clubLogoUrl ? (
+                  <Image
+                    source={{ uri: clubLogoUrl }}
+                    style={styles.clubLogoImage}
+                  />
+                ) : (
+                  <Ionicons
+                    name="shield-outline"
+                    size={64}
+                    color={colors.textMuted}
+                  />
+                )}
+                <View style={styles.clubLogoCameraBadge}>
+                  <Ionicons name="camera" size={18} color={colors.inkInvert} />
+                </View>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  handleMediaUpload({
+                    field: "clubLogo",
+                    folder: "club-logos",
+                    mediaTypes: ["images"],
+                    onUploaded: (items) =>
+                      updateValue("clubLogoUrl", items[0]?.url ?? ""),
+                  })
+                }
+              >
+                <AppText variant="bodySm" style={styles.clubLogoLink}>
+                  Carica logo squadra
+                </AppText>
+              </Pressable>
+            </View>
+
+            <OnboardingSectionCard>
+              <Input
+                label="Nome società"
+                onChangeText={(value) => updateValue("clubName", value)}
+                placeholder="Es. ASD Calcio Milano"
+                style={
+                  validationErrors.clubName
+                    ? { borderColor: colors.danger }
+                    : undefined
+                }
+                value={clubName}
+              />
+              {validationErrors.clubName ? (
+                <ValidationMessage>
+                  {validationErrors.clubName}
+                </ValidationMessage>
+              ) : null}
+
+              <View style={styles.clubFieldRow}>
+                <View style={styles.flex1}>
                   <Input
                     keyboardType="number-pad"
                     label="Anno di fondazione"
@@ -1940,7 +2082,7 @@ export default function OnboardingProfileScreen() {
                     onChangeText={(value) =>
                       updateValue("clubFoundingYear", value)
                     }
-                    placeholder="Es. 1920"
+                    placeholder="Es. 1999"
                     style={
                       validationErrors.clubFoundingYear
                         ? { borderColor: colors.danger }
@@ -1953,216 +2095,239 @@ export default function OnboardingProfileScreen() {
                       {validationErrors.clubFoundingYear}
                     </ValidationMessage>
                   ) : null}
-
+                </View>
+                <View style={styles.flex1}>
                   <Input
                     label="Colori sociali"
                     onChangeText={(value) => updateValue("clubColors", value)}
-                    placeholder="Es. Biancorosso"
+                    placeholder="Seleziona"
                     value={clubColors}
-                  />
-
-                  <SelectField
-                    label="Categoria prima squadra *"
-                    onChange={(value) => updateValue("clubCategory", value)}
-                    options={SENIOR_CATEGORY_OPTIONS}
-                    placeholder="Seleziona la categoria"
-                    value={clubCategory}
-                  />
-                  {validationErrors.clubCategory ? (
-                    <ValidationMessage>
-                      {validationErrors.clubCategory}
-                    </ValidationMessage>
-                  ) : null}
-
-                  <Toggle
-                    label="Settore giovanile"
-                    onValueChange={(value) => {
-                      if (value) {
-                        updateValue("clubHasYouthSector", true);
-                      } else {
-                        patchForm({
-                          clubHasYouthSector: false,
-                          clubYouthCategories: [],
-                        });
-                      }
-                    }}
-                    value={clubHasYouthSector}
-                  />
-
-                  {clubHasYouthSector ? (
-                    <View style={styles.sectionHeaderGap}>
-                      <AppText variant="titleSm">
-                        Seleziona le categorie giovanili
-                      </AppText>
-                      <View style={styles.youthCategoryGrid}>
-                        {YOUTH_CATEGORY_OPTIONS.map((option) => {
-                          const isSelected = clubYouthCategories.includes(
-                            option.value,
-                          );
-                          return (
-                            <FootChip
-                              key={option.value}
-                              active={isSelected}
-                              label={option.label}
-                              onPress={() => {
-                                const updated = isSelected
-                                  ? clubYouthCategories.filter(
-                                      (v) => v !== option.value,
-                                    )
-                                  : [...clubYouthCategories, option.value];
-                                updateValue("clubYouthCategories", updated);
-                              }}
-                            />
-                          );
-                        })}
-                      </View>
-                      {validationErrors.clubYouthCategories ? (
-                        <ValidationMessage>
-                          {validationErrors.clubYouthCategories}
-                        </ValidationMessage>
-                      ) : null}
-                    </View>
-                  ) : null}
-
-                  <ResidenceCityInput
-                    errorMessage={validationErrors.clubCity}
-                    helperText={
-                      clubRegion
-                        ? `Città selezionata: ${clubCity} · ${clubRegion}`
-                        : undefined
-                    }
-                    label="Città *"
-                    onChangeText={handleClubCityChange}
-                    onSelectCity={handleClubCitySelect}
-                    value={clubCity}
-                  />
-
-                  <NationalityAutocompleteInput
-                    label="Nazione"
-                    onChange={handleClubCountrySelect}
-                    value={clubCountry}
-                  />
-
-                  <Input
-                    label="Indirizzo sede"
-                    onChangeText={(value) =>
-                      updateValue("clubHeadquartersAddress", value)
-                    }
-                    placeholder="Es. Via Roma 1"
-                    value={clubHeadquartersAddress}
-                  />
-
-                  <Input
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    label="Email società *"
-                    onChangeText={(value) => updateValue("clubEmail", value)}
-                    placeholder="Es. info@asdesempio.it"
-                    style={
-                      validationErrors.clubEmail
-                        ? { borderColor: colors.danger }
-                        : undefined
-                    }
-                    value={clubEmail}
-                  />
-                  {validationErrors.clubEmail ? (
-                    <ValidationMessage>
-                      {validationErrors.clubEmail}
-                    </ValidationMessage>
-                  ) : null}
-
-                  <PhoneInputWithCountryCode
-                    countryCode={clubPhoneCountryCode}
-                    errorMessage={validationErrors.clubPhone}
-                    label="Telefono società"
-                    onChangeCountryCode={(value) =>
-                      updateValue("clubPhoneCountryCode", value, ["clubPhone"])
-                    }
-                    onChangePhoneNumber={(value) =>
-                      updateValue("clubPhone", value, ["clubPhone"])
-                    }
-                    phoneNumber={clubPhone}
-                  />
-
-                  <Input
-                    autoCapitalize="none"
-                    keyboardType="url"
-                    label="Sito web"
-                    onChangeText={(value) => updateValue("clubWebsite", value)}
-                    placeholder="Es. https://www.asdesempio.it"
-                    style={
-                      validationErrors.clubWebsite
-                        ? { borderColor: colors.danger }
-                        : undefined
-                    }
-                    value={clubWebsite}
-                  />
-                  {validationErrors.clubWebsite ? (
-                    <ValidationMessage>
-                      {validationErrors.clubWebsite}
-                    </ValidationMessage>
-                  ) : null}
-
-                  <Input
-                    label="Indirizzo campo"
-                    onChangeText={(value) =>
-                      updateValue("clubFieldAddress", value)
-                    }
-                    placeholder="Es. Stadio Comunale, Via dello Sport 5"
-                    value={clubFieldAddress}
-                  />
-
-                  <MediaPickerField
-                    buttonLabel="Carica gallery media"
-                    helperText="Aggiungi foto e video della societa' dalla libreria del telefono."
-                    isUploading={uploadingField === "club-gallery"}
-                    label="Gallery media"
-                    onPick={() =>
-                      handleMediaUpload({
-                        allowsMultipleSelection: true,
-                        field: "club-gallery",
-                        folder: "club-gallery",
-                        mediaTypes: ["images", "videos"],
-                        onUploaded: (items) =>
-                          appendUploadedMedia("clubGalleryItems", items),
-                      })
-                    }
-                    onRemove={() => updateValue("clubGalleryItems", [])}
-                    removable
-                    removeLabel="Svuota gallery"
-                    selectedCount={clubGalleryItems.length}
-                  />
-
-                  <Input
-                    label="Descrizione"
-                    multiline
-                    onChangeText={(value) =>
-                      updateValue("clubDescription", value)
-                    }
-                    placeholder="Racconta identita', struttura e obiettivi del club"
-                    value={clubDescription}
                   />
                 </View>
               </View>
+
+              <SelectField
+                label="Categoria prima squadra"
+                onChange={(value) => updateValue("clubCategory", value)}
+                options={SENIOR_CATEGORY_OPTIONS}
+                placeholder="Scegli il campionato"
+                value={clubCategory}
+              />
+              {validationErrors.clubCategory ? (
+                <ValidationMessage>
+                  {validationErrors.clubCategory}
+                </ValidationMessage>
+              ) : null}
             </OnboardingSectionCard>
 
-            <View style={styles.buttonRow}>
-              <View style={styles.flex1}>
-                <Button
-                  label="Indietro"
-                  onPress={handleBackNavigation}
-                  variant="secondary"
-                />
-              </View>
-              <View style={styles.flex1}>
-                <Button
-                  disabled={isBusy}
-                  label={isBusy ? "Salvataggio..." : "Crea la pagina del club"}
-                  onPress={handleSubmitClub}
-                  variant="primary"
-                />
-              </View>
+            <OnboardingSectionCard>
+              <ResidenceCityInput
+                errorMessage={validationErrors.clubCity}
+                helperText={
+                  clubRegion
+                    ? `Città selezionata: ${clubCity} · ${clubRegion}`
+                    : undefined
+                }
+                label="Città"
+                onChangeText={handleClubCityChange}
+                onSelectCity={handleClubCitySelect}
+                value={clubCity}
+              />
+
+              <Input
+                label="Indirizzo sede"
+                onChangeText={(value) =>
+                  updateValue("clubHeadquartersAddress", value)
+                }
+                placeholder="Es. Via Roma, 10"
+                value={clubHeadquartersAddress}
+              />
+
+              <Input
+                autoCapitalize="none"
+                keyboardType="email-address"
+                label="Email ufficiale società"
+                onChangeText={(value) => updateValue("clubEmail", value)}
+                placeholder="info@societa.it"
+                style={
+                  validationErrors.clubEmail
+                    ? { borderColor: colors.danger }
+                    : undefined
+                }
+                value={clubEmail}
+              />
+              {validationErrors.clubEmail ? (
+                <ValidationMessage>
+                  {validationErrors.clubEmail}
+                </ValidationMessage>
+              ) : null}
+
+              <PhoneInputWithCountryCode
+                countryCode={clubPhoneCountryCode}
+                errorMessage={validationErrors.clubPhone}
+                label="Telefono segreteria"
+                onChangeCountryCode={(value) =>
+                  updateValue("clubPhoneCountryCode", value, ["clubPhone"])
+                }
+                onChangePhoneNumber={(value) =>
+                  updateValue("clubPhone", value, ["clubPhone"])
+                }
+                phoneNumber={clubPhone}
+              />
+            </OnboardingSectionCard>
+
+            <Button
+              disabled={isBusy}
+              label={isBusy ? "Verifica..." : "Continua"}
+              onPress={handleContinueFromClubData}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Club Youth (Settore giovanile)                           */}
+        {/* ============================================================= */}
+        {step === "club_youth" ? (
+          <View style={styles.stepContainer}>
+            <View style={styles.clubStepHeader}>
+              <AppText variant="displaySm">Settore giovanile</AppText>
+              <AppText variant="bodySm" color="secondary">
+                Indica se la società gestisce un vivaio e in quali categorie
+                opera.
+              </AppText>
             </View>
+
+            <OnboardingToggleRow
+              label="La società ha un settore giovanile"
+              onValueChange={(value) => {
+                if (value) {
+                  updateValue("clubHasYouthSector", true);
+                } else {
+                  patchForm({
+                    clubHasYouthSector: false,
+                    clubYouthCategories: [],
+                  });
+                }
+              }}
+              value={clubHasYouthSector}
+            />
+
+            {clubHasYouthSector ? (
+              <>
+                <View style={styles.clubCheckboxList}>
+                  {YOUTH_CATEGORY_OPTIONS.map((option) => {
+                    const isSelected = clubYouthCategories.includes(
+                      option.value,
+                    );
+                    return (
+                      <OnboardingCheckboxRow
+                        key={option.value}
+                        active={isSelected}
+                        label={option.label}
+                        onPress={() => {
+                          const updated = isSelected
+                            ? clubYouthCategories.filter(
+                                (v) => v !== option.value,
+                              )
+                            : [...clubYouthCategories, option.value];
+                          updateValue("clubYouthCategories", updated);
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+                {validationErrors.clubYouthCategories ? (
+                  <ValidationMessage>
+                    {validationErrors.clubYouthCategories}
+                  </ValidationMessage>
+                ) : null}
+              </>
+            ) : null}
+
+            <Button
+              label="Continua"
+              onPress={handleContinueFromClubYouth}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Club Profile (Completa il profilo)                       */}
+        {/* ============================================================= */}
+        {step === "club_profile" ? (
+          <View style={styles.stepContainer}>
+            <View style={styles.clubStepHeader}>
+              <AppText variant="displaySm">Completa il profilo</AppText>
+              <AppText variant="bodySm" color="secondary">
+                Aggiungi dettagli per rendere la pagina della società più
+                attraente e autorevole.
+              </AppText>
+            </View>
+
+            <OnboardingSectionCard>
+              <Input
+                label="Descrizione società"
+                multiline
+                onChangeText={(value) =>
+                  updateValue("clubDescription", value)
+                }
+                placeholder="Racconta la storia e i valori del club..."
+                value={clubDescription}
+              />
+
+              <Input
+                label="Stadio / Campo sportivo principale"
+                onChangeText={(value) => updateValue("clubStadium", value)}
+                placeholder="Nome dell'impianto"
+                value={clubStadium}
+              />
+
+              <Input
+                keyboardType="number-pad"
+                label="Numero totale tesserati"
+                onChangeText={(value) =>
+                  updateValue("clubTotalMembers", value)
+                }
+                placeholder="Es. 250"
+                value={clubTotalMembers}
+              />
+            </OnboardingSectionCard>
+
+            <OnboardingSectionCard>
+              <Input
+                autoCapitalize="none"
+                keyboardType="url"
+                label="Sito web"
+                onChangeText={(value) => updateValue("clubWebsite", value)}
+                placeholder="www.societa.it"
+                value={clubWebsite}
+              />
+
+              <Input
+                autoCapitalize="none"
+                label="Instagram"
+                onChangeText={(value) => updateValue("clubInstagram", value)}
+                placeholder="@societa"
+                value={clubInstagram}
+              />
+
+              <Input
+                autoCapitalize="none"
+                label="Facebook"
+                onChangeText={(value) => updateValue("clubFacebook", value)}
+                placeholder="Nome Pagina"
+                value={clubFacebook}
+              />
+            </OnboardingSectionCard>
+
+            <Button
+              disabled={isBusy}
+              label={isBusy ? "Creazione in corso..." : "Completa registrazione"}
+              onPress={handleSubmitClubProfile}
+              variant="primary"
+            />
           </View>
         ) : null}
 
@@ -2171,43 +2336,81 @@ export default function OnboardingProfileScreen() {
         {/* ============================================================= */}
         {step === "complete" ? (
           <View style={styles.stepContainer}>
-            <OnboardingSectionCard>
-              <View style={styles.completionIcon}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={64}
-                  color={colors.success}
-                />
-              </View>
-              <AppText variant="displaySm" style={styles.textCenter}>
-                Il tuo profilo e' pronto!
-              </AppText>
-              <AppText
-                variant="bodySm"
-                color="secondary"
-                style={styles.textCenter}
-              >
-                Ora puoi iniziare a connetterti con squadre, allenatori e
-                giocatori. Se vuoi, potrai aggiungere altri dettagli in
-                qualsiasi momento.
-              </AppText>
-            </OnboardingSectionCard>
+            {role === "club_admin" ? (
+              <>
+                <View style={styles.clubSuccessContainer}>
+                  <View style={styles.clubSuccessIcon}>
+                    <Ionicons
+                      name="checkmark"
+                      size={48}
+                      color={colors.successForeground}
+                    />
+                  </View>
+                  <AppText variant="displaySm" style={styles.textCenter}>
+                    Profilo società{"\n"}creato con successo
+                  </AppText>
+                  <AppText
+                    variant="bodyLg"
+                    color="secondary"
+                    style={styles.clubSuccessDesc}
+                  >
+                    Benvenuto su FootMe. Inizia subito a cercare giocatori,
+                    allenatori e staff per la tua squadra.
+                  </AppText>
+                </View>
 
-            <Button
-              label="Vai alla home feed"
-              onPress={() => finishOnboarding("feed")}
-              variant="primary"
-            />
-            <Button
-              label="Cerca squadre e contatti"
-              onPress={() => finishOnboarding("network")}
-              variant="secondary"
-            />
-            <Button
-              label="Completa ulteriormente il profilo"
-              onPress={() => finishOnboarding("profile")}
-              variant="tertiary"
-            />
+                <Button
+                  label="Vai alla Home"
+                  onPress={() => finishOnboarding("feed")}
+                  variant="primary"
+                />
+                <Button
+                  label="Completa il profilo più tardi"
+                  onPress={() => finishOnboarding("profile")}
+                  variant="tertiary"
+                />
+              </>
+            ) : (
+              <>
+                <OnboardingSectionCard>
+                  <View style={styles.completionIcon}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={64}
+                      color={colors.success}
+                    />
+                  </View>
+                  <AppText variant="displaySm" style={styles.textCenter}>
+                    Il tuo profilo e' pronto!
+                  </AppText>
+                  <AppText
+                    variant="bodySm"
+                    color="secondary"
+                    style={styles.textCenter}
+                  >
+                    Ora puoi iniziare a connetterti con squadre, allenatori e
+                    giocatori. Se vuoi, potrai aggiungere altri dettagli in
+                    qualsiasi momento.
+                  </AppText>
+                </OnboardingSectionCard>
+
+                <Button
+                  label="Vai alla home feed"
+                  onPress={() => finishOnboarding("feed")}
+                  variant="primary"
+                />
+                <Button
+                  label="Cerca squadre e contatti"
+                  onPress={() => finishOnboarding("network")}
+                  variant="secondary"
+                />
+                <Button
+                  label="Completa ulteriormente il profilo"
+                  onPress={() => finishOnboarding("profile")}
+                  variant="tertiary"
+                />
+              </>
+            )}
           </View>
         ) : null}
       </KeyboardAwareForm>
@@ -2227,6 +2430,85 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: "row",
     gap: spacing[12],
+  },
+  clubCheckboxList: {
+    gap: spacing[10],
+  },
+  clubFieldRow: {
+    flexDirection: "row",
+    gap: spacing[12],
+  },
+  clubLogoCameraBadge: {
+    alignItems: "center",
+    backgroundColor: colors.accent,
+    borderColor: colors.background,
+    borderRadius: radius.full,
+    borderWidth: 3,
+    bottom: -8,
+    height: 36,
+    justifyContent: "center",
+    position: "absolute",
+    right: -8,
+    width: 36,
+  },
+  clubLogoImage: {
+    borderRadius: radius[12],
+    height: "100%",
+    width: "100%",
+  },
+  clubLogoLink: {
+    color: colors.accent,
+    fontWeight: "600",
+    marginTop: spacing[16],
+  },
+  clubLogoShell: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius[12],
+    borderStyle: "dashed",
+    borderWidth: 2,
+    height: 140,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 140,
+  },
+  clubLogoShellFilled: {
+    borderStyle: "solid",
+    borderWidth: 4,
+    borderColor: colors.surface,
+  },
+  clubLogoStage: {
+    alignItems: "center",
+    paddingBottom: spacing[8],
+    paddingTop: spacing[24],
+  },
+  clubStepHeader: {
+    gap: spacing[12],
+  },
+  clubSuccessContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing[32],
+  },
+  clubSuccessDesc: {
+    marginTop: spacing[12],
+    maxWidth: 300,
+    textAlign: "center",
+  },
+  clubSuccessIcon: {
+    alignItems: "center",
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.full,
+    height: 88,
+    justifyContent: "center",
+    marginBottom: spacing[24],
+    shadowColor: "rgba(16, 185, 129, 0.24)",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 1,
+    shadowRadius: 32,
+    elevation: 4,
+    width: 88,
   },
   completionIcon: {
     alignItems: "center",

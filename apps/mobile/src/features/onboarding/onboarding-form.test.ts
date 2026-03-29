@@ -20,14 +20,11 @@ describe("onboarding-form", () => {
   it("maps missing required base fields to field-level errors", () => {
     const errors = validateOnboardingStep("base", {
       ...defaultOnboardingFormState,
-      role: "club_admin",
+      role: "player",
     });
 
     expect(errors).toMatchObject({
       birthDate: "Questo campo è obbligatorio",
-      clubCity: "Questo campo è obbligatorio",
-      clubName: "Questo campo è obbligatorio",
-      clubRegion: "Questo campo è obbligatorio",
       firstName: "Questo campo è obbligatorio",
       gender: "Questo campo è obbligatorio",
       lastName: "Questo campo è obbligatorio",
@@ -142,6 +139,6 @@ describe("onboarding-form", () => {
       totalSteps: 5,
     });
     expect(getPreviousOnboardingStep("complete")).toBe("experience");
-    expect(getPreviousOnboardingStep("complete", null, "club_admin")).toBe("club");
+    expect(getPreviousOnboardingStep("complete", null, "club_admin")).toBe("club_profile");
   });
 });

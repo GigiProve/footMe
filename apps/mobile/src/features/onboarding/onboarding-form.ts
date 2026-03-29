@@ -14,11 +14,15 @@ export type OnboardingStep =
   | "photo"
   | "technical"
   | "experience"
-  | "club"
+  | "club_representative"
+  | "club_data"
+  | "club_youth"
+  | "club_profile"
   | "complete"
   // Legacy steps kept for draft migration
   | "decision"
-  | "details";
+  | "details"
+  | "club";
 
 export type OnboardingValidationErrors = Partial<Record<string, string>>;
 
@@ -38,17 +42,22 @@ export type OnboardingFormState = {
   clubCountry: string;
   clubDescription: string;
   clubEmail: string;
+  clubFacebook: string;
   clubFieldAddress: string;
   clubFoundingYear: string;
   clubGalleryItems: UploadedMediaItem[];
   clubHeadquartersAddress: string;
+  clubInstagram: string;
   clubLeague: string;
   clubLogoUrl: string;
   clubName: string;
   clubPhone: string;
   clubPhoneCountryCode: string;
   clubRegion: string;
+  clubStadium: string;
+  clubTotalMembers: string;
   clubWebsite: string;
+
   coachedCategories: string;
   coachedClubs: string;
   coachPreferredRegions: string;
@@ -76,6 +85,9 @@ export type OnboardingFormState = {
   preferredCategories: string;
   preferredFoot: PreferredFoot | "";
   primaryPosition: PlayerPosition | "";
+  repEmail: string;
+  repPhone: string;
+  repPhoneCountryCode: string;
   residence: string;
   residenceRegion: string;
   role: AppRole | "";
@@ -95,7 +107,7 @@ export type OnboardingVisibleStep = {
   description: string;
   index: number;
   label: string;
-  step: Exclude<OnboardingStep, "complete" | "decision" | "details">;
+  step: Exclude<OnboardingStep, "complete" | "decision" | "details" | "club">;
 };
 
 const defaultVisibleSteps: OnboardingVisibleStep[] = [
@@ -139,10 +151,28 @@ const clubVisibleSteps: OnboardingVisibleStep[] = [
     step: "role",
   },
   {
-    description: "Inserisci i dati della tua societa'",
+    description: "Inserisci i dati del responsabile della società",
     index: 2,
-    label: "Il tuo club",
-    step: "club",
+    label: "Referente",
+    step: "club_representative",
+  },
+  {
+    description: "Aggiungi le informazioni ufficiali del club",
+    index: 3,
+    label: "Dati società",
+    step: "club_data",
+  },
+  {
+    description: "Configura il settore giovanile della società",
+    index: 4,
+    label: "Settore giovanile",
+    step: "club_youth",
+  },
+  {
+    description: "Completa il profilo della società",
+    index: 5,
+    label: "Profilo",
+    step: "club_profile",
   },
 ];
 
@@ -157,7 +187,10 @@ const defaultStepOrder: OnboardingStep[] = [
 
 const clubStepOrder: OnboardingStep[] = [
   "role",
-  "club",
+  "club_representative",
+  "club_data",
+  "club_youth",
+  "club_profile",
   "complete",
 ];
 
@@ -189,17 +222,22 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   clubCountry: "IT",
   clubDescription: "",
   clubEmail: "",
+  clubFacebook: "",
   clubFieldAddress: "",
   clubFoundingYear: "",
   clubGalleryItems: [],
   clubHeadquartersAddress: "",
+  clubInstagram: "",
   clubLeague: "",
   clubLogoUrl: "",
   clubName: "",
   clubPhone: "",
   clubPhoneCountryCode: "+39",
   clubRegion: "",
+  clubStadium: "",
+  clubTotalMembers: "",
   clubWebsite: "",
+
   coachedCategories: "",
   coachedClubs: "",
   coachPreferredRegions: "",
@@ -227,6 +265,9 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   preferredCategories: "",
   preferredFoot: "",
   primaryPosition: "",
+  repEmail: "",
+  repPhone: "",
+  repPhoneCountryCode: "+39",
   residence: "",
   residenceRegion: "",
   role: "",
@@ -250,6 +291,7 @@ export const defaultOnboardingFormState: OnboardingFormState = {
 function migrateLegacyStep(step: OnboardingStep): OnboardingStep {
   if (step === "decision") return "base";
   if (step === "details") return "technical";
+  if (step === "club") return "club_representative";
   return step;
 }
 
@@ -339,9 +381,10 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
 
   const allSteps: OnboardingStep[] = [
     "role", "base", "photo", "technical", "experience",
-    "club", "complete",
+    "club_representative", "club_data", "club_youth", "club_profile",
+    "complete",
     // Legacy steps for draft migration
-    "decision", "details",
+    "decision", "details", "club",
   ];
   return allSteps.includes(value as OnboardingStep)
     ? (value as OnboardingStep)
@@ -400,7 +443,7 @@ export function getPreviousOnboardingStep(
 
   if (effectiveStep === "complete") {
     if (role === "club_admin") {
-      return "club";
+      return "club_profile";
     }
     return "experience";
   }
@@ -429,8 +472,20 @@ export function validateOnboardingStep(
     return mapBaseStepValidationError(form);
   }
 
-  if (step === "club") {
-    return mapClubStepValidationError(form);
+  if (step === "club_representative") {
+    return mapClubRepresentativeValidationError(form);
+  }
+
+  if (step === "club_data") {
+    return mapClubDataValidationError(form);
+  }
+
+  if (step === "club_youth") {
+    return mapClubYouthValidationError(form);
+  }
+
+  if (step === "club_profile") {
+    return {};
   }
 
   if (step === "technical" || step === "details") {
@@ -486,7 +541,7 @@ function isBasicEmailFormat(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function mapClubStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+function mapClubRepresentativeValidationError(form: OnboardingFormState): OnboardingValidationErrors {
   const errors: OnboardingValidationErrors = {};
 
   if (!form.firstName.trim()) {
@@ -497,8 +552,30 @@ function mapClubStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.lastName = "Questo campo è obbligatorio";
   }
 
+  if (!form.repEmail.trim()) {
+    errors.repEmail = "Questo campo è obbligatorio";
+  } else if (!isBasicEmailFormat(form.repEmail.trim())) {
+    errors.repEmail = "Inserisci un indirizzo email valido.";
+  }
+
+  const repPhoneValue = composePhoneNumber(form.repPhoneCountryCode, form.repPhone);
+
+  if (repPhoneValue && !isPhoneNumberValid(repPhoneValue)) {
+    errors.repPhone = "Inserisci un numero di telefono valido.";
+  }
+
+  return errors;
+}
+
+function mapClubDataValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
   if (!form.clubName.trim()) {
     errors.clubName = "Questo campo è obbligatorio";
+  }
+
+  if (!form.clubCategory.trim()) {
+    errors.clubCategory = "Seleziona la categoria della prima squadra";
   }
 
   if (!form.clubCity.trim()) {
@@ -507,12 +584,6 @@ function mapClubStepValidationError(form: OnboardingFormState): OnboardingValida
 
   if (!form.clubRegion.trim()) {
     errors.clubRegion = "Questo campo è obbligatorio";
-  }
-
-  if (!form.clubEmail.trim()) {
-    errors.clubEmail = "Questo campo è obbligatorio";
-  } else if (!isBasicEmailFormat(form.clubEmail.trim())) {
-    errors.clubEmail = "Inserisci un indirizzo email valido.";
   }
 
   if (form.clubFoundingYear.trim()) {
@@ -524,26 +595,24 @@ function mapClubStepValidationError(form: OnboardingFormState): OnboardingValida
     }
   }
 
-  if (form.clubWebsite.trim()) {
-    const website = form.clubWebsite.trim();
-
-    if (!/^https?:\/\/.+\..+/.test(website) && !/^[a-zA-Z0-9].*\..+/.test(website)) {
-      errors.clubWebsite = "Inserisci un indirizzo web valido.";
-    }
-  }
-
-  if (!form.clubCategory.trim()) {
-    errors.clubCategory = "Seleziona la categoria della prima squadra";
-  }
-
-  if (form.clubHasYouthSector && form.clubYouthCategories.length === 0) {
-    errors.clubYouthCategories = "Seleziona almeno una categoria giovanile";
+  if (form.clubEmail.trim() && !isBasicEmailFormat(form.clubEmail.trim())) {
+    errors.clubEmail = "Inserisci un indirizzo email valido.";
   }
 
   const phoneValue = composePhoneNumber(form.clubPhoneCountryCode, form.clubPhone);
 
   if (phoneValue && !isPhoneNumberValid(phoneValue)) {
     errors.clubPhone = "Inserisci un numero di telefono valido.";
+  }
+
+  return errors;
+}
+
+function mapClubYouthValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
+  if (form.clubHasYouthSector && form.clubYouthCategories.length === 0) {
+    errors.clubYouthCategories = "Seleziona almeno una categoria giovanile";
   }
 
   return errors;
@@ -580,20 +649,6 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
 
   if (phoneValue && !isPhoneNumberValid(phoneValue)) {
     errors.phoneNumber = "Inserisci un numero di cellulare valido.";
-  }
-
-  if (form.role === "club_admin") {
-    if (!form.clubName.trim()) {
-      errors.clubName = "Questo campo è obbligatorio";
-    }
-
-    if (!form.clubCity.trim()) {
-      errors.clubCity = "Questo campo è obbligatorio";
-    }
-
-    if (!form.clubRegion.trim()) {
-      errors.clubRegion = "Questo campo è obbligatorio";
-    }
   }
 
   return errors;

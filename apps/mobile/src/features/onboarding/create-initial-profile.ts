@@ -14,24 +14,32 @@ type CreateInitialProfileInput = {
   clubCategory: string;
   clubCity: string;
   clubColors: string;
-  clubHasYouthSector: boolean;
-  clubYouthCategories: string[];
   clubCountry: string;
+  clubDescription: string;
   clubEmail: string;
+  clubFacebook: string;
   clubFieldAddress: string;
   clubFoundingYear: string;
+  clubHasYouthSector: boolean;
   clubHeadquartersAddress: string;
+  clubInstagram: string;
   clubLogoUrl: string;
   clubName: string;
   clubPhone: string;
   clubRegion: string;
+  clubStadium: string;
+  clubTotalMembers: string;
   clubWebsite: string;
+  clubYouthCategories: string[];
+
   domicile: string;
   fullName: string;
   gender: ProfileGender;
   nationality: string;
   phoneNumber: string;
   primaryPosition: PlayerPosition;
+  repEmail: string;
+  repPhone: string;
   residence: string;
   role: AppRole;
   staffSpecialization: StaffSpecialization;
@@ -109,22 +117,6 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
     throw new BaseProfileValidationError("Inserisci un numero di cellulare valido.", [
       "numero di cellulare",
     ]);
-  }
-
-  if (input.role === "club_admin") {
-    const missingClubFields = [
-      !input.clubName.trim() ? "nome società" : null,
-      !input.clubCity.trim() ? "città società" : null,
-      !input.clubRegion.trim() ? "regione società" : null,
-      !input.clubEmail.trim() ? "email società" : null,
-    ].filter(Boolean) as string[];
-
-    if (missingClubFields.length > 0) {
-      throw new BaseProfileValidationError(
-        `Completa i dati obbligatori della società: ${missingClubFields.join(", ")}.`,
-        missingClubFields,
-      );
-    }
   }
 
   return {
@@ -227,15 +219,23 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
           city: input.clubCity.trim(),
           region: input.clubRegion.trim(),
           club_colors: parseOptionalText(input.clubColors),
-          club_email: input.clubEmail.trim().toLowerCase(),
+          club_email: parseOptionalText(input.clubEmail),
           club_phone: parseOptionalText(input.clubPhone),
           country: input.clubCountry || "IT",
+          description: parseOptionalText(input.clubDescription),
+          facebook: parseOptionalText(input.clubFacebook),
           field_address: parseOptionalText(input.clubFieldAddress),
           founding_year: parseOptionalInteger(input.clubFoundingYear),
           headquarters_address: parseOptionalText(input.clubHeadquartersAddress),
+          instagram: parseOptionalText(input.clubInstagram),
           logo_url: parseOptionalText(input.clubLogoUrl),
+          representative_email: parseOptionalText(input.repEmail),
+          representative_phone: parseOptionalText(input.repPhone),
+          stadium: parseOptionalText(input.clubStadium),
+          total_members: parseOptionalInteger(input.clubTotalMembers),
           verification_status: "pending_review",
           website_url: parseOptionalText(input.clubWebsite),
+
         },
         { onConflict: "owner_profile_id" },
       )
