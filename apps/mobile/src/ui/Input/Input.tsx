@@ -50,7 +50,11 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
 
   return (
     <View style={styles.wrapper}>
-      {label ? <AppText variant="caption" color="muted" style={styles.label}>{label}</AppText> : null}
+      {label ? (
+        <AppText variant="caption" color="muted" style={styles.label}>
+          {label}
+        </AppText>
+      ) : null}
       <TextInput
         editable={!disabled}
         multiline={multiline}
@@ -102,7 +106,7 @@ const styles = StyleSheet.create({
     gap: spacing[8],
   },
   label: {
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize[13],
   },
   input: {
@@ -138,7 +142,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   helperText: {
-    fontSize: typography.fontSize[13],
+    fontSize: typography.fontSize[12],
     lineHeight: 18,
   },
 });

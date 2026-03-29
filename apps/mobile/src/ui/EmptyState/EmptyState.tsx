@@ -26,15 +26,20 @@ export function EmptyState({
   return (
     <View style={styles.container}>
       {icon ? (
-        <View style={[styles.iconCircle, variant === "error" ? styles.iconCircleError : null]}>
+        <View
+          style={[
+            styles.iconCircle,
+            variant === "error" ? styles.iconCircleError : null,
+          ]}
+        >
           <Ionicons
-            color={variant === "error" ? colors.destructiveForeground : colors.accentStrong}
+            color={variant === "error" ? colors.danger : colors.textMuted}
             name={icon}
-            size={24}
+            size={32}
           />
         </View>
       ) : null}
-      <AppText variant="titleSm" align="center">
+      <AppText variant="headingSm" align="center">
         {title}
       </AppText>
       {description ? (
@@ -50,24 +55,24 @@ export function EmptyState({
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    gap: spacing[12],
-    paddingVertical: spacing[32],
-    paddingHorizontal: spacing[16],
+    gap: spacing[16],
+    paddingVertical: spacing[40],
+    paddingHorizontal: spacing[20],
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius[8],
     backgroundColor: colors.surface,
   },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: colors.accentSoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing[4],
   },
   iconCircleError: {
-    backgroundColor: colors.danger,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
   },
 });

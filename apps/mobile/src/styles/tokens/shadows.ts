@@ -9,10 +9,10 @@ export const shadows = {
     elevation: 1,
   },
   card: {
-    shadowColor: colors.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: "#000000",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
   elevated: {

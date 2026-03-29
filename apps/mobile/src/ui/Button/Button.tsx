@@ -58,9 +58,16 @@ export type ButtonProps = {
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   variant?: ButtonVariant;
-} & Omit<ComponentProps<typeof Pressable>, "accessibilityLabel" | "children" | "style">;
+} & Omit<
+  ComponentProps<typeof Pressable>,
+  "accessibilityLabel" | "children" | "style"
+>;
 
-function resolvePalette(variant: ButtonVariant, destructive: boolean, selected: boolean): ButtonPalette {
+function resolvePalette(
+  variant: ButtonVariant,
+  destructive: boolean,
+  selected: boolean,
+): ButtonPalette {
   if (variant === "chipAction") {
     const palette = destructive
       ? destructiveOverrides.chipAction
@@ -91,7 +98,10 @@ function resolvePalette(variant: ButtonVariant, destructive: boolean, selected: 
   return destructive ? destructiveOverrides[variant] : buttonVariants[variant];
 }
 
-function resolveContainerSize(size: ButtonSize, variant: ButtonVariant): ViewStyle {
+function resolveContainerSize(
+  size: ButtonSize,
+  variant: ButtonVariant,
+): ViewStyle {
   const height = buttonHeights[size];
   const borderRadius = resolveBorderRadius(variant);
 
@@ -158,6 +168,7 @@ export function Button({
         fullWidth ? styles.fullWidth : null,
         variant === "link" ? styles.linkButton : null,
         variant === "icon" ? styles.iconButton : null,
+        variant === "primary" ? styles.primaryShadow : null,
         "focused" in state && state.focused ? styles.focused : null,
         state.pressed && !isDisabled ? styles.pressed : null,
         isDisabled ? styles.disabled : null,
@@ -183,7 +194,9 @@ export function Button({
               resolveLabelSize(size),
               { color: palette.textColor },
               variant === "link" ? styles.linkLabel : null,
-              variant === "tertiary" || variant === "outline" || variant === "ghost"
+              variant === "tertiary" ||
+              variant === "outline" ||
+              variant === "ghost"
                 ? styles.tertiaryLabel
                 : null,
               variant === "chipAction" ? styles.chipLabel : null,
@@ -227,6 +240,13 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     paddingHorizontal: 0,
+  },
+  primaryShadow: {
+    shadowColor: "#0A66C2",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   label: {
     textAlign: "center",

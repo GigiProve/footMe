@@ -3,7 +3,16 @@ import { StyleSheet, View } from "react-native";
 import { colors, radius, spacing, typography } from "../../styles";
 import { AppText } from "../AppText/AppText";
 
-type BadgeVariant = "default" | "info" | "success" | "warning" | "error" | "inverse" | "accent" | "hero" | "selected";
+type BadgeVariant =
+  | "default"
+  | "info"
+  | "success"
+  | "warning"
+  | "error"
+  | "inverse"
+  | "accent"
+  | "hero"
+  | "selected";
 
 export function Badge({
   label,
@@ -27,15 +36,14 @@ export function Badge({
 const styles = StyleSheet.create({
   base: {
     alignSelf: "flex-start",
-    paddingHorizontal: spacing[8],
-    paddingVertical: spacing[4],
+    height: 26,
+    paddingHorizontal: 10,
     borderRadius: radius[4],
+    justifyContent: "center",
   },
   label: {
     fontSize: typography.fontSize[12],
     fontWeight: typography.fontWeight.semibold,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
 });
 
@@ -49,7 +57,7 @@ const variantStyles = StyleSheet.create({
     borderWidth: 1,
   },
   error: {
-    backgroundColor: colors.danger,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
   },
   hero: {
     backgroundColor: colors.heroSoft,
@@ -66,10 +74,10 @@ const variantStyles = StyleSheet.create({
     borderWidth: 1,
   },
   success: {
-    backgroundColor: colors.successSoft,
+    backgroundColor: "rgba(34, 197, 94, 0.15)",
   },
   warning: {
-    backgroundColor: colors.warningSoft,
+    backgroundColor: "rgba(234, 179, 8, 0.15)",
   },
 });
 
@@ -81,13 +89,13 @@ const textVariantStyles = StyleSheet.create({
     color: colors.textPrimary,
   },
   error: {
-    color: colors.destructiveForeground,
+    color: colors.danger,
   },
   hero: {
     color: colors.hero,
   },
   info: {
-    color: colors.accentStrong,
+    color: colors.textPrimary,
   },
   inverse: {
     color: colors.inkInvert,
@@ -99,6 +107,6 @@ const textVariantStyles = StyleSheet.create({
     color: colors.successForeground,
   },
   warning: {
-    color: colors.warningForeground,
+    color: "#CA8A04",
   },
 });

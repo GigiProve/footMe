@@ -25,19 +25,19 @@ export const buttonTypography = {
     lineHeight: typography.lineHeight[22],
   },
   md: {
-    fontSize: typography.fontSize[16],
+    fontSize: typography.fontSize[15],
     fontWeight: typography.fontWeight.semibold,
-    lineHeight: typography.lineHeight[24],
+    lineHeight: typography.lineHeight[22],
   },
   lg: {
-    fontSize: typography.fontSize[16],
+    fontSize: typography.fontSize[15],
     fontWeight: typography.fontWeight.semibold,
-    lineHeight: typography.lineHeight[24],
+    lineHeight: typography.lineHeight[22],
   },
 } as const;
 
 export const buttonRadius = {
-  default: radius.full,
+  default: radius[12],
   chip: radius.full,
   icon: radius.full,
 } as const;
@@ -46,25 +46,25 @@ export const buttonContentGap = spacing[8];
 
 export const buttonStateOpacity = {
   disabled: 0.5,
-  loading: 0.74,
+  loading: 0.8,
   pressed: 0.88,
 } as const;
 
 export const buttonVariants = {
   chipAction: {
-    backgroundColor: colors.inputBackground,
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    borderColor: "transparent",
     borderWidth: 1,
     textColor: colors.textPrimary,
   },
   danger: {
-    backgroundColor: colors.danger,
+    backgroundColor: colors.surface,
     borderColor: colors.danger,
-    borderWidth: 1,
-    textColor: colors.destructiveForeground,
+    borderWidth: 1.5,
+    textColor: colors.danger,
   },
   ghost: {
-    backgroundColor: "transparent",
+    backgroundColor: colors.accentSoft,
     borderColor: "transparent",
     borderWidth: 0,
     textColor: colors.textPrimary,
@@ -73,7 +73,7 @@ export const buttonVariants = {
     backgroundColor: colors.accentSoft,
     borderColor: "transparent",
     borderWidth: 0,
-    textColor: colors.accentStrong,
+    textColor: colors.textPrimary,
   },
   link: {
     backgroundColor: "transparent",
@@ -94,15 +94,15 @@ export const buttonVariants = {
     textColor: colors.inkInvert,
   },
   secondary: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accentSoft,
-    borderWidth: 1,
-    textColor: colors.accentStrong,
+    backgroundColor: colors.surface,
+    borderColor: colors.accent,
+    borderWidth: 1.5,
+    textColor: colors.accent,
   },
   tertiary: {
-    backgroundColor: "transparent",
-    borderColor: colors.border,
-    borderWidth: 1,
+    backgroundColor: colors.accentSoft,
+    borderColor: "transparent",
+    borderWidth: 0,
     textColor: colors.textPrimary,
   },
 } as const;
@@ -159,7 +159,7 @@ export const destructiveOverrides = {
 } as const;
 
 export const chipSelectedPalette = {
-  backgroundColor: colors.accent,
-  borderColor: colors.accent,
-  textColor: colors.inkInvert,
+  backgroundColor: colors.accentSoft,
+  borderColor: "rgba(10, 102, 194, 0.2)",
+  textColor: colors.accent,
 } as const;
