@@ -1,10 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  type TextLayoutEventData,
-  View,
-} from "react-native";
+import { StyleSheet, type TextLayoutEventData, View } from "react-native";
 import type { NativeSyntheticEvent } from "react-native";
 
 import {
@@ -14,7 +9,7 @@ import {
   normalizeProfileBioInput,
 } from "./profile-form-utils";
 import { ProfileSectionCard } from "./profile-screen-components";
-import { colors, radius, sizes, spacing, typography } from "../../theme/tokens";
+import { colors, radius, sizes, spacing } from "../../theme/tokens";
 import { AppText, Button, Input } from "../../ui";
 
 const BIO_PLACEHOLDER =
@@ -62,7 +57,10 @@ export function CharacterCounter({
 }
 
 export function BioInput({ errorMessage, onChangeText, value }: BioInputProps) {
-  const normalizedValue = useMemo(() => normalizeProfileBioInput(value), [value]);
+  const normalizedValue = useMemo(
+    () => normalizeProfileBioInput(value),
+    [value],
+  );
 
   return (
     <View style={styles.fieldContainer}>
@@ -74,7 +72,9 @@ export function BioInput({ errorMessage, onChangeText, value }: BioInputProps) {
         helperText={errorMessage ?? undefined}
         maxLength={PROFILE_BIO_MAX_LENGTH}
         multiline
-        onChangeText={(nextValue) => onChangeText(normalizeProfileBioInput(nextValue))}
+        onChangeText={(nextValue) =>
+          onChangeText(normalizeProfileBioInput(nextValue))
+        }
         placeholder={BIO_PLACEHOLDER}
         returnKeyType="default"
         scrollEnabled={false}
@@ -99,9 +99,7 @@ export function PublicBioBlock({
   const [canExpand, setCanExpand] = useState(false);
   const hasValue = normalizedBio.length > 0;
 
-  function handleTextLayout(
-    event: NativeSyntheticEvent<TextLayoutEventData>,
-  ) {
+  function handleTextLayout(event: NativeSyntheticEvent<TextLayoutEventData>) {
     if (canExpand) {
       return;
     }
@@ -113,7 +111,9 @@ export function PublicBioBlock({
     <View
       style={[
         styles.readonlySurface,
-        hasValue ? styles.completedReadonlySurface : styles.emptyReadonlySurface,
+        hasValue
+          ? styles.completedReadonlySurface
+          : styles.emptyReadonlySurface,
       ]}
     >
       <AppText
@@ -155,7 +155,11 @@ export function BioSection({
           Bio
         </AppText>
         {editable && onChangeText ? (
-          <BioInput errorMessage={errorMessage} onChangeText={onChangeText} value={normalizedBio} />
+          <BioInput
+            errorMessage={errorMessage}
+            onChangeText={onChangeText}
+            value={normalizedBio}
+          />
         ) : (
           <PublicBioBlock bio={normalizedBio} />
         )}

@@ -4,6 +4,7 @@ import { updateCompleteProfessionalProfile } from "./profile-service";
 
 const mocks = vi.hoisted(() => {
   const profileUpdateEqMock = vi.fn();
+  const profileUpdateMaybeSingleMock = vi.fn();
   const profileContactsUpsertMock = vi.fn();
   const privateContactsUpsertMock = vi.fn();
   const rpcMock = vi.fn();
@@ -12,12 +13,21 @@ const mocks = vi.hoisted(() => {
     privateContactsUpsertMock,
     profileContactsUpsertMock,
     profileUpdateEqMock,
+    profileUpdateMaybeSingleMock,
     rpcMock,
     fromMock: vi.fn((table: string) => {
       if (table === "profiles") {
         return {
           update: vi.fn(() => ({
-            eq: profileUpdateEqMock,
+            eq: vi.fn((...args: unknown[]) => {
+              profileUpdateEqMock(...args);
+
+              return {
+                select: vi.fn(() => ({
+                  maybeSingle: profileUpdateMaybeSingleMock,
+                })),
+              };
+            }),
           })),
         };
       }
@@ -59,6 +69,8 @@ function buildUpdateInput() {
       preferred_foot: "right" as const,
       primary_position: "striker" as const,
       secondary_positions: [],
+      availability_type: "REGIONS",
+      transfer_provinces: [],
       transfer_regions: ["Umbria"],
       weight_kg: 75,
       willing_to_change_club: true,
@@ -93,11 +105,15 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
   beforeEach(() => {
     mocks.fromMock.mockClear();
     mocks.profileUpdateEqMock.mockReset();
+    mocks.profileUpdateMaybeSingleMock.mockReset();
     mocks.profileContactsUpsertMock.mockReset();
     mocks.privateContactsUpsertMock.mockReset();
     mocks.rpcMock.mockReset();
 
-    mocks.profileUpdateEqMock.mockResolvedValue({ error: null });
+    mocks.profileUpdateMaybeSingleMock.mockResolvedValue({
+      data: { id: "profile-1" },
+      error: null,
+    });
     mocks.profileContactsUpsertMock.mockResolvedValue({ error: null });
     mocks.privateContactsUpsertMock.mockResolvedValue({ error: null });
     mocks.rpcMock.mockResolvedValue({ error: null });
@@ -180,12 +196,14 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         },
       ],
       p_player_profile: {
+        availability_type: "REGIONS",
         height_cm: 180,
         highlight_video_url: null,
         preferred_categories: ["Promozione"],
         preferred_foot: "right",
         primary_position: "striker",
         secondary_positions: [],
+        transfer_provinces: [],
         transfer_regions: ["Umbria"],
         weight_kg: 75,
         willing_to_change_club: true,
@@ -237,12 +255,14 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         },
       ],
       p_player_profile: {
+        availability_type: "REGIONS",
         height_cm: 180,
         highlight_video_url: null,
         preferred_categories: ["Promozione"],
         preferred_foot: "right",
         primary_position: "striker",
         secondary_positions: [],
+        transfer_provinces: [],
         transfer_regions: ["Umbria"],
         weight_kg: 75,
         willing_to_change_club: true,

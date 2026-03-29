@@ -106,7 +106,7 @@ export async function getPublishedAds(profileId: string) {
     throw adsError;
   }
 
-  const ads = (adsData ?? []) as Array<{
+  const ads = (adsData ?? []) as {
     age_max: number | null;
     age_min: number | null;
     club_id: string;
@@ -119,7 +119,7 @@ export async function getPublishedAds(profileId: string) {
     role_required: string;
     status: string;
     title: string;
-  }>;
+  }[];
 
   const clubIds = Array.from(new Set(ads.map((ad) => ad.club_id)));
   const clubsById = new Map<string, ClubSummary>();
@@ -161,14 +161,14 @@ export async function getPublishedAds(profileId: string) {
     throw applicationsError;
   }
 
-  for (const row of (savedAdsData ?? []) as Array<{ ad_id: string }>) {
+  for (const row of (savedAdsData ?? []) as { ad_id: string }[]) {
     savedIds.add(row.ad_id);
   }
 
-  for (const row of (applicationsData ?? []) as Array<{
+  for (const row of (applicationsData ?? []) as {
     ad_id: string;
     status: string;
-  }>) {
+  }[]) {
     applicationStatusByAdId.set(row.ad_id, row.status);
   }
 
@@ -263,12 +263,12 @@ export async function getClubApplications(profileId: string) {
     throw adsError;
   }
 
-  const ads = (adsData ?? []) as Array<{
+  const ads = (adsData ?? []) as {
     id: string;
     role_required: string;
     status: string;
     title: string;
-  }>;
+  }[];
 
   if (ads.length === 0) {
     return [] as ClubApplicationSummary[];
@@ -289,14 +289,14 @@ export async function getClubApplications(profileId: string) {
     throw applicationsError;
   }
 
-  const applications = (applicationsData ?? []) as Array<{
+  const applications = (applicationsData ?? []) as {
     ad_id: string;
     applicant_profile_id: string;
     cover_message: string | null;
     created_at: string;
     id: string;
     status: string;
-  }>;
+  }[];
 
   const applicantIds = Array.from(
     new Set(
@@ -323,12 +323,12 @@ export async function getClubApplications(profileId: string) {
       throw applicantsError;
     }
 
-    for (const applicant of (applicantsData ?? []) as Array<{
+    for (const applicant of (applicantsData ?? []) as {
       full_name: string | null;
       id: string;
       region: string | null;
       role: string | null;
-    }>) {
+    }[]) {
       applicantsById.set(applicant.id, applicant);
     }
   }

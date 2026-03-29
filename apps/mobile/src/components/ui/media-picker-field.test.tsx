@@ -49,7 +49,7 @@ describe("MediaPickerField", () => {
 
     expect(previewStyle.width).toBe(96);
     expect(previewStyle.height).toBe(96);
-    expect(previewStyle.borderRadius).toBe(radius[20]);
+    expect(previewStyle.borderRadius).toBe(radius[12]);
     expect(previewStyle.overflow).toBe("hidden");
     expect(previewStyle.backgroundColor).toBe(colors.surfaceMuted);
   });

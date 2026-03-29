@@ -197,3 +197,32 @@ export async function pickAndUploadMedia(input: PickAndUploadMediaInput) {
     throw mapUploadError(error);
   }
 }
+
+export async function captureAndUploadPhoto(input: Omit<PickAndUploadMediaInput, "allowsMultipleSelection" | "mediaTypes">) {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+  if (!permission.granted) {
+    throw new ProfileMediaUploadError(
+      "permission_denied",
+      "Consenti l'accesso alla fotocamera per scattare una foto.",
+    );
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    allowsEditing: true,
+    mediaTypes: ["images"],
+    quality: 1,
+  });
+
+  if (result.canceled) {
+    return [];
+  }
+
+  try {
+    return await Promise.all(
+      result.assets.map((asset, index) => uploadAsset(asset, { ...input, mediaTypes: ["images"] }, index)),
+    );
+  } catch (error) {
+    throw mapUploadError(error);
+  }
+}

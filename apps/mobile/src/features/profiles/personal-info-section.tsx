@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Keyboard,
+  Modal,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { SelectField } from "../../components/ui/select-field";
@@ -75,7 +85,9 @@ export function BirthDateInput({
               <Input
                 keyboardType="number-pad"
                 maxLength={10}
-                onChangeText={(nextValue) => onChange?.(normalizeBirthDateInput(nextValue))}
+                onChangeText={(nextValue) =>
+                  onChange?.(normalizeBirthDateInput(nextValue))
+                }
                 placeholder={placeholder}
                 value={value}
               />
@@ -99,7 +111,10 @@ export function CityAutocompleteInput({
 }: CityAutocompleteInputProps) {
   const [suggestionsOpen, setSuggestionsOpen] = useState(true);
   const shouldShowSuggestions =
-    editable && suggestionsOpen && value.trim().length >= 2 && suggestions.length > 0;
+    editable &&
+    suggestionsOpen &&
+    value.trim().length >= 2 &&
+    suggestions.length > 0;
   const fallbackHelperText =
     value.trim().length >= 2 && suggestions.length === 0
       ? "Nessuna città trovata nel dataset ISTAT."
@@ -131,7 +146,10 @@ export function CityAutocompleteInput({
                   value={value}
                 />
                 {shouldShowSuggestions ? (
-                  <View style={styles.suggestionsSurface} testID="city-autocomplete-suggestions">
+                  <View
+                    style={styles.suggestionsSurface}
+                    testID="city-autocomplete-suggestions"
+                  >
                     <ScrollView
                       contentContainerStyle={styles.suggestionsContent}
                       nestedScrollEnabled
@@ -147,8 +165,12 @@ export function CityAutocompleteInput({
                           ]}
                           testID={`city-autocomplete-suggestion-${suggestion.name}-${suggestion.region}`}
                         >
-                          <Text style={styles.suggestionName}>{suggestion.name}</Text>
-                          <Text style={styles.suggestionMeta}>{suggestion.region}</Text>
+                          <Text style={styles.suggestionName}>
+                            {suggestion.name}
+                          </Text>
+                          <Text style={styles.suggestionMeta}>
+                            {suggestion.region}
+                          </Text>
                         </Pressable>
                       ))}
                     </ScrollView>
@@ -166,8 +188,6 @@ export function CityAutocompleteInput({
 // ---------------------------------------------------------------------------
 // LanguageMultiSelect
 // ---------------------------------------------------------------------------
-
-import { Keyboard, Modal, SafeAreaView, TextInput } from "react-native";
 
 function LanguageMultiSelect({
   languages,
@@ -263,7 +283,8 @@ function LanguageMultiSelect({
               >
                 {languages.map((code) => {
                   const label =
-                    LANGUAGE_OPTIONS.find((o) => o.value === code)?.label ?? code;
+                    LANGUAGE_OPTIONS.find((o) => o.value === code)?.label ??
+                    code;
                   return (
                     <Pressable
                       accessibilityRole="button"
@@ -304,7 +325,9 @@ function LanguageMultiSelect({
                 >
                   <AppText
                     variant="bodySm"
-                    style={isSelected ? styles.langOptionTextSelected : undefined}
+                    style={
+                      isSelected ? styles.langOptionTextSelected : undefined
+                    }
                   >
                     {option.label}
                   </AppText>
@@ -349,7 +372,9 @@ export function PersonalInfoSection({
   const [langModalOpen, setLangModalOpen] = useState(false);
 
   const languageLabels = languages
-    .map((code) => LANGUAGE_OPTIONS.find((o) => o.value === code)?.label ?? code)
+    .map(
+      (code) => LANGUAGE_OPTIONS.find((o) => o.value === code)?.label ?? code,
+    )
     .join(", ");
 
   function toggleLanguage(code: string) {
@@ -394,7 +419,9 @@ export function PersonalInfoSection({
       ) : (
         <ProfileField
           label="Nazionalità"
-          value={nationality ? getOptionLabel(nationalityOptions, nationality) : ""}
+          value={
+            nationality ? getOptionLabel(nationalityOptions, nationality) : ""
+          }
         />
       )}
       <CityAutocompleteInput
@@ -440,7 +467,7 @@ const styles = StyleSheet.create({
     gap: spacing[10],
   },
   suggestionButton: {
-    borderRadius: radius[16],
+    borderRadius: radius[12],
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -464,7 +491,7 @@ const styles = StyleSheet.create({
   },
   suggestionsSurface: {
     maxHeight: 220,
-    borderRadius: radius[20],
+    borderRadius: radius[12],
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceMuted,
@@ -482,7 +509,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[14],
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius[16],
+    borderRadius: radius[12],
     backgroundColor: colors.background,
   },
   languageTriggerFilled: {
@@ -518,7 +545,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[12],
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius[16],
+    borderRadius: radius[12],
     backgroundColor: colors.surface,
     color: colors.textPrimary,
     fontSize: typography.fontSize[16],
@@ -551,7 +578,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: spacing[14],
     paddingVertical: spacing[12],
-    borderRadius: radius[16],
+    borderRadius: radius[12],
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,

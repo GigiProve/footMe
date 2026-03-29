@@ -1,7 +1,7 @@
 import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 
 import { colors, spacing } from "../../../theme/tokens";
-import { AppText, Button, EmptyState as SharedEmptyState } from "../../../ui";
+import { AppText, Button } from "../../../ui";
 import type { AdminClubEntry } from "../admin-service";
 import { ClubRegistrationRequestCard } from "./club-registration-request-card";
 import { EmptyState } from "./empty-state";
@@ -37,7 +37,12 @@ export function ClubRegistrationRequestList({
         <AppText variant="bodyLg" color="secondary" align="center">
           {error}
         </AppText>
-        <Button label="Riprova" onPress={onRefresh} size="sm" variant="secondary" />
+        <Button
+          label="Riprova"
+          onPress={onRefresh}
+          size="sm"
+          variant="secondary"
+        />
       </View>
     );
   }
@@ -47,7 +52,9 @@ export function ClubRegistrationRequestList({
       contentContainerStyle={styles.listContent}
       data={clubs}
       keyExtractor={(item) => item.id}
-      ListEmptyComponent={<EmptyState message="Nessuna richiesta di iscrizione in attesa." />}
+      ListEmptyComponent={
+        <EmptyState message="Nessuna richiesta di iscrizione in attesa." />
+      }
       onRefresh={onRefresh}
       refreshing={refreshing}
       renderItem={({ item }) => (

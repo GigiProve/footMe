@@ -116,6 +116,8 @@ add column if not exists shared_contact_name text;
 alter table public.messages
 add column if not exists shared_contact_phone text;
 
+drop function if exists public.get_conversation_messages(uuid);
+
 create or replace function public.get_conversation_messages(target_conversation_id uuid)
 returns table (
   message_id uuid,

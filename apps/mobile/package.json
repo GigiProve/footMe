@@ -10,10 +10,10 @@
     "dev": "npx -y -p node@20 node ../../node_modules/@expo/cli/build/bin/cli start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "lint": "npx -y -p node@20 node ../../node_modules/eslint/bin/eslint.js .",
+    "typecheck": "npx -y -p node@20 node ../../node_modules/typescript/bin/tsc --noEmit",
+    "test": "npx -y -p node@20 node ../../node_modules/vitest/vitest.mjs run",
+    "test:watch": "npx -y -p node@20 node ../../node_modules/vitest/vitest.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

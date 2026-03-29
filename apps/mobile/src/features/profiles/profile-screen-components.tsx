@@ -207,12 +207,12 @@ const styles = StyleSheet.create({
     marginTop: -52,
   },
   clubLogoAvatar: {
-    borderRadius: radius[24],
+    borderRadius: radius[12],
   },
   clubLogoPlaceholder: {
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radius[24],
+    borderRadius: radius[12],
   },
   badge: {
     paddingHorizontal: spacing[10],
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   },
   coverArea: {
     minHeight: 132,
-    borderRadius: radius[24],
+    borderRadius: radius[12],
     backgroundColor: colors.backgroundStrong,
     overflow: "hidden",
     justifyContent: "flex-start",
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     opacity: 0.82,
   },
   readonlySurface: {
-    borderRadius: radius[18],
+    borderRadius: radius[12],
     borderWidth: 1,
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[14],
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   sectionCard: {
     gap: spacing[12],
     padding: spacing[18],
-    borderRadius: radius[24],
+    borderRadius: radius[12],
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,

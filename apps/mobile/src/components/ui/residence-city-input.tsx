@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { type View as ViewType, Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import {
   type ItalianCityOption,
   searchItalianCities,
 } from "../../features/profiles/profile-form-utils";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
-import { Input } from "../../ui/Input/Input";
+import { colors, radius, spacing } from "../../theme/tokens";
+import { AppText, Input } from "../../ui";
+import { useKeyboardAwareScroll } from "./keyboard-aware-scroll-view";
 
 type ResidenceCityInputProps = {
   errorMessage?: string;
@@ -30,9 +31,17 @@ export function ResidenceCityInput({
   const [isOpen, setIsOpen] = useState(false);
   const suggestions = useMemo(() => searchItalianCities(value, 6), [value]);
   const shouldShowSuggestions = isOpen && value.trim().length >= 2 && suggestions.length > 0;
+  const rootRef = useRef<ViewType>(null);
+  const keyboardAware = useKeyboardAwareScroll();
+
+  useEffect(() => {
+    if (shouldShowSuggestions && rootRef.current && keyboardAware) {
+      keyboardAware.scrollElementToTop(rootRef.current);
+    }
+  }, [shouldShowSuggestions, keyboardAware]);
 
   return (
-    <View style={{ gap: spacing[8] }}>
+    <View ref={rootRef} style={styles.root}>
       <Input
         autoCapitalize="words"
         autoCorrect={false}
@@ -43,27 +52,20 @@ export function ResidenceCityInput({
         }}
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
-        style={errorMessage ? { borderColor: colors.danger } : undefined}
+        style={errorMessage ? styles.errorBorder : undefined}
         value={value}
       />
-      <Text style={{ color: errorMessage ? colors.danger : colors.textSecondary }}>
+      <AppText variant="bodySm" color={errorMessage ? "danger" : "secondary"}>
         {errorMessage ??
           helperText ??
           "Scrivi almeno 2 caratteri per vedere città reali e scegliere il suggerimento corretto."}
-      </Text>
+      </AppText>
       {shouldShowSuggestions ? (
         <View
-          style={{
-            maxHeight: 220,
-            borderRadius: radius[20],
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.surfaceMuted,
-            padding: spacing[10],
-          }}
+          style={styles.suggestionsSurface}
           testID="residence-city-suggestions"
         >
-          <ScrollView contentContainerStyle={{ gap: spacing[8] }} nestedScrollEnabled>
+          <ScrollView contentContainerStyle={styles.suggestionsContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
             {suggestions.map((suggestion) => (
               <Pressable
                 accessibilityRole="button"
@@ -71,27 +73,16 @@ export function ResidenceCityInput({
                 onPress={() => {
                   setIsOpen(false);
                   onSelectCity(suggestion);
+                  Keyboard.dismiss();
                 }}
-                style={({ pressed }) => ({
-                  gap: spacing[4],
-                  borderRadius: radius[16],
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: pressed ? colors.heroSoft : colors.surface,
-                  paddingHorizontal: spacing[14],
-                  paddingVertical: spacing[12],
-                })}
+                style={({ pressed }) => [
+                  styles.suggestionButton,
+                  pressed ? styles.suggestionButtonPressed : null,
+                ]}
                 testID={`residence-city-suggestion-${suggestion.name}-${suggestion.region}`}
               >
-                <Text
-                  style={{
-                    color: colors.textPrimary,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  {suggestion.name}
-                </Text>
-                <Text style={{ color: colors.textSecondary }}>{suggestion.region}</Text>
+                <AppText variant="titleSm">{suggestion.name}</AppText>
+                <AppText variant="bodySm" color="secondary">{suggestion.region}</AppText>
               </Pressable>
             ))}
           </ScrollView>
@@ -100,3 +91,35 @@ export function ResidenceCityInput({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  errorBorder: {
+    borderColor: colors.danger,
+  },
+  root: {
+    gap: spacing[8],
+  },
+  suggestionButton: {
+    borderRadius: radius[12],
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing[14],
+    paddingVertical: spacing[12],
+    gap: spacing[4],
+  },
+  suggestionButtonPressed: {
+    backgroundColor: colors.heroSoft,
+  },
+  suggestionsContent: {
+    gap: spacing[8],
+  },
+  suggestionsSurface: {
+    maxHeight: 220,
+    borderRadius: radius[12],
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing[10],
+  },
+});

@@ -25,13 +25,15 @@ describe("wheel-picker", () => {
     });
 
     act(() => {
-      tree!.root.findByProps({ testID: "wheel-picker-cm" }).props.onMomentumScrollEnd({
-        nativeEvent: {
-          contentOffset: {
-            y: 104,
+      tree!.root
+        .findByProps({ testID: "wheel-picker-cm" })
+        .props.onMomentumScrollEnd({
+          nativeEvent: {
+            contentOffset: {
+              y: 104,
+            },
           },
-        },
-      });
+        });
     });
 
     expect(onChange).toHaveBeenCalledWith(160);
@@ -64,14 +66,15 @@ describe("wheel-picker", () => {
     });
 
     const emphasizedValueStyle = StyleSheet.flatten(
-      tree!.root.findByProps({ testID: "wheel-picker-value-kg-71" }).props.style,
+      tree!.root.findByProps({ testID: "wheel-picker-value-kg-71" }).parent
+        ?.props.style,
     );
     const unitHintStyle = StyleSheet.flatten(
       tree!.root.findByProps({ testID: "wheel-picker-unit-kg" }).props.style,
     );
 
     expect(emphasizedValueStyle.opacity).toBe(1);
-    expect(emphasizedValueStyle.transform).toEqual([{ scale: 1.08 }]);
+    expect(emphasizedValueStyle.transform).toEqual([{ scale: 1.06 }]);
     expect(unitHintStyle.backgroundColor).toBe("rgba(255,255,255,0.86)");
     expect(unitHintStyle.paddingVertical).toBe(4);
   });

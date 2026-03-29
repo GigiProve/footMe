@@ -1,8 +1,8 @@
-import { Pressable, Text, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { INTEREST_CATEGORY_OPTIONS } from "../../features/profiles/player-sports";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
+import { AppText } from "../../ui/AppText/AppText";
 
 type InterestCategoriesSelectorProps = {
   editable?: boolean;
@@ -15,7 +15,7 @@ type InterestCategoriesSelectorProps = {
 export function InterestCategoriesSelector({
   editable = true,
   hideLabel = false,
-  label = "Categorie in cui sei interessato a giocare",
+  label = "Categorie di interesse",
   onChange,
   value,
 }: InterestCategoriesSelectorProps) {
@@ -30,100 +30,95 @@ export function InterestCategoriesSelector({
   }
 
   return (
-    <View style={{ gap: spacing[8] }}>
+    <View style={styles.container}>
       {!hideLabel ? (
-        <Text
-          style={{
-            color: colors.textPrimary,
-            fontWeight: typography.fontWeight.bold,
-          }}
-        >
+        <AppText variant="bodySm" color="primary" style={styles.label}>
           {label}
-        </Text>
+        </AppText>
       ) : null}
-      {editable ? (
-        <View style={{ gap: spacing[6] }}>
-          {INTEREST_CATEGORY_OPTIONS.map((option) => {
-            const isSelected = selectedSet.has(option.value);
-            return (
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isSelected }}
-                key={option.value}
-                onPress={() => handleToggle(option.value)}
-                style={({ pressed }) => ({
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing[12],
-                  paddingHorizontal: spacing[14],
-                  paddingVertical: spacing[12],
-                  borderRadius: radius[16],
-                  borderWidth: 1,
-                  borderColor: isSelected ? colors.hero : colors.border,
-                  backgroundColor: pressed
-                    ? colors.heroSoft
-                    : isSelected
-                      ? colors.heroSoft
-                      : colors.surface,
-                })}
-                testID={`interest-category-${option.value}`}
-              >
-                <Ionicons
-                  color={isSelected ? colors.hero : colors.border}
-                  name={isSelected ? "checkbox" : "square-outline"}
-                  size={22}
-                />
-                <Text
-                  style={{
-                    flex: 1,
-                    color: colors.textPrimary,
-                    fontWeight: isSelected
-                      ? typography.fontWeight.bold
-                      : typography.fontWeight.regular,
-                    fontSize: typography.fontSize[16],
-                  }}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : value.length > 0 ? (
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: spacing[8],
-          }}
-        >
-          {value.map((category) => (
-            <View
-              key={category}
-              style={{
-                paddingHorizontal: spacing[12],
-                paddingVertical: spacing[8],
-                borderRadius: radius.full,
-                backgroundColor: colors.accentSoft,
-                borderWidth: 1,
-                borderColor: colors.accentSoft,
-              }}
+      <View style={styles.pillsRow}>
+        {INTEREST_CATEGORY_OPTIONS.map((option) => {
+          const isSelected = selectedSet.has(option.value);
+          return editable ? (
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isSelected }}
+              key={option.value}
+              onPress={() => handleToggle(option.value)}
+              style={[styles.pill, isSelected ? styles.pillActive : null]}
+              testID={`interest-category-${option.value}`}
             >
-              <Text
-                style={{
-                  color: colors.accentStrong,
-                  fontWeight: typography.fontWeight.bold,
-                  fontSize: typography.fontSize[14],
-                }}
+              <AppText
+                variant="bodySm"
+                color={isSelected ? "accent" : "primary"}
+                style={[
+                  styles.pillText,
+                  isSelected ? styles.pillTextActive : null,
+                ]}
               >
-                {category}
-              </Text>
+                {option.label}
+              </AppText>
+            </Pressable>
+          ) : isSelected ? (
+            <View key={option.value} style={styles.pillReadonly}>
+              <AppText
+                variant="bodySm"
+                color="accent"
+                style={styles.pillTextActive}
+              >
+                {option.label}
+              </AppText>
             </View>
-          ))}
-        </View>
-      ) : (
-        <Text style={{ color: colors.textSecondary }}>Da completare</Text>
-      )}
+          ) : null;
+        })}
+        {!editable && value.length === 0 ? (
+          <AppText variant="bodySm" color="secondary">
+            Da completare
+          </AppText>
+        ) : null}
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    gap: spacing[8],
+  },
+  label: {
+    fontWeight: typography.fontWeight.bold,
+  },
+  pillsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
+  },
+  pill: {
+    minHeight: 40,
+    paddingHorizontal: spacing[14],
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  pillActive: {
+    backgroundColor: colors.accentSoft,
+    borderColor: "rgba(10,102,194,0.18)",
+  },
+  pillText: {
+    fontWeight: typography.fontWeight.bold,
+  },
+  pillTextActive: {
+    fontWeight: typography.fontWeight.bold,
+  },
+  pillReadonly: {
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[8],
+    borderRadius: radius.full,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accentSoft,
+  },
+});

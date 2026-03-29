@@ -16,6 +16,7 @@ const variantStyles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
+    ...shadows.card,
   },
   inverse: {
     backgroundColor: colors.surfaceInverse,

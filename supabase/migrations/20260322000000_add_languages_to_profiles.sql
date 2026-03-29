@@ -2,6 +2,7 @@
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS languages text[] DEFAULT '{}';
 
 -- Recreate the view to include the new column
+DROP VIEW IF EXISTS public.profiles_with_age;
 CREATE OR REPLACE VIEW public.profiles_with_age
 WITH (security_invoker = true) AS
 SELECT

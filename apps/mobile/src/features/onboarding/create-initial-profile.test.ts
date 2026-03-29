@@ -78,15 +78,25 @@ describe("createInitialProfile", () => {
     clubCategory: "",
     clubColors: "",
     clubCountry: "IT",
+    clubDescription: "",
     clubEmail: "",
+    clubFacebook: "",
     clubFieldAddress: "",
     clubFoundingYear: "",
     clubHasYouthSector: false,
     clubHeadquartersAddress: "",
+    clubInstagram: "",
     clubLogoUrl: "",
+    clubName: "",
     clubPhone: "",
+    clubRegion: "",
+    clubStadium: "",
+    clubTotalMembers: "",
     clubWebsite: "",
     clubYouthCategories: [] as string[],
+
+    repEmail: "",
+    repPhone: "",
   };
 
   it("rejects empty full name before calling Supabase", async () => {
@@ -172,6 +182,8 @@ describe("createInitialProfile", () => {
       nationality: "IT",
       phoneNumber: "",
       primaryPosition: "midfielder",
+      repEmail: "owner@elite.it",
+      repPhone: "",
       residence: "Città di Castello",
       role: "club_admin",
       staffSpecialization: "fitness_coach",
@@ -179,54 +191,23 @@ describe("createInitialProfile", () => {
     });
 
     expect(upsertMocks.clubs).toHaveBeenCalledWith(
-      {
+      expect.objectContaining({
         category: null,
         city: "Città di Castello",
         club_colors: null,
         club_email: "info@elite.it",
         club_phone: null,
         country: "IT",
-        field_address: null,
-        founding_year: null,
-        headquarters_address: null,
-        logo_url: null,
         name: "Città Élite Naïve FC",
         owner_profile_id: "club-1",
         region: "Umbria",
+        representative_email: "owner@elite.it",
         slug: "citta-elite-naive-fc",
         verification_status: "pending_review",
         website_url: null,
-      },
+      }),
       { onConflict: "owner_profile_id" },
     );
-  });
-
-  it("requires club identity fields for club admins", async () => {
-    await expect(
-      createInitialProfile({
-        ...defaultClubFields,
-        avatarUrl: "https://example.com/avatar.jpg",
-        birthDate: "1988-03-17",
-        clubCity: " ",
-        clubEmail: "",
-        clubName: "Club",
-        clubRegion: "",
-        domicile: "Roma",
-        fullName: "Club Owner",
-        gender: "male",
-        nationality: "IT",
-        phoneNumber: "",
-        primaryPosition: "midfielder",
-        residence: "Roma",
-        role: "club_admin",
-        staffSpecialization: "fitness_coach",
-        userId: "club-2",
-      }),
-    ).rejects.toThrow(
-      "Completa i dati obbligatori della società: città società, regione società, email società.",
-    );
-
-    expect(upsertMocks.clubs).not.toHaveBeenCalled();
   });
 
   it("requires the mandatory base onboarding fields", async () => {

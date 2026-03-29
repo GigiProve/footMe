@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { spacing } from "../../theme/tokens";
 
 type KeyboardAwareContextValue = {
+  scrollElementToTop: (element: Measurable | null, animated?: boolean) => void;
   scrollToFocusedInput: (input: Measurable | null, animated?: boolean) => void;
 };
 
@@ -220,17 +221,55 @@ export function KeyboardAwareScrollView({
     };
   }, [clearScheduledScroll, keyboardVerticalOffset, scheduleScrollIntoView]);
 
+  const scrollElementToTop = useCallback(
+    (element: Measurable | null, animated = true) => {
+      if (!element?.measure || !scrollViewRef.current?.measure) {
+        return;
+      }
+
+      clearScheduledScroll();
+
+      scrollTimerRef.current = setTimeout(() => {
+        element.measure((
+          _ex: number, _ey: number, _ew: number, _eh: number,
+          _epx: number, elementPageY: number,
+        ) => {
+          scrollViewRef.current?.measure((
+            _sx: number, _sy: number, _sw: number, _sh: number,
+            _spx: number, scrollPageY: number,
+          ) => {
+            const visibleTop = scrollPageY + DEFAULT_VISIBLE_OFFSET;
+            const delta = elementPageY - visibleTop;
+
+            if (Math.abs(delta) < 2) {
+              return;
+            }
+
+            scrollViewRef.current?.scrollTo({
+              animated,
+              y: Math.max(scrollOffsetRef.current + delta, 0),
+            });
+          });
+        });
+      }, 100);
+    },
+    [clearScheduledScroll],
+  );
+
   const keyboardAwareContextValue = useMemo<KeyboardAwareContextValue>(
     () => ({
+      scrollElementToTop: (element, animated = true) =>
+        scrollElementToTop(element, animated),
       scrollToFocusedInput: (input, animated = true) =>
         scheduleScrollIntoView(input, animated),
     }),
-    [scheduleScrollIntoView],
+    [scheduleScrollIntoView, scrollElementToTop],
   );
 
   const scrollView = (
     <KeyboardAwareContext.Provider value={keyboardAwareContextValue}>
       <ScrollView
+        showsVerticalScrollIndicator={false}
         {...props}
         contentContainerStyle={[
           contentContainerStyle,

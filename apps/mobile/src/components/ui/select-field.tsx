@@ -1,167 +1,34 @@
 import { useMemo, useState } from "react";
 import {
   Keyboard,
-  Modal,
+  LayoutAnimation,
   Pressable,
-  SafeAreaView,
   ScrollView,
-  Text,
+  StyleSheet,
   TextInput,
+  UIManager,
+  Platform,
   View,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import type { SelectOption } from "../../features/profiles/profile-form-utils";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
+import { AppText } from "../../ui";
 
-function ModalContent<T extends string>({
-  allowClear,
-  clearLabel,
-  filteredOptions,
-  label,
-  onChange,
-  onClose,
-  onSearchChange,
-  searchPlaceholder,
-  searchQuery,
-  searchable,
-  value,
-}: {
-  allowClear: boolean;
-  clearLabel: string;
-  filteredOptions: SelectOption<T>[];
-  label: string;
-  onChange: (value: T | "") => void;
-  onClose: () => void;
-  onSearchChange: (query: string) => void;
-  searchPlaceholder: string;
-  searchQuery: string;
-  searchable: boolean;
-  value: T | "";
-}) {
-  return (
-    <>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: spacing[12],
-        }}
-      >
-        <Text
-          style={{
-            color: colors.textPrimary,
-            fontSize: typography.fontSize[18],
-            fontWeight: typography.fontWeight.heavy,
-          }}
-        >
-          {label}
-        </Text>
-        <Pressable accessibilityRole="button" onPress={onClose}>
-          <Text
-            style={{
-              color: colors.accentStrong,
-              fontWeight: typography.fontWeight.bold,
-            }}
-          >
-            Chiudi
-          </Text>
-        </Pressable>
-      </View>
-
-      {searchable ? (
-        <TextInput
-          autoFocus
-          onChangeText={onSearchChange}
-          placeholder={searchPlaceholder}
-          placeholderTextColor={colors.textMuted}
-          style={{
-            minHeight: 48,
-            paddingHorizontal: spacing[16],
-            paddingVertical: spacing[12],
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: radius[16],
-            backgroundColor: colors.background,
-            color: colors.textPrimary,
-            fontSize: typography.fontSize[16],
-          }}
-          value={searchQuery}
-        />
-      ) : null}
-
-      {allowClear ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            onChange("");
-            onClose();
-          }}
-          style={{
-            borderRadius: radius[16],
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.surfaceMuted,
-            paddingHorizontal: spacing[14],
-            paddingVertical: spacing[12],
-          }}
-        >
-          <Text style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}>
-            {clearLabel}
-          </Text>
-        </Pressable>
-      ) : null}
-
-      <ScrollView contentContainerStyle={{ gap: spacing[8] }} keyboardShouldPersistTaps="handled">
-        {filteredOptions.map((option) => {
-          const isSelected = option.value === value;
-          const isDisabled = option.disabled === true;
-
-          return (
-            <Pressable
-              key={option.value}
-              accessibilityRole="button"
-              disabled={isDisabled}
-              onPress={() => {
-                onChange(option.value);
-                onClose();
-              }}
-              style={{
-                borderRadius: radius[16],
-                borderWidth: 1,
-                borderColor: isSelected ? colors.accentStrong : colors.border,
-                backgroundColor: isDisabled
-                  ? colors.surfaceMuted
-                  : isSelected
-                    ? colors.accentSoft
-                    : colors.background,
-                paddingHorizontal: spacing[14],
-                paddingVertical: spacing[12],
-                opacity: isDisabled ? 0.4 : 1,
-              }}
-            >
-              <Text
-                style={{
-                  color: isDisabled ? colors.textMuted : colors.textPrimary,
-                  fontWeight: isSelected
-                    ? typography.fontWeight.heavy
-                    : typography.fontWeight.regular,
-                }}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </>
-  );
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+const MAX_DROPDOWN_HEIGHT = 264;
 
 export function SelectField<T extends string>({
   allowClear = false,
   clearLabel = "Svuota selezione",
-  fullScreen = false,
+  fullScreen: _fullScreen,
   label,
   onChange,
   options,
@@ -172,6 +39,7 @@ export function SelectField<T extends string>({
 }: {
   allowClear?: boolean;
   clearLabel?: string;
+  /** @deprecated No longer used — dropdown expands inline */
   fullScreen?: boolean;
   label: string;
   onChange: (value: T | "") => void;
@@ -192,122 +60,228 @@ export function SelectField<T extends string>({
   const filteredOptions = useMemo(() => {
     if (!searchable || !searchQuery.trim()) return options;
     const query = searchQuery.trim().toLowerCase();
-    return options.filter((option) => option.label.toLowerCase().includes(query));
+    return options.filter((option) =>
+      option.label.toLowerCase().includes(query),
+    );
   }, [options, searchable, searchQuery]);
 
-  function handleOpen() {
+  function toggle() {
     Keyboard.dismiss();
-    setSearchQuery("");
-    setIsOpen(true);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (isOpen) {
+      setSearchQuery("");
+      setIsOpen(false);
+    } else {
+      setSearchQuery("");
+      setIsOpen(true);
+    }
   }
 
-  function handleClose() {
+  function handleSelect(selected: T | "") {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    onChange(selected);
     setSearchQuery("");
     setIsOpen(false);
   }
 
   return (
-    <View style={{ gap: spacing[8] }}>
-      <Text
-        style={{ color: colors.textPrimary, fontWeight: typography.fontWeight.bold }}
-      >
+    <View style={styles.container}>
+      <AppText variant="caption" style={styles.label}>
         {label}
-      </Text>
+      </AppText>
+
       <Pressable
         accessibilityRole="button"
-        onPress={handleOpen}
-        style={{
-          minHeight: 52,
-          justifyContent: "center",
-          paddingHorizontal: spacing[16],
-          paddingVertical: spacing[14],
-          borderWidth: 1,
-          borderColor: isOpen ? colors.accentStrong : colors.border,
-          borderRadius: radius[16],
-          backgroundColor: selectedLabel ? colors.accentSoft : colors.background,
-        }}
+        onPress={toggle}
+        style={[styles.trigger, isOpen && styles.triggerOpen]}
       >
-        <Text
-          style={{
-            color: selectedLabel ? colors.textPrimary : colors.textMuted,
-            fontWeight: selectedLabel
-              ? typography.fontWeight.bold
-              : typography.fontWeight.regular,
-          }}
+        <AppText
+          variant="bodySm"
+          style={[
+            styles.triggerText,
+            !selectedLabel && styles.triggerPlaceholder,
+          ]}
         >
           {selectedLabel ?? placeholder}
-        </Text>
+        </AppText>
+        <Ionicons
+          color={colors.textMuted}
+          name={isOpen ? "chevron-up" : "chevron-down"}
+          size={20}
+        />
       </Pressable>
 
-      <Modal
-        animationType="slide"
-        onRequestClose={handleClose}
-        transparent={!fullScreen}
-        visible={isOpen}
-      >
-        {fullScreen ? (
-          <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-            <View
-              style={{
-                flex: 1,
-                gap: spacing[12],
-                padding: spacing[18],
-              }}
-            >
-              <ModalContent
-                allowClear={allowClear}
-                clearLabel={clearLabel}
-                filteredOptions={filteredOptions}
-                label={label}
-                onChange={onChange}
-                onClose={handleClose}
-                onSearchChange={setSearchQuery}
-                searchPlaceholder={searchPlaceholder}
-                searchQuery={searchQuery}
-                searchable={searchable}
-                value={value}
-              />
-            </View>
-          </SafeAreaView>
-        ) : (
-          <Pressable
-            onPress={handleClose}
-            style={{
-              flex: 1,
-              justifyContent: "flex-end",
-              backgroundColor: "rgba(15, 23, 42, 0.45)",
-              padding: spacing[16],
-            }}
-          >
+      {isOpen ? (
+        <View style={styles.dropdownCard}>
+          {searchable ? (
+            <TextInput
+              autoFocus
+              onChangeText={setSearchQuery}
+              placeholder={searchPlaceholder}
+              placeholderTextColor={colors.textMuted}
+              style={styles.searchInput}
+              value={searchQuery}
+            />
+          ) : null}
+
+          {allowClear ? (
             <Pressable
-              onPress={(event) => event.stopPropagation()}
-              style={{
-                maxHeight: "75%",
-                gap: spacing[12],
-                borderRadius: radius[24],
-                backgroundColor: colors.surface,
-                padding: spacing[18],
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
+              accessibilityRole="button"
+              onPress={() => handleSelect("")}
+              style={styles.clearButton}
             >
-              <ModalContent
-                allowClear={allowClear}
-                clearLabel={clearLabel}
-                filteredOptions={filteredOptions}
-                label={label}
-                onChange={onChange}
-                onClose={handleClose}
-                onSearchChange={setSearchQuery}
-                searchPlaceholder={searchPlaceholder}
-                searchQuery={searchQuery}
-                searchable={searchable}
-                value={value}
-              />
+              <AppText variant="bodySm" color="muted">
+                {clearLabel}
+              </AppText>
             </Pressable>
-          </Pressable>
-        )}
-      </Modal>
+          ) : null}
+
+          <ScrollView
+            contentContainerStyle={styles.optionsList}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            style={styles.optionsScroll}
+          >
+            {filteredOptions.map((option) => {
+              const isSelected = option.value === value;
+              const isDisabled = option.disabled === true;
+
+              return (
+                <Pressable
+                  key={option.value}
+                  accessibilityRole="button"
+                  disabled={isDisabled}
+                  onPress={() => handleSelect(option.value)}
+                  style={[
+                    styles.option,
+                    isSelected && styles.optionActive,
+                    isDisabled && styles.optionDisabled,
+                  ]}
+                >
+                  <AppText
+                    variant="bodySm"
+                    style={[
+                      styles.optionText,
+                      isSelected && styles.optionTextActive,
+                      isDisabled && styles.optionTextDisabled,
+                    ]}
+                  >
+                    {option.label}
+                  </AppText>
+                  {isSelected ? (
+                    <Ionicons
+                      color={colors.accentStrong}
+                      name="checkmark"
+                      size={18}
+                    />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    gap: spacing[6],
+  },
+  label: {
+    color: colors.textPrimary,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  trigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 52,
+    paddingHorizontal: spacing[16],
+    gap: spacing[12],
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius[8],
+    backgroundColor: colors.surfaceMuted,
+  },
+  triggerOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomWidth: 0,
+  },
+  triggerText: {
+    flex: 1,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textPrimary,
+  },
+  triggerPlaceholder: {
+    color: colors.textMuted,
+  },
+  dropdownCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: radius[8],
+    borderBottomRightRadius: radius[8],
+    padding: spacing[8],
+    shadowColor: "rgba(11, 43, 64, 0.08)",
+    shadowOpacity: 1,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+  },
+  searchInput: {
+    minHeight: 44,
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[10],
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius[6],
+    backgroundColor: colors.surfaceMuted,
+    color: colors.textPrimary,
+    fontSize: typography.fontSize[15],
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing[4],
+  },
+  clearButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: spacing[12],
+    borderRadius: radius[6],
+    marginBottom: spacing[4],
+  },
+  optionsScroll: {
+    maxHeight: MAX_DROPDOWN_HEIGHT,
+  },
+  optionsList: {
+    gap: spacing[4],
+  },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing[12],
+    minHeight: 44,
+    paddingHorizontal: spacing[12],
+    borderRadius: radius[8],
+  },
+  optionActive: {
+    backgroundColor: colors.accentSoft,
+  },
+  optionDisabled: {
+    opacity: 0.4,
+  },
+  optionText: {
+    flex: 1,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textPrimary,
+  },
+  optionTextActive: {
+    color: colors.accentStrong,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  optionTextDisabled: {
+    color: colors.textMuted,
+  },
+});

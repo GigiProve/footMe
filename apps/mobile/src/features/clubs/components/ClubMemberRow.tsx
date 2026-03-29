@@ -2,8 +2,8 @@ import { Alert, StyleSheet, View } from "react-native";
 
 import { useRouter } from "expo-router";
 
-import { colors, spacing } from "../../../theme/tokens";
-import { AppText, Avatar, Badge, Button, ListItem } from "../../../ui";
+import { spacing } from "../../../theme/tokens";
+import { Avatar, Badge, Button, ListItem } from "../../../ui";
 import type { ClubMember } from "../membership-types";
 
 type ClubMemberRowProps = {
@@ -19,12 +19,16 @@ const roleLabelMap: Record<string, string> = {
   staff: "Staff",
 };
 
-export function ClubMemberRow({ member, onRemove, onReject }: ClubMemberRowProps) {
+export function ClubMemberRow({
+  member,
+  onRemove,
+  onReject,
+}: ClubMemberRowProps) {
   const router = useRouter();
   const isLinked = member.profile_id !== null;
   const displayName = isLinked
-    ? member.full_name ?? "Profilo collegato"
-    : member.manual_name ?? "Senza nome";
+    ? (member.full_name ?? "Profilo collegato")
+    : (member.manual_name ?? "Senza nome");
   const roleLabel = roleLabelMap[member.member_role] ?? member.member_role;
   const subtitle = member.staff_title
     ? `${roleLabel} · ${member.staff_title}`
@@ -60,19 +64,11 @@ export function ClubMemberRow({ member, onRemove, onReject }: ClubMemberRowProps
 
   return (
     <ListItem
-      left={
-        <Avatar
-          name={displayName}
-          size="md"
-          uri={member.avatar_url}
-        />
-      }
+      left={<Avatar name={displayName} size="md" uri={member.avatar_url} />}
       onPress={isLinked ? handlePress : undefined}
       right={
         <View style={styles.rightSlot}>
-          {!isLinked ? (
-            <Badge label="Non collegato" variant="default" />
-          ) : null}
+          {!isLinked ? <Badge label="Non collegato" variant="default" /> : null}
           {member.added_by === "self_request" ? (
             <Badge label="Auto" variant="accent" />
           ) : null}

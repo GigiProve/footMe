@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   },
   sheet: {
     gap: spacing[18],
-    borderRadius: radius[24],
+    borderRadius: radius[12],
     backgroundColor: colors.surface,
     padding: spacing[20],
     borderWidth: 1,
