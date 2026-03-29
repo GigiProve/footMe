@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet } from "react-native";
 
 import { spacing } from "../../../theme/tokens";
 import { AppText, Card } from "../../../ui";

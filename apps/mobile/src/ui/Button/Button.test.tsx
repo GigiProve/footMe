@@ -17,7 +17,9 @@ function renderButton(element: React.ReactElement) {
 
 describe("Button", () => {
   it("uses the primary palette by default", () => {
-    const tree = renderButton(<Button label="Salva" onPress={() => undefined} />);
+    const tree = renderButton(
+      <Button label="Salva" onPress={() => undefined} />,
+    );
     const pressable = tree.root.findByProps({ accessibilityRole: "button" });
     const styles = pressable.props.style({ focused: false, pressed: false });
     const label = tree.root.findByProps({ children: "Salva" });
@@ -31,7 +33,9 @@ describe("Button", () => {
       ]),
     );
     expect(label.props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ color: colors.inkInvert })]),
+      expect.arrayContaining([
+        expect.objectContaining({ color: colors.inkInvert }),
+      ]),
     );
   });
 
@@ -51,8 +55,8 @@ describe("Button", () => {
     expect(styles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          backgroundColor: colors.accent,
-          borderColor: colors.accent,
+          backgroundColor: colors.accentSoft,
+          borderColor: "rgba(10, 102, 194, 0.2)",
         }),
       ]),
     );
@@ -72,7 +76,9 @@ describe("Button", () => {
 
     expect(pressable.props.disabled).toBe(true);
     expect(pressable.props.accessibilityState.busy).toBe(true);
-    expect(tree.root.findByProps({ testID: "apply-action-spinner" })).toBeTruthy();
+    expect(
+      tree.root.findByProps({ testID: "apply-action-spinner" }),
+    ).toBeTruthy();
   });
 
   it("supports destructive secondary buttons without promoting them to filled danger", () => {
@@ -97,7 +103,9 @@ describe("Button", () => {
       ]),
     );
     expect(label.props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ color: colors.dangerStrong })]),
+      expect.arrayContaining([
+        expect.objectContaining({ color: colors.dangerStrong }),
+      ]),
     );
   });
 });

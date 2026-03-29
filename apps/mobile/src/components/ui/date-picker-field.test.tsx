@@ -1,14 +1,13 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
+import { DatePickerField } from "./date-picker-field";
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   __esModule: true,
   default: (props: Record<string, unknown>) =>
     React.createElement("mock-ionicons", props),
 }));
-
-import { DatePickerField } from "./date-picker-field";
 
 function renderDatePickerField(element: React.ReactElement) {
   let tree!: TestRenderer.ReactTestRenderer;
@@ -23,7 +22,11 @@ function renderDatePickerField(element: React.ReactElement) {
 describe("DatePickerField", () => {
   it("shows the placeholder until a date is selected", () => {
     const tree = renderDatePickerField(
-      <DatePickerField label="Data di nascita" onChange={() => undefined} value="" />,
+      <DatePickerField
+        label="Data di nascita"
+        onChange={() => undefined}
+        value=""
+      />,
     );
     const root = tree.root;
 
@@ -54,7 +57,11 @@ describe("DatePickerField", () => {
   it("closes the calendar and fires onChange when a day is tapped", () => {
     const onChange = vi.fn();
     const tree = renderDatePickerField(
-      <DatePickerField label="Data di nascita" onChange={onChange} value="2001-03-11" />,
+      <DatePickerField
+        label="Data di nascita"
+        onChange={onChange}
+        value="2001-03-11"
+      />,
     );
     const root = tree.root;
 

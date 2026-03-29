@@ -12,8 +12,6 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { AvailabilityRegionsSelector } from "../../src/components/ui/availability-regions-selector";
-import { InterestCategoriesSelector } from "../../src/components/ui/interest-categories-selector";
 import { DatePickerField } from "../../src/components/ui/date-picker-field";
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { MediaPickerField } from "../../src/components/ui/media-picker-field";
@@ -21,7 +19,6 @@ import { NationalityAutocompleteInput } from "../../src/components/ui/nationalit
 import { PhoneInputWithCountryCode } from "../../src/components/ui/phone-input-with-country-code";
 import { ResidenceCityInput } from "../../src/components/ui/residence-city-input";
 import { SelectField } from "../../src/components/ui/select-field";
-import { WheelPicker } from "../../src/components/ui/wheel-picker";
 import { WheelPickerField } from "../../src/components/ui/wheel-picker-field";
 import { useSession } from "../../src/features/auth/use-session";
 import {
@@ -258,26 +255,6 @@ function GenderCard({
   );
 }
 
-function FootChip({
-  active,
-  label,
-  onPress,
-}: {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Button
-      label={label}
-      onPress={onPress}
-      selected={active}
-      size="sm"
-      variant="chipAction"
-    />
-  );
-}
-
 function ValidationMessage({
   children,
   tone = "danger",
@@ -431,7 +408,6 @@ export default function OnboardingProfileScreen() {
     firstName,
     gamePhilosophy,
     gender,
-    hasCreatedProfile,
     heightCm,
     highlightVideoUrl,
     isOpenToTransfer,
@@ -541,22 +517,6 @@ export default function OnboardingProfileScreen() {
       clearValidationErrors(["clubCity", "clubRegion"]);
     },
     [clearValidationErrors, patchForm],
-  );
-
-  const handleClubCountrySelect = useCallback(
-    (value: string) => {
-      const country = getCountryByCode(value);
-
-      patchForm({
-        clubCountry: value,
-        clubPhoneCountryCode:
-          !clubPhone.trim() && country
-            ? country.phoneCountryCode
-            : clubPhoneCountryCode,
-      });
-      clearValidationErrors(["clubCountry"]);
-    },
-    [clearValidationErrors, clubPhone, clubPhoneCountryCode, patchForm],
   );
 
   const handleResidenceChange = useCallback(
@@ -1194,14 +1154,6 @@ export default function OnboardingProfileScreen() {
   function goToCompletion(previousStep: OnboardingStep) {
     patchForm({ lastCompletedStep: previousStep });
     navigateToStep("complete");
-  }
-
-  function appendUploadedMedia(
-    field: "clubGalleryItems" | "playerMediaItems",
-    items: UploadedMediaItem[],
-  ) {
-    const currentItems = form[field];
-    updateValue(field, [...currentItems, ...items]);
   }
 
   // -----------------------------------------------------------------------
@@ -2270,9 +2222,7 @@ export default function OnboardingProfileScreen() {
               <Input
                 label="Descrizione società"
                 multiline
-                onChangeText={(value) =>
-                  updateValue("clubDescription", value)
-                }
+                onChangeText={(value) => updateValue("clubDescription", value)}
                 placeholder="Racconta la storia e i valori del club..."
                 value={clubDescription}
               />
@@ -2287,15 +2237,11 @@ export default function OnboardingProfileScreen() {
               <Input
                 keyboardType="number-pad"
                 label="Numero totale tesserati"
-                onChangeText={(value) =>
-                  updateValue("clubTotalMembers", value)
-                }
+                onChangeText={(value) => updateValue("clubTotalMembers", value)}
                 placeholder="Es. 250"
                 value={clubTotalMembers}
               />
-            </OnboardingSectionCard>
 
-            <OnboardingSectionCard>
               <Input
                 autoCapitalize="none"
                 keyboardType="url"
@@ -2324,7 +2270,9 @@ export default function OnboardingProfileScreen() {
 
             <Button
               disabled={isBusy}
-              label={isBusy ? "Creazione in corso..." : "Completa registrazione"}
+              label={
+                isBusy ? "Creazione in corso..." : "Completa registrazione"
+              }
               onPress={handleSubmitClubProfile}
               variant="primary"
             />

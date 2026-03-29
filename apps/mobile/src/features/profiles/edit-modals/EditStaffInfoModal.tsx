@@ -15,14 +15,6 @@ import { EditModalShell } from "./EditModalShell";
 import { AppText, Button } from "../../../ui";
 import { colors, spacing } from "../../../theme/tokens";
 
-type StaffFormState = {
-  certifications: string;
-  experienceSummary: string;
-  openToWork: boolean;
-  preferredRegions: string;
-  specialization: StaffSpecialization;
-};
-
 type EditStaffInfoModalProps = {
   completeProfile: CompleteProfessionalProfile;
   onClose: () => void;
@@ -38,7 +30,8 @@ export function EditStaffInfoModal({
   userId,
   visible,
 }: EditStaffInfoModalProps) {
-  const [specialization, setSpecialization] = useState<StaffSpecialization>("fitness_coach");
+  const [specialization, setSpecialization] =
+    useState<StaffSpecialization>("fitness_coach");
   const [experienceSummary, setExperienceSummary] = useState("");
   const [certifications, setCertifications] = useState("");
   const [preferredRegions, setPreferredRegions] = useState("");
@@ -71,12 +64,17 @@ export function EditStaffInfoModal({
       };
 
       const payload = buildFullUpdatePayload(completeProfile, mergedState);
-      payload.profile.birth_date = validateBirthDateInput(baseState.birthDate).isoValue;
+      payload.profile.birth_date = validateBirthDateInput(
+        baseState.birthDate,
+      ).isoValue;
 
       await updateCompleteProfessionalProfile(payload);
       onSaved();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Errore durante il salvataggio.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore durante il salvataggio.";
       Alert.alert("Errore", message);
     } finally {
       setIsSaving(false);
@@ -100,7 +98,9 @@ export function EditStaffInfoModal({
               key={option.value}
               label={option.label}
               onPress={() => setSpecialization(option.value)}
-              variant={specialization === option.value ? "primary" : "chipAction"}
+              variant={
+                specialization === option.value ? "primary" : "chipAction"
+              }
             />
           ))}
         </View>

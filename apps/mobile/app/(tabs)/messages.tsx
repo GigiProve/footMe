@@ -16,7 +16,6 @@ import {
   type NetworkOverviewItem,
 } from "../../src/features/networking/networking-service";
 import {
-  formatLocation,
   formatPosition,
   formatRole,
 } from "../../src/features/profiles/profile-display-helpers";
@@ -162,14 +161,6 @@ export default function MessagesScreen() {
         {summaries.length > 0 ? (
           <View style={styles.conversationList}>
             {summaries.map((summary) => {
-              const roleLabel = formatRole(summary.other_role);
-              const posLabel =
-                summary.other_role === "player"
-                  ? formatPosition(summary.other_primary_position)
-                  : "";
-              const subtitle = [roleLabel, posLabel]
-                .filter(Boolean)
-                .join(" · ");
               const lastMsg =
                 summary.last_message_body ?? "Apri la chat per iniziare.";
               const timeLabel = summary.last_message_sent_at

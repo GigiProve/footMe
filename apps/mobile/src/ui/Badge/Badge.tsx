@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native";
 
-import { colors, radius, spacing, typography } from "../../styles";
+import { colors, radius, typography } from "../../styles";
 import { AppText } from "../AppText/AppText";
 
 type BadgeVariant =

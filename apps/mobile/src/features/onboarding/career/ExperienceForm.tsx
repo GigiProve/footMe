@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { SelectField } from "../../../components/ui/select-field";
 import { WheelPicker } from "../../../components/ui/wheel-picker";
 import { colors, radius, spacing } from "../../../theme/tokens";
-import { AppText, Button, Input, Toggle } from "../../../ui";
+import { AppText, Button, Toggle } from "../../../ui";
 import type { TeamAutocompleteOption } from "../../profiles/player-sports";
 import { TeamAutocompleteInput } from "../../profiles/player-sports-section";
 import type {

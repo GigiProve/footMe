@@ -4,6 +4,7 @@ import { updateCompleteProfessionalProfile } from "./profile-service";
 
 const mocks = vi.hoisted(() => {
   const profileUpdateEqMock = vi.fn();
+  const profileUpdateMaybeSingleMock = vi.fn();
   const profileContactsUpsertMock = vi.fn();
   const privateContactsUpsertMock = vi.fn();
   const rpcMock = vi.fn();
@@ -12,12 +13,21 @@ const mocks = vi.hoisted(() => {
     privateContactsUpsertMock,
     profileContactsUpsertMock,
     profileUpdateEqMock,
+    profileUpdateMaybeSingleMock,
     rpcMock,
     fromMock: vi.fn((table: string) => {
       if (table === "profiles") {
         return {
           update: vi.fn(() => ({
-            eq: profileUpdateEqMock,
+            eq: vi.fn((...args: unknown[]) => {
+              profileUpdateEqMock(...args);
+
+              return {
+                select: vi.fn(() => ({
+                  maybeSingle: profileUpdateMaybeSingleMock,
+                })),
+              };
+            }),
           })),
         };
       }
@@ -95,11 +105,15 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
   beforeEach(() => {
     mocks.fromMock.mockClear();
     mocks.profileUpdateEqMock.mockReset();
+    mocks.profileUpdateMaybeSingleMock.mockReset();
     mocks.profileContactsUpsertMock.mockReset();
     mocks.privateContactsUpsertMock.mockReset();
     mocks.rpcMock.mockReset();
 
-    mocks.profileUpdateEqMock.mockResolvedValue({ error: null });
+    mocks.profileUpdateMaybeSingleMock.mockResolvedValue({
+      data: { id: "profile-1" },
+      error: null,
+    });
     mocks.profileContactsUpsertMock.mockResolvedValue({ error: null });
     mocks.privateContactsUpsertMock.mockResolvedValue({ error: null });
     mocks.rpcMock.mockResolvedValue({ error: null });

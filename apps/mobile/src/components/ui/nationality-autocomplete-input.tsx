@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type View as ViewType, Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  type View as ViewType,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 
 import {
   getCountryByCode,
   searchCountries,
 } from "../../features/profiles/profile-form-utils";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
+import { colors, radius, spacing } from "../../theme/tokens";
 import { AppText, Input } from "../../ui";
 import { useKeyboardAwareScroll } from "./keyboard-aware-scroll-view";
 
@@ -25,13 +32,17 @@ export function NationalityAutocompleteInput({
   value,
 }: NationalityAutocompleteInputProps) {
   const selectedCountry = useMemo(() => getCountryByCode(value), [value]);
-  const [query, setQuery] = useState(selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "");
+  const [query, setQuery] = useState(
+    selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "",
+  );
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<ViewType>(null);
   const keyboardAware = useKeyboardAwareScroll();
 
   useEffect(() => {
-    setQuery(selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "");
+    setQuery(
+      selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "",
+    );
   }, [selectedCountry]);
 
   const suggestions = useMemo(() => {
@@ -57,7 +68,11 @@ export function NationalityAutocompleteInput({
         autoCorrect={false}
         label={label}
         onBlur={() => {
-          setQuery(selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "");
+          setQuery(
+            selectedCountry
+              ? `${selectedCountry.flag} ${selectedCountry.name}`
+              : "",
+          );
         }}
         onChangeText={(nextValue) => {
           setQuery(nextValue);
@@ -98,8 +113,12 @@ export function NationalityAutocompleteInput({
                 ]}
                 testID={`nationality-autocomplete-suggestion-${suggestion.code}`}
               >
-                <AppText variant="titleSm">{suggestion.flag} {suggestion.name}</AppText>
-                <AppText variant="bodySm" color="secondary">{suggestion.code}</AppText>
+                <AppText variant="titleSm">
+                  {suggestion.flag} {suggestion.name}
+                </AppText>
+                <AppText variant="bodySm" color="secondary">
+                  {suggestion.code}
+                </AppText>
               </Pressable>
             ))}
           </ScrollView>

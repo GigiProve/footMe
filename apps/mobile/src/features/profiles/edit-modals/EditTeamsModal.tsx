@@ -2,8 +2,11 @@ import { useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 
 import { SelectField } from "../../../components/ui/select-field";
-import { SENIOR_CATEGORY_OPTIONS, YOUTH_CATEGORY_OPTIONS } from "../player-sports";
-import { colors, spacing } from "../../../theme/tokens";
+import {
+  SENIOR_CATEGORY_OPTIONS,
+  YOUTH_CATEGORY_OPTIONS,
+} from "../player-sports";
+import { spacing } from "../../../theme/tokens";
 import { AppText, Button, SectionCard } from "../../../ui";
 import {
   deleteClubTeam,
@@ -56,7 +59,9 @@ export function EditTeamsModal({
 
   function handleYouthCategoryChange(index: number, value: string) {
     setYouthDrafts((prev) =>
-      prev.map((draft, i) => (i === index ? { ...draft, category: value } : draft)),
+      prev.map((draft, i) =>
+        i === index ? { ...draft, category: value } : draft,
+      ),
     );
   }
 
@@ -68,7 +73,10 @@ export function EditTeamsModal({
 
     const invalidYouth = youthDrafts.some((d) => !d.category.trim());
     if (invalidYouth) {
-      Alert.alert("Errore", "Seleziona la categoria per ogni squadra giovanile");
+      Alert.alert(
+        "Errore",
+        "Seleziona la categoria per ogni squadra giovanile",
+      );
       return;
     }
 
@@ -174,7 +182,10 @@ export function EditTeamsModal({
           </AppText>
         ) : (
           youthDrafts.map((draft, index) => (
-            <View key={draft.existingId ?? `new-${index}`} style={styles.youthRow}>
+            <View
+              key={draft.existingId ?? `new-${index}`}
+              style={styles.youthRow}
+            >
               <View style={styles.youthFieldContainer}>
                 <SelectField
                   label={`Squadra giovanile ${index + 1}`}

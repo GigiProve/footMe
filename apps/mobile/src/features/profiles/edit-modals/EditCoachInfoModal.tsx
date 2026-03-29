@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 
 import { MediaPickerField } from "../../../components/ui/media-picker-field";
-import { colors, spacing } from "../../../theme/tokens";
+import { spacing } from "../../../theme/tokens";
 import { AppText, Button } from "../../../ui";
 import {
   pickAndUploadMedia,
@@ -10,7 +10,10 @@ import {
   removeMediaFromStorage,
   type UploadedMediaItem,
 } from "../media-upload-service";
-import { buildFullUpdatePayload, buildInitialState } from "../profile-edit-helpers";
+import {
+  buildFullUpdatePayload,
+  buildInitialState,
+} from "../profile-edit-helpers";
 import { validateBirthDateInput } from "../profile-form-utils";
 import { ProfileField as Field } from "../profile-screen-components";
 import type { CompleteProfessionalProfile } from "../profile-service";
@@ -154,7 +157,9 @@ export function EditCoachInfoModal({
       };
 
       const payload = buildFullUpdatePayload(completeProfile, mergedState);
-      payload.profile.birth_date = validateBirthDateInput(baseState.birthDate).isoValue;
+      payload.profile.birth_date = validateBirthDateInput(
+        baseState.birthDate,
+      ).isoValue;
 
       await updateCompleteProfessionalProfile(payload);
       onSaved();
@@ -232,9 +237,7 @@ export function EditCoachInfoModal({
       />
 
       <View style={styles.booleanField}>
-        <AppText variant="titleSm">
-          Disponibile per nuove panchine
-        </AppText>
+        <AppText variant="titleSm">Disponibile per nuove panchine</AppText>
         <View style={styles.booleanRow}>
           <Button
             label="Si"

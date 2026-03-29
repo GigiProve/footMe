@@ -30,7 +30,9 @@ export const TextInput = Object.assign(createRefComponent("TextInput"), {
     currentlyFocusedInput: () => null,
   },
 });
-export const TouchableWithoutFeedback = createComponent("TouchableWithoutFeedback");
+export const TouchableWithoutFeedback = createComponent(
+  "TouchableWithoutFeedback",
+);
 export const View = createComponent("View");
 export const Alert = {
   alert: () => undefined,
@@ -69,10 +71,87 @@ export class AnimatedValue {
   setValue(nextValue: number) {
     this.value = nextValue;
   }
+
+  interpolate({
+    inputRange,
+    outputRange,
+  }: {
+    inputRange: number[];
+    outputRange: number[];
+  }) {
+    return {
+      __getValue: () => {
+        const currentValue = this.value;
+        const firstInput = inputRange[0];
+        const lastInput = inputRange[inputRange.length - 1];
+
+        if (currentValue <= firstInput) {
+          return outputRange[0];
+        }
+
+        if (currentValue >= lastInput) {
+          return outputRange[outputRange.length - 1];
+        }
+
+        for (let index = 0; index < inputRange.length - 1; index += 1) {
+          const startInput = inputRange[index];
+          const endInput = inputRange[index + 1];
+
+          if (currentValue < startInput || currentValue > endInput) {
+            continue;
+          }
+
+          const startOutput = outputRange[index];
+          const endOutput = outputRange[index + 1];
+          const progress =
+            (currentValue - startInput) / (endInput - startInput);
+
+          return startOutput + (endOutput - startOutput) * progress;
+        }
+
+        return outputRange[outputRange.length - 1];
+      },
+    };
+  }
 }
+
+function resolveAnimatedStyleValue(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map((entry) => resolveAnimatedStyleValue(entry));
+  }
+
+  if (value && typeof value === "object") {
+    if (typeof value.__getValue === "function") {
+      return value.__getValue();
+    }
+
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        resolveAnimatedStyleValue(entry),
+      ]),
+    );
+  }
+
+  return value;
+}
+
 export const Animated = {
   Value: AnimatedValue,
+  ScrollView: createRefComponent("AnimatedScrollView"),
   View: createComponent("AnimatedView"),
+  event: (
+    mappings: { nativeEvent?: { contentOffset?: { y?: AnimatedValue } } }[],
+  ) => {
+    return (event: { nativeEvent?: { contentOffset?: { y?: number } } }) => {
+      const animatedValue = mappings[0]?.nativeEvent?.contentOffset?.y;
+      const nextY = event.nativeEvent?.contentOffset?.y;
+
+      if (animatedValue instanceof AnimatedValue && typeof nextY === "number") {
+        animatedValue.setValue(nextY);
+      }
+    };
+  },
   timing: (value: AnimatedValue, config: { toValue: number }) => ({
     start: (callback?: (result: { finished: boolean }) => void) => {
       value.setValue(config.toValue);
@@ -89,8 +168,14 @@ export const StyleSheet = {
   create: <T,>(styles: T) => styles,
   flatten: (styles: any) =>
     Array.isArray(styles)
-      ? styles.reduce((accumulator, style) => ({ ...accumulator, ...style }), {})
-      : styles,
+      ? styles.reduce(
+          (accumulator, style) => ({
+            ...accumulator,
+            ...resolveAnimatedStyleValue(style),
+          }),
+          {},
+        )
+      : resolveAnimatedStyleValue(styles),
   absoluteFillObject: {
     bottom: 0,
     left: 0,

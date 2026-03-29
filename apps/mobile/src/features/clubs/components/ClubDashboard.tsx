@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, Modal, SafeAreaView, StyleSheet, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  Modal,
+  SafeAreaView,
+  StyleSheet,
+  View,
+} from "react-native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { Screen } from "../../../components/ui/screen";
 import { KeyboardAwareForm } from "../../../components/ui/keyboard-aware-form";
 import { useSession } from "../../auth/use-session";
-import { getHomeDashboard, type HomeDashboardData } from "../../home/home-dashboard-service";
-import { colors, radius, spacing } from "../../../theme/tokens";
+import {
+  getHomeDashboard,
+  type HomeDashboardData,
+} from "../../home/home-dashboard-service";
+import { colors, spacing } from "../../../theme/tokens";
 import {
   AppText,
   Badge,
@@ -20,10 +30,22 @@ import {
   SectionCard,
   StatCard,
 } from "../../../ui";
-import { fetchClubMembers, removeMember, rejectMember } from "../membership-service";
+import {
+  fetchClubMembers,
+  removeMember,
+  rejectMember,
+} from "../membership-service";
 import { fetchClubTeams, type ClubTeam } from "../team-service";
-import { fetchNotifications, getUnreadCount, markNotificationRead } from "../notification-service";
-import type { AppNotification, ClubMember, MemberRole } from "../membership-types";
+import {
+  fetchNotifications,
+  getUnreadCount,
+  markNotificationRead,
+} from "../notification-service";
+import type {
+  AppNotification,
+  ClubMember,
+  MemberRole,
+} from "../membership-types";
 import { EditTeamsModal } from "../../profiles/edit-modals/EditTeamsModal";
 import { AddMemberModal } from "./AddMemberModal";
 import { ClubMemberRow } from "./ClubMemberRow";
@@ -68,7 +90,8 @@ export function ClubDashboard() {
       const data = await getHomeDashboard(userId, userEmail);
       setDashboard(data);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Errore nel caricamento";
+      const message =
+        error instanceof Error ? error.message : "Errore nel caricamento";
       Alert.alert("Errore dashboard", message);
     } finally {
       setIsLoadingDashboard(false);
@@ -82,7 +105,8 @@ export function ClubDashboard() {
       const data = await fetchClubMembers(clubId);
       setMembers(data);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Errore nel caricamento rosa";
+      const message =
+        error instanceof Error ? error.message : "Errore nel caricamento rosa";
       Alert.alert("Errore rosa", message);
     } finally {
       setIsLoadingMembers(false);
@@ -135,21 +159,25 @@ export function ClubDashboard() {
   }
 
   async function handleRejectMember(memberId: string) {
-    Alert.alert("Conferma", "Vuoi rifiutare il collegamento di questo membro?", [
-      { style: "cancel", text: "Annulla" },
-      {
-        onPress: async () => {
-          try {
-            await rejectMember(memberId);
-            await loadMembers();
-          } catch {
-            Alert.alert("Errore", "Impossibile rifiutare il membro");
-          }
+    Alert.alert(
+      "Conferma",
+      "Vuoi rifiutare il collegamento di questo membro?",
+      [
+        { style: "cancel", text: "Annulla" },
+        {
+          onPress: async () => {
+            try {
+              await rejectMember(memberId);
+              await loadMembers();
+            } catch {
+              Alert.alert("Errore", "Impossibile rifiutare il membro");
+            }
+          },
+          style: "destructive",
+          text: "Rifiuta",
         },
-        style: "destructive",
-        text: "Rifiuta",
-      },
-    ]);
+      ],
+    );
   }
 
   function handleMemberSaved() {
@@ -173,7 +201,9 @@ export function ClubDashboard() {
     try {
       await markNotificationRead(notificationId);
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)),
+        prev.map((n) =>
+          n.id === notificationId ? { ...n, is_read: true } : n,
+        ),
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch {
@@ -190,8 +220,12 @@ export function ClubDashboard() {
         ? activeMembers.filter((m) => m.member_role === "player")
         : activeMembers.filter((m) => m.member_role !== "player");
 
-  const playersCount = activeMembers.filter((m) => m.member_role === "player").length;
-  const staffCount = activeMembers.filter((m) => m.member_role !== "player").length;
+  const playersCount = activeMembers.filter(
+    (m) => m.member_role === "player",
+  ).length;
+  const staffCount = activeMembers.filter(
+    (m) => m.member_role !== "player",
+  ).length;
 
   const toneMap: Record<string, "accent" | "hero" | "muted"> = {
     accent: "accent",
@@ -228,7 +262,11 @@ export function ClubDashboard() {
         </View>
 
         <View style={styles.statRow}>
-          <StatCard label="Giocatori" tone="accent" value={String(playersCount)} />
+          <StatCard
+            label="Giocatori"
+            tone="accent"
+            value={String(playersCount)}
+          />
           <StatCard label="Staff" tone="hero" value={String(staffCount)} />
         </View>
 
@@ -250,15 +288,9 @@ export function ClubDashboard() {
                   <ListItem
                     key={team.id}
                     left={
-                      <Ionicons
-                        color={colors.accent}
-                        name="shield"
-                        size={22}
-                      />
+                      <Ionicons color={colors.accent} name="shield" size={22} />
                     }
-                    right={
-                      <Badge label={team.category} variant="accent" />
-                    }
+                    right={<Badge label={team.category} variant="accent" />}
                     subtitle="Prima squadra"
                     title={team.name}
                   />
@@ -280,9 +312,7 @@ export function ClubDashboard() {
                         size={20}
                       />
                     }
-                    right={
-                      <Badge label={team.category} variant="default" />
-                    }
+                    right={<Badge label={team.category} variant="default" />}
                     title={team.name}
                   />
                 ))}
@@ -416,7 +446,9 @@ export function ClubDashboard() {
                   left={
                     <Ionicons
                       color={item.is_read ? colors.textMuted : colors.accent}
-                      name={item.is_read ? "notifications-outline" : "notifications"}
+                      name={
+                        item.is_read ? "notifications-outline" : "notifications"
+                      }
                       size={22}
                     />
                   }

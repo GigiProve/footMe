@@ -2,10 +2,9 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { KeyboardAwareScrollView } from "../../components/ui/keyboard-aware-scroll-view";
 import { SelectField } from "../../components/ui/select-field";
-import { colors, radius, spacing } from "../../theme/tokens";
-import { AppText, Button, Card, Input, ModalHeader } from "../../ui";
+import { colors, spacing } from "../../theme/tokens";
+import { AppText, Button, Card, Input } from "../../ui";
 import { EditModalShell } from "./edit-modals/EditModalShell";
 import { PLAYER_CATEGORY_OPTIONS } from "./player-sports";
 import type { ClubSeasonEntryRecord } from "./profile-service";
@@ -91,7 +90,13 @@ function ClubSeasonCard({
             <Button
               accessibilityLabel="Modifica stagione"
               label=""
-              leftIcon={<Ionicons color={colors.textSecondary} name="pencil" size={16} />}
+              leftIcon={
+                <Ionicons
+                  color={colors.textSecondary}
+                  name="pencil"
+                  size={16}
+                />
+              }
               onPress={onEdit}
               size="sm"
               variant="icon"
@@ -100,7 +105,13 @@ function ClubSeasonCard({
               accessibilityLabel="Elimina stagione"
               destructive
               label=""
-              leftIcon={<Ionicons color={colors.danger} name="trash-outline" size={16} />}
+              leftIcon={
+                <Ionicons
+                  color={colors.danger}
+                  name="trash-outline"
+                  size={16}
+                />
+              }
               onPress={onDelete}
               size="sm"
               variant="icon"

@@ -13,7 +13,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
 import { SelectField } from "../../components/ui/select-field";
 import { WheelPicker } from "../../components/ui/wheel-picker";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
+import { colors, radius, spacing } from "../../theme/tokens";
 import { AppText, Button, Card, Input } from "../../ui";
 import {
   MONTH_OPTIONS,
@@ -24,7 +24,6 @@ import {
 import {
   type ExperienceBlockData,
   type SeasonDetail,
-  YEAR_OPTIONS,
   areAllBlocksValid,
   blocksToExperienceForms,
   computeEndYearOptions,
@@ -47,11 +46,7 @@ const TEAM_SEARCH_DEBOUNCE_MS = 250;
 // TeamLogo (inline – avoids circular import with player-sports-section)
 // ---------------------------------------------------------------------------
 
-function TeamLogo({
-  teamLogoUrl,
-}: {
-  teamLogoUrl: string | null | undefined;
-}) {
+function TeamLogo({ teamLogoUrl }: { teamLogoUrl: string | null | undefined }) {
   if (teamLogoUrl?.trim()) {
     return <Image source={{ uri: teamLogoUrl }} style={styles.teamLogo} />;
   }
@@ -190,11 +185,7 @@ function TeamSearchInput({
                 ]}
               >
                 <View style={[styles.teamLogo, styles.teamLogoFallback]}>
-                  <Ionicons
-                    color={colors.accentStrong}
-                    name="add"
-                    size={24}
-                  />
+                  <Ionicons color={colors.accentStrong} name="add" size={24} />
                 </View>
                 <View style={styles.suggestionCopy}>
                   <AppText variant="titleSm">Aggiungi nuova squadra</AppText>
@@ -264,8 +255,7 @@ function DateRangeSelector({
   hasAttemptedSave: boolean;
 }) {
   const missingStartYear = hasAttemptedSave && !block.startYear;
-  const missingEndYear =
-    hasAttemptedSave && !block.isOngoing && !block.endYear;
+  const missingEndYear = hasAttemptedSave && !block.isOngoing && !block.endYear;
 
   return (
     <View style={styles.dateRangeWrapper}>
@@ -381,7 +371,14 @@ function SeasonDetailCard({
 
   if (hasConflict) {
     return (
-      <Card style={[styles.seasonCard, styles.seasonCardConflict, styles.seasonCardDisabled]} variant="muted">
+      <Card
+        style={[
+          styles.seasonCard,
+          styles.seasonCardConflict,
+          styles.seasonCardDisabled,
+        ]}
+        variant="muted"
+      >
         <View style={styles.seasonCardHeader}>
           <View style={styles.seasonLabelBadgeConflict}>
             <AppText variant="caption" style={styles.seasonLabelTextConflict}>
@@ -432,7 +429,9 @@ function SeasonDetailCard({
             label="Presenze"
             max={200}
             min={0}
-            onChange={(val) => onChange({ ...detail, appearances: String(val) })}
+            onChange={(val) =>
+              onChange({ ...detail, appearances: String(val) })
+            }
             value={detail.appearances ? parseInt(detail.appearances, 10) : 0}
           />
         </View>
@@ -681,9 +680,7 @@ export function ExperienceFlowScreen({
     lastBlock !== null && isBlockComplete(lastBlock, lastBlockConflicts);
 
   function updateBlock(index: number, updated: ExperienceBlockData) {
-    setBlocks((prev) =>
-      prev.map((b, i) => (i === index ? updated : b)),
-    );
+    setBlocks((prev) => prev.map((b, i) => (i === index ? updated : b)));
   }
 
   function deleteBlock(index: number) {
@@ -713,11 +710,7 @@ export function ExperienceFlowScreen({
   }
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      visible={visible}
-    >
+    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
       <SafeAreaView style={styles.screenRoot}>
         {/* Header */}
         <View style={styles.screenHeader}>
@@ -747,18 +740,24 @@ export function ExperienceFlowScreen({
         </View>
 
         {/* Scrollable content */}
-        <KeyboardAwareForm
-          contentContainerStyle={styles.screenScrollContent}
-        >
+        <KeyboardAwareForm contentContainerStyle={styles.screenScrollContent}>
           <AppText variant="bodySm" color="secondary">
             Aggiungi le tue esperienze calcistiche. Seleziona prima la squadra,
             poi il periodo: le stagioni vengono calcolate automaticamente.
           </AppText>
 
           {blocks.map((block, index) => {
-            const usedMap = getUsedSeasonsMap(blocks, block.localId, savedSeasons);
+            const usedMap = getUsedSeasonsMap(
+              blocks,
+              block.localId,
+              savedSeasons,
+            );
             const blockConflicts = getBlockConflicts(block, usedMap);
-            const fullyUsed = getFullyUsedSeasons(blocks, block.localId, savedSeasons);
+            const fullyUsed = getFullyUsedSeasons(
+              blocks,
+              block.localId,
+              savedSeasons,
+            );
             const startYearOpts = computeStartYearOptions(
               block.endYear,
               block.endMonth,
