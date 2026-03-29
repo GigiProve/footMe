@@ -48,6 +48,7 @@ import {
   OnboardingScreenHeader,
   OnboardingSectionCard,
 } from "../../src/features/onboarding/onboarding-ui";
+import { WhereToPlaySection } from "../../src/features/onboarding/where-to-play-section";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
 import {
   PlayerCharacteristicsSection,
@@ -384,6 +385,7 @@ export default function OnboardingProfileScreen() {
 
   const step = requestedStep ?? form.currentStep;
   const {
+    availabilityType,
     avatarUrl,
     bio,
     birthDate,
@@ -440,6 +442,7 @@ export default function OnboardingProfileScreen() {
     staffPreferredRegions,
     staffSpecialization,
     technicalVideoUrl,
+    transferProvinces,
     transferRegions,
     uploadingField,
     useResidenceForDomicile,
@@ -893,9 +896,7 @@ export default function OnboardingProfileScreen() {
       setIsSubmitting(true);
       setValidationErrors({});
 
-      if (!hasCreatedProfile) {
-        await ensureInitialProfileCreated();
-      }
+      await ensureInitialProfileCreated();
 
       const normalizedCareerEntries = parsePlayerExperienceForms(careerEntries);
 
@@ -942,6 +943,7 @@ export default function OnboardingProfileScreen() {
         playerProfile:
           role === "player"
             ? {
+                availability_type: availabilityType,
                 height_cm: parseOptionalNumber(heightCm),
                 highlight_video_url: parseOptionalText(highlightVideoUrl),
                 preferred_categories: fromDelimitedString(preferredCategories),
@@ -949,6 +951,7 @@ export default function OnboardingProfileScreen() {
                 primary_position:
                   primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
                 secondary_positions: secondaryPositions,
+                transfer_provinces: fromDelimitedString(transferProvinces),
                 transfer_regions: fromDelimitedString(transferRegions),
                 weight_kg: parseOptionalNumber(weightKg),
                 willing_to_change_club: willingToChangeClub,
@@ -1034,6 +1037,7 @@ export default function OnboardingProfileScreen() {
         coachProfile: null,
         playerCareerEntries: normalizedCareerEntries,
         playerProfile: {
+          availability_type: availabilityType,
           height_cm: parseOptionalNumber(heightCm),
           highlight_video_url: parseOptionalText(highlightVideoUrl),
           preferred_categories: fromDelimitedString(preferredCategories),
@@ -1041,6 +1045,7 @@ export default function OnboardingProfileScreen() {
           primary_position:
             primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
           secondary_positions: secondaryPositions,
+          transfer_provinces: fromDelimitedString(transferProvinces),
           transfer_regions: fromDelimitedString(transferRegions),
           weight_kg: parseOptionalNumber(weightKg),
           willing_to_change_club: willingToChangeClub,
@@ -1619,33 +1624,57 @@ export default function OnboardingProfileScreen() {
                 </OnboardingSectionCard>
 
                 <OnboardingSectionCard
-                  title="Disponibilita'"
-                  subtitle="Indica apertura al trasferimento, regioni di interesse e categorie in cui vuoi ricevere opportunita'."
+                  title="Dove vuoi giocare?"
+                  subtitle="Seleziona le zone in cui sei disponibile a giocare e le categorie in cui vuoi ricevere opportunità."
                 >
-                  <Toggle
-                    label="Disponibile a cambiare squadra"
-                    onValueChange={(value) =>
+                  <WhereToPlaySection
+                    availabilityType={availabilityType}
+                    categories={fromDelimitedString(preferredCategories)}
+                    isAvailable={isOpenToTransfer}
+                    onAvailabilityTypeChange={(type) => {
+                      patchForm({ availabilityType: type });
+                      clearValidationErrors([
+                        "transferRegions",
+                        "transferProvinces",
+                      ]);
+                    }}
+                    onCategoriesChange={(categories) => {
+                      updateValue(
+                        "preferredCategories",
+                        categories.join(", "),
+                      );
+                      clearValidationErrors(["preferredCategories"]);
+                    }}
+                    onIsAvailableChange={(value) => {
                       patchForm({
                         isOpenToTransfer: value,
                         willingToChangeClub: value,
-                      })
-                    }
-                    subtitle="Il tuo profilo puo' comparire tra i calciatori disponibili."
-                    value={isOpenToTransfer}
-                  />
-                  <AvailabilityRegionsSelector
-                    label="Regioni di interesse"
-                    onChange={(regions) =>
-                      updateValue("transferRegions", regions.join(", "))
-                    }
-                    placeholder="Cerca regione"
-                    value={fromDelimitedString(transferRegions)}
-                  />
-                  <InterestCategoriesSelector
-                    onChange={(categories) =>
-                      updateValue("preferredCategories", categories.join(", "))
-                    }
-                    value={fromDelimitedString(preferredCategories)}
+                      });
+                      if (!value) {
+                        clearValidationErrors([
+                          "transferRegions",
+                          "transferProvinces",
+                          "preferredCategories",
+                        ]);
+                      }
+                    }}
+                    onProvincesChange={(nextProvinces) => {
+                      updateValue(
+                        "transferProvinces",
+                        nextProvinces.join(", "),
+                      );
+                      clearValidationErrors(["transferProvinces"]);
+                    }}
+                    onRegionsChange={(nextRegions) => {
+                      updateValue(
+                        "transferRegions",
+                        nextRegions.join(", "),
+                      );
+                      clearValidationErrors(["transferRegions"]);
+                    }}
+                    provinces={fromDelimitedString(transferProvinces)}
+                    regions={fromDelimitedString(transferRegions)}
+                    validationErrors={validationErrors}
                   />
                 </OnboardingSectionCard>
 

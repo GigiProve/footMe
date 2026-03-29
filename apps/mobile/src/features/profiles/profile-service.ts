@@ -38,6 +38,7 @@ export type UserContactsRecord = {
 };
 
 type PlayerProfileRecord = {
+  availability_type: string;
   height_cm: number | null;
   highlight_video_url: string | null;
   preferred_categories: string[];
@@ -45,6 +46,7 @@ type PlayerProfileRecord = {
   primary_position: PlayerPosition;
   profile_id: string;
   secondary_positions: PlayerPosition[];
+  transfer_provinces: string[];
   transfer_regions: string[];
   weight_kg: number | null;
   willing_to_change_club: boolean;
@@ -177,12 +179,14 @@ export type CompleteProfessionalProfileUpdate = {
   } | null;
   playerCareerEntries: PlayerCareerEntryInput[];
   playerProfile: {
+    availability_type: string;
     height_cm: number | null;
     highlight_video_url: string | null;
     preferred_categories: string[];
     preferred_foot: PreferredFoot | null;
     primary_position: PlayerPosition;
     secondary_positions: PlayerPosition[];
+    transfer_provinces: string[];
     transfer_regions: string[];
     weight_kg: number | null;
     willing_to_change_club: boolean;
@@ -299,6 +303,7 @@ function normalizePlayerProfileRecord(
   const normalizedSecondaryPositions = normalizePlayerPositions(rawProfile.secondary_positions);
 
   return {
+    availability_type: typeof rawProfile.availability_type === "string" ? rawProfile.availability_type : "ITALY",
     height_cm: normalizeNumber(rawProfile.height_cm),
     highlight_video_url: normalizeOptionalText(rawProfile.highlight_video_url),
     preferred_categories: normalizeStringArray(rawProfile.preferred_categories),
@@ -313,6 +318,7 @@ function normalizePlayerProfileRecord(
       : DEFAULT_PLAYER_PRIMARY_POSITION,
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
     secondary_positions: normalizedSecondaryPositions,
+    transfer_provinces: normalizeStringArray(rawProfile.transfer_provinces),
     transfer_regions: normalizeStringArray(rawProfile.transfer_regions),
     weight_kg: normalizeNumber(rawProfile.weight_kg),
     willing_to_change_club: normalizeBoolean(rawProfile.willing_to_change_club),
@@ -487,7 +493,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("player_profiles")
           .select(
-            "profile_id, preferred_foot, height_cm, weight_kg, primary_position, secondary_positions, willing_to_change_club, transfer_regions, preferred_categories, highlight_video_url",
+            "profile_id, preferred_foot, height_cm, weight_kg, primary_position, secondary_positions, willing_to_change_club, availability_type, transfer_regions, transfer_provinces, preferred_categories, highlight_video_url",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -610,7 +616,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 export async function updateCompleteProfessionalProfile(
   input: CompleteProfessionalProfileUpdate,
 ) {
-  const { error: profileError } = await supabase
+  const { data: updatedProfile, error: profileError } = await supabase
     .from("profiles")
     .update({
       avatar_url: input.profile.avatar_url,
@@ -623,10 +629,16 @@ export async function updateCompleteProfessionalProfile(
       nationality: input.profile.nationality,
       region: input.profile.region,
     })
-    .eq("id", input.profileId);
+    .eq("id", input.profileId)
+    .select("id")
+    .maybeSingle();
 
   if (profileError) {
     throw profileError;
+  }
+
+  if (!updatedProfile) {
+    throw new Error("Profilo non trovato. Riprova dal primo passaggio.");
   }
 
   const { error: profileContactsError } = await supabase

@@ -139,6 +139,7 @@ export type ProfileFormState = {
   gamePhilosophy: string;
   heightCm: string;
   highlightVideoUrl: string;
+  availabilityType: string;
   isOpenToTransfer: boolean;
   languages: string;
   licenses: string;
@@ -156,6 +157,7 @@ export type ProfileFormState = {
   secondaryPositions: PlayerPosition[];
   specialization: StaffSpecialization;
   technicalVideoUrl: string;
+  transferProvinces: string;
   transferRegions: string;
   weightKg: string;
   willingToChangeClub: boolean;
@@ -214,6 +216,7 @@ export function buildInitialState(
     gamePhilosophy: coachProfile?.game_philosophy ?? "",
     heightCm: playerProfile?.height_cm ? String(playerProfile.height_cm) : "",
     highlightVideoUrl: playerProfile?.highlight_video_url ?? "",
+    availabilityType: playerProfile?.availability_type ?? "ITALY",
     isOpenToTransfer: data.profile.is_open_to_transfer,
     languages: toDelimitedString(data.profile.languages),
     licenses: toDelimitedString(coachProfile?.licenses),
@@ -234,6 +237,7 @@ export function buildInitialState(
     secondaryPositions: playerProfile?.secondary_positions ?? [],
     specialization: staffProfile?.specialization ?? "fitness_coach",
     technicalVideoUrl: coachProfile?.technical_video_url ?? "",
+    transferProvinces: toDelimitedString(playerProfile?.transfer_provinces),
     transferRegions: toDelimitedString(playerProfile?.transfer_regions),
     weightKg: playerProfile?.weight_kg ? String(playerProfile.weight_kg) : "",
     willingToChangeClub: playerProfile?.willing_to_change_club ?? false,
@@ -304,6 +308,7 @@ export function buildFullUpdatePayload(
     playerProfile:
       data.profile.role === "player"
         ? {
+            availability_type: formState.availabilityType,
             height_cm: parseOptionalNumber(formState.heightCm),
             highlight_video_url: parseOptionalText(
               formState.highlightVideoUrl,
@@ -314,6 +319,9 @@ export function buildFullUpdatePayload(
             preferred_foot: formState.preferredFoot || null,
             primary_position: formState.primaryPosition,
             secondary_positions: formState.secondaryPositions,
+            transfer_provinces: fromDelimitedString(
+              formState.transferProvinces,
+            ),
             transfer_regions: fromDelimitedString(
               formState.transferRegions,
             ),

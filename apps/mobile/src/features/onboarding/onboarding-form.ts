@@ -22,7 +22,10 @@ export type OnboardingStep =
 
 export type OnboardingValidationErrors = Partial<Record<string, string>>;
 
+export type AvailabilityType = "ITALY" | "REGIONS" | "PROVINCES";
+
 export type OnboardingFormState = {
+  availabilityType: AvailabilityType;
   avatarUrl: string;
   bio: string;
   birthDate: string;
@@ -80,6 +83,7 @@ export type OnboardingFormState = {
   staffPreferredRegions: string;
   staffSpecialization: StaffSpecialization;
   technicalVideoUrl: string;
+  transferProvinces: string;
   transferRegions: string;
   uploadingField: string | null;
   useResidenceForDomicile: boolean;
@@ -172,6 +176,7 @@ export const onboardingVisibleSteps = defaultVisibleSteps;
 export const onboardingStepOrder = defaultStepOrder;
 
 export const defaultOnboardingFormState: OnboardingFormState = {
+  availabilityType: "ITALY",
   avatarUrl: "",
   bio: "",
   birthDate: "",
@@ -229,6 +234,7 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   staffPreferredRegions: "",
   staffSpecialization: "fitness_coach",
   technicalVideoUrl: "",
+  transferProvinces: "",
   transferRegions: "",
   uploadingField: null,
   useResidenceForDomicile: true,
@@ -262,6 +268,7 @@ export function normalizeOnboardingDraft(
   return {
     ...defaultOnboardingFormState,
     ...value,
+    availabilityType: coerceAvailabilityType(value.availabilityType) ?? defaultOnboardingFormState.availabilityType,
     currentStep: migrateLegacyStep(rawCurrentStep),
     lastCompletedStep: rawLastCompleted ? migrateLegacyStep(rawLastCompleted) : null,
     gender: coerceProfileGender(value.gender) ?? defaultOnboardingFormState.gender,
@@ -302,6 +309,13 @@ export function coerceAppRole(value: unknown): AppRole | null {
     return value;
   }
 
+  return null;
+}
+
+export function coerceAvailabilityType(value: unknown): AvailabilityType | null {
+  if (value === "ITALY" || value === "REGIONS" || value === "PROVINCES") {
+    return value;
+  }
   return null;
 }
 
@@ -420,15 +434,42 @@ export function validateOnboardingStep(
   }
 
   if (step === "technical" || step === "details") {
-    if (form.role === "player" && !form.primaryPosition) {
-      return {
-        primaryPosition: "Seleziona il ruolo principale per continuare.",
-      };
-    }
+    return mapTechnicalStepValidationError(form);
   }
 
   // photo and experience steps have no required validation
   return {};
+}
+
+function fromDelimitedString(value: string): string[] {
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function mapTechnicalStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
+  if (form.role === "player" && !form.primaryPosition) {
+    errors.primaryPosition = "Seleziona il ruolo principale per continuare.";
+  }
+
+  if (form.isOpenToTransfer) {
+    if (form.availabilityType === "REGIONS" && fromDelimitedString(form.transferRegions).length === 0) {
+      errors.transferRegions = "Seleziona almeno una regione.";
+    }
+
+    if (form.availabilityType === "PROVINCES" && fromDelimitedString(form.transferProvinces).length === 0) {
+      errors.transferProvinces = "Seleziona almeno una provincia.";
+    }
+
+    if (fromDelimitedString(form.preferredCategories).length === 0) {
+      errors.preferredCategories = "Seleziona almeno una categoria.";
+    }
+  }
+
+  return errors;
 }
 
 function mapRoleStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
