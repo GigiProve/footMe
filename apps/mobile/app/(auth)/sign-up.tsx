@@ -58,7 +58,7 @@ export default function SignUpScreen() {
         return;
       }
 
-      Alert.alert("Account creato", "Completa ora il profilo iniziale.");
+      // Session exists — the auth listener will redirect to onboarding automatically
     } finally {
       setIsSubmitting(false);
     }

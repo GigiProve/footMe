@@ -50,10 +50,8 @@ import {
 } from "../../src/features/onboarding/onboarding-ui";
 import { WhereToPlaySection } from "../../src/features/onboarding/where-to-play-section";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
-import {
-  PlayerCharacteristicsSection,
-  PlayerExperiencesSection,
-} from "../../src/features/profiles/player-sports-section";
+import { CareerExperienceStep } from "../../src/features/onboarding/career/CareerExperienceStep";
+import { PlayerCharacteristicsSection } from "../../src/features/profiles/player-sports-section";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
   excludePrimaryFromSecondaryPositions,
@@ -200,13 +198,15 @@ function RoleSelectionCard({
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={[
-        styles.roleCard,
-        active ? styles.roleCardActive : null,
-      ]}
+      style={[styles.roleCard, active ? styles.roleCardActive : null]}
       testID={testID}
     >
-      <View style={[styles.roleIconCircle, active ? styles.roleIconCircleActive : null]}>
+      <View
+        style={[
+          styles.roleIconCircle,
+          active ? styles.roleIconCircleActive : null,
+        ]}
+      >
         <Ionicons
           name={icon}
           size={24}
@@ -215,7 +215,10 @@ function RoleSelectionCard({
       </View>
       <AppText
         variant="bodySm"
-        style={[styles.roleCardTitle, active ? styles.roleCardActiveText : undefined]}
+        style={[
+          styles.roleCardTitle,
+          active ? styles.roleCardActiveText : undefined,
+        ]}
       >
         {label}
       </AppText>
@@ -242,7 +245,10 @@ function GenderCard({
       style={[styles.genderCard, active ? styles.genderCardActive : null]}
       testID={testID}
     >
-      <AppText variant="titleSm" style={active ? styles.genderCardActiveText : undefined}>
+      <AppText
+        variant="titleSm"
+        style={active ? styles.genderCardActiveText : undefined}
+      >
         {label}
       </AppText>
     </Pressable>
@@ -373,7 +379,6 @@ export default function OnboardingProfileScreen() {
   );
   const [validationErrors, setValidationErrors] =
     useState<OnboardingValidationErrors>({});
-  const [showExperienceForm, setShowExperienceForm] = useState(false);
 
   const requestedStep = useMemo(() => {
     if (Array.isArray(params.step)) {
@@ -852,7 +857,7 @@ export default function OnboardingProfileScreen() {
     navigateToStep(form.role === "club_admin" ? "club" : "base");
   }
 
-  async function handleContinueFromBase() {
+  function handleContinueFromBase() {
     const nextErrors = validateOnboardingStep("base", form);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -860,19 +865,9 @@ export default function OnboardingProfileScreen() {
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      setValidationErrors({});
-      await ensureInitialProfileCreated();
-      patchForm({ lastCompletedStep: "base" });
-      navigateToStep("photo");
-    } catch (error) {
-      const alertCopy = getBaseStepAlert(error);
-      setValidationErrors(validateOnboardingStep("base", form));
-      Alert.alert(alertCopy.title, alertCopy.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "base" });
+    navigateToStep("photo");
   }
 
   function handleContinueFromPhoto() {
@@ -880,11 +875,7 @@ export default function OnboardingProfileScreen() {
     navigateToStep("technical");
   }
 
-  async function handleContinueFromTechnical() {
-    if (!session?.user) {
-      return;
-    }
-
+  function handleContinueFromTechnical() {
     const nextErrors = validateOnboardingStep("technical", form);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -892,13 +883,26 @@ export default function OnboardingProfileScreen() {
       return;
     }
 
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "technical" });
+
+    // Players get an optional experience step; others save and go to completion
+    if (role === "player") {
+      navigateToStep("experience");
+    } else {
+      handleSaveNonPlayerTechnical();
+    }
+  }
+
+  async function handleSaveNonPlayerTechnical() {
+    if (!session?.user) {
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      setValidationErrors({});
 
       await ensureInitialProfileCreated();
-
-      const normalizedCareerEntries = parsePlayerExperienceForms(careerEntries);
 
       await updateCompleteProfessionalProfile({
         club:
@@ -939,24 +943,8 @@ export default function OnboardingProfileScreen() {
                 technical_video_url: parseOptionalText(technicalVideoUrl),
               }
             : null,
-        playerCareerEntries: role === "player" ? normalizedCareerEntries : [],
-        playerProfile:
-          role === "player"
-            ? {
-                availability_type: availabilityType,
-                height_cm: parseOptionalNumber(heightCm),
-                highlight_video_url: parseOptionalText(highlightVideoUrl),
-                preferred_categories: fromDelimitedString(preferredCategories),
-                preferred_foot: preferredFoot || null,
-                primary_position:
-                  primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
-                secondary_positions: secondaryPositions,
-                transfer_provinces: fromDelimitedString(transferProvinces),
-                transfer_regions: fromDelimitedString(transferRegions),
-                weight_kg: parseOptionalNumber(weightKg),
-                willing_to_change_club: willingToChangeClub,
-              }
-            : null,
+        playerCareerEntries: [],
+        playerProfile: null,
         profile: {
           avatar_url: parseOptionalText(avatarUrl),
           bio: parseOptionalText(normalizeProfileBioInput(bio)),
@@ -991,25 +979,7 @@ export default function OnboardingProfileScreen() {
         },
       });
 
-      if (role === "player") {
-        const { error } = await supabase
-          .from("player_profiles")
-          .update({ media_urls: playerMediaItems.map((item) => item.url) })
-          .eq("profile_id", session.user.id);
-
-        if (error) {
-          throw error;
-        }
-      }
-
-      patchForm({ lastCompletedStep: "technical" });
-
-      // Players get an optional experience step; others go straight to completion
-      if (role === "player") {
-        navigateToStep("experience");
-      } else {
-        goToCompletion("technical");
-      }
+      goToCompletion("technical");
     } catch (error) {
       const message =
         error instanceof Error
@@ -1029,6 +999,8 @@ export default function OnboardingProfileScreen() {
     try {
       setIsSubmitting(true);
 
+      await ensureInitialProfileCreated();
+
       const normalizedCareerEntries = parsePlayerExperienceForms(careerEntries);
 
       await updateCompleteProfessionalProfile({
@@ -1042,8 +1014,7 @@ export default function OnboardingProfileScreen() {
           highlight_video_url: parseOptionalText(highlightVideoUrl),
           preferred_categories: fromDelimitedString(preferredCategories),
           preferred_foot: preferredFoot || null,
-          primary_position:
-            primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
+          primary_position: primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
           secondary_positions: secondaryPositions,
           transfer_provinces: fromDelimitedString(transferProvinces),
           transfer_regions: fromDelimitedString(transferRegions),
@@ -1075,13 +1046,22 @@ export default function OnboardingProfileScreen() {
         },
       });
 
+      const { error } = await supabase
+        .from("player_profiles")
+        .update({ media_urls: playerMediaItems.map((item) => item.url) })
+        .eq("profile_id", session.user.id);
+
+      if (error) {
+        throw error;
+      }
+
       goToCompletion("experience");
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "Errore inatteso nel salvataggio esperienze.";
-      Alert.alert("Esperienze non salvate", message);
+          : "Errore inatteso nel salvataggio.";
+      Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
     }
@@ -1216,7 +1196,10 @@ export default function OnboardingProfileScreen() {
                 {Array.from(
                   { length: Math.ceil(roleOptions.length / 2) },
                   (_, rowIndex) => {
-                    const pair = roleOptions.slice(rowIndex * 2, rowIndex * 2 + 2);
+                    const pair = roleOptions.slice(
+                      rowIndex * 2,
+                      rowIndex * 2 + 2,
+                    );
                     return (
                       <View key={rowIndex} style={styles.roleGridRow}>
                         {pair.map((entry) => (
@@ -1225,7 +1208,9 @@ export default function OnboardingProfileScreen() {
                             active={role === entry.value}
                             icon={entry.icon}
                             label={entry.label}
-                            onPress={() => updateValue("role", entry.value, ["role"])}
+                            onPress={() =>
+                              updateValue("role", entry.value, ["role"])
+                            }
                             testID={`role-card-${entry.value}`}
                           />
                         ))}
@@ -1238,7 +1223,11 @@ export default function OnboardingProfileScreen() {
 
             <Button
               disabled={!role}
-              label={role ? `Continua come ${roleOptions.find((r) => r.value === role)?.label}` : "Seleziona un ruolo"}
+              label={
+                role
+                  ? `Continua come ${roleOptions.find((r) => r.value === role)?.label}`
+                  : "Seleziona un ruolo"
+              }
               onPress={handleContinueFromRole}
               variant="primary"
             />
@@ -1449,8 +1438,7 @@ export default function OnboardingProfileScreen() {
               </View>
               <View style={styles.flex1}>
                 <Button
-                  disabled={isBusy}
-                  label={isBusy ? "Salvataggio..." : "Continua"}
+                  label="Continua"
                   onPress={handleContinueFromBase}
                   variant="primary"
                 />
@@ -1494,8 +1482,18 @@ export default function OnboardingProfileScreen() {
 
             <Button
               disabled={uploadingField === "avatar"}
-              label={uploadingField === "avatar" ? "Caricamento..." : "Carica da galleria"}
-              leftIcon={<Ionicons name="images-outline" size={18} color={colors.inkInvert} />}
+              label={
+                uploadingField === "avatar"
+                  ? "Caricamento..."
+                  : "Carica da galleria"
+              }
+              leftIcon={
+                <Ionicons
+                  name="images-outline"
+                  size={18}
+                  color={colors.inkInvert}
+                />
+              }
               onPress={() =>
                 handleMediaUpload({
                   field: "avatar",
@@ -1510,7 +1508,13 @@ export default function OnboardingProfileScreen() {
             <Button
               disabled={uploadingField === "avatar"}
               label="Scatta foto"
-              leftIcon={<Ionicons name="camera-outline" size={18} color={colors.accentStrong} />}
+              leftIcon={
+                <Ionicons
+                  name="camera-outline"
+                  size={18}
+                  color={colors.accentStrong}
+                />
+              }
               onPress={() =>
                 handleCameraCapture({
                   field: "avatar",
@@ -1639,10 +1643,7 @@ export default function OnboardingProfileScreen() {
                       ]);
                     }}
                     onCategoriesChange={(categories) => {
-                      updateValue(
-                        "preferredCategories",
-                        categories.join(", "),
-                      );
+                      updateValue("preferredCategories", categories.join(", "));
                       clearValidationErrors(["preferredCategories"]);
                     }}
                     onIsAvailableChange={(value) => {
@@ -1666,10 +1667,7 @@ export default function OnboardingProfileScreen() {
                       clearValidationErrors(["transferProvinces"]);
                     }}
                     onRegionsChange={(nextRegions) => {
-                      updateValue(
-                        "transferRegions",
-                        nextRegions.join(", "),
-                      );
+                      updateValue("transferRegions", nextRegions.join(", "));
                       clearValidationErrors(["transferRegions"]);
                     }}
                     provinces={fromDelimitedString(transferProvinces)}
@@ -1677,7 +1675,6 @@ export default function OnboardingProfileScreen() {
                     validationErrors={validationErrors}
                   />
                 </OnboardingSectionCard>
-
               </>
             ) : null}
 
@@ -1709,9 +1706,7 @@ export default function OnboardingProfileScreen() {
                 <Input
                   label="Filosofia di gioco"
                   multiline
-                  onChangeText={(value) =>
-                    updateValue("gamePhilosophy", value)
-                  }
+                  onChangeText={(value) => updateValue("gamePhilosophy", value)}
                   placeholder="Descrivi principi, metodologia e obiettivi"
                   value={gamePhilosophy}
                 />
@@ -1753,9 +1748,7 @@ export default function OnboardingProfileScreen() {
                 />
                 <Toggle
                   label="Disponibile a un nuovo incarico"
-                  onValueChange={(value) =>
-                    updateValue("openToNewRole", value)
-                  }
+                  onValueChange={(value) => updateValue("openToNewRole", value)}
                   value={openToNewRole}
                 />
               </OnboardingSectionCard>
@@ -1780,9 +1773,7 @@ export default function OnboardingProfileScreen() {
                 />
                 <Input
                   label="Certificazioni"
-                  onChangeText={(value) =>
-                    updateValue("certifications", value)
-                  }
+                  onChangeText={(value) => updateValue("certifications", value)}
                   placeholder="Es. UEFA Fitness, FMS"
                   value={certifications}
                 />
@@ -1805,9 +1796,7 @@ export default function OnboardingProfileScreen() {
                 />
                 <Toggle
                   label="Disponibile a collaborare subito"
-                  onValueChange={(value) =>
-                    updateValue("openToWork", value)
-                  }
+                  onValueChange={(value) => updateValue("openToWork", value)}
                   value={openToWork}
                 />
               </OnboardingSectionCard>
@@ -1824,7 +1813,7 @@ export default function OnboardingProfileScreen() {
               <View style={styles.flex1}>
                 <Button
                   disabled={isBusy}
-                  label={isBusy ? "Salvataggio..." : "Conferma profilo"}
+                  label={isBusy ? "Salvataggio..." : "Continua"}
                   onPress={handleContinueFromTechnical}
                   variant="primary"
                 />
@@ -1837,71 +1826,14 @@ export default function OnboardingProfileScreen() {
         {/* STEP: Experience (player only, optional)                        */}
         {/* ============================================================= */}
         {step === "experience" ? (
-          <View style={styles.stepContainer}>
-            {!showExperienceForm ? (
-              <>
-                <OnboardingSectionCard
-                  title="Aggiungi esperienza"
-                  subtitle="Un profilo con esperienze e' piu' visibile per club e allenatori."
-                >
-                  <View style={styles.experienceBridgeIcon}>
-                    <Ionicons
-                      name="trophy-outline"
-                      size={48}
-                      color={colors.accent}
-                    />
-                  </View>
-                  <OnboardingInfoCard message="Puoi aggiungere le tue esperienze calcistiche ora oppure farlo in seguito dal tuo profilo." />
-                </OnboardingSectionCard>
-
-                <Button
-                  label="Aggiungi esperienza"
-                  onPress={() => setShowExperienceForm(true)}
-                  variant="primary"
-                />
-                <Button
-                  label="Completa la registrazione"
-                  onPress={() => goToCompletion("experience")}
-                  variant="secondary"
-                />
-              </>
-            ) : (
-              <>
-                <OnboardingSectionCard
-                  title="Carriera calcistica"
-                  subtitle="Aggiungi una stagione per volta con squadra, categoria e statistiche."
-                >
-                  <PlayerExperiencesSection
-                    addButtonLabel="Aggiungi altra esperienza"
-                    autoOpenFlow
-                    editable
-                    emptyStateLabel="Aggiungi la tua prima esperienza stagionale."
-                    experiences={careerEntries}
-                    onChange={(value) => updateValue("careerEntries", value)}
-                    searchTeams={searchTeams}
-                  />
-                </OnboardingSectionCard>
-
-                <View style={styles.buttonRow}>
-                  <View style={styles.flex1}>
-                    <Button
-                      label="Salta"
-                      onPress={() => goToCompletion("experience")}
-                      variant="secondary"
-                    />
-                  </View>
-                  <View style={styles.flex1}>
-                    <Button
-                      disabled={isBusy || careerEntries.length === 0}
-                      label={isBusy ? "Salvataggio..." : "Salva e continua"}
-                      onPress={handleSaveExperiences}
-                      variant="primary"
-                    />
-                  </View>
-                </View>
-              </>
-            )}
-          </View>
+          <CareerExperienceStep
+            careerEntries={careerEntries}
+            isBusy={isBusy}
+            onSaveAndContinue={handleSaveExperiences}
+            onSkip={handleSaveExperiences}
+            onUpdateEntries={(entries) => updateValue("careerEntries", entries)}
+            searchTeams={searchTeams}
+          />
         ) : null}
 
         {/* ============================================================= */}
@@ -2299,10 +2231,6 @@ const styles = StyleSheet.create({
   completionIcon: {
     alignItems: "center",
     paddingVertical: spacing[8],
-  },
-  experienceBridgeIcon: {
-    alignItems: "center",
-    paddingVertical: spacing[16],
   },
   fieldGap12: {
     gap: spacing[12],
