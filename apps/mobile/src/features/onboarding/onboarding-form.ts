@@ -7,6 +7,7 @@ import type { PlayerExperienceForm, PlayerPosition, PreferredFoot } from "../pro
 import { normalizePlayerPositions } from "../profiles/player-sports";
 import type { UploadedMediaItem } from "../profiles/media-upload-service";
 import type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
+import type { CoachCareerEntry } from "./coach/coach-career-types";
 
 export type OnboardingStep =
   | "role"
@@ -18,6 +19,11 @@ export type OnboardingStep =
   | "club_data"
   | "club_youth"
   | "club_profile"
+  | "coach_role"
+  | "coach_career"
+  | "player_career_toggle"
+  | "player_career"
+  | "coach_extra"
   | "complete"
   // Legacy steps kept for draft migration
   | "decision"
@@ -62,6 +68,17 @@ export type OnboardingFormState = {
   coachedClubs: string;
   coachPreferredRegions: string;
   certifications: string;
+  coachPrimaryRole: string;
+  coachLicenseType: string;
+  coachCategoriesArray: string[];
+  coachAvailableFrom: string;
+  coachRegionsArray: string[];
+  coachCareerEntries: CoachCareerEntry[];
+  hasPlayedFootball: boolean;
+  coachPlayerCareerEntries: PlayerExperienceForm[];
+  coachFormation: string;
+  coachPlayStyle: string;
+  coachLanguages: string[];
   currentStep: OnboardingStep;
   domicile: string;
   domicileRegion: string;
@@ -194,12 +211,73 @@ const clubStepOrder: OnboardingStep[] = [
   "complete",
 ];
 
+const coachStepOrder: OnboardingStep[] = [
+  "role",
+  "base",
+  "photo",
+  "coach_role",
+  "coach_career",
+  "player_career_toggle",
+  "player_career",
+  "coach_extra",
+  "complete",
+];
+
+const coachVisibleSteps: OnboardingVisibleStep[] = [
+  {
+    description: "Seleziona il tipo di profilo da creare",
+    index: 1,
+    label: "Ruolo",
+    step: "role",
+  },
+  {
+    description: "Informazioni personali",
+    index: 2,
+    label: "Dati",
+    step: "base",
+  },
+  {
+    description: "Aggiungi una foto profilo",
+    index: 3,
+    label: "Foto",
+    step: "photo",
+  },
+  {
+    description: "Ruolo e disponibilità",
+    index: 4,
+    label: "Qualifica",
+    step: "coach_role",
+  },
+  {
+    description: "Esperienze da allenatore",
+    index: 5,
+    label: "Carriera",
+    step: "coach_career",
+  },
+  {
+    description: "Carriera in campo",
+    index: 6,
+    label: "Giocatore",
+    step: "player_career_toggle",
+  },
+  {
+    description: "Filosofia e stile di gioco",
+    index: 7,
+    label: "Profilo",
+    step: "coach_extra",
+  },
+];
+
 export function getOnboardingVisibleSteps(role: AppRole | ""): OnboardingVisibleStep[] {
-  return role === "club_admin" ? clubVisibleSteps : defaultVisibleSteps;
+  if (role === "club_admin") return clubVisibleSteps;
+  if (role === "coach") return coachVisibleSteps;
+  return defaultVisibleSteps;
 }
 
 export function getOnboardingStepOrder(role: AppRole | ""): OnboardingStep[] {
-  return role === "club_admin" ? clubStepOrder : defaultStepOrder;
+  if (role === "club_admin") return clubStepOrder;
+  if (role === "coach") return coachStepOrder;
+  return defaultStepOrder;
 }
 
 /** @deprecated Use getOnboardingVisibleSteps(role) instead */
@@ -242,6 +320,17 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   coachedClubs: "",
   coachPreferredRegions: "",
   certifications: "",
+  coachPrimaryRole: "",
+  coachLicenseType: "",
+  coachCategoriesArray: [],
+  coachAvailableFrom: "",
+  coachRegionsArray: [],
+  coachCareerEntries: [],
+  hasPlayedFootball: false,
+  coachPlayerCareerEntries: [],
+  coachFormation: "",
+  coachPlayStyle: "",
+  coachLanguages: [],
   currentStep: "role",
   domicile: "",
   domicileRegion: "",
@@ -335,6 +424,24 @@ export function normalizeOnboardingDraft(
     clubYouthCategories: Array.isArray(value.clubYouthCategories)
       ? value.clubYouthCategories.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.clubYouthCategories,
+    coachCategoriesArray: Array.isArray(value.coachCategoriesArray)
+      ? value.coachCategoriesArray.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.coachCategoriesArray,
+    coachRegionsArray: Array.isArray(value.coachRegionsArray)
+      ? value.coachRegionsArray.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.coachRegionsArray,
+    coachCareerEntries: Array.isArray(value.coachCareerEntries)
+      ? value.coachCareerEntries
+      : defaultOnboardingFormState.coachCareerEntries,
+    coachPlayerCareerEntries: Array.isArray(value.coachPlayerCareerEntries)
+      ? value.coachPlayerCareerEntries
+      : Array.isArray((value as { simplePlayerCareerEntries?: unknown }).simplePlayerCareerEntries)
+        ? []
+        : defaultOnboardingFormState.coachPlayerCareerEntries,
+    coachLanguages: Array.isArray(value.coachLanguages)
+      ? value.coachLanguages.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.coachLanguages,
+    hasPlayedFootball: value.hasPlayedFootball === true,
     uploadingField: null,
   };
 }
@@ -382,6 +489,7 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
   const allSteps: OnboardingStep[] = [
     "role", "base", "photo", "technical", "experience",
     "club_representative", "club_data", "club_youth", "club_profile",
+    "coach_role", "coach_career", "player_career_toggle", "player_career", "coach_extra",
     "complete",
     // Legacy steps for draft migration
     "decision", "details", "club",
@@ -442,9 +550,8 @@ export function getPreviousOnboardingStep(
   const effectiveStep = migrateLegacyStep(step);
 
   if (effectiveStep === "complete") {
-    if (role === "club_admin") {
-      return "club_profile";
-    }
+    if (role === "club_admin") return "club_profile";
+    if (role === "coach") return "coach_extra";
     return "experience";
   }
 
@@ -485,6 +592,20 @@ export function validateOnboardingStep(
   }
 
   if (step === "club_profile") {
+    return {};
+  }
+
+  if (step === "coach_role") {
+    return mapCoachRoleValidationError(form);
+  }
+
+  // coach_career, player_career_toggle, player_career, coach_extra have no required validation here
+  if (
+    step === "coach_career" ||
+    step === "player_career_toggle" ||
+    step === "player_career" ||
+    step === "coach_extra"
+  ) {
     return {};
   }
 
@@ -616,6 +737,13 @@ function mapClubYouthValidationError(form: OnboardingFormState): OnboardingValid
   }
 
   return errors;
+}
+
+function mapCoachRoleValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (!form.coachPrimaryRole) {
+    return { coachPrimaryRole: "Seleziona il ruolo principale per continuare." };
+  }
+  return {};
 }
 
 function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
