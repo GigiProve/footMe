@@ -1,0 +1,110 @@
+import { Pressable, StyleSheet, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+
+import { colors, radius, spacing } from "../../../theme/tokens";
+import { AppText } from "../../../ui";
+import type { CoachCareerEntry } from "./coach-career-types";
+
+type CoachCareerExperienceCardProps = {
+  entry: CoachCareerEntry;
+  onEdit: () => void;
+};
+
+function formatDuration(entry: CoachCareerEntry): string {
+  if (entry.type === "CUSTOM_PERIOD" && entry.period) {
+    const { startMonth, startYear, endMonth, endYear } = entry.period;
+    const start = startMonth ? `${startMonth} ${startYear}` : startYear;
+    const end = endMonth ? `${endMonth} ${endYear}` : endYear;
+    return `Da ${start} a ${end}`;
+  }
+
+  return entry.seasons
+    .map((s) => {
+      const parts = s.split("/");
+      if (parts.length !== 2) return s;
+      const endYear = parts[1];
+      return `${parts[0]}/${endYear.length === 4 ? endYear.slice(2) : endYear}`;
+    })
+    .join(", ");
+}
+
+export function CoachCareerExperienceCard({
+  entry,
+  onEdit,
+}: CoachCareerExperienceCardProps) {
+  const duration = formatDuration(entry);
+
+  return (
+    <View style={cardStyles.card}>
+      <View style={cardStyles.content}>
+        <View style={cardStyles.header}>
+          <AppText variant="titleMd" style={cardStyles.teamName}>
+            {entry.teamName}
+          </AppText>
+          <Pressable
+            accessibilityLabel="Modifica esperienza"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onEdit}
+            style={cardStyles.editButton}
+          >
+            <Ionicons name="pencil" size={14} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+
+        <AppText variant="bodySm" color="secondary">
+          {entry.role}
+          {entry.category ? ` • ${entry.category}` : ""}
+        </AppText>
+
+        {duration ? (
+          <View style={cardStyles.durationRow}>
+            <Ionicons
+              name="calendar-outline"
+              size={14}
+              color={colors.textSecondary}
+            />
+            <AppText variant="bodySm" color="secondary">
+              {duration}
+            </AppText>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+const cardStyles = StyleSheet.create({
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius[8],
+    padding: spacing[16],
+  },
+  content: {
+    gap: spacing[4],
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  teamName: {
+    flex: 1,
+  },
+  editButton: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  durationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[6],
+    marginTop: spacing[4],
+  },
+});

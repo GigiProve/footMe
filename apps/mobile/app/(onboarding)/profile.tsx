@@ -51,6 +51,11 @@ import {
 import { WhereToPlaySection } from "../../src/features/onboarding/where-to-play-section";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
 import { CareerExperienceStep } from "../../src/features/onboarding/career/CareerExperienceStep";
+import type { CoachCareerEntry } from "../../src/features/onboarding/coach/coach-career-types";
+import { CoachRoleStep } from "../../src/features/onboarding/coach/CoachRoleStep";
+import { CoachCareerStep } from "../../src/features/onboarding/coach/CoachCareerStep";
+import { PlayerCareerToggleStep } from "../../src/features/onboarding/coach/PlayerCareerToggleStep";
+import { CoachExtraStep } from "../../src/features/onboarding/coach/CoachExtraStep";
 import { PlayerCharacteristicsSection } from "../../src/features/profiles/player-sports-section";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
@@ -343,6 +348,14 @@ export default function OnboardingProfileScreen() {
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
+  const stepBackOverrideRef = useRef<(() => void) | null>(null);
+
+  const registerCoachCareerBack = useCallback(
+    (fn: (() => void) | null) => {
+      stepBackOverrideRef.current = fn;
+    },
+    [],
+  );
   const params = useLocalSearchParams<{ step?: string | string[] }>();
   const { refreshProfile, session } = useSession();
   const {
@@ -402,6 +415,17 @@ export default function OnboardingProfileScreen() {
     coachedClubs,
     coachPreferredRegions,
     certifications,
+    coachPrimaryRole,
+    coachLicenseType,
+    coachCategoriesArray,
+    coachAvailableFrom,
+    coachRegionsArray,
+    coachCareerEntries,
+    hasPlayedFootball,
+    coachPlayerCareerEntries,
+    coachFormation,
+    coachPlayStyle,
+    coachLanguages,
     domicile,
     domicileRegion,
     experienceSummary,
@@ -622,6 +646,11 @@ export default function OnboardingProfileScreen() {
   );
 
   const handleBackNavigation = useCallback(() => {
+    if (stepBackOverrideRef.current) {
+      stepBackOverrideRef.current();
+      return;
+    }
+
     const previousStep = getPreviousOnboardingStep(
       step,
       lastCompletedStep,
@@ -849,7 +878,11 @@ export default function OnboardingProfileScreen() {
 
   function handleContinueFromPhoto() {
     patchForm({ lastCompletedStep: "photo" });
-    navigateToStep("technical");
+    if (role === "coach") {
+      navigateToStep("coach_role");
+    } else {
+      navigateToStep("technical");
+    }
   }
 
   function handleContinueFromTechnical() {
@@ -1038,6 +1071,100 @@ export default function OnboardingProfileScreen() {
         error instanceof Error
           ? error.message
           : "Errore inatteso nel salvataggio.";
+      Alert.alert("Profilo non salvato", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleContinueFromCoachRole() {
+    const nextErrors = validateOnboardingStep("coach_role", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "coach_role" });
+    navigateToStep("coach_career");
+  }
+
+  function handleContinueFromCoachCareer() {
+    patchForm({ lastCompletedStep: "coach_career" });
+    navigateToStep("player_career_toggle");
+  }
+
+  function handleContinueFromPlayerCareerToggle() {
+    patchForm({ lastCompletedStep: "player_career_toggle" });
+
+    if (hasPlayedFootball) {
+      navigateToStep("player_career");
+    } else {
+      navigateToStep("coach_extra");
+    }
+  }
+
+  function handleContinueFromPlayerCareer() {
+    patchForm({ lastCompletedStep: "player_career" });
+    navigateToStep("coach_extra");
+  }
+
+  async function handleFinishCoachExtra() {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await ensureInitialProfileCreated();
+
+      await updateCompleteProfessionalProfile({
+        club: null,
+        clubSeasonEntries: [],
+        coachProfile: {
+          coached_categories: coachCategoriesArray,
+          coached_clubs: [],
+          game_philosophy: gamePhilosophy || null,
+          licenses: coachLicenseType ? [coachLicenseType] : [],
+          open_to_new_role: openToNewRole,
+          preferred_regions: coachRegionsArray,
+          technical_video_url: null,
+        },
+        playerCareerEntries: [],
+        playerProfile: null,
+        profile: {
+          avatar_url: parseOptionalText(avatarUrl),
+          bio: parseOptionalText(normalizeProfileBioInput(form.bio)),
+          birth_date: birthDate,
+          city: null,
+          full_name: fullName,
+          is_open_to_transfer: false,
+          languages: coachLanguages,
+          nationality,
+          region: null,
+        },
+        profileId: session.user.id,
+        role: role as AppRole,
+        staffProfile: null,
+        userContacts: {
+          email: "",
+          facebook: "",
+          instagram: "",
+          phone: composePhoneNumber(phoneCountryCode, phoneNumber),
+          showEmail: false,
+          showFacebook: false,
+          showInstagram: false,
+        },
+      });
+
+      goToCompletion("coach_extra");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -1249,7 +1376,7 @@ export default function OnboardingProfileScreen() {
         {step === "base" ? (
           <View style={styles.stepContainer}>
             <OnboardingSectionCard
-              title="Dati del calciatore"
+              title="Informazioni personali"
               subtitle="Completa i dati minimi per attivare il profilo."
             >
               {validationErrors.form ? (
@@ -1842,6 +1969,89 @@ export default function OnboardingProfileScreen() {
             onSkip={handleSaveExperiences}
             onUpdateEntries={(entries) => updateValue("careerEntries", entries)}
             searchTeams={searchTeams}
+          />
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Coach Role (Qualifica e disponibilità)                   */}
+        {/* ============================================================= */}
+        {step === "coach_role" ? (
+          <View style={styles.stepContainer}>
+            <CoachRoleStep
+              availableFrom={coachAvailableFrom}
+              categoriesArray={coachCategoriesArray}
+              licenseType={coachLicenseType}
+              openToNewRole={openToNewRole}
+              primaryRole={coachPrimaryRole}
+              regionsArray={coachRegionsArray}
+              onUpdate={(patch) => patchForm(patch)}
+              validationErrors={validationErrors}
+            />
+            <Button
+              disabled={isBusy}
+              label="Continua"
+              onPress={handleContinueFromCoachRole}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Coach Career                                             */}
+        {/* ============================================================= */}
+        {step === "coach_career" ? (
+          <CoachCareerStep
+            entries={coachCareerEntries as CoachCareerEntry[]}
+            isBusy={isBusy}
+            onContinue={handleContinueFromCoachCareer}
+            onRegisterBack={registerCoachCareerBack}
+            onSkip={handleContinueFromCoachCareer}
+            onUpdateEntries={(entries) => patchForm({ coachCareerEntries: entries })}
+            searchTeams={searchTeams}
+          />
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Player Career Toggle                                     */}
+        {/* ============================================================= */}
+        {step === "player_career_toggle" ? (
+          <PlayerCareerToggleStep
+            hasPlayedFootball={hasPlayedFootball}
+            isBusy={isBusy}
+            onContinue={handleContinueFromPlayerCareerToggle}
+            onUpdate={(value) => patchForm({ hasPlayedFootball: value })}
+          />
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Player Career                                            */}
+        {/* ============================================================= */}
+        {step === "player_career" ? (
+          <CareerExperienceStep
+            careerEntries={coachPlayerCareerEntries}
+            isBusy={isBusy}
+            onSaveAndContinue={handleContinueFromPlayerCareer}
+            onSkip={handleContinueFromPlayerCareer}
+            onUpdateEntries={(entries) =>
+              patchForm({ coachPlayerCareerEntries: entries })
+            }
+            searchTeams={searchTeams}
+          />
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Coach Extra (filosofia e stile)                          */}
+        {/* ============================================================= */}
+        {step === "coach_extra" ? (
+          <CoachExtraStep
+            bio={bio}
+            formation={coachFormation}
+            isBusy={isBusy}
+            languages={coachLanguages}
+            playStyle={coachPlayStyle}
+            onFinish={handleFinishCoachExtra}
+            onSkip={handleFinishCoachExtra}
+            onUpdate={(patch) => patchForm(patch)}
           />
         ) : null}
 
