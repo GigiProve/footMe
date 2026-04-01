@@ -173,6 +173,20 @@ export type CompleteProfessionalProfileUpdate = {
     player_career_entries: unknown[];
     player_types: string[];
   } | null;
+  directorProfile?: {
+    career_entries: unknown[];
+    club_types: string[];
+    director_roles: string[];
+    experience_categories: string[];
+    has_other_football_experience: boolean;
+    has_played_football: boolean;
+    main_focus: string | null;
+    market_involvement: string | null;
+    other_football_roles: string[];
+    player_career_entries: unknown[];
+    primary_role: string | null;
+    responsibilities: string[];
+  } | null;
   club: {
     category: string | null;
     city: string;
@@ -782,6 +796,29 @@ export async function updateCompleteProfessionalProfile(
       player_career_entries: input.agentProfile.player_career_entries,
       player_types: input.agentProfile.player_types,
       profile_id: input.profileId,
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (input.role === "director" && input.directorProfile) {
+    const { error } = await supabase.from("director_profiles").upsert({
+      career_entries: input.directorProfile.career_entries,
+      club_types: input.directorProfile.club_types,
+      director_roles: input.directorProfile.director_roles,
+      experience_categories: input.directorProfile.experience_categories,
+      has_other_football_experience:
+        input.directorProfile.has_other_football_experience,
+      has_played_football: input.directorProfile.has_played_football,
+      main_focus: input.directorProfile.main_focus,
+      market_involvement: input.directorProfile.market_involvement,
+      other_football_roles: input.directorProfile.other_football_roles,
+      player_career_entries: input.directorProfile.player_career_entries,
+      primary_role: input.directorProfile.primary_role,
+      profile_id: input.profileId,
+      responsibilities: input.directorProfile.responsibilities,
     });
 
     if (error) {

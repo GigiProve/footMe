@@ -110,7 +110,7 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
   // mockup does not expose a gender field in the onboarding flow.
   if (input.role !== "club_admin") {
     const missingFields = [
-      input.role !== "agent" && !input.gender ? "sesso" : null,
+      input.role !== "agent" && input.role !== "director" && !input.gender ? "sesso" : null,
       !birthDate ? "data di nascita" : null,
     ].filter(Boolean) as string[];
 
@@ -223,6 +223,16 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
 
   if (input.role === "agent") {
     const { error } = await supabase.from("agent_profiles").upsert({
+      profile_id: input.userId,
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (input.role === "director") {
+    const { error } = await supabase.from("director_profiles").upsert({
       profile_id: input.userId,
     });
 

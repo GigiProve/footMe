@@ -43,6 +43,17 @@ export type OnboardingStep =
   | "player_career_toggle"
   | "player_career"
   | "coach_extra"
+  | "director_roles"
+  | "director_responsibilities"
+  | "director_categories"
+  | "director_focus"
+  | "director_market"
+  | "director_career"
+  | "director_football_experience"
+  | "director_player_career_toggle"
+  | "director_player_career"
+  | "director_club_type"
+  | "director_extra"
   | "complete"
   // Legacy steps kept for draft migration
   | "decision"
@@ -153,6 +164,21 @@ export type OnboardingFormState = {
   staffPreferredRegions: string;
   staffRoles: StaffRole[];
   staffSpecialization: StaffSpecialization;
+  // Director fields
+  directorRoles: string[];
+  directorPrimaryRole: string;
+  directorResponsibilities: string[];
+  directorCategories: string[];
+  directorMainFocus: string;
+  directorMarketInvolvement: string;
+  directorCareerEntries: CoachCareerEntry[];
+  directorHasOtherFootballExperience: boolean;
+  directorOtherFootballRoles: string[];
+  directorHasPlayedFootball: boolean;
+  directorPlayerCareerEntries: PlayerExperienceForm[];
+  directorClubTypes: string[];
+  directorLanguages: string[];
+  directorBio: string;
   technicalVideoUrl: string;
   transferProvinces: string;
   transferRegions: string;
@@ -434,11 +460,111 @@ const staffVisibleSteps: OnboardingVisibleStep[] = [
   },
 ];
 
+const directorStepOrder: OnboardingStep[] = [
+  "role",
+  "base",
+  "photo",
+  "director_roles",
+  "director_responsibilities",
+  "director_categories",
+  "director_focus",
+  "director_market",
+  "director_career",
+  "director_football_experience",
+  "director_player_career_toggle",
+  "director_player_career",
+  "director_club_type",
+  "director_extra",
+  "complete",
+];
+
+const directorVisibleSteps: OnboardingVisibleStep[] = [
+  {
+    description: "Seleziona il tipo di profilo da creare",
+    index: 1,
+    label: "Ruolo",
+    step: "role",
+  },
+  {
+    description: "Informazioni personali",
+    index: 2,
+    label: "Dati",
+    step: "base",
+  },
+  {
+    description: "Aggiungi una foto profilo",
+    index: 3,
+    label: "Foto",
+    step: "photo",
+  },
+  {
+    description: "Il tuo ruolo nel calcio",
+    index: 4,
+    label: "Ruolo",
+    step: "director_roles",
+  },
+  {
+    description: "Le tue aree di responsabilità",
+    index: 5,
+    label: "Responsabilità",
+    step: "director_responsibilities",
+  },
+  {
+    description: "Categorie di esperienza",
+    index: 6,
+    label: "Categorie",
+    step: "director_categories",
+  },
+  {
+    description: "Focus principale",
+    index: 7,
+    label: "Focus",
+    step: "director_focus",
+  },
+  {
+    description: "Coinvolgimento nel mercato",
+    index: 8,
+    label: "Mercato",
+    step: "director_market",
+  },
+  {
+    description: "Esperienze dirigenziali",
+    index: 9,
+    label: "Carriera",
+    step: "director_career",
+  },
+  {
+    description: "Altri ruoli nel calcio",
+    index: 10,
+    label: "Esperienze",
+    step: "director_football_experience",
+  },
+  {
+    description: "Carriera da calciatore",
+    index: 11,
+    label: "Giocatore",
+    step: "director_player_career_toggle",
+  },
+  {
+    description: "Tipo di società prevalente",
+    index: 12,
+    label: "Società",
+    step: "director_club_type",
+  },
+  {
+    description: "Bio e lingue",
+    index: 13,
+    label: "Profilo",
+    step: "director_extra",
+  },
+];
+
 export function getOnboardingVisibleSteps(role: AppRole | ""): OnboardingVisibleStep[] {
   if (role === "club_admin") return clubVisibleSteps;
   if (role === "agent") return agentVisibleSteps;
   if (role === "coach") return coachVisibleSteps;
   if (role === "staff") return staffVisibleSteps;
+  if (role === "director") return directorVisibleSteps;
   return defaultVisibleSteps;
 }
 
@@ -447,6 +573,7 @@ export function getOnboardingStepOrder(role: AppRole | ""): OnboardingStep[] {
   if (role === "agent") return agentStepOrder;
   if (role === "coach") return coachStepOrder;
   if (role === "staff") return staffStepOrder;
+  if (role === "director") return directorStepOrder;
   return defaultStepOrder;
 }
 
@@ -556,6 +683,20 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   staffPreferredRegions: "",
   staffRoles: [],
   staffSpecialization: "fitness_coach",
+  directorRoles: [],
+  directorPrimaryRole: "",
+  directorResponsibilities: [],
+  directorCategories: [],
+  directorMainFocus: "",
+  directorMarketInvolvement: "",
+  directorCareerEntries: [],
+  directorHasOtherFootballExperience: false,
+  directorOtherFootballRoles: [],
+  directorHasPlayedFootball: false,
+  directorPlayerCareerEntries: [],
+  directorClubTypes: [],
+  directorLanguages: [],
+  directorBio: "",
   technicalVideoUrl: "",
   transferProvinces: "",
   transferRegions: "",
@@ -680,6 +821,32 @@ export function normalizeOnboardingDraft(
       typeof value.staffPreferredProvinces === "string"
         ? value.staffPreferredProvinces
         : defaultOnboardingFormState.staffPreferredProvinces,
+    directorRoles: Array.isArray(value.directorRoles)
+      ? value.directorRoles.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.directorRoles,
+    directorResponsibilities: Array.isArray(value.directorResponsibilities)
+      ? value.directorResponsibilities.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.directorResponsibilities,
+    directorCategories: Array.isArray(value.directorCategories)
+      ? value.directorCategories.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.directorCategories,
+    directorCareerEntries: Array.isArray(value.directorCareerEntries)
+      ? value.directorCareerEntries
+      : defaultOnboardingFormState.directorCareerEntries,
+    directorHasOtherFootballExperience: value.directorHasOtherFootballExperience === true,
+    directorOtherFootballRoles: Array.isArray(value.directorOtherFootballRoles)
+      ? value.directorOtherFootballRoles.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.directorOtherFootballRoles,
+    directorHasPlayedFootball: value.directorHasPlayedFootball === true,
+    directorPlayerCareerEntries: Array.isArray(value.directorPlayerCareerEntries)
+      ? value.directorPlayerCareerEntries
+      : defaultOnboardingFormState.directorPlayerCareerEntries,
+    directorClubTypes: Array.isArray(value.directorClubTypes)
+      ? value.directorClubTypes.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.directorClubTypes,
+    directorLanguages: Array.isArray(value.directorLanguages)
+      ? value.directorLanguages.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.directorLanguages,
     uploadingField: null,
   };
 }
@@ -733,6 +900,10 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     "coach_role", "coach_career", "staff_role", "staff_availability", "staff_career",
     "staff_player_career_toggle", "staff_player_career",
     "player_career_toggle", "player_career", "coach_extra",
+    "director_roles", "director_responsibilities", "director_categories",
+    "director_focus", "director_market", "director_career",
+    "director_football_experience", "director_player_career_toggle",
+    "director_player_career", "director_club_type", "director_extra",
     "complete",
     // Legacy steps for draft migration
     "decision", "details", "club",
@@ -765,6 +936,10 @@ export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" 
 
   if (role === "agent" && effectiveStep === "agent_extra") {
     comparableStep = "agent_verification";
+  }
+
+  if (role === "director" && effectiveStep === "director_player_career") {
+    comparableStep = "director_player_career_toggle";
   }
 
   const visibleIndex = visibleSteps.findIndex((entry) => entry.step === comparableStep);
@@ -823,6 +998,7 @@ export function getPreviousOnboardingStep(
         ? "staff_player_career"
         : "staff_player_career_toggle";
     }
+    if (role === "director") return "director_extra";
     return "experience";
   }
 
@@ -830,6 +1006,12 @@ export function getPreviousOnboardingStep(
     return _lastCompletedStep === "agent_player_career"
       ? "agent_player_career"
       : "agent_player_career_toggle";
+  }
+
+  if (role === "director" && effectiveStep === "director_club_type") {
+    return _lastCompletedStep === "director_player_career"
+      ? "director_player_career"
+      : "director_player_career_toggle";
   }
 
   const previousIndex = stepOrder.indexOf(effectiveStep) - 1;
@@ -906,6 +1088,38 @@ export function validateOnboardingStep(
 
   if (step === "staff_availability") {
     return mapStaffAvailabilityValidationError(form);
+  }
+
+  if (step === "director_roles") {
+    return mapDirectorRolesValidationError(form);
+  }
+  if (step === "director_responsibilities") {
+    return mapDirectorResponsibilitiesValidationError(form);
+  }
+  if (step === "director_categories") {
+    return mapDirectorCategoriesValidationError(form);
+  }
+  if (step === "director_focus") {
+    return mapDirectorFocusValidationError(form);
+  }
+  if (step === "director_market") {
+    return mapDirectorMarketValidationError(form);
+  }
+  if (step === "director_football_experience") {
+    return mapDirectorFootballExperienceValidationError(form);
+  }
+  if (step === "director_club_type") {
+    return mapDirectorClubTypeValidationError(form);
+  }
+
+  // director career, toggle, player career, extra → no required validation
+  if (
+    step === "director_career" ||
+    step === "director_player_career_toggle" ||
+    step === "director_player_career" ||
+    step === "director_extra"
+  ) {
+    return {};
   }
 
   // career toggle/list steps have no required validation here
@@ -1129,7 +1343,7 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.lastName = "Questo campo è obbligatorio";
   }
 
-  if (form.role !== "agent" && !form.gender) {
+  if (form.role !== "agent" && form.role !== "director" && !form.gender) {
     errors.gender = "Questo campo è obbligatorio";
   }
 
@@ -1137,11 +1351,11 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.birthDate = "Questo campo è obbligatorio";
   }
 
-  if (form.role === "agent" && !form.nationality.trim()) {
+  if ((form.role === "agent" || form.role === "director") && !form.nationality.trim()) {
     errors.nationality = "Questo campo è obbligatorio";
   }
 
-  if (form.role === "agent" && !form.residence.trim()) {
+  if ((form.role === "agent" || form.role === "director") && !form.residence.trim()) {
     errors.residence = "Questo campo è obbligatorio";
   }
 
@@ -1247,5 +1461,57 @@ function mapAgentVerificationValidationError(
     };
   }
 
+  return {};
+}
+
+function mapDirectorRolesValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (form.directorRoles.length === 0) {
+    return { directorRoles: "Seleziona almeno un ruolo per continuare." };
+  }
+  if (form.directorRoles.length > 1 && !form.directorPrimaryRole) {
+    return { directorPrimaryRole: "Seleziona il ruolo principale per continuare." };
+  }
+  return {};
+}
+
+function mapDirectorResponsibilitiesValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (form.directorResponsibilities.length === 0) {
+    return { directorResponsibilities: "Seleziona almeno una responsabilità per continuare." };
+  }
+  return {};
+}
+
+function mapDirectorCategoriesValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (form.directorCategories.length === 0) {
+    return { directorCategories: "Seleziona almeno una categoria per continuare." };
+  }
+  return {};
+}
+
+function mapDirectorFocusValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (!form.directorMainFocus) {
+    return { directorMainFocus: "Seleziona il focus principale per continuare." };
+  }
+  return {};
+}
+
+function mapDirectorMarketValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (!form.directorMarketInvolvement) {
+    return { directorMarketInvolvement: "Seleziona una risposta per continuare." };
+  }
+  return {};
+}
+
+function mapDirectorFootballExperienceValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (form.directorHasOtherFootballExperience && form.directorOtherFootballRoles.length === 0) {
+    return { directorOtherFootballRoles: "Seleziona almeno un'esperienza calcistica." };
+  }
+  return {};
+}
+
+function mapDirectorClubTypeValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (form.directorClubTypes.length === 0) {
+    return { directorClubTypes: "Seleziona almeno un tipo di società per continuare." };
+  }
   return {};
 }
