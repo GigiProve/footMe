@@ -286,7 +286,7 @@ describe("createInitialProfile", () => {
     });
 
     expect(upsertMocks.staff_profiles).toHaveBeenCalledWith({
-      available_from: "",
+      available_from: null,
       primary_staff_role: "Match analyst",
       profile_id: "staff-1",
       specialization: "match_analyst",
