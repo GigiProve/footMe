@@ -69,37 +69,59 @@ export function OnboardingProgressBar({
   currentIndex,
   steps,
 }: OnboardingProgressBarProps) {
+  const currentStep = steps[currentIndex];
+
   return (
     <View style={progressStyles.container}>
-      {steps.map((entry, index) => (
+      <View style={progressStyles.metaRow}>
+        <AppText variant="bodySm" style={progressStyles.metaText}>
+          {currentStep?.label ?? ""}
+        </AppText>
+        <AppText variant="bodySm" style={progressStyles.metaText}>
+          {Math.min(currentIndex + 1, steps.length)}/{steps.length}
+        </AppText>
+      </View>
+      <View style={progressStyles.track}>
         <View
-          key={entry.step}
           style={[
-            progressStyles.bar,
-            index <= currentIndex ? progressStyles.barActive : null,
+            progressStyles.fill,
+            {
+              width: `${((Math.min(currentIndex + 1, steps.length)) / Math.max(steps.length, 1)) * 100}%`,
+            },
           ]}
         />
-      ))}
+      </View>
     </View>
   );
 }
 
 const progressStyles = StyleSheet.create({
   container: {
-    flexDirection: "row",
     gap: spacing[8],
-    paddingHorizontal: spacing[16],
+    paddingHorizontal: spacing[20],
     paddingTop: spacing[20],
-    paddingBottom: spacing[28],
+    paddingBottom: spacing[24],
   },
-  bar: {
-    flex: 1,
-    height: 6,
+  fill: {
+    height: "100%",
     borderRadius: radius.full,
-    backgroundColor: "#D5DAE0",
-  },
-  barActive: {
     backgroundColor: colors.accent,
+  },
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  metaText: {
+    color: colors.textSecondary,
+    fontWeight: "600",
+  },
+  track: {
+    width: "100%",
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    overflow: "hidden",
   },
 });
 

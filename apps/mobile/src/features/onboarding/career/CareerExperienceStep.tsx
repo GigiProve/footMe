@@ -34,12 +34,16 @@ type FlowScreen =
 // ---------------------------------------------------------------------------
 
 type CareerExperienceStepProps = {
+  addButtonLabel?: string;
   careerEntries: PlayerExperienceForm[];
+  emptyMessage?: string;
   isBusy: boolean;
   onSaveAndContinue: () => void;
   onSkip: () => void;
   onUpdateEntries: (entries: PlayerExperienceForm[]) => void;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  subtitle?: string;
+  title?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -47,12 +51,16 @@ type CareerExperienceStepProps = {
 // ---------------------------------------------------------------------------
 
 export function CareerExperienceStep({
+  addButtonLabel = "Aggiungi esperienza",
   careerEntries,
+  emptyMessage = "Puoi aggiungere le tue esperienze calcistiche ora oppure farlo in seguito dal tuo profilo.",
   isBusy,
   onSaveAndContinue,
   onSkip,
   onUpdateEntries,
   searchTeams,
+  subtitle = "Aggiungi le tue esperienze calcistiche per completare il tuo profilo in modo accurato.",
+  title = "La tua carriera",
 }: CareerExperienceStepProps) {
   const [screen, setScreen] = useState<FlowScreen>({ type: "list" });
 
@@ -163,15 +171,15 @@ export function CareerExperienceStep({
   return (
     <View style={stepStyles.container}>
       <OnboardingSectionCard
-        title="La tua carriera"
-        subtitle="Aggiungi le tue esperienze calcistiche per completare il tuo profilo in modo accurato."
+        title={title}
+        subtitle={subtitle}
       >
         {!hasExperiences ? (
           <>
             <View style={stepStyles.emptyIcon}>
               <Ionicons name="trophy-outline" size={48} color={colors.accent} />
             </View>
-            <OnboardingInfoCard message="Puoi aggiungere le tue esperienze calcistiche ora oppure farlo in seguito dal tuo profilo." />
+            <OnboardingInfoCard message={emptyMessage} />
           </>
         ) : null}
 
@@ -212,7 +220,8 @@ export function CareerExperienceStep({
         ) : null}
         {/* Add experience button */}
         <Button
-          label="Aggiungi esperienza"
+          label={addButtonLabel}
+          fullWidth
           leftIcon={
             <Ionicons name="add-outline" size={20} color={colors.accent} />
           }
@@ -224,6 +233,7 @@ export function CareerExperienceStep({
       {/* Bottom CTA */}
       <Button
         disabled={isBusy}
+        fullWidth
         label={isBusy ? "Salvataggio..." : "Continua"}
         onPress={hasExperiences ? handleContinue : onSkip}
         variant="primary"

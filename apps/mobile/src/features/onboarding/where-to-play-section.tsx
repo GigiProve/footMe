@@ -15,14 +15,24 @@ import type { AvailabilityType } from "./onboarding-form";
 type WhereToPlaySectionProps = {
   availabilityType: AvailabilityType;
   categories: string[];
+  categoriesHelperText?: string;
+  categoriesLabel?: string;
+  hideCategories?: boolean;
+  infoMessages?: Partial<Record<AvailabilityType, string>>;
   isAvailable: boolean;
+  regionsHelperText?: string;
+  regionsLabel?: string;
   onAvailabilityTypeChange: (type: AvailabilityType) => void;
   onCategoriesChange: (categories: string[]) => void;
   onIsAvailableChange: (value: boolean) => void;
   onProvincesChange: (provinces: string[]) => void;
   onRegionsChange: (regions: string[]) => void;
+  provincesHelperText?: string;
+  provincesLabel?: string;
   provinces: string[];
   regions: string[];
+  toggleLabel?: string;
+  toggleSubtitle?: string;
   validationErrors?: Partial<Record<string, string>>;
 };
 
@@ -51,14 +61,24 @@ const INFO_MESSAGES: Record<AvailabilityType, string> = {
 export function WhereToPlaySection({
   availabilityType,
   categories,
+  categoriesHelperText = undefined,
+  categoriesLabel = "Categorie di interesse",
+  hideCategories = false,
+  infoMessages,
   isAvailable,
+  regionsHelperText = "Puoi selezionare più zone.",
+  regionsLabel = "Regioni di interesse",
   onAvailabilityTypeChange,
   onCategoriesChange,
   onIsAvailableChange,
   onProvincesChange,
   onRegionsChange,
+  provincesHelperText = "Puoi selezionare più province.",
+  provincesLabel = "Province di interesse",
   provinces,
   regions,
+  toggleLabel = "Disponibile a cambiare squadra",
+  toggleSubtitle = "Il tuo profilo può comparire tra i calciatori disponibili sul mercato.",
   validationErrors = {},
 }: WhereToPlaySectionProps) {
   function handleAvailabilityTypeChange(type: AvailabilityType) {
@@ -79,9 +99,9 @@ export function WhereToPlaySection({
     <View style={styles.container}>
       {/* Toggle */}
       <Toggle
-        label="Disponibile a cambiare squadra"
+        label={toggleLabel}
         onValueChange={handleToggle}
-        subtitle="Il tuo profilo può comparire tra i calciatori disponibili sul mercato."
+        subtitle={toggleSubtitle}
         value={isAvailable}
       />
 
@@ -120,11 +140,11 @@ export function WhereToPlaySection({
           </View>
 
           {/* Info card — shown for REGIONS and PROVINCES */}
-          {availabilityType !== "ITALY" ? (
+                {availabilityType !== "ITALY" ? (
             <View style={styles.infoCard}>
               <Ionicons name="map-outline" size={20} color={colors.accent} />
               <AppText variant="bodySm" color="secondary" style={styles.infoText}>
-                {INFO_MESSAGES[availabilityType]}
+                {(infoMessages ?? INFO_MESSAGES)[availabilityType] ?? ""}
               </AppText>
             </View>
           ) : null}
@@ -133,17 +153,17 @@ export function WhereToPlaySection({
           {availabilityType === "REGIONS" ? (
             <View style={styles.fieldGroup}>
               <AvailabilityRegionsSelector
-                label="Regioni di interesse"
+                label={regionsLabel}
                 onChange={onRegionsChange}
                 placeholder="Cerca regione"
                 value={regions}
               />
               <AppText variant="caption" color="secondary">
-                Puoi selezionare più zone.
+                {regionsHelperText}
               </AppText>
-              {validationErrors.transferRegions ? (
+              {validationErrors.transferRegions || validationErrors.staffPreferredRegions ? (
                 <AppText variant="caption" color="danger">
-                  {validationErrors.transferRegions}
+                  {validationErrors.transferRegions ?? validationErrors.staffPreferredRegions}
                 </AppText>
               ) : null}
             </View>
@@ -153,35 +173,42 @@ export function WhereToPlaySection({
           {availabilityType === "PROVINCES" ? (
             <View style={styles.fieldGroup}>
               <AvailabilityProvincesSelector
-                label="Province di interesse"
+                label={provincesLabel}
                 onChange={onProvincesChange}
                 placeholder="Cerca provincia"
                 value={provinces}
               />
               <AppText variant="caption" color="secondary">
-                Puoi selezionare più province.
+                {provincesHelperText}
               </AppText>
-              {validationErrors.transferProvinces ? (
+              {validationErrors.transferProvinces || validationErrors.staffPreferredProvinces ? (
                 <AppText variant="caption" color="danger">
-                  {validationErrors.transferProvinces}
+                  {validationErrors.transferProvinces ?? validationErrors.staffPreferredProvinces}
                 </AppText>
               ) : null}
             </View>
           ) : null}
 
           {/* Categories */}
-          <View style={styles.fieldGroup}>
-            <InterestCategoriesSelector
-              label="Categorie di interesse"
-              onChange={onCategoriesChange}
-              value={categories}
-            />
-            {validationErrors.preferredCategories ? (
-              <AppText variant="caption" color="danger">
-                {validationErrors.preferredCategories}
-              </AppText>
-            ) : null}
-          </View>
+          {!hideCategories ? (
+            <View style={styles.fieldGroup}>
+              <InterestCategoriesSelector
+                label={categoriesLabel}
+                onChange={onCategoriesChange}
+                value={categories}
+              />
+              {categoriesHelperText ? (
+                <AppText variant="caption" color="secondary">
+                  {categoriesHelperText}
+                </AppText>
+              ) : null}
+              {validationErrors.preferredCategories ? (
+                <AppText variant="caption" color="danger">
+                  {validationErrors.preferredCategories}
+                </AppText>
+              ) : null}
+            </View>
+          ) : null}
         </>
       ) : null}
     </View>

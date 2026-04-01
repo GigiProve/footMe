@@ -26,7 +26,6 @@ import {
   BaseProfileValidationError,
   type AppRole,
   type ProfileGender,
-  type StaffSpecialization,
 } from "../../src/features/onboarding/create-initial-profile";
 import {
   coerceOnboardingStep,
@@ -51,11 +50,25 @@ import {
 import { WhereToPlaySection } from "../../src/features/onboarding/where-to-play-section";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
 import { CareerExperienceStep } from "../../src/features/onboarding/career/CareerExperienceStep";
+import { AgentAgencyStep } from "../../src/features/onboarding/agent/AgentAgencyStep";
+import { AgentAvailabilityStep } from "../../src/features/onboarding/agent/AgentAvailabilityStep";
+import { AgentBasicInfoStep } from "../../src/features/onboarding/agent/AgentBasicInfoStep";
+import { AgentExtraStep } from "../../src/features/onboarding/agent/AgentExtraStep";
+import { AgentFootballExperienceStep } from "../../src/features/onboarding/agent/AgentFootballExperienceStep";
+import { AgentPlayersStep } from "../../src/features/onboarding/agent/AgentPlayersStep";
+import { AgentPortfolioStep } from "../../src/features/onboarding/agent/AgentPortfolioStep";
+import { AgentVerificationStep } from "../../src/features/onboarding/agent/AgentVerificationStep";
 import type { CoachCareerEntry } from "../../src/features/onboarding/coach/coach-career-types";
 import { CoachRoleStep } from "../../src/features/onboarding/coach/CoachRoleStep";
 import { CoachCareerStep } from "../../src/features/onboarding/coach/CoachCareerStep";
 import { PlayerCareerToggleStep } from "../../src/features/onboarding/coach/PlayerCareerToggleStep";
 import { CoachExtraStep } from "../../src/features/onboarding/coach/CoachExtraStep";
+import { StaffAvailabilityStep } from "../../src/features/onboarding/staff/StaffAvailabilityStep";
+import { StaffRoleStep } from "../../src/features/onboarding/staff/StaffRoleStep";
+import {
+  mapStaffRoleToSpecialization,
+  STAFF_ROLE_OPTIONS,
+} from "../../src/features/onboarding/onboarding-types";
 import { PlayerCharacteristicsSection } from "../../src/features/profiles/player-sports-section";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
@@ -116,8 +129,8 @@ const roleOptions: {
     value: "club_admin",
   },
   {
-    icon: "hand-right-outline",
-    label: "Procuratore",
+    icon: "people-outline",
+    label: "Agente",
     value: "agent",
   },
   {
@@ -132,16 +145,32 @@ const genderOptions: { label: string; value: ProfileGender }[] = [
   { label: "Donna", value: "female" },
 ];
 
-const staffSpecializationOptions: {
-  label: string;
-  value: StaffSpecialization;
-}[] = [
-  { label: "Preparatore atletico", value: "fitness_coach" },
-  { label: "Preparatore portieri", value: "goalkeeper_coach" },
-  { label: "Fisioterapista", value: "physiotherapist" },
-  { label: "Match analyst", value: "match_analyst" },
-  { label: "Team manager", value: "team_manager" },
-  { label: "Altro", value: "other" },
+const staffExperienceRoleOptions = STAFF_ROLE_OPTIONS.map((option) => ({
+  label: option.label,
+  value: option.value,
+}));
+
+const staffExperienceTypeOptions = [
+  {
+    type: "MULTI_SEASON" as const,
+    title: "Stagioni complete",
+    subtitle:
+      "Aggiungi più stagioni complete nella stessa squadra con lo stesso ruolo.",
+    icon: "layers-outline" as const,
+  },
+  {
+    type: "SINGLE_SEASON" as const,
+    title: "Singola stagione",
+    subtitle: "Inserisci una sola stagione sportiva.",
+    icon: "calendar-outline" as const,
+  },
+  {
+    type: "CUSTOM_PERIOD" as const,
+    title: "Periodo personalizzato",
+    subtitle:
+      "Specifica mese e anno di inizio e fine per incarichi brevi o subentri.",
+    icon: "time-outline" as const,
+  },
 ];
 
 function parseOptionalText(value: string) {
@@ -350,12 +379,9 @@ export default function OnboardingProfileScreen() {
   routerRef.current = router;
   const stepBackOverrideRef = useRef<(() => void) | null>(null);
 
-  const registerCoachCareerBack = useCallback(
-    (fn: (() => void) | null) => {
-      stepBackOverrideRef.current = fn;
-    },
-    [],
-  );
+  const registerCoachCareerBack = useCallback((fn: (() => void) | null) => {
+    stepBackOverrideRef.current = fn;
+  }, []);
   const params = useLocalSearchParams<{ step?: string | string[] }>();
   const { refreshProfile, session } = useSession();
   const {
@@ -383,6 +409,20 @@ export default function OnboardingProfileScreen() {
 
   const step = requestedStep ?? form.currentStep;
   const {
+    agentAgencyLogoUrl,
+    agentAgencyName,
+    agentFederation,
+    agentHasOtherFootballExperience,
+    agentHasPlayedFootball,
+    agentIsFederationLicensed,
+    agentLanguages,
+    agentMainPlayerRoles,
+    agentManagedPlayersCount,
+    agentOpenToClubs,
+    agentOpenToPlayers,
+    agentOtherFootballRoles,
+    agentPlayerCareerEntries,
+    agentPlayerTypes,
     availabilityType,
     avatarUrl,
     bio,
@@ -454,8 +494,17 @@ export default function OnboardingProfileScreen() {
     residenceRegion,
     role,
     secondaryPositions,
+    staffAvailabilityType,
+    staffAvailableFrom,
+    staffCareerEntries,
+    staffHasPlayedFootball,
+    staffPlayerCareerEntries,
+    staffPrimaryRole,
+    staffPreferredCategories,
+    staffPreferredProvinces,
     staffPreferredRegions,
     staffSpecialization,
+    staffRoles,
     technicalVideoUrl,
     transferProvinces,
     transferRegions,
@@ -838,6 +887,9 @@ export default function OnboardingProfileScreen() {
       repPhone: composePhoneNumber(repPhoneCountryCode, repPhone),
       residence,
       role: role as AppRole,
+      staffAvailableFrom,
+      staffPrimaryRole,
+      staffRoles,
       staffSpecialization,
       userId: session.user.id,
     });
@@ -878,8 +930,12 @@ export default function OnboardingProfileScreen() {
 
   function handleContinueFromPhoto() {
     patchForm({ lastCompletedStep: "photo" });
-    if (role === "coach") {
+    if (role === "agent") {
+      navigateToStep("agent_agency");
+    } else if (role === "coach") {
       navigateToStep("coach_role");
+    } else if (role === "staff") {
+      navigateToStep("staff_role");
     } else {
       navigateToStep("technical");
     }
@@ -972,10 +1028,23 @@ export default function OnboardingProfileScreen() {
           role === "staff"
             ? {
                 certifications: fromDelimitedString(certifications),
+                experience_entries: staffCareerEntries,
                 experience_summary: parseOptionalText(experienceSummary),
                 open_to_work: openToWork,
+                availability_type: openToWork ? staffAvailabilityType : null,
+                available_from: openToWork
+                  ? parseOptionalText(staffAvailableFrom)
+                  : null,
+                primary_staff_role: staffPrimaryRole || null,
+                preferred_categories: fromDelimitedString(
+                  staffPreferredCategories,
+                ),
+                preferred_provinces: fromDelimitedString(
+                  staffPreferredProvinces,
+                ),
                 preferred_regions: fromDelimitedString(staffPreferredRegions),
-                specialization: staffSpecialization,
+                specialization: mapStaffRoleToSpecialization(staffPrimaryRole),
+                staff_roles: staffRoles,
               }
             : null,
         userContacts: {
@@ -1075,6 +1144,290 @@ export default function OnboardingProfileScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleContinueFromAgentAgency() {
+    const nextErrors = validateOnboardingStep("agent_agency", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "agent_agency" });
+    setValidationErrors({});
+    navigateToStep("agent_players");
+  }
+
+  function handleContinueFromAgentPlayers() {
+    const nextErrors = validateOnboardingStep("agent_players", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "agent_players" });
+    setValidationErrors({});
+    navigateToStep("agent_football_experience");
+  }
+
+  function handleContinueFromAgentFootballExperience() {
+    const nextErrors = validateOnboardingStep(
+      "agent_football_experience",
+      form,
+    );
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "agent_football_experience" });
+    setValidationErrors({});
+    navigateToStep("agent_player_career_toggle");
+  }
+
+  function handleContinueFromAgentPlayerCareerToggle() {
+    patchForm({ lastCompletedStep: "agent_player_career_toggle" });
+
+    if (agentHasPlayedFootball) {
+      navigateToStep("agent_player_career");
+      return;
+    }
+
+    navigateToStep("agent_portfolio");
+  }
+
+  function handleContinueFromAgentPlayerCareer() {
+    patchForm({ lastCompletedStep: "agent_player_career" });
+    navigateToStep("agent_portfolio");
+  }
+
+  function handleContinueFromAgentPortfolio() {
+    const nextErrors = validateOnboardingStep("agent_portfolio", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "agent_portfolio" });
+    setValidationErrors({});
+    navigateToStep("agent_availability");
+  }
+
+  function handleContinueFromAgentAvailability() {
+    const nextErrors = validateOnboardingStep("agent_availability", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "agent_availability" });
+    setValidationErrors({});
+    navigateToStep("agent_verification");
+  }
+
+  function handleContinueFromAgentVerification() {
+    const nextErrors = validateOnboardingStep("agent_verification", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "agent_verification" });
+    setValidationErrors({});
+    navigateToStep("agent_extra");
+  }
+
+  async function handleFinishAgentExtra() {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await ensureInitialProfileCreated();
+
+      await updateCompleteProfessionalProfile({
+        agentProfile: {
+          agency_logo_url: parseOptionalText(agentAgencyLogoUrl),
+          agency_name: parseOptionalText(agentAgencyName),
+          federation: agentIsFederationLicensed
+            ? parseOptionalText(agentFederation)
+            : null,
+          has_other_football_experience: agentHasOtherFootballExperience,
+          has_played_football: agentHasPlayedFootball,
+          is_federation_licensed: agentIsFederationLicensed,
+          main_player_roles: agentMainPlayerRoles,
+          managed_players_count: parseOptionalText(agentManagedPlayersCount),
+          open_to_clubs: agentOpenToClubs,
+          open_to_players: agentOpenToPlayers,
+          other_football_roles: agentOtherFootballRoles,
+          player_career_entries: agentPlayerCareerEntries,
+          player_types: agentPlayerTypes,
+        },
+        club: null,
+        clubSeasonEntries: [],
+        coachProfile: null,
+        playerCareerEntries: [],
+        playerProfile: null,
+        profile: {
+          avatar_url: parseOptionalText(avatarUrl),
+          bio: parseOptionalText(normalizeProfileBioInput(bio)),
+          birth_date: birthDate,
+          city: parseOptionalText(residence),
+          full_name: fullName,
+          is_open_to_transfer: false,
+          languages: agentLanguages,
+          nationality,
+          region: parseOptionalText(residenceRegion),
+        },
+        profileId: session.user.id,
+        role: role as AppRole,
+        staffProfile: null,
+        userContacts: {
+          email: "",
+          facebook: "",
+          instagram: "",
+          phone: composePhoneNumber(phoneCountryCode, phoneNumber),
+          showEmail: false,
+          showFacebook: false,
+          showInstagram: false,
+        },
+      });
+
+      goToCompletion("agent_extra");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso nel completamento profilo.";
+      Alert.alert("Profilo non salvato", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleContinueFromStaffRole() {
+    const nextErrors = validateOnboardingStep("staff_role", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    const normalizedPrimaryRole =
+      staffRoles.length === 1 ? staffRoles[0] : staffPrimaryRole;
+
+    patchForm({
+      lastCompletedStep: "staff_role",
+      staffPrimaryRole: normalizedPrimaryRole,
+      staffSpecialization: mapStaffRoleToSpecialization(normalizedPrimaryRole),
+    });
+    setValidationErrors({});
+    navigateToStep("staff_availability");
+  }
+
+  function handleContinueFromStaffAvailability() {
+    const nextErrors = validateOnboardingStep("staff_availability", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "staff_availability" });
+    setValidationErrors({});
+    navigateToStep("staff_career");
+  }
+
+  async function handleSaveStaffCareer() {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await ensureInitialProfileCreated();
+
+      await updateCompleteProfessionalProfile({
+        club: null,
+        clubSeasonEntries: [],
+        coachProfile: null,
+        playerCareerEntries: [],
+        playerProfile: null,
+        profile: {
+          avatar_url: parseOptionalText(avatarUrl),
+          bio: parseOptionalText(normalizeProfileBioInput(bio)),
+          birth_date: birthDate,
+          city: null,
+          full_name: fullName,
+          is_open_to_transfer: false,
+          languages: [],
+          nationality,
+          region: null,
+        },
+        profileId: session.user.id,
+        role: role as AppRole,
+        staffProfile: {
+          certifications: fromDelimitedString(certifications),
+          experience_entries: staffCareerEntries,
+          experience_summary: parseOptionalText(experienceSummary),
+          open_to_work: openToWork,
+          availability_type: openToWork ? staffAvailabilityType : null,
+          available_from: openToWork
+            ? parseOptionalText(staffAvailableFrom)
+            : null,
+          primary_staff_role: staffPrimaryRole || null,
+          preferred_categories: fromDelimitedString(staffPreferredCategories),
+          preferred_provinces: fromDelimitedString(staffPreferredProvinces),
+          preferred_regions: fromDelimitedString(staffPreferredRegions),
+          specialization: mapStaffRoleToSpecialization(staffPrimaryRole),
+          staff_roles: staffRoles,
+        },
+        userContacts: {
+          email: "",
+          facebook: "",
+          instagram: "",
+          phone: composePhoneNumber(phoneCountryCode, phoneNumber),
+          showEmail: false,
+          showFacebook: false,
+          showInstagram: false,
+        },
+      });
+
+      patchForm({ lastCompletedStep: "staff_career" });
+      navigateToStep("staff_player_career_toggle");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso nel completamento profilo.";
+      Alert.alert("Profilo non salvato", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleContinueFromStaffPlayerCareerToggle() {
+    patchForm({ lastCompletedStep: "staff_player_career_toggle" });
+
+    if (staffHasPlayedFootball) {
+      navigateToStep("staff_player_career");
+    } else {
+      goToCompletion("staff_player_career_toggle");
+    }
+  }
+
+  function handleContinueFromStaffPlayerCareer() {
+    patchForm({ lastCompletedStep: "staff_player_career" });
+    goToCompletion("staff_player_career");
   }
 
   function handleContinueFromCoachRole() {
@@ -1307,7 +1660,7 @@ export default function OnboardingProfileScreen() {
         />
       ) : null}
 
-      {step !== "complete" ? (
+      {step !== "complete" && step !== "role" ? (
         <OnboardingProgressBar
           currentIndex={progress.stepIndex}
           steps={visibleSteps}
@@ -1374,213 +1727,235 @@ export default function OnboardingProfileScreen() {
         {/* STEP: Base (personal data)                                     */}
         {/* ============================================================= */}
         {step === "base" ? (
-          <View style={styles.stepContainer}>
-            <OnboardingSectionCard
-              title="Informazioni personali"
-              subtitle="Completa i dati minimi per attivare il profilo."
-            >
-              {validationErrors.form ? (
-                <ValidationMessage>{validationErrors.form}</ValidationMessage>
-              ) : null}
-
-              <View style={styles.fieldGap12}>
-                <Input
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  label="Nome *"
-                  onBlur={() => handleFormattedNameBlur("firstName")}
-                  onChangeText={(value) => updateValue("firstName", value)}
-                  placeholder="Es. Marco"
-                  style={
-                    validationErrors.firstName
-                      ? { borderColor: colors.danger }
-                      : undefined
-                  }
-                  value={firstName}
-                />
-                {validationErrors.firstName ? (
-                  <ValidationMessage>
-                    {validationErrors.firstName}
-                  </ValidationMessage>
+          role === "agent" ? (
+            <AgentBasicInfoStep
+              birthDate={birthDate}
+              firstName={firstName}
+              lastName={lastName}
+              nationality={nationality}
+              phoneCountryCode={phoneCountryCode}
+              phoneNumber={phoneNumber}
+              residence={residence}
+              residenceRegion={residenceRegion}
+              validationErrors={validationErrors}
+              onContinue={handleContinueFromBase}
+              onFormattedNameBlur={handleFormattedNameBlur}
+              onResidenceChange={handleResidenceChange}
+              onResidenceSelect={handleResidenceSelect}
+              onUpdate={(patch, fieldsToClear) => {
+                patchForm(patch);
+                clearValidationErrors(fieldsToClear ?? Object.keys(patch));
+              }}
+            />
+          ) : (
+            <View style={styles.stepContainer}>
+              <OnboardingSectionCard
+                title="Informazioni personali"
+                subtitle="Completa i dati minimi per attivare il profilo."
+              >
+                {validationErrors.form ? (
+                  <ValidationMessage>{validationErrors.form}</ValidationMessage>
                 ) : null}
-                <Input
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  label="Cognome *"
-                  onBlur={() => handleFormattedNameBlur("lastName")}
-                  onChangeText={(value) => updateValue("lastName", value)}
-                  placeholder="Es. Rossi"
-                  style={
-                    validationErrors.lastName
-                      ? { borderColor: colors.danger }
-                      : undefined
-                  }
-                  value={lastName}
-                />
-                {validationErrors.lastName ? (
-                  <ValidationMessage>
-                    {validationErrors.lastName}
-                  </ValidationMessage>
-                ) : null}
-              </View>
 
-              <View style={styles.sectionHeaderGap}>
-                <AppText variant="titleSm">Sesso *</AppText>
-                <View style={styles.genderRow}>
-                  {genderOptions.map((entry) => (
-                    <GenderCard
-                      key={entry.value}
-                      active={gender === entry.value}
-                      label={entry.label}
-                      onPress={() =>
-                        updateValue("gender", entry.value, ["gender"])
-                      }
-                      testID={`gender-card-${entry.value}`}
-                    />
-                  ))}
-                </View>
-                {validationErrors.gender ? (
-                  <ValidationMessage>
-                    {validationErrors.gender}
-                  </ValidationMessage>
-                ) : null}
-              </View>
-
-              <DatePickerField
-                label="Data di nascita *"
-                onChange={(value) => updateValue("birthDate", value)}
-                placeholder="Apri il calendario e seleziona la data"
-                value={birthDate}
-              />
-              {validationErrors.birthDate ? (
-                <ValidationMessage>
-                  {validationErrors.birthDate}
-                </ValidationMessage>
-              ) : null}
-
-              <NationalityAutocompleteInput
-                label="Nazionalità"
-                onChange={handleNationalitySelect}
-                value={nationality}
-              />
-
-              <ResidenceCityInput
-                errorMessage={validationErrors.residence}
-                helperText={
-                  residenceRegion
-                    ? `Città selezionata: ${residence} · ${residenceRegion}`
-                    : undefined
-                }
-                onChangeText={handleResidenceChange}
-                onSelectCity={handleResidenceSelect}
-                value={residence}
-              />
-
-              <Toggle
-                label="Vuoi inserire un domicilio diverso dalla residenza?"
-                onValueChange={handleDomicileToggle}
-                value={!useResidenceForDomicile}
-              />
-
-              {!useResidenceForDomicile ? (
-                <ResidenceCityInput
-                  errorMessage={validationErrors.domicile}
-                  helperText={
-                    domicileRegion
-                      ? `Città selezionata: ${domicile} · ${domicileRegion}`
-                      : undefined
-                  }
-                  label="Domicilio"
-                  onChangeText={handleDomicileChange}
-                  onSelectCity={handleDomicileSelect}
-                  placeholder="Cerca la città di domicilio"
-                  value={domicile}
-                />
-              ) : null}
-
-              <PhoneInputWithCountryCode
-                countryCode={phoneCountryCode}
-                errorMessage={validationErrors.phoneNumber}
-                label="Numero di cellulare"
-                onChangeCountryCode={(value) =>
-                  updateValue("phoneCountryCode", value, ["phoneNumber"])
-                }
-                onChangePhoneNumber={(value) =>
-                  updateValue("phoneNumber", value, ["phoneNumber"])
-                }
-                phoneNumber={phoneNumber}
-              />
-
-              {role === "club_admin" ? (
                 <View style={styles.fieldGap12}>
-                  <AppText variant="headingSm">
-                    Dati iniziali della società
-                  </AppText>
                   <Input
-                    label="Nome società"
-                    onChangeText={(value) => updateValue("clubName", value)}
-                    placeholder="Es. ASD Example"
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    label="Nome *"
+                    onBlur={() => handleFormattedNameBlur("firstName")}
+                    onChangeText={(value) => updateValue("firstName", value)}
+                    placeholder="Es. Marco"
                     style={
-                      validationErrors.clubName
+                      validationErrors.firstName
                         ? { borderColor: colors.danger }
                         : undefined
                     }
-                    value={clubName}
+                    value={firstName}
                   />
-                  {validationErrors.clubName ? (
+                  {validationErrors.firstName ? (
                     <ValidationMessage>
-                      {validationErrors.clubName}
+                      {validationErrors.firstName}
                     </ValidationMessage>
                   ) : null}
                   <Input
-                    label="Città"
-                    onChangeText={(value) => updateValue("clubCity", value)}
-                    placeholder="Es. Perugia"
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    label="Cognome *"
+                    onBlur={() => handleFormattedNameBlur("lastName")}
+                    onChangeText={(value) => updateValue("lastName", value)}
+                    placeholder="Es. Rossi"
                     style={
-                      validationErrors.clubCity
+                      validationErrors.lastName
                         ? { borderColor: colors.danger }
                         : undefined
                     }
-                    value={clubCity}
+                    value={lastName}
                   />
-                  {validationErrors.clubCity ? (
+                  {validationErrors.lastName ? (
                     <ValidationMessage>
-                      {validationErrors.clubCity}
-                    </ValidationMessage>
-                  ) : null}
-                  <SelectField
-                    label="Regione"
-                    onChange={(value) => updateValue("clubRegion", value)}
-                    options={REGION_OPTIONS}
-                    placeholder="Seleziona la regione"
-                    value={clubRegion}
-                  />
-                  {validationErrors.clubRegion ? (
-                    <ValidationMessage>
-                      {validationErrors.clubRegion}
+                      {validationErrors.lastName}
                     </ValidationMessage>
                   ) : null}
                 </View>
-              ) : null}
-            </OnboardingSectionCard>
 
-            <View style={styles.buttonRow}>
-              <View style={styles.flex1}>
-                <Button
-                  label="Indietro"
-                  onPress={handleBackNavigation}
-                  variant="secondary"
+                <View style={styles.sectionHeaderGap}>
+                  <AppText variant="titleSm">Sesso *</AppText>
+                  <View style={styles.genderRow}>
+                    {genderOptions.map((entry) => (
+                      <GenderCard
+                        key={entry.value}
+                        active={gender === entry.value}
+                        label={entry.label}
+                        onPress={() =>
+                          updateValue("gender", entry.value, ["gender"])
+                        }
+                        testID={`gender-card-${entry.value}`}
+                      />
+                    ))}
+                  </View>
+                  {validationErrors.gender ? (
+                    <ValidationMessage>
+                      {validationErrors.gender}
+                    </ValidationMessage>
+                  ) : null}
+                </View>
+
+                <DatePickerField
+                  label="Data di nascita *"
+                  onChange={(value) => updateValue("birthDate", value)}
+                  placeholder="Apri il calendario e seleziona la data"
+                  value={birthDate}
                 />
-              </View>
-              <View style={styles.flex1}>
-                <Button
-                  label="Continua"
-                  onPress={handleContinueFromBase}
-                  variant="primary"
+                {validationErrors.birthDate ? (
+                  <ValidationMessage>
+                    {validationErrors.birthDate}
+                  </ValidationMessage>
+                ) : null}
+
+                <NationalityAutocompleteInput
+                  label="Nazionalità"
+                  onChange={handleNationalitySelect}
+                  value={nationality}
                 />
+
+                <ResidenceCityInput
+                  errorMessage={validationErrors.residence}
+                  helperText={
+                    residenceRegion
+                      ? `Città selezionata: ${residence} · ${residenceRegion}`
+                      : undefined
+                  }
+                  onChangeText={handleResidenceChange}
+                  onSelectCity={handleResidenceSelect}
+                  value={residence}
+                />
+
+                <Toggle
+                  label="Vuoi inserire un domicilio diverso dalla residenza?"
+                  onValueChange={handleDomicileToggle}
+                  value={!useResidenceForDomicile}
+                />
+
+                {!useResidenceForDomicile ? (
+                  <ResidenceCityInput
+                    errorMessage={validationErrors.domicile}
+                    helperText={
+                      domicileRegion
+                        ? `Città selezionata: ${domicile} · ${domicileRegion}`
+                        : undefined
+                    }
+                    label="Domicilio"
+                    onChangeText={handleDomicileChange}
+                    onSelectCity={handleDomicileSelect}
+                    placeholder="Cerca la città di domicilio"
+                    value={domicile}
+                  />
+                ) : null}
+
+                <PhoneInputWithCountryCode
+                  countryCode={phoneCountryCode}
+                  errorMessage={validationErrors.phoneNumber}
+                  label="Numero di cellulare"
+                  onChangeCountryCode={(value) =>
+                    updateValue("phoneCountryCode", value, ["phoneNumber"])
+                  }
+                  onChangePhoneNumber={(value) =>
+                    updateValue("phoneNumber", value, ["phoneNumber"])
+                  }
+                  phoneNumber={phoneNumber}
+                />
+
+                {role === "club_admin" ? (
+                  <View style={styles.fieldGap12}>
+                    <AppText variant="headingSm">
+                      Dati iniziali della società
+                    </AppText>
+                    <Input
+                      label="Nome società"
+                      onChangeText={(value) => updateValue("clubName", value)}
+                      placeholder="Es. ASD Example"
+                      style={
+                        validationErrors.clubName
+                          ? { borderColor: colors.danger }
+                          : undefined
+                      }
+                      value={clubName}
+                    />
+                    {validationErrors.clubName ? (
+                      <ValidationMessage>
+                        {validationErrors.clubName}
+                      </ValidationMessage>
+                    ) : null}
+                    <Input
+                      label="Città"
+                      onChangeText={(value) => updateValue("clubCity", value)}
+                      placeholder="Es. Perugia"
+                      style={
+                        validationErrors.clubCity
+                          ? { borderColor: colors.danger }
+                          : undefined
+                      }
+                      value={clubCity}
+                    />
+                    {validationErrors.clubCity ? (
+                      <ValidationMessage>
+                        {validationErrors.clubCity}
+                      </ValidationMessage>
+                    ) : null}
+                    <SelectField
+                      label="Regione"
+                      onChange={(value) => updateValue("clubRegion", value)}
+                      options={REGION_OPTIONS}
+                      placeholder="Seleziona la regione"
+                      value={clubRegion}
+                    />
+                    {validationErrors.clubRegion ? (
+                      <ValidationMessage>
+                        {validationErrors.clubRegion}
+                      </ValidationMessage>
+                    ) : null}
+                  </View>
+                ) : null}
+              </OnboardingSectionCard>
+
+              <View style={styles.buttonRow}>
+                <View style={styles.flex1}>
+                  <Button
+                    label="Indietro"
+                    onPress={handleBackNavigation}
+                    variant="secondary"
+                  />
+                </View>
+                <View style={styles.flex1}>
+                  <Button
+                    label="Continua"
+                    onPress={handleContinueFromBase}
+                    variant="primary"
+                  />
+                </View>
               </View>
             </View>
-          </View>
+          )
         ) : null}
 
         {/* ============================================================= */}
@@ -1890,54 +2265,6 @@ export default function OnboardingProfileScreen() {
               </OnboardingSectionCard>
             ) : null}
 
-            {role === "staff" ? (
-              <OnboardingSectionCard
-                title="Profilo staff tecnico"
-                subtitle="Inserisci specializzazione, certificazioni e disponibilita'."
-              >
-                <SelectField
-                  label="Specializzazione"
-                  onChange={(value) =>
-                    updateValue(
-                      "staffSpecialization",
-                      value as StaffSpecialization,
-                    )
-                  }
-                  options={staffSpecializationOptions}
-                  placeholder="Seleziona la specializzazione"
-                  value={staffSpecialization}
-                />
-                <Input
-                  label="Certificazioni"
-                  onChangeText={(value) => updateValue("certifications", value)}
-                  placeholder="Es. UEFA Fitness, FMS"
-                  value={certifications}
-                />
-                <Input
-                  label="Esperienza"
-                  multiline
-                  onChangeText={(value) =>
-                    updateValue("experienceSummary", value)
-                  }
-                  placeholder="Ruoli, staff e contesti in cui hai lavorato"
-                  value={experienceSummary}
-                />
-                <Input
-                  label="Regioni preferite"
-                  onChangeText={(value) =>
-                    updateValue("staffPreferredRegions", value)
-                  }
-                  placeholder="Es. Lombardia, Emilia-Romagna"
-                  value={staffPreferredRegions}
-                />
-                <Toggle
-                  label="Disponibile a collaborare subito"
-                  onValueChange={(value) => updateValue("openToWork", value)}
-                  value={openToWork}
-                />
-              </OnboardingSectionCard>
-            ) : null}
-
             <View style={styles.buttonRow}>
               <View style={styles.flex1}>
                 <Button
@@ -1972,6 +2299,139 @@ export default function OnboardingProfileScreen() {
           />
         ) : null}
 
+        {step === "agent_agency" ? (
+          <AgentAgencyStep
+            agencyLogoUrl={agentAgencyLogoUrl}
+            agencyName={agentAgencyName}
+            errorMessage={validationErrors.agentAgencyName}
+            isUploading={uploadingField === "agent-agency-logo"}
+            onContinue={handleContinueFromAgentAgency}
+            onPickLogo={() =>
+              handleMediaUpload({
+                field: "agent-agency-logo",
+                folder: "agent-agencies",
+                mediaTypes: ["images"],
+                onUploaded: (items) =>
+                  patchForm({ agentAgencyLogoUrl: items[0]?.url ?? "" }),
+              })
+            }
+            onUpdate={(patch) => patchForm(patch)}
+          />
+        ) : null}
+
+        {step === "agent_players" ? (
+          <AgentPlayersStep
+            errorMessage={validationErrors.agentManagedPlayersCount}
+            isBusy={isBusy}
+            managedPlayersCount={agentManagedPlayersCount}
+            onContinue={handleContinueFromAgentPlayers}
+            onUpdate={(value) =>
+              updateValue("agentManagedPlayersCount", value, [
+                "agentManagedPlayersCount",
+              ])
+            }
+          />
+        ) : null}
+
+        {step === "agent_football_experience" ? (
+          <AgentFootballExperienceStep
+            errorMessage={validationErrors.agentOtherFootballRoles}
+            hasOtherFootballExperience={agentHasOtherFootballExperience}
+            isBusy={isBusy}
+            onContinue={handleContinueFromAgentFootballExperience}
+            onToggleExperience={(value) =>
+              patchForm({
+                agentHasOtherFootballExperience: value,
+                ...(value ? {} : { agentOtherFootballRoles: [] }),
+              })
+            }
+            onUpdateRoles={(roles) =>
+              patchForm({ agentOtherFootballRoles: roles })
+            }
+            otherFootballRoles={agentOtherFootballRoles}
+          />
+        ) : null}
+
+        {step === "agent_player_career_toggle" ? (
+          <PlayerCareerToggleStep
+            buttonLabel={agentHasPlayedFootball ? "Continua" : "Salta"}
+            hasPlayedFootball={agentHasPlayedFootball}
+            isBusy={isBusy}
+            onContinue={handleContinueFromAgentPlayerCareerToggle}
+            onUpdate={(value) => patchForm({ agentHasPlayedFootball: value })}
+            subtitle="Hai giocato a calcio? Puoi aggiungere i tuoi trascorsi in campo per aumentare l'autorevolezza del profilo."
+            title="Carriera da giocatore"
+            toggleLabel="Aggiungi carriera da giocatore"
+            toggleSubtitle="Includi le esperienze da calciatore se sono rilevanti per il tuo percorso."
+          />
+        ) : null}
+
+        {step === "agent_player_career" ? (
+          <CareerExperienceStep
+            addButtonLabel="Aggiungi carriera"
+            careerEntries={agentPlayerCareerEntries}
+            emptyMessage="Puoi aggiungere le tue esperienze da calciatore ora oppure proseguire e completarle piu' tardi."
+            isBusy={isBusy}
+            onSaveAndContinue={handleContinueFromAgentPlayerCareer}
+            onSkip={handleContinueFromAgentPlayerCareer}
+            onUpdateEntries={(entries) =>
+              patchForm({ agentPlayerCareerEntries: entries })
+            }
+            searchTeams={searchTeams}
+            subtitle="Aggiungi i tuoi trascorsi da calciatore con lo stesso pattern usato negli altri onboarding."
+            title="Carriera da giocatore"
+          />
+        ) : null}
+
+        {step === "agent_portfolio" ? (
+          <AgentPortfolioStep
+            isBusy={isBusy}
+            mainPlayerRoles={agentMainPlayerRoles}
+            onContinue={handleContinueFromAgentPortfolio}
+            onUpdateMainRoles={(roles) =>
+              patchForm({ agentMainPlayerRoles: roles })
+            }
+            onUpdatePlayerTypes={(types) =>
+              patchForm({ agentPlayerTypes: types })
+            }
+            playerTypes={agentPlayerTypes}
+            validationErrors={validationErrors}
+          />
+        ) : null}
+
+        {step === "agent_availability" ? (
+          <AgentAvailabilityStep
+            errorMessage={validationErrors.agentAvailability}
+            isBusy={isBusy}
+            onContinue={handleContinueFromAgentAvailability}
+            onUpdate={(patch) => patchForm(patch)}
+            openToClubs={agentOpenToClubs}
+            openToPlayers={agentOpenToPlayers}
+          />
+        ) : null}
+
+        {step === "agent_verification" ? (
+          <AgentVerificationStep
+            federation={agentFederation}
+            isBusy={isBusy}
+            isFederationLicensed={agentIsFederationLicensed}
+            onContinue={handleContinueFromAgentVerification}
+            onUpdate={(patch) => patchForm(patch)}
+            validationErrors={validationErrors}
+          />
+        ) : null}
+
+        {step === "agent_extra" ? (
+          <AgentExtraStep
+            bio={bio}
+            isBusy={isBusy}
+            languages={agentLanguages}
+            onFinish={handleFinishAgentExtra}
+            onSkip={handleFinishAgentExtra}
+            onUpdate={(patch) => patchForm(patch)}
+          />
+        ) : null}
+
         {/* ============================================================= */}
         {/* STEP: Coach Role (Qualifica e disponibilità)                   */}
         {/* ============================================================= */}
@@ -1996,6 +2456,40 @@ export default function OnboardingProfileScreen() {
           </View>
         ) : null}
 
+        {step === "staff_role" ? (
+          <View style={styles.stepContainer}>
+            <StaffRoleStep
+              certifications={certifications}
+              experienceSummary={experienceSummary}
+              primaryRole={staffPrimaryRole}
+              selectedRoles={staffRoles}
+              onUpdate={(patch) => patchForm(patch)}
+              validationErrors={validationErrors}
+            />
+            <Button
+              disabled={isBusy}
+              label="Continua"
+              onPress={handleContinueFromStaffRole}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
+        {step === "staff_availability" ? (
+          <StaffAvailabilityStep
+            availabilityType={staffAvailabilityType}
+            availableFrom={staffAvailableFrom}
+            isBusy={isBusy}
+            onContinue={handleContinueFromStaffAvailability}
+            onUpdate={(patch) => patchForm(patch)}
+            openToWork={openToWork}
+            preferredCategories={fromDelimitedString(staffPreferredCategories)}
+            preferredProvinces={fromDelimitedString(staffPreferredProvinces)}
+            preferredRegions={fromDelimitedString(staffPreferredRegions)}
+            validationErrors={validationErrors}
+          />
+        ) : null}
+
         {/* ============================================================= */}
         {/* STEP: Coach Career                                             */}
         {/* ============================================================= */}
@@ -2006,7 +2500,53 @@ export default function OnboardingProfileScreen() {
             onContinue={handleContinueFromCoachCareer}
             onRegisterBack={registerCoachCareerBack}
             onSkip={handleContinueFromCoachCareer}
-            onUpdateEntries={(entries) => patchForm({ coachCareerEntries: entries })}
+            onUpdateEntries={(entries) =>
+              patchForm({ coachCareerEntries: entries })
+            }
+            searchTeams={searchTeams}
+          />
+        ) : null}
+
+        {step === "staff_career" ? (
+          <CoachCareerStep
+            addButtonLabel="Aggiungi esperienza"
+            defaultRole={staffPrimaryRole}
+            entries={staffCareerEntries as CoachCareerEntry[]}
+            emptyMessage="Aggiungi le tue esperienze nello staff tecnico. Puoi inserirne anche più di una per la stessa squadra."
+            isBusy={isBusy}
+            onContinue={handleSaveStaffCareer}
+            onSkip={handleSaveStaffCareer}
+            onUpdateEntries={(entries) =>
+              patchForm({ staffCareerEntries: entries })
+            }
+            roleOptions={staffExperienceRoleOptions}
+            searchTeams={searchTeams}
+            selectorSubtitle="Scegli come vuoi inserire questa esperienza."
+            selectorTitle="Aggiungi esperienza"
+            subtitle="Aggiungi le tue esperienze da staff tecnico per completare il profilo."
+            title="Esperienze staff tecnico"
+            typeOptions={staffExperienceTypeOptions}
+          />
+        ) : null}
+
+        {step === "staff_player_career_toggle" ? (
+          <PlayerCareerToggleStep
+            hasPlayedFootball={staffHasPlayedFootball}
+            isBusy={isBusy}
+            onContinue={handleContinueFromStaffPlayerCareerToggle}
+            onUpdate={(value) => patchForm({ staffHasPlayedFootball: value })}
+          />
+        ) : null}
+
+        {step === "staff_player_career" ? (
+          <CareerExperienceStep
+            careerEntries={staffPlayerCareerEntries}
+            isBusy={isBusy}
+            onSaveAndContinue={handleContinueFromStaffPlayerCareer}
+            onSkip={handleContinueFromStaffPlayerCareer}
+            onUpdateEntries={(entries) =>
+              patchForm({ staffPlayerCareerEntries: entries })
+            }
             searchTeams={searchTeams}
           />
         ) : null}

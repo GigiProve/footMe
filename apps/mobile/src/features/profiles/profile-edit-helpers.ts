@@ -345,15 +345,22 @@ export function buildFullUpdatePayload(
     staffProfile:
       data.profile.role === "staff"
         ? {
+            availability_type: data.staffProfile?.availability_type ?? null,
+            available_from: data.staffProfile?.available_from ?? null,
             certifications: fromDelimitedString(formState.certifications),
+            experience_entries: data.staffProfile?.experience_entries ?? [],
             experience_summary: parseOptionalText(
               formState.experienceSummary,
             ),
             open_to_work: formState.openToWork,
+            primary_staff_role: data.staffProfile?.primary_staff_role ?? null,
+            preferred_categories: data.staffProfile?.preferred_categories ?? [],
+            preferred_provinces: data.staffProfile?.preferred_provinces ?? [],
             preferred_regions: fromDelimitedString(
               formState.preferredRegions,
             ),
             specialization: formState.specialization,
+            staff_roles: data.staffProfile?.staff_roles ?? [],
           }
         : null,
     userContacts: {
@@ -419,11 +426,11 @@ export function buildHeaderDetails(data: CompleteProfessionalProfile) {
     return {
       badges: [
         roleBadge,
-        data.staffProfile?.open_to_work ? "Open to work" : "Profilo attivo",
+        data.staffProfile?.open_to_work ? "Disponibile" : "Profilo attivo",
       ],
       fullName,
       primaryMeta,
-      secondaryMeta: `${formatSpecialization(data.staffProfile?.specialization ?? null)} · ${
+      secondaryMeta: `${data.staffProfile?.primary_staff_role ?? formatSpecialization(data.staffProfile?.specialization ?? null)} · ${
         data.staffProfile?.preferred_regions?.[0] ?? "Area da definire"
       }`,
     };

@@ -1,4 +1,7 @@
-import type { AppRole, StaffSpecialization } from "../onboarding/create-initial-profile";
+import type {
+  AppRole,
+  StaffSpecialization,
+} from "../onboarding/create-initial-profile";
 
 import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
@@ -64,12 +67,19 @@ type CoachProfileRecord = {
 };
 
 type StaffProfileRecord = {
+  availability_type: string | null;
+  available_from: string | null;
   certifications: string[];
+  experience_entries: unknown[];
   experience_summary: string | null;
   open_to_work: boolean;
+  primary_staff_role: string | null;
+  preferred_categories: string[];
+  preferred_provinces: string[];
   preferred_regions: string[];
   profile_id: string;
   specialization: StaffSpecialization;
+  staff_roles: string[];
 };
 
 type ClubRecord = {
@@ -148,6 +158,21 @@ export type ClubSeasonEntryInput = {
 };
 
 export type CompleteProfessionalProfileUpdate = {
+  agentProfile?: {
+    agency_logo_url: string | null;
+    agency_name: string | null;
+    federation: string | null;
+    has_other_football_experience: boolean;
+    has_played_football: boolean;
+    is_federation_licensed: boolean;
+    main_player_roles: PlayerPosition[];
+    managed_players_count: string | null;
+    open_to_clubs: boolean;
+    open_to_players: boolean;
+    other_football_roles: string[];
+    player_career_entries: unknown[];
+    player_types: string[];
+  } | null;
   club: {
     category: string | null;
     city: string;
@@ -205,11 +230,18 @@ export type CompleteProfessionalProfileUpdate = {
   profileId: string;
   role: AppRole;
   staffProfile: {
+    availability_type: string | null;
+    available_from: string | null;
     certifications: string[];
+    experience_entries: unknown[];
     experience_summary: string | null;
     open_to_work: boolean;
+    primary_staff_role: string | null;
+    preferred_categories: string[];
+    preferred_provinces: string[];
     preferred_regions: string[];
     specialization: StaffSpecialization;
+    staff_roles: string[];
   } | null;
   userContacts: UserContactsRecord;
 };
@@ -354,9 +386,17 @@ function normalizeStaffProfileRecord(
   }
 
   return {
+    availability_type: normalizeOptionalText(rawProfile.availability_type),
+    available_from: normalizeOptionalText(rawProfile.available_from),
     certifications: normalizeStringArray(rawProfile.certifications),
+    experience_entries: Array.isArray(rawProfile.experience_entries)
+      ? rawProfile.experience_entries
+      : [],
     experience_summary: normalizeOptionalText(rawProfile.experience_summary),
     open_to_work: normalizeBoolean(rawProfile.open_to_work),
+    primary_staff_role: normalizeOptionalText(rawProfile.primary_staff_role),
+    preferred_categories: normalizeStringArray(rawProfile.preferred_categories),
+    preferred_provinces: normalizeStringArray(rawProfile.preferred_provinces),
     preferred_regions: normalizeStringArray(rawProfile.preferred_regions),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
     specialization:
@@ -367,6 +407,7 @@ function normalizeStaffProfileRecord(
       rawProfile.specialization === "other"
         ? rawProfile.specialization
         : "fitness_coach",
+    staff_roles: normalizeStringArray(rawProfile.staff_roles),
   } satisfies StaffProfileRecord;
 }
 
@@ -511,7 +552,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("staff_profiles")
           .select(
-            "profile_id, specialization, experience_summary, certifications, preferred_regions, open_to_work",
+            "profile_id, specialization, availability_type, available_from, preferred_categories, preferred_provinces, primary_staff_role, staff_roles, experience_entries, experience_summary, certifications, preferred_regions, open_to_work",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -704,12 +745,43 @@ export async function updateCompleteProfessionalProfile(
 
   if (input.role === "staff" && input.staffProfile) {
     const { error } = await supabase.from("staff_profiles").upsert({
+      availability_type: input.staffProfile.availability_type,
+      available_from: input.staffProfile.available_from,
       certifications: input.staffProfile.certifications,
+      experience_entries: input.staffProfile.experience_entries,
       experience_summary: input.staffProfile.experience_summary,
       open_to_work: input.staffProfile.open_to_work,
+      primary_staff_role: input.staffProfile.primary_staff_role,
+      preferred_categories: input.staffProfile.preferred_categories,
+      preferred_provinces: input.staffProfile.preferred_provinces,
       preferred_regions: input.staffProfile.preferred_regions,
       profile_id: input.profileId,
       specialization: input.staffProfile.specialization,
+      staff_roles: input.staffProfile.staff_roles,
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (input.role === "agent" && input.agentProfile) {
+    const { error } = await supabase.from("agent_profiles").upsert({
+      agency_logo_url: input.agentProfile.agency_logo_url,
+      agency_name: input.agentProfile.agency_name,
+      federation: input.agentProfile.federation,
+      has_other_football_experience:
+        input.agentProfile.has_other_football_experience,
+      has_played_football: input.agentProfile.has_played_football,
+      is_federation_licensed: input.agentProfile.is_federation_licensed,
+      main_player_roles: input.agentProfile.main_player_roles,
+      managed_players_count: input.agentProfile.managed_players_count,
+      open_to_clubs: input.agentProfile.open_to_clubs,
+      open_to_players: input.agentProfile.open_to_players,
+      other_football_roles: input.agentProfile.other_football_roles,
+      player_career_entries: input.agentProfile.player_career_entries,
+      player_types: input.agentProfile.player_types,
+      profile_id: input.profileId,
     });
 
     if (error) {

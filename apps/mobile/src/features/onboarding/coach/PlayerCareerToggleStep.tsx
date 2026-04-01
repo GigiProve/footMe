@@ -11,8 +11,13 @@ import { OnboardingSectionCard } from "../onboarding-ui";
 type PlayerCareerToggleStepProps = {
   hasPlayedFootball: boolean;
   isBusy: boolean;
+  buttonLabel?: string;
   onContinue: () => void;
   onUpdate: (value: boolean) => void;
+  subtitle?: string;
+  title?: string;
+  toggleLabel?: string;
+  toggleSubtitle?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -22,26 +27,32 @@ type PlayerCareerToggleStepProps = {
 export function PlayerCareerToggleStep({
   hasPlayedFootball,
   isBusy,
+  buttonLabel = "Continua",
   onContinue,
   onUpdate,
+  subtitle = "Hai maturato esperienze come calciatore prima di diventare allenatore?",
+  title = "Carriera da giocatore",
+  toggleLabel = "Hai giocato a calcio?",
+  toggleSubtitle = "Aggiungi la tua carriera in campo per arricchire il tuo profilo tecnico.",
 }: PlayerCareerToggleStepProps) {
   return (
     <View style={styles.container}>
       <OnboardingSectionCard
-        title="Carriera da giocatore"
-        subtitle="Hai maturato esperienze come calciatore prima di diventare allenatore?"
+        title={title}
+        subtitle={subtitle}
       >
         <Toggle
-          label="Hai giocato a calcio?"
+          label={toggleLabel}
           onValueChange={onUpdate}
-          subtitle="Aggiungi la tua carriera in campo per arricchire il tuo profilo tecnico."
+          subtitle={toggleSubtitle}
           value={hasPlayedFootball}
         />
       </OnboardingSectionCard>
 
       <Button
         disabled={isBusy}
-        label="Continua"
+        fullWidth
+        label={buttonLabel}
         onPress={onContinue}
         variant="primary"
       />

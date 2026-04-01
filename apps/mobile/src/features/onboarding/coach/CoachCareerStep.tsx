@@ -26,13 +26,27 @@ type FlowScreen =
 // ---------------------------------------------------------------------------
 
 type CoachCareerStepProps = {
+  addButtonLabel?: string;
+  defaultRole?: string;
+  emptyMessage?: string;
   entries: CoachCareerEntry[];
+  subtitle?: string;
   isBusy: boolean;
   onContinue: () => void;
   onRegisterBack?: (fn: (() => void) | null) => void;
   onSkip: () => void;
   onUpdateEntries: (entries: CoachCareerEntry[]) => void;
+  roleOptions?: { label: string; value: string }[];
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  selectorSubtitle?: string;
+  selectorTitle?: string;
+  title?: string;
+  typeOptions?: {
+    icon: keyof typeof Ionicons.glyphMap;
+    subtitle: string;
+    title: string;
+    type: CoachExperienceType;
+  }[];
 };
 
 // ---------------------------------------------------------------------------
@@ -40,13 +54,22 @@ type CoachCareerStepProps = {
 // ---------------------------------------------------------------------------
 
 export function CoachCareerStep({
+  addButtonLabel = "Aggiungi esperienza",
+  defaultRole = "",
+  emptyMessage = "Puoi aggiungere le tue esperienze ora oppure farlo in seguito dal tuo profilo.",
   entries,
+  subtitle = "Aggiungi le tue esperienze come allenatore per completare il tuo profilo.",
   isBusy,
   onContinue,
   onRegisterBack,
   onSkip,
   onUpdateEntries,
+  roleOptions,
   searchTeams,
+  selectorSubtitle,
+  selectorTitle,
+  title = "Carriera da allenatore",
+  typeOptions,
 }: CoachCareerStepProps) {
   const [screen, setScreen] = useState<FlowScreen>({ type: "list" });
 
@@ -69,7 +92,7 @@ export function CoachCareerStep({
         id: generateCoachEntryId(),
         teamName: "",
         category: "",
-        role: "",
+        role: defaultRole,
         type,
         seasons: [],
         period: null,
@@ -112,7 +135,12 @@ export function CoachCareerStep({
     return (
       <View style={stepStyles.container}>
         <OnboardingSectionCard>
-          <CoachExperienceTypeSelector onSelect={handleSelectType} />
+          <CoachExperienceTypeSelector
+            onSelect={handleSelectType}
+            options={typeOptions}
+            subtitle={selectorSubtitle}
+            title={selectorTitle}
+          />
         </OnboardingSectionCard>
       </View>
     );
@@ -146,6 +174,7 @@ export function CoachCareerStep({
             isEditing={screen.editIndex !== null}
             onCancel={handleFormCancel}
             onSave={handleFormSave}
+            roleOptions={roleOptions}
             searchTeams={searchTeams}
           />
         </OnboardingSectionCard>
@@ -160,8 +189,8 @@ export function CoachCareerStep({
   return (
     <View style={stepStyles.container}>
       <OnboardingSectionCard
-        title="Carriera da allenatore"
-        subtitle="Aggiungi le tue esperienze come allenatore per completare il tuo profilo."
+        title={title}
+        subtitle={subtitle}
       >
         {!hasEntries ? (
           <View style={stepStyles.emptyIcon}>
@@ -174,7 +203,7 @@ export function CoachCareerStep({
         ) : null}
 
         {!hasEntries ? (
-          <OnboardingInfoCard message="Puoi aggiungere le tue esperienze da allenatore ora oppure farlo in seguito dal tuo profilo." />
+          <OnboardingInfoCard message={emptyMessage} />
         ) : null}
 
         {entries.map((entry, index) => (
@@ -186,7 +215,7 @@ export function CoachCareerStep({
         ))}
 
         <Button
-          label="Aggiungi esperienza"
+          label={addButtonLabel}
           leftIcon={
             <Ionicons name="add-outline" size={20} color={colors.accent} />
           }

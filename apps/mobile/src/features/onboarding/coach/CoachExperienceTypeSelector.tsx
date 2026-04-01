@@ -6,6 +6,14 @@ import { AppText } from "../../../ui";
 import type { CoachExperienceType } from "./coach-career-types";
 
 type CoachExperienceTypeSelectorProps = {
+  options?: {
+    icon: keyof typeof Ionicons.glyphMap;
+    subtitle: string;
+    title: string;
+    type: CoachExperienceType;
+  }[];
+  subtitle?: string;
+  title?: string;
   onSelect: (type: CoachExperienceType) => void;
 };
 
@@ -38,17 +46,20 @@ const typeOptions: {
 ];
 
 export function CoachExperienceTypeSelector({
+  options = typeOptions,
+  subtitle = "Che tipo di esperienza vuoi inserire?",
+  title = "Aggiungi esperienza",
   onSelect,
 }: CoachExperienceTypeSelectorProps) {
   return (
     <View style={selectorStyles.container}>
-      <AppText variant="headingMd">Aggiungi esperienza</AppText>
+      <AppText variant="headingMd">{title}</AppText>
       <AppText variant="bodySm" color="secondary">
-        Che tipo di esperienza vuoi inserire?
+        {subtitle}
       </AppText>
 
       <View style={selectorStyles.optionsContainer}>
-        {typeOptions.map((option) => (
+        {options.map((option) => (
           <Pressable
             accessibilityRole="button"
             key={option.type}

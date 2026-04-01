@@ -37,7 +37,7 @@ const COACH_CATEGORY_OPTIONS: string[] = [
   "Settore Giovanile",
 ];
 
-const AVAILABLE_FROM_OPTIONS: { label: string; value: string }[] = [
+export const AVAILABLE_FROM_OPTIONS: { label: string; value: string }[] = [
   { label: "Immediatamente", value: "Immediatamente" },
   { label: "Da luglio", value: "Da luglio" },
   { label: "Da settembre", value: "Da settembre" },

@@ -6,7 +6,12 @@ import {
 import type { PlayerExperienceForm, PlayerPosition, PreferredFoot } from "../profiles/player-sports";
 import { normalizePlayerPositions } from "../profiles/player-sports";
 import type { UploadedMediaItem } from "../profiles/media-upload-service";
-import type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
+import type {
+  AppRole,
+  ProfileGender,
+  StaffRole,
+  StaffSpecialization,
+} from "./onboarding-types";
 import type { CoachCareerEntry } from "./coach/coach-career-types";
 
 export type OnboardingStep =
@@ -15,12 +20,26 @@ export type OnboardingStep =
   | "photo"
   | "technical"
   | "experience"
+  | "agent_agency"
+  | "agent_players"
+  | "agent_football_experience"
+  | "agent_player_career_toggle"
+  | "agent_player_career"
+  | "agent_portfolio"
+  | "agent_availability"
+  | "agent_verification"
+  | "agent_extra"
   | "club_representative"
   | "club_data"
   | "club_youth"
   | "club_profile"
   | "coach_role"
   | "coach_career"
+  | "staff_role"
+  | "staff_availability"
+  | "staff_career"
+  | "staff_player_career_toggle"
+  | "staff_player_career"
   | "player_career_toggle"
   | "player_career"
   | "coach_extra"
@@ -35,6 +54,20 @@ export type OnboardingValidationErrors = Partial<Record<string, string>>;
 export type AvailabilityType = "ITALY" | "REGIONS" | "PROVINCES";
 
 export type OnboardingFormState = {
+  agentAgencyLogoUrl: string;
+  agentAgencyName: string;
+  agentFederation: string;
+  agentHasOtherFootballExperience: boolean;
+  agentHasPlayedFootball: boolean;
+  agentIsFederationLicensed: boolean;
+  agentLanguages: string[];
+  agentMainPlayerRoles: PlayerPosition[];
+  agentManagedPlayersCount: string;
+  agentOpenToClubs: boolean;
+  agentOpenToPlayers: boolean;
+  agentOtherFootballRoles: string[];
+  agentPlayerCareerEntries: PlayerExperienceForm[];
+  agentPlayerTypes: string[];
   availabilityType: AvailabilityType;
   avatarUrl: string;
   bio: string;
@@ -109,7 +142,16 @@ export type OnboardingFormState = {
   residenceRegion: string;
   role: AppRole | "";
   secondaryPositions: PlayerPosition[];
+  staffAvailabilityType: AvailabilityType;
+  staffAvailableFrom: string;
+  staffCareerEntries: CoachCareerEntry[];
+  staffHasPlayedFootball: boolean;
+  staffPlayerCareerEntries: PlayerExperienceForm[];
+  staffPrimaryRole: string;
+  staffPreferredCategories: string;
+  staffPreferredProvinces: string;
   staffPreferredRegions: string;
+  staffRoles: StaffRole[];
   staffSpecialization: StaffSpecialization;
   technicalVideoUrl: string;
   transferProvinces: string;
@@ -193,12 +235,79 @@ const clubVisibleSteps: OnboardingVisibleStep[] = [
   },
 ];
 
+const agentVisibleSteps: OnboardingVisibleStep[] = [
+  {
+    description: "Completa i tuoi dati personali",
+    index: 1,
+    label: "Dati",
+    step: "base",
+  },
+  {
+    description: "Aggiungi una foto profilo",
+    index: 2,
+    label: "Foto",
+    step: "photo",
+  },
+  {
+    description: "Configura il profilo professionale",
+    index: 3,
+    label: "Profilo",
+    step: "agent_agency",
+  },
+  {
+    description: "Definisci la tua attivita' principale",
+    index: 4,
+    label: "Attivita'",
+    step: "agent_players",
+  },
+  {
+    description: "Aggiungi le esperienze nel calcio",
+    index: 5,
+    label: "Esperienze",
+    step: "agent_football_experience",
+  },
+  {
+    description: "Indica il portfolio dei calciatori seguiti",
+    index: 6,
+    label: "Portfolio",
+    step: "agent_portfolio",
+  },
+  {
+    description: "Imposta disponibilita' e verifica",
+    index: 7,
+    label: "Verifica",
+    step: "agent_availability",
+  },
+  {
+    description: "Aggiungi i dettagli di verifica",
+    index: 8,
+    label: "Conferma",
+    step: "agent_verification",
+  },
+];
+
 const defaultStepOrder: OnboardingStep[] = [
   "role",
   "base",
   "photo",
   "technical",
   "experience",
+  "complete",
+];
+
+const agentStepOrder: OnboardingStep[] = [
+  "role",
+  "base",
+  "photo",
+  "agent_agency",
+  "agent_players",
+  "agent_football_experience",
+  "agent_player_career_toggle",
+  "agent_player_career",
+  "agent_portfolio",
+  "agent_availability",
+  "agent_verification",
+  "agent_extra",
   "complete",
 ];
 
@@ -220,6 +329,18 @@ const coachStepOrder: OnboardingStep[] = [
   "player_career_toggle",
   "player_career",
   "coach_extra",
+  "complete",
+];
+
+const staffStepOrder: OnboardingStep[] = [
+  "role",
+  "base",
+  "photo",
+  "staff_role",
+  "staff_availability",
+  "staff_career",
+  "staff_player_career_toggle",
+  "staff_player_career",
   "complete",
 ];
 
@@ -268,15 +389,64 @@ const coachVisibleSteps: OnboardingVisibleStep[] = [
   },
 ];
 
+const staffVisibleSteps: OnboardingVisibleStep[] = [
+  {
+    description: "Seleziona il tipo di profilo da creare",
+    index: 1,
+    label: "Ruolo",
+    step: "role",
+  },
+  {
+    description: "Informazioni personali",
+    index: 2,
+    label: "Dati",
+    step: "base",
+  },
+  {
+    description: "Aggiungi una foto profilo",
+    index: 3,
+    label: "Foto",
+    step: "photo",
+  },
+  {
+    description: "Seleziona i tuoi ruoli nello staff",
+    index: 4,
+    label: "Ruoli",
+    step: "staff_role",
+  },
+  {
+    description: "Definisci dove e quando vuoi collaborare",
+    index: 5,
+    label: "Disponibilità",
+    step: "staff_availability",
+  },
+  {
+    description: "Aggiungi le tue esperienze da staff tecnico",
+    index: 6,
+    label: "Esperienze",
+    step: "staff_career",
+  },
+  {
+    description: "Carriera in campo",
+    index: 7,
+    label: "Giocatore",
+    step: "staff_player_career_toggle",
+  },
+];
+
 export function getOnboardingVisibleSteps(role: AppRole | ""): OnboardingVisibleStep[] {
   if (role === "club_admin") return clubVisibleSteps;
+  if (role === "agent") return agentVisibleSteps;
   if (role === "coach") return coachVisibleSteps;
+  if (role === "staff") return staffVisibleSteps;
   return defaultVisibleSteps;
 }
 
 export function getOnboardingStepOrder(role: AppRole | ""): OnboardingStep[] {
   if (role === "club_admin") return clubStepOrder;
+  if (role === "agent") return agentStepOrder;
   if (role === "coach") return coachStepOrder;
+  if (role === "staff") return staffStepOrder;
   return defaultStepOrder;
 }
 
@@ -287,6 +457,20 @@ export const onboardingVisibleSteps = defaultVisibleSteps;
 export const onboardingStepOrder = defaultStepOrder;
 
 export const defaultOnboardingFormState: OnboardingFormState = {
+  agentAgencyLogoUrl: "",
+  agentAgencyName: "",
+  agentFederation: "",
+  agentHasOtherFootballExperience: false,
+  agentHasPlayedFootball: false,
+  agentIsFederationLicensed: false,
+  agentLanguages: [],
+  agentMainPlayerRoles: [],
+  agentManagedPlayersCount: "",
+  agentOpenToClubs: true,
+  agentOpenToPlayers: true,
+  agentOtherFootballRoles: [],
+  agentPlayerCareerEntries: [],
+  agentPlayerTypes: [],
   availabilityType: "ITALY",
   avatarUrl: "",
   bio: "",
@@ -361,7 +545,16 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   residenceRegion: "",
   role: "",
   secondaryPositions: [],
+  staffAvailabilityType: "ITALY",
+  staffAvailableFrom: "",
+  staffCareerEntries: [],
+  staffHasPlayedFootball: false,
+  staffPlayerCareerEntries: [],
+  staffPrimaryRole: "",
+  staffPreferredCategories: "",
+  staffPreferredProvinces: "",
   staffPreferredRegions: "",
+  staffRoles: [],
   staffSpecialization: "fitness_coach",
   technicalVideoUrl: "",
   transferProvinces: "",
@@ -441,7 +634,52 @@ export function normalizeOnboardingDraft(
     coachLanguages: Array.isArray(value.coachLanguages)
       ? value.coachLanguages.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.coachLanguages,
+    agentHasOtherFootballExperience: value.agentHasOtherFootballExperience === true,
+    agentHasPlayedFootball: value.agentHasPlayedFootball === true,
+    agentIsFederationLicensed: value.agentIsFederationLicensed === true,
+    agentLanguages: Array.isArray(value.agentLanguages)
+      ? value.agentLanguages.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.agentLanguages,
+    agentMainPlayerRoles: normalizePlayerPositions(value.agentMainPlayerRoles),
+    agentOtherFootballRoles: Array.isArray(value.agentOtherFootballRoles)
+      ? value.agentOtherFootballRoles.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.agentOtherFootballRoles,
+    agentPlayerCareerEntries: Array.isArray(value.agentPlayerCareerEntries)
+      ? value.agentPlayerCareerEntries
+      : defaultOnboardingFormState.agentPlayerCareerEntries,
+    agentPlayerTypes: Array.isArray(value.agentPlayerTypes)
+      ? value.agentPlayerTypes.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.agentPlayerTypes,
     hasPlayedFootball: value.hasPlayedFootball === true,
+    staffCareerEntries: Array.isArray(value.staffCareerEntries)
+      ? value.staffCareerEntries
+      : defaultOnboardingFormState.staffCareerEntries,
+    staffHasPlayedFootball: value.staffHasPlayedFootball === true,
+    staffPlayerCareerEntries: Array.isArray(value.staffPlayerCareerEntries)
+      ? value.staffPlayerCareerEntries
+      : defaultOnboardingFormState.staffPlayerCareerEntries,
+    staffAvailabilityType:
+      coerceAvailabilityType(value.staffAvailabilityType) ??
+      defaultOnboardingFormState.staffAvailabilityType,
+    staffAvailableFrom:
+      typeof value.staffAvailableFrom === "string"
+        ? value.staffAvailableFrom
+        : defaultOnboardingFormState.staffAvailableFrom,
+    staffPrimaryRole:
+      typeof value.staffPrimaryRole === "string"
+        ? value.staffPrimaryRole
+        : defaultOnboardingFormState.staffPrimaryRole,
+    staffPreferredCategories:
+      typeof value.staffPreferredCategories === "string"
+        ? value.staffPreferredCategories
+        : defaultOnboardingFormState.staffPreferredCategories,
+    staffRoles: Array.isArray(value.staffRoles)
+      ? value.staffRoles.filter((v): v is StaffRole => typeof v === "string")
+      : defaultOnboardingFormState.staffRoles,
+    staffPreferredProvinces:
+      typeof value.staffPreferredProvinces === "string"
+        ? value.staffPreferredProvinces
+        : defaultOnboardingFormState.staffPreferredProvinces,
     uploadingField: null,
   };
 }
@@ -488,8 +726,13 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
 
   const allSteps: OnboardingStep[] = [
     "role", "base", "photo", "technical", "experience",
+    "agent_agency", "agent_players", "agent_football_experience",
+    "agent_player_career_toggle", "agent_player_career", "agent_portfolio",
+    "agent_availability", "agent_verification", "agent_extra",
     "club_representative", "club_data", "club_youth", "club_profile",
-    "coach_role", "coach_career", "player_career_toggle", "player_career", "coach_extra",
+    "coach_role", "coach_career", "staff_role", "staff_availability", "staff_career",
+    "staff_player_career_toggle", "staff_player_career",
+    "player_career_toggle", "player_career", "coach_extra",
     "complete",
     // Legacy steps for draft migration
     "decision", "details", "club",
@@ -502,7 +745,29 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
 export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" = "") {
   const visibleSteps = getOnboardingVisibleSteps(role);
   const effectiveStep = migrateLegacyStep(step);
-  const visibleIndex = visibleSteps.findIndex((entry) => entry.step === effectiveStep);
+  let comparableStep = effectiveStep;
+
+  if (role === "coach" && effectiveStep === "player_career") {
+    comparableStep = "player_career_toggle";
+  }
+
+  if (role === "staff" && effectiveStep === "staff_player_career") {
+    comparableStep = "staff_player_career_toggle";
+  }
+
+  if (
+    role === "agent" &&
+    (effectiveStep === "agent_player_career_toggle" ||
+      effectiveStep === "agent_player_career")
+  ) {
+    comparableStep = "agent_football_experience";
+  }
+
+  if (role === "agent" && effectiveStep === "agent_extra") {
+    comparableStep = "agent_verification";
+  }
+
+  const visibleIndex = visibleSteps.findIndex((entry) => entry.step === comparableStep);
 
   if (visibleIndex >= 0) {
     return visibleIndex;
@@ -551,8 +816,20 @@ export function getPreviousOnboardingStep(
 
   if (effectiveStep === "complete") {
     if (role === "club_admin") return "club_profile";
+    if (role === "agent") return "agent_extra";
     if (role === "coach") return "coach_extra";
+    if (role === "staff") {
+      return _lastCompletedStep === "staff_player_career"
+        ? "staff_player_career"
+        : "staff_player_career_toggle";
+    }
     return "experience";
+  }
+
+  if (role === "agent" && effectiveStep === "agent_portfolio") {
+    return _lastCompletedStep === "agent_player_career"
+      ? "agent_player_career"
+      : "agent_player_career_toggle";
   }
 
   const previousIndex = stepOrder.indexOf(effectiveStep) - 1;
@@ -599,9 +876,47 @@ export function validateOnboardingStep(
     return mapCoachRoleValidationError(form);
   }
 
-  // coach_career, player_career_toggle, player_career, coach_extra have no required validation here
+  if (step === "agent_agency") {
+    return mapAgentAgencyValidationError(form);
+  }
+
+  if (step === "agent_players") {
+    return mapAgentPlayersValidationError(form);
+  }
+
+  if (step === "agent_football_experience") {
+    return mapAgentFootballExperienceValidationError(form);
+  }
+
+  if (step === "agent_portfolio") {
+    return mapAgentPortfolioValidationError(form);
+  }
+
+  if (step === "agent_availability") {
+    return mapAgentAvailabilityValidationError(form);
+  }
+
+  if (step === "agent_verification") {
+    return mapAgentVerificationValidationError(form);
+  }
+
+  if (step === "staff_role") {
+    return mapStaffRoleValidationError(form);
+  }
+
+  if (step === "staff_availability") {
+    return mapStaffAvailabilityValidationError(form);
+  }
+
+  // career toggle/list steps have no required validation here
   if (
     step === "coach_career" ||
+    step === "staff_career" ||
+    step === "staff_player_career_toggle" ||
+    step === "staff_player_career" ||
+    step === "agent_player_career_toggle" ||
+    step === "agent_player_career" ||
+    step === "agent_extra" ||
     step === "player_career_toggle" ||
     step === "player_career" ||
     step === "coach_extra"
@@ -746,6 +1061,63 @@ function mapCoachRoleValidationError(form: OnboardingFormState): OnboardingValid
   return {};
 }
 
+function mapStaffRoleValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (form.staffRoles.length === 0) {
+    return { staffRoles: "Seleziona almeno un ruolo per continuare." };
+  }
+
+  if (form.staffRoles.length > 1 && !form.staffPrimaryRole) {
+    return {
+      staffPrimaryRole: "Seleziona il ruolo principale per continuare.",
+    };
+  }
+
+  if (
+    form.staffPrimaryRole &&
+    !form.staffRoles.includes(form.staffPrimaryRole as StaffRole)
+  ) {
+    return {
+      staffPrimaryRole: "Il ruolo principale deve appartenere ai ruoli selezionati.",
+    };
+  }
+
+  return {};
+}
+
+function mapStaffAvailabilityValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
+  if (!form.openToWork) {
+    return errors;
+  }
+
+  if (!form.staffAvailableFrom) {
+    errors.staffAvailableFrom = "Seleziona da quando sei disponibile.";
+  }
+
+  if (
+    form.staffAvailabilityType === "REGIONS" &&
+    fromDelimitedString(form.staffPreferredRegions).length === 0
+  ) {
+    errors.staffPreferredRegions = "Seleziona almeno una regione.";
+  }
+
+  if (
+    form.staffAvailabilityType === "PROVINCES" &&
+    fromDelimitedString(form.staffPreferredProvinces).length === 0
+  ) {
+    errors.staffPreferredProvinces = "Seleziona almeno una provincia.";
+  }
+
+  if (fromDelimitedString(form.staffPreferredCategories).length === 0) {
+    errors.staffPreferredCategories = "Seleziona almeno una categoria.";
+  }
+
+  return errors;
+}
+
 function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {
   const errors: OnboardingValidationErrors = {};
 
@@ -757,7 +1129,7 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.lastName = "Questo campo è obbligatorio";
   }
 
-  if (!form.gender) {
+  if (form.role !== "agent" && !form.gender) {
     errors.gender = "Questo campo è obbligatorio";
   }
 
@@ -765,19 +1137,115 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.birthDate = "Questo campo è obbligatorio";
   }
 
+  if (form.role === "agent" && !form.nationality.trim()) {
+    errors.nationality = "Questo campo è obbligatorio";
+  }
+
+  if (form.role === "agent" && !form.residence.trim()) {
+    errors.residence = "Questo campo è obbligatorio";
+  }
+
   if (form.residence.trim() && !form.residenceRegion.trim()) {
     errors.residence = "Seleziona una città valida dai suggerimenti.";
   }
 
-  if (!form.useResidenceForDomicile && form.domicile.trim() && !form.domicileRegion.trim()) {
+  if (
+    form.role !== "agent" &&
+    !form.useResidenceForDomicile &&
+    form.domicile.trim() &&
+    !form.domicileRegion.trim()
+  ) {
     errors.domicile = "Seleziona una città valida dai suggerimenti.";
   }
 
   const phoneValue = composePhoneNumber(form.phoneCountryCode, form.phoneNumber);
+
+  if (form.role === "agent" && !form.phoneNumber.trim()) {
+    errors.phoneNumber = "Questo campo è obbligatorio";
+  }
 
   if (phoneValue && !isPhoneNumberValid(phoneValue)) {
     errors.phoneNumber = "Inserisci un numero di cellulare valido.";
   }
 
   return errors;
+}
+
+function mapAgentAgencyValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (!form.agentAgencyName.trim()) {
+    return {
+      agentAgencyName: "Inserisci il nome dell'agenzia o dello studio.",
+    };
+  }
+
+  return {};
+}
+
+function mapAgentPlayersValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (!form.agentManagedPlayersCount) {
+    return {
+      agentManagedPlayersCount: "Seleziona la fascia di calciatori seguiti.",
+    };
+  }
+
+  return {};
+}
+
+function mapAgentFootballExperienceValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (
+    form.agentHasOtherFootballExperience &&
+    form.agentOtherFootballRoles.length === 0
+  ) {
+    return {
+      agentOtherFootballRoles: "Seleziona almeno un'esperienza calcistica.",
+    };
+  }
+
+  return {};
+}
+
+function mapAgentPortfolioValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
+  if (form.agentPlayerTypes.length === 0) {
+    errors.agentPlayerTypes = "Seleziona almeno un profilo di calciatore.";
+  }
+
+  if (form.agentMainPlayerRoles.length === 0) {
+    errors.agentMainPlayerRoles = "Seleziona almeno un ruolo principale.";
+  }
+
+  return errors;
+}
+
+function mapAgentAvailabilityValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (!form.agentOpenToClubs && !form.agentOpenToPlayers) {
+    return {
+      agentAvailability: "Attiva almeno un canale di contatto.",
+    };
+  }
+
+  return {};
+}
+
+function mapAgentVerificationValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (form.agentIsFederationLicensed && !form.agentFederation.trim()) {
+    return {
+      agentFederation: "Inserisci la federazione di riferimento.",
+    };
+  }
+
+  return {};
 }

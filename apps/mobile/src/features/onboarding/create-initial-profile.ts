@@ -2,7 +2,13 @@ import { isPhoneNumberValid, normalizePhoneInput } from "../profiles/profile-for
 import { slugify } from "../../lib/slugify";
 import { supabase } from "../../lib/supabase";
 import type { PlayerPosition } from "../profiles/player-sports";
-import type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
+import {
+  mapStaffRoleToSpecialization,
+  type AppRole,
+  type ProfileGender,
+  type StaffRole,
+  type StaffSpecialization,
+} from "./onboarding-types";
 
 export type { PlayerPosition } from "../profiles/player-sports";
 export type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
@@ -42,6 +48,9 @@ type CreateInitialProfileInput = {
   repPhone: string;
   residence: string;
   role: AppRole;
+  staffAvailableFrom: string;
+  staffPrimaryRole: string;
+  staffRoles: StaffRole[];
   staffSpecialization: StaffSpecialization;
   userId: string;
 };
@@ -97,11 +106,11 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
     ]);
   }
 
-  // Club admins skip gender and birth date during onboarding — these are
-  // personal fields that can be filled later from the profile settings.
+  // Club admins and agents skip gender during onboarding. The Banani agent
+  // mockup does not expose a gender field in the onboarding flow.
   if (input.role !== "club_admin") {
     const missingFields = [
-      !input.gender ? "sesso" : null,
+      input.role !== "agent" && !input.gender ? "sesso" : null,
       !birthDate ? "data di nascita" : null,
     ].filter(Boolean) as string[];
 
@@ -198,8 +207,23 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
 
   if (input.role === "staff") {
     const { error } = await supabase.from("staff_profiles").upsert({
+      available_from: input.staffAvailableFrom || null,
+      primary_staff_role: input.staffPrimaryRole || null,
       profile_id: input.userId,
-      specialization: input.staffSpecialization,
+      specialization: mapStaffRoleToSpecialization(
+        input.staffPrimaryRole || input.staffSpecialization,
+      ),
+      staff_roles: input.staffRoles,
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (input.role === "agent") {
+    const { error } = await supabase.from("agent_profiles").upsert({
+      profile_id: input.userId,
     });
 
     if (error) {

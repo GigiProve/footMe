@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createInitialProfile, validateBaseProfileStep } from "./create-initial-profile";
+import type { StaffRole } from "./onboarding-types";
 
 const { fromMock, upsertMocks } = vi.hoisted(() => {
   const upsertMocks = {
+    agent_profiles: vi.fn(),
     club_teams: vi.fn(),
     clubs: vi.fn(),
     coach_profiles: vi.fn(),
@@ -97,6 +99,9 @@ describe("createInitialProfile", () => {
 
     repEmail: "",
     repPhone: "",
+    staffAvailableFrom: "",
+    staffPrimaryRole: "",
+    staffRoles: [] as StaffRole[],
   };
 
   it("rejects empty full name before calling Supabase", async () => {
@@ -258,6 +263,37 @@ describe("createInitialProfile", () => {
     ).toThrow("Completa i campi obbligatori: data di nascita.");
   });
 
+  it("persists multi-role staff metadata on staff profile creation", async () => {
+    await createInitialProfile({
+      ...defaultClubFields,
+      avatarUrl: "",
+      birthDate: "1992-04-21",
+      clubCity: "",
+      clubName: "",
+      clubRegion: "",
+      domicile: "Milano",
+      fullName: "Luca Bianchi",
+      gender: "male",
+      nationality: "IT",
+      phoneNumber: "",
+      primaryPosition: "midfielder",
+      residence: "Milano",
+      role: "staff",
+      staffPrimaryRole: "Match analyst",
+      staffRoles: ["Match analyst", "Collaboratore tecnico"],
+      staffSpecialization: "match_analyst",
+      userId: "staff-1",
+    });
+
+    expect(upsertMocks.staff_profiles).toHaveBeenCalledWith({
+      available_from: "",
+      primary_staff_role: "Match analyst",
+      profile_id: "staff-1",
+      specialization: "match_analyst",
+      staff_roles: ["Match analyst", "Collaboratore tecnico"],
+    });
+  });
+
   it("allows optional nationality and residence fields to stay empty", () => {
     expect(
       validateBaseProfileStep({
@@ -286,7 +322,7 @@ describe("createInitialProfile", () => {
     });
   });
 
-  it("creates agent profiles without extra role-specific tables", async () => {
+  it("creates agent profiles with the dedicated agent table", async () => {
     await createInitialProfile({
       ...defaultClubFields,
       avatarUrl: "",
@@ -311,6 +347,9 @@ describe("createInitialProfile", () => {
         role: "agent",
       }),
     );
+    expect(upsertMocks.agent_profiles).toHaveBeenCalledWith({
+      profile_id: "agent-1",
+    });
     expect(upsertMocks.player_profiles).not.toHaveBeenCalled();
     expect(upsertMocks.coach_profiles).not.toHaveBeenCalled();
     expect(upsertMocks.staff_profiles).not.toHaveBeenCalled();

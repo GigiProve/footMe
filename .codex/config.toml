@@ -1,0 +1,3 @@
+[mcp_servers.banani]
+url = "https://app.banani.co/api/mcp/mcp"
+http_headers = { "Authorization" = "Bearer bnni_nfMEoPTNRheZsrgkfmeiXHzuqk7ysZ0u" }

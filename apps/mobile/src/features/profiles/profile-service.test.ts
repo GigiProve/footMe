@@ -348,12 +348,19 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.coachMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
     mocks.staffMaybeSingleMock.mockResolvedValueOnce({
       data: {
+        availability_type: null,
+        available_from: null,
         certifications: null,
+        experience_entries: null,
         experience_summary: null,
         open_to_work: null,
+        primary_staff_role: null,
+        preferred_categories: null,
+        preferred_provinces: null,
         preferred_regions: null,
         profile_id: "profile-legacy",
         specialization: null,
+        staff_roles: null,
       },
       error: null,
     });
@@ -371,12 +378,19 @@ describe("getCompleteProfessionalProfile", () => {
       role: "staff",
     });
     expect(result.staffProfile).toEqual({
+      availability_type: null,
+      available_from: null,
       certifications: [],
+      experience_entries: [],
       experience_summary: null,
       open_to_work: false,
+      primary_staff_role: null,
+      preferred_categories: [],
+      preferred_provinces: [],
       preferred_regions: [],
       profile_id: "profile-legacy",
       specialization: "fitness_coach",
+      staff_roles: [],
     });
     expect(result.userContacts).toEqual({
       email: "",

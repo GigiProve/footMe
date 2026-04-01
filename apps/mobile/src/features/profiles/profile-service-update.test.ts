@@ -8,13 +8,17 @@ const mocks = vi.hoisted(() => {
   const profileContactsUpsertMock = vi.fn();
   const privateContactsUpsertMock = vi.fn();
   const rpcMock = vi.fn();
+  const agentProfilesUpsertMock = vi.fn();
+  const staffProfilesUpsertMock = vi.fn();
 
   return {
+    agentProfilesUpsertMock,
     privateContactsUpsertMock,
     profileContactsUpsertMock,
     profileUpdateEqMock,
     profileUpdateMaybeSingleMock,
     rpcMock,
+    staffProfilesUpsertMock,
     fromMock: vi.fn((table: string) => {
       if (table === "profiles") {
         return {
@@ -41,6 +45,18 @@ const mocks = vi.hoisted(() => {
       if (table === "profile_private_contacts") {
         return {
           upsert: privateContactsUpsertMock,
+        };
+      }
+
+      if (table === "staff_profiles") {
+        return {
+          upsert: staffProfilesUpsertMock,
+        };
+      }
+
+      if (table === "agent_profiles") {
+        return {
+          upsert: agentProfilesUpsertMock,
         };
       }
 
@@ -109,6 +125,8 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     mocks.profileContactsUpsertMock.mockReset();
     mocks.privateContactsUpsertMock.mockReset();
     mocks.rpcMock.mockReset();
+    mocks.agentProfilesUpsertMock.mockReset();
+    mocks.staffProfilesUpsertMock.mockReset();
 
     mocks.profileUpdateMaybeSingleMock.mockResolvedValue({
       data: { id: "profile-1" },
@@ -117,6 +135,8 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     mocks.profileContactsUpsertMock.mockResolvedValue({ error: null });
     mocks.privateContactsUpsertMock.mockResolvedValue({ error: null });
     mocks.rpcMock.mockResolvedValue({ error: null });
+    mocks.agentProfilesUpsertMock.mockResolvedValue({ error: null });
+    mocks.staffProfilesUpsertMock.mockResolvedValue({ error: null });
   });
 
   it("persists player profile data and experiences through the atomic rpc", async () => {
@@ -268,6 +288,151 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         willing_to_change_club: true,
       },
       p_profile_id: "profile-1",
+    });
+  });
+
+  it("persists staff roles, primary role and separate experience entries", async () => {
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "staff",
+      staffProfile: {
+        availability_type: "REGIONS",
+        available_from: "Da luglio",
+        certifications: ["FIGC Match Analysis"],
+        experience_entries: [
+          {
+            id: "staff-exp-1",
+            category: "Serie D",
+            role: "Match analyst",
+            seasons: ["2024/2025"],
+            teamName: "USD Virtus",
+            type: "SINGLE_SEASON",
+            period: null,
+          },
+          {
+            id: "staff-exp-2",
+            category: "Primavera 2",
+            role: "Collaboratore tecnico",
+            seasons: [],
+            teamName: "USD Virtus",
+            type: "CUSTOM_PERIOD",
+            period: {
+              startMonth: "Gennaio",
+              startYear: "2024",
+              endMonth: "Maggio",
+              endYear: "2024",
+            },
+          },
+        ],
+        experience_summary: "Analisi video e supporto in campo.",
+        open_to_work: true,
+        primary_staff_role: "Match analyst",
+        preferred_categories: ["Serie D", "Primavera 2"],
+        preferred_provinces: [],
+        preferred_regions: ["Lombardia"],
+        specialization: "match_analyst",
+        staff_roles: ["Match analyst", "Collaboratore tecnico"],
+      },
+    });
+
+    expect(mocks.staffProfilesUpsertMock).toHaveBeenCalledWith({
+      availability_type: "REGIONS",
+      available_from: "Da luglio",
+      certifications: ["FIGC Match Analysis"],
+      experience_entries: [
+        {
+          id: "staff-exp-1",
+          category: "Serie D",
+          role: "Match analyst",
+          seasons: ["2024/2025"],
+          teamName: "USD Virtus",
+          type: "SINGLE_SEASON",
+          period: null,
+        },
+        {
+          id: "staff-exp-2",
+          category: "Primavera 2",
+          role: "Collaboratore tecnico",
+          seasons: [],
+          teamName: "USD Virtus",
+          type: "CUSTOM_PERIOD",
+          period: {
+            startMonth: "Gennaio",
+            startYear: "2024",
+            endMonth: "Maggio",
+            endYear: "2024",
+          },
+        },
+      ],
+      experience_summary: "Analisi video e supporto in campo.",
+      open_to_work: true,
+      preferred_regions: ["Lombardia"],
+      primary_staff_role: "Match analyst",
+      preferred_categories: ["Serie D", "Primavera 2"],
+      preferred_provinces: [],
+      profile_id: "profile-1",
+      specialization: "match_analyst",
+      staff_roles: ["Match analyst", "Collaboratore tecnico"],
+    });
+  });
+
+  it("persists agent-specific onboarding data in agent_profiles", async () => {
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      agentProfile: {
+        agency_logo_url: "https://example.com/agency.png",
+        agency_name: "MB Football Management",
+        federation: "FIGC (Italia)",
+        has_other_football_experience: true,
+        has_played_football: true,
+        is_federation_licensed: true,
+        main_player_roles: ["defender", "midfielder"],
+        managed_players_count: "5-15 calciatori",
+        open_to_clubs: true,
+        open_to_players: false,
+        other_football_roles: ["Ex calciatore", "Scout"],
+        player_career_entries: [
+          {
+            id: "agent-player-exp-1",
+            category: "Serie D",
+            teamName: "ASD Test",
+            seasons: ["2020/2021"],
+            type: "FIRST_TEAM",
+          },
+        ],
+        player_types: ["Giovani", "Senior"],
+      },
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "agent",
+      staffProfile: null,
+    });
+
+    expect(mocks.agentProfilesUpsertMock).toHaveBeenCalledWith({
+      agency_logo_url: "https://example.com/agency.png",
+      agency_name: "MB Football Management",
+      federation: "FIGC (Italia)",
+      has_other_football_experience: true,
+      has_played_football: true,
+      is_federation_licensed: true,
+      main_player_roles: ["defender", "midfielder"],
+      managed_players_count: "5-15 calciatori",
+      open_to_clubs: true,
+      open_to_players: false,
+      other_football_roles: ["Ex calciatore", "Scout"],
+      player_career_entries: [
+        {
+          id: "agent-player-exp-1",
+          category: "Serie D",
+          teamName: "ASD Test",
+          seasons: ["2020/2021"],
+          type: "FIRST_TEAM",
+        },
+      ],
+      player_types: ["Giovani", "Senior"],
+      profile_id: "profile-1",
     });
   });
 });

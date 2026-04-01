@@ -26,11 +26,19 @@ import {
 // ---------------------------------------------------------------------------
 
 type CoachExperienceFormProps = {
+  categoryLabel?: string;
+  categoryPlaceholder?: string;
   entry: CoachCareerEntry;
   isEditing: boolean;
   onCancel: () => void;
   onSave: (entry: CoachCareerEntry) => void;
+  roleLabel?: string;
+  roleOptions?: { label: string; value: string }[];
+  rolePlaceholder?: string;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  teamLabel?: string;
+  teamPlaceholder?: string;
+  title?: string;
 };
 
 const COACH_EXPERIENCE_CATEGORY_OPTIONS = [
@@ -39,6 +47,8 @@ const COACH_EXPERIENCE_CATEGORY_OPTIONS = [
 ];
 
 type FormErrors = {
+  category?: string;
+  role?: string;
   teamName?: string;
   seasons?: string;
   startYear?: string;
@@ -268,11 +278,19 @@ const periodStyles = StyleSheet.create({
 // ---------------------------------------------------------------------------
 
 export function CoachExperienceForm({
+  categoryLabel = "Categoria *",
+  categoryPlaceholder = "Seleziona categoria",
   entry,
   isEditing,
   onCancel,
   onSave,
+  roleLabel = "Ruolo *",
+  roleOptions = COACH_ROLE_OPTIONS,
+  rolePlaceholder = "Seleziona ruolo",
   searchTeams,
+  teamLabel = "Squadra *",
+  teamPlaceholder = "Es. ASD Pro Calcio",
+  title,
 }: CoachExperienceFormProps) {
   const [form, setForm] = useState<CoachCareerEntry>(entry);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -310,7 +328,15 @@ export function CoachExperienceForm({
     const nextErrors: FormErrors = {};
 
     if (!form.teamName.trim()) {
-      nextErrors.teamName = "Il nome della squadra è obbligatorio.";
+      nextErrors.teamName = "La squadra è obbligatoria.";
+    }
+
+    if (!form.role.trim()) {
+      nextErrors.role = "Seleziona un ruolo.";
+    }
+
+    if (!form.category.trim()) {
+      nextErrors.category = "Seleziona una categoria.";
     }
 
     if (form.type === "MULTI_SEASON" && form.seasons.length === 0) {
@@ -346,16 +372,16 @@ export function CoachExperienceForm({
   return (
     <View style={formStyles.container}>
       <AppText variant="headingMd">
-        {isEditing ? "Modifica esperienza" : "Dettagli esperienza"}
+        {title ?? (isEditing ? "Modifica esperienza" : "Dettagli esperienza")}
       </AppText>
 
       {/* Team name */}
       <View style={formStyles.fieldGroup}>
         <TeamAutocompleteInput
-          label="Nome squadra *"
+          label={teamLabel}
           onChangeText={(val) => updateField("teamName", val)}
           onSelectTeam={(team) => updateField("teamName", team.name)}
-          placeholder="Es. ASD Pro Calcio"
+          placeholder={teamPlaceholder}
           searchTeams={searchTeams}
           value={form.teamName}
         />
@@ -367,22 +393,38 @@ export function CoachExperienceForm({
       </View>
 
       {/* Category */}
-      <SelectField
-        label="Categoria"
-        onChange={(val) => updateField("category", val)}
-        options={COACH_EXPERIENCE_CATEGORY_OPTIONS}
-        placeholder="Seleziona categoria"
-        value={form.category}
-      />
+      <View style={formStyles.fieldGroup}>
+        <SelectField
+          label={categoryLabel}
+          onChange={(val) => updateField("category", val)}
+          options={COACH_EXPERIENCE_CATEGORY_OPTIONS}
+          placeholder={categoryPlaceholder}
+          searchable
+          searchPlaceholder="Cerca categoria..."
+          value={form.category}
+        />
+        {errors.category ? (
+          <AppText variant="caption" color="danger">
+            {errors.category}
+          </AppText>
+        ) : null}
+      </View>
 
       {/* Role */}
-      <SelectField
-        label="Ruolo"
-        onChange={(val) => updateField("role", val)}
-        options={COACH_ROLE_OPTIONS}
-        placeholder="Seleziona ruolo"
-        value={form.role}
-      />
+      <View style={formStyles.fieldGroup}>
+        <SelectField
+          label={roleLabel}
+          onChange={(val) => updateField("role", val)}
+          options={roleOptions}
+          placeholder={rolePlaceholder}
+          value={form.role}
+        />
+        {errors.role ? (
+          <AppText variant="caption" color="danger">
+            {errors.role}
+          </AppText>
+        ) : null}
+      </View>
 
       {/* Duration content by type */}
       {form.type === "MULTI_SEASON" ? (

@@ -31,6 +31,23 @@ describe("onboarding-form", () => {
     });
   });
 
+  it("uses the Banani-aligned base validation for agents", () => {
+    const errors = validateOnboardingStep("base", {
+      ...defaultOnboardingFormState,
+      role: "agent",
+    });
+
+    expect(errors).toMatchObject({
+      birthDate: "Questo campo è obbligatorio",
+      firstName: "Questo campo è obbligatorio",
+      lastName: "Questo campo è obbligatorio",
+      nationality: "Questo campo è obbligatorio",
+      phoneNumber: "Questo campo è obbligatorio",
+      residence: "Questo campo è obbligatorio",
+    });
+    expect(errors.gender).toBeUndefined();
+  });
+
   it("blocks invalid residence and phone values while allowing optional empty fields", () => {
     const errors = validateOnboardingStep("base", {
       ...defaultOnboardingFormState,
@@ -106,6 +123,52 @@ describe("onboarding-form", () => {
     expect(errors).toEqual({});
   });
 
+  it("requires at least one staff role before continuing", () => {
+    const errors = validateOnboardingStep("staff_role", {
+      ...defaultOnboardingFormState,
+      role: "staff",
+    });
+
+    expect(errors).toEqual({
+      staffRoles: "Seleziona almeno un ruolo per continuare.",
+    });
+  });
+
+  it("requires a primary staff role when multiple roles are selected", () => {
+    const errors = validateOnboardingStep("staff_role", {
+      ...defaultOnboardingFormState,
+      role: "staff",
+      staffRoles: ["Preparatore atletico", "Match analyst"],
+    });
+
+    expect(errors).toEqual({
+      staffPrimaryRole: "Seleziona il ruolo principale per continuare.",
+    });
+  });
+
+  it("accepts a single staff role without extra primary-role friction", () => {
+    const errors = validateOnboardingStep("staff_role", {
+      ...defaultOnboardingFormState,
+      role: "staff",
+      staffPrimaryRole: "Preparatore atletico",
+      staffRoles: ["Preparatore atletico"],
+    });
+
+    expect(errors).toEqual({});
+  });
+
+  it("requires portfolio data for the agent onboarding", () => {
+    const errors = validateOnboardingStep("agent_portfolio", {
+      ...defaultOnboardingFormState,
+      role: "agent",
+    });
+
+    expect(errors).toEqual({
+      agentMainPlayerRoles: "Seleziona almeno un ruolo principale.",
+      agentPlayerTypes: "Seleziona almeno un profilo di calciatore.",
+    });
+  });
+
   it("still validates the legacy details step for backward compatibility", () => {
     const errors = validateOnboardingStep("details", {
       ...defaultOnboardingFormState,
@@ -140,5 +203,32 @@ describe("onboarding-form", () => {
     });
     expect(getPreviousOnboardingStep("complete")).toBe("experience");
     expect(getPreviousOnboardingStep("complete", null, "club_admin")).toBe("club_profile");
+    expect(getPreviousOnboardingStep("complete", null, "staff")).toBe("staff_player_career_toggle");
+    expect(getPreviousOnboardingStep("complete", "staff_player_career", "staff")).toBe("staff_player_career");
+  });
+
+  it("maps agent optional substeps to the expected progress and back navigation", () => {
+    expect(getOnboardingProgress("base", "agent")).toMatchObject({
+      percentage: 13,
+      stepIndex: 0,
+      totalSteps: 8,
+    });
+    expect(getOnboardingProgress("agent_player_career", "agent")).toMatchObject({
+      percentage: 63,
+      stepIndex: 4,
+      totalSteps: 8,
+    });
+    expect(getOnboardingProgress("agent_extra", "agent")).toMatchObject({
+      percentage: 100,
+      stepIndex: 7,
+      totalSteps: 8,
+    });
+    expect(
+      getPreviousOnboardingStep("agent_portfolio", "agent_player_career_toggle", "agent"),
+    ).toBe("agent_player_career_toggle");
+    expect(
+      getPreviousOnboardingStep("agent_portfolio", "agent_player_career", "agent"),
+    ).toBe("agent_player_career");
+    expect(getPreviousOnboardingStep("complete", null, "agent")).toBe("agent_extra");
   });
 });
