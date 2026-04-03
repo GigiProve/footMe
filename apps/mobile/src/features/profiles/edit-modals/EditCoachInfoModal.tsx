@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert } from "react-native";
 
 import { MediaPickerField } from "../../../components/ui/media-picker-field";
-import { spacing } from "../../../theme/tokens";
-import { AppText, Button } from "../../../ui";
+
+import type { AvailabilityType } from "../../onboarding/onboarding-form";
+import { WhereToPlaySection } from "../../onboarding/where-to-play-section";
 import {
   pickAndUploadMedia,
   ProfileMediaUploadError,
@@ -13,6 +14,7 @@ import {
 import {
   buildFullUpdatePayload,
   buildInitialState,
+  fromDelimitedString,
 } from "../profile-edit-helpers";
 import { validateBirthDateInput } from "../profile-form-utils";
 import { ProfileField as Field } from "../profile-screen-components";
@@ -26,7 +28,6 @@ type CoachFormState = {
   gamePhilosophy: string;
   licenses: string;
   openToNewRole: boolean;
-  preferredRegions: string;
   technicalVideoUrl: string;
 };
 
@@ -48,7 +49,6 @@ function getInitialFormState(
     gamePhilosophy: base.gamePhilosophy,
     licenses: base.licenses,
     openToNewRole: base.openToNewRole,
-    preferredRegions: base.preferredRegions,
     technicalVideoUrl: base.technicalVideoUrl,
   };
 }
@@ -63,12 +63,19 @@ export function EditCoachInfoModal({
   const [form, setForm] = useState<CoachFormState>(() =>
     getInitialFormState(completeProfile),
   );
+  const [preferredRegionsArr, setPreferredRegionsArr] = useState<string[]>([]);
+  const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("ITALY");
+  const [preferredProvincesArr, setPreferredProvincesArr] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
       setForm(getInitialFormState(completeProfile));
+      const base = buildInitialState(completeProfile);
+      setPreferredRegionsArr(fromDelimitedString(base.preferredRegions));
+      setAvailabilityType((base.coachAvailabilityType as AvailabilityType) || "ITALY");
+      setPreferredProvincesArr(fromDelimitedString(base.coachPreferredProvinces));
     }
   }, [visible, completeProfile]);
 
@@ -152,7 +159,9 @@ export function EditCoachInfoModal({
         coachedCategories: form.coachedCategories,
         gamePhilosophy: form.gamePhilosophy,
         technicalVideoUrl: form.technicalVideoUrl,
-        preferredRegions: form.preferredRegions,
+        preferredRegions: preferredRegionsArr.join(", "),
+        coachAvailabilityType: availabilityType,
+        coachPreferredProvinces: preferredProvincesArr.join(", "),
         openToNewRole: form.openToNewRole,
       };
 
@@ -228,41 +237,39 @@ export function EditCoachInfoModal({
         removable={Boolean(form.technicalVideoUrl)}
       />
 
-      <Field
-        editable
-        label="Aree di interesse"
-        onChangeText={(value) => updateField("preferredRegions", value)}
-        placeholder="Lombardia, Piemonte..."
-        value={form.preferredRegions}
+      {/* Availability + geographic selection */}
+      <WhereToPlaySection
+        availabilityType={availabilityType}
+        categories={[]}
+        hideCategories
+        infoMessages={{
+          ITALY: "",
+          REGIONS: "Indica una o più regioni in cui sei disponibile ad allenare.",
+          PROVINCES: "Indica una o più province in cui sei disponibile ad allenare.",
+        }}
+        isAvailable={form.openToNewRole}
+        onAvailabilityTypeChange={setAvailabilityType}
+        onCategoriesChange={() => undefined}
+        onIsAvailableChange={(value) => {
+          updateField("openToNewRole", value);
+          if (!value) {
+            setPreferredRegionsArr([]);
+            setPreferredProvincesArr([]);
+            setAvailabilityType("ITALY");
+          }
+        }}
+        onProvincesChange={setPreferredProvincesArr}
+        onRegionsChange={setPreferredRegionsArr}
+        provinces={preferredProvincesArr}
+        provincesHelperText="Puoi selezionare più province in cui allenare."
+        provincesLabel="Province di interesse"
+        regions={preferredRegionsArr}
+        regionsHelperText="Puoi selezionare più regioni in cui allenare."
+        regionsLabel="Regioni di interesse"
+        toggleLabel="Disponibile per nuove panchine"
+        toggleSubtitle="Il tuo profilo può comparire tra gli allenatori disponibili."
       />
-
-      <View style={styles.booleanField}>
-        <AppText variant="titleSm">Disponibile per nuove panchine</AppText>
-        <View style={styles.booleanRow}>
-          <Button
-            label="Si"
-            onPress={() => updateField("openToNewRole", true)}
-            selected={form.openToNewRole}
-            variant="chipAction"
-          />
-          <Button
-            label="No"
-            onPress={() => updateField("openToNewRole", false)}
-            selected={!form.openToNewRole}
-            variant="chipAction"
-          />
-        </View>
-      </View>
     </EditModalShell>
   );
 }
 
-const styles = StyleSheet.create({
-  booleanField: {
-    gap: spacing[8],
-  },
-  booleanRow: {
-    flexDirection: "row",
-    gap: spacing[10],
-  },
-});

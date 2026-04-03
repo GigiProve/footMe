@@ -491,6 +491,8 @@ export default function OnboardingProfileScreen() {
     coachLicenseType,
     coachCategoriesArray,
     coachAvailableFrom,
+    coachAvailabilityType,
+    coachProvincesArray,
     coachRegionsArray,
     coachCareerEntries,
     hasPlayedFootball,
@@ -1111,11 +1113,13 @@ export default function OnboardingProfileScreen() {
         coachProfile:
           role === "coach"
             ? {
+                availability_type: coachAvailabilityType || null,
                 coached_categories: fromDelimitedString(coachedCategories),
                 coached_clubs: fromDelimitedString(coachedClubs),
                 game_philosophy: parseOptionalText(gamePhilosophy),
                 licenses: fromDelimitedString(licenses),
                 open_to_new_role: openToNewRole,
+                preferred_provinces: coachProvincesArray,
                 preferred_regions: fromDelimitedString(coachPreferredRegions),
                 technical_video_url: parseOptionalText(technicalVideoUrl),
               }
@@ -1984,11 +1988,13 @@ export default function OnboardingProfileScreen() {
         club: null,
         clubSeasonEntries: [],
         coachProfile: {
+          availability_type: coachAvailabilityType || null,
           coached_categories: coachCategoriesArray,
           coached_clubs: [],
           game_philosophy: gamePhilosophy || null,
           licenses: coachLicenseType ? [coachLicenseType] : [],
           open_to_new_role: openToNewRole,
+          preferred_provinces: coachProvincesArray,
           preferred_regions: coachRegionsArray,
           technical_video_url: null,
         },
@@ -3200,11 +3206,13 @@ export default function OnboardingProfileScreen() {
         {step === "coach_role" ? (
           <View style={styles.stepContainer}>
             <CoachRoleStep
+              availabilityType={coachAvailabilityType}
               availableFrom={coachAvailableFrom}
               categoriesArray={coachCategoriesArray}
               licenseType={coachLicenseType}
               openToNewRole={openToNewRole}
               primaryRole={coachPrimaryRole}
+              provincesArray={coachProvincesArray}
               regionsArray={coachRegionsArray}
               onUpdate={(patch) => patchForm(patch)}
               validationErrors={validationErrors}

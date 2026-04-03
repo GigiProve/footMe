@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { SelectField } from "../../../components/ui/select-field";
@@ -10,10 +10,11 @@ import {
 } from "../../profiles/player-sports";
 import type { TeamAutocompleteOption } from "../../profiles/player-sports";
 import { TeamAutocompleteInput } from "../../profiles/player-sports-section";
-import type { CoachCareerEntry } from "./coach-career-types";
+import type { CoachCareerEntry, CoachSeasonDetail } from "./coach-career-types";
 import {
   COACH_ROLE_OPTIONS,
   MONTH_OPTIONS,
+  computeCoachSeasonsFromPeriod,
   formatSeasonShort,
   generateCoachEntryId,
   getCoachSeasonOptions,
@@ -53,6 +54,7 @@ type FormErrors = {
   seasons?: string;
   startYear?: string;
   endYear?: string;
+  seasonDetails?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -274,6 +276,75 @@ const periodStyles = StyleSheet.create({
 });
 
 // ---------------------------------------------------------------------------
+// SeasonDetailCard
+// ---------------------------------------------------------------------------
+
+function SeasonDetailCard({
+  categoryOptions,
+  detail,
+  onChange,
+  roleOptions,
+  season,
+}: {
+  categoryOptions: { label: string; value: string }[];
+  detail: CoachSeasonDetail;
+  onChange: (field: keyof CoachSeasonDetail, value: string) => void;
+  roleOptions: { label: string; value: string }[];
+  season: string;
+}) {
+  return (
+    <View style={seasonDetailStyles.container}>
+      <View style={seasonDetailStyles.labelBadge}>
+        <AppText variant="caption" style={seasonDetailStyles.labelText}>
+          {formatSeasonShort(season)}
+        </AppText>
+      </View>
+
+      <SelectField
+        label="Categoria *"
+        onChange={(val) => onChange("category", val)}
+        options={categoryOptions}
+        placeholder="Seleziona categoria"
+        searchable
+        searchPlaceholder="Cerca categoria..."
+        value={detail.category}
+      />
+
+      <SelectField
+        label="Ruolo *"
+        onChange={(val) => onChange("role", val)}
+        options={roleOptions}
+        placeholder="Seleziona ruolo"
+        value={detail.role}
+      />
+    </View>
+  );
+}
+
+const seasonDetailStyles = StyleSheet.create({
+  container: {
+    gap: spacing[10],
+    padding: spacing[14],
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius[8],
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  labelBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: spacing[10],
+    paddingVertical: spacing[4],
+    borderRadius: radius.full,
+    backgroundColor: colors.heroSoft,
+    borderWidth: 1,
+    borderColor: colors.hero,
+  },
+  labelText: {
+    color: colors.hero,
+  },
+});
+
+// ---------------------------------------------------------------------------
 // CoachExperienceForm
 // ---------------------------------------------------------------------------
 
@@ -300,6 +371,19 @@ export function CoachExperienceForm({
     value: s,
   }));
 
+  const effectiveSeasons = useMemo(() => {
+    if (form.type === "MULTI_SEASON") {
+      return form.seasons.length > 1 ? form.seasons : [];
+    }
+    if (form.type === "CUSTOM_PERIOD" && form.period) {
+      const seasons = computeCoachSeasonsFromPeriod(form.period);
+      return seasons.length > 1 ? seasons : [];
+    }
+    return [];
+  }, [form.type, form.seasons, form.period]);
+
+  const isMultiSeason = effectiveSeasons.length > 1;
+
   function updateField<K extends keyof CoachCareerEntry>(
     key: K,
     value: CoachCareerEntry[K],
@@ -314,14 +398,51 @@ export function CoachExperienceForm({
       const nextSeasons = isSelected
         ? prev.seasons.filter((s) => s !== season)
         : [...prev.seasons, season];
-      return { ...prev, seasons: nextSeasons };
+
+      const nextDetails = { ...prev.seasonDetails };
+      if (!isSelected && !nextDetails[season]) {
+        nextDetails[season] = { category: prev.category, role: prev.role };
+      }
+      if (isSelected) {
+        delete nextDetails[season];
+      }
+
+      return { ...prev, seasons: nextSeasons, seasonDetails: nextDetails };
     });
     setErrors((prev) => ({ ...prev, seasons: undefined }));
   }
 
   function handlePeriodChange(period: NonNullable<CoachCareerEntry["period"]>) {
-    setForm((prev) => ({ ...prev, period }));
+    setForm((prev) => {
+      const newSeasons = computeCoachSeasonsFromPeriod(period);
+      if (newSeasons.length <= 1) {
+        return { ...prev, period, seasonDetails: {} };
+      }
+      const nextDetails: Record<string, CoachSeasonDetail> = {};
+      for (const season of newSeasons) {
+        nextDetails[season] = prev.seasonDetails[season] ?? {
+          category: prev.category,
+          role: prev.role,
+        };
+      }
+      return { ...prev, period, seasonDetails: nextDetails };
+    });
     setErrors((prev) => ({ ...prev, startYear: undefined, endYear: undefined }));
+  }
+
+  function handleSeasonDetailChange(
+    season: string,
+    field: keyof CoachSeasonDetail,
+    value: string,
+  ) {
+    setForm((prev) => ({
+      ...prev,
+      seasonDetails: {
+        ...prev.seasonDetails,
+        [season]: { ...(prev.seasonDetails[season] ?? { category: "", role: "" }), [field]: value },
+      },
+    }));
+    setErrors((prev) => ({ ...prev, seasonDetails: undefined }));
   }
 
   function handleSave() {
@@ -331,12 +452,25 @@ export function CoachExperienceForm({
       nextErrors.teamName = "La squadra è obbligatoria.";
     }
 
-    if (!form.role.trim()) {
-      nextErrors.role = "Seleziona un ruolo.";
-    }
-
-    if (!form.category.trim()) {
-      nextErrors.category = "Seleziona una categoria.";
+    if (!isMultiSeason) {
+      if (!form.role.trim()) {
+        nextErrors.role = "Seleziona un ruolo.";
+      }
+      if (!form.category.trim()) {
+        nextErrors.category = "Seleziona una categoria.";
+      }
+    } else {
+      for (const season of effectiveSeasons) {
+        const detail = form.seasonDetails[season];
+        if (!detail?.category) {
+          nextErrors.seasonDetails = `Seleziona una categoria per la stagione ${formatSeasonShort(season)}.`;
+          break;
+        }
+        if (!detail?.role) {
+          nextErrors.seasonDetails = `Seleziona un ruolo per la stagione ${formatSeasonShort(season)}.`;
+          break;
+        }
+      }
     }
 
     if (form.type === "MULTI_SEASON" && form.seasons.length === 0) {
@@ -392,39 +526,43 @@ export function CoachExperienceForm({
         ) : null}
       </View>
 
-      {/* Category */}
-      <View style={formStyles.fieldGroup}>
-        <SelectField
-          label={categoryLabel}
-          onChange={(val) => updateField("category", val)}
-          options={COACH_EXPERIENCE_CATEGORY_OPTIONS}
-          placeholder={categoryPlaceholder}
-          searchable
-          searchPlaceholder="Cerca categoria..."
-          value={form.category}
-        />
-        {errors.category ? (
-          <AppText variant="caption" color="danger">
-            {errors.category}
-          </AppText>
-        ) : null}
-      </View>
+      {/* Category — only shown when single season */}
+      {!isMultiSeason ? (
+        <View style={formStyles.fieldGroup}>
+          <SelectField
+            label={categoryLabel}
+            onChange={(val) => updateField("category", val)}
+            options={COACH_EXPERIENCE_CATEGORY_OPTIONS}
+            placeholder={categoryPlaceholder}
+            searchable
+            searchPlaceholder="Cerca categoria..."
+            value={form.category}
+          />
+          {errors.category ? (
+            <AppText variant="caption" color="danger">
+              {errors.category}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
 
-      {/* Role */}
-      <View style={formStyles.fieldGroup}>
-        <SelectField
-          label={roleLabel}
-          onChange={(val) => updateField("role", val)}
-          options={roleOptions}
-          placeholder={rolePlaceholder}
-          value={form.role}
-        />
-        {errors.role ? (
-          <AppText variant="caption" color="danger">
-            {errors.role}
-          </AppText>
-        ) : null}
-      </View>
+      {/* Role — only shown when single season */}
+      {!isMultiSeason ? (
+        <View style={formStyles.fieldGroup}>
+          <SelectField
+            label={roleLabel}
+            onChange={(val) => updateField("role", val)}
+            options={roleOptions}
+            placeholder={rolePlaceholder}
+            value={form.role}
+          />
+          {errors.role ? (
+            <AppText variant="caption" color="danger">
+              {errors.role}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Duration content by type */}
       {form.type === "MULTI_SEASON" ? (
@@ -472,6 +610,32 @@ export function CoachExperienceForm({
         />
       ) : null}
 
+      {/* Per-season category + role — only when multiple seasons selected */}
+      {isMultiSeason ? (
+        <View style={formStyles.fieldGroup}>
+          <AppText variant="caption" color="muted">
+            Categoria e ruolo per stagione
+          </AppText>
+          <View style={formStyles.seasonDetailsSection}>
+            {effectiveSeasons.map((season) => (
+              <SeasonDetailCard
+                key={season}
+                categoryOptions={COACH_EXPERIENCE_CATEGORY_OPTIONS}
+                detail={form.seasonDetails[season] ?? { category: form.category, role: form.role }}
+                onChange={(field, value) => handleSeasonDetailChange(season, field, value)}
+                roleOptions={roleOptions}
+                season={season}
+              />
+            ))}
+          </View>
+          {errors.seasonDetails ? (
+            <AppText variant="caption" color="danger">
+              {errors.seasonDetails}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
+
       {/* Action buttons */}
       <Button
         label={isEditing ? "Salva modifiche" : "Salva esperienza"}
@@ -489,5 +653,8 @@ const formStyles = StyleSheet.create({
   },
   fieldGroup: {
     gap: spacing[8],
+  },
+  seasonDetailsSection: {
+    gap: spacing[12],
   },
 });

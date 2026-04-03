@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 
 import type { StaffSpecialization } from "../../onboarding/create-initial-profile";
+import type { AvailabilityType } from "../../onboarding/onboarding-form";
+import { WhereToPlaySection } from "../../onboarding/where-to-play-section";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import { updateCompleteProfessionalProfile } from "../profile-service";
 import {
   buildFullUpdatePayload,
   buildInitialState,
+  fromDelimitedString,
   specializationOptions,
 } from "../profile-edit-helpers";
 import { validateBirthDateInput } from "../profile-form-utils";
@@ -34,7 +37,9 @@ export function EditStaffInfoModal({
     useState<StaffSpecialization>("fitness_coach");
   const [experienceSummary, setExperienceSummary] = useState("");
   const [certifications, setCertifications] = useState("");
-  const [preferredRegions, setPreferredRegions] = useState("");
+  const [preferredRegions, setPreferredRegions] = useState<string[]>([]);
+  const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("ITALY");
+  const [preferredProvinces, setPreferredProvinces] = useState<string[]>([]);
   const [openToWork, setOpenToWork] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -44,7 +49,9 @@ export function EditStaffInfoModal({
       setSpecialization(initial.specialization);
       setExperienceSummary(initial.experienceSummary);
       setCertifications(initial.certifications);
-      setPreferredRegions(initial.preferredRegions);
+      setPreferredRegions(fromDelimitedString(initial.preferredRegions));
+      setAvailabilityType((initial.staffAvailabilityType as AvailabilityType) || "ITALY");
+      setPreferredProvinces(fromDelimitedString(initial.staffPreferredProvinces));
       setOpenToWork(initial.openToWork);
     }
   }, [visible, completeProfile]);
@@ -59,7 +66,9 @@ export function EditStaffInfoModal({
         certifications,
         experienceSummary,
         openToWork,
-        preferredRegions,
+        preferredRegions: preferredRegions.join(", "),
+        staffAvailabilityType: availabilityType,
+        staffPreferredProvinces: preferredProvinces.join(", "),
         specialization,
       };
 
@@ -123,39 +132,43 @@ export function EditStaffInfoModal({
         value={certifications}
       />
 
-      {/* Preferred regions */}
-      <Field
-        label="Aree di interesse"
-        onChangeText={setPreferredRegions}
-        placeholder="Es. Lombardia, Piemonte"
-        value={preferredRegions}
+      {/* Availability + geographic selection */}
+      <WhereToPlaySection
+        availabilityType={availabilityType}
+        categories={[]}
+        hideCategories
+        infoMessages={{
+          ITALY: "",
+          REGIONS: "Indica una o più regioni in cui sei disponibile a collaborare con club e staff tecnici.",
+          PROVINCES: "Indica una o più province in cui sei disponibile a collaborare con club e staff tecnici.",
+        }}
+        isAvailable={openToWork}
+        onAvailabilityTypeChange={setAvailabilityType}
+        onCategoriesChange={() => undefined}
+        onIsAvailableChange={(value) => {
+          setOpenToWork(value);
+          if (!value) {
+            setPreferredRegions([]);
+            setPreferredProvinces([]);
+            setAvailabilityType("ITALY");
+          }
+        }}
+        onProvincesChange={setPreferredProvinces}
+        onRegionsChange={setPreferredRegions}
+        provinces={preferredProvinces}
+        provincesHelperText="Puoi selezionare più province in cui collaborare."
+        provincesLabel="Province di interesse"
+        regions={preferredRegions}
+        regionsHelperText="Puoi selezionare più regioni in cui collaborare."
+        regionsLabel="Regioni di interesse"
+        toggleLabel="Disponibile a nuove collaborazioni"
+        toggleSubtitle="Il tuo profilo può comparire tra gli staff tecnici disponibili."
       />
-
-      {/* Open to work boolean field */}
-      <View style={styles.fieldGroup}>
-        <AppText style={styles.fieldLabel}>Disponibile a lavorare</AppText>
-        <View style={styles.booleanRow}>
-          <Button
-            label="Si"
-            onPress={() => setOpenToWork(true)}
-            variant={openToWork ? "primary" : "chipAction"}
-          />
-          <Button
-            label="No"
-            onPress={() => setOpenToWork(false)}
-            variant={!openToWork ? "primary" : "chipAction"}
-          />
-        </View>
-      </View>
     </EditModalShell>
   );
 }
 
 const styles = StyleSheet.create({
-  booleanRow: {
-    flexDirection: "row",
-    gap: spacing[8],
-  },
   fieldGroup: {
     gap: spacing[8],
   },

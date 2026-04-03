@@ -90,9 +90,9 @@ export function createBlockFromTeam(
 const CURRENT_YEAR = new Date().getFullYear();
 
 export const YEAR_OPTIONS = Array.from(
-  { length: CURRENT_YEAR - 2004 },
+  { length: CURRENT_YEAR - 1969 },
   (_, i) => {
-    const year = CURRENT_YEAR + 1 - i;
+    const year = CURRENT_YEAR - i;
     return { label: String(year), value: String(year) };
   },
 );
@@ -333,7 +333,7 @@ export function computeEndYearOptions(
   startMonth: string,
   fullyUsedSeasons: Set<string>,
 ): SelectOption[] {
-  if (!startYear || fullyUsedSeasons.size === 0) return YEAR_OPTIONS;
+  if (!startYear) return YEAR_OPTIONS;
 
   const sYear = parseInt(startYear, 10);
   if (isNaN(sYear)) return YEAR_OPTIONS;
@@ -342,7 +342,9 @@ export function computeEndYearOptions(
 
   return YEAR_OPTIONS.map((opt) => {
     const eYear = parseInt(opt.value, 10);
-    if (eYear < sYear) return opt;
+    if (eYear < sYear) return { ...opt, disabled: true };
+
+    if (fullyUsedSeasons.size === 0) return opt;
 
     const seasons = computeSeasonsFromDates(sYear, sMo, eYear, null);
     if (seasons.length === 0) return opt;

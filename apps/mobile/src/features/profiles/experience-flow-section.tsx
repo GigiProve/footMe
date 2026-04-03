@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -11,6 +11,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
+import { useKeyboardAwareScroll } from "../../components/ui/keyboard-aware-scroll-view";
 import { SelectField } from "../../components/ui/select-field";
 import { WheelPicker } from "../../components/ui/wheel-picker";
 import { colors, radius, spacing } from "../../theme/tokens";
@@ -269,8 +270,6 @@ function DateRangeSelector({
             onChange={(val) => onDateChange({ ...block, startYear: val })}
             options={startYearOptions}
             placeholder="Anno"
-            searchable
-            searchPlaceholder="Cerca anno..."
             value={block.startYear}
           />
           {missingStartYear ? (
@@ -301,8 +300,6 @@ function DateRangeSelector({
               onChange={(val) => onDateChange({ ...block, endYear: val })}
               options={endYearOptions}
               placeholder="Anno"
-              searchable
-              searchPlaceholder="Cerca anno..."
               value={block.endYear}
             />
             {missingEndYear ? (
@@ -368,6 +365,8 @@ function SeasonDetailCard({
   hasAttemptedSave: boolean;
 }) {
   const missingCategory = hasAttemptedSave && !detail.category.trim();
+  const scrollCtx = useKeyboardAwareScroll();
+  const categoryRef = useRef<View>(null);
 
   if (hasConflict) {
     return (
@@ -403,16 +402,22 @@ function SeasonDetailCard({
         </View>
       </View>
 
-      <SelectField
-        fullScreen
-        label="Categoria *"
-        onChange={(val) => onChange({ ...detail, category: val })}
-        options={PLAYER_CATEGORY_OPTIONS}
-        placeholder="Seleziona la categoria"
-        searchable
-        searchPlaceholder="Cerca categoria..."
-        value={detail.category}
-      />
+      <View ref={categoryRef}>
+        <SelectField
+          fullScreen
+          label="Categoria *"
+          onChange={(val) => onChange({ ...detail, category: val })}
+          onOpen={() =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            scrollCtx?.scrollElementToTop(categoryRef.current as any)
+          }
+          options={PLAYER_CATEGORY_OPTIONS}
+          placeholder="Seleziona la categoria"
+          searchable
+          searchPlaceholder="Cerca categoria..."
+          value={detail.category}
+        />
+      </View>
       {missingCategory ? (
         <AppText variant="caption" color="danger">
           Seleziona una categoria.

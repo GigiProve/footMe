@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { SelectField } from "../../../components/ui/select-field";
@@ -249,8 +249,32 @@ function PeriodSelector({
     endYear: "",
   };
 
+  const endYearOptions = useMemo(
+    () =>
+      current.startYear
+        ? yearOptions.map((opt) =>
+            parseInt(opt.value, 10) < parseInt(current.startYear, 10)
+              ? { ...opt, disabled: true }
+              : opt,
+          )
+        : yearOptions,
+    [yearOptions, current.startYear],
+  );
+
   function update(patch: Partial<CareerExperiencePeriod>) {
     onChange({ ...current, ...patch });
+  }
+
+  function updateStart(patch: Partial<CareerExperiencePeriod>) {
+    const next = { ...current, ...patch };
+    if (
+      patch.startYear &&
+      next.endYear &&
+      parseInt(next.endYear, 10) < parseInt(patch.startYear, 10)
+    ) {
+      next.endYear = "";
+    }
+    onChange(next);
   }
 
   return (
@@ -271,11 +295,9 @@ function PeriodSelector({
           <SelectField
             fullScreen
             label="Dal (Anno) *"
-            onChange={(val) => update({ startYear: val })}
+            onChange={(val) => updateStart({ startYear: val })}
             options={yearOptions}
             placeholder="Anno"
-            searchable
-            searchPlaceholder="Cerca anno..."
             value={current.startYear}
           />
         </View>
@@ -298,10 +320,8 @@ function PeriodSelector({
             fullScreen
             label="Al (Anno) *"
             onChange={(val) => update({ endYear: val })}
-            options={yearOptions}
+            options={endYearOptions}
             placeholder="Anno"
-            searchable
-            searchPlaceholder="Cerca anno..."
             value={current.endYear}
           />
         </View>
