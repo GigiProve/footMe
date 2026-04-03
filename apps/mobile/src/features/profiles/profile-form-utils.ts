@@ -1191,3 +1191,32 @@ function normalizeLookupValue(value: string) {
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
+
+// ---------------------------------------------------------------------------
+// Nationality category classification (Italy / EU / non-EU)
+// ---------------------------------------------------------------------------
+
+export type NationalityCategory = "italy" | "eu" | "non_eu";
+
+/**
+ * ISO 3166-1 alpha-2 codes for the 27 EU member states (excluding Italy,
+ * which is classified as "italy").
+ */
+const EU_COUNTRY_CODES = new Set([
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
+  "DE", "GR", "HU", "IE", "LV", "LT", "LU", "MT", "NL", "PL",
+  "PT", "RO", "SK", "SI", "ES", "SE",
+]);
+
+/**
+ * Classifies a nationality code into one of three categories:
+ * - "italy" — the user is Italian
+ * - "eu"    — the user is from another EU member state
+ * - "non_eu" — the user is from outside the EU (or code is empty/unknown)
+ */
+export function getNationalityCategory(code: string | null | undefined): NationalityCategory {
+  if (!code) return "non_eu";
+  if (code === "IT") return "italy";
+  if (EU_COUNTRY_CODES.has(code)) return "eu";
+  return "non_eu";
+}

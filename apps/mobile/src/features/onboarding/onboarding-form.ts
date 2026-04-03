@@ -1,5 +1,6 @@
 import {
   composePhoneNumber,
+  getNationalityCategory,
   isPhoneNumberValid,
   splitPhoneNumber,
 } from "../profiles/profile-form-utils";
@@ -75,6 +76,8 @@ export type OnboardingValidationErrors = Partial<Record<string, string>>;
 
 export type AvailabilityType = "ITALY" | "REGIONS" | "PROVINCES";
 
+export type LegalStatus = "has_permit" | "no_permit" | "pending_permit" | "";
+
 export type OnboardingFormState = {
   agentAgencyLogoUrl: string;
   agentAgencyName: string;
@@ -136,6 +139,8 @@ export type OnboardingFormState = {
   coachFormation: string;
   coachPlayStyle: string;
   coachLanguages: string[];
+  currentLocationCity: string;
+  currentLocationCountry: string;
   currentStep: OnboardingStep;
   domicile: string;
   domicileRegion: string;
@@ -149,6 +154,7 @@ export type OnboardingFormState = {
   isOpenToTransfer: boolean;
   lastCompletedStep: OnboardingStep | null;
   lastName: string;
+  legalStatus: LegalStatus;
   licenses: string;
   nationality: string;
   openToNewRole: boolean;
@@ -178,6 +184,8 @@ export type OnboardingFormState = {
   repPhone: string;
   repPhoneCountryCode: string;
   residence: string;
+  residenceCity: string;
+  residenceCountry: string;
   residenceRegion: string;
   role: AppRole | "";
   secondaryPositions: PlayerPosition[];
@@ -776,6 +784,8 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   coachFormation: "",
   coachPlayStyle: "",
   coachLanguages: [],
+  currentLocationCity: "",
+  currentLocationCountry: "",
   currentStep: "role",
   domicile: "",
   domicileRegion: "",
@@ -789,6 +799,7 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   isOpenToTransfer: false,
   lastCompletedStep: null,
   lastName: "",
+  legalStatus: "",
   licenses: "",
   nationality: "",
   openToNewRole: false,
@@ -818,6 +829,8 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   repPhone: "",
   repPhoneCountryCode: "+39",
   residence: "",
+  residenceCity: "",
+  residenceCountry: "",
   residenceRegion: "",
   role: "",
   secondaryPositions: [],
@@ -1067,6 +1080,28 @@ export function normalizeOnboardingDraft(
     directorLanguages: Array.isArray(value.directorLanguages)
       ? value.directorLanguages.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.directorLanguages,
+    currentLocationCity:
+      typeof value.currentLocationCity === "string"
+        ? value.currentLocationCity
+        : defaultOnboardingFormState.currentLocationCity,
+    currentLocationCountry:
+      typeof value.currentLocationCountry === "string"
+        ? value.currentLocationCountry
+        : defaultOnboardingFormState.currentLocationCountry,
+    legalStatus:
+      value.legalStatus === "has_permit" ||
+      value.legalStatus === "no_permit" ||
+      value.legalStatus === "pending_permit"
+        ? value.legalStatus
+        : defaultOnboardingFormState.legalStatus,
+    residenceCity:
+      typeof value.residenceCity === "string"
+        ? value.residenceCity
+        : defaultOnboardingFormState.residenceCity,
+    residenceCountry:
+      typeof value.residenceCountry === "string"
+        ? value.residenceCountry
+        : defaultOnboardingFormState.residenceCountry,
     uploadingField: null,
   };
 }
@@ -1709,25 +1744,55 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.birthDate = "Questo campo è obbligatorio";
   }
 
-  if ((form.role === "agent" || form.role === "director") && !form.nationality.trim()) {
+  if (!form.nationality.trim()) {
     errors.nationality = "Questo campo è obbligatorio";
   }
 
-  if ((form.role === "agent" || form.role === "director") && !form.residence.trim()) {
-    errors.residence = "Questo campo è obbligatorio";
+  const nationalityCategory = getNationalityCategory(form.nationality);
+
+  // Italian users: validate Italian city autocomplete fields
+  if (nationalityCategory === "italy") {
+    if ((form.role === "agent" || form.role === "director") && !form.residence.trim()) {
+      errors.residence = "Questo campo è obbligatorio";
+    }
+
+    if (form.residence.trim() && !form.residenceRegion.trim()) {
+      errors.residence = "Seleziona una città valida dai suggerimenti.";
+    }
+
+    if (
+      form.role !== "agent" &&
+      !form.useResidenceForDomicile &&
+      form.domicile.trim() &&
+      !form.domicileRegion.trim()
+    ) {
+      errors.domicile = "Seleziona una città valida dai suggerimenti.";
+    }
   }
 
-  if (form.residence.trim() && !form.residenceRegion.trim()) {
-    errors.residence = "Seleziona una città valida dai suggerimenti.";
+  // EU and non-EU users: validate international location fields
+  if (nationalityCategory === "eu" || nationalityCategory === "non_eu") {
+    if (form.nationality.trim()) {
+      if (!form.residenceCountry.trim()) {
+        errors.residenceCountry = "Questo campo è obbligatorio";
+      }
+      if (!form.residenceCity.trim()) {
+        errors.residenceCity = "Questo campo è obbligatorio";
+      }
+      if (!form.currentLocationCountry.trim()) {
+        errors.currentLocationCountry = "Questo campo è obbligatorio";
+      }
+      if (!form.currentLocationCity.trim()) {
+        errors.currentLocationCity = "Questo campo è obbligatorio";
+      }
+    }
   }
 
-  if (
-    form.role !== "agent" &&
-    !form.useResidenceForDomicile &&
-    form.domicile.trim() &&
-    !form.domicileRegion.trim()
-  ) {
-    errors.domicile = "Seleziona una città valida dai suggerimenti.";
+  // non-EU only: legal status is required
+  if (nationalityCategory === "non_eu" && form.nationality.trim()) {
+    if (!form.legalStatus) {
+      errors.legalStatus = "Questo campo è obbligatorio";
+    }
   }
 
   const phoneValue = composePhoneNumber(form.phoneCountryCode, form.phoneNumber);

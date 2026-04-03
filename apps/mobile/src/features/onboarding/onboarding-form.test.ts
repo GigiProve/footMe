@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getNationalityCategory,
+} from "../profiles/profile-form-utils";
+import {
   defaultOnboardingFormState,
   getOnboardingProgress,
   getPreviousOnboardingStep,
@@ -28,6 +31,7 @@ describe("onboarding-form", () => {
       firstName: "Questo campo è obbligatorio",
       gender: "Questo campo è obbligatorio",
       lastName: "Questo campo è obbligatorio",
+      nationality: "Questo campo è obbligatorio",
     });
   });
 
@@ -43,9 +47,26 @@ describe("onboarding-form", () => {
       lastName: "Questo campo è obbligatorio",
       nationality: "Questo campo è obbligatorio",
       phoneNumber: "Questo campo è obbligatorio",
+    });
+    // residence only required when nationality is set to Italy
+    expect(errors.residence).toBeUndefined();
+    expect(errors.gender).toBeUndefined();
+  });
+
+  it("requires residence for Italian agents when nationality is IT", () => {
+    const errors = validateOnboardingStep("base", {
+      ...defaultOnboardingFormState,
+      role: "agent",
+      nationality: "IT",
+      birthDate: "1990-01-01",
+      firstName: "Marco",
+      lastName: "Rossi",
+      phoneNumber: "+393401234567",
+    });
+
+    expect(errors).toMatchObject({
       residence: "Questo campo è obbligatorio",
     });
-    expect(errors.gender).toBeUndefined();
   });
 
   it("requires the community profile type before entering fan or media onboarding", () => {
@@ -73,13 +94,14 @@ describe("onboarding-form", () => {
     expect(errors.gender).toBeUndefined();
   });
 
-  it("blocks invalid residence and phone values while allowing optional empty fields", () => {
+  it("blocks invalid residence and phone values for Italian users", () => {
     const errors = validateOnboardingStep("base", {
       ...defaultOnboardingFormState,
       birthDate: "2001-03-11",
       firstName: "Marco",
       gender: "male",
       lastName: "Rossi",
+      nationality: "IT",
       phoneCountryCode: "+39",
       phoneNumber: "123",
       residence: "Milx",
@@ -93,13 +115,14 @@ describe("onboarding-form", () => {
     });
   });
 
-  it("validates domicile when user opts for a different domicile", () => {
+  it("validates domicile when Italian user opts for a different domicile", () => {
     const errors = validateOnboardingStep("base", {
       ...defaultOnboardingFormState,
       birthDate: "2001-03-11",
       firstName: "Marco",
       gender: "male",
       lastName: "Rossi",
+      nationality: "IT",
       role: "player",
       useResidenceForDomicile: false,
       domicile: "Milx",
@@ -111,13 +134,14 @@ describe("onboarding-form", () => {
     });
   });
 
-  it("skips domicile validation when useResidenceForDomicile is true", () => {
+  it("skips domicile validation for Italian user when useResidenceForDomicile is true", () => {
     const errors = validateOnboardingStep("base", {
       ...defaultOnboardingFormState,
       birthDate: "2001-03-11",
       firstName: "Marco",
       gender: "male",
       lastName: "Rossi",
+      nationality: "IT",
       role: "player",
       useResidenceForDomicile: true,
       domicile: "Milx",
@@ -296,6 +320,120 @@ describe("onboarding-form", () => {
       getPreviousOnboardingStep("agent_portfolio", "agent_player_career", "agent"),
     ).toBe("agent_player_career");
     expect(getPreviousOnboardingStep("complete", null, "agent")).toBe("agent_extra");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Nationality category classification
+  // ---------------------------------------------------------------------------
+
+  it("classifies Italy as 'italy'", () => {
+    expect(getNationalityCategory("IT")).toBe("italy");
+  });
+
+  it("classifies EU member states as 'eu'", () => {
+    expect(getNationalityCategory("DE")).toBe("eu");
+    expect(getNationalityCategory("FR")).toBe("eu");
+    expect(getNationalityCategory("ES")).toBe("eu");
+    expect(getNationalityCategory("PT")).toBe("eu");
+    expect(getNationalityCategory("SE")).toBe("eu");
+  });
+
+  it("classifies non-EU countries as 'non_eu'", () => {
+    expect(getNationalityCategory("BR")).toBe("non_eu");
+    expect(getNationalityCategory("US")).toBe("non_eu");
+    expect(getNationalityCategory("AR")).toBe("non_eu");
+    expect(getNationalityCategory("MA")).toBe("non_eu");
+  });
+
+  it("returns 'non_eu' for empty or null nationality codes", () => {
+    expect(getNationalityCategory("")).toBe("non_eu");
+    expect(getNationalityCategory(null)).toBe("non_eu");
+    expect(getNationalityCategory(undefined)).toBe("non_eu");
+  });
+
+  // ---------------------------------------------------------------------------
+  // EU/non-EU base step validation
+  // ---------------------------------------------------------------------------
+
+  it("requires international location fields for EU users", () => {
+    const errors = validateOnboardingStep("base", {
+      ...defaultOnboardingFormState,
+      birthDate: "1990-01-01",
+      firstName: "Carlos",
+      gender: "male",
+      lastName: "García",
+      nationality: "ES",
+      role: "player",
+    });
+
+    expect(errors).toMatchObject({
+      residenceCountry: "Questo campo è obbligatorio",
+      residenceCity: "Questo campo è obbligatorio",
+      currentLocationCountry: "Questo campo è obbligatorio",
+      currentLocationCity: "Questo campo è obbligatorio",
+    });
+    expect(errors.residence).toBeUndefined();
+    expect(errors.domicile).toBeUndefined();
+    expect(errors.legalStatus).toBeUndefined();
+  });
+
+  it("requires international location fields + legal status for non-EU users", () => {
+    const errors = validateOnboardingStep("base", {
+      ...defaultOnboardingFormState,
+      birthDate: "1990-01-01",
+      firstName: "João",
+      gender: "male",
+      lastName: "Silva",
+      nationality: "BR",
+      role: "player",
+    });
+
+    expect(errors).toMatchObject({
+      residenceCountry: "Questo campo è obbligatorio",
+      residenceCity: "Questo campo è obbligatorio",
+      currentLocationCountry: "Questo campo è obbligatorio",
+      currentLocationCity: "Questo campo è obbligatorio",
+      legalStatus: "Questo campo è obbligatorio",
+    });
+    expect(errors.residence).toBeUndefined();
+    expect(errors.domicile).toBeUndefined();
+  });
+
+  it("passes base validation for a fully filled EU user", () => {
+    const errors = validateOnboardingStep("base", {
+      ...defaultOnboardingFormState,
+      birthDate: "1990-01-01",
+      firstName: "Carlos",
+      gender: "male",
+      lastName: "García",
+      nationality: "ES",
+      residenceCountry: "ES",
+      residenceCity: "Madrid",
+      currentLocationCountry: "IT",
+      currentLocationCity: "Milano",
+      role: "player",
+    });
+
+    expect(errors).toEqual({});
+  });
+
+  it("passes base validation for a fully filled non-EU user", () => {
+    const errors = validateOnboardingStep("base", {
+      ...defaultOnboardingFormState,
+      birthDate: "1990-01-01",
+      firstName: "João",
+      gender: "male",
+      lastName: "Silva",
+      nationality: "BR",
+      residenceCountry: "BR",
+      residenceCity: "São Paulo",
+      currentLocationCountry: "IT",
+      currentLocationCity: "Roma",
+      legalStatus: "has_permit",
+      role: "player",
+    });
+
+    expect(errors).toEqual({});
   });
 
   it("maps fan and media progress to the new community flows", () => {

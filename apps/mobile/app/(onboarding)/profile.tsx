@@ -35,6 +35,7 @@ import {
   getOnboardingVisibleSteps,
   getPreviousOnboardingStep,
   validateOnboardingStep,
+  type LegalStatus,
   type OnboardingStep,
   type OnboardingValidationErrors,
 } from "../../src/features/onboarding/onboarding-form";
@@ -108,6 +109,7 @@ import {
   composePhoneNumber,
   formatName,
   getCountryByCode,
+  getNationalityCategory,
   REGION_OPTIONS,
   normalizeProfileBioInput,
 } from "../../src/features/profiles/profile-form-utils";
@@ -175,6 +177,12 @@ const roleOptions: {
 const genderOptions: { label: string; value: ProfileGender }[] = [
   { label: "Uomo", value: "male" },
   { label: "Donna", value: "female" },
+];
+
+const LEGAL_STATUS_OPTIONS: { label: string; value: LegalStatus }[] = [
+  { label: "Ho il permesso di soggiorno", value: "has_permit" },
+  { label: "Non ho il permesso di soggiorno", value: "no_permit" },
+  { label: "In fase di richiesta", value: "pending_permit" },
 ];
 
 const staffExperienceRoleOptions = STAFF_ROLE_OPTIONS.map((option) => ({
@@ -500,6 +508,8 @@ export default function OnboardingProfileScreen() {
     coachFormation,
     coachPlayStyle,
     coachLanguages,
+    currentLocationCity,
+    currentLocationCountry,
     domicile,
     domicileRegion,
     experienceSummary,
@@ -511,6 +521,7 @@ export default function OnboardingProfileScreen() {
     isOpenToTransfer,
     lastCompletedStep,
     lastName,
+    legalStatus,
     licenses,
     nationality,
     openToNewRole,
@@ -540,6 +551,8 @@ export default function OnboardingProfileScreen() {
     repPhone,
     repPhoneCountryCode,
     residence,
+    residenceCity,
+    residenceCountry,
     residenceRegion,
     role,
     secondaryPositions,
@@ -578,6 +591,7 @@ export default function OnboardingProfileScreen() {
   } = form;
 
   const fullName = getOnboardingFullName(form);
+  const nationalityCategory = getNationalityCategory(nationality);
   const visibleSteps = getOnboardingVisibleSteps(role as AppRole | "");
   const progress = getOnboardingProgress(step, role as AppRole | "");
   const canGoBack = step !== "role";
@@ -722,17 +736,53 @@ export default function OnboardingProfileScreen() {
   const handleNationalitySelect = useCallback(
     (value: string) => {
       const country = getCountryByCode(value);
+      const newCategory = getNationalityCategory(value);
+      const prevCategory = getNationalityCategory(nationality);
 
-      patchForm({
+      const patch: Partial<typeof form> = {
         nationality: value,
         phoneCountryCode:
           !phoneNumber.trim() && country
             ? country.phoneCountryCode
             : phoneCountryCode,
-      });
-      clearValidationErrors(["nationality", "phoneNumber"]);
+      };
+
+      // Reset fields that belong to the previous category when switching
+      if (newCategory !== prevCategory) {
+        if (prevCategory === "italy") {
+          // Leaving Italy: clear Italian-specific location fields
+          patch.residence = "";
+          patch.residenceRegion = "";
+          patch.domicile = "";
+          patch.domicileRegion = "";
+          patch.useResidenceForDomicile = true;
+        }
+        if (prevCategory === "eu" || prevCategory === "non_eu") {
+          // Leaving EU/non-EU: clear international location fields
+          patch.residenceCountry = "";
+          patch.residenceCity = "";
+          patch.currentLocationCountry = "";
+          patch.currentLocationCity = "";
+        }
+        if (prevCategory === "non_eu") {
+          // Leaving non-EU: clear legal status
+          patch.legalStatus = "" as LegalStatus;
+        }
+
+        clearValidationErrors([
+          "nationality", "phoneNumber",
+          "residence", "residenceRegion", "domicile", "domicileRegion",
+          "residenceCountry", "residenceCity",
+          "currentLocationCountry", "currentLocationCity",
+          "legalStatus",
+        ]);
+      } else {
+        clearValidationErrors(["nationality", "phoneNumber"]);
+      }
+
+      patchForm(patch);
     },
-    [clearValidationErrors, patchForm, phoneCountryCode, phoneNumber],
+    [clearValidationErrors, nationality, patchForm, phoneCountryCode, phoneNumber],
   );
 
   // Track whether the initial hydration navigation has been performed so we
@@ -940,7 +990,10 @@ export default function OnboardingProfileScreen() {
       clubTotalMembers,
       clubWebsite,
       clubYouthCategories,
-      domicile: getEffectiveDomicile(form),
+      domicile:
+        nationalityCategory === "italy"
+          ? getEffectiveDomicile(form)
+          : currentLocationCity,
       fullName,
       gender: gender as ProfileGender,
       nationality,
@@ -948,7 +1001,7 @@ export default function OnboardingProfileScreen() {
       primaryPosition: primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
       repEmail,
       repPhone: composePhoneNumber(repPhoneCountryCode, repPhone),
-      residence,
+      residence: nationalityCategory === "italy" ? residence : residenceCity,
       role: role as AppRole,
       staffAvailableFrom,
       staffPrimaryRole,
@@ -2310,16 +2363,22 @@ export default function OnboardingProfileScreen() {
           role === "agent" || role === "director" ? (
             <AgentBasicInfoStep
               birthDate={birthDate}
+              currentLocationCity={currentLocationCity}
+              currentLocationCountry={currentLocationCountry}
               firstName={firstName}
               lastName={lastName}
+              legalStatus={legalStatus as LegalStatus}
               nationality={nationality}
               phoneCountryCode={phoneCountryCode}
               phoneNumber={phoneNumber}
               residence={residence}
+              residenceCity={residenceCity}
+              residenceCountry={residenceCountry}
               residenceRegion={residenceRegion}
               validationErrors={validationErrors}
               onContinue={handleContinueFromBase}
               onFormattedNameBlur={handleFormattedNameBlur}
+              onNationalityChange={handleNationalitySelect}
               onResidenceChange={handleResidenceChange}
               onResidenceSelect={handleResidenceSelect}
               onUpdate={(patch, fieldsToClear) => {
@@ -2413,43 +2472,182 @@ export default function OnboardingProfileScreen() {
                 ) : null}
 
                 <NationalityAutocompleteInput
-                  label="Nazionalità"
+                  errorMessage={validationErrors.nationality}
+                  label="Nazionalità *"
                   onChange={handleNationalitySelect}
                   value={nationality}
                 />
+                {validationErrors.nationality ? (
+                  <ValidationMessage>
+                    {validationErrors.nationality}
+                  </ValidationMessage>
+                ) : null}
 
-                <ResidenceCityInput
-                  errorMessage={validationErrors.residence}
-                  helperText={
-                    residenceRegion
-                      ? `Città selezionata: ${residence} · ${residenceRegion}`
-                      : undefined
-                  }
-                  onChangeText={handleResidenceChange}
-                  onSelectCity={handleResidenceSelect}
-                  value={residence}
-                />
+                {/* Italian users: Italian city autocomplete + optional domicile */}
+                {nationalityCategory === "italy" ? (
+                  <>
+                    <ResidenceCityInput
+                      errorMessage={validationErrors.residence}
+                      helperText={
+                        residenceRegion
+                          ? `Città selezionata: ${residence} · ${residenceRegion}`
+                          : undefined
+                      }
+                      onChangeText={handleResidenceChange}
+                      onSelectCity={handleResidenceSelect}
+                      value={residence}
+                    />
 
-                <Toggle
-                  label="Vuoi inserire un domicilio diverso dalla residenza?"
-                  onValueChange={handleDomicileToggle}
-                  value={!useResidenceForDomicile}
-                />
+                    <Toggle
+                      label="Vuoi inserire un domicilio diverso dalla residenza?"
+                      onValueChange={handleDomicileToggle}
+                      value={!useResidenceForDomicile}
+                    />
 
-                {!useResidenceForDomicile ? (
-                  <ResidenceCityInput
-                    errorMessage={validationErrors.domicile}
-                    helperText={
-                      domicileRegion
-                        ? `Città selezionata: ${domicile} · ${domicileRegion}`
-                        : undefined
-                    }
-                    label="Domicilio"
-                    onChangeText={handleDomicileChange}
-                    onSelectCity={handleDomicileSelect}
-                    placeholder="Cerca la città di domicilio"
-                    value={domicile}
-                  />
+                    {!useResidenceForDomicile ? (
+                      <ResidenceCityInput
+                        errorMessage={validationErrors.domicile}
+                        helperText={
+                          domicileRegion
+                            ? `Città selezionata: ${domicile} · ${domicileRegion}`
+                            : undefined
+                        }
+                        label="Domicilio"
+                        onChangeText={handleDomicileChange}
+                        onSelectCity={handleDomicileSelect}
+                        placeholder="Cerca la città di domicilio"
+                        value={domicile}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+
+                {/* EU and non-EU users: international residence + current location */}
+                {(nationalityCategory === "eu" || nationalityCategory === "non_eu") && nationality ? (
+                  <>
+                    <View style={styles.sectionHeaderGap}>
+                      <AppText variant="titleSm">Residenza</AppText>
+                      <AppText variant="bodySm" color="secondary">
+                        Il paese e la città dove sei ufficialmente residente.
+                      </AppText>
+                    </View>
+
+                    <NationalityAutocompleteInput
+                      errorMessage={validationErrors.residenceCountry}
+                      label="Paese di residenza *"
+                      onChange={(value) =>
+                        updateValue("residenceCountry", value, ["residenceCountry"])
+                      }
+                      value={residenceCountry}
+                    />
+                    {validationErrors.residenceCountry ? (
+                      <ValidationMessage>
+                        {validationErrors.residenceCountry}
+                      </ValidationMessage>
+                    ) : null}
+
+                    <Input
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                      label="Città di residenza *"
+                      onChangeText={(value) =>
+                        updateValue("residenceCity", value, ["residenceCity"])
+                      }
+                      placeholder="Es. Madrid"
+                      style={
+                        validationErrors.residenceCity
+                          ? { borderColor: colors.danger }
+                          : undefined
+                      }
+                      value={residenceCity}
+                    />
+                    {validationErrors.residenceCity ? (
+                      <ValidationMessage>
+                        {validationErrors.residenceCity}
+                      </ValidationMessage>
+                    ) : null}
+
+                    <View style={styles.sectionHeaderGap}>
+                      <AppText variant="titleSm">Dove ti trovi attualmente</AppText>
+                      <AppText variant="bodySm" color="secondary">
+                        Il paese e la città in cui vivi in questo momento.
+                      </AppText>
+                    </View>
+
+                    <NationalityAutocompleteInput
+                      errorMessage={validationErrors.currentLocationCountry}
+                      label="Paese attuale *"
+                      onChange={(value) =>
+                        updateValue("currentLocationCountry", value, ["currentLocationCountry"])
+                      }
+                      value={currentLocationCountry}
+                    />
+                    {validationErrors.currentLocationCountry ? (
+                      <ValidationMessage>
+                        {validationErrors.currentLocationCountry}
+                      </ValidationMessage>
+                    ) : null}
+
+                    <Input
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                      label="Città attuale *"
+                      onChangeText={(value) =>
+                        updateValue("currentLocationCity", value, ["currentLocationCity"])
+                      }
+                      placeholder="Es. Milano"
+                      style={
+                        validationErrors.currentLocationCity
+                          ? { borderColor: colors.danger }
+                          : undefined
+                      }
+                      value={currentLocationCity}
+                    />
+                    {validationErrors.currentLocationCity ? (
+                      <ValidationMessage>
+                        {validationErrors.currentLocationCity}
+                      </ValidationMessage>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {/* Non-EU only: legal status selector */}
+                {nationalityCategory === "non_eu" && nationality ? (
+                  <>
+                    <View style={styles.sectionHeaderGap}>
+                      <AppText variant="titleSm">Stato legale *</AppText>
+                      <AppText variant="bodySm" color="secondary">
+                        La tua situazione relativa al permesso di soggiorno in Italia.
+                      </AppText>
+                    </View>
+
+                    <View style={styles.legalStatusOptions}>
+                      {LEGAL_STATUS_OPTIONS.map((option) => (
+                        <Pressable
+                          key={option.value}
+                          onPress={() =>
+                            updateValue("legalStatus", option.value, ["legalStatus"])
+                          }
+                          style={[
+                            styles.legalStatusOption,
+                            legalStatus === option.value && styles.legalStatusOptionActive,
+                          ]}
+                        >
+                          <AppText
+                            variant="bodySm"
+                            color={legalStatus === option.value ? "accentStrong" : "primary"}
+                          >
+                            {option.label}
+                          </AppText>
+                        </Pressable>
+                      ))}
+                    </View>
+                    {validationErrors.legalStatus ? (
+                      <ValidationMessage>
+                        {validationErrors.legalStatus}
+                      </ValidationMessage>
+                    ) : null}
+                  </>
                 ) : null}
 
                 <PhoneInputWithCountryCode
@@ -4352,6 +4550,21 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
   },
   sectionHeaderGap: {
+    gap: spacing[8],
+  },
+  legalStatusOption: {
+    borderRadius: radius[12],
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[14],
+  },
+  legalStatusOptionActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.heroSoft,
+  },
+  legalStatusOptions: {
     gap: spacing[8],
   },
   stepContainer: {
