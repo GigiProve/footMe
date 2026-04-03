@@ -67,6 +67,9 @@ import { StaffAvailabilityStep } from "../../src/features/onboarding/staff/Staff
 import { StaffRoleStep } from "../../src/features/onboarding/staff/StaffRoleStep";
 import {
   mapStaffRoleToSpecialization,
+  MEDIA_AFFILIATION_TYPE_OPTIONS,
+  MEDIA_CONTENT_TYPE_OPTIONS,
+  MEDIA_FOCUS_AREA_OPTIONS,
   STAFF_ROLE_OPTIONS,
 } from "../../src/features/onboarding/onboarding-types";
 import {
@@ -84,6 +87,15 @@ import {
   DIRECTOR_RESPONSIBILITY_OPTIONS,
   DIRECTOR_ROLE_OPTIONS,
 } from "../../src/features/onboarding/onboarding-types";
+import {
+  CommunityBasicInfoStep,
+  CommunityChipGroup,
+  CommunityProfileTypeStep,
+  FanInterestsStep,
+  MediaChannelsStep,
+  MediaCollaborationsStep,
+  MediaEntityStep,
+} from "../../src/features/onboarding/community";
 import { PlayerCharacteristicsSection } from "../../src/features/profiles/player-sports-section";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
@@ -121,7 +133,7 @@ type CompletionDestination = "feed" | "network" | "profile";
 const roleOptions: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  value: AppRole;
+  value: AppRole | "community";
 }[] = [
   {
     icon: "person-outline",
@@ -152,6 +164,11 @@ const roleOptions: {
     icon: "people-outline",
     label: "Dirigente",
     value: "director",
+  },
+  {
+    icon: "newspaper-outline",
+    label: "Media e appassionati",
+    value: "community",
   },
 ];
 
@@ -498,6 +515,21 @@ export default function OnboardingProfileScreen() {
     openToWork,
     phoneCountryCode,
     phoneNumber,
+    communityProfileType,
+    fanInterestCategories,
+    fanInterestRegions,
+    mediaAffiliationName,
+    mediaAffiliationType,
+    mediaContentTypes,
+    mediaEntityDescription,
+    mediaEntityName,
+    mediaFacebook,
+    mediaFocusAreas,
+    mediaInstagram,
+    mediaLogoUrl,
+    mediaTikTok,
+    mediaWebsite,
+    mediaYouTube,
     playerMediaItems,
     preferredCategories,
     preferredFoot,
@@ -941,7 +973,51 @@ export default function OnboardingProfileScreen() {
     }
 
     setValidationErrors({});
+    if (role === "fan" || role === "media") {
+      navigateToStep("community_profile_type");
+      return;
+    }
+
     navigateToStep(form.role === "club_admin" ? "club_representative" : "base");
+  }
+
+  function handleContinueFromCommunityProfileType() {
+    const nextErrors = validateOnboardingStep("community_profile_type", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "community_profile_type" });
+    navigateToStep(role === "media" ? "media_basic" : "fan_basic");
+  }
+
+  function handleContinueFromCommunityBasic() {
+    const currentBasicStep = role === "media" ? "media_basic" : "fan_basic";
+    const nextErrors = validateOnboardingStep(currentBasicStep, form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: currentBasicStep });
+    navigateToStep(role === "media" ? "media_photo" : "fan_photo");
+  }
+
+  function handleContinueFromFanInterests() {
+    const nextErrors = validateOnboardingStep("fan_interests", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    handleFinishFanOnboarding();
   }
 
   function handleContinueFromBase() {
@@ -967,6 +1043,10 @@ export default function OnboardingProfileScreen() {
       navigateToStep("staff_role");
     } else if (role === "director") {
       navigateToStep("director_roles");
+    } else if (role === "fan") {
+      navigateToStep("fan_interests");
+    } else if (role === "media") {
+      navigateToStep("media_entity");
     } else {
       navigateToStep("technical");
     }
@@ -1086,6 +1166,12 @@ export default function OnboardingProfileScreen() {
           showEmail: false,
           showFacebook: false,
           showInstagram: false,
+          showTikTok: false,
+          showWebsite: false,
+          showYouTube: false,
+          tiktok: "",
+          website: "",
+          youtube: "",
         },
       });
 
@@ -1650,6 +1736,207 @@ export default function OnboardingProfileScreen() {
     }
   }
 
+  function handleContinueFromMediaEntity() {
+    const nextErrors = validateOnboardingStep("media_entity", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "media_entity" });
+    setValidationErrors({});
+    navigateToStep("media_content");
+  }
+
+  function handleContinueFromMediaContent() {
+    const nextErrors = validateOnboardingStep("media_content", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "media_content" });
+    setValidationErrors({});
+    navigateToStep("media_focus");
+  }
+
+  function handleContinueFromMediaFocus() {
+    const nextErrors = validateOnboardingStep("media_focus", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "media_focus" });
+    setValidationErrors({});
+    navigateToStep("media_channels");
+  }
+
+  function handleContinueFromMediaChannels() {
+    patchForm({ lastCompletedStep: "media_channels" });
+    setValidationErrors({});
+    navigateToStep("media_collaborations");
+  }
+
+  function handleContinueFromMediaCollaborations() {
+    const nextErrors = validateOnboardingStep("media_collaborations", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "media_collaborations" });
+    setValidationErrors({});
+    handleFinishMediaOnboarding();
+  }
+
+  async function handleFinishFanOnboarding() {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await ensureInitialProfileCreated();
+
+      await updateCompleteProfessionalProfile({
+        agentProfile: null,
+        club: null,
+        clubSeasonEntries: [],
+        coachProfile: null,
+        directorProfile: null,
+        fanProfile: {
+          interest_categories: fanInterestCategories,
+          interest_regions: fanInterestRegions,
+        },
+        mediaProfile: null,
+        playerCareerEntries: [],
+        playerProfile: null,
+        profile: {
+          avatar_url: parseOptionalText(avatarUrl),
+          bio: null,
+          birth_date: birthDate,
+          city: null,
+          full_name: fullName,
+          is_open_to_transfer: false,
+          languages: [],
+          nationality: null,
+          region: null,
+        },
+        profileId: session.user.id,
+        role: role as AppRole,
+        staffProfile: null,
+        userContacts: {
+          email: "",
+          facebook: "",
+          instagram: "",
+          phone: "",
+          showEmail: false,
+          showFacebook: false,
+          showInstagram: false,
+          showTikTok: false,
+          showWebsite: false,
+          showYouTube: false,
+          tiktok: "",
+          website: "",
+          youtube: "",
+        },
+      });
+
+      goToCompletion("fan_interests");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso nel completamento profilo.";
+      Alert.alert("Profilo non salvato", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleFinishMediaOnboarding() {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await ensureInitialProfileCreated();
+
+      await updateCompleteProfessionalProfile({
+        agentProfile: null,
+        club: null,
+        clubSeasonEntries: [],
+        coachProfile: null,
+        directorProfile: null,
+        fanProfile: null,
+        mediaProfile: {
+          affiliation_name:
+            mediaAffiliationType !== "Nessuna"
+              ? parseOptionalText(mediaAffiliationName)
+              : null,
+          affiliation_type:
+            mediaAffiliationType !== "Nessuna"
+              ? parseOptionalText(mediaAffiliationType)
+              : null,
+          content_types: mediaContentTypes,
+          entity_name: parseOptionalText(mediaEntityName),
+          focus_areas: mediaFocusAreas,
+          logo_url: parseOptionalText(mediaLogoUrl),
+          short_description: parseOptionalText(mediaEntityDescription),
+        },
+        playerCareerEntries: [],
+        playerProfile: null,
+        profile: {
+          avatar_url: parseOptionalText(avatarUrl),
+          bio: parseOptionalText(normalizeProfileBioInput(mediaEntityDescription)),
+          birth_date: birthDate,
+          city: null,
+          full_name: fullName,
+          is_open_to_transfer: false,
+          languages: [],
+          nationality: null,
+          region: null,
+        },
+        profileId: session.user.id,
+        role: role as AppRole,
+        staffProfile: null,
+        userContacts: {
+          email: "",
+          facebook: mediaFacebook,
+          instagram: mediaInstagram,
+          phone: "",
+          showEmail: false,
+          showFacebook: Boolean(mediaFacebook.trim()),
+          showInstagram: Boolean(mediaInstagram.trim()),
+          showTikTok: Boolean(mediaTikTok.trim()),
+          showWebsite: Boolean(mediaWebsite.trim()),
+          showYouTube: Boolean(mediaYouTube.trim()),
+          tiktok: mediaTikTok,
+          website: mediaWebsite,
+          youtube: mediaYouTube,
+        },
+      });
+
+      goToCompletion("media_collaborations");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso nel completamento profilo media.";
+      Alert.alert("Profilo media non salvato", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   function handleContinueFromCoachRole() {
     const nextErrors = validateOnboardingStep("coach_role", form);
 
@@ -1914,12 +2201,29 @@ export default function OnboardingProfileScreen() {
                         {pair.map((entry) => (
                           <RoleSelectionCard
                             key={entry.value}
-                            active={role === entry.value}
+                            active={
+                              entry.value === "community"
+                                ? role === "fan" || role === "media"
+                                : role === entry.value
+                            }
                             icon={entry.icon}
                             label={entry.label}
-                            onPress={() =>
-                              updateValue("role", entry.value, ["role"])
-                            }
+                            onPress={() => {
+                              if (entry.value === "community") {
+                                patchForm({
+                                  communityProfileType: "",
+                                  role: "fan",
+                                });
+                                clearValidationErrors(["role", "communityProfileType"]);
+                                return;
+                              }
+
+                              patchForm({
+                                communityProfileType: "",
+                                role: entry.value,
+                              });
+                              clearValidationErrors(["role", "communityProfileType"]);
+                            }}
                             testID={`role-card-${entry.value}`}
                           />
                         ))}
@@ -1934,7 +2238,11 @@ export default function OnboardingProfileScreen() {
               disabled={!role}
               label={
                 role
-                  ? `Continua come ${roleOptions.find((r) => r.value === role)?.label}`
+                  ? `Continua come ${
+                      role === "fan" || role === "media"
+                        ? "Media e appassionati"
+                        : roleOptions.find((r) => r.value === role)?.label
+                    }`
                   : "Seleziona un ruolo"
               }
               onPress={handleContinueFromRole}
@@ -1943,9 +2251,55 @@ export default function OnboardingProfileScreen() {
           </View>
         ) : null}
 
+        {step === "community_profile_type" ? (
+          <View style={styles.stepContainer}>
+            <CommunityProfileTypeStep
+              errorMessage={validationErrors.communityProfileType}
+              onSelect={(value) => {
+                patchForm({ communityProfileType: value, role: value });
+                clearValidationErrors(["communityProfileType", "role"]);
+              }}
+              selectedValue={communityProfileType}
+            />
+            <Button
+              disabled={!communityProfileType}
+              label="Continua"
+              onPress={handleContinueFromCommunityProfileType}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
         {/* ============================================================= */}
         {/* STEP: Base (personal data)                                     */}
         {/* ============================================================= */}
+        {step === "fan_basic" || step === "media_basic" ? (
+          <View style={styles.stepContainer}>
+            <CommunityBasicInfoStep
+              birthDate={birthDate}
+              firstName={firstName}
+              lastName={lastName}
+              onFormattedNameBlur={handleFormattedNameBlur}
+              onUpdate={(patch, fieldsToClear) => {
+                patchForm(patch);
+                clearValidationErrors(fieldsToClear ?? Object.keys(patch));
+              }}
+              subtitle={
+                step === "media_basic"
+                  ? "Inserisci i tuoi dati personali per creare il tuo account media."
+                  : "Inserisci le tue informazioni personali per creare il tuo profilo base."
+              }
+              title="I tuoi dati"
+              validationErrors={validationErrors}
+            />
+            <Button
+              label="Continua"
+              onPress={handleContinueFromCommunityBasic}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
         {step === "base" ? (
           role === "agent" || role === "director" ? (
             <AgentBasicInfoStep
@@ -2181,11 +2535,17 @@ export default function OnboardingProfileScreen() {
         {/* ============================================================= */}
         {/* STEP: Photo                                                    */}
         {/* ============================================================= */}
-        {step === "photo" ? (
+        {step === "photo" || step === "fan_photo" || step === "media_photo" ? (
           <View style={styles.stepContainer}>
             <OnboardingSectionCard
               title="Aggiungi una foto"
-              subtitle="Una foto profilo aiuta gli altri a riconoscerti. Puoi saltare questo passaggio e aggiungerla in seguito."
+              subtitle={
+                step === "fan_photo"
+                  ? "Aggiungi una foto per farti riconoscere dagli altri utenti della community. Puoi saltare questo passaggio."
+                  : step === "media_photo"
+                    ? "Carica una foto personale per il tuo profilo account. Puoi saltare questo passaggio."
+                    : "Una foto profilo aiuta gli altri a riconoscerti. Puoi saltare questo passaggio e aggiungerla in seguito."
+              }
             >
               <View style={styles.photoPreviewContainer}>
                 <View style={styles.photoWrapper}>
@@ -2269,6 +2629,188 @@ export default function OnboardingProfileScreen() {
                 variant="tertiary"
               />
             )}
+          </View>
+        ) : null}
+
+        {step === "fan_interests" ? (
+          <View style={styles.stepContainer}>
+            <FanInterestsStep
+              interestCategories={fanInterestCategories}
+              interestRegions={fanInterestRegions}
+              onUpdate={(patch) => {
+                patchForm(patch);
+                clearValidationErrors(Object.keys(patch));
+              }}
+              validationErrors={validationErrors}
+            />
+            <Button
+              disabled={isBusy}
+              label={isBusy ? "Salvataggio..." : "Completa registrazione"}
+              onPress={handleContinueFromFanInterests}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
+        {step === "media_entity" ? (
+          <View style={styles.stepContainer}>
+            <MediaEntityStep
+              description={mediaEntityDescription}
+              entityName={mediaEntityName}
+              errorMessage={validationErrors.mediaEntityName}
+              onUpdate={(patch) => {
+                patchForm(patch);
+                clearValidationErrors(Object.keys(patch));
+              }}
+            />
+
+            <OnboardingSectionCard
+              title="Logo o immagine"
+              subtitle="Carica un'immagine rappresentativa della tua pagina o progetto."
+            >
+              <MediaPickerField
+                buttonLabel="Carica immagine"
+                helperText="Puoi caricare un logo o una cover da usare come riferimento della tua pagina."
+                isUploading={uploadingField === "media-logo"}
+                label="Logo o immagine"
+                mediaType="image"
+                onPick={() =>
+                  handleMediaUpload({
+                    field: "media-logo",
+                    folder: "media-logos",
+                    mediaTypes: ["images"],
+                    onUploaded: (items) =>
+                      patchForm({ mediaLogoUrl: items[0]?.url ?? "" }),
+                  })
+                }
+                onRemove={() => patchForm({ mediaLogoUrl: "" })}
+                previewUrl={mediaLogoUrl}
+                removable
+              />
+            </OnboardingSectionCard>
+
+            <Button
+              disabled={isBusy}
+              label="Continua"
+              onPress={handleContinueFromMediaEntity}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
+        {step === "media_content" ? (
+          <View style={styles.stepContainer}>
+            <OnboardingSectionCard
+              title="Che tipo di contenuti crei?"
+              subtitle="Seleziona uno o più tipi di contenuti che descrivono il tuo lavoro."
+            >
+              <CommunityChipGroup
+                onToggle={(value) => {
+                  const next = mediaContentTypes.includes(value)
+                    ? mediaContentTypes.filter((entry) => entry !== value)
+                    : [...mediaContentTypes, value];
+                  patchForm({ mediaContentTypes: next });
+                  clearValidationErrors(["mediaContentTypes"]);
+                }}
+                options={MEDIA_CONTENT_TYPE_OPTIONS}
+                selectedValues={mediaContentTypes}
+              />
+              {validationErrors.mediaContentTypes ? (
+                <AppText variant="caption" color="danger">
+                  {validationErrors.mediaContentTypes}
+                </AppText>
+              ) : null}
+            </OnboardingSectionCard>
+
+            <Button
+              disabled={isBusy}
+              label="Continua"
+              onPress={handleContinueFromMediaContent}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
+        {step === "media_focus" ? (
+          <View style={styles.stepContainer}>
+            <OnboardingSectionCard
+              title="Ambito principale"
+              subtitle="Cosa segui principalmente nei tuoi contenuti?"
+            >
+              <CommunityChipGroup
+                onToggle={(value) => {
+                  const next = mediaFocusAreas.includes(value)
+                    ? mediaFocusAreas.filter((entry) => entry !== value)
+                    : [...mediaFocusAreas, value];
+                  patchForm({ mediaFocusAreas: next });
+                  clearValidationErrors(["mediaFocusAreas"]);
+                }}
+                options={MEDIA_FOCUS_AREA_OPTIONS}
+                selectedValues={mediaFocusAreas}
+              />
+              {validationErrors.mediaFocusAreas ? (
+                <AppText variant="caption" color="danger">
+                  {validationErrors.mediaFocusAreas}
+                </AppText>
+              ) : null}
+            </OnboardingSectionCard>
+
+            <Button
+              disabled={isBusy}
+              label="Continua"
+              onPress={handleContinueFromMediaFocus}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
+        {step === "media_channels" ? (
+          <View style={styles.stepContainer}>
+            <MediaChannelsStep
+              facebook={mediaFacebook}
+              instagram={mediaInstagram}
+              onUpdate={(patch) => patchForm(patch)}
+              tikTok={mediaTikTok}
+              website={mediaWebsite}
+              youTube={mediaYouTube}
+            />
+            <Button
+              disabled={isBusy}
+              label="Continua"
+              onPress={handleContinueFromMediaChannels}
+              variant="primary"
+            />
+            <Button
+              label="Salta"
+              onPress={handleContinueFromMediaChannels}
+              variant="tertiary"
+            />
+          </View>
+        ) : null}
+
+        {step === "media_collaborations" ? (
+          <View style={styles.stepContainer}>
+            <MediaCollaborationsStep
+              affiliationName={mediaAffiliationName}
+              affiliationType={mediaAffiliationType}
+              errorMessage={validationErrors.mediaAffiliationName}
+              onUpdate={(patch) => {
+                patchForm(patch);
+                clearValidationErrors(Object.keys(patch));
+              }}
+              options={MEDIA_AFFILIATION_TYPE_OPTIONS}
+            />
+            <Button
+              disabled={isBusy}
+              label={isBusy ? "Salvataggio..." : "Completa registrazione"}
+              onPress={handleContinueFromMediaCollaborations}
+              variant="primary"
+            />
+            <Button
+              label="Salta"
+              onPress={handleFinishMediaOnboarding}
+              variant="tertiary"
+            />
           </View>
         ) : null}
 
@@ -3544,21 +4086,27 @@ export default function OnboardingProfileScreen() {
                     />
                   </View>
                   <AppText variant="displaySm" style={styles.textCenter}>
-                    Il tuo profilo e' pronto!
+                    {role === "media"
+                      ? "Profilo media creato con successo"
+                      : role === "fan"
+                        ? "Profilo creato con successo"
+                        : "Il tuo profilo e' pronto!"}
                   </AppText>
                   <AppText
                     variant="bodySm"
                     color="secondary"
                     style={styles.textCenter}
                   >
-                    Ora puoi iniziare a connetterti con squadre, allenatori e
-                    giocatori. Se vuoi, potrai aggiungere altri dettagli in
-                    qualsiasi momento.
+                    {role === "media"
+                      ? "Il tuo profilo e' pronto per raccontare il mondo del calcio e farsi trovare dalla community di FootMe."
+                      : role === "fan"
+                        ? "Ora puoi esplorare il network, seguire le aree che ti interessano e partecipare alla community."
+                        : "Ora puoi iniziare a connetterti con squadre, allenatori e giocatori. Se vuoi, potrai aggiungere altri dettagli in qualsiasi momento."}
                   </AppText>
                 </OnboardingSectionCard>
 
                 <Button
-                  label="Vai alla home feed"
+                  label={role === "fan" || role === "media" ? "Vai alla Home" : "Vai alla home feed"}
                   onPress={() => finishOnboarding("feed")}
                   variant="primary"
                 />

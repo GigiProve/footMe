@@ -9,10 +9,16 @@ const mocks = vi.hoisted(() => {
   const privateContactsUpsertMock = vi.fn();
   const rpcMock = vi.fn();
   const agentProfilesUpsertMock = vi.fn();
+  const directorProfilesUpsertMock = vi.fn();
+  const fanProfilesUpsertMock = vi.fn();
+  const mediaProfilesUpsertMock = vi.fn();
   const staffProfilesUpsertMock = vi.fn();
 
   return {
     agentProfilesUpsertMock,
+    directorProfilesUpsertMock,
+    fanProfilesUpsertMock,
+    mediaProfilesUpsertMock,
     privateContactsUpsertMock,
     profileContactsUpsertMock,
     profileUpdateEqMock,
@@ -57,6 +63,24 @@ const mocks = vi.hoisted(() => {
       if (table === "agent_profiles") {
         return {
           upsert: agentProfilesUpsertMock,
+        };
+      }
+
+      if (table === "director_profiles") {
+        return {
+          upsert: directorProfilesUpsertMock,
+        };
+      }
+
+      if (table === "fan_profiles") {
+        return {
+          upsert: fanProfilesUpsertMock,
+        };
+      }
+
+      if (table === "media_profiles") {
+        return {
+          upsert: mediaProfilesUpsertMock,
         };
       }
 
@@ -126,6 +150,9 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     mocks.privateContactsUpsertMock.mockReset();
     mocks.rpcMock.mockReset();
     mocks.agentProfilesUpsertMock.mockReset();
+    mocks.directorProfilesUpsertMock.mockReset();
+    mocks.fanProfilesUpsertMock.mockReset();
+    mocks.mediaProfilesUpsertMock.mockReset();
     mocks.staffProfilesUpsertMock.mockReset();
 
     mocks.profileUpdateMaybeSingleMock.mockResolvedValue({
@@ -136,6 +163,9 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     mocks.privateContactsUpsertMock.mockResolvedValue({ error: null });
     mocks.rpcMock.mockResolvedValue({ error: null });
     mocks.agentProfilesUpsertMock.mockResolvedValue({ error: null });
+    mocks.directorProfilesUpsertMock.mockResolvedValue({ error: null });
+    mocks.fanProfilesUpsertMock.mockResolvedValue({ error: null });
+    mocks.mediaProfilesUpsertMock.mockResolvedValue({ error: null });
     mocks.staffProfilesUpsertMock.mockResolvedValue({ error: null });
   });
 
@@ -434,5 +464,79 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       player_types: ["Giovani", "Senior"],
       profile_id: "profile-1",
     });
+  });
+
+  it("persists fan interests in fan_profiles", async () => {
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      fanProfile: {
+        interest_categories: ["dilettanti", "mercato"],
+        interest_regions: ["Umbria", "Toscana"],
+      },
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "fan",
+      staffProfile: null,
+    });
+
+    expect(mocks.fanProfilesUpsertMock).toHaveBeenCalledWith({
+      interest_categories: ["dilettanti", "mercato"],
+      interest_regions: ["Umbria", "Toscana"],
+      profile_id: "profile-1",
+    });
+  });
+
+  it("persists media profile details and social channels", async () => {
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      mediaProfile: {
+        affiliation_name: "ASD Test",
+        affiliation_type: "Società sportiva",
+        content_types: ["Notizie", "Video"],
+        entity_name: "TuttoDilettanti",
+        focus_areas: ["Calcio locale", "Mercato"],
+        logo_url: "https://example.com/logo.png",
+        short_description: "Pagina dedicata al calcio regionale.",
+      },
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "media",
+      staffProfile: null,
+      userContacts: {
+        ...buildUpdateInput().userContacts,
+        facebook: "https://facebook.com/tuttodilettanti",
+        instagram: "https://instagram.com/tuttodilettanti",
+        showFacebook: true,
+        showInstagram: true,
+        showTikTok: true,
+        showWebsite: true,
+        showYouTube: true,
+        tiktok: "https://tiktok.com/@tuttodilettanti",
+        website: "https://tuttodilettanti.it",
+        youtube: "https://youtube.com/@tuttodilettanti",
+      },
+    });
+
+    expect(mocks.mediaProfilesUpsertMock).toHaveBeenCalledWith({
+      affiliation_name: "ASD Test",
+      affiliation_type: "Società sportiva",
+      content_types: ["Notizie", "Video"],
+      entity_name: "TuttoDilettanti",
+      focus_areas: ["Calcio locale", "Mercato"],
+      logo_url: "https://example.com/logo.png",
+      profile_id: "profile-1",
+      short_description: "Pagina dedicata al calcio regionale.",
+    });
+
+    expect(mocks.profileContactsUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tiktok: "https://tiktok.com/@tuttodilettanti",
+        website: "https://tuttodilettanti.it",
+        youtube: "https://youtube.com/@tuttodilettanti",
+        show_tiktok: true,
+        show_website: true,
+        show_youtube: true,
+      }),
+    );
   });
 });

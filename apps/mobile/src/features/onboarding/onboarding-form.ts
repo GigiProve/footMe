@@ -16,10 +16,21 @@ import type { CoachCareerEntry } from "./coach/coach-career-types";
 
 export type OnboardingStep =
   | "role"
+  | "community_profile_type"
   | "base"
   | "photo"
   | "technical"
   | "experience"
+  | "fan_basic"
+  | "fan_photo"
+  | "fan_interests"
+  | "media_basic"
+  | "media_photo"
+  | "media_entity"
+  | "media_content"
+  | "media_focus"
+  | "media_channels"
+  | "media_collaborations"
   | "agent_agency"
   | "agent_players"
   | "agent_football_experience"
@@ -142,6 +153,21 @@ export type OnboardingFormState = {
   openToWork: boolean;
   phoneCountryCode: string;
   phoneNumber: string;
+  communityProfileType: "fan" | "media" | "";
+  fanInterestCategories: string[];
+  fanInterestRegions: string[];
+  mediaAffiliationName: string;
+  mediaAffiliationType: string;
+  mediaContentTypes: string[];
+  mediaEntityDescription: string;
+  mediaEntityName: string;
+  mediaFocusAreas: string[];
+  mediaFacebook: string;
+  mediaInstagram: string;
+  mediaLogoUrl: string;
+  mediaTikTok: string;
+  mediaWebsite: string;
+  mediaYouTube: string;
   playerMediaItems: UploadedMediaItem[];
   preferredCategories: string;
   preferredFoot: PreferredFoot | "";
@@ -321,6 +347,28 @@ const defaultStepOrder: OnboardingStep[] = [
   "complete",
 ];
 
+const fanStepOrder: OnboardingStep[] = [
+  "role",
+  "community_profile_type",
+  "fan_basic",
+  "fan_photo",
+  "fan_interests",
+  "complete",
+];
+
+const mediaStepOrder: OnboardingStep[] = [
+  "role",
+  "community_profile_type",
+  "media_basic",
+  "media_photo",
+  "media_entity",
+  "media_content",
+  "media_focus",
+  "media_channels",
+  "media_collaborations",
+  "complete",
+];
+
 const agentStepOrder: OnboardingStep[] = [
   "role",
   "base",
@@ -460,6 +508,84 @@ const staffVisibleSteps: OnboardingVisibleStep[] = [
   },
 ];
 
+const fanVisibleSteps: OnboardingVisibleStep[] = [
+  {
+    description: "Scegli tra profilo base e profilo media",
+    index: 1,
+    label: "Tipo profilo",
+    step: "community_profile_type",
+  },
+  {
+    description: "Inserisci i dati personali essenziali",
+    index: 2,
+    label: "Dati",
+    step: "fan_basic",
+  },
+  {
+    description: "Aggiungi una foto profilo",
+    index: 3,
+    label: "Foto",
+    step: "fan_photo",
+  },
+  {
+    description: "Seleziona interessi e regioni che vuoi seguire",
+    index: 4,
+    label: "Interessi",
+    step: "fan_interests",
+  },
+];
+
+const mediaVisibleSteps: OnboardingVisibleStep[] = [
+  {
+    description: "Scegli tra profilo base e profilo media",
+    index: 1,
+    label: "Tipo profilo",
+    step: "community_profile_type",
+  },
+  {
+    description: "Inserisci i dati personali essenziali",
+    index: 2,
+    label: "Dati",
+    step: "media_basic",
+  },
+  {
+    description: "Aggiungi una foto profilo",
+    index: 3,
+    label: "Foto",
+    step: "media_photo",
+  },
+  {
+    description: "Configura la tua pagina o realtà editoriale",
+    index: 4,
+    label: "Pagina",
+    step: "media_entity",
+  },
+  {
+    description: "Definisci i contenuti che produci",
+    index: 5,
+    label: "Contenuti",
+    step: "media_content",
+  },
+  {
+    description: "Seleziona l'ambito che segui maggiormente",
+    index: 6,
+    label: "Ambito",
+    step: "media_focus",
+  },
+  {
+    description: "Collega i tuoi canali social e web",
+    index: 7,
+    label: "Canali",
+    step: "media_channels",
+  },
+  {
+    description: "Aggiungi eventuali collaborazioni e riferimenti",
+    index: 8,
+    label: "Collaborazioni",
+    step: "media_collaborations",
+  },
+];
+
 const directorStepOrder: OnboardingStep[] = [
   "role",
   "base",
@@ -565,6 +691,8 @@ export function getOnboardingVisibleSteps(role: AppRole | ""): OnboardingVisible
   if (role === "coach") return coachVisibleSteps;
   if (role === "staff") return staffVisibleSteps;
   if (role === "director") return directorVisibleSteps;
+  if (role === "fan") return fanVisibleSteps;
+  if (role === "media") return mediaVisibleSteps;
   return defaultVisibleSteps;
 }
 
@@ -574,6 +702,8 @@ export function getOnboardingStepOrder(role: AppRole | ""): OnboardingStep[] {
   if (role === "coach") return coachStepOrder;
   if (role === "staff") return staffStepOrder;
   if (role === "director") return directorStepOrder;
+  if (role === "fan") return fanStepOrder;
+  if (role === "media") return mediaStepOrder;
   return defaultStepOrder;
 }
 
@@ -661,6 +791,21 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   openToWork: false,
   phoneCountryCode: "+39",
   phoneNumber: "",
+  communityProfileType: "",
+  fanInterestCategories: [],
+  fanInterestRegions: [],
+  mediaAffiliationName: "",
+  mediaAffiliationType: "Nessuna",
+  mediaContentTypes: [],
+  mediaEntityDescription: "",
+  mediaEntityName: "",
+  mediaFacebook: "",
+  mediaFocusAreas: [],
+  mediaInstagram: "",
+  mediaLogoUrl: "",
+  mediaTikTok: "",
+  mediaWebsite: "",
+  mediaYouTube: "",
   playerMediaItems: [],
   preferredCategories: "",
   preferredFoot: "",
@@ -745,11 +890,67 @@ export function normalizeOnboardingDraft(
       typeof value.phoneCountryCode === "string"
         ? splitPhoneNumber(composePhoneNumber(value.phoneCountryCode, value.phoneNumber)).phoneNumber
         : splitPhoneNumber(value.phoneNumber).phoneNumber,
+    communityProfileType:
+      value.communityProfileType === "fan" || value.communityProfileType === "media"
+        ? value.communityProfileType
+        : defaultOnboardingFormState.communityProfileType,
+    fanInterestCategories: Array.isArray(value.fanInterestCategories)
+      ? value.fanInterestCategories.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.fanInterestCategories,
+    fanInterestRegions: Array.isArray(value.fanInterestRegions)
+      ? value.fanInterestRegions.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.fanInterestRegions,
     primaryPosition:
       normalizePlayerPositions(value.primaryPosition)[0] ?? defaultOnboardingFormState.primaryPosition,
     residenceRegion:
       typeof value.residenceRegion === "string" ? value.residenceRegion : defaultOnboardingFormState.residenceRegion,
     role: coerceAppRole(value.role) ?? defaultOnboardingFormState.role,
+    mediaAffiliationName:
+      typeof value.mediaAffiliationName === "string"
+        ? value.mediaAffiliationName
+        : defaultOnboardingFormState.mediaAffiliationName,
+    mediaAffiliationType:
+      typeof value.mediaAffiliationType === "string"
+        ? value.mediaAffiliationType
+        : defaultOnboardingFormState.mediaAffiliationType,
+    mediaContentTypes: Array.isArray(value.mediaContentTypes)
+      ? value.mediaContentTypes.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.mediaContentTypes,
+    mediaEntityDescription:
+      typeof value.mediaEntityDescription === "string"
+        ? value.mediaEntityDescription
+        : defaultOnboardingFormState.mediaEntityDescription,
+    mediaEntityName:
+      typeof value.mediaEntityName === "string"
+        ? value.mediaEntityName
+        : defaultOnboardingFormState.mediaEntityName,
+    mediaFacebook:
+      typeof value.mediaFacebook === "string"
+        ? value.mediaFacebook
+        : defaultOnboardingFormState.mediaFacebook,
+    mediaFocusAreas: Array.isArray(value.mediaFocusAreas)
+      ? value.mediaFocusAreas.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.mediaFocusAreas,
+    mediaInstagram:
+      typeof value.mediaInstagram === "string"
+        ? value.mediaInstagram
+        : defaultOnboardingFormState.mediaInstagram,
+    mediaLogoUrl:
+      typeof value.mediaLogoUrl === "string"
+        ? value.mediaLogoUrl
+        : defaultOnboardingFormState.mediaLogoUrl,
+    mediaTikTok:
+      typeof value.mediaTikTok === "string"
+        ? value.mediaTikTok
+        : defaultOnboardingFormState.mediaTikTok,
+    mediaWebsite:
+      typeof value.mediaWebsite === "string"
+        ? value.mediaWebsite
+        : defaultOnboardingFormState.mediaWebsite,
+    mediaYouTube:
+      typeof value.mediaYouTube === "string"
+        ? value.mediaYouTube
+        : defaultOnboardingFormState.mediaYouTube,
     secondaryPositions:
       normalizedSecondaryPositions.length > 0
         ? normalizedSecondaryPositions
@@ -858,7 +1059,9 @@ export function coerceAppRole(value: unknown): AppRole | null {
     value === "staff" ||
     value === "club_admin" ||
     value === "agent" ||
-    value === "director"
+    value === "director" ||
+    value === "fan" ||
+    value === "media"
   ) {
     return value;
   }
@@ -892,7 +1095,10 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
   }
 
   const allSteps: OnboardingStep[] = [
-    "role", "base", "photo", "technical", "experience",
+    "role", "community_profile_type", "base", "photo", "technical", "experience",
+    "fan_basic", "fan_photo", "fan_interests",
+    "media_basic", "media_photo", "media_entity", "media_content", "media_focus",
+    "media_channels", "media_collaborations",
     "agent_agency", "agent_players", "agent_football_experience",
     "agent_player_career_toggle", "agent_player_career", "agent_portfolio",
     "agent_availability", "agent_verification", "agent_extra",
@@ -993,6 +1199,8 @@ export function getPreviousOnboardingStep(
     if (role === "club_admin") return "club_profile";
     if (role === "agent") return "agent_extra";
     if (role === "coach") return "coach_extra";
+    if (role === "fan") return "fan_interests";
+    if (role === "media") return "media_collaborations";
     if (role === "staff") {
       return _lastCompletedStep === "staff_player_career"
         ? "staff_player_career"
@@ -1032,6 +1240,34 @@ export function validateOnboardingStep(
 ): OnboardingValidationErrors {
   if (step === "role") {
     return mapRoleStepValidationError(form);
+  }
+
+  if (step === "community_profile_type") {
+    return mapCommunityProfileTypeValidationError(form);
+  }
+
+  if (step === "fan_basic" || step === "media_basic") {
+    return mapSimpleCommunityBasicValidationError(form);
+  }
+
+  if (step === "fan_interests") {
+    return mapFanInterestsValidationError(form);
+  }
+
+  if (step === "media_entity") {
+    return mapMediaEntityValidationError(form);
+  }
+
+  if (step === "media_content") {
+    return mapMediaContentValidationError(form);
+  }
+
+  if (step === "media_focus") {
+    return mapMediaFocusValidationError(form);
+  }
+
+  if (step === "media_collaborations") {
+    return mapMediaCollaborationsValidationError(form);
   }
 
   if (step === "base") {
@@ -1117,7 +1353,10 @@ export function validateOnboardingStep(
     step === "director_career" ||
     step === "director_player_career_toggle" ||
     step === "director_player_career" ||
-    step === "director_extra"
+    step === "director_extra" ||
+    step === "fan_photo" ||
+    step === "media_photo" ||
+    step === "media_channels"
   ) {
     return {};
   }
@@ -1185,6 +1424,106 @@ function mapRoleStepValidationError(form: OnboardingFormState): OnboardingValida
   return {
     role: "Seleziona un ruolo per continuare.",
   };
+}
+
+function mapCommunityProfileTypeValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (form.communityProfileType === "fan" || form.communityProfileType === "media") {
+    return {};
+  }
+
+  return {
+    communityProfileType: "Seleziona il tipo di profilo per continuare.",
+  };
+}
+
+function mapSimpleCommunityBasicValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
+  if (!form.firstName.trim()) {
+    errors.firstName = "Questo campo è obbligatorio";
+  }
+
+  if (!form.lastName.trim()) {
+    errors.lastName = "Questo campo è obbligatorio";
+  }
+
+  if (!form.birthDate.trim()) {
+    errors.birthDate = "Questo campo è obbligatorio";
+  }
+
+  return errors;
+}
+
+function mapFanInterestsValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
+  if (form.fanInterestCategories.length === 0) {
+    errors.fanInterestCategories = "Seleziona almeno una categoria di interesse.";
+  }
+
+  if (form.fanInterestRegions.length === 0) {
+    errors.fanInterestRegions = "Seleziona almeno una regione di interesse.";
+  }
+
+  return errors;
+}
+
+function mapMediaEntityValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (form.mediaEntityName.trim()) {
+    return {};
+  }
+
+  return {
+    mediaEntityName: "Inserisci il nome della tua pagina, testata o realtà.",
+  };
+}
+
+function mapMediaContentValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (form.mediaContentTypes.length > 0) {
+    return {};
+  }
+
+  return {
+    mediaContentTypes: "Seleziona almeno un tipo di contenuto.",
+  };
+}
+
+function mapMediaFocusValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (form.mediaFocusAreas.length > 0) {
+    return {};
+  }
+
+  return {
+    mediaFocusAreas: "Seleziona almeno un ambito principale.",
+  };
+}
+
+function mapMediaCollaborationsValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (
+    form.mediaAffiliationType &&
+    form.mediaAffiliationType !== "Nessuna" &&
+    !form.mediaAffiliationName.trim()
+  ) {
+    return {
+      mediaAffiliationName: "Inserisci il nome del riferimento collegato.",
+    };
+  }
+
+  return {};
 }
 
 function isBasicEmailFormat(value: string) {

@@ -106,11 +106,16 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
     ]);
   }
 
-  // Club admins and agents skip gender during onboarding. The Banani agent
-  // mockup does not expose a gender field in the onboarding flow.
+  // Some Banani-aligned onboarding flows do not expose gender.
   if (input.role !== "club_admin") {
     const missingFields = [
-      input.role !== "agent" && input.role !== "director" && !input.gender ? "sesso" : null,
+      input.role !== "agent" &&
+      input.role !== "director" &&
+      input.role !== "fan" &&
+      input.role !== "media" &&
+      !input.gender
+        ? "sesso"
+        : null,
       !birthDate ? "data di nascita" : null,
     ].filter(Boolean) as string[];
 
@@ -233,6 +238,26 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
 
   if (input.role === "director") {
     const { error } = await supabase.from("director_profiles").upsert({
+      profile_id: input.userId,
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (input.role === "fan") {
+    const { error } = await supabase.from("fan_profiles").upsert({
+      profile_id: input.userId,
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (input.role === "media") {
+    const { error } = await supabase.from("media_profiles").upsert({
       profile_id: input.userId,
     });
 

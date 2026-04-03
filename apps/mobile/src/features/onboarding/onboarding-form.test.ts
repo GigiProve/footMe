@@ -48,6 +48,31 @@ describe("onboarding-form", () => {
     expect(errors.gender).toBeUndefined();
   });
 
+  it("requires the community profile type before entering fan or media onboarding", () => {
+    const errors = validateOnboardingStep("community_profile_type", {
+      ...defaultOnboardingFormState,
+      role: "fan",
+    });
+
+    expect(errors).toEqual({
+      communityProfileType: "Seleziona il tipo di profilo per continuare.",
+    });
+  });
+
+  it("validates the simplified fan/media basic step", () => {
+    const errors = validateOnboardingStep("fan_basic", {
+      ...defaultOnboardingFormState,
+      role: "fan",
+    });
+
+    expect(errors).toMatchObject({
+      birthDate: "Questo campo è obbligatorio",
+      firstName: "Questo campo è obbligatorio",
+      lastName: "Questo campo è obbligatorio",
+    });
+    expect(errors.gender).toBeUndefined();
+  });
+
   it("blocks invalid residence and phone values while allowing optional empty fields", () => {
     const errors = validateOnboardingStep("base", {
       ...defaultOnboardingFormState,
@@ -169,6 +194,47 @@ describe("onboarding-form", () => {
     });
   });
 
+  it("requires fast interests before completing the fan onboarding", () => {
+    const errors = validateOnboardingStep("fan_interests", {
+      ...defaultOnboardingFormState,
+      role: "fan",
+    });
+
+    expect(errors).toEqual({
+      fanInterestCategories: "Seleziona almeno una categoria di interesse.",
+      fanInterestRegions: "Seleziona almeno una regione di interesse.",
+    });
+  });
+
+  it("requires media page details and editorial selections", () => {
+    expect(
+      validateOnboardingStep("media_entity", {
+        ...defaultOnboardingFormState,
+        role: "media",
+      }),
+    ).toEqual({
+      mediaEntityName: "Inserisci il nome della tua pagina, testata o realtà.",
+    });
+
+    expect(
+      validateOnboardingStep("media_content", {
+        ...defaultOnboardingFormState,
+        role: "media",
+      }),
+    ).toEqual({
+      mediaContentTypes: "Seleziona almeno un tipo di contenuto.",
+    });
+
+    expect(
+      validateOnboardingStep("media_focus", {
+        ...defaultOnboardingFormState,
+        role: "media",
+      }),
+    ).toEqual({
+      mediaFocusAreas: "Seleziona almeno un ambito principale.",
+    });
+  });
+
   it("still validates the legacy details step for backward compatibility", () => {
     const errors = validateOnboardingStep("details", {
       ...defaultOnboardingFormState,
@@ -230,5 +296,22 @@ describe("onboarding-form", () => {
       getPreviousOnboardingStep("agent_portfolio", "agent_player_career", "agent"),
     ).toBe("agent_player_career");
     expect(getPreviousOnboardingStep("complete", null, "agent")).toBe("agent_extra");
+  });
+
+  it("maps fan and media progress to the new community flows", () => {
+    expect(getOnboardingProgress("community_profile_type", "fan")).toMatchObject({
+      percentage: 25,
+      stepIndex: 0,
+      totalSteps: 4,
+    });
+    expect(getOnboardingProgress("media_channels", "media")).toMatchObject({
+      percentage: 88,
+      stepIndex: 6,
+      totalSteps: 8,
+    });
+    expect(getPreviousOnboardingStep("complete", null, "fan")).toBe("fan_interests");
+    expect(getPreviousOnboardingStep("complete", null, "media")).toBe(
+      "media_collaborations",
+    );
   });
 });

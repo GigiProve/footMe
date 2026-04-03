@@ -35,9 +35,15 @@ export type UserContactsRecord = {
   facebook: string;
   instagram: string;
   phone: string;
+  tiktok?: string;
+  website?: string;
+  youtube?: string;
   showEmail: boolean;
   showFacebook: boolean;
   showInstagram: boolean;
+  showTikTok?: boolean;
+  showWebsite?: boolean;
+  showYouTube?: boolean;
 };
 
 type PlayerProfileRecord = {
@@ -187,6 +193,19 @@ export type CompleteProfessionalProfileUpdate = {
     primary_role: string | null;
     responsibilities: string[];
   } | null;
+  fanProfile?: {
+    interest_categories: string[];
+    interest_regions: string[];
+  } | null;
+  mediaProfile?: {
+    affiliation_name: string | null;
+    affiliation_type: string | null;
+    content_types: string[];
+    entity_name: string | null;
+    focus_areas: string[];
+    logo_url: string | null;
+    short_description: string | null;
+  } | null;
   club: {
     category: string | null;
     city: string;
@@ -313,7 +332,9 @@ function normalizeRole(value: unknown): AppRole {
     value === "staff" ||
     value === "club_admin" ||
     value === "agent" ||
-    value === "director"
+    value === "director" ||
+    value === "fan" ||
+    value === "media"
     ? value
     : "player";
 }
@@ -493,9 +514,15 @@ export function normalizeUserProfile(input: {
     email?: string | null;
     facebook?: string | null;
     instagram?: string | null;
+    tiktok?: string | null;
+    website?: string | null;
+    youtube?: string | null;
     show_email?: boolean | null;
     show_facebook?: boolean | null;
     show_instagram?: boolean | null;
+    show_tiktok?: boolean | null;
+    show_website?: boolean | null;
+    show_youtube?: boolean | null;
   } | null;
   privateContacts?: {
     phone?: string | null;
@@ -517,9 +544,15 @@ export function normalizeUserProfile(input: {
       facebook: input.profileContacts?.facebook ?? "",
       instagram: input.profileContacts?.instagram ?? "",
       phone: input.privateContacts?.phone ?? "",
+      tiktok: input.profileContacts?.tiktok ?? "",
+      website: input.profileContacts?.website ?? "",
+      youtube: input.profileContacts?.youtube ?? "",
       showEmail: normalizeBoolean(input.profileContacts?.show_email),
       showFacebook: normalizeBoolean(input.profileContacts?.show_facebook),
       showInstagram: normalizeBoolean(input.profileContacts?.show_instagram),
+      showTikTok: normalizeBoolean(input.profileContacts?.show_tiktok),
+      showWebsite: normalizeBoolean(input.profileContacts?.show_website),
+      showYouTube: normalizeBoolean(input.profileContacts?.show_youtube),
     },
   };
 }
@@ -582,7 +615,9 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       : Promise.resolve({ data: null, error: null }),
     supabase
       .from("profile_contacts")
-      .select("instagram, facebook, email, show_instagram, show_facebook, show_email")
+      .select(
+        "instagram, facebook, email, tiktok, youtube, website, show_instagram, show_facebook, show_email, show_tiktok, show_youtube, show_website",
+      )
       .eq("profile_id", profileId)
       .maybeSingle(),
     supabase
@@ -702,10 +737,16 @@ export async function updateCompleteProfessionalProfile(
       email: input.userContacts.email || null,
       facebook: input.userContacts.facebook || null,
       instagram: input.userContacts.instagram || null,
+      tiktok: input.userContacts.tiktok || null,
+      website: input.userContacts.website || null,
+      youtube: input.userContacts.youtube || null,
       profile_id: input.profileId,
       show_email: input.userContacts.showEmail,
       show_facebook: input.userContacts.showFacebook,
       show_instagram: input.userContacts.showInstagram,
+      show_tiktok: input.userContacts.showTikTok ?? false,
+      show_website: input.userContacts.showWebsite ?? false,
+      show_youtube: input.userContacts.showYouTube ?? false,
     });
 
   if (profileContactsError) {
@@ -819,6 +860,35 @@ export async function updateCompleteProfessionalProfile(
       primary_role: input.directorProfile.primary_role,
       profile_id: input.profileId,
       responsibilities: input.directorProfile.responsibilities,
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (input.role === "fan" && input.fanProfile) {
+    const { error } = await supabase.from("fan_profiles").upsert({
+      interest_categories: input.fanProfile.interest_categories,
+      interest_regions: input.fanProfile.interest_regions,
+      profile_id: input.profileId,
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (input.role === "media" && input.mediaProfile) {
+    const { error } = await supabase.from("media_profiles").upsert({
+      affiliation_name: input.mediaProfile.affiliation_name,
+      affiliation_type: input.mediaProfile.affiliation_type,
+      content_types: input.mediaProfile.content_types,
+      entity_name: input.mediaProfile.entity_name,
+      focus_areas: input.mediaProfile.focus_areas,
+      logo_url: input.mediaProfile.logo_url,
+      profile_id: input.profileId,
+      short_description: input.mediaProfile.short_description,
     });
 
     if (error) {

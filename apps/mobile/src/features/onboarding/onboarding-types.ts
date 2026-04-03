@@ -5,7 +5,9 @@ export type AppRole =
   | "staff"
   | "club_admin"
   | "agent"
-  | "director";
+  | "director"
+  | "fan"
+  | "media";
 
 export type ProfileGender =
   | "male"
@@ -157,4 +159,48 @@ export const DIRECTOR_LANGUAGE_OPTIONS = [
   "Tedesco",
   "Portoghese",
   "Arabo",
+] as const;
+
+export const COMMUNITY_PROFILE_TYPE_OPTIONS = [
+  {
+    description: "Per seguire, commentare e interagire velocemente con la community.",
+    label: "Profilo base",
+    value: "fan",
+  },
+  {
+    description:
+      "Per giornalisti, creator, pagine, testate e progetti editoriali sul calcio.",
+    label: "Profilo media",
+    value: "media",
+  },
+] as const;
+
+export const MEDIA_CONTENT_TYPE_OPTIONS = [
+  "Notizie",
+  "Partite e risultati",
+  "Highlights",
+  "Analisi",
+  "Interviste",
+  "Osservazione giocatori",
+  "Contenuti social",
+  "Foto",
+  "Video",
+  "Altro",
+] as const;
+
+export const MEDIA_FOCUS_AREA_OPTIONS = [
+  "Calcio locale",
+  "Calcio dilettantistico",
+  "Settore giovanile",
+  "Professionistico",
+  "Mercato",
+  "Calcio generale",
+] as const;
+
+export const MEDIA_AFFILIATION_TYPE_OPTIONS = [
+  "Nessuna",
+  "Società sportiva",
+  "Testata o sito",
+  "Pagina o progetto media",
+  "Altro",
 ] as const;

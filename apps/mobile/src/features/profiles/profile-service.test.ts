@@ -264,6 +264,12 @@ describe("getCompleteProfessionalProfile", () => {
       showEmail: true,
       showFacebook: false,
       showInstagram: true,
+      showTikTok: false,
+      showWebsite: false,
+      showYouTube: false,
+      tiktok: "",
+      website: "",
+      youtube: "",
     });
     expect(mocks.playerCareerEqMock).toHaveBeenCalledWith(
       "player_profile_id",
@@ -400,6 +406,12 @@ describe("getCompleteProfessionalProfile", () => {
       showEmail: false,
       showFacebook: false,
       showInstagram: false,
+      showTikTok: false,
+      showWebsite: false,
+      showYouTube: false,
+      tiktok: "",
+      website: "",
+      youtube: "",
     });
   });
 });

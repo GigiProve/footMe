@@ -9,6 +9,8 @@ const { fromMock, upsertMocks } = vi.hoisted(() => {
     club_teams: vi.fn(),
     clubs: vi.fn(),
     coach_profiles: vi.fn(),
+    fan_profiles: vi.fn(),
+    media_profiles: vi.fn(),
     player_profiles: vi.fn(),
     profile_contacts: vi.fn(),
     profile_private_contacts: vi.fn(),
@@ -354,6 +356,53 @@ describe("createInitialProfile", () => {
     expect(upsertMocks.coach_profiles).not.toHaveBeenCalled();
     expect(upsertMocks.staff_profiles).not.toHaveBeenCalled();
     expect(upsertMocks.clubs).not.toHaveBeenCalled();
+  });
+
+  it("creates fan and media profiles in their dedicated tables", async () => {
+    await createInitialProfile({
+      ...defaultClubFields,
+      avatarUrl: "",
+      birthDate: "1996-01-01",
+      clubCity: "",
+      clubName: "",
+      clubRegion: "",
+      domicile: "",
+      fullName: "Fan Example",
+      gender: "" as never,
+      nationality: "",
+      phoneNumber: "",
+      primaryPosition: "midfielder",
+      residence: "",
+      role: "fan",
+      staffSpecialization: "fitness_coach",
+      userId: "fan-1",
+    });
+
+    await createInitialProfile({
+      ...defaultClubFields,
+      avatarUrl: "",
+      birthDate: "1994-01-01",
+      clubCity: "",
+      clubName: "",
+      clubRegion: "",
+      domicile: "",
+      fullName: "Media Example",
+      gender: "" as never,
+      nationality: "",
+      phoneNumber: "",
+      primaryPosition: "midfielder",
+      residence: "",
+      role: "media",
+      staffSpecialization: "fitness_coach",
+      userId: "media-1",
+    });
+
+    expect(upsertMocks.fan_profiles).toHaveBeenCalledWith({
+      profile_id: "fan-1",
+    });
+    expect(upsertMocks.media_profiles).toHaveBeenCalledWith({
+      profile_id: "media-1",
+    });
   });
 
   it("saves a null avatar when no profile image is uploaded", async () => {
