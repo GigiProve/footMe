@@ -7,7 +7,7 @@ import { AppText, Button } from "../../../ui";
 import type { TeamAutocompleteOption } from "../../profiles/player-sports";
 import { OnboardingInfoCard, OnboardingSectionCard } from "../onboarding-ui";
 import type { CoachCareerEntry, CoachExperienceType } from "./coach-career-types";
-import { generateCoachEntryId } from "./coach-career-utils";
+import { generateCoachEntryId, splitCoachEntryBySeasonDetails } from "./coach-career-utils";
 import { CoachCareerExperienceCard } from "./CoachCareerExperienceCard";
 import { CoachExperienceForm } from "./CoachExperienceForm";
 import { CoachExperienceTypeSelector } from "./CoachExperienceTypeSelector";
@@ -96,6 +96,7 @@ export function CoachCareerStep({
         type,
         seasons: [],
         period: null,
+        seasonDetails: {},
       },
       editIndex: null,
     });
@@ -111,12 +112,17 @@ export function CoachCareerStep({
 
   function handleFormSave(saved: CoachCareerEntry) {
     const editIndex = screen.type === "form" ? screen.editIndex : null;
+    const splitEntries = splitCoachEntryBySeasonDetails(saved);
     let updated: CoachCareerEntry[];
 
     if (editIndex !== null) {
-      updated = entries.map((e, i) => (i === editIndex ? saved : e));
+      updated = [
+        ...entries.slice(0, editIndex),
+        ...splitEntries,
+        ...entries.slice(editIndex + 1),
+      ];
     } else {
-      updated = [...entries, saved];
+      updated = [...entries, ...splitEntries];
     }
 
     onUpdateEntries(updated);

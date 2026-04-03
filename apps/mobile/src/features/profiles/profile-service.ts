@@ -62,11 +62,13 @@ type PlayerProfileRecord = {
 };
 
 type CoachProfileRecord = {
+  availability_type: string | null;
   coached_categories: string[];
   coached_clubs: string[];
   game_philosophy: string | null;
   licenses: string[];
   open_to_new_role: boolean;
+  preferred_provinces: string[];
   preferred_regions: string[];
   profile_id: string;
   technical_video_url: string | null;
@@ -227,11 +229,13 @@ export type CompleteProfessionalProfileUpdate = {
   } | null;
   clubSeasonEntries: ClubSeasonEntryInput[];
   coachProfile: {
+    availability_type: string | null;
     coached_categories: string[];
     coached_clubs: string[];
     game_philosophy: string | null;
     licenses: string[];
     open_to_new_role: boolean;
+    preferred_provinces: string[];
     preferred_regions: string[];
     technical_video_url: string | null;
   } | null;
@@ -401,11 +405,13 @@ function normalizeCoachProfileRecord(
   }
 
   return {
+    availability_type: normalizeOptionalText(rawProfile.availability_type),
     coached_categories: normalizeStringArray(rawProfile.coached_categories),
     coached_clubs: normalizeStringArray(rawProfile.coached_clubs),
     game_philosophy: normalizeOptionalText(rawProfile.game_philosophy),
     licenses: normalizeStringArray(rawProfile.licenses),
     open_to_new_role: normalizeBoolean(rawProfile.open_to_new_role),
+    preferred_provinces: normalizeStringArray(rawProfile.preferred_provinces),
     preferred_regions: normalizeStringArray(rawProfile.preferred_regions),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
     technical_video_url: normalizeOptionalText(rawProfile.technical_video_url),
@@ -590,7 +596,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("coach_profiles")
           .select(
-            "profile_id, licenses, coached_clubs, coached_categories, game_philosophy, technical_video_url, preferred_regions, open_to_new_role",
+            "profile_id, licenses, coached_clubs, coached_categories, game_philosophy, technical_video_url, preferred_regions, preferred_provinces, availability_type, open_to_new_role",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -783,11 +789,13 @@ export async function updateCompleteProfessionalProfile(
 
   if (input.role === "coach" && input.coachProfile) {
     const { error } = await supabase.from("coach_profiles").upsert({
+      availability_type: input.coachProfile.availability_type,
       coached_categories: input.coachProfile.coached_categories,
       coached_clubs: input.coachProfile.coached_clubs,
       game_philosophy: input.coachProfile.game_philosophy,
       licenses: input.coachProfile.licenses,
       open_to_new_role: input.coachProfile.open_to_new_role,
+      preferred_provinces: input.coachProfile.preferred_provinces,
       preferred_regions: input.coachProfile.preferred_regions,
       profile_id: input.profileId,
       technical_video_url: input.coachProfile.technical_video_url,

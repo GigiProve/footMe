@@ -135,6 +135,8 @@ export type ProfileFormState = {
   clubPhone: string;
   clubRegion: string;
   clubWebsite: string;
+  coachAvailabilityType: string;
+  coachPreferredProvinces: string;
   coachedCategories: string;
   coachedClubs: string;
   fullName: string;
@@ -158,6 +160,8 @@ export type ProfileFormState = {
   showContactInstagram: boolean;
   secondaryPositions: PlayerPosition[];
   specialization: StaffSpecialization;
+  staffAvailabilityType: string;
+  staffPreferredProvinces: string;
   technicalVideoUrl: string;
   transferProvinces: string;
   transferRegions: string;
@@ -211,6 +215,8 @@ export function buildInitialState(
     clubPhone: club?.club_phone ?? "",
     clubRegion: club?.region ?? "",
     clubWebsite: club?.website_url ?? "",
+    coachAvailabilityType: coachProfile?.availability_type ?? "ITALY",
+    coachPreferredProvinces: toDelimitedString(coachProfile?.preferred_provinces),
     coachedCategories: toDelimitedString(coachProfile?.coached_categories),
     coachedClubs: toDelimitedString(coachProfile?.coached_clubs),
     experienceSummary: staffProfile?.experience_summary ?? "",
@@ -238,6 +244,8 @@ export function buildInitialState(
     showContactInstagram: data.userContacts.showInstagram,
     secondaryPositions: playerProfile?.secondary_positions ?? [],
     specialization: staffProfile?.specialization ?? "fitness_coach",
+    staffAvailabilityType: staffProfile?.availability_type ?? "ITALY",
+    staffPreferredProvinces: toDelimitedString(staffProfile?.preferred_provinces),
     technicalVideoUrl: coachProfile?.technical_video_url ?? "",
     transferProvinces: toDelimitedString(playerProfile?.transfer_provinces),
     transferRegions: toDelimitedString(playerProfile?.transfer_regions),
@@ -290,6 +298,7 @@ export function buildFullUpdatePayload(
     coachProfile:
       data.profile.role === "coach"
         ? {
+            availability_type: formState.coachAvailabilityType || null,
             coached_categories: fromDelimitedString(
               formState.coachedCategories,
             ),
@@ -297,6 +306,9 @@ export function buildFullUpdatePayload(
             game_philosophy: parseOptionalText(formState.gamePhilosophy),
             licenses: fromDelimitedString(formState.licenses),
             open_to_new_role: formState.openToNewRole,
+            preferred_provinces: fromDelimitedString(
+              formState.coachPreferredProvinces,
+            ),
             preferred_regions: fromDelimitedString(
               formState.preferredRegions,
             ),
@@ -347,7 +359,7 @@ export function buildFullUpdatePayload(
     staffProfile:
       data.profile.role === "staff"
         ? {
-            availability_type: data.staffProfile?.availability_type ?? null,
+            availability_type: formState.staffAvailabilityType || null,
             available_from: data.staffProfile?.available_from ?? null,
             certifications: fromDelimitedString(formState.certifications),
             experience_entries: data.staffProfile?.experience_entries ?? [],
@@ -357,7 +369,9 @@ export function buildFullUpdatePayload(
             open_to_work: formState.openToWork,
             primary_staff_role: data.staffProfile?.primary_staff_role ?? null,
             preferred_categories: data.staffProfile?.preferred_categories ?? [],
-            preferred_provinces: data.staffProfile?.preferred_provinces ?? [],
+            preferred_provinces: fromDelimitedString(
+              formState.staffPreferredProvinces,
+            ),
             preferred_regions: fromDelimitedString(
               formState.preferredRegions,
             ),

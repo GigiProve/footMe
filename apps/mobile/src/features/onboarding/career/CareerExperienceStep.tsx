@@ -2,18 +2,17 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
+import { ExperienceFlowScreen } from "../../profiles/experience-flow-section";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button } from "../../../ui";
-import type { CareerExperience, CareerExperienceType } from "./career-types";
+import type { CareerExperience } from "./career-types";
 import {
-  createEmptyExperience,
   experiencesToForms,
   formsToExperiences,
   getExperienceTypeLabel,
 } from "./career-utils";
 import { ExperienceCard } from "./ExperienceCard";
 import { ExperienceForm } from "./ExperienceForm";
-import { ExperienceTypeSelector } from "./ExperienceTypeSelector";
 import { OnboardingInfoCard, OnboardingSectionCard } from "../onboarding-ui";
 import type {
   PlayerExperienceForm,
@@ -26,7 +25,6 @@ import type {
 
 type FlowScreen =
   | { type: "list" }
-  | { type: "select-type" }
   | { type: "form"; experience: CareerExperience; editIndex: number | null };
 
 // ---------------------------------------------------------------------------
@@ -63,6 +61,7 @@ export function CareerExperienceStep({
   title = "La tua carriera",
 }: CareerExperienceStepProps) {
   const [screen, setScreen] = useState<FlowScreen>({ type: "list" });
+  const [flowOpen, setFlowOpen] = useState(false);
 
   // Reconstruct CareerExperience[] from existing form entries
   const experiences = formsToExperiences(careerEntries);
@@ -77,14 +76,6 @@ export function CareerExperienceStep({
   // ----------------------------------
   // Handlers
   // ----------------------------------
-
-  function handleSelectType(type: CareerExperienceType) {
-    setScreen({
-      type: "form",
-      experience: createEmptyExperience(type),
-      editIndex: null,
-    });
-  }
 
   function handleEdit(index: number) {
     setScreen({
@@ -114,24 +105,15 @@ export function CareerExperienceStep({
     setScreen({ type: "list" });
   }
 
+  function handleFlowSave(newEntries: PlayerExperienceForm[]) {
+    onUpdateEntries([...careerEntries, ...newEntries]);
+    setFlowOpen(false);
+  }
+
   function handleContinue() {
     if (hasExperiences) {
       onSaveAndContinue();
     }
-  }
-
-  // ----------------------------------
-  // Render: Type Selector
-  // ----------------------------------
-
-  if (screen.type === "select-type") {
-    return (
-      <View style={stepStyles.container}>
-        <OnboardingSectionCard>
-          <ExperienceTypeSelector onSelect={handleSelectType} />
-        </OnboardingSectionCard>
-      </View>
-    );
   }
 
   // ----------------------------------
@@ -225,7 +207,7 @@ export function CareerExperienceStep({
           leftIcon={
             <Ionicons name="add-outline" size={20} color={colors.accent} />
           }
-          onPress={() => setScreen({ type: "select-type" })}
+          onPress={() => setFlowOpen(true)}
           variant="secondary"
         />
       </OnboardingSectionCard>
@@ -237,6 +219,14 @@ export function CareerExperienceStep({
         label={isBusy ? "Salvataggio..." : "Continua"}
         onPress={hasExperiences ? handleContinue : onSkip}
         variant="primary"
+      />
+
+      <ExperienceFlowScreen
+        existingExperiences={careerEntries}
+        onClose={() => setFlowOpen(false)}
+        onSave={handleFlowSave}
+        searchTeams={searchTeams}
+        visible={flowOpen}
       />
     </View>
   );

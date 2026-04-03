@@ -125,8 +125,10 @@ export type OnboardingFormState = {
   certifications: string;
   coachPrimaryRole: string;
   coachLicenseType: string;
+  coachAvailabilityType: AvailabilityType;
   coachCategoriesArray: string[];
   coachAvailableFrom: string;
+  coachProvincesArray: string[];
   coachRegionsArray: string[];
   coachCareerEntries: CoachCareerEntry[];
   hasPlayedFootball: boolean;
@@ -763,8 +765,10 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   certifications: "",
   coachPrimaryRole: "",
   coachLicenseType: "",
+  coachAvailabilityType: "ITALY",
   coachCategoriesArray: [],
   coachAvailableFrom: "",
+  coachProvincesArray: [],
   coachRegionsArray: [],
   coachCareerEntries: [],
   hasPlayedFootball: false,
@@ -962,11 +966,20 @@ export function normalizeOnboardingDraft(
     coachCategoriesArray: Array.isArray(value.coachCategoriesArray)
       ? value.coachCategoriesArray.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.coachCategoriesArray,
+    coachAvailabilityType:
+      coerceAvailabilityType(value.coachAvailabilityType) ??
+      defaultOnboardingFormState.coachAvailabilityType,
+    coachProvincesArray: Array.isArray(value.coachProvincesArray)
+      ? value.coachProvincesArray.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.coachProvincesArray,
     coachRegionsArray: Array.isArray(value.coachRegionsArray)
       ? value.coachRegionsArray.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.coachRegionsArray,
     coachCareerEntries: Array.isArray(value.coachCareerEntries)
-      ? value.coachCareerEntries
+      ? value.coachCareerEntries.map((e: CoachCareerEntry) => ({
+          ...e,
+          seasonDetails: e.seasonDetails ?? {},
+        }))
       : defaultOnboardingFormState.coachCareerEntries,
     coachPlayerCareerEntries: Array.isArray(value.coachPlayerCareerEntries)
       ? value.coachPlayerCareerEntries
@@ -994,7 +1007,10 @@ export function normalizeOnboardingDraft(
       : defaultOnboardingFormState.agentPlayerTypes,
     hasPlayedFootball: value.hasPlayedFootball === true,
     staffCareerEntries: Array.isArray(value.staffCareerEntries)
-      ? value.staffCareerEntries
+      ? (value.staffCareerEntries as CoachCareerEntry[]).map((e) => ({
+          ...e,
+          seasonDetails: e.seasonDetails ?? {},
+        }))
       : defaultOnboardingFormState.staffCareerEntries,
     staffHasPlayedFootball: value.staffHasPlayedFootball === true,
     staffPlayerCareerEntries: Array.isArray(value.staffPlayerCareerEntries)
@@ -1032,7 +1048,10 @@ export function normalizeOnboardingDraft(
       ? value.directorCategories.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.directorCategories,
     directorCareerEntries: Array.isArray(value.directorCareerEntries)
-      ? value.directorCareerEntries
+      ? (value.directorCareerEntries as CoachCareerEntry[]).map((e) => ({
+          ...e,
+          seasonDetails: e.seasonDetails ?? {},
+        }))
       : defaultOnboardingFormState.directorCareerEntries,
     directorHasOtherFootballExperience: value.directorHasOtherFootballExperience === true,
     directorOtherFootballRoles: Array.isArray(value.directorOtherFootballRoles)

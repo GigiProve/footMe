@@ -1,10 +1,11 @@
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { SelectField } from "../../../components/ui/select-field";
-import { REGION_OPTIONS } from "../../profiles/profile-form-utils";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
-import { OnboardingSectionCard, OnboardingToggleRow } from "../onboarding-ui";
+import { OnboardingSectionCard } from "../onboarding-ui";
+import type { AvailabilityType } from "../onboarding-form";
+import { WhereToPlaySection } from "../where-to-play-section";
 
 // ---------------------------------------------------------------------------
 // Options
@@ -49,11 +50,13 @@ export const AVAILABLE_FROM_OPTIONS: { label: string; value: string }[] = [
 // ---------------------------------------------------------------------------
 
 type CoachRoleStepProps = {
+  availabilityType: AvailabilityType;
   availableFrom: string;
   categoriesArray: string[];
   licenseType: string;
   openToNewRole: boolean;
   primaryRole: string;
+  provincesArray: string[];
   regionsArray: string[];
   onUpdate: (
     patch: Partial<{
@@ -62,6 +65,8 @@ type CoachRoleStepProps = {
       coachCategoriesArray: string[];
       openToNewRole: boolean;
       coachAvailableFrom: string;
+      coachAvailabilityType: AvailabilityType;
+      coachProvincesArray: string[];
       coachRegionsArray: string[];
     }>,
   ) => void;
@@ -73,11 +78,13 @@ type CoachRoleStepProps = {
 // ---------------------------------------------------------------------------
 
 export function CoachRoleStep({
+  availabilityType,
   availableFrom,
   categoriesArray,
   licenseType,
   openToNewRole,
   primaryRole,
+  provincesArray,
   regionsArray,
   onUpdate,
   validationErrors,
@@ -87,13 +94,6 @@ export function CoachRoleStep({
       ? categoriesArray.filter((c) => c !== option)
       : [...categoriesArray, option];
     onUpdate({ coachCategoriesArray: next });
-  }
-
-  function toggleRegion(region: string) {
-    const next = regionsArray.includes(region)
-      ? regionsArray.filter((r) => r !== region)
-      : [...regionsArray, region];
-    onUpdate({ coachRegionsArray: next });
   }
 
   return (
@@ -159,11 +159,40 @@ export function CoachRoleStep({
         </View>
       </View>
 
-      {/* Open to new role toggle */}
-      <OnboardingToggleRow
-        label="Disponibile per una nuova squadra"
-        onValueChange={(val) => onUpdate({ openToNewRole: val })}
-        value={openToNewRole}
+      {/* Availability + geographic selection */}
+      <WhereToPlaySection
+        availabilityType={availabilityType}
+        categories={[]}
+        hideCategories
+        infoMessages={{
+          ITALY: "",
+          REGIONS: "Indica una o più regioni in cui sei disponibile ad allenare.",
+          PROVINCES: "Indica una o più province in cui sei disponibile ad allenare.",
+        }}
+        isAvailable={openToNewRole}
+        onAvailabilityTypeChange={(value) => onUpdate({ coachAvailabilityType: value })}
+        onCategoriesChange={() => undefined}
+        onIsAvailableChange={(value) => {
+          onUpdate({
+            openToNewRole: value,
+            ...(value ? {} : {
+              coachAvailableFrom: "",
+              coachProvincesArray: [],
+              coachRegionsArray: [],
+            }),
+          });
+        }}
+        onProvincesChange={(value) => onUpdate({ coachProvincesArray: value })}
+        onRegionsChange={(value) => onUpdate({ coachRegionsArray: value })}
+        provinces={provincesArray}
+        provincesHelperText="Puoi selezionare più province in cui allenare."
+        provincesLabel="Province di interesse"
+        regions={regionsArray}
+        regionsHelperText="Puoi selezionare più regioni in cui allenare."
+        regionsLabel="Regioni di interesse"
+        toggleLabel="Disponibile per una nuova squadra"
+        toggleSubtitle="Il tuo profilo può comparire tra gli allenatori disponibili sul mercato."
+        validationErrors={validationErrors}
       />
 
       {/* Available from — only when toggle is ON */}
@@ -175,41 +204,6 @@ export function CoachRoleStep({
           placeholder="Seleziona disponibilità"
           value={availableFrom}
         />
-      ) : null}
-
-      {/* Regions multi-select — only when toggle is ON */}
-      {openToNewRole ? (
-        <View style={styles.fieldGroup}>
-          <AppText variant="caption" color="muted">
-            Regioni disponibili
-          </AppText>
-          <View style={styles.chipRow}>
-            {REGION_OPTIONS.map((option) => {
-              const isSelected = regionsArray.includes(option.value);
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected }}
-                  key={option.value}
-                  onPress={() => toggleRegion(option.value)}
-                  style={[
-                    styles.chip,
-                    isSelected ? styles.chipSelected : null,
-                  ]}
-                >
-                  <AppText
-                    variant="bodySm"
-                    style={
-                      isSelected ? styles.chipTextSelected : styles.chipText
-                    }
-                  >
-                    {option.label}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
       ) : null}
     </OnboardingSectionCard>
   );

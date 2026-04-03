@@ -117,8 +117,8 @@ export { MONTH_OPTIONS };
 // ---------------------------------------------------------------------------
 
 export function getYearOptions(): SportsSelectOption[] {
-  return Array.from({ length: CURRENT_YEAR - 2004 }, (_, i) => {
-    const year = CURRENT_YEAR + 1 - i;
+  return Array.from({ length: CURRENT_YEAR - 1969 }, (_, i) => {
+    const year = CURRENT_YEAR - i;
     return { label: String(year), value: String(year) };
   });
 }

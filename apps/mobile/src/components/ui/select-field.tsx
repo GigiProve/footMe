@@ -31,6 +31,7 @@ export function SelectField<T extends string>({
   fullScreen: _fullScreen,
   label,
   onChange,
+  onOpen,
   options,
   placeholder,
   searchable = false,
@@ -43,6 +44,7 @@ export function SelectField<T extends string>({
   fullScreen?: boolean;
   label: string;
   onChange: (value: T | "") => void;
+  onOpen?: () => void;
   options: SelectOption<T>[];
   placeholder: string;
   searchable?: boolean;
@@ -74,6 +76,7 @@ export function SelectField<T extends string>({
     } else {
       setSearchQuery("");
       setIsOpen(true);
+      onOpen?.();
     }
   }
 
