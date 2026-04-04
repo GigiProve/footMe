@@ -288,8 +288,8 @@ describe("onboarding-form", () => {
   it("reports progress and previous-step fallback for the completion screen", () => {
     expect(getOnboardingProgress("complete")).toMatchObject({
       percentage: 100,
-      stepIndex: 4,
-      totalSteps: 5,
+      stepIndex: 5,
+      totalSteps: 6,
     });
     expect(getPreviousOnboardingStep("complete")).toBe("experience");
     expect(getPreviousOnboardingStep("complete", null, "club_admin")).toBe("club_profile");
