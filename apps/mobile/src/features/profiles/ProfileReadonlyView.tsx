@@ -89,14 +89,17 @@ export function ProfileReadonlyView({
         <SectionCard
           onEdit={() => onEdit("personalInfo")}
           title="Informazioni personali"
+          variant="flat"
         >
           <Field
             label="Nome e cognome"
             value={completeProfile.profile.full_name}
+            variant="plain"
           />
           <Field
             label="Data di nascita"
             value={formatBirthDateInputValue(completeProfile.profile.birth_date)}
+            variant="plain"
           />
           <Field
             label="Nazionalità"
@@ -108,10 +111,12 @@ export function ProfileReadonlyView({
                   )
                 : ""
             }
+            variant="plain"
           />
           <Field
             label="Città"
             value={formatOptionalSummary(completeProfile.profile.city)}
+            variant="plain"
           />
           <Field
             label="Regione"
@@ -120,6 +125,7 @@ export function ProfileReadonlyView({
                 ? getOptionLabel(REGION_OPTIONS, completeProfile.profile.region)
                 : ""
             }
+            variant="plain"
           />
           {completeProfile.profile.languages.length > 0 ? (
             <Field
@@ -127,6 +133,7 @@ export function ProfileReadonlyView({
               value={completeProfile.profile.languages
                 .map((code) => getOptionLabel(LANGUAGE_OPTIONS, code))
                 .join(", ")}
+              variant="plain"
             />
           ) : null}
         </SectionCard>
@@ -138,6 +145,7 @@ export function ProfileReadonlyView({
           description="Storico delle categorie in cui il club ha militato."
           onEdit={() => onEdit("clubSeasons")}
           title="Storico stagioni"
+          variant="flat"
         >
           <ClubSeasonsSection seasons={clubSeasonForms} />
         </SectionCard>
@@ -149,6 +157,7 @@ export function ProfileReadonlyView({
           description="Squadra, categoria, stagione e numeri chiave del percorso calcistico."
           onEdit={() => onEdit("playerExperiences")}
           title="Esperienze calcistiche"
+          variant="flat"
         >
           <PlayerExperiencesSection
             emptyStateLabel="Nessuna esperienza calcistica salvata."
@@ -164,8 +173,9 @@ export function ProfileReadonlyView({
         description="Disponibilità e descrizione pubblica del profilo"
         onEdit={() => onEdit("bio")}
         title="Presentazione"
+        variant="flat"
       >
-        <PublicBioBlock bio={completeProfile.profile.bio} />
+        <PublicBioBlock bio={completeProfile.profile.bio} variant="plain" />
       </SectionCard>
 
       {/* Role-specific summary sections */}
@@ -178,6 +188,7 @@ export function ProfileReadonlyView({
             key={section.title}
             onEdit={editTarget ? () => onEdit(editTarget) : undefined}
             title={section.title}
+            variant="flat"
           >
             {section.items.map((item) =>
               item.label === "Categorie preferite" ? (
@@ -195,6 +206,7 @@ export function ProfileReadonlyView({
                     />
                   )}
                   value={item.value}
+                  variant="plain"
                 />
               ) : item.label === "Regioni di interesse" ? (
                 <Field
@@ -211,12 +223,14 @@ export function ProfileReadonlyView({
                     />
                   )}
                   value={item.value}
+                  variant="plain"
                 />
               ) : (
                 <Field
                   key={item.label}
                   label={item.label}
                   value={item.value}
+                  variant="plain"
                 />
               ),
             )}
@@ -230,6 +244,7 @@ export function ProfileReadonlyView({
           description="Ruolo e piede preferito leggibili rapidamente anche in consultazione."
           onEdit={() => onEdit("playerSports")}
           title="Profilo sportivo"
+          variant="flat"
         >
           <PlayerCharacteristicsSection
             preferredFoot={
@@ -251,6 +266,7 @@ export function ProfileReadonlyView({
         <SectionCard
           onEdit={() => onEdit("playerSports")}
           title="Media"
+          variant="flat"
         >
           <MediaPreview
             emptyLabel="Nessun video highlights caricato"
@@ -265,6 +281,7 @@ export function ProfileReadonlyView({
         <SectionCard
           onEdit={() => onEdit("coachInfo")}
           title="Media"
+          variant="flat"
         >
           <MediaPreview
             emptyLabel="Nessun video tecnico caricato"
@@ -279,6 +296,7 @@ export function ProfileReadonlyView({
         <SectionCard
           onEdit={() => onEdit("clubInfo")}
           title="Media"
+          variant="flat"
         >
           <MediaPreview
             emptyLabel="Nessun logo caricato"
@@ -314,7 +332,7 @@ function ContactSectionWithEdit({
 }) {
   return (
     <View>
-      <ContactSection contacts={completeProfile.userContacts} />
+      <ContactSection contacts={completeProfile.userContacts} variant="flat" />
       <Pressable
         accessibilityLabel="Modifica contatti"
         accessibilityRole="button"

@@ -36,6 +36,7 @@ type ContactFieldProps = {
   onChangeText?: (value: string) => void;
   placeholder?: string;
   value: string;
+  variant?: "default" | "plain";
 };
 
 type ContactSectionProps = {
@@ -48,6 +49,7 @@ type ContactSectionProps = {
   onShowEmailChange?: (value: boolean) => void;
   onShowFacebookChange?: (value: boolean) => void;
   onShowInstagramChange?: (value: boolean) => void;
+  variant?: "card" | "flat";
 };
 
 type PublicContactRow = {
@@ -90,6 +92,7 @@ export function ContactField({
   onChangeText,
   placeholder,
   value,
+  variant = "default",
 }: ContactFieldProps) {
   const trimmedValue = value.trim();
 
@@ -116,7 +119,7 @@ export function ContactField({
             }
           }}
           style={({ pressed }) => [
-            styles.readonlyField,
+            variant === "plain" ? styles.readonlyFieldPlain : styles.readonlyField,
             pressed && linkUrl ? styles.pressed : null,
           ]}
         >
@@ -147,6 +150,7 @@ export function ContactSection({
   onShowEmailChange,
   onShowFacebookChange,
   onShowInstagramChange,
+  variant = "card",
 }: ContactSectionProps) {
   const instagramUrl = normalizeInstagramInput(contacts.instagram);
   const facebookUrl = normalizeFacebookInput(contacts.facebook);
@@ -187,6 +191,7 @@ export function ContactSection({
           : "Mostra solo i contatti pubblici che vuoi rendere visibili nel profilo."
       }
       title="Contatti"
+      variant={variant}
     >
       {editable ? (
         <>
@@ -252,6 +257,7 @@ export function ContactSection({
             label={item.label}
             linkUrl={item.linkUrl}
             value={item.value}
+            variant={variant === "flat" ? "plain" : "default"}
           />
         ))
       ) : (
@@ -311,6 +317,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBackground,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  readonlyFieldPlain: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[12],
+    minHeight: 48,
+    paddingVertical: spacing[4],
   },
   readonlyValue: {
     flex: 1,

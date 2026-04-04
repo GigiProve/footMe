@@ -17,6 +17,7 @@ type SectionCardProps = PropsWithChildren<{
   onEdit?: () => void;
   style?: StyleProp<ViewStyle>;
   title: string;
+  variant?: "card" | "flat";
 }>;
 
 export function SectionCard({
@@ -25,9 +26,10 @@ export function SectionCard({
   onEdit,
   style,
   title,
+  variant = "card",
 }: SectionCardProps) {
   return (
-    <View style={[styles.card, style]}>
+    <View style={[styles.base, variant === "flat" ? styles.flat : styles.card, style]}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <AppText variant="titleSm">{title}</AppText>
@@ -63,8 +65,10 @@ export function SectionCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
+  base: {
     gap: spacing[12],
+  },
+  card: {
     padding: spacing[16],
     borderRadius: radius[8],
     backgroundColor: colors.surface,
@@ -75,6 +79,12 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
+  },
+  flat: {
+    paddingHorizontal: spacing[16],
+    paddingTop: spacing[20],
+    paddingBottom: spacing[18],
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: "row",

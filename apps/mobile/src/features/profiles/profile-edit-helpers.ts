@@ -17,10 +17,16 @@ import {
   formatLocationSummary,
   calculateAge,
   formatOptionalSummary,
+  formatProfileDisplayName,
   getOptionLabel,
   REGION_OPTIONS,
 } from "./profile-form-utils";
-import { getLatestPlayerExperience, getPlayerPositionLabel } from "./player-sports";
+import {
+  getLatestPlayerExperience,
+  getPlayerPositionLabel,
+  getPlayerPositionLabels,
+  getPreferredFootLabel,
+} from "./player-sports";
 
 // ────────────────────────────────
 // Role labels
@@ -471,6 +477,78 @@ export function buildHeaderDetails(data: CompleteProfessionalProfile) {
     fullName,
     primaryMeta,
     secondaryMeta: undefined,
+  };
+}
+
+export type PlayerProfileHeaderDetails = {
+  ageLabel: string;
+  availabilityBadges: string[];
+  bio: string | null;
+  clubLabel?: string;
+  fullName: string;
+  heightLabel: string;
+  locationLabel?: string;
+  preferredFootLabel: string;
+  primaryRole: string;
+  regionBadges: string[];
+  secondaryRole?: string;
+  statusBadge?: string;
+  weightLabel: string;
+};
+
+export function buildPlayerProfileHeaderDetails(
+  data: CompleteProfessionalProfile,
+): PlayerProfileHeaderDetails | null {
+  if (data.profile.role !== "player") {
+    return null;
+  }
+
+  const age = data.profile.age ?? calculateAge(data.profile.birth_date);
+  const latestEntry = getLatestPlayerExperience(
+    data.playerCareerEntries.map((entry) => toPlayerExperienceForm(entry)),
+  );
+  const primaryRole = getPlayerPositionLabel(
+    data.playerProfile?.primary_position ?? DEFAULT_PLAYER_PRIMARY_POSITION,
+  );
+  const secondaryRole = getPlayerPositionLabels(
+    data.playerProfile?.secondary_positions,
+  ).find((label) => label !== primaryRole);
+  const clubLabel = [latestEntry?.clubName?.trim(), latestEntry?.category?.trim()]
+    .filter(Boolean)
+    .join(" · ");
+  const locationLabel = formatLocationSummary(
+    data.profile.city,
+    data.profile.region,
+  );
+  const isAvailable =
+    data.profile.is_open_to_transfer ||
+    data.playerProfile?.willing_to_change_club;
+  const availabilityBadges = [
+    latestEntry?.clubName?.trim() ? "Sotto contratto" : "Svincolato",
+    isAvailable ? "Disponibile al trasferimento" : "In valutazione",
+  ];
+
+  return {
+    ageLabel: age ? `${age} anni` : "Da definire",
+    availabilityBadges,
+    bio: data.profile.bio?.trim() || null,
+    clubLabel: clubLabel || undefined,
+    fullName: formatProfileDisplayName(data.profile.full_name, null),
+    heightLabel: data.playerProfile?.height_cm
+      ? `${data.playerProfile.height_cm} cm`
+      : "Da definire",
+    locationLabel: locationLabel === "Da completare" ? undefined : locationLabel,
+    preferredFootLabel: getPreferredFootLabel(
+      data.playerProfile?.preferred_foot,
+      "Da definire",
+    ),
+    primaryRole,
+    regionBadges: data.playerProfile?.transfer_regions?.filter(Boolean) ?? [],
+    secondaryRole,
+    statusBadge: isAvailable ? "Disponibile al trasferimento" : "Profilo attivo",
+    weightLabel: data.playerProfile?.weight_kg
+      ? `${data.playerProfile.weight_kg} kg`
+      : "Da definire",
   };
 }
 

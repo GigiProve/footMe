@@ -37,6 +37,7 @@ type BioSectionProps = {
 type PublicBioBlockProps = {
   bio: string | null | undefined;
   collapsedLines?: number;
+  variant?: "default" | "plain";
 };
 
 export function CharacterCounter({
@@ -93,6 +94,7 @@ export function BioInput({ errorMessage, onChangeText, value }: BioInputProps) {
 export function PublicBioBlock({
   bio,
   collapsedLines = 3,
+  variant = "default",
 }: PublicBioBlockProps) {
   const normalizedBio = bio?.trim() ?? "";
   const [isExpanded, setIsExpanded] = useState(false);
@@ -109,12 +111,16 @@ export function PublicBioBlock({
 
   return (
     <View
-      style={[
-        styles.readonlySurface,
-        hasValue
-          ? styles.completedReadonlySurface
-          : styles.emptyReadonlySurface,
-      ]}
+      style={
+        variant === "plain"
+          ? styles.readonlyPlain
+          : [
+              styles.readonlySurface,
+              hasValue
+                ? styles.completedReadonlySurface
+                : styles.emptyReadonlySurface,
+            ]
+      }
     >
       <AppText
         variant="bodyLg"
@@ -196,5 +202,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[14],
     borderRadius: radius[8],
     borderWidth: 1,
+  },
+  readonlyPlain: {
+    gap: spacing[10],
   },
 });

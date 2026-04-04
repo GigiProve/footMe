@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet } from "react-native";
+import { Alert, SafeAreaView, StyleSheet } from "react-native";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
-import { Screen } from "../../src/components/ui/screen";
 import { useSession } from "../../src/features/auth/use-session";
 import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
@@ -14,17 +13,23 @@ import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/E
 import { EditPlayerExperiencesModal } from "../../src/features/profiles/edit-modals/EditPlayerExperiencesModal";
 import { EditPlayerSportsModal } from "../../src/features/profiles/edit-modals/EditPlayerSportsModal";
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
-import { buildHeaderDetails } from "../../src/features/profiles/profile-edit-helpers";
+import {
+  buildHeaderDetails,
+  buildPlayerProfileHeaderDetails,
+} from "../../src/features/profiles/profile-edit-helpers";
 import {
   ProfileReadonlyView,
   type EditSection,
 } from "../../src/features/profiles/ProfileReadonlyView";
-import { ProfileHeader } from "../../src/features/profiles/profile-screen-components";
+import {
+  PlayerProfileHeader,
+  ProfileHeader,
+} from "../../src/features/profiles/profile-screen-components";
 import {
   getCompleteProfessionalProfile,
   type CompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
-import { spacing } from "../../src/theme/tokens";
+import { colors } from "../../src/theme/tokens";
 import { AppText } from "../../src/ui";
 
 export default function ProfileScreen() {
@@ -65,6 +70,11 @@ export default function ProfileScreen() {
     () => (completeProfile ? buildHeaderDetails(completeProfile) : null),
     [completeProfile],
   );
+  const playerHeaderDetails = useMemo(
+    () =>
+      completeProfile ? buildPlayerProfileHeaderDetails(completeProfile) : null,
+    [completeProfile],
+  );
 
   if (!userId || !profile) {
     return null;
@@ -90,11 +100,34 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen>
+    <SafeAreaView style={styles.screen}>
       <KeyboardAwareForm
         contentContainerStyle={styles.scrollContent}
       >
-        {completeProfile && headerDetails ? (
+        {completeProfile && role === "player" && playerHeaderDetails ? (
+          <PlayerProfileHeader
+            ageLabel={playerHeaderDetails.ageLabel}
+            availabilityBadges={playerHeaderDetails.availabilityBadges}
+            avatarUrl={completeProfile.profile.avatar_url}
+            bio={playerHeaderDetails.bio}
+            categoryBadges={
+              completeProfile.playerProfile?.preferred_categories ?? []
+            }
+            clubLabel={playerHeaderDetails.clubLabel}
+            fullName={playerHeaderDetails.fullName}
+            heightLabel={playerHeaderDetails.heightLabel}
+            locationLabel={playerHeaderDetails.locationLabel}
+            mode="owner"
+            onAddContentPress={() => handleEdit("playerSports")}
+            onEditProfilePress={() => handleEdit("personalInfo")}
+            preferredFootLabel={playerHeaderDetails.preferredFootLabel}
+            primaryRole={playerHeaderDetails.primaryRole}
+            regionBadges={playerHeaderDetails.regionBadges}
+            secondaryRole={playerHeaderDetails.secondaryRole}
+            statusBadge={playerHeaderDetails.statusBadge}
+            weightLabel={playerHeaderDetails.weightLabel}
+          />
+        ) : completeProfile && headerDetails ? (
           <ProfileHeader
             avatarUrl={completeProfile.profile.avatar_url}
             badges={headerDetails.badges}
@@ -199,13 +232,17 @@ export default function ProfileScreen() {
           ) : null}
         </>
       ) : null}
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.surface,
+  },
   scrollContent: {
-    gap: spacing[18],
-    paddingBottom: 28,
+    backgroundColor: colors.surface,
+    paddingBottom: 0,
   },
 });
