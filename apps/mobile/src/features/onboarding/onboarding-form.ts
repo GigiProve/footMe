@@ -21,6 +21,7 @@ export type OnboardingStep =
   | "base"
   | "photo"
   | "technical"
+  | "player_availability"
   | "experience"
   | "fan_basic"
   | "fan_photo"
@@ -46,6 +47,7 @@ export type OnboardingStep =
   | "club_youth"
   | "club_profile"
   | "coach_role"
+  | "coach_availability"
   | "coach_career"
   | "staff_role"
   | "staff_availability"
@@ -257,8 +259,14 @@ const defaultVisibleSteps: OnboardingVisibleStep[] = [
     step: "technical",
   },
   {
-    description: "Aggiungi le tue esperienze calcistiche",
+    description: "Dove vuoi giocare e in quali categorie",
     index: 5,
+    label: "Disponibilità",
+    step: "player_availability",
+  },
+  {
+    description: "Aggiungi le tue esperienze calcistiche",
+    index: 6,
     label: "Esperienze",
     step: "experience",
   },
@@ -353,6 +361,7 @@ const defaultStepOrder: OnboardingStep[] = [
   "base",
   "photo",
   "technical",
+  "player_availability",
   "experience",
   "complete",
 ];
@@ -409,6 +418,7 @@ const coachStepOrder: OnboardingStep[] = [
   "base",
   "photo",
   "coach_role",
+  "coach_availability",
   "coach_career",
   "player_career_toggle",
   "player_career",
@@ -448,26 +458,32 @@ const coachVisibleSteps: OnboardingVisibleStep[] = [
     step: "photo",
   },
   {
-    description: "Ruolo e disponibilità",
+    description: "Qualifica e licenza",
     index: 4,
     label: "Qualifica",
     step: "coach_role",
   },
   {
-    description: "Esperienze da allenatore",
+    description: "Disponibilità per una nuova squadra",
     index: 5,
+    label: "Disponibilità",
+    step: "coach_availability",
+  },
+  {
+    description: "Esperienze da allenatore",
+    index: 6,
     label: "Carriera",
     step: "coach_career",
   },
   {
     description: "Carriera in campo",
-    index: 6,
+    index: 7,
     label: "Giocatore",
     step: "player_career_toggle",
   },
   {
     description: "Filosofia e stile di gioco",
-    index: 7,
+    index: 8,
     label: "Profilo",
     step: "coach_extra",
   },
@@ -1149,7 +1165,7 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
   }
 
   const allSteps: OnboardingStep[] = [
-    "role", "community_profile_type", "base", "photo", "technical", "experience",
+    "role", "community_profile_type", "base", "photo", "technical", "player_availability", "experience",
     "fan_basic", "fan_photo", "fan_interests",
     "media_basic", "media_photo", "media_entity", "media_content", "media_focus",
     "media_channels", "media_collaborations",
@@ -1157,7 +1173,7 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     "agent_player_career_toggle", "agent_player_career", "agent_portfolio",
     "agent_availability", "agent_verification", "agent_extra",
     "club_representative", "club_data", "club_youth", "club_profile",
-    "coach_role", "coach_career", "staff_role", "staff_availability", "staff_career",
+    "coach_role", "coach_availability", "coach_career", "staff_role", "staff_availability", "staff_career",
     "staff_player_career_toggle", "staff_player_career",
     "player_career_toggle", "player_career", "coach_extra",
     "director_roles", "director_responsibilities", "director_categories",
@@ -1348,6 +1364,10 @@ export function validateOnboardingStep(
     return mapCoachRoleValidationError(form);
   }
 
+  if (step === "player_availability") {
+    return mapPlayerAvailabilityValidationError(form);
+  }
+
   if (step === "agent_agency") {
     return mapAgentAgencyValidationError(form);
   }
@@ -1418,6 +1438,7 @@ export function validateOnboardingStep(
   // career toggle/list steps have no required validation here
   if (
     step === "coach_career" ||
+    step === "coach_availability" ||
     step === "staff_career" ||
     step === "staff_player_career_toggle" ||
     step === "staff_player_career" ||
@@ -1452,6 +1473,12 @@ function mapTechnicalStepValidationError(form: OnboardingFormState): OnboardingV
   if (form.role === "player" && !form.primaryPosition) {
     errors.primaryPosition = "Seleziona il ruolo principale per continuare.";
   }
+
+  return errors;
+}
+
+function mapPlayerAvailabilityValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
 
   if (form.isOpenToTransfer) {
     if (form.availabilityType === "REGIONS" && fromDelimitedString(form.transferRegions).length === 0) {

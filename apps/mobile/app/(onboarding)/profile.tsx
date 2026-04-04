@@ -60,7 +60,7 @@ import { AgentPlayersStep } from "../../src/features/onboarding/agent/AgentPlaye
 import { AgentPortfolioStep } from "../../src/features/onboarding/agent/AgentPortfolioStep";
 import { AgentVerificationStep } from "../../src/features/onboarding/agent/AgentVerificationStep";
 import type { CoachCareerEntry } from "../../src/features/onboarding/coach/coach-career-types";
-import { CoachRoleStep } from "../../src/features/onboarding/coach/CoachRoleStep";
+import { AVAILABLE_FROM_OPTIONS, CoachRoleStep } from "../../src/features/onboarding/coach/CoachRoleStep";
 import { CoachCareerStep } from "../../src/features/onboarding/coach/CoachCareerStep";
 import { PlayerCareerToggleStep } from "../../src/features/onboarding/coach/PlayerCareerToggleStep";
 import { CoachExtraStep } from "../../src/features/onboarding/coach/CoachExtraStep";
@@ -1118,12 +1118,25 @@ export default function OnboardingProfileScreen() {
     setValidationErrors({});
     patchForm({ lastCompletedStep: "technical" });
 
-    // Players get an optional experience step; others save and go to completion
+    // Players get an availability step then experience; others save and go to completion
     if (role === "player") {
-      navigateToStep("experience");
+      navigateToStep("player_availability");
     } else {
       handleSaveNonPlayerTechnical();
     }
+  }
+
+  function handleContinueFromPlayerAvailability() {
+    const nextErrors = validateOnboardingStep("player_availability", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "player_availability" });
+    navigateToStep("experience");
   }
 
   async function handleSaveNonPlayerTechnical() {
@@ -2004,6 +2017,12 @@ export default function OnboardingProfileScreen() {
 
     setValidationErrors({});
     patchForm({ lastCompletedStep: "coach_role" });
+    navigateToStep("coach_availability");
+  }
+
+  function handleContinueFromCoachAvailability() {
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "coach_availability" });
     navigateToStep("coach_career");
   }
 
@@ -3104,54 +3123,6 @@ export default function OnboardingProfileScreen() {
                   ) : null}
                 </OnboardingSectionCard>
 
-                <OnboardingSectionCard
-                  title="Dove vuoi giocare?"
-                  subtitle="Seleziona le zone in cui sei disponibile a giocare e le categorie in cui vuoi ricevere opportunità."
-                >
-                  <WhereToPlaySection
-                    availabilityType={availabilityType}
-                    categories={fromDelimitedString(preferredCategories)}
-                    isAvailable={isOpenToTransfer}
-                    onAvailabilityTypeChange={(type) => {
-                      patchForm({ availabilityType: type });
-                      clearValidationErrors([
-                        "transferRegions",
-                        "transferProvinces",
-                      ]);
-                    }}
-                    onCategoriesChange={(categories) => {
-                      updateValue("preferredCategories", categories.join(", "));
-                      clearValidationErrors(["preferredCategories"]);
-                    }}
-                    onIsAvailableChange={(value) => {
-                      patchForm({
-                        isOpenToTransfer: value,
-                        willingToChangeClub: value,
-                      });
-                      if (!value) {
-                        clearValidationErrors([
-                          "transferRegions",
-                          "transferProvinces",
-                          "preferredCategories",
-                        ]);
-                      }
-                    }}
-                    onProvincesChange={(nextProvinces) => {
-                      updateValue(
-                        "transferProvinces",
-                        nextProvinces.join(", "),
-                      );
-                      clearValidationErrors(["transferProvinces"]);
-                    }}
-                    onRegionsChange={(nextRegions) => {
-                      updateValue("transferRegions", nextRegions.join(", "));
-                      clearValidationErrors(["transferRegions"]);
-                    }}
-                    provinces={fromDelimitedString(transferProvinces)}
-                    regions={fromDelimitedString(transferRegions)}
-                    validationErrors={validationErrors}
-                  />
-                </OnboardingSectionCard>
               </>
             ) : null}
 
@@ -3244,6 +3215,66 @@ export default function OnboardingProfileScreen() {
                   disabled={isBusy}
                   label={isBusy ? "Salvataggio..." : "Continua"}
                   onPress={handleContinueFromTechnical}
+                  variant="primary"
+                />
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Player Availability (dove vuoi giocare)                   */}
+        {/* ============================================================= */}
+        {step === "player_availability" ? (
+          <View style={styles.stepContainer}>
+            <OnboardingSectionCard
+              title="Dove vuoi giocare?"
+              subtitle="Seleziona le zone in cui sei disponibile a giocare e le categorie in cui vuoi ricevere opportunità."
+            >
+              <WhereToPlaySection
+                availabilityType={availabilityType}
+                categories={fromDelimitedString(preferredCategories)}
+                isAvailable={isOpenToTransfer}
+                onAvailabilityTypeChange={(type) => {
+                  patchForm({ availabilityType: type });
+                  clearValidationErrors(["transferRegions", "transferProvinces"]);
+                }}
+                onCategoriesChange={(categories) => {
+                  updateValue("preferredCategories", categories.join(", "));
+                  clearValidationErrors(["preferredCategories"]);
+                }}
+                onIsAvailableChange={(value) => {
+                  patchForm({ isOpenToTransfer: value, willingToChangeClub: value });
+                  if (!value) {
+                    clearValidationErrors(["transferRegions", "transferProvinces", "preferredCategories"]);
+                  }
+                }}
+                onProvincesChange={(nextProvinces) => {
+                  updateValue("transferProvinces", nextProvinces.join(", "));
+                  clearValidationErrors(["transferProvinces"]);
+                }}
+                onRegionsChange={(nextRegions) => {
+                  updateValue("transferRegions", nextRegions.join(", "));
+                  clearValidationErrors(["transferRegions"]);
+                }}
+                provinces={fromDelimitedString(transferProvinces)}
+                regions={fromDelimitedString(transferRegions)}
+                validationErrors={validationErrors}
+              />
+            </OnboardingSectionCard>
+            <View style={styles.buttonRow}>
+              <View style={styles.flex1}>
+                <Button
+                  label="Indietro"
+                  onPress={handleBackNavigation}
+                  variant="secondary"
+                />
+              </View>
+              <View style={styles.flex1}>
+                <Button
+                  disabled={isBusy}
+                  label="Continua"
+                  onPress={handleContinueFromPlayerAvailability}
                   variant="primary"
                 />
               </View>
@@ -3399,19 +3430,14 @@ export default function OnboardingProfileScreen() {
         ) : null}
 
         {/* ============================================================= */}
-        {/* STEP: Coach Role (Qualifica e disponibilità)                   */}
+        {/* STEP: Coach Role (Qualifica)                                   */}
         {/* ============================================================= */}
         {step === "coach_role" ? (
           <View style={styles.stepContainer}>
             <CoachRoleStep
-              availabilityType={coachAvailabilityType}
-              availableFrom={coachAvailableFrom}
               categoriesArray={coachCategoriesArray}
               licenseType={coachLicenseType}
-              openToNewRole={openToNewRole}
               primaryRole={coachPrimaryRole}
-              provincesArray={coachProvincesArray}
-              regionsArray={coachRegionsArray}
               onUpdate={(patch) => patchForm(patch)}
               validationErrors={validationErrors}
             />
@@ -3421,6 +3447,79 @@ export default function OnboardingProfileScreen() {
               onPress={handleContinueFromCoachRole}
               variant="primary"
             />
+          </View>
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Coach Availability (disponibilità nuova squadra)         */}
+        {/* ============================================================= */}
+        {step === "coach_availability" ? (
+          <View style={styles.stepContainer}>
+            <OnboardingSectionCard
+              title="Disponibilità"
+              subtitle="Indica se sei disponibile per una nuova squadra e le zone di interesse."
+            >
+              <WhereToPlaySection
+                availabilityType={coachAvailabilityType}
+                categories={[]}
+                hideCategories
+                infoMessages={{
+                  ITALY: "",
+                  REGIONS: "Indica una o più regioni in cui sei disponibile ad allenare.",
+                  PROVINCES: "Indica una o più province in cui sei disponibile ad allenare.",
+                }}
+                isAvailable={openToNewRole}
+                onAvailabilityTypeChange={(value) => patchForm({ coachAvailabilityType: value })}
+                onCategoriesChange={() => undefined}
+                onIsAvailableChange={(value) => {
+                  patchForm({
+                    openToNewRole: value,
+                    ...(value ? {} : {
+                      coachAvailableFrom: "",
+                      coachProvincesArray: [],
+                      coachRegionsArray: [],
+                    }),
+                  });
+                }}
+                onProvincesChange={(value) => patchForm({ coachProvincesArray: value })}
+                onRegionsChange={(value) => patchForm({ coachRegionsArray: value })}
+                provinces={coachProvincesArray}
+                provincesHelperText="Puoi selezionare più province in cui allenare."
+                provincesLabel="Province di interesse"
+                regions={coachRegionsArray}
+                regionsHelperText="Puoi selezionare più regioni in cui allenare."
+                regionsLabel="Regioni di interesse"
+                toggleLabel="Disponibile per una nuova squadra"
+                toggleSubtitle="Il tuo profilo può comparire tra gli allenatori disponibili sul mercato."
+                validationErrors={validationErrors}
+              />
+              {openToNewRole ? (
+                <SelectField
+                  label="Disponibile da"
+                  onChange={(val) => patchForm({ coachAvailableFrom: val })}
+                  options={AVAILABLE_FROM_OPTIONS}
+                  placeholder="Seleziona disponibilità"
+                  value={coachAvailableFrom}
+                />
+              ) : null}
+            </OnboardingSectionCard>
+            <View style={styles.buttonRow}>
+              <View style={styles.flex1}>
+                <Button
+                  label="Indietro"
+                  onPress={handleBackNavigation}
+                  variant="secondary"
+                />
+              </View>
+              <View style={styles.flex1}>
+                <Button
+                  disabled={isBusy}
+                  label="Continua"
+                  onPress={handleContinueFromCoachAvailability}
+                  variant="primary"
+                />
+              </View>
+            </View>
           </View>
         ) : null}
 
