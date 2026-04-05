@@ -604,8 +604,24 @@ export function PlayerExperienceForm({
       <View style={formStyles.fieldGroup}>
         <TeamAutocompleteInput
           label={teamLabel}
-          onChangeText={(val) => updateField("teamName", val)}
-          onSelectTeam={(team) => updateField("teamName", team.name)}
+          onChangeText={(val) =>
+            setForm((prev) => ({
+              ...prev,
+              clubId: null,
+              teamCity: "",
+              teamLogoUrl: "",
+              teamName: val,
+            }))
+          }
+          onSelectTeam={(team) =>
+            setForm((prev) => ({
+              ...prev,
+              clubId: team.id,
+              teamCity: team.city ?? "",
+              teamLogoUrl: team.logoUrl ?? "",
+              teamName: team.name,
+            }))
+          }
           placeholder={teamPlaceholder}
           searchTeams={searchTeams}
           value={form.teamName}

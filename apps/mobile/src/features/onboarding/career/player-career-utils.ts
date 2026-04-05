@@ -315,7 +315,7 @@ export function playerEntriesToForms(
           assists: detail?.assists || "",
           awards: detail?.awards || "",
           category: detail?.category || entry.category,
-          clubId: null,
+          clubId: entry.clubId ?? null,
           clubName: entry.teamName,
           goals: detail?.goals || "",
           minutesPlayed: detail?.minutesPlayed || "",
@@ -323,8 +323,8 @@ export function playerEntriesToForms(
           periodStartMonth: "",
           seasonLabel: season,
           seasonPeriod: "full",
-          teamCity: "",
-          teamLogoUrl: "",
+          teamCity: entry.teamCity ?? "",
+          teamLogoUrl: entry.teamLogoUrl ?? "",
         });
       }
     } else if (entry.type === "CUSTOM_PERIOD" && entry.period) {
@@ -349,7 +349,7 @@ export function playerEntriesToForms(
           assists: detail?.assists || "",
           awards: detail?.awards || "",
           category: detail?.category || entry.category,
-          clubId: null,
+          clubId: entry.clubId ?? null,
           clubName: entry.teamName,
           goals: detail?.goals || "",
           minutesPlayed: detail?.minutesPlayed || "",
@@ -357,8 +357,8 @@ export function playerEntriesToForms(
           periodStartMonth: isFirst && entry.period ? entry.period.startMonth || "" : "",
           seasonLabel: season,
           seasonPeriod,
-          teamCity: "",
-          teamLogoUrl: "",
+          teamCity: entry.teamCity ?? "",
+          teamLogoUrl: entry.teamLogoUrl ?? "",
         });
       }
     }
@@ -408,8 +408,11 @@ export function formsToPlayerEntries(
       }
 
       entries.push({
+        clubId: first.clubId,
         id: generatePlayerEntryId(),
         teamName: first.clubName,
+        teamCity: first.teamCity,
+        teamLogoUrl: first.teamLogoUrl,
         category: first.category,
         type: "CUSTOM_PERIOD",
         seasons: [],
@@ -443,8 +446,11 @@ export function formsToPlayerEntries(
       }
 
       entries.push({
+        clubId: first.clubId,
         id: generatePlayerEntryId(),
         teamName: first.clubName,
+        teamCity: first.teamCity,
+        teamLogoUrl: first.teamLogoUrl,
         category: first.category,
         type,
         seasons,

@@ -10,7 +10,10 @@ export type PlayerSeasonDetail = {
 };
 
 export type PlayerCareerEntry = {
+  clubId?: string | null;
   id: string;
+  teamCity?: string;
+  teamLogoUrl?: string;
   teamName: string;
   category: string; // used for single season; defaults for new seasons
   type: PlayerCareerType;

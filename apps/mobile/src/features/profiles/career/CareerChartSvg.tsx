@@ -21,10 +21,12 @@ type CareerChartSvgProps = {
   metricLabel: string;
 };
 
-const CHART_HEIGHT = 148;
-const PADDING_X = 14;
-const PADDING_TOP = 16;
-const BASELINE_Y = CHART_HEIGHT - 8;
+const CHART_HEIGHT = 220;
+const Y_AXIS_WIDTH = 40;
+const RIGHT_PADDING = 18;
+const TOP_PADDING = 28;
+const BOTTOM_PADDING = 34;
+const POINT_RADIUS = 9;
 
 export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
   const [containerWidth, setContainerWidth] = useState(0);
@@ -40,16 +42,21 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
   }
 
   const width = containerWidth > 0 ? containerWidth : 320;
+  const chartLeft = Y_AXIS_WIDTH;
+  const chartRight = width - RIGHT_PADDING;
+  const chartTop = TOP_PADDING;
+  const baselineY = CHART_HEIGHT - BOTTOM_PADDING;
+  const plotHeight = baselineY - chartTop;
   const maxValue = Math.max(...data.map((d) => d.value), 1);
-  const yScale = (BASELINE_Y - PADDING_TOP) / maxValue;
+  const yScale = plotHeight / maxValue;
 
   function xPos(index: number): number {
     if (data.length === 1) return width / 2;
-    return PADDING_X + (index * (width - PADDING_X * 2)) / (data.length - 1);
+    return chartLeft + (index * (chartRight - chartLeft)) / (data.length - 1);
   }
 
   function yPos(value: number): number {
-    return BASELINE_Y - value * yScale;
+    return baselineY - value * yScale;
   }
 
   const points = data.map((d, i) => ({ x: xPos(i), y: yPos(d.value), d }));
@@ -62,7 +69,7 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
   // Area path (close back to baseline)
   const lastX = points[points.length - 1]?.x ?? 0;
   const firstX = points[0]?.x ?? 0;
-  const areaPath = `${linePath} L ${lastX} ${BASELINE_Y} L ${firstX} ${BASELINE_Y} Z`;
+  const areaPath = `${linePath} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
 
   // Best value index
   const bestIndex = data.reduce(
@@ -70,8 +77,16 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
     0,
   );
 
-  // Grid lines at 25%, 50%, 75% of maxValue
-  const gridValues = [maxValue * 0.75, maxValue * 0.5, maxValue * 0.25];
+  const yAxisTicks = Array.from(
+    new Set([
+      maxValue,
+      Math.round(maxValue * 0.66),
+      Math.round(maxValue * 0.33),
+      0,
+    ]),
+  )
+    .filter((value) => value >= 0 && value <= maxValue)
+    .sort((a, b) => b - a);
 
   return (
     <View
@@ -87,29 +102,39 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
             </LinearGradient>
           </Defs>
 
+          {yAxisTicks.map((tick) => (
+            <G key={`tick-${tick}`}>
+              <Line
+                stroke={tick === 0 ? colors.border : colors.border}
+                strokeDasharray={tick === 0 ? undefined : "4 5"}
+                strokeWidth={1}
+                x1={chartLeft}
+                x2={chartRight}
+                y1={yPos(tick)}
+                y2={yPos(tick)}
+              />
+              <SvgText
+                fill={colors.textSecondary}
+                fontSize={11}
+                fontWeight="600"
+                textAnchor="end"
+                x={chartLeft - 8}
+                y={yPos(tick) + 4}
+              >
+                {tick}
+              </SvgText>
+            </G>
+          ))}
+
           {/* Baseline */}
           <Line
             stroke={colors.border}
             strokeWidth={1}
-            x1={PADDING_X}
-            x2={width - PADDING_X}
-            y1={BASELINE_Y}
-            y2={BASELINE_Y}
+            x1={chartLeft}
+            x2={chartRight}
+            y1={baselineY}
+            y2={baselineY}
           />
-
-          {/* Dashed grid lines */}
-          {gridValues.map((gv, i) => (
-            <Line
-              key={i}
-              stroke={colors.border}
-              strokeDasharray="4 5"
-              strokeWidth={1}
-              x1={PADDING_X}
-              x2={width - PADDING_X}
-              y1={yPos(gv)}
-              y2={yPos(gv)}
-            />
-          ))}
 
           {/* Gradient fill area */}
           <Path d={areaPath} fill="url(#careerGrad)" />
@@ -129,11 +154,17 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
             const isBest = i === bestIndex;
             return (
               <G key={i}>
+                <PointValueLabel
+                  chartTop={chartTop}
+                  value={p.d.value}
+                  x={p.x}
+                  y={p.y}
+                />
                 <Circle
                   cx={p.x}
                   cy={p.y}
                   fill={isBest ? colors.accent : colors.surface}
-                  r={9}
+                  r={POINT_RADIUS}
                   stroke={isBest ? colors.surface : colors.accent}
                   strokeWidth={2.5}
                 />
@@ -147,6 +178,16 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
                 >
                   {p.d.teamInitials}
                 </SvgText>
+                <SvgText
+                  fill={colors.textSecondary}
+                  fontSize={10}
+                  fontWeight="600"
+                  textAnchor="middle"
+                  x={p.x}
+                  y={baselineY + 18}
+                >
+                  {p.d.seasonLabel}
+                </SvgText>
               </G>
             );
           })}
@@ -158,48 +199,93 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
               x={points[bestIndex]!.x}
               y={points[bestIndex]!.y}
               chartWidth={width}
+              chartTop={chartTop}
             />
           ) : null}
+
+          <SvgText
+            fill={colors.textSecondary}
+            fontSize={11}
+            fontWeight="700"
+            textAnchor="start"
+            x={chartLeft}
+            y={14}
+          >
+            {metricLabel}
+          </SvgText>
         </Svg>
       ) : (
         <View style={{ height: CHART_HEIGHT }} />
       )}
-
-      {/* X-axis labels */}
-      <View style={styles.xLabels}>
-        {data.map((d, i) => (
-          <AppText
-            color="muted"
-            key={i}
-            style={[styles.xLabel, data.length === 1 ? styles.xLabelCenter : null]}
-            variant="caption"
-          >
-            {d.seasonLabel}
-          </AppText>
-        ))}
-      </View>
     </View>
+  );
+}
+
+function PointValueLabel({
+  chartTop,
+  value,
+  x,
+  y,
+}: {
+  chartTop: number;
+  value: number;
+  x: number;
+  y: number;
+}) {
+  const label = String(value);
+  const labelWidth = Math.max(24, label.length * 7 + 10);
+  const labelHeight = 20;
+  const topY = y - POINT_RADIUS - labelHeight - 6;
+  const labelY = topY < chartTop ? y + POINT_RADIUS + 6 : topY;
+  const textY = labelY + 13;
+
+  return (
+    <>
+      <Rect
+        fill={colors.surface}
+        height={labelHeight}
+        rx={10}
+        stroke={colors.border}
+        strokeWidth={1}
+        width={labelWidth}
+        x={x - labelWidth / 2}
+        y={labelY}
+      />
+      <SvgText
+        fill={colors.textPrimary}
+        fontSize={11}
+        fontWeight="700"
+        textAnchor="middle"
+        x={x}
+        y={textY}
+      >
+        {label}
+      </SvgText>
+    </>
   );
 }
 
 function TooltipEl({
   chartWidth,
+  chartTop,
   label,
   x,
   y,
 }: {
   chartWidth: number;
+  chartTop: number;
   label: string;
   x: number;
   y: number;
 }) {
   const tooltipWidth = label.length * 7 + 16;
   const tooltipHeight = 24;
-  const tooltipY = y - tooltipHeight - 8;
+  const topCandidate = y - tooltipHeight - 10;
+  const tooltipY = topCandidate < chartTop ? y + 18 : topCandidate;
   let tooltipX = x - tooltipWidth / 2;
 
   // Clamp within chart
-  tooltipX = Math.max(PADDING_X, Math.min(tooltipX, chartWidth - PADDING_X - tooltipWidth));
+  tooltipX = Math.max(8, Math.min(tooltipX, chartWidth - 8 - tooltipWidth));
 
   return (
     <>
@@ -227,7 +313,7 @@ function TooltipEl({
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing[6],
+    minHeight: CHART_HEIGHT,
   },
   empty: {
     alignItems: "center",
@@ -236,18 +322,5 @@ const styles = StyleSheet.create({
   },
   svg: {
     overflow: "visible",
-  },
-  xLabel: {
-    flex: 1,
-    fontSize: typography.fontSize[11],
-    textAlign: "center",
-  },
-  xLabelCenter: {
-    textAlign: "center",
-  },
-  xLabels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing[4],
   },
 });

@@ -73,8 +73,11 @@ export function CareerExperienceStep({
     setScreen({
       type: "form",
       entry: {
+        clubId: null,
         id: generatePlayerEntryId(),
         teamName: "",
+        teamCity: "",
+        teamLogoUrl: "",
         category: "",
         type,
         seasons: [],

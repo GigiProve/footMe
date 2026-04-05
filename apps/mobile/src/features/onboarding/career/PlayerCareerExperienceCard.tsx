@@ -7,6 +7,7 @@ import type { PlayerCareerEntry } from "./player-career-types";
 
 type PlayerCareerExperienceCardProps = {
   entry: PlayerCareerEntry;
+  onDelete?: () => void;
   onEdit: () => void;
 };
 
@@ -30,6 +31,7 @@ function formatDuration(entry: PlayerCareerEntry): string {
 
 export function PlayerCareerExperienceCard({
   entry,
+  onDelete,
   onEdit,
 }: PlayerCareerExperienceCardProps) {
   const duration = formatDuration(entry);
@@ -41,15 +43,28 @@ export function PlayerCareerExperienceCard({
           <AppText variant="titleMd" style={cardStyles.teamName}>
             {entry.teamName}
           </AppText>
-          <Pressable
-            accessibilityLabel="Modifica esperienza"
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={onEdit}
-            style={cardStyles.editButton}
-          >
-            <Ionicons name="pencil" size={14} color={colors.textSecondary} />
-          </Pressable>
+          <View style={cardStyles.actions}>
+            <Pressable
+              accessibilityLabel="Modifica esperienza"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onEdit}
+              style={cardStyles.editButton}
+            >
+              <Ionicons name="pencil" size={14} color={colors.textSecondary} />
+            </Pressable>
+            {onDelete ? (
+              <Pressable
+                accessibilityLabel="Elimina esperienza"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={onDelete}
+                style={cardStyles.editButton}
+              >
+                <Ionicons name="trash-outline" size={14} color={colors.danger} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         {entry.category ? (
@@ -85,6 +100,11 @@ const cardStyles = StyleSheet.create({
   },
   content: {
     gap: spacing[4],
+  },
+  actions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[8],
   },
   header: {
     flexDirection: "row",
