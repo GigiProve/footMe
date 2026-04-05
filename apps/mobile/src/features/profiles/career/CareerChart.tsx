@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 
 import { colors, radius, shadows, spacing, typography } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
@@ -27,6 +27,8 @@ const METRIC_LABELS: Record<ChartMetric, string> = {
 export function CareerChart({ entries }: CareerChartProps) {
   const [metric, setMetric] = useState<ChartMetric>("goals");
   const data = buildChartData(entries, metric);
+  const chartWidth = Math.max(320, data.length * 74);
+  const isScrollable = data.length > 4;
 
   return (
     <View style={styles.section}>
@@ -39,7 +41,23 @@ export function CareerChart({ entries }: CareerChartProps) {
           options={CHART_OPTIONS}
           value={metric}
         />
-        <CareerChartSvg data={data} metricLabel={METRIC_LABELS[metric]} />
+        <ScrollView
+          contentContainerStyle={[
+            styles.chartScrollContent,
+            !isScrollable ? styles.chartScrollContentCentered : null,
+          ]}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
+          <View style={[styles.chartCanvas, { width: chartWidth }]}>
+            <CareerChartSvg data={data} metricLabel={METRIC_LABELS[metric]} />
+          </View>
+        </ScrollView>
+        {isScrollable ? (
+          <AppText color="muted" style={styles.chartHint} variant="caption">
+            Scorri orizzontalmente e trascina sul grafico per vedere i valori stagione per stagione.
+          </AppText>
+        ) : null}
       </View>
     </View>
   );
@@ -54,6 +72,18 @@ const styles = StyleSheet.create({
     gap: spacing[16],
     padding: spacing[16],
     ...shadows.card,
+  },
+  chartCanvas: {
+    minWidth: "100%",
+  },
+  chartHint: {
+    lineHeight: typography.lineHeight[22],
+  },
+  chartScrollContent: {
+    flexGrow: 1,
+  },
+  chartScrollContentCentered: {
+    justifyContent: "center",
   },
   section: {
     backgroundColor: colors.surface,

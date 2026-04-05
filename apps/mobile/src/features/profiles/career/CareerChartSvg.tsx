@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Svg, {
   Circle,
@@ -76,6 +76,11 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
     (best, d, i) => (d.value > (data[best]?.value ?? 0) ? i : best),
     0,
   );
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(bestIndex);
+
+  useEffect(() => {
+    setSelectedIndex(bestIndex);
+  }, [bestIndex, metricLabel, data]);
 
   const yAxisTicks = Array.from(
     new Set([
@@ -88,9 +93,27 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
     .filter((value) => value >= 0 && value <= maxValue)
     .sort((a, b) => b - a);
 
+  function getNearestPointIndex(locationX: number): number {
+    return points.reduce((nearestIndex, point, index) => {
+      const nearestDistance = Math.abs(points[nearestIndex]!.x - locationX);
+      const currentDistance = Math.abs(point.x - locationX);
+      return currentDistance < nearestDistance ? index : nearestIndex;
+    }, 0);
+  }
+
+  function handlePointer(locationX: number) {
+    if (points.length === 0) return;
+    setSelectedIndex(getNearestPointIndex(locationX));
+  }
+
+  const activeIndex = selectedIndex ?? bestIndex;
+  const activePoint = points[activeIndex];
+
   return (
     <View
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+      onTouchMove={(e) => handlePointer(e.nativeEvent.locationX)}
+      onTouchStart={(e) => handlePointer(e.nativeEvent.locationX)}
       style={styles.container}
     >
       {containerWidth > 0 ? (
@@ -139,6 +162,18 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
           {/* Gradient fill area */}
           <Path d={areaPath} fill="url(#careerGrad)" />
 
+          {activePoint ? (
+            <Line
+              stroke={colors.accent}
+              strokeDasharray="3 4"
+              strokeWidth={1.5}
+              x1={activePoint.x}
+              x2={activePoint.x}
+              y1={chartTop}
+              y2={baselineY}
+            />
+          ) : null}
+
           {/* Line */}
           <Path
             d={linePath}
@@ -152,10 +187,12 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
           {/* Data points */}
           {points.map((p, i) => {
             const isBest = i === bestIndex;
+            const isActive = i === activeIndex;
             return (
               <G key={i}>
                 <PointValueLabel
                   chartTop={chartTop}
+                  isActive={isActive}
                   value={p.d.value}
                   x={p.x}
                   y={p.y}
@@ -163,13 +200,13 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
                 <Circle
                   cx={p.x}
                   cy={p.y}
-                  fill={isBest ? colors.accent : colors.surface}
-                  r={POINT_RADIUS}
-                  stroke={isBest ? colors.surface : colors.accent}
-                  strokeWidth={2.5}
+                  fill={isActive || isBest ? colors.accent : colors.surface}
+                  r={isActive ? POINT_RADIUS + 1 : POINT_RADIUS}
+                  stroke={isActive || isBest ? colors.surface : colors.accent}
+                  strokeWidth={isActive ? 3 : 2.5}
                 />
                 <SvgText
-                  fill={isBest ? colors.inkInvert : colors.accent}
+                  fill={isActive || isBest ? colors.inkInvert : colors.accent}
                   fontSize={7}
                   fontWeight="700"
                   textAnchor="middle"
@@ -181,7 +218,7 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
                 <SvgText
                   fill={colors.textSecondary}
                   fontSize={10}
-                  fontWeight="600"
+                  fontWeight={isActive ? "700" : "600"}
                   textAnchor="middle"
                   x={p.x}
                   y={baselineY + 18}
@@ -193,11 +230,11 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
           })}
 
           {/* Tooltip on best value */}
-          {points[bestIndex] ? (
+          {activePoint ? (
             <TooltipEl
-              label={`${data[bestIndex]?.value ?? 0} ${metricLabel}`}
-              x={points[bestIndex]!.x}
-              y={points[bestIndex]!.y}
+              label={`${data[activeIndex]?.value ?? 0} ${metricLabel} • ${data[activeIndex]?.seasonLabel ?? ""}`}
+              x={activePoint.x}
+              y={activePoint.y}
               chartWidth={width}
               chartTop={chartTop}
             />
@@ -223,11 +260,13 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
 
 function PointValueLabel({
   chartTop,
+  isActive,
   value,
   x,
   y,
 }: {
   chartTop: number;
+  isActive: boolean;
   value: number;
   x: number;
   y: number;
@@ -242,17 +281,17 @@ function PointValueLabel({
   return (
     <>
       <Rect
-        fill={colors.surface}
+        fill={isActive ? colors.accentSoft : colors.surface}
         height={labelHeight}
         rx={10}
-        stroke={colors.border}
+        stroke={isActive ? colors.accent : colors.border}
         strokeWidth={1}
         width={labelWidth}
         x={x - labelWidth / 2}
         y={labelY}
       />
       <SvgText
-        fill={colors.textPrimary}
+        fill={isActive ? colors.accentStrong : colors.textPrimary}
         fontSize={11}
         fontWeight="700"
         textAnchor="middle"
