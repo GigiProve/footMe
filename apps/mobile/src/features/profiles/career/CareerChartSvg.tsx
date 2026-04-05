@@ -12,7 +12,7 @@ import Svg, {
   Text as SvgText,
 } from "react-native-svg";
 
-import { colors, spacing, typography } from "../../../theme/tokens";
+import { colors } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 import type { ChartDataPoint } from "./chart-data";
 
@@ -30,6 +30,15 @@ const POINT_RADIUS = 9;
 
 export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
   const [containerWidth, setContainerWidth] = useState(0);
+  const bestIndex = data.reduce(
+    (best, point, index) => (point.value > (data[best]?.value ?? 0) ? index : best),
+    0,
+  );
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(bestIndex);
+
+  useEffect(() => {
+    setSelectedIndex(bestIndex);
+  }, [bestIndex, metricLabel, data]);
 
   if (data.length === 0) {
     return (
@@ -70,17 +79,6 @@ export function CareerChartSvg({ data, metricLabel }: CareerChartSvgProps) {
   const lastX = points[points.length - 1]?.x ?? 0;
   const firstX = points[0]?.x ?? 0;
   const areaPath = `${linePath} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
-
-  // Best value index
-  const bestIndex = data.reduce(
-    (best, d, i) => (d.value > (data[best]?.value ?? 0) ? i : best),
-    0,
-  );
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(bestIndex);
-
-  useEffect(() => {
-    setSelectedIndex(bestIndex);
-  }, [bestIndex, metricLabel, data]);
 
   const yAxisTicks = Array.from(
     new Set([

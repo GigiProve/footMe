@@ -3,17 +3,17 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "npx -y -p node@20 node ../../node_modules/@expo/cli/build/bin/cli start",
-    "start:clear": "npx -y -p node@20 node ../../node_modules/@expo/cli/build/bin/cli start --clear",
-    "start:ios-sim": "open -a Simulator && npx -y -p node@20 node ../../node_modules/@expo/cli/build/bin/cli start --clear --ios",
-    "start:tunnel": "npx -y -p node@20 node ../../node_modules/@expo/cli/build/bin/cli start --clear --tunnel",
-    "dev": "npx -y -p node@20 node ../../node_modules/@expo/cli/build/bin/cli start",
+    "start": "node ../../node_modules/@expo/cli/build/bin/cli start",
+    "start:clear": "node ../../node_modules/@expo/cli/build/bin/cli start --clear",
+    "start:ios-sim": "open -a Simulator && node ../../node_modules/@expo/cli/build/bin/cli start --clear --ios",
+    "start:tunnel": "node ../../node_modules/@expo/cli/build/bin/cli start --clear --tunnel",
+    "dev": "node ../../node_modules/@expo/cli/build/bin/cli start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "npx -y -p node@20 node ../../node_modules/eslint/bin/eslint.js .",
-    "typecheck": "npx -y -p node@20 node ../../node_modules/typescript/bin/tsc --noEmit",
-    "test": "npx -y -p node@20 node ../../node_modules/vitest/vitest.mjs run",
-    "test:watch": "npx -y -p node@20 node ../../node_modules/vitest/vitest.mjs"
+    "lint": "node ../../node_modules/eslint/bin/eslint.js .",
+    "typecheck": "node ../../node_modules/typescript/bin/tsc --noEmit",
+    "test": "node ../../node_modules/vitest/vitest.mjs run",
+    "test:watch": "node ../../node_modules/vitest/vitest.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
