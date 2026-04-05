@@ -14,7 +14,9 @@ import { EditPlayerExperiencesModal } from "../../src/features/profiles/edit-mod
 import { EditPlayerSportsModal } from "../../src/features/profiles/edit-modals/EditPlayerSportsModal";
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
 import {
+  buildFullUpdatePayload,
   buildHeaderDetails,
+  buildInitialState,
   buildPlayerProfileHeaderDetails,
 } from "../../src/features/profiles/profile-edit-helpers";
 import {
@@ -27,8 +29,11 @@ import {
 } from "../../src/features/profiles/profile-screen-components";
 import {
   getCompleteProfessionalProfile,
+  updateCompleteProfessionalProfile,
   type CompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
+import type { GroupedExperience } from "../../src/features/profiles/career/career-grouping";
+import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
 import { colors } from "../../src/theme/tokens";
 import { AppText } from "../../src/ui";
 
@@ -99,6 +104,38 @@ export default function ProfileScreen() {
     );
   }
 
+  async function handleDeleteExperience(group: GroupedExperience) {
+    if (!completeProfile) return;
+
+    Alert.alert(
+      "Elimina esperienza",
+      `Eliminare tutte le stagioni con ${group.clubName}?`,
+      [
+        { style: "cancel", text: "Annulla" },
+        {
+          onPress: async () => {
+            try {
+              const baseState = buildInitialState(completeProfile);
+              const filteredEntries = baseState.careerEntries.filter((e) => {
+                if (group.clubId && e.clubId) return e.clubId !== group.clubId;
+                return e.clubName !== group.clubName;
+              });
+              const mergedState = { ...baseState, careerEntries: filteredEntries };
+              const payload = buildFullUpdatePayload(completeProfile, mergedState);
+              await updateCompleteProfessionalProfile(payload);
+              await loadProfile();
+              Alert.alert("Esperienza eliminata", "Le stagioni sono state rimosse.");
+            } catch {
+              Alert.alert("Errore", "Impossibile eliminare l'esperienza.");
+            }
+          },
+          style: "destructive",
+          text: "Elimina",
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAwareForm
@@ -144,6 +181,14 @@ export default function ProfileScreen() {
           <AppText variant="bodySm" color="secondary">
             Sto recuperando i dati professionali del tuo account...
           </AppText>
+        ) : completeProfile && role === "player" ? (
+          <ProfileTabView
+            completeProfile={completeProfile}
+            isOwner={true}
+            onAddExperience={() => handleEdit("playerExperiences")}
+            onDeleteExperience={handleDeleteExperience}
+            onEdit={handleEdit}
+          />
         ) : completeProfile ? (
           <ProfileReadonlyView
             completeProfile={completeProfile}
