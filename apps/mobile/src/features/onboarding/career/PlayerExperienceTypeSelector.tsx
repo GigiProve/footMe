@@ -3,45 +3,63 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
-import type { CareerExperienceType } from "./career-types";
+import type { PlayerCareerType } from "./player-career-types";
 
-type ExperienceTypeSelectorProps = {
-  onSelect: (type: CareerExperienceType) => void;
+type PlayerExperienceTypeSelectorProps = {
+  options?: {
+    icon: keyof typeof Ionicons.glyphMap;
+    subtitle: string;
+    title: string;
+    type: PlayerCareerType;
+  }[];
+  subtitle?: string;
+  title?: string;
+  onSelect: (type: PlayerCareerType) => void;
 };
 
 const typeOptions: {
-  type: CareerExperienceType;
+  type: PlayerCareerType;
   title: string;
   subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
   {
-    type: "FIRST_TEAM",
-    title: "Prima Squadra",
+    type: "MULTI_SEASON",
+    title: "Più stagioni complete",
     subtitle:
-      "Esperienze maturate in prima squadra (dilettanti o professionisti)",
-    icon: "football-outline",
+      "Es. 2022/23, 2023/24 nella stessa squadra con la stessa categoria.",
+    icon: "layers-outline",
   },
   {
-    type: "YOUTH",
-    title: "Settore Giovanile",
-    subtitle: "Esperienze nei campionati giovanili (Primavera, Under 19, ecc.)",
-    icon: "people-outline",
+    type: "SINGLE_SEASON",
+    title: "Singola stagione",
+    subtitle: "Es. 2023/24, una sola stagione sportiva.",
+    icon: "calendar-outline",
+  },
+  {
+    type: "CUSTOM_PERIOD",
+    title: "Periodo personalizzato",
+    subtitle:
+      "Es. da Gennaio 2023 a Maggio 2023. Utile per prestiti o periodi brevi.",
+    icon: "time-outline",
   },
 ];
 
-export function ExperienceTypeSelector({
+export function PlayerExperienceTypeSelector({
+  options = typeOptions,
+  subtitle = "Che tipo di esperienza vuoi inserire?",
+  title = "Aggiungi esperienza",
   onSelect,
-}: ExperienceTypeSelectorProps) {
+}: PlayerExperienceTypeSelectorProps) {
   return (
     <View style={selectorStyles.container}>
-      <AppText variant="headingMd">Aggiungi esperienza</AppText>
+      <AppText variant="headingMd">{title}</AppText>
       <AppText variant="bodySm" color="secondary">
-        Che tipo di esperienza vuoi inserire nel tuo profilo?
+        {subtitle}
       </AppText>
 
       <View style={selectorStyles.optionsContainer}>
-        {typeOptions.map((option) => (
+        {options.map((option) => (
           <Pressable
             accessibilityRole="button"
             key={option.type}
@@ -52,7 +70,7 @@ export function ExperienceTypeSelector({
             ]}
           >
             <View style={selectorStyles.optionIcon}>
-              <Ionicons name={option.icon} size={28} color={colors.hero} />
+              <Ionicons name={option.icon} size={24} color={colors.accentStrong} />
             </View>
             <View style={selectorStyles.optionText}>
               <AppText variant="titleMd">{option.title}</AppText>
@@ -97,7 +115,7 @@ const selectorStyles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: radius.full,
-    backgroundColor: colors.heroSoft,
+    backgroundColor: colors.accentSoft,
     alignItems: "center",
     justifyContent: "center",
   },
