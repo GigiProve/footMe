@@ -17,9 +17,12 @@ import {
   computeCoachSeasonsFromPeriod,
   formatSeasonShort,
   generateCoachEntryId,
-  getCoachSeasonOptions,
-  getCoachYearOptions,
-  getOlderCoachSeasonOptions,
+  getCoachEndYearOptions,
+  getCoachSeasonSelectOptions,
+  getCoachStartYearOptions,
+  getOccupiedCoachSeasonLabels,
+  getOlderCoachSeasonSelectOptions,
+  sanitizeCoachPeriodSelection,
 } from "./coach-career-utils";
 
 // ---------------------------------------------------------------------------
@@ -30,6 +33,7 @@ type CoachExperienceFormProps = {
   categoryLabel?: string;
   categoryPlaceholder?: string;
   entry: CoachCareerEntry;
+  existingEntries?: CoachCareerEntry[];
   isEditing: boolean;
   onCancel: () => void;
   onSave: (entry: CoachCareerEntry) => void;
@@ -62,41 +66,55 @@ type FormErrors = {
 // ---------------------------------------------------------------------------
 
 function SeasonChipGrid({
+  disabledSeasons,
   selectedSeasons,
   onToggle,
 }: {
+  disabledSeasons?: Set<string>;
   selectedSeasons: string[];
   onToggle: (season: string) => void;
 }) {
-  const allSeasons = getCoachSeasonOptions();
+  const allSeasons = getCoachSeasonSelectOptions(disabledSeasons ?? new Set());
   const selectedSet = new Set(selectedSeasons);
 
-  const olderSelected = selectedSeasons.filter((s) => !allSeasons.includes(s));
-  const olderSeasonOptions = getOlderCoachSeasonOptions();
+  const olderSelected = selectedSeasons.filter(
+    (season) => !allSeasons.some((option) => option.value === season),
+  );
+  const olderSeasonOptions = getOlderCoachSeasonSelectOptions(
+    disabledSeasons ?? new Set(),
+  );
   const availableOlderOptions = olderSeasonOptions.filter(
     (o) => !selectedSet.has(o.value),
   );
 
   return (
     <View style={chipStyles.container}>
-      {allSeasons.map((season) => {
-        const isSelected = selectedSet.has(season);
+      {allSeasons.map((seasonOption) => {
+        const isSelected = selectedSet.has(seasonOption.value);
         return (
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ selected: isSelected }}
-            key={season}
-            onPress={() => onToggle(season)}
+            accessibilityState={{
+              disabled: seasonOption.disabled === true,
+              selected: isSelected,
+            }}
+            disabled={seasonOption.disabled === true}
+            key={seasonOption.value}
+            onPress={() => onToggle(seasonOption.value)}
             style={[
               chipStyles.chip,
+              seasonOption.disabled ? chipStyles.chipDisabled : null,
               isSelected ? chipStyles.chipSelected : null,
             ]}
           >
             <AppText
               variant="bodySm"
-              style={isSelected ? chipStyles.chipTextSelected : chipStyles.chipText}
+              style={[
+                isSelected ? chipStyles.chipTextSelected : chipStyles.chipText,
+                seasonOption.disabled ? chipStyles.chipTextDisabled : null,
+              ]}
             >
-              {formatSeasonShort(season)}
+              {seasonOption.label}
             </AppText>
           </Pressable>
         );
@@ -155,12 +173,20 @@ const chipStyles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
+  chipDisabled: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    opacity: 0.5,
+  },
   chipText: {
     color: colors.textPrimary,
   },
   chipTextSelected: {
     color: colors.inkInvert,
     fontWeight: "600",
+  },
+  chipTextDisabled: {
+    color: colors.textMuted,
   },
   olderPickerRow: {
     width: "100%",
@@ -175,17 +201,20 @@ const chipStyles = StyleSheet.create({
 type Period = NonNullable<CoachCareerEntry["period"]>;
 
 function PeriodSelector({
+  endYearOptions,
   period,
   onChange,
+  startYearOptions,
   startYearError,
   endYearError,
 }: {
+  endYearOptions: { label: string; value: string; disabled?: boolean }[];
   period: Period | null;
   onChange: (period: Period) => void;
+  startYearOptions: { label: string; value: string; disabled?: boolean }[];
   startYearError?: string;
   endYearError?: string;
 }) {
-  const yearOptions = getCoachYearOptions();
   const current: Period = period ?? {
     startMonth: "",
     startYear: "",
@@ -215,7 +244,7 @@ function PeriodSelector({
           <SelectField
             label="Dal (Anno) *"
             onChange={(val) => update({ startYear: val })}
-            options={yearOptions}
+            options={startYearOptions}
             placeholder="Anno"
             searchable
             searchPlaceholder="Cerca anno..."
@@ -245,7 +274,7 @@ function PeriodSelector({
           <SelectField
             label="Al (Anno) *"
             onChange={(val) => update({ endYear: val })}
-            options={yearOptions}
+            options={endYearOptions}
             placeholder="Anno"
             searchable
             searchPlaceholder="Cerca anno..."
@@ -352,6 +381,7 @@ export function CoachExperienceForm({
   categoryLabel = "Categoria *",
   categoryPlaceholder = "Seleziona categoria",
   entry,
+  existingEntries = [],
   isEditing,
   onCancel,
   onSave,
@@ -365,11 +395,32 @@ export function CoachExperienceForm({
 }: CoachExperienceFormProps) {
   const [form, setForm] = useState<CoachCareerEntry>(entry);
   const [errors, setErrors] = useState<FormErrors>({});
-
-  const seasonOptions = getCoachSeasonOptions().map((s) => ({
-    label: formatSeasonShort(s),
-    value: s,
-  }));
+  const occupiedSeasons = useMemo(
+    () => getOccupiedCoachSeasonLabels(existingEntries, entry.id),
+    [existingEntries, entry.id],
+  );
+  const seasonOptions = useMemo(
+    () => getCoachSeasonSelectOptions(occupiedSeasons),
+    [occupiedSeasons],
+  );
+  const startYearOptions = useMemo(
+    () =>
+      getCoachStartYearOptions(
+        form.period?.endYear ?? "",
+        form.period?.endMonth ?? "",
+        occupiedSeasons,
+      ),
+    [form.period?.endMonth, form.period?.endYear, occupiedSeasons],
+  );
+  const endYearOptions = useMemo(
+    () =>
+      getCoachEndYearOptions(
+        form.period?.startYear ?? "",
+        form.period?.startMonth ?? "",
+        occupiedSeasons,
+      ),
+    [form.period?.startMonth, form.period?.startYear, occupiedSeasons],
+  );
 
   const effectiveSeasons = useMemo(() => {
     if (form.type === "MULTI_SEASON") {
@@ -413,10 +464,12 @@ export function CoachExperienceForm({
   }
 
   function handlePeriodChange(period: NonNullable<CoachCareerEntry["period"]>) {
+    const nextPeriod = sanitizeCoachPeriodSelection(period, occupiedSeasons);
+
     setForm((prev) => {
-      const newSeasons = computeCoachSeasonsFromPeriod(period);
+      const newSeasons = computeCoachSeasonsFromPeriod(nextPeriod);
       if (newSeasons.length <= 1) {
-        return { ...prev, period, seasonDetails: {} };
+        return { ...prev, period: nextPeriod, seasonDetails: {} };
       }
       const nextDetails: Record<string, CoachSeasonDetail> = {};
       for (const season of newSeasons) {
@@ -425,7 +478,7 @@ export function CoachExperienceForm({
           role: prev.role,
         };
       }
-      return { ...prev, period, seasonDetails: nextDetails };
+      return { ...prev, period: nextPeriod, seasonDetails: nextDetails };
     });
     setErrors((prev) => ({ ...prev, startYear: undefined, endYear: undefined }));
   }
@@ -571,6 +624,7 @@ export function CoachExperienceForm({
             Stagioni (seleziona tutte quelle applicabili)
           </AppText>
           <SeasonChipGrid
+            disabledSeasons={occupiedSeasons}
             onToggle={handleToggleSeason}
             selectedSeasons={form.seasons}
           />
@@ -591,6 +645,8 @@ export function CoachExperienceForm({
             }
             options={seasonOptions}
             placeholder="Seleziona stagione"
+            searchable
+            searchPlaceholder="Cerca stagione..."
             value={form.seasons[0] ?? ""}
           />
           {errors.seasons ? (
@@ -603,9 +659,11 @@ export function CoachExperienceForm({
 
       {form.type === "CUSTOM_PERIOD" ? (
         <PeriodSelector
+          endYearOptions={endYearOptions}
           endYearError={errors.endYear}
           onChange={handlePeriodChange}
           period={form.period}
+          startYearOptions={startYearOptions}
           startYearError={errors.startYear}
         />
       ) : null}

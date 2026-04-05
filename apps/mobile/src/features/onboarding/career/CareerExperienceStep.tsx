@@ -158,6 +158,7 @@ export function CareerExperienceStep({
 
           <PlayerExperienceFormComponent
             entry={screen.entry}
+            existingEntries={entries}
             isEditing={screen.editIndex !== null}
             onCancel={handleFormCancel}
             onSave={handleFormSave}

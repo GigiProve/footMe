@@ -1,0 +1,104 @@
+import { describe, expect, it } from "vitest";
+
+import type { CoachCareerEntry, SimplePlayerCareerEntry } from "./coach-career-types";
+import {
+  getCoachEndYearOptions,
+  getCoachSeasonSelectOptions,
+  getCoachStartYearOptions,
+  getOccupiedCoachSeasonLabels,
+  getSimplePlayerSeasonSelectOptions,
+  sanitizeCoachPeriodSelection,
+} from "./coach-career-utils";
+
+function createCoachEntry(overrides: Partial<CoachCareerEntry>): CoachCareerEntry {
+  return {
+    id: "coach-1",
+    teamName: "ASD Test",
+    category: "Prima Squadra",
+    role: "Allenatore",
+    type: "SINGLE_SEASON",
+    seasons: ["2024/2025"],
+    period: null,
+    seasonDetails: {},
+    ...overrides,
+  };
+}
+
+describe("coach-career-utils", () => {
+  it("excludes the current coach entry when computing occupied seasons", () => {
+    const entries: CoachCareerEntry[] = [
+      createCoachEntry({ id: "coach-1", seasons: ["2024/2025"] }),
+      createCoachEntry({ id: "coach-2", seasons: ["2023/2024"] }),
+    ];
+
+    expect(getOccupiedCoachSeasonLabels(entries, "coach-1")).toEqual(
+      new Set(["2023/2024"]),
+    );
+  });
+
+  it("disables occupied coach seasons", () => {
+    const options = getCoachSeasonSelectOptions(new Set(["2024/2025"]));
+
+    expect(options.find((option) => option.value === "2024/2025")?.disabled).toBe(true);
+    expect(options.find((option) => option.value === "2023/2024")?.disabled).not.toBe(true);
+  });
+
+  it("disables invalid coach end years", () => {
+    const options = getCoachEndYearOptions("2023", "", new Set(["2024/2025"]));
+
+    expect(options.find((option) => option.value === "2022")?.disabled).toBe(true);
+    expect(options.find((option) => option.value === "2025")?.disabled).toBe(true);
+    expect(options.find((option) => option.value === "2024")?.disabled).not.toBe(true);
+  });
+
+  it("disables invalid coach start years", () => {
+    const options = getCoachStartYearOptions("2025", "", new Set(["2024/2025"]));
+
+    expect(options.find((option) => option.value === "2026")?.disabled).toBe(true);
+    expect(options.find((option) => option.value === "2024")?.disabled).toBe(true);
+    expect(options.find((option) => option.value === "2025")?.disabled).not.toBe(true);
+  });
+
+  it("clears an invalid coach end year after a conflicting change", () => {
+    const sanitized = sanitizeCoachPeriodSelection(
+      {
+        startMonth: "",
+        startYear: "2023",
+        endMonth: "",
+        endYear: "2025",
+      },
+      new Set(["2024/2025"]),
+    );
+
+    expect(sanitized).toEqual({
+      startMonth: "",
+      startYear: "2023",
+      endMonth: "",
+      endYear: "",
+    });
+  });
+
+  it("disables occupied seasons in simple player career options", () => {
+    const entries: SimplePlayerCareerEntry[] = [
+      {
+        id: "simple-1",
+        teamName: "ASD One",
+        season: "2024/2025",
+        category: "",
+        position: "",
+      },
+      {
+        id: "simple-2",
+        teamName: "ASD Two",
+        season: "2023/2024",
+        category: "",
+        position: "",
+      },
+    ];
+
+    const options = getSimplePlayerSeasonSelectOptions(entries, "simple-2");
+
+    expect(options.find((option) => option.value === "2024/2025")?.disabled).toBe(true);
+    expect(options.find((option) => option.value === "2023/2024")?.disabled).not.toBe(true);
+  });
+});

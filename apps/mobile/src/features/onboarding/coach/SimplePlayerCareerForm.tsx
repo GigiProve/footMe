@@ -8,7 +8,7 @@ import type { SimplePlayerCareerEntry } from "./coach-career-types";
 import {
   PLAYER_POSITION_OPTIONS,
   generateCoachEntryId,
-  getPlayerSeasonOptions,
+  getSimplePlayerSeasonSelectOptions,
 } from "./coach-career-utils";
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,7 @@ import {
 
 type SimplePlayerCareerFormProps = {
   entry: SimplePlayerCareerEntry;
+  existingEntries?: SimplePlayerCareerEntry[];
   isEditing: boolean;
   onCancel: () => void;
   onSave: (entry: SimplePlayerCareerEntry) => void;
@@ -32,6 +33,7 @@ type FormErrors = {
 
 export function SimplePlayerCareerForm({
   entry,
+  existingEntries = [],
   isEditing,
   onCancel,
   onSave,
@@ -39,7 +41,10 @@ export function SimplePlayerCareerForm({
   const [form, setForm] = useState<SimplePlayerCareerEntry>(entry);
   const [errors, setErrors] = useState<FormErrors>({});
 
-  const seasonOptions = getPlayerSeasonOptions();
+  const seasonOptions = getSimplePlayerSeasonSelectOptions(
+    existingEntries,
+    entry.id,
+  );
 
   function updateField<K extends keyof SimplePlayerCareerEntry>(
     key: K,
@@ -98,6 +103,8 @@ export function SimplePlayerCareerForm({
         onChange={(val) => updateField("season", val)}
         options={seasonOptions}
         placeholder="Seleziona stagione"
+        searchable
+        searchPlaceholder="Cerca stagione..."
         value={form.season}
       />
 

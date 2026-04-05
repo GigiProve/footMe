@@ -166,6 +166,7 @@ export function EditPlayerExperiencesModal({
           </Card>
           <PlayerExperienceFormComponent
             entry={screen.entry}
+            existingEntries={groupedEntries}
             isEditing={screen.editIndex !== null}
             onCancel={() => setScreen({ type: "list" })}
             onSave={handleFormSave}

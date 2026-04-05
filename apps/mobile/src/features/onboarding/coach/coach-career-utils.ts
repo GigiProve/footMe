@@ -1,4 +1,5 @@
-import type { CoachCareerEntry } from "./coach-career-types";
+import type { SelectOption } from "../../profiles/profile-form-utils";
+import type { CoachCareerEntry, SimplePlayerCareerEntry } from "./coach-career-types";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CHIP_FIRST_YEAR = 2010;
@@ -54,6 +55,218 @@ export function getCoachYearOptions(): { label: string; value: string }[] {
     const year = CURRENT_YEAR - i;
     return { label: String(year), value: String(year) };
   });
+}
+
+export function getEntrySeasonLabels(entry: CoachCareerEntry): string[] {
+  if (entry.type === "CUSTOM_PERIOD" && entry.period) {
+    return computeCoachSeasonsFromPeriod(entry.period);
+  }
+
+  return entry.seasons;
+}
+
+export function getOccupiedCoachSeasonLabels(
+  entries: CoachCareerEntry[],
+  currentEntryId?: string,
+): Set<string> {
+  const occupied = new Set<string>();
+
+  for (const entry of entries) {
+    if (currentEntryId && entry.id === currentEntryId) {
+      continue;
+    }
+
+    for (const season of getEntrySeasonLabels(entry)) {
+      if (season.trim()) {
+        occupied.add(season);
+      }
+    }
+  }
+
+  return occupied;
+}
+
+export function getCoachSeasonSelectOptions(
+  occupiedSeasons: Set<string>,
+): SelectOption[] {
+  return getCoachSeasonOptions().map((season) => ({
+    label: formatSeasonShort(season),
+    value: season,
+    disabled: occupiedSeasons.has(season),
+  }));
+}
+
+export function getOlderCoachSeasonSelectOptions(
+  occupiedSeasons: Set<string>,
+): SelectOption[] {
+  return getOlderCoachSeasonOptions().map((option) => ({
+    ...option,
+    disabled: occupiedSeasons.has(option.value),
+  }));
+}
+
+function computeSeasonsFromYearRange(
+  startYear: number,
+  startMonth: number | null,
+  endYear: number,
+  endMonth: number | null,
+): string[] {
+  const firstSeasonStart =
+    startMonth !== null && startMonth >= 1 && startMonth <= 6
+      ? startYear - 1
+      : startYear;
+
+  let lastSeasonStart =
+    endMonth !== null && endMonth >= 7 ? endYear : endYear - 1;
+
+  if (lastSeasonStart < firstSeasonStart) {
+    lastSeasonStart = firstSeasonStart;
+  }
+
+  const seasons: string[] = [];
+  for (let year = firstSeasonStart; year <= lastSeasonStart; year += 1) {
+    seasons.push(`${year}/${year + 1}`);
+  }
+
+  return seasons;
+}
+
+export function getCoachEndYearOptions(
+  startYear: string,
+  startMonth: string,
+  occupiedSeasons: Set<string>,
+): SelectOption[] {
+  const yearOptions = getCoachYearOptions();
+  if (!startYear) {
+    return yearOptions;
+  }
+
+  const parsedStartYear = Number.parseInt(startYear, 10);
+  if (Number.isNaN(parsedStartYear)) {
+    return yearOptions;
+  }
+
+  const parsedStartMonth = startMonth
+    ? (MONTH_LABEL_TO_NUM[startMonth] ?? null)
+    : null;
+
+  return yearOptions.map((option) => {
+    const parsedEndYear = Number.parseInt(option.value, 10);
+    if (parsedEndYear < parsedStartYear) {
+      return { ...option, disabled: true };
+    }
+
+    const seasons = computeSeasonsFromYearRange(
+      parsedStartYear,
+      parsedStartMonth,
+      parsedEndYear,
+      null,
+    );
+
+    return seasons.some((season) => occupiedSeasons.has(season))
+      ? { ...option, disabled: true }
+      : option;
+  });
+}
+
+export function getCoachStartYearOptions(
+  endYear: string,
+  endMonth: string,
+  occupiedSeasons: Set<string>,
+): SelectOption[] {
+  const yearOptions = getCoachYearOptions();
+  if (!endYear) {
+    return yearOptions;
+  }
+
+  const parsedEndYear = Number.parseInt(endYear, 10);
+  if (Number.isNaN(parsedEndYear)) {
+    return yearOptions;
+  }
+
+  const parsedEndMonth = endMonth ? (MONTH_LABEL_TO_NUM[endMonth] ?? null) : null;
+
+  return yearOptions.map((option) => {
+    const parsedStartYear = Number.parseInt(option.value, 10);
+    if (parsedStartYear > parsedEndYear) {
+      return { ...option, disabled: true };
+    }
+
+    const seasons = computeSeasonsFromYearRange(
+      parsedStartYear,
+      null,
+      parsedEndYear,
+      parsedEndMonth,
+    );
+
+    return seasons.some((season) => occupiedSeasons.has(season))
+      ? { ...option, disabled: true }
+      : option;
+  });
+}
+
+export function sanitizeCoachPeriodSelection(
+  period: NonNullable<CoachCareerEntry["period"]>,
+  occupiedSeasons: Set<string>,
+): NonNullable<CoachCareerEntry["period"]> {
+  let nextPeriod = { ...period };
+
+  if (nextPeriod.startYear && nextPeriod.endYear) {
+    const endYearOptions = getCoachEndYearOptions(
+      nextPeriod.startYear,
+      nextPeriod.startMonth,
+      occupiedSeasons,
+    );
+    const selectedEndYear = endYearOptions.find(
+      (option) => option.value === nextPeriod.endYear,
+    );
+
+    if (selectedEndYear?.disabled) {
+      nextPeriod = {
+        ...nextPeriod,
+        endMonth: "",
+        endYear: "",
+      };
+    }
+  }
+
+  if (nextPeriod.startYear && nextPeriod.endYear) {
+    const startYearOptions = getCoachStartYearOptions(
+      nextPeriod.endYear,
+      nextPeriod.endMonth,
+      occupiedSeasons,
+    );
+    const selectedStartYear = startYearOptions.find(
+      (option) => option.value === nextPeriod.startYear,
+    );
+
+    if (selectedStartYear?.disabled) {
+      nextPeriod = {
+        ...nextPeriod,
+        startMonth: "",
+        startYear: "",
+      };
+    }
+  }
+
+  return nextPeriod;
+}
+
+export function getSimplePlayerSeasonSelectOptions(
+  entries: SimplePlayerCareerEntry[],
+  currentEntryId?: string,
+): SelectOption[] {
+  const occupied = new Set(
+    entries
+      .filter((entry) => entry.id !== currentEntryId)
+      .map((entry) => entry.season)
+      .filter((season) => season.trim() !== ""),
+  );
+
+  return getPlayerSeasonOptions().map((option) => ({
+    ...option,
+    disabled: occupied.has(option.value),
+  }));
 }
 
 export function formatSeasonShort(season: string): string {
