@@ -175,6 +175,8 @@ describe("getCompleteProfessionalProfile", () => {
       data: {
         height_cm: 180,
         highlight_video_url: null,
+        media_items: [],
+        media_urls: [],
         preferred_categories: ["Promozione"],
         preferred_foot: "right",
         primary_position: "forward",

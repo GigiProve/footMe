@@ -333,6 +333,8 @@ export function buildFullUpdatePayload(
             highlight_video_url: parseOptionalText(
               formState.highlightVideoUrl,
             ),
+            media_items: data.playerProfile?.media_items ?? [],
+            media_urls: data.playerProfile?.media_urls ?? [],
             preferred_categories: fromDelimitedString(
               formState.preferredCategories,
             ),

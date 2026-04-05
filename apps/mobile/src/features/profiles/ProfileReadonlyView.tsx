@@ -42,6 +42,7 @@ type EditSection =
   | "personalInfo"
   | "bio"
   | "contact"
+  | "playerMedia"
   | "playerSports"
   | "playerExperiences"
   | "coachInfo"

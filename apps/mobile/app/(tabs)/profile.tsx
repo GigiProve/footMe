@@ -11,6 +11,7 @@ import { EditCoachInfoModal } from "../../src/features/profiles/edit-modals/Edit
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
 import { EditPlayerExperiencesModal } from "../../src/features/profiles/edit-modals/EditPlayerExperiencesModal";
+import { EditPlayerMediaModal } from "../../src/features/profiles/edit-modals/EditPlayerMediaModal";
 import { EditPlayerSportsModal } from "../../src/features/profiles/edit-modals/EditPlayerSportsModal";
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
 import {
@@ -188,6 +189,7 @@ export default function ProfileScreen() {
             onAddExperience={() => handleEdit("playerExperiences")}
             onDeleteExperience={handleDeleteExperience}
             onEdit={handleEdit}
+            onManageMedia={() => handleEdit("playerMedia")}
           />
         ) : completeProfile ? (
           <ProfileReadonlyView
@@ -236,6 +238,13 @@ export default function ProfileScreen() {
                 onClose={handleCloseModal}
                 onSaved={handleSaved}
                 visible={activeModal === "playerExperiences"}
+              />
+              <EditPlayerMediaModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "playerMedia"}
               />
             </>
           ) : null}

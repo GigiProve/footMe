@@ -14,6 +14,10 @@ import {
   type PreferredFoot,
   type TeamAutocompleteOption,
 } from "./player-sports";
+import {
+  normalizePlayerMediaItems,
+  type PlayerMediaItemRecord,
+} from "./player-media";
 
 type BaseProfileRecord = {
   age: number | null;
@@ -50,6 +54,8 @@ type PlayerProfileRecord = {
   availability_type: string;
   height_cm: number | null;
   highlight_video_url: string | null;
+  media_items: PlayerMediaItemRecord[];
+  media_urls: string[];
   preferred_categories: string[];
   preferred_foot: PreferredFoot | null;
   primary_position: PlayerPosition;
@@ -244,6 +250,8 @@ export type CompleteProfessionalProfileUpdate = {
     availability_type: string;
     height_cm: number | null;
     highlight_video_url: string | null;
+    media_items: PlayerMediaItemRecord[];
+    media_urls: string[];
     preferred_categories: string[];
     preferred_foot: PreferredFoot | null;
     primary_position: PlayerPosition;
@@ -377,6 +385,8 @@ function normalizePlayerProfileRecord(
     availability_type: typeof rawProfile.availability_type === "string" ? rawProfile.availability_type : "ITALY",
     height_cm: normalizeNumber(rawProfile.height_cm),
     highlight_video_url: normalizeOptionalText(rawProfile.highlight_video_url),
+    media_items: normalizePlayerMediaItems(rawProfile.media_items, normalizeStringArray(rawProfile.media_urls)),
+    media_urls: normalizeStringArray(rawProfile.media_urls),
     preferred_categories: normalizeStringArray(rawProfile.preferred_categories),
     preferred_foot:
       rawProfile.preferred_foot === "right" ||
@@ -587,7 +597,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("player_profiles")
           .select(
-            "profile_id, preferred_foot, height_cm, weight_kg, primary_position, secondary_positions, willing_to_change_club, availability_type, transfer_regions, transfer_provinces, preferred_categories, highlight_video_url",
+            "profile_id, preferred_foot, height_cm, weight_kg, primary_position, secondary_positions, willing_to_change_club, availability_type, transfer_regions, transfer_provinces, preferred_categories, highlight_video_url, media_urls, media_items",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -1017,6 +1027,33 @@ export async function updateCompleteProfessionalProfile(
         }
       }
     }
+  }
+}
+
+export async function savePlayerProfileMedia(input: {
+  mediaItems: PlayerMediaItemRecord[];
+  playerProfile: NonNullable<CompleteProfessionalProfile["playerProfile"]>;
+  profileId: string;
+}) {
+  const { error } = await supabase.from("player_profiles").upsert({
+    availability_type: input.playerProfile.availability_type,
+    height_cm: input.playerProfile.height_cm,
+    highlight_video_url: input.playerProfile.highlight_video_url,
+    media_items: input.mediaItems,
+    media_urls: input.mediaItems.map((item) => item.url),
+    preferred_categories: input.playerProfile.preferred_categories,
+    preferred_foot: input.playerProfile.preferred_foot,
+    primary_position: input.playerProfile.primary_position,
+    profile_id: input.profileId,
+    secondary_positions: input.playerProfile.secondary_positions,
+    transfer_provinces: input.playerProfile.transfer_provinces,
+    transfer_regions: input.playerProfile.transfer_regions,
+    weight_kg: input.playerProfile.weight_kg,
+    willing_to_change_club: input.playerProfile.willing_to_change_club,
+  });
+
+  if (error) {
+    throw error;
   }
 }
 

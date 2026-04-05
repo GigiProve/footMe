@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { MediaPreview } from "../../../components/ui/media-preview";
 import { colors, radius } from "../../../theme/tokens";
 import { SectionCard } from "../../../ui";
 import { PublicBioBlock } from "../bio-section";
@@ -23,12 +22,15 @@ import {
   NATIONALITY_OPTIONS,
   REGION_OPTIONS,
 } from "../profile-form-utils";
+import { withDefaultProfileAvatar } from "../profile-avatar";
 import { ProfileField as Field } from "../profile-screen-components";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import type { EditSection } from "../ProfileReadonlyView";
 import type { GroupedExperience } from "./career-grouping";
 import { CareerTabContent } from "./CareerTabContent";
+import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
 import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
+import { getPlayerMediaTagMeta } from "../player-media";
 
 type ProfileTabViewProps = {
   completeProfile: CompleteProfessionalProfile;
@@ -36,6 +38,7 @@ type ProfileTabViewProps = {
   onAddExperience: () => void;
   onDeleteExperience: (group: GroupedExperience) => void;
   onEdit: (section: EditSection) => void;
+  onManageMedia: () => void;
 };
 
 export function ProfileTabView({
@@ -44,6 +47,7 @@ export function ProfileTabView({
   onAddExperience,
   onDeleteExperience,
   onEdit,
+  onManageMedia,
 }: ProfileTabViewProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("career");
 
@@ -70,7 +74,11 @@ export function ProfileTabView({
           onEdit={onAddExperience}
         />
       ) : activeTab === "media" ? (
-        <MediaTab completeProfile={completeProfile} onEdit={onEdit} />
+        <MediaTab
+          completeProfile={completeProfile}
+          isOwner={isOwner}
+          onManageMedia={onManageMedia}
+        />
       ) : (
         <InfoTab completeProfile={completeProfile} onEdit={onEdit} />
       )}
@@ -84,26 +92,72 @@ export function ProfileTabView({
 
 function MediaTab({
   completeProfile,
-  onEdit,
+  isOwner,
+  onManageMedia,
 }: {
   completeProfile: CompleteProfessionalProfile;
-  onEdit: (section: EditSection) => void;
+  isOwner: boolean;
+  onManageMedia: () => void;
 }) {
+  const mediaItems = useMemo<MediaContentItem[]>(() => {
+    const profileMediaItems = completeProfile.playerProfile?.media_items ?? [];
+
+    if (profileMediaItems.length > 0) {
+      return profileMediaItems.map((item) => {
+        const tagMeta = getPlayerMediaTagMeta(item.tag);
+
+        return {
+          commentCount: 0,
+          comments: [],
+          description: item.description ?? "",
+          id: item.id,
+          isFeatured: item.is_featured,
+          isLiked: false,
+          isSaved: false,
+          likeCount: 0,
+          tag: { icon: tagMeta.icon, label: tagMeta.label },
+          thumbnailUrl:
+            item.thumbnail_url ??
+            withDefaultProfileAvatar(completeProfile.profile.avatar_url),
+          type: item.type,
+          videoUrl: item.type === "video" ? item.url : undefined,
+        } satisfies MediaContentItem;
+      });
+    }
+
+    const highlightVideoUrl = completeProfile.playerProfile?.highlight_video_url;
+
+    return highlightVideoUrl
+      ? [
+          {
+            commentCount: 0,
+            comments: [],
+            description: "Video highlights del profilo.",
+            id: "profile-highlight-video",
+            isFeatured: false,
+            isLiked: false,
+            isSaved: false,
+            likeCount: 0,
+            tag: { icon: "play-circle-outline", label: "Highlights" },
+            thumbnailUrl: withDefaultProfileAvatar(completeProfile.profile.avatar_url),
+            type: "video",
+            videoUrl: highlightVideoUrl,
+          },
+        ]
+      : [];
+  }, [
+    completeProfile.playerProfile?.media_items,
+    completeProfile.playerProfile?.highlight_video_url,
+    completeProfile.profile.avatar_url,
+  ]);
+
   return (
-    <View style={styles.tabContent}>
-      <SectionCard
-        onEdit={() => onEdit("playerSports")}
-        title="Media"
-        variant="flat"
-      >
-        <MediaPreview
-          emptyLabel="Nessun video highlights caricato"
-          label="Video highlights"
-          mediaType="video"
-          url={completeProfile.playerProfile?.highlight_video_url}
-        />
-      </SectionCard>
-    </View>
+    <MediaTabContent
+      authorName={completeProfile.profile.full_name}
+      initialItems={mediaItems}
+      mode={isOwner ? "owner" : "visitor"}
+      onAddContentPress={isOwner ? onManageMedia : undefined}
+    />
   );
 }
 
