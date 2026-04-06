@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { Animated, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { colors, radius, spacing, typography } from "../../theme/tokens";
@@ -18,6 +18,64 @@ type WheelPickerProps = {
   unit?: string;
   value: number | null | undefined;
 };
+
+type WheelPickerItemProps = {
+  compact: boolean;
+  entry: number;
+  index: number;
+  itemHeight: number;
+  scrollY: Animated.Value;
+  unit?: string;
+};
+
+const WheelPickerItem = memo(function WheelPickerItem({
+  compact,
+  entry,
+  index,
+  itemHeight,
+  scrollY,
+  unit,
+}: WheelPickerItemProps) {
+  const center = index * itemHeight;
+  const inputRange = [
+    center - 2 * itemHeight,
+    center - itemHeight,
+    center,
+    center + itemHeight,
+    center + 2 * itemHeight,
+  ];
+
+  const opacity = scrollY.interpolate({
+    inputRange,
+    outputRange: [0.25, 0.6, 1, 0.6, 0.25],
+    extrapolate: "clamp",
+  });
+
+  const scale = scrollY.interpolate({
+    inputRange,
+    outputRange: [0.78, 0.9, 1.06, 0.9, 0.78],
+    extrapolate: "clamp",
+  });
+
+  return (
+    <Animated.View
+      style={{
+        height: itemHeight,
+        alignItems: "center",
+        justifyContent: "center",
+        opacity,
+        transform: [{ scale }],
+      }}
+    >
+      <Text
+        style={compact ? styles.valueTextSelectedCompact : styles.valueTextSelected}
+        testID={unit ? `wheel-picker-value-${unit}-${entry}` : undefined}
+      >
+        {entry}
+      </Text>
+    </Animated.View>
+  );
+});
 
 function clampValue(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -93,7 +151,7 @@ export function WheelPicker({
         />
         <Animated.ScrollView
           contentContainerStyle={{ paddingVertical: edgePadding }}
-          decelerationRate="normal"
+          decelerationRate="fast"
           onMomentumScrollEnd={(event) =>
             commitOffset(event.nativeEvent.contentOffset.y)
           }
@@ -105,53 +163,23 @@ export function WheelPicker({
             commitOffset(event.nativeEvent.contentOffset.y)
           }
           ref={scrollViewRef}
-          scrollEventThrottle={16}
+          scrollEventThrottle={8}
           showsVerticalScrollIndicator={false}
+          snapToAlignment="start"
           snapToInterval={itemHeight}
           testID={unit ? `wheel-picker-${unit}` : undefined}
         >
-          {values.map((entry, index) => {
-            const center = index * itemHeight;
-            const inputRange = [
-              center - 2 * itemHeight,
-              center - itemHeight,
-              center,
-              center + itemHeight,
-              center + 2 * itemHeight,
-            ];
-
-            const opacity = scrollY.interpolate({
-              inputRange,
-              outputRange: [0.25, 0.6, 1, 0.6, 0.25],
-              extrapolate: "clamp",
-            });
-
-            const scale = scrollY.interpolate({
-              inputRange,
-              outputRange: [0.78, 0.9, 1.06, 0.9, 0.78],
-              extrapolate: "clamp",
-            });
-
-            return (
-              <Animated.View
-                key={entry}
-                style={{
-                  height: itemHeight,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity,
-                  transform: [{ scale }],
-                }}
-              >
-                <Text
-                  style={compact ? styles.valueTextSelectedCompact : styles.valueTextSelected}
-                  testID={unit ? `wheel-picker-value-${unit}-${entry}` : undefined}
-                >
-                  {entry}
-                </Text>
-              </Animated.View>
-            );
-          })}
+          {values.map((entry, index) => (
+            <WheelPickerItem
+              compact={compact}
+              entry={entry}
+              index={index}
+              itemHeight={itemHeight}
+              key={entry}
+              scrollY={scrollY}
+              unit={unit}
+            />
+          ))}
         </Animated.ScrollView>
         {unit ? (
           <View

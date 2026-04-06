@@ -12,6 +12,9 @@ import { EditContactModal } from "../../src/features/profiles/edit-modals/EditCo
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
 import { EditPlayerExperiencesModal } from "../../src/features/profiles/edit-modals/EditPlayerExperiencesModal";
 import { EditPlayerMediaModal } from "../../src/features/profiles/edit-modals/EditPlayerMediaModal";
+import { EditPlayerPalmaresModal } from "../../src/features/profiles/edit-modals/EditPlayerPalmaresModal";
+import { EditPlayerProfileModal } from "../../src/features/profiles/edit-modals/EditPlayerProfileModal";
+import { EditPlayerSituationModal } from "../../src/features/profiles/edit-modals/EditPlayerSituationModal";
 import { EditPlayerSportsModal } from "../../src/features/profiles/edit-modals/EditPlayerSportsModal";
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
 import {
@@ -157,7 +160,7 @@ export default function ProfileScreen() {
             locationLabel={playerHeaderDetails.locationLabel}
             mode="owner"
             onAddContentPress={() => handleEdit("playerSports")}
-            onEditProfilePress={() => handleEdit("personalInfo")}
+            onEditProfilePress={() => handleEdit("editPlayerProfile")}
             preferredFootLabel={playerHeaderDetails.preferredFootLabel}
             primaryRole={playerHeaderDetails.primaryRole}
             regionBadges={playerHeaderDetails.regionBadges}
@@ -245,6 +248,27 @@ export default function ProfileScreen() {
                 onSaved={handleSaved}
                 userId={userId}
                 visible={activeModal === "playerMedia"}
+              />
+              <EditPlayerSituationModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "playerSituation"}
+              />
+              <EditPlayerPalmaresModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "playerPalmares"}
+              />
+              <EditPlayerProfileModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "editPlayerProfile"}
               />
             </>
           ) : null}

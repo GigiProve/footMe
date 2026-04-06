@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => {
   const playerCareerEqMock = vi.fn();
   const playerCareerFirstOrderMock = vi.fn();
   const playerCareerSecondOrderMock = vi.fn();
+  const playerPalmaresEqMock = vi.fn();
+  const playerPalmaresOrderMock = vi.fn();
   const playerMaybeSingleMock = vi.fn();
   const profileContactsMaybeSingleMock = vi.fn();
   const privateContactsMaybeSingleMock = vi.fn();
@@ -84,6 +86,14 @@ const mocks = vi.hoisted(() => {
         };
       }
 
+      if (table === "player_palmares") {
+        return {
+          select: vi.fn(() => ({
+            eq: playerPalmaresEqMock,
+          })),
+        };
+      }
+
       if (table === "club_season_entries") {
         return {
           select: vi.fn(() => ({
@@ -124,6 +134,8 @@ const mocks = vi.hoisted(() => {
     playerCareerFirstOrderMock,
     playerCareerSecondOrderChain,
     playerCareerSecondOrderMock,
+    playerPalmaresEqMock,
+    playerPalmaresOrderMock,
     playerMaybeSingleMock,
     privateContactsMaybeSingleMock,
     profileContactsMaybeSingleMock,
@@ -154,6 +166,8 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.playerCareerEqMock.mockReset();
     mocks.playerCareerFirstOrderMock.mockReset();
     mocks.playerCareerSecondOrderMock.mockReset();
+    mocks.playerPalmaresEqMock.mockReset();
+    mocks.playerPalmaresOrderMock.mockReset();
 
     mocks.profileMaybeSingleMock.mockResolvedValue({
       data: {
@@ -230,6 +244,13 @@ describe("getCompleteProfessionalProfile", () => {
           team_logo_url: "https://example.com/club.png",
         },
       ],
+      error: null,
+    });
+    mocks.playerPalmaresEqMock.mockImplementation(() => ({
+      order: mocks.playerPalmaresOrderMock,
+    }));
+    mocks.playerPalmaresOrderMock.mockResolvedValue({
+      data: [],
       error: null,
     });
   });

@@ -164,6 +164,8 @@ export type ProfileFormState = {
   showContactEmail: boolean;
   showContactFacebook: boolean;
   showContactInstagram: boolean;
+  showTransferBadge: boolean;
+  showRegionsBadge: boolean;
   secondaryPositions: PlayerPosition[];
   specialization: StaffSpecialization;
   staffAvailabilityType: string;
@@ -175,6 +177,11 @@ export type ProfileFormState = {
   willingToChangeClub: boolean;
   city: string;
   experienceSummary: string;
+  openToTrials: boolean;
+  playerObjectives: string;
+  contractStatus: string;
+  contractExpiry: string;
+  currentCondition: string;
 };
 
 export function buildInitialState(
@@ -248,6 +255,8 @@ export function buildInitialState(
     showContactEmail: data.userContacts.showEmail,
     showContactFacebook: data.userContacts.showFacebook,
     showContactInstagram: data.userContacts.showInstagram,
+    showTransferBadge: playerProfile?.show_transfer_badge ?? false,
+    showRegionsBadge: playerProfile?.show_regions_badge ?? false,
     secondaryPositions: playerProfile?.secondary_positions ?? [],
     specialization: staffProfile?.specialization ?? "fitness_coach",
     staffAvailabilityType: staffProfile?.availability_type ?? "ITALY",
@@ -257,6 +266,11 @@ export function buildInitialState(
     transferRegions: toDelimitedString(playerProfile?.transfer_regions),
     weightKg: playerProfile?.weight_kg ? String(playerProfile.weight_kg) : "",
     willingToChangeClub: playerProfile?.willing_to_change_club ?? false,
+    openToTrials: playerProfile?.open_to_trials ?? false,
+    playerObjectives: (playerProfile?.player_objectives ?? []).join(", "),
+    contractStatus: playerProfile?.contract_status ?? "",
+    contractExpiry: playerProfile?.contract_expiry ?? "",
+    currentCondition: playerProfile?.current_condition ?? "",
   };
 }
 
@@ -349,6 +363,16 @@ export function buildFullUpdatePayload(
             ),
             weight_kg: parseOptionalNumber(formState.weightKg),
             willing_to_change_club: formState.willingToChangeClub,
+            show_transfer_badge: formState.showTransferBadge,
+            show_regions_badge: formState.showRegionsBadge,
+            open_to_trials: formState.openToTrials,
+            player_objectives: formState.playerObjectives
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+            contract_status: formState.contractStatus || null,
+            contract_expiry: formState.contractExpiry || null,
+            current_condition: formState.currentCondition || null,
           }
         : null,
     profile: {
@@ -545,9 +569,14 @@ export function buildPlayerProfileHeaderDetails(
       "Da definire",
     ),
     primaryRole,
-    regionBadges: data.playerProfile?.transfer_regions?.filter(Boolean) ?? [],
+    regionBadges: data.playerProfile?.show_regions_badge
+      ? (data.playerProfile?.transfer_regions?.filter(Boolean) ?? [])
+      : [],
     secondaryRole,
-    statusBadge: isAvailable ? "Disponibile al trasferimento" : "Profilo attivo",
+    statusBadge:
+      data.playerProfile?.show_transfer_badge && isAvailable
+        ? "Disponibile al trasferimento"
+        : undefined,
     weightLabel: data.playerProfile?.weight_kg
       ? `${data.playerProfile.weight_kg} kg`
       : "Da definire",

@@ -1,33 +1,13 @@
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { StyleSheet, View } from "react-native";
 
-import { colors, radius } from "../../../theme/tokens";
-import { SectionCard } from "../../../ui";
-import { PublicBioBlock } from "../bio-section";
-import { ContactSection } from "../contact-section";
-import {
-  PlayerCharacteristicsSection,
-} from "../player-sports-section";
-import {
-  DEFAULT_PLAYER_PRIMARY_POSITION,
-  sortPlayerExperiencesBySeason,
-  toPlayerExperienceForm,
-} from "../player-sports";
-import {
-  formatBirthDateInputValue,
-  formatOptionalSummary,
-  getOptionLabel,
-  LANGUAGE_OPTIONS,
-  NATIONALITY_OPTIONS,
-  REGION_OPTIONS,
-} from "../profile-form-utils";
+import { sortPlayerExperiencesBySeason, toPlayerExperienceForm } from "../player-sports";
 import { withDefaultProfileAvatar } from "../profile-avatar";
-import { ProfileField as Field } from "../profile-screen-components";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import type { EditSection } from "../ProfileReadonlyView";
 import type { GroupedExperience } from "./career-grouping";
 import { CareerTabContent } from "./CareerTabContent";
+import { InfoTab } from "./InfoTab";
 import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
 import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
 import { getPlayerMediaTagMeta } from "../player-media";
@@ -80,7 +60,11 @@ export function ProfileTabView({
           onManageMedia={onManageMedia}
         />
       ) : (
-        <InfoTab completeProfile={completeProfile} onEdit={onEdit} />
+        <InfoTab
+          completeProfile={completeProfile}
+          isOwner={isOwner}
+          onEdit={onEdit}
+        />
       )}
     </View>
   );
@@ -161,142 +145,8 @@ function MediaTab({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Info tab
-// ---------------------------------------------------------------------------
-
-function InfoTab({
-  completeProfile,
-  onEdit,
-}: {
-  completeProfile: CompleteProfessionalProfile;
-  onEdit: (section: EditSection) => void;
-}) {
-  return (
-    <View style={styles.tabContent}>
-      <SectionCard
-        onEdit={() => onEdit("personalInfo")}
-        title="Informazioni personali"
-        variant="flat"
-      >
-        <Field
-          label="Nome e cognome"
-          value={completeProfile.profile.full_name}
-          variant="plain"
-        />
-        <Field
-          label="Data di nascita"
-          value={formatBirthDateInputValue(completeProfile.profile.birth_date)}
-          variant="plain"
-        />
-        <Field
-          label="Nazionalità"
-          value={
-            completeProfile.profile.nationality
-              ? getOptionLabel(NATIONALITY_OPTIONS, completeProfile.profile.nationality)
-              : ""
-          }
-          variant="plain"
-        />
-        <Field
-          label="Città"
-          value={formatOptionalSummary(completeProfile.profile.city)}
-          variant="plain"
-        />
-        <Field
-          label="Regione"
-          value={
-            completeProfile.profile.region
-              ? getOptionLabel(REGION_OPTIONS, completeProfile.profile.region)
-              : ""
-          }
-          variant="plain"
-        />
-        {completeProfile.profile.languages.length > 0 ? (
-          <Field
-            label="Lingue parlate"
-            value={completeProfile.profile.languages
-              .map((code) => getOptionLabel(LANGUAGE_OPTIONS, code))
-              .join(", ")}
-            variant="plain"
-          />
-        ) : null}
-      </SectionCard>
-
-      <SectionCard
-        description="Disponibilità e descrizione pubblica del profilo"
-        onEdit={() => onEdit("bio")}
-        title="Presentazione"
-        variant="flat"
-      >
-        <PublicBioBlock bio={completeProfile.profile.bio} variant="plain" />
-      </SectionCard>
-
-      <SectionCard
-        description="Ruolo e piede preferito leggibili rapidamente anche in consultazione."
-        onEdit={() => onEdit("playerSports")}
-        title="Profilo sportivo"
-        variant="flat"
-      >
-        <PlayerCharacteristicsSection
-          preferredFoot={completeProfile.playerProfile?.preferred_foot ?? ""}
-          primaryPosition={
-            completeProfile.playerProfile?.primary_position ??
-            DEFAULT_PLAYER_PRIMARY_POSITION
-          }
-          secondaryPositions={
-            completeProfile.playerProfile?.secondary_positions ?? []
-          }
-        />
-      </SectionCard>
-
-      <ContactSectionWithEdit
-        completeProfile={completeProfile}
-        onEdit={() => onEdit("contact")}
-      />
-    </View>
-  );
-}
-
-function ContactSectionWithEdit({
-  completeProfile,
-  onEdit,
-}: {
-  completeProfile: CompleteProfessionalProfile;
-  onEdit: () => void;
-}) {
-  return (
-    <View>
-      <ContactSection contacts={completeProfile.userContacts} variant="flat" />
-      <Pressable
-        accessibilityLabel="Modifica contatti"
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={onEdit}
-        style={styles.editButton}
-      >
-        <Ionicons color={colors.textSecondary} name="pencil" size={16} />
-      </Pressable>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  editButton: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.full,
-    height: 32,
-    justifyContent: "center",
-    position: "absolute",
-    right: 18,
-    top: 18,
-    width: 32,
-  },
-  tabContent: {
     flex: 1,
   },
 });

@@ -52,19 +52,36 @@ export type UserContactsRecord = {
 
 type PlayerProfileRecord = {
   availability_type: string;
+  contract_expiry: string | null;
+  contract_status: string | null;
+  current_condition: string | null;
   height_cm: number | null;
   highlight_video_url: string | null;
   media_items: PlayerMediaItemRecord[];
   media_urls: string[];
+  open_to_trials: boolean;
+  player_objectives: string[];
   preferred_categories: string[];
   preferred_foot: PreferredFoot | null;
   primary_position: PlayerPosition;
   profile_id: string;
   secondary_positions: PlayerPosition[];
   transfer_provinces: string[];
+  show_transfer_badge: boolean;
+  show_regions_badge: boolean;
   transfer_regions: string[];
   weight_kg: number | null;
   willing_to_change_club: boolean;
+};
+
+export type PlayerPalmaresRecord = {
+  id: string;
+  player_profile_id: string;
+  competition_name: string;
+  season_label: string;
+  club_name: string;
+  palmares_type: string;
+  sort_order: number;
 };
 
 type CoachProfileRecord = {
@@ -153,6 +170,7 @@ export type CompleteProfessionalProfile = {
   clubSeasonEntries: ClubSeasonEntryRecord[];
   coachProfile: CoachProfileRecord | null;
   playerCareerEntries: PlayerCareerEntryRecord[];
+  playerPalmares: PlayerPalmaresRecord[];
   playerProfile: PlayerProfileRecord | null;
   profile: BaseProfileRecord;
   staffProfile: StaffProfileRecord | null;
@@ -169,6 +187,15 @@ export type ClubSeasonEntryInput = {
   notes: string | null;
   sort_order: number;
   start_year: number;
+};
+
+export type PlayerPalmaresInput = {
+  id: string;
+  competition_name: string;
+  season_label: string;
+  club_name: string;
+  palmares_type: string;
+  sort_order: number;
 };
 
 export type CompleteProfessionalProfileUpdate = {
@@ -246,16 +273,24 @@ export type CompleteProfessionalProfileUpdate = {
     technical_video_url: string | null;
   } | null;
   playerCareerEntries: PlayerCareerEntryInput[];
+  playerPalmares?: PlayerPalmaresInput[];
   playerProfile: {
     availability_type: string;
+    contract_expiry: string | null;
+    contract_status: string | null;
+    current_condition: string | null;
     height_cm: number | null;
     highlight_video_url: string | null;
     media_items: PlayerMediaItemRecord[];
     media_urls: string[];
+    open_to_trials: boolean;
+    player_objectives: string[];
     preferred_categories: string[];
     preferred_foot: PreferredFoot | null;
     primary_position: PlayerPosition;
     secondary_positions: PlayerPosition[];
+    show_transfer_badge: boolean;
+    show_regions_badge: boolean;
     transfer_provinces: string[];
     transfer_regions: string[];
     weight_kg: number | null;
@@ -383,10 +418,15 @@ function normalizePlayerProfileRecord(
 
   return {
     availability_type: typeof rawProfile.availability_type === "string" ? rawProfile.availability_type : "ITALY",
+    contract_expiry: normalizeOptionalText(rawProfile.contract_expiry),
+    contract_status: normalizeOptionalText(rawProfile.contract_status),
+    current_condition: normalizeOptionalText(rawProfile.current_condition),
     height_cm: normalizeNumber(rawProfile.height_cm),
     highlight_video_url: normalizeOptionalText(rawProfile.highlight_video_url),
     media_items: normalizePlayerMediaItems(rawProfile.media_items, normalizeStringArray(rawProfile.media_urls)),
     media_urls: normalizeStringArray(rawProfile.media_urls),
+    open_to_trials: normalizeBoolean(rawProfile.open_to_trials),
+    player_objectives: normalizeStringArray(rawProfile.player_objectives),
     preferred_categories: normalizeStringArray(rawProfile.preferred_categories),
     preferred_foot:
       rawProfile.preferred_foot === "right" ||
@@ -399,11 +439,29 @@ function normalizePlayerProfileRecord(
       : DEFAULT_PLAYER_PRIMARY_POSITION,
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
     secondary_positions: normalizedSecondaryPositions,
+    show_transfer_badge: rawProfile?.show_transfer_badge ?? false,
+    show_regions_badge: rawProfile?.show_regions_badge ?? false,
     transfer_provinces: normalizeStringArray(rawProfile.transfer_provinces),
     transfer_regions: normalizeStringArray(rawProfile.transfer_regions),
     weight_kg: normalizeNumber(rawProfile.weight_kg),
     willing_to_change_club: normalizeBoolean(rawProfile.willing_to_change_club),
   } satisfies PlayerProfileRecord;
+}
+
+function normalizePlayerPalmaresRecord(
+  profileId: string,
+  rawEntry: Partial<PlayerPalmaresRecord>,
+  index: number,
+): PlayerPalmaresRecord {
+  return {
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-palmares-${index}`),
+    player_profile_id: normalizeRequiredText(rawEntry.player_profile_id, profileId),
+    competition_name: normalizeRequiredText(rawEntry.competition_name, ""),
+    season_label: normalizeRequiredText(rawEntry.season_label, ""),
+    club_name: normalizeRequiredText(rawEntry.club_name, ""),
+    palmares_type: normalizeRequiredText(rawEntry.palmares_type, "trophy"),
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+  };
 }
 
 function normalizeCoachProfileRecord(
@@ -523,6 +581,7 @@ export function normalizeUserProfile(input: {
   clubSeasonEntries?: ClubSeasonEntryRecord[];
   coachProfile?: Partial<CoachProfileRecord> | null;
   playerCareerEntries?: Partial<PlayerCareerEntryRecord>[] | null;
+  playerPalmares?: Partial<PlayerPalmaresRecord>[] | null;
   playerProfile?: Partial<PlayerProfileRecord> | null;
   profile: Partial<BaseProfileRecord> | null | undefined;
   profileId: string;
@@ -551,6 +610,9 @@ export function normalizeUserProfile(input: {
     coachProfile: normalizeCoachProfileRecord(input.profileId, input.coachProfile),
     playerCareerEntries: (input.playerCareerEntries ?? []).map((entry, index) =>
       normalizePlayerCareerEntryRecord(input.profileId, entry, index),
+    ),
+    playerPalmares: (input.playerPalmares ?? []).map((entry, index) =>
+      normalizePlayerPalmaresRecord(input.profileId, entry, index),
     ),
     playerProfile: normalizePlayerProfileRecord(input.profileId, input.playerProfile),
     profile: normalizeBaseProfileRecord(input.profileId, input.profile),
@@ -597,7 +659,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("player_profiles")
           .select(
-            "profile_id, preferred_foot, height_cm, weight_kg, primary_position, secondary_positions, willing_to_change_club, availability_type, transfer_regions, transfer_provinces, preferred_categories, highlight_video_url, media_urls, media_items",
+            "profile_id, preferred_foot, height_cm, weight_kg, primary_position, secondary_positions, willing_to_change_club, availability_type, transfer_regions, transfer_provinces, preferred_categories, highlight_video_url, media_urls, media_items, open_to_trials, player_objectives, contract_status, contract_expiry, current_condition, show_transfer_badge, show_regions_badge",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -668,23 +730,39 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   }
 
   let playerCareerEntries: PlayerCareerEntryRecord[] = [];
+  let playerPalmares: PlayerPalmaresRecord[] = [];
 
   if (profile.role === "player") {
-    const { data: careerData, error: careerError } = await supabase
-      .from("player_career_entries")
-      .select(
-        "id, player_profile_id, season_label, club_id, club_name, competition_name, appearances, goals, assists, minutes_played, awards, sort_order, team_logo_url, season_period, period_start_month, period_end_month",
-      )
-      .eq("player_profile_id", profileId)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false });
+    const [careerResult, palmaresResult] = await Promise.all([
+      supabase
+        .from("player_career_entries")
+        .select(
+          "id, player_profile_id, season_label, club_id, club_name, competition_name, appearances, goals, assists, minutes_played, awards, sort_order, team_logo_url, season_period, period_start_month, period_end_month",
+        )
+        .eq("player_profile_id", profileId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("player_palmares")
+        .select("id, player_profile_id, competition_name, season_label, club_name, palmares_type, sort_order")
+        .eq("player_profile_id", profileId)
+        .order("sort_order", { ascending: true }),
+    ]);
 
-    if (careerError) {
-      throw careerError;
+    if (careerResult.error) {
+      throw careerResult.error;
     }
 
-    playerCareerEntries = (careerData ?? []).map((entry, index) =>
+    if (palmaresResult.error) {
+      throw palmaresResult.error;
+    }
+
+    playerCareerEntries = (careerResult.data ?? []).map((entry, index) =>
       normalizePlayerCareerEntryRecord(profileId, entry as Partial<PlayerCareerEntryRecord>, index),
+    );
+
+    playerPalmares = (palmaresResult.data ?? []).map((entry, index) =>
+      normalizePlayerPalmaresRecord(profileId, entry as Partial<PlayerPalmaresRecord>, index),
     );
   }
 
@@ -710,6 +788,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     clubSeasonEntries,
     coachProfile: (coachProfile.data as Partial<CoachProfileRecord> | null) ?? null,
     playerCareerEntries,
+    playerPalmares,
     playerProfile: (playerProfile.data as Partial<PlayerProfileRecord> | null) ?? null,
     privateContacts: privateContacts.data,
     profile,
@@ -794,6 +873,23 @@ export async function updateCompleteProfessionalProfile(
 
     if (playerProfileError) {
       throw playerProfileError;
+    }
+  }
+
+  if (input.role === "player" && input.playerPalmares !== undefined) {
+    const { error: palmaresError } = await supabase.rpc("save_player_palmares", {
+      p_profile_id: input.profileId,
+      p_entries: input.playerPalmares.map((entry, index) => ({
+        competition_name: entry.competition_name,
+        season_label: entry.season_label,
+        club_name: entry.club_name,
+        palmares_type: entry.palmares_type,
+        sort_order: entry.sort_order ?? index,
+      })),
+    });
+
+    if (palmaresError) {
+      throw palmaresError;
     }
   }
 

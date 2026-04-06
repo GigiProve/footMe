@@ -39,12 +39,15 @@ import { searchTeams, type CompleteProfessionalProfile } from "./profile-service
 import type { AppRole } from "../onboarding/create-initial-profile";
 
 type EditSection =
+  | "editPlayerProfile"
   | "personalInfo"
   | "bio"
   | "contact"
   | "playerMedia"
   | "playerSports"
   | "playerExperiences"
+  | "playerSituation"
+  | "playerPalmares"
   | "coachInfo"
   | "staffInfo"
   | "clubInfo"
