@@ -8,10 +8,7 @@ import {
   OnboardingInfoCard,
   OnboardingSectionCard,
 } from "../onboarding-ui";
-import {
-  STAFF_ROLE_OPTIONS,
-  type StaffRole,
-} from "../onboarding-types";
+import { STAFF_ROLE_OPTIONS, type StaffRole } from "../onboarding-types";
 
 type StaffRoleStepProps = {
   certifications: string;
@@ -116,10 +113,7 @@ export function StaffRoleStep({
                       </AppText>
                     </View>
                     <View
-                      style={[
-                        styles.radio,
-                        active ? styles.radioActive : null,
-                      ]}
+                      style={[styles.radio, active ? styles.radioActive : null]}
                     >
                       {active ? (
                         <Ionicons
@@ -164,7 +158,7 @@ export function StaffRoleStep({
           label="Esperienza"
           multiline
           onChangeText={(value) => onUpdate({ experienceSummary: value })}
-          placeholder="Ruoli, contesti e staff in cui hai lavorato"
+          placeholder="Esperienza rilevante, competenze chiave, risultati ottenuti..."
           value={experienceSummary}
         />
       </OnboardingSectionCard>
