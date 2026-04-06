@@ -1,0 +1,140 @@
+import React from "react";
+import TestRenderer, { act } from "react-test-renderer";
+import { describe, expect, it, vi } from "vitest";
+
+import type { CompleteProfessionalProfile } from "../profile-service";
+import { CoachInfoTab } from "./CoachInfoTab";
+
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: (props: Record<string, unknown>) => React.createElement("Ionicon", props),
+}));
+
+function buildCoachProfile(
+  overrides: Partial<CompleteProfessionalProfile> = {},
+): CompleteProfessionalProfile {
+  return {
+    club: null,
+    clubSeasonEntries: [],
+    coachCareerEntries: [],
+    coachDirectorCareerEntries: [],
+    coachPlayerCareerEntries: [],
+    coachProfile: {
+      availability_type: "REGIONS",
+      coached_categories: ["Promozione", "Juniores"],
+      coached_clubs: ["USD Virtus"],
+      game_philosophy: "Squadra aggressiva e propositiva.",
+      licenses: ["UEFA B"],
+      media_items: [],
+      open_to_new_role: true,
+      preferred_provinces: [],
+      preferred_regions: ["Lombardia"],
+      profile_id: "profile-1",
+      technical_video_url: "https://example.com/video.mp4",
+    },
+    playerCareerEntries: [],
+    playerPalmares: [],
+    playerProfile: null,
+    profile: {
+      age: 39,
+      avatar_url: null,
+      bio: "Allenatore orientato al lavoro sul campo.",
+      birth_date: "1987-05-20",
+      city: "Milano",
+      full_name: "Luca Bianchi",
+      id: "profile-1",
+      is_open_to_transfer: false,
+      languages: ["it"],
+      nationality: "IT",
+      region: "Lombardia",
+      role: "coach",
+    },
+    staffProfile: null,
+    userContacts: {
+      email: "coach@example.com",
+      facebook: "",
+      instagram: "coach_example",
+      phone: "+393331234567",
+      showEmail: true,
+      showFacebook: false,
+      showInstagram: true,
+    },
+    ...overrides,
+  };
+}
+
+describe("CoachInfoTab", () => {
+  it("renders the coach info cards and owner edit actions", () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(
+        <CoachInfoTab
+          completeProfile={buildCoachProfile()}
+          isOwner
+          onEdit={() => undefined}
+        />,
+      );
+    });
+
+    expect(tree.root.findByProps({ children: "Disponibilità" })).toBeTruthy();
+    expect(tree.root.findByProps({ children: "Qualifica" })).toBeTruthy();
+    expect(tree.root.findByProps({ children: "Squadre allenate" })).toBeTruthy();
+    expect(tree.root.findByProps({ children: "Filosofia di gioco" })).toBeTruthy();
+    expect(tree.root.findByProps({ children: "UEFA B" })).toBeTruthy();
+    expect(tree.root.findByProps({ children: "Promozione" })).toBeTruthy();
+    expect(tree.root.findByProps({ children: "USD Virtus" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Modifica Disponibilità" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Modifica Qualifica" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Modifica contatti" })).toBeTruthy();
+  });
+
+  it("shows empty states and hides owner actions for visitors", () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(
+        <CoachInfoTab
+          completeProfile={buildCoachProfile({
+            coachProfile: {
+              availability_type: null,
+              coached_categories: [],
+              coached_clubs: [],
+              game_philosophy: null,
+              licenses: [],
+              media_items: [],
+              open_to_new_role: false,
+              preferred_provinces: [],
+              preferred_regions: [],
+              profile_id: "profile-1",
+              technical_video_url: null,
+            },
+            userContacts: {
+              email: "",
+              facebook: "",
+              instagram: "",
+              phone: "",
+              showEmail: false,
+              showFacebook: false,
+              showInstagram: false,
+            },
+          })}
+          isOwner={false}
+          onEdit={() => undefined}
+        />,
+      );
+    });
+
+    expect(tree.root.findByProps({ children: "Nessuna licenza inserita." })).toBeTruthy();
+    expect(
+      tree.root.findByProps({ children: "Nessuna categoria allenata inserita." }),
+    ).toBeTruthy();
+    expect(
+      tree.root.findByProps({ children: "Nessuna squadra allenata inserita." }),
+    ).toBeTruthy();
+    expect(
+      tree.root.findByProps({ children: "Nessuna filosofia di gioco inserita." }),
+    ).toBeTruthy();
+    expect(() => tree.root.findByProps({ accessibilityLabel: "Modifica contatti" })).toThrow();
+    expect(() => tree.root.findByProps({ accessibilityLabel: "Modifica Disponibilità" })).toThrow();
+  });
+});

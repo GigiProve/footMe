@@ -40,6 +40,7 @@ import type { AppRole } from "../onboarding/create-initial-profile";
 
 type EditSection =
   | "editPlayerProfile"
+  | "editCoachProfile"
   | "personalInfo"
   | "bio"
   | "contact"

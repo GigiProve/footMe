@@ -8,6 +8,7 @@ import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioMod
 import { EditClubInfoModal } from "../../src/features/profiles/edit-modals/EditClubInfoModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
 import { EditCoachInfoModal } from "../../src/features/profiles/edit-modals/EditCoachInfoModal";
+import { EditCoachProfileModal } from "../../src/features/profiles/edit-modals/EditCoachProfileModal";
 import { EditCoachMediaModal } from "../../src/features/profiles/edit-modals/EditCoachMediaModal";
 import { EditCoachExperiencesModal } from "../../src/features/profiles/edit-modals/EditCoachExperiencesModal";
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
@@ -222,7 +223,7 @@ export default function ProfileScreen() {
             licenseBadges={coachHeaderDetails.licenseBadges}
             locationLabel={coachHeaderDetails.locationLabel}
             mode="owner"
-            onEditProfilePress={() => handleEdit("coachInfo")}
+            onEditProfilePress={() => handleEdit("editCoachProfile")}
             primaryRole={coachHeaderDetails.primaryRole}
             statusBadge={coachHeaderDetails.statusBadge}
             teamLabel={coachHeaderDetails.teamLabel}
@@ -343,6 +344,13 @@ export default function ProfileScreen() {
           ) : null}
           {role === "coach" ? (
             <>
+              <EditCoachProfileModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "editCoachProfile"}
+              />
               <EditCoachInfoModal
                 completeProfile={completeProfile}
                 onClose={handleCloseModal}

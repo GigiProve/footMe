@@ -16,6 +16,21 @@ type CoachInfoTabProps = {
   onEdit: (section: EditSection) => void;
 };
 
+function formatAvailabilityType(value: string | null | undefined) {
+  if (value === "REGIONS") return "Regioni";
+  if (value === "PROVINCES") return "Province";
+  if (value === "ITALY") return "Tutta Italia";
+  return "Non specificato";
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <AppText color="secondary" variant="bodySm">
+      {message}
+    </AppText>
+  );
+}
+
 export function CoachInfoTab({
   completeProfile,
   isOwner,
@@ -33,41 +48,73 @@ export function CoachInfoTab({
         : coachProfile?.open_to_new_role
           ? ["Tutta Italia"]
           : [];
-  const edit = (section: EditSection) => (isOwner ? () => onEdit(section) : undefined);
+  const editProfile = isOwner ? () => onEdit("editCoachProfile") : undefined;
 
   return (
     <View style={styles.container}>
-      <SectionCard onEdit={edit("coachInfo")} title="Disponibilità" variant="flat">
+      <SectionCard
+        description="Disponibilità per nuove panchine e aree di interesse."
+        onEdit={editProfile}
+        title="Disponibilità"
+        variant="flat"
+      >
         <InfoRow
           label="Nuove panchine"
           value={coachProfile?.open_to_new_role ? "Disponibile" : "Non disponibile"}
           valueColor={coachProfile?.open_to_new_role ? "success" : "default"}
         />
         <InfoRow
-          label="Ambito"
-          value={coachProfile?.availability_type ?? "Non specificato"}
           isLast={zoneLabels.length === 0}
+          label="Ambito"
+          value={formatAvailabilityType(coachProfile?.availability_type)}
         />
         {zoneLabels.length > 0 ? <InfoTagsRow label="Zone" tags={zoneLabels} /> : null}
       </SectionCard>
 
-      <SectionCard onEdit={edit("coachInfo")} title="Filosofia di gioco" variant="flat">
-        {coachProfile?.game_philosophy ? (
-          <AppText variant="bodySm">{coachProfile.game_philosophy}</AppText>
+      <SectionCard
+        description="Licenze e categorie già impostate nel profilo allenatore."
+        onEdit={editProfile}
+        title="Qualifica"
+        variant="flat"
+      >
+        {coachProfile?.licenses?.length ? (
+          <InfoTagsRow label="Licenze" tags={coachProfile.licenses} />
         ) : (
-          <AppText color="secondary" variant="bodySm">
-            Nessuna filosofia di gioco inserita.
-          </AppText>
+          <EmptyState message="Nessuna licenza inserita." />
+        )}
+        {coachProfile?.coached_categories?.length ? (
+          <InfoTagsRow
+            label="Categorie allenate"
+            tags={coachProfile.coached_categories}
+          />
+        ) : (
+          <EmptyState message="Nessuna categoria allenata inserita." />
         )}
       </SectionCard>
 
-      <SectionCard onEdit={edit("coachInfo")} title="Licenze" variant="flat">
-        {coachProfile?.licenses?.length ? (
-          <InfoTagsRow tags={coachProfile.licenses} />
+      <SectionCard
+        description="Storico sintetico delle squadre già salvate nel profilo."
+        onEdit={editProfile}
+        title="Squadre allenate"
+        variant="flat"
+      >
+        {coachProfile?.coached_clubs?.length ? (
+          <InfoTagsRow tags={coachProfile.coached_clubs} />
         ) : (
-          <AppText color="secondary" variant="bodySm">
-            Nessuna licenza inserita.
-          </AppText>
+          <EmptyState message="Nessuna squadra allenata inserita." />
+        )}
+      </SectionCard>
+
+      <SectionCard
+        description="Presentazione tecnica e metodologia di lavoro."
+        onEdit={editProfile}
+        title="Filosofia di gioco"
+        variant="flat"
+      >
+        {coachProfile?.game_philosophy ? (
+          <AppText variant="bodySm">{coachProfile.game_philosophy}</AppText>
+        ) : (
+          <EmptyState message="Nessuna filosofia di gioco inserita." />
         )}
       </SectionCard>
 

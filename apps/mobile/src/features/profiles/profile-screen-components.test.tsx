@@ -3,6 +3,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  CoachProfileHeader,
   PlayerProfileHeader,
   ProfileField,
   ProfileHeader,
@@ -154,5 +155,35 @@ describe("profile-screen-components", () => {
     expect(tree!.root.findByProps({ children: "Marco Rossi" })).toBeTruthy();
     expect(tree!.root.findByProps({ children: "Attaccante" })).toBeTruthy();
     expect(tree!.root.findAllByProps({ children: "Da definire" }).length).toBeGreaterThan(0);
+  });
+
+  it("renders the shared coach header in owner mode", () => {
+    let tree: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(
+        <CoachProfileHeader
+          availabilityBadges={["Lombardia", "Piemonte"]}
+          avatarUrl=""
+          bio="Allenatore focalizzato su intensità e organizzazione."
+          categoryLabel="Promozione"
+          fullName="Luca Bianchi"
+          licenseBadges={["UEFA B"]}
+          locationLabel="Milano, Lombardia"
+          mode="owner"
+          onEditProfilePress={() => undefined}
+          primaryRole="Allenatore"
+          statusBadge="Disponibile per nuove panchine"
+          teamLabel="USD Virtus"
+        />,
+      );
+    });
+
+    expect(tree!.root.findByProps({ children: "Luca Bianchi" })).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "Allenatore" })).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "USD Virtus" })).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "Promozione" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "Modifica profilo" })).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "Licenze" })).toBeTruthy();
   });
 });
