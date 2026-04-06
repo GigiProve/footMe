@@ -15,6 +15,10 @@ import {
   type TeamAutocompleteOption,
 } from "./player-sports";
 import {
+  normalizeCoachMediaItems,
+  type CoachMediaItemRecord,
+} from "./coach-media";
+import {
   normalizePlayerMediaItems,
   type PlayerMediaItemRecord,
 } from "./player-media";
@@ -136,6 +140,7 @@ type CoachProfileRecord = {
   coached_clubs: string[];
   game_philosophy: string | null;
   licenses: string[];
+  media_items: CoachMediaItemRecord[];
   open_to_new_role: boolean;
   preferred_provinces: string[];
   preferred_regions: string[];
@@ -316,6 +321,7 @@ export type CompleteProfessionalProfileUpdate = {
     coached_clubs: string[];
     game_philosophy: string | null;
     licenses: string[];
+    media_items: CoachMediaItemRecord[];
     open_to_new_role: boolean;
     preferred_provinces: string[];
     preferred_regions: string[];
@@ -530,6 +536,7 @@ function normalizeCoachProfileRecord(
     coached_clubs: normalizeStringArray(rawProfile.coached_clubs),
     game_philosophy: normalizeOptionalText(rawProfile.game_philosophy),
     licenses: normalizeStringArray(rawProfile.licenses),
+    media_items: normalizeCoachMediaItems(rawProfile.media_items, []),
     open_to_new_role: normalizeBoolean(rawProfile.open_to_new_role),
     preferred_provinces: normalizeStringArray(rawProfile.preferred_provinces),
     preferred_regions: normalizeStringArray(rawProfile.preferred_regions),
@@ -806,7 +813,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("coach_profiles")
           .select(
-            "profile_id, licenses, coached_clubs, coached_categories, game_philosophy, technical_video_url, preferred_regions, preferred_provinces, availability_type, open_to_new_role",
+            "profile_id, licenses, coached_clubs, coached_categories, game_philosophy, technical_video_url, media_items, preferred_regions, preferred_provinces, availability_type, open_to_new_role",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -1383,6 +1390,30 @@ export async function savePlayerProfileMedia(input: {
     transfer_regions: input.playerProfile.transfer_regions,
     weight_kg: input.playerProfile.weight_kg,
     willing_to_change_club: input.playerProfile.willing_to_change_club,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function saveCoachProfileMedia(input: {
+  coachProfile: NonNullable<CompleteProfessionalProfile["coachProfile"]>;
+  mediaItems: CoachMediaItemRecord[];
+  profileId: string;
+}) {
+  const { error } = await supabase.from("coach_profiles").upsert({
+    availability_type: input.coachProfile.availability_type,
+    coached_categories: input.coachProfile.coached_categories,
+    coached_clubs: input.coachProfile.coached_clubs,
+    game_philosophy: input.coachProfile.game_philosophy,
+    licenses: input.coachProfile.licenses,
+    media_items: input.mediaItems,
+    open_to_new_role: input.coachProfile.open_to_new_role,
+    preferred_provinces: input.coachProfile.preferred_provinces,
+    preferred_regions: input.coachProfile.preferred_regions,
+    profile_id: input.profileId,
+    technical_video_url: input.coachProfile.technical_video_url,
   });
 
   if (error) {

@@ -1,19 +1,25 @@
-import { type ComponentProps, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentProps,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
+  Dimensions,
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
+import { VideoPlayerModal } from "../../../components/ui/video-player-modal";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button } from "../../../ui";
-import { VideoPlayerModal } from "../../../components/ui/video-player-modal";
 
 export type MediaViewerMode = "owner" | "visitor";
 
@@ -58,24 +64,80 @@ export function MediaTabContent({
 }: MediaTabContentProps) {
   const [items, setItems] = useState(initialItems);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [activeViewerIndex, setActiveViewerIndex] = useState(0);
+  const [isGridInteractionLocked, setIsGridInteractionLocked] = useState(false);
   const [isVideoPlayerOpen, setIsVideoPlayerOpen] = useState(false);
-
-  const selectedItem = useMemo(
-    () => items.find((item) => item.id === selectedItemId) ?? null,
-    [items, selectedItemId],
-  );
+  const closeLockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastViewerCloseAtRef = useRef(0);
+  const viewerScrollRef = useRef<ScrollView | null>(null);
+  const viewportHeight = Dimensions.get("window").height;
 
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
 
+  useEffect(() => {
+    return () => {
+      if (closeLockTimeoutRef.current) {
+        clearTimeout(closeLockTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const orderedItems = useMemo(
+    () =>
+      [...items].sort((left, right) => {
+        if (left.isFeatured !== right.isFeatured) {
+          return left.isFeatured ? -1 : 1;
+        }
+
+        return left.id.localeCompare(right.id);
+      }),
+    [items],
+  );
+
+  const selectedItem = useMemo(
+    () => orderedItems.find((item) => item.id === selectedItemId) ?? null,
+    [orderedItems, selectedItemId],
+  );
+  const currentViewerItem = orderedItems[activeViewerIndex] ?? selectedItem;
+
+  useEffect(() => {
+    if (selectedItemId !== null && viewerScrollRef.current && viewportHeight > 0) {
+      viewerScrollRef.current.scrollTo({
+        animated: false,
+        y: activeViewerIndex * viewportHeight,
+      });
+    }
+  }, [activeViewerIndex, selectedItemId, viewportHeight]);
+
   function handleOpenItem(itemId: string) {
+    if (isGridInteractionLocked || Date.now() - lastViewerCloseAtRef.current < 350) {
+      return;
+    }
+
+    const itemIndex = orderedItems.findIndex((item) => item.id === itemId);
+    if (itemIndex < 0) {
+      return;
+    }
+
+    setActiveViewerIndex(itemIndex);
     setSelectedItemId(itemId);
   }
 
   function handleCloseViewer() {
+    lastViewerCloseAtRef.current = Date.now();
+    setIsGridInteractionLocked(true);
+    if (closeLockTimeoutRef.current) {
+      clearTimeout(closeLockTimeoutRef.current);
+    }
+    closeLockTimeoutRef.current = setTimeout(() => {
+      setIsGridInteractionLocked(false);
+      closeLockTimeoutRef.current = null;
+    }, 350);
     setSelectedItemId(null);
     setIsVideoPlayerOpen(false);
+    setActiveViewerIndex(0);
   }
 
   function handleAddContent() {
@@ -136,25 +198,41 @@ export function MediaTabContent({
   }
 
   function handleEditItem() {
-    if (!selectedItem) {
+    const currentItem = orderedItems[activeViewerIndex];
+
+    if (!currentItem) {
       return;
     }
 
     Alert.alert(
       "Modifica contenuto",
-      `La scheda di modifica per "${selectedItem.tag.label}" verra' collegata al form media dedicato.`,
+      `La scheda di modifica per "${currentItem.tag.label}" verra' collegata al form media dedicato.`,
     );
   }
 
   function handleOpenComments() {
-    if (!selectedItem) {
+    const currentItem = orderedItems[activeViewerIndex];
+
+    if (!currentItem) {
       return;
     }
 
     Alert.alert(
       "Commenti",
-      `Apri la lista completa dei ${selectedItem.commentCount} commenti.`,
+      currentItem.commentCount > 0
+        ? `Apri la lista completa dei ${currentItem.commentCount} commenti.`
+        : "Non ci sono ancora commenti su questo contenuto.",
     );
+  }
+
+  function handleViewerScroll(offsetY: number) {
+    if (viewportHeight <= 0) {
+      return;
+    }
+
+    const nextIndex = Math.round(offsetY / viewportHeight);
+    const boundedIndex = Math.max(0, Math.min(nextIndex, orderedItems.length - 1));
+    setActiveViewerIndex(boundedIndex);
   }
 
   return (
@@ -172,20 +250,27 @@ export function MediaTabContent({
         ) : null}
       </View>
 
-      {items.length > 0 ? (
-        <View style={styles.grid} testID="media-grid">
-          {items.map((item) => (
+      {orderedItems.length > 0 ? (
+        <View
+          pointerEvents={isGridInteractionLocked ? "none" : "auto"}
+          style={styles.grid}
+          testID="media-grid"
+        >
+          {orderedItems.map((item) => (
             <View key={item.id} style={styles.gridCell}>
               <Pressable
                 accessibilityLabel={`Apri contenuto ${item.tag.label}`}
+                disabled={isGridInteractionLocked}
                 onPress={() => handleOpenItem(item.id)}
                 style={({ pressed }) => [
                   styles.gridItem,
+                  isGridInteractionLocked ? styles.gridItemDisabled : null,
                   pressed ? styles.pressed : null,
                 ]}
                 testID={`media-grid-item-${item.id}`}
               >
                 <Image source={{ uri: item.thumbnailUrl }} style={styles.gridImage} />
+                <View style={styles.gridShade} />
                 <View style={styles.tagBadge}>
                   <Ionicons color={colors.inkInvert} name={item.tag.icon} size={11} />
                   <AppText color="inverse" style={styles.tagText} variant="caption">
@@ -199,200 +284,223 @@ export function MediaTabContent({
                 ) : null}
                 {item.isFeatured ? (
                   <View style={styles.featuredBadge}>
-                    <Ionicons color={colors.inkInvert} name="bookmark" size={12} />
+                    <Ionicons color={colors.inkInvert} name="pin" size={11} />
                   </View>
                 ) : null}
               </Pressable>
             </View>
           ))}
         </View>
-      ) : null}
+      ) : (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons color={colors.textSecondary} name="images-outline" size={28} />
+          </View>
+          <AppText style={styles.emptyTitle} variant="titleSm">
+            Nessun contenuto
+          </AppText>
+          <AppText color="secondary" style={styles.emptySubtitle} variant="bodySm">
+            {mode === "owner"
+              ? "Aggiungi foto e video per mostrare il lavoro svolto sul campo."
+              : "Questo profilo allenatore non ha ancora pubblicato contenuti."}
+          </AppText>
+          {mode === "owner" ? (
+            <Button
+              accessibilityLabel="Aggiungi contenuto"
+              label="Aggiungi contenuto"
+              onPress={handleAddContent}
+              variant="primary"
+            />
+          ) : null}
+        </View>
+      )}
 
       <Modal
         animationType="slide"
         onRequestClose={handleCloseViewer}
         visible={selectedItem !== null}
       >
-        {selectedItem ? (
-          <SafeAreaView style={styles.viewerRoot}>
-            <View style={styles.viewerHeader}>
-              <Pressable
-                accessibilityLabel="Chiudi contenuto media"
-                hitSlop={8}
-                onPress={handleCloseViewer}
-                style={({ pressed }) => [styles.iconButton, pressed ? styles.pressed : null]}
-              >
-                <Ionicons color={colors.textPrimary} name="arrow-back" size={22} />
-              </Pressable>
-              <AppText variant="titleSm">{`Post di ${authorName}`}</AppText>
-              <View style={styles.iconButtonPlaceholder} />
-            </View>
+        {currentViewerItem ? (
+          <View style={styles.viewerRoot}>
+            <Pressable
+              accessibilityLabel="Chiudi contenuto media"
+              hitSlop={8}
+              onPress={handleCloseViewer}
+              style={({ pressed }) => [styles.viewerBackButton, pressed ? styles.pressed : null]}
+            >
+              <Ionicons color={colors.inkInvert} name="arrow-back" size={22} />
+            </Pressable>
 
             <ScrollView
               bounces={false}
-              contentContainerStyle={styles.viewerContent}
+              onMomentumScrollEnd={(event) =>
+                handleViewerScroll(event.nativeEvent.contentOffset.y)
+              }
+              pagingEnabled
+              ref={viewerScrollRef}
+              scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
             >
-              <View style={styles.heroMedia}>
-                <Image source={{ uri: selectedItem.thumbnailUrl }} style={styles.heroImage} />
-                <View style={styles.viewerTagBadge}>
-                  <Ionicons color={colors.inkInvert} name={selectedItem.tag.icon} size={14} />
-                  <AppText color="inverse" style={styles.viewerTagText} variant="caption">
-                    {selectedItem.tag.label}
-                  </AppText>
-                </View>
-                {selectedItem.type === "video" ? (
-                  <Pressable
-                    accessibilityLabel="Riproduci video"
-                    onPress={() => setIsVideoPlayerOpen(true)}
-                    style={({ pressed }) => [
-                      styles.videoPlayButton,
-                      pressed ? styles.pressed : null,
-                    ]}
-                  >
-                    <Ionicons color={colors.inkInvert} name="play" size={28} />
-                  </Pressable>
-                ) : null}
-              </View>
-
-              {mode === "owner" ? (
-                <View style={styles.ownerActionsRow}>
-                  <ActionChip
-                    icon="create-outline"
-                    label="Modifica"
-                    onPress={handleEditItem}
-                  />
-                  <ActionChip
-                    icon={selectedItem.isFeatured ? "bookmark-outline" : "bookmark"}
-                    label={selectedItem.isFeatured ? "Rimuovi" : "Evidenza"}
-                    onPress={() => handleToggleFeatured(selectedItem.id)}
-                  />
-                  <ActionChip
-                    destructive
-                    icon="trash-outline"
-                    label="Elimina"
-                    onPress={() => handleDeleteItem(selectedItem.id)}
-                  />
-                </View>
-              ) : (
-                <View style={styles.visitorActionsRow}>
-                  <View style={styles.visitorPrimaryActions}>
-                    <IconAction
-                      accessibilityLabel="Metti like al contenuto"
-                      active={selectedItem.isLiked}
-                      activeIcon="heart"
-                      icon="heart-outline"
-                      onPress={() => handleToggleLike(selectedItem.id)}
-                    />
-                    <IconAction
-                      accessibilityLabel="Apri commenti contenuto"
-                      icon="chatbubble-outline"
-                      onPress={handleOpenComments}
-                    />
-                  </View>
-                  <IconAction
-                    accessibilityLabel="Salva contenuto"
-                    active={selectedItem.isSaved}
-                    activeIcon="bookmark"
-                    icon="bookmark-outline"
-                    onPress={() => handleToggleSaved(selectedItem.id)}
-                  />
-                </View>
-              )}
-
-              <View style={styles.viewerMetaBlock}>
-                <AppText variant="bodySm" style={styles.statsText}>
-                  {`Piace a ${formatCount(selectedItem.likeCount)} persone • ${selectedItem.commentCount} commenti`}
-                </AppText>
-                <AppText variant="bodySm">
-                  <AppText style={styles.authorText} variant="bodySm">
-                    {authorName}
-                  </AppText>{" "}
-                  {selectedItem.description}
-                </AppText>
-              </View>
-
-              <View style={styles.commentsBlock}>
-                {selectedItem.comments.slice(0, 2).map((comment) => (
-                  <AppText key={comment.id} variant="bodySm">
-                    <AppText style={styles.authorText} variant="bodySm">
-                      {comment.author}
-                    </AppText>{" "}
-                    {comment.text}
-                  </AppText>
-                ))}
-                <Pressable
-                  accessibilityLabel="Vedi tutti i commenti"
-                  onPress={handleOpenComments}
-                  style={({ pressed }) => [styles.viewAllButton, pressed ? styles.pressed : null]}
+              {orderedItems.map((item) => (
+                <View
+                  key={item.id}
+                  style={[styles.viewerPage, { height: viewportHeight || undefined }]}
                 >
-                  <AppText color="secondary" variant="bodySm">
-                    {`Vedi tutti i ${selectedItem.commentCount} commenti`}
-                  </AppText>
-                </Pressable>
-              </View>
+                  <Image source={{ uri: item.thumbnailUrl }} style={styles.viewerImage} />
+                  <View style={styles.viewerOverlay} />
+
+                  <View style={styles.viewerTopBar}>
+                    <View />
+                    {item.isFeatured ? (
+                      <View style={styles.viewerPinnedBadge}>
+                        <Ionicons color={colors.inkInvert} name="pin" size={12} />
+                      </View>
+                    ) : (
+                      <View />
+                    )}
+                  </View>
+
+                  {item.type === "video" ? (
+                    <Pressable
+                      accessibilityLabel="Riproduci video"
+                      onPress={() => {
+                        setSelectedItemId(item.id);
+                        setIsVideoPlayerOpen(true);
+                      }}
+                      style={({ pressed }) => [
+                        styles.videoPlayButton,
+                        pressed ? styles.pressed : null,
+                      ]}
+                    >
+                      <Ionicons color={colors.inkInvert} name="play" size={30} />
+                    </Pressable>
+                  ) : null}
+
+                  <View style={styles.viewerRightRail}>
+                    {mode === "visitor" ? (
+                      <>
+                        <ViewerAction
+                          accessibilityLabel="Metti like al contenuto"
+                          active={item.isLiked}
+                          activeIcon="heart"
+                          count={formatCount(item.likeCount)}
+                          icon="heart-outline"
+                          onPress={() => handleToggleLike(item.id)}
+                        />
+                        <ViewerAction
+                          accessibilityLabel="Apri commenti contenuto"
+                          count={formatCount(item.commentCount)}
+                          icon="chatbubble-outline"
+                          onPress={handleOpenComments}
+                        />
+                        <ViewerAction
+                          accessibilityLabel="Salva contenuto"
+                          active={item.isSaved}
+                          activeIcon="bookmark"
+                          icon="bookmark-outline"
+                          onPress={() => handleToggleSaved(item.id)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <ViewerAction
+                          accessibilityLabel={item.isFeatured ? "Rimuovi evidenza" : "Metti in evidenza"}
+                          active={item.isFeatured}
+                          activeIcon="pin"
+                          icon="pin-outline"
+                          onPress={() => handleToggleFeatured(item.id)}
+                        />
+                        <ViewerAction
+                          accessibilityLabel="Modifica"
+                          icon="create-outline"
+                          onPress={handleEditItem}
+                        />
+                        <ViewerAction
+                          accessibilityLabel="Elimina"
+                          destructive
+                          icon="trash-outline"
+                          onPress={() => handleDeleteItem(item.id)}
+                        />
+                      </>
+                    )}
+                  </View>
+
+                  <View style={styles.viewerBottomSheet}>
+                    <AppText color="inverse" style={styles.viewerAuthor} variant="bodySm">
+                      {authorName}
+                    </AppText>
+                    {item.description ? (
+                      <AppText color="inverse" style={styles.viewerDescription} variant="bodySm">
+                        {item.description}
+                      </AppText>
+                    ) : null}
+                    <AppText color="inverse" style={styles.viewerStats} variant="caption">
+                      {`Piace a ${formatCount(item.likeCount)} persone • ${item.commentCount} commenti`}
+                    </AppText>
+
+                    <View style={styles.commentsPreview}>
+                      {item.comments.length > 0 ? (
+                        item.comments.slice(0, 2).map((comment) => (
+                          <AppText key={comment.id} color="inverse" variant="bodySm">
+                            <AppText color="inverse" style={styles.commentAuthor} variant="bodySm">
+                              {comment.author}
+                            </AppText>{" "}
+                            {comment.text}
+                          </AppText>
+                        ))
+                      ) : (
+                        <AppText color="inverse" style={styles.noCommentsText} variant="bodySm">
+                          Nessun commento per ora.
+                        </AppText>
+                      )}
+                    </View>
+
+                    <Pressable
+                      accessibilityLabel="Vedi tutti i commenti"
+                      onPress={handleOpenComments}
+                      style={({ pressed }) => [
+                        styles.viewAllButton,
+                        pressed ? styles.pressed : null,
+                      ]}
+                    >
+                      <AppText color="inverse" variant="bodySm">
+                        {item.commentCount > 0
+                          ? `Vedi tutti i ${item.commentCount} commenti`
+                          : "Apri commenti"}
+                      </AppText>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
             </ScrollView>
 
             <VideoPlayerModal
               onClose={() => setIsVideoPlayerOpen(false)}
-              title={selectedItem.tag.label}
-              url={selectedItem.videoUrl ?? ""}
+              title={currentViewerItem.tag.label}
+              url={currentViewerItem.videoUrl ?? ""}
               visible={isVideoPlayerOpen}
             />
-          </SafeAreaView>
+          </View>
         ) : null}
       </Modal>
     </View>
   );
 }
 
-function ActionChip({
-  destructive = false,
-  icon,
-  label,
-  onPress,
-}: {
-  destructive?: boolean;
-  icon: ComponentProps<typeof Ionicons>["name"];
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.ownerAction,
-        destructive ? styles.ownerActionDanger : null,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      <Ionicons
-        color={destructive ? colors.danger : colors.textPrimary}
-        name={icon}
-        size={16}
-      />
-      <AppText
-        color={destructive ? "danger" : "primary"}
-        style={styles.ownerActionText}
-        variant="caption"
-      >
-        {label}
-      </AppText>
-    </Pressable>
-  );
-}
-
-function IconAction({
+function ViewerAction({
   accessibilityLabel,
   active = false,
   activeIcon,
+  count,
+  destructive = false,
   icon,
   onPress,
 }: {
   accessibilityLabel: string;
   active?: boolean;
   activeIcon?: ComponentProps<typeof Ionicons>["name"];
+  count?: string;
+  destructive?: boolean;
   icon: ComponentProps<typeof Ionicons>["name"];
   onPress: () => void;
 }) {
@@ -400,33 +508,62 @@ function IconAction({
     <Pressable
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
-      style={({ pressed }) => [styles.iconButton, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [styles.viewerAction, pressed ? styles.pressed : null]}
     >
-      <Ionicons
-        color={active ? colors.accent : colors.textPrimary}
-        name={active && activeIcon ? activeIcon : icon}
-        size={24}
-      />
+      <View style={[styles.viewerActionIconWrap, destructive ? styles.viewerDangerAction : null]}>
+        <Ionicons
+          color={colors.inkInvert}
+          name={active && activeIcon ? activeIcon : icon}
+          size={20}
+        />
+      </View>
+      {count ? (
+        <AppText color="inverse" style={styles.viewerActionCount} variant="caption">
+          {count}
+        </AppText>
+      ) : null}
     </Pressable>
   );
 }
 
 function formatCount(value: number) {
-  return new Intl.NumberFormat("it-IT").format(value);
+  return new Intl.NumberFormat("it-IT").format(Math.max(0, value));
 }
 
 const styles = StyleSheet.create({
-  authorText: {
+  commentAuthor: {
     fontWeight: "700",
   },
-  commentsBlock: {
-    gap: spacing[8],
-    paddingBottom: spacing[24],
-    paddingHorizontal: spacing[16],
+  commentsPreview: {
+    gap: spacing[6],
+    marginTop: spacing[8],
+  },
+  emptyIconWrap: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.full,
+    height: 64,
+    justifyContent: "center",
+    marginBottom: spacing[16],
+    width: 64,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing[24],
+    paddingVertical: spacing[36],
+  },
+  emptySubtitle: {
+    marginBottom: spacing[20],
+    maxWidth: 260,
+    textAlign: "center",
+  },
+  emptyTitle: {
+    marginBottom: spacing[8],
   },
   featuredBadge: {
     alignItems: "center",
-    backgroundColor: colors.accent,
+    backgroundColor: "rgba(10,102,194,0.92)",
     borderRadius: radius.full,
     height: 22,
     justifyContent: "center",
@@ -453,6 +590,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
+  gridItemDisabled: {
+    opacity: 0.72,
+  },
+  gridShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(11,43,64,0.08)",
+  },
   header: {
     alignItems: "center",
     flexDirection: "row",
@@ -461,48 +605,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[16],
     paddingTop: spacing[16],
   },
-  heroImage: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  heroMedia: {
-    aspectRatio: 4 / 5,
-    backgroundColor: colors.hero,
-    overflow: "hidden",
-    position: "relative",
-  },
-  iconButton: {
-    alignItems: "center",
-    borderRadius: radius.full,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  iconButtonPlaceholder: {
-    width: 36,
-  },
-  ownerAction: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    flex: 1,
-    flexDirection: "row",
-    gap: spacing[6],
-    justifyContent: "center",
-    minHeight: 40,
-    paddingHorizontal: spacing[10],
-    paddingVertical: spacing[10],
-  },
-  ownerActionDanger: {
-    backgroundColor: colors.dangerSoft,
-  },
-  ownerActionText: {
-    fontWeight: "700",
-  },
-  ownerActionsRow: {
-    flexDirection: "row",
-    gap: spacing[12],
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[16],
+  noCommentsText: {
+    opacity: 0.82,
   },
   pressed: {
     opacity: 0.82,
@@ -510,9 +614,6 @@ const styles = StyleSheet.create({
   root: {
     backgroundColor: colors.surface,
     paddingBottom: spacing[20],
-  },
-  statsText: {
-    fontWeight: "700",
   },
   tagBadge: {
     alignItems: "center",
@@ -545,67 +646,102 @@ const styles = StyleSheet.create({
   },
   videoPlayButton: {
     alignItems: "center",
-    backgroundColor: "rgba(11, 43, 64, 0.5)",
+    alignSelf: "center",
+    backgroundColor: "rgba(11,43,64,0.46)",
     borderRadius: radius.full,
-    height: 64,
+    height: 70,
     justifyContent: "center",
-    left: "50%",
-    marginLeft: -32,
-    marginTop: -32,
     position: "absolute",
-    top: "50%",
-    width: 64,
+    top: "42%",
+    width: 70,
   },
   viewAllButton: {
-    paddingVertical: spacing[4],
-  },
-  viewerContent: {
-    paddingBottom: spacing[24],
-  },
-  viewerHeader: {
-    alignItems: "center",
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[12],
-  },
-  viewerMetaBlock: {
-    gap: spacing[8],
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[16],
-  },
-  viewerRoot: {
-    backgroundColor: colors.surface,
-    flex: 1,
-  },
-  viewerTagBadge: {
-    alignItems: "center",
-    backgroundColor: "rgba(11, 43, 64, 0.74)",
-    borderColor: "rgba(255,255,255,0.18)",
-    borderRadius: radius.full,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing[6],
-    left: spacing[16],
-    paddingHorizontal: spacing[12],
+    marginTop: spacing[10],
     paddingVertical: spacing[6],
-    position: "absolute",
-    top: spacing[16],
   },
-  viewerTagText: {
+  viewerAction: {
+    alignItems: "center",
+    gap: spacing[6],
+  },
+  viewerActionCount: {
     fontWeight: "700",
   },
-  visitorActionsRow: {
+  viewerActionIconWrap: {
+    alignItems: "center",
+    backgroundColor: "rgba(11,43,64,0.46)",
+    borderRadius: radius.full,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  viewerAuthor: {
+    fontWeight: "700",
+  },
+  viewerBackButton: {
+    left: spacing[12],
+    padding: spacing[8],
+    position: "absolute",
+    top: 44,
+    zIndex: 20,
+  },
+  viewerBottomSheet: {
+    backgroundColor: "rgba(11,43,64,0.32)",
+    bottom: spacing[18],
+    left: spacing[12],
+    paddingBottom: spacing[12],
+    paddingHorizontal: spacing[14],
+    paddingTop: spacing[14],
+    position: "absolute",
+    right: 74,
+    borderRadius: radius[16],
+  },
+  viewerDangerAction: {
+    backgroundColor: "rgba(220,38,38,0.45)",
+  },
+  viewerDescription: {
+    marginTop: spacing[6],
+  },
+  viewerImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  viewerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.28)",
+  },
+  viewerPage: {
+    backgroundColor: colors.hero,
+    overflow: "hidden",
+  },
+  viewerPinnedBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(10,102,194,0.92)",
+    borderRadius: radius.full,
+    height: 28,
+    justifyContent: "center",
+    width: 28,
+  },
+  viewerRightRail: {
+    alignItems: "center",
+    bottom: spacing[28],
+    gap: spacing[20],
+    position: "absolute",
+    right: spacing[14],
+  },
+  viewerRoot: {
+    backgroundColor: colors.hero,
+    flex: 1,
+  },
+  viewerStats: {
+    marginTop: spacing[8],
+    opacity: 0.9,
+  },
+  viewerTopBar: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[14],
-  },
-  visitorPrimaryActions: {
-    flexDirection: "row",
-    gap: spacing[14],
+    left: spacing[12],
+    position: "absolute",
+    right: spacing[12],
+    top: 50,
   },
 });

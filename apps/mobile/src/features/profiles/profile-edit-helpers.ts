@@ -325,6 +325,7 @@ export function buildFullUpdatePayload(
             coached_clubs: fromDelimitedString(formState.coachedClubs),
             game_philosophy: parseOptionalText(formState.gamePhilosophy),
             licenses: fromDelimitedString(formState.licenses),
+            media_items: data.coachProfile?.media_items ?? [],
             open_to_new_role: formState.openToNewRole,
             preferred_provinces: fromDelimitedString(
               formState.coachPreferredProvinces,

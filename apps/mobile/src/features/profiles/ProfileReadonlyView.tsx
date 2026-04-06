@@ -48,6 +48,7 @@ type EditSection =
   | "playerExperiences"
   | "playerSituation"
   | "playerPalmares"
+  | "coachMedia"
   | "coachInfo"
   | "coachExperiences"
   | "staffInfo"
@@ -284,7 +285,7 @@ export function ProfileReadonlyView({
 
       {role === "coach" ? (
         <SectionCard
-          onEdit={() => onEdit("coachInfo")}
+          onEdit={() => onEdit("coachMedia")}
           title="Media"
           variant="flat"
         >

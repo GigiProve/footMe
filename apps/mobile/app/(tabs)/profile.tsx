@@ -8,6 +8,7 @@ import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioMod
 import { EditClubInfoModal } from "../../src/features/profiles/edit-modals/EditClubInfoModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
 import { EditCoachInfoModal } from "../../src/features/profiles/edit-modals/EditCoachInfoModal";
+import { EditCoachMediaModal } from "../../src/features/profiles/edit-modals/EditCoachMediaModal";
 import { EditCoachExperiencesModal } from "../../src/features/profiles/edit-modals/EditCoachExperiencesModal";
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
@@ -260,7 +261,7 @@ export default function ProfileScreen() {
             onDeleteExperience={handleDeleteCoachExperience}
             onEdit={handleEdit}
             onEditExperience={() => handleEdit("coachExperiences")}
-            onManageMedia={() => handleEdit("coachInfo")}
+            onManageMedia={() => handleEdit("coachMedia")}
           />
         ) : completeProfile ? (
           <ProfileReadonlyView
@@ -348,6 +349,13 @@ export default function ProfileScreen() {
                 onSaved={handleSaved}
                 userId={userId}
                 visible={activeModal === "coachInfo"}
+              />
+              <EditCoachMediaModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "coachMedia"}
               />
               <EditCoachExperiencesModal
                 completeProfile={completeProfile}

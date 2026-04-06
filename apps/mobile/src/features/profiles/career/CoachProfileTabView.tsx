@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
+import { getCoachMediaTagMeta } from "../coach-media";
 import { withDefaultProfileAvatar } from "../profile-avatar";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import type { EditSection } from "../ProfileReadonlyView";
-import { getPlayerMediaTagMeta } from "../player-media";
 import { CoachCareerTabContent } from "./CoachCareerTabContent";
 import { CoachInfoTab } from "./CoachInfoTab";
 import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
@@ -33,13 +33,35 @@ export function CoachProfileTabView({
   const [activeTab, setActiveTab] = useState<ProfileTab>("career");
 
   const mediaItems = useMemo<MediaContentItem[]>(() => {
+    const profileMediaItems = completeProfile.coachProfile?.media_items ?? [];
     const technicalVideoUrl = completeProfile.coachProfile?.technical_video_url;
+
+    if (profileMediaItems.length > 0) {
+      return profileMediaItems.map((item) => {
+        const tagMeta = getCoachMediaTagMeta(item.tag);
+
+        return {
+          commentCount: 0,
+          comments: [],
+          description: item.description ?? "",
+          id: item.id,
+          isFeatured: item.is_featured,
+          isLiked: false,
+          isSaved: false,
+          likeCount: 0,
+          tag: { icon: tagMeta.icon, label: tagMeta.label },
+          thumbnailUrl:
+            item.thumbnail_url ??
+            withDefaultProfileAvatar(completeProfile.profile.avatar_url),
+          type: item.type,
+          videoUrl: item.type === "video" ? item.url : undefined,
+        } satisfies MediaContentItem;
+      });
+    }
 
     if (!technicalVideoUrl) {
       return [];
     }
-
-    const tagMeta = getPlayerMediaTagMeta("highlights");
 
     return [
       {
@@ -51,13 +73,14 @@ export function CoachProfileTabView({
         isLiked: false,
         isSaved: false,
         likeCount: 0,
-        tag: { icon: tagMeta.icon, label: "Video tecnico" },
+        tag: { icon: "play-circle-outline", label: "Video tecnico" },
         thumbnailUrl: withDefaultProfileAvatar(completeProfile.profile.avatar_url),
         type: "video",
         videoUrl: technicalVideoUrl,
       },
     ];
   }, [
+    completeProfile.coachProfile?.media_items,
     completeProfile.coachProfile?.technical_video_url,
     completeProfile.profile.avatar_url,
   ]);

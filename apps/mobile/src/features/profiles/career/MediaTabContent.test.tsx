@@ -32,7 +32,9 @@ describe("MediaTabContent", () => {
       <MediaTabContent authorName="Alessandro Bianchi" mode="visitor" />,
     );
 
-    expect(ownerTree.root.findByProps({ accessibilityLabel: "Aggiungi contenuto" })).toBeTruthy();
+    expect(
+      ownerTree.root.findAllByProps({ accessibilityLabel: "Aggiungi contenuto" }).length,
+    ).toBeGreaterThan(0);
     expect(() =>
       visitorTree.root.findByProps({ accessibilityLabel: "Aggiungi contenuto" }),
     ).toThrow();
@@ -77,5 +79,52 @@ describe("MediaTabContent", () => {
 
     expect(tree.root.findByProps({ accessibilityLabel: "Modifica" })).toBeTruthy();
     expect(tree.root.findByProps({ accessibilityLabel: "Elimina" })).toBeTruthy();
+  });
+
+  it("renders featured items first in the grid", () => {
+    const tree = renderMediaTabContent(
+      <MediaTabContent
+        authorName="Alessandro Bianchi"
+        initialItems={[
+          {
+            commentCount: 0,
+            comments: [],
+            description: "",
+            id: "normal-item",
+            isFeatured: false,
+            isLiked: false,
+            isSaved: false,
+            likeCount: 0,
+            tag: { icon: "play-circle-outline", label: "Highlights" },
+            thumbnailUrl: "https://example.com/normal.jpg",
+            type: "image",
+          },
+          {
+            commentCount: 0,
+            comments: [],
+            description: "",
+            id: "featured-item",
+            isFeatured: true,
+            isLiked: false,
+            isSaved: false,
+            likeCount: 0,
+            tag: { icon: "play-circle-outline", label: "Highlights" },
+            thumbnailUrl: "https://example.com/featured.jpg",
+            type: "image",
+          },
+        ]}
+        mode="visitor"
+      />,
+    );
+
+    const gridItemIds = tree.root
+      .findAll(
+        (node) =>
+          node.props.testID === "media-grid-item-featured-item" ||
+          node.props.testID === "media-grid-item-normal-item",
+      )
+      .map((node) => node.props.testID);
+
+    expect(gridItemIds[0]).toBe("media-grid-item-featured-item");
   });
 });
