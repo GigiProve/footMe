@@ -225,6 +225,7 @@ export function getCoachEndYearOptions(
 export function getCoachStartYearOptions(
   endYear: string,
   endMonth: string,
+  startMonth: string,
   occupiedSeasons: Set<string>,
 ): SelectOption[] {
   const yearOptions = getCoachYearOptions();
@@ -238,6 +239,9 @@ export function getCoachStartYearOptions(
   }
 
   const parsedEndMonth = endMonth ? (MONTH_LABEL_TO_NUM[endMonth] ?? null) : null;
+  const parsedStartMonth = startMonth
+    ? (MONTH_LABEL_TO_NUM[startMonth] ?? null)
+    : null;
 
   return yearOptions.map((option) => {
     const parsedStartYear = Number.parseInt(option.value, 10);
@@ -247,7 +251,7 @@ export function getCoachStartYearOptions(
 
     const seasons = computeSeasonsFromYearRange(
       parsedStartYear,
-      null,
+      parsedStartMonth,
       parsedEndYear,
       parsedEndMonth,
     );
@@ -287,6 +291,7 @@ export function sanitizeCoachPeriodSelection(
     const startYearOptions = getCoachStartYearOptions(
       nextPeriod.endYear,
       nextPeriod.endMonth,
+      nextPeriod.startMonth,
       occupiedSeasons,
     );
     const selectedStartYear = startYearOptions.find(
@@ -303,6 +308,19 @@ export function sanitizeCoachPeriodSelection(
   }
 
   return nextPeriod;
+}
+
+export function getCoachPeriodOverlapSeasons(
+  period: NonNullable<CoachCareerEntry["period"]> | null | undefined,
+  occupiedSeasons: Set<string>,
+): string[] {
+  if (!period) {
+    return [];
+  }
+
+  return computeCoachSeasonsFromPeriod(period).filter((season) =>
+    occupiedSeasons.has(season),
+  );
 }
 
 export function getSimplePlayerSeasonSelectOptions(

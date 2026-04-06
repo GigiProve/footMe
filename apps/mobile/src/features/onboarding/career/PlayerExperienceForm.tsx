@@ -21,6 +21,7 @@ import {
   getOccupiedPlayerSeasonLabels,
   getOlderPlayerSeasonSelectOptions,
   getPlayerEndYearOptions,
+  getPlayerPeriodOverlapSeasons,
   getPlayerSeasonSelectOptions,
   getPlayerStartYearOptions,
   sanitizePlayerPeriodSelection,
@@ -55,6 +56,7 @@ type FormErrors = {
   seasons?: string;
   startYear?: string;
   endYear?: string;
+  period?: string;
   seasonDetails?: string;
 };
 
@@ -204,6 +206,7 @@ function PeriodSelector({
   startYearOptions,
   startYearError,
   endYearError,
+  periodError,
 }: {
   endYearOptions: { label: string; value: string; disabled?: boolean }[];
   period: Period | null;
@@ -211,6 +214,7 @@ function PeriodSelector({
   startYearOptions: { label: string; value: string; disabled?: boolean }[];
   startYearError?: string;
   endYearError?: string;
+  periodError?: string;
 }) {
   const current: Period = period ?? {
     startMonth: "",
@@ -282,6 +286,11 @@ function PeriodSelector({
       {endYearError ? (
         <AppText variant="caption" color="danger">
           {endYearError}
+        </AppText>
+      ) : null}
+      {periodError ? (
+        <AppText variant="caption" color="danger">
+          {periodError}
         </AppText>
       ) : null}
     </View>
@@ -479,9 +488,10 @@ export function PlayerExperienceForm({
       getPlayerStartYearOptions(
         form.period?.endYear ?? "",
         form.period?.endMonth ?? "",
+        form.period?.startMonth ?? "",
         occupiedSeasons,
       ),
-    [form.period?.endMonth, form.period?.endYear, occupiedSeasons],
+    [form.period?.endMonth, form.period?.endYear, form.period?.startMonth, occupiedSeasons],
   );
   const endYearOptions = useMemo(
     () =>
@@ -556,7 +566,12 @@ export function PlayerExperienceForm({
       }
       return { ...prev, period: nextPeriod, seasonDetails: nextDetails };
     });
-    setErrors((prev) => ({ ...prev, startYear: undefined, endYear: undefined }));
+    setErrors((prev) => ({
+      ...prev,
+      startYear: undefined,
+      endYear: undefined,
+      period: undefined,
+    }));
   }
 
   function handleSeasonDetailChange(
@@ -635,6 +650,17 @@ export function PlayerExperienceForm({
       }
       if (!form.period?.endYear) {
         nextErrors.endYear = "L'anno di fine è obbligatorio.";
+      }
+      const overlappingSeasons = getPlayerPeriodOverlapSeasons(
+        form.period,
+        occupiedSeasons,
+      );
+      if (overlappingSeasons.length > 0) {
+        const seasonLabels = overlappingSeasons.map(formatSeasonShort).join(", ");
+        nextErrors.period =
+          overlappingSeasons.length === 1
+            ? `Il periodo personalizzato si sovrappone alla stagione ${seasonLabels} gia' inserita.`
+            : `Il periodo personalizzato si sovrappone alle stagioni ${seasonLabels} gia' inserite.`;
       }
     }
 
@@ -754,6 +780,7 @@ export function PlayerExperienceForm({
           endYearError={errors.endYear}
           onChange={handlePeriodChange}
           period={form.period}
+          periodError={errors.period}
           startYearOptions={startYearOptions}
           startYearError={errors.startYear}
         />

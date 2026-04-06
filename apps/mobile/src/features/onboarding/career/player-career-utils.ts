@@ -197,6 +197,7 @@ export function getPlayerEndYearOptions(
 export function getPlayerStartYearOptions(
   endYear: string,
   endMonth: string,
+  startMonth: string,
   occupiedSeasons: Set<string>,
 ): SelectOption[] {
   const yearOptions = getPlayerYearOptions();
@@ -210,6 +211,9 @@ export function getPlayerStartYearOptions(
   }
 
   const parsedEndMonth = endMonth ? (MONTH_LABEL_TO_NUM[endMonth] ?? null) : null;
+  const parsedStartMonth = startMonth
+    ? (MONTH_LABEL_TO_NUM[startMonth] ?? null)
+    : null;
 
   return yearOptions.map((option) => {
     const parsedStartYear = Number.parseInt(option.value, 10);
@@ -219,7 +223,7 @@ export function getPlayerStartYearOptions(
 
     const seasons = computeSeasonsFromYearRange(
       parsedStartYear,
-      null,
+      parsedStartMonth,
       parsedEndYear,
       parsedEndMonth,
     );
@@ -259,6 +263,7 @@ export function sanitizePlayerPeriodSelection(
     const startYearOptions = getPlayerStartYearOptions(
       nextPeriod.endYear,
       nextPeriod.endMonth,
+      nextPeriod.startMonth,
       occupiedSeasons,
     );
     const selectedStartYear = startYearOptions.find(
@@ -275,6 +280,19 @@ export function sanitizePlayerPeriodSelection(
   }
 
   return nextPeriod;
+}
+
+export function getPlayerPeriodOverlapSeasons(
+  period: NonNullable<PlayerCareerEntry["period"]> | null | undefined,
+  occupiedSeasons: Set<string>,
+): string[] {
+  if (!period) {
+    return [];
+  }
+
+  return computePlayerSeasonsFromPeriod(period).filter((season) =>
+    occupiedSeasons.has(season),
+  );
 }
 
 export function formatSeasonShort(season: string): string {

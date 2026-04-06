@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CoachCareerEntry, SimplePlayerCareerEntry } from "./coach-career-types";
 import {
   getCoachEndYearOptions,
+  getCoachPeriodOverlapSeasons,
   getCoachSeasonSelectOptions,
   getCoachStartYearOptions,
   getOccupiedCoachSeasonLabels,
@@ -53,7 +54,7 @@ describe("coach-career-utils", () => {
   });
 
   it("disables invalid coach start years", () => {
-    const options = getCoachStartYearOptions("2025", "", new Set(["2024/2025"]));
+    const options = getCoachStartYearOptions("2025", "", "", new Set(["2024/2025"]));
 
     expect(options.find((option) => option.value === "2026")?.disabled).toBe(true);
     expect(options.find((option) => option.value === "2024")?.disabled).toBe(true);
@@ -127,5 +128,58 @@ describe("coach-career-utils", () => {
       "coach-3",
       "coach-1",
     ]);
+  });
+
+  it("returns the overlapping coach seasons for a custom period", () => {
+    expect(
+      getCoachPeriodOverlapSeasons(
+        {
+          startMonth: "Luglio",
+          startYear: "2023",
+          endMonth: "Giugno",
+          endYear: "2025",
+        },
+        new Set(["2024/2025"]),
+      ),
+    ).toEqual(["2024/2025"]);
+  });
+
+  it("returns no overlapping coach seasons when the custom period is free", () => {
+    expect(
+      getCoachPeriodOverlapSeasons(
+        {
+          startMonth: "Luglio",
+          startYear: "2023",
+          endMonth: "Giugno",
+          endYear: "2024",
+        },
+        new Set(["2024/2025"]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not mark January to June of a year as overlap for the following full coach season", () => {
+    expect(
+      getCoachPeriodOverlapSeasons(
+        {
+          startMonth: "Gennaio",
+          startYear: "2018",
+          endMonth: "Giugno",
+          endYear: "2018",
+        },
+        new Set(["2018/2019"]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps the coach start year selectable when months map the period to the previous season", () => {
+    const options = getCoachStartYearOptions(
+      "2017",
+      "Giugno",
+      "Gennaio",
+      new Set(["2017/2018"]),
+    );
+
+    expect(options.find((option) => option.value === "2017")?.disabled).not.toBe(true);
   });
 });

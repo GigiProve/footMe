@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PlayerCareerEntry } from "./player-career-types";
 import {
+  getPlayerPeriodOverlapSeasons,
   getOccupiedPlayerSeasonLabels,
   getPlayerEndYearOptions,
   getPlayerSeasonSelectOptions,
@@ -55,7 +56,7 @@ describe("player-career-utils", () => {
   });
 
   it("disables invalid start years when they are after end year or collide with occupied seasons", () => {
-    const options = getPlayerStartYearOptions("2025", "", new Set(["2024/2025"]));
+    const options = getPlayerStartYearOptions("2025", "", "", new Set(["2024/2025"]));
 
     expect(options.find((option) => option.value === "2026")?.disabled).toBe(true);
     expect(options.find((option) => option.value === "2024")?.disabled).toBe(true);
@@ -79,5 +80,58 @@ describe("player-career-utils", () => {
       endMonth: "",
       endYear: "",
     });
+  });
+
+  it("returns the overlapping seasons for a custom period", () => {
+    expect(
+      getPlayerPeriodOverlapSeasons(
+        {
+          startMonth: "Luglio",
+          startYear: "2023",
+          endMonth: "Giugno",
+          endYear: "2025",
+        },
+        new Set(["2024/2025"]),
+      ),
+    ).toEqual(["2024/2025"]);
+  });
+
+  it("returns no overlapping seasons when the custom period is free", () => {
+    expect(
+      getPlayerPeriodOverlapSeasons(
+        {
+          startMonth: "Luglio",
+          startYear: "2023",
+          endMonth: "Giugno",
+          endYear: "2024",
+        },
+        new Set(["2024/2025"]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not mark January to June of a year as overlap for the following full season", () => {
+    expect(
+      getPlayerPeriodOverlapSeasons(
+        {
+          startMonth: "Gennaio",
+          startYear: "2018",
+          endMonth: "Giugno",
+          endYear: "2018",
+        },
+        new Set(["2018/2019"]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps the start year selectable when months map the period to the previous season", () => {
+    const options = getPlayerStartYearOptions(
+      "2017",
+      "Giugno",
+      "Gennaio",
+      new Set(["2017/2018"]),
+    );
+
+    expect(options.find((option) => option.value === "2017")?.disabled).not.toBe(true);
   });
 });

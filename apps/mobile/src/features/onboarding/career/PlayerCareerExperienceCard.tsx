@@ -4,6 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 import type { PlayerCareerEntry } from "./player-career-types";
+import { computePlayerSeasonsFromPeriod } from "./player-career-utils";
 
 type PlayerCareerExperienceCardProps = {
   entry: PlayerCareerEntry;
@@ -29,12 +30,33 @@ function formatDuration(entry: PlayerCareerEntry): string {
     .join(", ");
 }
 
+function formatSeasonShort(season: string): string {
+  const parts = season.split("/");
+  if (parts.length !== 2) return season;
+  const endYear = parts[1];
+  return `${parts[0]}/${endYear.length === 4 ? endYear.slice(2) : endYear}`;
+}
+
+function getPartialSeasonLabel(entry: PlayerCareerEntry): string | null {
+  if (entry.type !== "CUSTOM_PERIOD" || !entry.period) {
+    return null;
+  }
+
+  const seasons = computePlayerSeasonsFromPeriod(entry.period);
+  if (seasons.length !== 1) {
+    return null;
+  }
+
+  return `Stagione parziale ${formatSeasonShort(seasons[0])}`;
+}
+
 export function PlayerCareerExperienceCard({
   entry,
   onDelete,
   onEdit,
 }: PlayerCareerExperienceCardProps) {
   const duration = formatDuration(entry);
+  const partialSeasonLabel = getPartialSeasonLabel(entry);
 
   return (
     <View style={cardStyles.card}>
@@ -71,6 +93,14 @@ export function PlayerCareerExperienceCard({
           <AppText variant="bodySm" color="secondary">
             {entry.category}
           </AppText>
+        ) : null}
+
+        {partialSeasonLabel ? (
+          <View style={cardStyles.partialBadge}>
+            <AppText variant="caption" style={cardStyles.partialBadgeText}>
+              {partialSeasonLabel}
+            </AppText>
+          </View>
         ) : null}
 
         {duration ? (
@@ -121,6 +151,19 @@ const cardStyles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
     justifyContent: "center",
+  },
+  partialBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: spacing[10],
+    paddingVertical: spacing[4],
+    borderRadius: radius.full,
+    backgroundColor: colors.heroSoft,
+    borderWidth: 1,
+    borderColor: colors.hero,
+    marginTop: spacing[4],
+  },
+  partialBadgeText: {
+    color: colors.hero,
   },
   durationRow: {
     flexDirection: "row",
