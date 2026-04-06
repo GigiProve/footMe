@@ -63,6 +63,24 @@ type PlayerProfileHeaderProps = {
   weightLabel: string;
 };
 
+type CoachProfileHeaderProps = {
+  availabilityBadges?: string[];
+  avatarUrl: string | null | undefined;
+  bio?: string | null;
+  categoryLabel?: string;
+  coverImageUrl?: string | null;
+  fullName: string;
+  licenseBadges?: string[];
+  locationLabel?: string;
+  mode: PlayerProfileHeaderMode;
+  onContactPress?: () => void;
+  onEditProfilePress?: () => void;
+  onFollowPress?: () => void;
+  primaryRole: string;
+  statusBadge?: string;
+  teamLabel?: string;
+};
+
 const DEFAULT_PLAYER_COVER_URI =
   "https://storage.googleapis.com/banani-generated-images/generated-images/b339be2f-1f6e-4796-b76a-a714a1fe33d2.jpg";
 
@@ -247,6 +265,160 @@ export function PlayerProfileHeader({
               ))}
             </View>
           ) : null}
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+export function CoachProfileHeader({
+  availabilityBadges = [],
+  avatarUrl,
+  bio,
+  categoryLabel,
+  coverImageUrl,
+  fullName,
+  licenseBadges = [],
+  locationLabel,
+  mode,
+  onContactPress,
+  onEditProfilePress,
+  onFollowPress,
+  primaryRole,
+  statusBadge,
+  teamLabel,
+}: CoachProfileHeaderProps) {
+  const resolvedAvatarUrl = withDefaultProfileAvatar(avatarUrl);
+  const infoGroups = [
+    {
+      label: "Disponibilita'",
+      values: availabilityBadges,
+      variant: "success" as const,
+    },
+    {
+      label: "Licenze",
+      values: licenseBadges,
+      variant: "default" as const,
+    },
+  ].filter((group) => group.values.length > 0);
+
+  return (
+    <View style={styles.playerHeaderSurface}>
+      <View style={styles.playerHeroBlock}>
+        <Image
+          accessibilityLabel="Copertina profilo allenatore"
+          source={{ uri: coverImageUrl || DEFAULT_PLAYER_COVER_URI }}
+          style={styles.playerCoverImage}
+        />
+        <View pointerEvents="none" style={styles.playerCoverOverlay} />
+        <View style={styles.playerAvatarShell}>
+          <Avatar name={fullName} size="xl" uri={resolvedAvatarUrl} />
+        </View>
+        <View style={styles.playerHeroContent}>
+          <View style={styles.playerIdentityStack}>
+            <AppText variant="headingLg">{fullName}</AppText>
+            <View style={styles.playerRoleRow}>
+              <AppText color="accent" style={styles.playerPrimaryRole} variant="titleSm">
+                {primaryRole}
+              </AppText>
+            </View>
+            {teamLabel ? (
+              <View style={styles.playerMetaRow}>
+                <Ionicons color={colors.textSecondary} name="shield-outline" size={15} />
+                <AppText color="secondary" variant="bodySm">
+                  {teamLabel}
+                </AppText>
+              </View>
+            ) : null}
+            {categoryLabel ? (
+              <View style={styles.playerMetaRow}>
+                <Ionicons color={colors.textSecondary} name="layers-outline" size={15} />
+                <AppText color="secondary" variant="bodySm">
+                  {categoryLabel}
+                </AppText>
+              </View>
+            ) : null}
+            {locationLabel ? (
+              <View style={styles.playerMetaRow}>
+                <Ionicons color={colors.textSecondary} name="location-outline" size={15} />
+                <AppText color="secondary" variant="bodySm">
+                  {locationLabel}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
+
+          {statusBadge ? (
+            <View style={styles.playerStatusBadge}>
+              <Ionicons color={colors.successForeground} name="checkmark-circle" size={16} />
+              <AppText color="success" variant="caption">
+                {statusBadge}
+              </AppText>
+            </View>
+          ) : null}
+
+          <View style={styles.playerActionsRow}>
+            {mode === "owner" ? (
+              <HeaderActionButton
+                icon="create-outline"
+                label="Modifica profilo"
+                onPress={onEditProfilePress}
+                variant="primary"
+              />
+            ) : (
+              <>
+                <HeaderActionButton
+                  icon="person-add-outline"
+                  label="Segui"
+                  onPress={onFollowPress}
+                  variant="primary"
+                />
+                <HeaderActionButton
+                  icon="chatbubble-ellipses-outline"
+                  label="Contatta"
+                  onPress={onContactPress}
+                  variant="secondary"
+                />
+              </>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {bio?.trim() || infoGroups.length > 0 ? (
+        <>
+          <Divider />
+          <View style={styles.playerSummarySection}>
+            {bio?.trim() ? (
+              <View style={styles.playerInfoBlock}>
+                <AppText color="secondary" variant="overline">
+                  Bio
+                </AppText>
+                <AppText numberOfLines={3} variant="bodySm">
+                  {bio.trim()}
+                </AppText>
+              </View>
+            ) : null}
+
+            {bio?.trim() && infoGroups.length > 0 ? <Divider /> : null}
+
+            {infoGroups.length > 0 ? (
+              <View style={styles.playerChipSectionList}>
+                {infoGroups.map((group) => (
+                  <View key={group.label} style={styles.playerInfoBlock}>
+                    <AppText color="secondary" variant="overline">
+                      {group.label}
+                    </AppText>
+                    <View style={styles.playerChipWrap}>
+                      {group.values.map((value) => (
+                        <Badge key={`${group.label}-${value}`} label={value} variant={group.variant} />
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         </>
       ) : null}

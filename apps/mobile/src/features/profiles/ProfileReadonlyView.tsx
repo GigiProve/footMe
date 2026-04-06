@@ -49,6 +49,7 @@ type EditSection =
   | "playerSituation"
   | "playerPalmares"
   | "coachInfo"
+  | "coachExperiences"
   | "staffInfo"
   | "clubInfo"
   | "clubSeasons";

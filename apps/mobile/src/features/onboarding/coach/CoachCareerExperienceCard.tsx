@@ -9,6 +9,7 @@ import { computeCoachSeasonsFromPeriod } from "./coach-career-utils";
 type CoachCareerExperienceCardProps = {
   entry: CoachCareerEntry;
   onEdit: () => void;
+  onDelete?: () => void;
 };
 
 function formatDuration(entry: CoachCareerEntry): string {
@@ -52,6 +53,7 @@ function getPartialSeasonLabel(entry: CoachCareerEntry): string | null {
 export function CoachCareerExperienceCard({
   entry,
   onEdit,
+  onDelete,
 }: CoachCareerExperienceCardProps) {
   const duration = formatDuration(entry);
   const partialSeasonLabel = getPartialSeasonLabel(entry);
@@ -63,15 +65,28 @@ export function CoachCareerExperienceCard({
           <AppText variant="titleMd" style={cardStyles.teamName}>
             {entry.teamName}
           </AppText>
-          <Pressable
-            accessibilityLabel="Modifica esperienza"
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={onEdit}
-            style={cardStyles.editButton}
-          >
-            <Ionicons name="pencil" size={14} color={colors.textSecondary} />
-          </Pressable>
+          <View style={cardStyles.actions}>
+            <Pressable
+              accessibilityLabel="Modifica esperienza"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onEdit}
+              style={cardStyles.editButton}
+            >
+              <Ionicons name="pencil" size={14} color={colors.textSecondary} />
+            </Pressable>
+            {onDelete ? (
+              <Pressable
+                accessibilityLabel="Elimina esperienza"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={onDelete}
+                style={cardStyles.deleteButton}
+              >
+                <Ionicons name="trash-outline" size={14} color={colors.danger} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         <AppText variant="bodySm" color="secondary">
@@ -114,6 +129,18 @@ const cardStyles = StyleSheet.create({
   },
   content: {
     gap: spacing[4],
+  },
+  actions: {
+    flexDirection: "row",
+    gap: spacing[8],
+  },
+  deleteButton: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.dangerSoft,
+    alignItems: "center",
+    justifyContent: "center",
   },
   header: {
     flexDirection: "row",

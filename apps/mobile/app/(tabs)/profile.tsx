@@ -8,6 +8,7 @@ import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioMod
 import { EditClubInfoModal } from "../../src/features/profiles/edit-modals/EditClubInfoModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
 import { EditCoachInfoModal } from "../../src/features/profiles/edit-modals/EditCoachInfoModal";
+import { EditCoachExperiencesModal } from "../../src/features/profiles/edit-modals/EditCoachExperiencesModal";
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
 import { EditPlayerExperiencesModal } from "../../src/features/profiles/edit-modals/EditPlayerExperiencesModal";
@@ -21,13 +22,16 @@ import {
   buildFullUpdatePayload,
   buildHeaderDetails,
   buildInitialState,
+  buildCoachProfileHeaderDetails,
   buildPlayerProfileHeaderDetails,
 } from "../../src/features/profiles/profile-edit-helpers";
+import { validateBirthDateInput } from "../../src/features/profiles/profile-form-utils";
 import {
   ProfileReadonlyView,
   type EditSection,
 } from "../../src/features/profiles/ProfileReadonlyView";
 import {
+  CoachProfileHeader,
   PlayerProfileHeader,
   ProfileHeader,
 } from "../../src/features/profiles/profile-screen-components";
@@ -37,6 +41,8 @@ import {
   type CompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
 import type { GroupedExperience } from "../../src/features/profiles/career/career-grouping";
+import type { CoachGroupedExperience } from "../../src/features/profiles/career/coach-career-grouping";
+import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
 import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
 import { colors } from "../../src/theme/tokens";
 import { AppText } from "../../src/ui";
@@ -82,6 +88,11 @@ export default function ProfileScreen() {
   const playerHeaderDetails = useMemo(
     () =>
       completeProfile ? buildPlayerProfileHeaderDetails(completeProfile) : null,
+    [completeProfile],
+  );
+  const coachHeaderDetails = useMemo(
+    () =>
+      completeProfile ? buildCoachProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
 
@@ -140,6 +151,38 @@ export default function ProfileScreen() {
     );
   }
 
+  async function handleDeleteCoachExperience(group: CoachGroupedExperience) {
+    if (!completeProfile) return;
+
+    Alert.alert(
+      "Elimina esperienza",
+      `Eliminare l'esperienza con ${group.teamName}?`,
+      [
+        { style: "cancel", text: "Annulla" },
+        {
+          onPress: async () => {
+            try {
+              const baseState = buildInitialState(completeProfile);
+              const payload = buildFullUpdatePayload(completeProfile, baseState);
+              payload.profile.birth_date =
+                validateBirthDateInput(baseState.birthDate).isoValue;
+              payload.coachCareerEntries = completeProfile.coachCareerEntries.filter(
+                (entry) => entry.id !== group.entryId,
+              );
+              await updateCompleteProfessionalProfile(payload);
+              await loadProfile();
+              Alert.alert("Esperienza eliminata", "La voce e' stata rimossa.");
+            } catch {
+              Alert.alert("Errore", "Impossibile eliminare l'esperienza.");
+            }
+          },
+          style: "destructive",
+          text: "Elimina",
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAwareForm
@@ -168,6 +211,21 @@ export default function ProfileScreen() {
             statusBadge={playerHeaderDetails.statusBadge}
             weightLabel={playerHeaderDetails.weightLabel}
           />
+        ) : completeProfile && role === "coach" && coachHeaderDetails ? (
+          <CoachProfileHeader
+            availabilityBadges={coachHeaderDetails.availabilityBadges}
+            avatarUrl={completeProfile.profile.avatar_url}
+            bio={coachHeaderDetails.bio}
+            categoryLabel={coachHeaderDetails.categoryLabel}
+            fullName={coachHeaderDetails.fullName}
+            licenseBadges={coachHeaderDetails.licenseBadges}
+            locationLabel={coachHeaderDetails.locationLabel}
+            mode="owner"
+            onEditProfilePress={() => handleEdit("coachInfo")}
+            primaryRole={coachHeaderDetails.primaryRole}
+            statusBadge={coachHeaderDetails.statusBadge}
+            teamLabel={coachHeaderDetails.teamLabel}
+          />
         ) : completeProfile && headerDetails ? (
           <ProfileHeader
             avatarUrl={completeProfile.profile.avatar_url}
@@ -193,6 +251,16 @@ export default function ProfileScreen() {
             onDeleteExperience={handleDeleteExperience}
             onEdit={handleEdit}
             onManageMedia={() => handleEdit("playerMedia")}
+          />
+        ) : completeProfile && role === "coach" ? (
+          <CoachProfileTabView
+            completeProfile={completeProfile}
+            isOwner={true}
+            onAddExperience={() => handleEdit("coachExperiences")}
+            onDeleteExperience={handleDeleteCoachExperience}
+            onEdit={handleEdit}
+            onEditExperience={() => handleEdit("coachExperiences")}
+            onManageMedia={() => handleEdit("coachInfo")}
           />
         ) : completeProfile ? (
           <ProfileReadonlyView
@@ -273,13 +341,21 @@ export default function ProfileScreen() {
             </>
           ) : null}
           {role === "coach" ? (
-            <EditCoachInfoModal
-              completeProfile={completeProfile}
-              onClose={handleCloseModal}
-              onSaved={handleSaved}
-              userId={userId}
-              visible={activeModal === "coachInfo"}
-            />
+            <>
+              <EditCoachInfoModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "coachInfo"}
+              />
+              <EditCoachExperiencesModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                visible={activeModal === "coachExperiences"}
+              />
+            </>
           ) : null}
           {role === "staff" ? (
             <EditStaffInfoModal

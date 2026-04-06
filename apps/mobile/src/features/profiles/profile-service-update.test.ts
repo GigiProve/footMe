@@ -435,6 +435,118 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     });
   });
 
+  it("persists coach profile data and structured career entries through the coach rpc", async () => {
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      coachCareerEntries: [
+        {
+          category: "Promozione",
+          club_id: null,
+          coach_profile_id: "profile-1",
+          description: "Salvezza raggiunta con tre giornate di anticipo.",
+          experience_type: "MULTI_SEASON",
+          id: "coach-exp-1",
+          period_end_month: null,
+          period_end_year: null,
+          period_start_month: null,
+          period_start_year: null,
+          results: [{ label: "Playoff", variant: "accent" }],
+          role: "Allenatore",
+          season_details: {
+            "2024/2025": { category: "Promozione", role: "Allenatore" },
+          },
+          seasons: ["2024/2025"],
+          sort_order: 0,
+          team_logo_url: "https://example.com/coach.png",
+          team_name: "USD Virtus",
+        },
+      ],
+      coachDirectorCareerEntries: [],
+      coachPlayerCareerEntries: [
+        {
+          appearances: 28,
+          assists: 4,
+          category: "Eccellenza",
+          coach_profile_id: "profile-1",
+          goals: 7,
+          id: "coach-player-1",
+          position: null,
+          season: "2012/2013",
+          sort_order: 0,
+          team_logo_url: null,
+          team_name: "USD Virtus",
+        },
+      ],
+      coachProfile: {
+        availability_type: "REGIONS",
+        coached_categories: ["Promozione"],
+        coached_clubs: ["USD Virtus"],
+        game_philosophy: "Squadra aggressiva e propositiva.",
+        licenses: ["UEFA B"],
+        open_to_new_role: true,
+        preferred_provinces: [],
+        preferred_regions: ["Lombardia"],
+        technical_video_url: "https://example.com/coach-video.mp4",
+      },
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "coach",
+      staffProfile: null,
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith("save_coach_career_details", {
+      p_career_entries: [
+        {
+          category: "Promozione",
+          club_id: null,
+          description: "Salvezza raggiunta con tre giornate di anticipo.",
+          experience_type: "MULTI_SEASON",
+          id: "coach-exp-1",
+          period_end_month: null,
+          period_end_year: null,
+          period_start_month: null,
+          period_start_year: null,
+          results: [{ label: "Playoff", variant: "accent" }],
+          role: "Allenatore",
+          season_details: {
+            "2024/2025": { category: "Promozione", role: "Allenatore" },
+          },
+          seasons: ["2024/2025"],
+          sort_order: 0,
+          team_logo_url: "https://example.com/coach.png",
+          team_name: "USD Virtus",
+        },
+      ],
+      p_coach_profile: {
+        availability_type: "REGIONS",
+        coached_categories: ["Promozione"],
+        coached_clubs: ["USD Virtus"],
+        game_philosophy: "Squadra aggressiva e propositiva.",
+        licenses: ["UEFA B"],
+        open_to_new_role: true,
+        preferred_provinces: [],
+        preferred_regions: ["Lombardia"],
+        technical_video_url: "https://example.com/coach-video.mp4",
+      },
+      p_director_entries: [],
+      p_player_career_entries: [
+        {
+          appearances: 28,
+          assists: 4,
+          category: "Eccellenza",
+          goals: 7,
+          id: "coach-player-1",
+          position: null,
+          season: "2012/2013",
+          sort_order: 0,
+          team_logo_url: null,
+          team_name: "USD Virtus",
+        },
+      ],
+      p_profile_id: "profile-1",
+    });
+  });
+
   it("persists agent-specific onboarding data in agent_profiles", async () => {
     await updateCompleteProfessionalProfile({
       ...buildUpdateInput(),

@@ -337,6 +337,12 @@ export function buildFullUpdatePayload(
             ),
           }
         : null,
+    coachCareerEntries:
+      data.profile.role === "coach" ? data.coachCareerEntries : [],
+    coachDirectorCareerEntries:
+      data.profile.role === "coach" ? data.coachDirectorCareerEntries : [],
+    coachPlayerCareerEntries:
+      data.profile.role === "coach" ? data.coachPlayerCareerEntries : [],
     playerCareerEntries:
       data.profile.role === "player" ? parsedCareerEntries : [],
     playerProfile:
@@ -522,6 +528,18 @@ export type PlayerProfileHeaderDetails = {
   weightLabel: string;
 };
 
+export type CoachProfileHeaderDetails = {
+  availabilityBadges: string[];
+  bio: string | null;
+  categoryLabel?: string;
+  fullName: string;
+  licenseBadges: string[];
+  locationLabel?: string;
+  primaryRole: string;
+  statusBadge?: string;
+  teamLabel?: string;
+};
+
 export function buildPlayerProfileHeaderDetails(
   data: CompleteProfessionalProfile,
 ): PlayerProfileHeaderDetails | null {
@@ -580,6 +598,42 @@ export function buildPlayerProfileHeaderDetails(
     weightLabel: data.playerProfile?.weight_kg
       ? `${data.playerProfile.weight_kg} kg`
       : "Da definire",
+  };
+}
+
+export function buildCoachProfileHeaderDetails(
+  data: CompleteProfessionalProfile,
+): CoachProfileHeaderDetails | null {
+  if (data.profile.role !== "coach") {
+    return null;
+  }
+
+  const latestEntry = data.coachCareerEntries[0];
+  const locationLabel = formatLocationSummary(
+    data.profile.city,
+    data.profile.region,
+  );
+  const availabilityBadges =
+    data.coachProfile?.availability_type === "REGIONS"
+      ? data.coachProfile.preferred_regions
+      : data.coachProfile?.availability_type === "PROVINCES"
+        ? data.coachProfile.preferred_provinces
+        : data.coachProfile?.open_to_new_role
+          ? ["Tutta Italia"]
+          : [];
+
+  return {
+    availabilityBadges,
+    bio: data.profile.bio?.trim() || null,
+    categoryLabel: latestEntry?.category ?? data.coachProfile?.coached_categories?.[0] ?? undefined,
+    fullName: formatProfileDisplayName(data.profile.full_name, null),
+    licenseBadges: data.coachProfile?.licenses ?? [],
+    locationLabel: locationLabel === "Da completare" ? undefined : locationLabel,
+    primaryRole: latestEntry?.role?.trim() || "Allenatore",
+    statusBadge: data.coachProfile?.open_to_new_role
+      ? "Disponibile per nuove panchine"
+      : undefined,
+    teamLabel: latestEntry?.team_name?.trim() || data.coachProfile?.coached_clubs?.[0] || undefined,
   };
 }
 

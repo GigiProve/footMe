@@ -84,6 +84,52 @@ export type PlayerPalmaresRecord = {
   sort_order: number;
 };
 
+export type CoachCareerEntryRecord = {
+  id: string;
+  coach_profile_id: string;
+  team_name: string;
+  team_logo_url: string | null;
+  club_id: string | null;
+  category: string | null;
+  role: string;
+  experience_type: "MULTI_SEASON" | "SINGLE_SEASON" | "CUSTOM_PERIOD";
+  seasons: string[];
+  period_start_month: string | null;
+  period_start_year: number | null;
+  period_end_month: string | null;
+  period_end_year: number | null;
+  season_details: Record<string, { category?: string; role?: string }>;
+  results: { label?: string; variant?: string; seasonLabel?: string }[];
+  description: string | null;
+  sort_order: number;
+};
+
+export type CoachPlayerCareerEntryRecord = {
+  id: string;
+  coach_profile_id: string;
+  team_name: string;
+  team_logo_url: string | null;
+  season: string;
+  category: string | null;
+  position: string | null;
+  appearances: number;
+  goals: number;
+  assists: number;
+  sort_order: number;
+};
+
+export type CoachDirectorCareerEntryRecord = {
+  id: string;
+  coach_profile_id: string;
+  team_name: string;
+  team_logo_url: string | null;
+  role: string;
+  seasons: string[];
+  category: string | null;
+  description: string | null;
+  sort_order: number;
+};
+
 type CoachProfileRecord = {
   availability_type: string | null;
   coached_categories: string[];
@@ -168,6 +214,9 @@ export type ClubSeasonEntryRecord = {
 export type CompleteProfessionalProfile = {
   club: ClubRecord | null;
   clubSeasonEntries: ClubSeasonEntryRecord[];
+  coachCareerEntries: CoachCareerEntryRecord[];
+  coachDirectorCareerEntries: CoachDirectorCareerEntryRecord[];
+  coachPlayerCareerEntries: CoachPlayerCareerEntryRecord[];
   coachProfile: CoachProfileRecord | null;
   playerCareerEntries: PlayerCareerEntryRecord[];
   playerPalmares: PlayerPalmaresRecord[];
@@ -272,6 +321,9 @@ export type CompleteProfessionalProfileUpdate = {
     preferred_regions: string[];
     technical_video_url: string | null;
   } | null;
+  coachCareerEntries?: CoachCareerEntryRecord[];
+  coachDirectorCareerEntries?: CoachDirectorCareerEntryRecord[];
+  coachPlayerCareerEntries?: CoachPlayerCareerEntryRecord[];
   playerCareerEntries: PlayerCareerEntryInput[];
   playerPalmares?: PlayerPalmaresInput[];
   playerProfile: {
@@ -486,6 +538,80 @@ function normalizeCoachProfileRecord(
   } satisfies CoachProfileRecord;
 }
 
+function normalizeCoachCareerEntryRecord(
+  profileId: string,
+  rawEntry: Partial<CoachCareerEntryRecord>,
+  index: number,
+) {
+  return {
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-coach-career-${index}`),
+    coach_profile_id: normalizeRequiredText(rawEntry.coach_profile_id, profileId),
+    team_name: normalizeRequiredText(rawEntry.team_name, ""),
+    team_logo_url: normalizeOptionalText(rawEntry.team_logo_url),
+    club_id:
+      typeof rawEntry.club_id === "string" && rawEntry.club_id.trim()
+        ? rawEntry.club_id
+        : null,
+    category: normalizeOptionalText(rawEntry.category),
+    role: normalizeRequiredText(rawEntry.role, "Allenatore"),
+    experience_type:
+      rawEntry.experience_type === "MULTI_SEASON" ||
+      rawEntry.experience_type === "CUSTOM_PERIOD"
+        ? rawEntry.experience_type
+        : "SINGLE_SEASON",
+    seasons: normalizeStringArray(rawEntry.seasons),
+    period_start_month: normalizeOptionalText(rawEntry.period_start_month),
+    period_start_year: normalizeNumber(rawEntry.period_start_year),
+    period_end_month: normalizeOptionalText(rawEntry.period_end_month),
+    period_end_year: normalizeNumber(rawEntry.period_end_year),
+    season_details:
+      rawEntry.season_details && typeof rawEntry.season_details === "object"
+        ? rawEntry.season_details
+        : {},
+    results: Array.isArray(rawEntry.results) ? rawEntry.results : [],
+    description: normalizeOptionalText(rawEntry.description),
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+  } satisfies CoachCareerEntryRecord;
+}
+
+function normalizeCoachPlayerCareerEntryRecord(
+  profileId: string,
+  rawEntry: Partial<CoachPlayerCareerEntryRecord>,
+  index: number,
+) {
+  return {
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-coach-player-${index}`),
+    coach_profile_id: normalizeRequiredText(rawEntry.coach_profile_id, profileId),
+    team_name: normalizeRequiredText(rawEntry.team_name, ""),
+    team_logo_url: normalizeOptionalText(rawEntry.team_logo_url),
+    season: normalizeRequiredText(rawEntry.season, ""),
+    category: normalizeOptionalText(rawEntry.category),
+    position: normalizeOptionalText(rawEntry.position),
+    appearances: normalizeNumber(rawEntry.appearances) ?? 0,
+    goals: normalizeNumber(rawEntry.goals) ?? 0,
+    assists: normalizeNumber(rawEntry.assists) ?? 0,
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+  } satisfies CoachPlayerCareerEntryRecord;
+}
+
+function normalizeCoachDirectorCareerEntryRecord(
+  profileId: string,
+  rawEntry: Partial<CoachDirectorCareerEntryRecord>,
+  index: number,
+) {
+  return {
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-coach-director-${index}`),
+    coach_profile_id: normalizeRequiredText(rawEntry.coach_profile_id, profileId),
+    team_name: normalizeRequiredText(rawEntry.team_name, ""),
+    team_logo_url: normalizeOptionalText(rawEntry.team_logo_url),
+    role: normalizeRequiredText(rawEntry.role, "Dirigente"),
+    seasons: normalizeStringArray(rawEntry.seasons),
+    category: normalizeOptionalText(rawEntry.category),
+    description: normalizeOptionalText(rawEntry.description),
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+  } satisfies CoachDirectorCareerEntryRecord;
+}
+
 function normalizeStaffProfileRecord(
   profileId: string,
   rawProfile: Partial<StaffProfileRecord> | null | undefined,
@@ -579,6 +705,9 @@ function normalizePlayerCareerEntryRecord(
 export function normalizeUserProfile(input: {
   club?: Partial<ClubRecord> | null;
   clubSeasonEntries?: ClubSeasonEntryRecord[];
+  coachCareerEntries?: Partial<CoachCareerEntryRecord>[] | null;
+  coachDirectorCareerEntries?: Partial<CoachDirectorCareerEntryRecord>[] | null;
+  coachPlayerCareerEntries?: Partial<CoachPlayerCareerEntryRecord>[] | null;
   coachProfile?: Partial<CoachProfileRecord> | null;
   playerCareerEntries?: Partial<PlayerCareerEntryRecord>[] | null;
   playerPalmares?: Partial<PlayerPalmaresRecord>[] | null;
@@ -607,6 +736,15 @@ export function normalizeUserProfile(input: {
   return {
     club: normalizeClubRecord(input.profileId, input.club),
     clubSeasonEntries: input.clubSeasonEntries ?? [],
+    coachCareerEntries: (input.coachCareerEntries ?? []).map((entry, index) =>
+      normalizeCoachCareerEntryRecord(input.profileId, entry, index),
+    ),
+    coachDirectorCareerEntries: (input.coachDirectorCareerEntries ?? []).map((entry, index) =>
+      normalizeCoachDirectorCareerEntryRecord(input.profileId, entry, index),
+    ),
+    coachPlayerCareerEntries: (input.coachPlayerCareerEntries ?? []).map((entry, index) =>
+      normalizeCoachPlayerCareerEntryRecord(input.profileId, entry, index),
+    ),
     coachProfile: normalizeCoachProfileRecord(input.profileId, input.coachProfile),
     playerCareerEntries: (input.playerCareerEntries ?? []).map((entry, index) =>
       normalizePlayerCareerEntryRecord(input.profileId, entry, index),
@@ -731,6 +869,9 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 
   let playerCareerEntries: PlayerCareerEntryRecord[] = [];
   let playerPalmares: PlayerPalmaresRecord[] = [];
+  let coachCareerEntries: CoachCareerEntryRecord[] = [];
+  let coachPlayerCareerEntries: CoachPlayerCareerEntryRecord[] = [];
+  let coachDirectorCareerEntries: CoachDirectorCareerEntryRecord[] = [];
 
   if (profile.role === "player") {
     const [careerResult, palmaresResult] = await Promise.all([
@@ -766,6 +907,67 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     );
   }
 
+  if (profile.role === "coach") {
+    const [careerResult, playerCareerResult, directorCareerResult] = await Promise.all([
+      supabase
+        .from("coach_career_entries")
+        .select(
+          "id, coach_profile_id, team_name, team_logo_url, club_id, category, role, experience_type, seasons, period_start_month, period_start_year, period_end_month, period_end_year, season_details, results, description, sort_order",
+        )
+        .eq("coach_profile_id", profileId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("coach_player_career_entries")
+        .select(
+          "id, coach_profile_id, team_name, team_logo_url, season, category, position, appearances, goals, assists, sort_order",
+        )
+        .eq("coach_profile_id", profileId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("coach_director_career_entries")
+        .select(
+          "id, coach_profile_id, team_name, team_logo_url, role, seasons, category, description, sort_order",
+        )
+        .eq("coach_profile_id", profileId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (careerResult.error) {
+      throw careerResult.error;
+    }
+
+    if (playerCareerResult.error) {
+      throw playerCareerResult.error;
+    }
+
+    if (directorCareerResult.error) {
+      throw directorCareerResult.error;
+    }
+
+    coachCareerEntries = (careerResult.data ?? []).map((entry, index) =>
+      normalizeCoachCareerEntryRecord(profileId, entry as Partial<CoachCareerEntryRecord>, index),
+    );
+
+    coachPlayerCareerEntries = (playerCareerResult.data ?? []).map((entry, index) =>
+      normalizeCoachPlayerCareerEntryRecord(
+        profileId,
+        entry as Partial<CoachPlayerCareerEntryRecord>,
+        index,
+      ),
+    );
+
+    coachDirectorCareerEntries = (directorCareerResult.data ?? []).map((entry, index) =>
+      normalizeCoachDirectorCareerEntryRecord(
+        profileId,
+        entry as Partial<CoachDirectorCareerEntryRecord>,
+        index,
+      ),
+    );
+  }
+
   let clubSeasonEntries: ClubSeasonEntryRecord[] = [];
 
   if (profile.role === "club_admin" && club.data) {
@@ -786,6 +988,9 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   return normalizeUserProfile({
     club: (club.data as Partial<ClubRecord> | null) ?? null,
     clubSeasonEntries,
+    coachCareerEntries,
+    coachDirectorCareerEntries,
+    coachPlayerCareerEntries,
     coachProfile: (coachProfile.data as Partial<CoachProfileRecord> | null) ?? null,
     playerCareerEntries,
     playerPalmares,
@@ -894,17 +1099,49 @@ export async function updateCompleteProfessionalProfile(
   }
 
   if (input.role === "coach" && input.coachProfile) {
-    const { error } = await supabase.from("coach_profiles").upsert({
-      availability_type: input.coachProfile.availability_type,
-      coached_categories: input.coachProfile.coached_categories,
-      coached_clubs: input.coachProfile.coached_clubs,
-      game_philosophy: input.coachProfile.game_philosophy,
-      licenses: input.coachProfile.licenses,
-      open_to_new_role: input.coachProfile.open_to_new_role,
-      preferred_provinces: input.coachProfile.preferred_provinces,
-      preferred_regions: input.coachProfile.preferred_regions,
-      profile_id: input.profileId,
-      technical_video_url: input.coachProfile.technical_video_url,
+    const { error } = await supabase.rpc("save_coach_career_details", {
+      p_profile_id: input.profileId,
+      p_coach_profile: input.coachProfile,
+      p_career_entries: (input.coachCareerEntries ?? []).map((entry) => ({
+        category: entry.category,
+        club_id: entry.club_id,
+        description: entry.description,
+        experience_type: entry.experience_type,
+        id: entry.id,
+        period_end_month: entry.period_end_month,
+        period_end_year: entry.period_end_year,
+        period_start_month: entry.period_start_month,
+        period_start_year: entry.period_start_year,
+        results: entry.results,
+        role: entry.role,
+        season_details: entry.season_details,
+        seasons: entry.seasons,
+        sort_order: entry.sort_order,
+        team_logo_url: entry.team_logo_url,
+        team_name: entry.team_name,
+      })),
+      p_director_entries: (input.coachDirectorCareerEntries ?? []).map((entry) => ({
+        category: entry.category,
+        description: entry.description,
+        id: entry.id,
+        role: entry.role,
+        seasons: entry.seasons,
+        sort_order: entry.sort_order,
+        team_logo_url: entry.team_logo_url,
+        team_name: entry.team_name,
+      })),
+      p_player_career_entries: (input.coachPlayerCareerEntries ?? []).map((entry) => ({
+        appearances: entry.appearances,
+        assists: entry.assists,
+        category: entry.category,
+        goals: entry.goals,
+        id: entry.id,
+        position: entry.position,
+        season: entry.season,
+        sort_order: entry.sort_order,
+        team_logo_url: entry.team_logo_url,
+        team_name: entry.team_name,
+      })),
     });
 
     if (error) {
