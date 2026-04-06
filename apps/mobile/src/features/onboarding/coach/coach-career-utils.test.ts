@@ -8,6 +8,7 @@ import {
   getOccupiedCoachSeasonLabels,
   getSimplePlayerSeasonSelectOptions,
   sanitizeCoachPeriodSelection,
+  sortCoachCareerEntriesBySeason,
 } from "./coach-career-utils";
 
 function createCoachEntry(overrides: Partial<CoachCareerEntry>): CoachCareerEntry {
@@ -100,5 +101,31 @@ describe("coach-career-utils", () => {
 
     expect(options.find((option) => option.value === "2024/2025")?.disabled).toBe(true);
     expect(options.find((option) => option.value === "2023/2024")?.disabled).not.toBe(true);
+  });
+
+  it("sorts coach entries by most recent season first", () => {
+    const entries: CoachCareerEntry[] = [
+      createCoachEntry({
+        id: "coach-1",
+        teamName: "Club 2022",
+        seasons: ["2022/2023"],
+      }),
+      createCoachEntry({
+        id: "coach-2",
+        teamName: "Club 2024",
+        seasons: ["2024/2025"],
+      }),
+      createCoachEntry({
+        id: "coach-3",
+        teamName: "Club 2023",
+        seasons: ["2023/2024"],
+      }),
+    ];
+
+    expect(sortCoachCareerEntriesBySeason(entries).map((entry) => entry.id)).toEqual([
+      "coach-2",
+      "coach-3",
+      "coach-1",
+    ]);
   });
 });

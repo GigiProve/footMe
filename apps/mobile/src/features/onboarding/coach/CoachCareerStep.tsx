@@ -7,7 +7,11 @@ import { AppText, Button } from "../../../ui";
 import type { TeamAutocompleteOption } from "../../profiles/player-sports";
 import { OnboardingInfoCard, OnboardingSectionCard } from "../onboarding-ui";
 import type { CoachCareerEntry, CoachExperienceType } from "./coach-career-types";
-import { generateCoachEntryId, splitCoachEntryBySeasonDetails } from "./coach-career-utils";
+import {
+  generateCoachEntryId,
+  sortCoachCareerEntriesBySeason,
+  splitCoachEntryBySeasonDetails,
+} from "./coach-career-utils";
 import { CoachCareerExperienceCard } from "./CoachCareerExperienceCard";
 import { CoachExperienceForm } from "./CoachExperienceForm";
 import { CoachExperienceTypeSelector } from "./CoachExperienceTypeSelector";
@@ -74,6 +78,7 @@ export function CoachCareerStep({
   const [screen, setScreen] = useState<FlowScreen>({ type: "list" });
 
   const hasEntries = entries.length > 0;
+  const sortedEntries = sortCoachCareerEntriesBySeason(entries);
 
   useEffect(() => {
     if (screen.type !== "list") {
@@ -213,11 +218,11 @@ export function CoachCareerStep({
           <OnboardingInfoCard message={emptyMessage} />
         ) : null}
 
-        {entries.map((entry, index) => (
+        {sortedEntries.map((entry) => (
           <CoachCareerExperienceCard
             entry={entry}
             key={entry.id}
-            onEdit={() => handleEdit(index)}
+            onEdit={() => handleEdit(entries.findIndex((item) => item.id === entry.id))}
           />
         ))}
 

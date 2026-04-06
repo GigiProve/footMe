@@ -65,6 +65,59 @@ export function getEntrySeasonLabels(entry: CoachCareerEntry): string[] {
   return entry.seasons;
 }
 
+function getSeasonStartYear(season: string): number {
+  const startYear = Number.parseInt(season.split("/")[0] ?? "", 10);
+  return Number.isNaN(startYear) ? 0 : startYear;
+}
+
+function getEntrySortYears(entry: CoachCareerEntry): {
+  latestSeasonStartYear: number;
+  earliestSeasonStartYear: number;
+} {
+  const seasonStartYears = getEntrySeasonLabels(entry)
+    .map(getSeasonStartYear)
+    .filter((year) => year > 0);
+
+  if (seasonStartYears.length > 0) {
+    return {
+      latestSeasonStartYear: Math.max(...seasonStartYears),
+      earliestSeasonStartYear: Math.min(...seasonStartYears),
+    };
+  }
+
+  if (entry.period) {
+    const startYear = Number.parseInt(entry.period.startYear, 10);
+    const endYear = Number.parseInt(entry.period.endYear, 10);
+
+    return {
+      latestSeasonStartYear: Number.isNaN(endYear) ? 0 : endYear,
+      earliestSeasonStartYear: Number.isNaN(startYear) ? 0 : startYear,
+    };
+  }
+
+  return {
+    latestSeasonStartYear: 0,
+    earliestSeasonStartYear: 0,
+  };
+}
+
+export function sortCoachCareerEntriesBySeason<T extends CoachCareerEntry>(entries: T[]): T[] {
+  return [...entries].sort((left, right) => {
+    const leftYears = getEntrySortYears(left);
+    const rightYears = getEntrySortYears(right);
+
+    if (leftYears.latestSeasonStartYear !== rightYears.latestSeasonStartYear) {
+      return rightYears.latestSeasonStartYear - leftYears.latestSeasonStartYear;
+    }
+
+    if (leftYears.earliestSeasonStartYear !== rightYears.earliestSeasonStartYear) {
+      return rightYears.earliestSeasonStartYear - leftYears.earliestSeasonStartYear;
+    }
+
+    return left.teamName.localeCompare(right.teamName, "it", { sensitivity: "base" });
+  });
+}
+
 export function getOccupiedCoachSeasonLabels(
   entries: CoachCareerEntry[],
   currentEntryId?: string,
