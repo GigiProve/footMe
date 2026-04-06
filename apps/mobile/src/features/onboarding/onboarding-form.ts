@@ -1803,9 +1803,6 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
       if (!form.residenceCountry.trim()) {
         errors.residenceCountry = "Questo campo è obbligatorio";
       }
-      if (!form.residenceCity.trim()) {
-        errors.residenceCity = "Questo campo è obbligatorio";
-      }
       if (!form.currentLocationCountry.trim()) {
         errors.currentLocationCountry = "Questo campo è obbligatorio";
       }

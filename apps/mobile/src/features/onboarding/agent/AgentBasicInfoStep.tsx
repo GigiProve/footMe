@@ -24,7 +24,6 @@ type AgentBasicInfoStepProps = {
   phoneCountryCode: string;
   phoneNumber: string;
   residence: string;
-  residenceCity: string;
   residenceCountry: string;
   residenceRegion: string;
   validationErrors: Partial<Record<string, string>>;
@@ -43,7 +42,6 @@ type AgentBasicInfoStepProps = {
       legalStatus: LegalStatus;
       phoneCountryCode: string;
       phoneNumber: string;
-      residenceCity: string;
       residenceCountry: string;
     }>,
     fieldsToClear?: string[],
@@ -67,7 +65,6 @@ export function AgentBasicInfoStep({
   phoneCountryCode,
   phoneNumber,
   residence,
-  residenceCity,
   residenceCountry,
   residenceRegion,
   validationErrors,
@@ -161,7 +158,7 @@ export function AgentBasicInfoStep({
             <View style={styles.sectionDivider}>
               <AppText variant="titleSm">Residenza</AppText>
               <AppText variant="bodySm" color="secondary">
-                Il paese e la città dove sei ufficialmente residente.
+                Il paese dove sei ufficialmente residente.
               </AppText>
             </View>
 
@@ -173,23 +170,6 @@ export function AgentBasicInfoStep({
               }
               value={residenceCountry}
             />
-
-            <Input
-              autoCapitalize="words"
-              autoCorrect={false}
-              label="Città di residenza *"
-              onChangeText={(value) =>
-                onUpdate({ residenceCity: value }, ["residenceCity"])
-              }
-              placeholder="Es. Madrid"
-              style={validationErrors.residenceCity ? styles.inputError : undefined}
-              value={residenceCity}
-            />
-            {validationErrors.residenceCity ? (
-              <AppText variant="bodySm" color="danger">
-                {validationErrors.residenceCity}
-              </AppText>
-            ) : null}
 
             <View style={styles.sectionDivider}>
               <AppText variant="titleSm">Dove ti trovi attualmente</AppText>

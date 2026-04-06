@@ -3,13 +3,15 @@ import { Alert, StyleSheet, View } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 
 import { fetchPendingClubs, type AdminClubEntry } from "../../src/features/admin/admin-service";
+import { logout } from "../../src/features/auth/logout";
+import { useSession } from "../../src/features/auth/use-session";
 import { ClubRegistrationRequestList } from "../../src/features/admin/components/club-registration-request-list";
-import { supabase } from "../../src/lib/supabase";
 import { colors, spacing } from "../../src/theme/tokens";
 import { AppText, Badge, Button } from "../../src/ui";
 
 export default function AdminDashboardScreen() {
   const router = useRouter();
+  const { profile, session } = useSession();
   const [clubs, setClubs] = useState<AdminClubEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,14 @@ export default function AdminDashboardScreen() {
       {
         text: "Esci",
         style: "destructive",
-        onPress: () => supabase.auth.signOut(),
+        onPress: async () => {
+          await logout({
+            avatarUrl: profile?.avatar_url,
+            email: session?.user.email,
+            fullName: profile?.full_name,
+          });
+          router.replace("/(auth)/sign-in");
+        },
       },
     ]);
   }

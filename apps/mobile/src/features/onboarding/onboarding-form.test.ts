@@ -368,7 +368,6 @@ describe("onboarding-form", () => {
 
     expect(errors).toMatchObject({
       residenceCountry: "Questo campo è obbligatorio",
-      residenceCity: "Questo campo è obbligatorio",
       currentLocationCountry: "Questo campo è obbligatorio",
       currentLocationCity: "Questo campo è obbligatorio",
     });
@@ -390,7 +389,6 @@ describe("onboarding-form", () => {
 
     expect(errors).toMatchObject({
       residenceCountry: "Questo campo è obbligatorio",
-      residenceCity: "Questo campo è obbligatorio",
       currentLocationCountry: "Questo campo è obbligatorio",
       currentLocationCity: "Questo campo è obbligatorio",
       legalStatus: "Questo campo è obbligatorio",

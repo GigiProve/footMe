@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { Screen } from "../../src/components/ui/screen";
 import {
   getHomeDashboard,
   type HomeDashboardData,
 } from "../../src/features/home/home-dashboard-service";
+import { logout } from "../../src/features/auth/logout";
 import { useSession } from "../../src/features/auth/use-session";
 import { ClubDashboard } from "../../src/features/clubs/components/ClubDashboard";
-import { hasSupabaseEnv, supabase } from "../../src/lib/supabase";
+import { hasSupabaseEnv } from "../../src/lib/supabase";
 import { spacing } from "../../src/theme/tokens";
 import { AppText, Badge, Button, Card, StatCard, TopBar } from "../../src/ui";
 
@@ -20,6 +22,7 @@ const toneMap: Record<string, HighlightTone> = {
 };
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { profile, session } = useSession();
   const userId = session?.user?.id;
   const userEmail = session?.user?.email ?? null;
@@ -61,7 +64,12 @@ export default function HomeScreen() {
   }
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    await logout({
+      avatarUrl: profile?.avatar_url,
+      email: session?.user.email,
+      fullName: profile?.full_name,
+    });
+    router.replace("/(auth)/sign-in");
   }
 
   const displayName =

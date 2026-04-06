@@ -1,5 +1,5 @@
-import { Link, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { Link, useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   Alert,
   Image,
@@ -43,19 +43,33 @@ export default function SignInScreen() {
   const [hasCredentials, setHasCredentials] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    async function load() {
+  const loadQuickLoginState = useCallback(async () => {
+    try {
       const [account, credentials] = await Promise.all([
         loadLastAccount(),
         loadLastCredentials(),
       ]);
+
       if (account && credentials && account.email === credentials.email) {
         setLastAccount(account);
         setHasCredentials(true);
+        setDismissed(false);
+        return;
       }
+
+      setLastAccount(null);
+      setHasCredentials(false);
+    } catch {
+      setLastAccount(null);
+      setHasCredentials(false);
     }
-    load();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadQuickLoginState();
+    }, [loadQuickLoginState]),
+  );
 
   async function handleQuickLogin() {
     const credentials = await loadLastCredentials();
@@ -91,7 +105,7 @@ export default function SignInScreen() {
   }
 
   async function handleSignIn() {
-    const loginEmail = email.trim();
+    const loginEmail = email.trim().toLowerCase();
     if (!loginEmail) return;
 
     try {

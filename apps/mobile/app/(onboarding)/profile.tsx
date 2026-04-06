@@ -60,7 +60,10 @@ import { AgentPlayersStep } from "../../src/features/onboarding/agent/AgentPlaye
 import { AgentPortfolioStep } from "../../src/features/onboarding/agent/AgentPortfolioStep";
 import { AgentVerificationStep } from "../../src/features/onboarding/agent/AgentVerificationStep";
 import type { CoachCareerEntry } from "../../src/features/onboarding/coach/coach-career-types";
-import { AVAILABLE_FROM_OPTIONS, CoachRoleStep } from "../../src/features/onboarding/coach/CoachRoleStep";
+import {
+  AVAILABLE_FROM_OPTIONS,
+  CoachRoleStep,
+} from "../../src/features/onboarding/coach/CoachRoleStep";
 import { CoachCareerStep } from "../../src/features/onboarding/coach/CoachCareerStep";
 import { PlayerCareerToggleStep } from "../../src/features/onboarding/coach/PlayerCareerToggleStep";
 import { CoachExtraStep } from "../../src/features/onboarding/coach/CoachExtraStep";
@@ -551,7 +554,6 @@ export default function OnboardingProfileScreen() {
     repPhone,
     repPhoneCountryCode,
     residence,
-    residenceCity,
     residenceCountry,
     residenceRegion,
     role,
@@ -770,10 +772,16 @@ export default function OnboardingProfileScreen() {
         }
 
         clearValidationErrors([
-          "nationality", "phoneNumber",
-          "residence", "residenceRegion", "domicile", "domicileRegion",
-          "residenceCountry", "residenceCity",
-          "currentLocationCountry", "currentLocationCity",
+          "nationality",
+          "phoneNumber",
+          "residence",
+          "residenceRegion",
+          "domicile",
+          "domicileRegion",
+          "residenceCountry",
+          "residenceCity",
+          "currentLocationCountry",
+          "currentLocationCity",
           "legalStatus",
         ]);
       } else {
@@ -782,7 +790,13 @@ export default function OnboardingProfileScreen() {
 
       patchForm(patch);
     },
-    [clearValidationErrors, nationality, patchForm, phoneCountryCode, phoneNumber],
+    [
+      clearValidationErrors,
+      nationality,
+      patchForm,
+      phoneCountryCode,
+      phoneNumber,
+    ],
   );
 
   // Track whether the initial hydration navigation has been performed so we
@@ -1001,7 +1015,7 @@ export default function OnboardingProfileScreen() {
       primaryPosition: primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
       repEmail,
       repPhone: composePhoneNumber(repPhoneCountryCode, repPhone),
-      residence: nationalityCategory === "italy" ? residence : residenceCity,
+      residence: nationalityCategory === "italy" ? residence : residenceCountry,
       role: role as AppRole,
       staffAvailableFrom,
       staffPrimaryRole,
@@ -1659,7 +1673,10 @@ export default function OnboardingProfileScreen() {
   }
 
   function handleContinueFromDirectorResponsibilities() {
-    const nextErrors = validateOnboardingStep("director_responsibilities", form);
+    const nextErrors = validateOnboardingStep(
+      "director_responsibilities",
+      form,
+    );
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
@@ -1716,7 +1733,10 @@ export default function OnboardingProfileScreen() {
   }
 
   function handleContinueFromDirectorFootballExperience() {
-    const nextErrors = validateOnboardingStep("director_football_experience", form);
+    const nextErrors = validateOnboardingStep(
+      "director_football_experience",
+      form,
+    );
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
@@ -1984,7 +2004,9 @@ export default function OnboardingProfileScreen() {
         playerProfile: null,
         profile: {
           avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(normalizeProfileBioInput(mediaEntityDescription)),
+          bio: parseOptionalText(
+            normalizeProfileBioInput(mediaEntityDescription),
+          ),
           birth_date: birthDate,
           city: null,
           full_name: fullName,
@@ -2310,7 +2332,10 @@ export default function OnboardingProfileScreen() {
                                   communityProfileType: "",
                                   role: "fan",
                                 });
-                                clearValidationErrors(["role", "communityProfileType"]);
+                                clearValidationErrors([
+                                  "role",
+                                  "communityProfileType",
+                                ]);
                                 return;
                               }
 
@@ -2318,7 +2343,10 @@ export default function OnboardingProfileScreen() {
                                 communityProfileType: "",
                                 role: entry.value,
                               });
-                              clearValidationErrors(["role", "communityProfileType"]);
+                              clearValidationErrors([
+                                "role",
+                                "communityProfileType",
+                              ]);
                             }}
                             testID={`role-card-${entry.value}`}
                           />
@@ -2409,7 +2437,6 @@ export default function OnboardingProfileScreen() {
               phoneCountryCode={phoneCountryCode}
               phoneNumber={phoneNumber}
               residence={residence}
-              residenceCity={residenceCity}
               residenceCountry={residenceCountry}
               residenceRegion={residenceRegion}
               validationErrors={validationErrors}
@@ -2560,12 +2587,14 @@ export default function OnboardingProfileScreen() {
                 ) : null}
 
                 {/* EU and non-EU users: international residence + current location */}
-                {(nationalityCategory === "eu" || nationalityCategory === "non_eu") && nationality ? (
+                {(nationalityCategory === "eu" ||
+                  nationalityCategory === "non_eu") &&
+                nationality ? (
                   <>
                     <View style={styles.sectionHeaderGap}>
                       <AppText variant="titleSm">Residenza</AppText>
                       <AppText variant="bodySm" color="secondary">
-                        Il paese e la città dove sei ufficialmente residente.
+                        Il paese dove sei ufficialmente residente.
                       </AppText>
                     </View>
 
@@ -2573,7 +2602,9 @@ export default function OnboardingProfileScreen() {
                       errorMessage={validationErrors.residenceCountry}
                       label="Paese di residenza *"
                       onChange={(value) =>
-                        updateValue("residenceCountry", value, ["residenceCountry"])
+                        updateValue("residenceCountry", value, [
+                          "residenceCountry",
+                        ])
                       }
                       value={residenceCountry}
                     />
@@ -2583,29 +2614,10 @@ export default function OnboardingProfileScreen() {
                       </ValidationMessage>
                     ) : null}
 
-                    <Input
-                      autoCapitalize="words"
-                      autoCorrect={false}
-                      label="Città di residenza *"
-                      onChangeText={(value) =>
-                        updateValue("residenceCity", value, ["residenceCity"])
-                      }
-                      placeholder="Es. Madrid"
-                      style={
-                        validationErrors.residenceCity
-                          ? { borderColor: colors.danger }
-                          : undefined
-                      }
-                      value={residenceCity}
-                    />
-                    {validationErrors.residenceCity ? (
-                      <ValidationMessage>
-                        {validationErrors.residenceCity}
-                      </ValidationMessage>
-                    ) : null}
-
                     <View style={styles.sectionHeaderGap}>
-                      <AppText variant="titleSm">Dove ti trovi attualmente</AppText>
+                      <AppText variant="titleSm">
+                        Dove ti trovi attualmente
+                      </AppText>
                       <AppText variant="bodySm" color="secondary">
                         Il paese e la città in cui vivi in questo momento.
                       </AppText>
@@ -2615,7 +2627,9 @@ export default function OnboardingProfileScreen() {
                       errorMessage={validationErrors.currentLocationCountry}
                       label="Paese attuale *"
                       onChange={(value) =>
-                        updateValue("currentLocationCountry", value, ["currentLocationCountry"])
+                        updateValue("currentLocationCountry", value, [
+                          "currentLocationCountry",
+                        ])
                       }
                       value={currentLocationCountry}
                     />
@@ -2630,7 +2644,9 @@ export default function OnboardingProfileScreen() {
                       autoCorrect={false}
                       label="Città attuale *"
                       onChangeText={(value) =>
-                        updateValue("currentLocationCity", value, ["currentLocationCity"])
+                        updateValue("currentLocationCity", value, [
+                          "currentLocationCity",
+                        ])
                       }
                       placeholder="Es. Milano"
                       style={
@@ -2654,7 +2670,8 @@ export default function OnboardingProfileScreen() {
                     <View style={styles.sectionHeaderGap}>
                       <AppText variant="titleSm">Stato legale *</AppText>
                       <AppText variant="bodySm" color="secondary">
-                        La tua situazione relativa al permesso di soggiorno in Italia.
+                        La tua situazione relativa al permesso di soggiorno in
+                        Italia.
                       </AppText>
                     </View>
 
@@ -2663,16 +2680,23 @@ export default function OnboardingProfileScreen() {
                         <Pressable
                           key={option.value}
                           onPress={() =>
-                            updateValue("legalStatus", option.value, ["legalStatus"])
+                            updateValue("legalStatus", option.value, [
+                              "legalStatus",
+                            ])
                           }
                           style={[
                             styles.legalStatusOption,
-                            legalStatus === option.value && styles.legalStatusOptionActive,
+                            legalStatus === option.value &&
+                              styles.legalStatusOptionActive,
                           ]}
                         >
                           <AppText
                             variant="bodySm"
-                            color={legalStatus === option.value ? "accentStrong" : "primary"}
+                            color={
+                              legalStatus === option.value
+                                ? "accentStrong"
+                                : "primary"
+                            }
                           >
                             {option.label}
                           </AppText>
@@ -3140,7 +3164,6 @@ export default function OnboardingProfileScreen() {
                     </View>
                   ) : null}
                 </OnboardingSectionCard>
-
               </>
             ) : null}
 
@@ -3255,16 +3278,26 @@ export default function OnboardingProfileScreen() {
                 isAvailable={isOpenToTransfer}
                 onAvailabilityTypeChange={(type) => {
                   patchForm({ availabilityType: type });
-                  clearValidationErrors(["transferRegions", "transferProvinces"]);
+                  clearValidationErrors([
+                    "transferRegions",
+                    "transferProvinces",
+                  ]);
                 }}
                 onCategoriesChange={(categories) => {
                   updateValue("preferredCategories", categories.join(", "));
                   clearValidationErrors(["preferredCategories"]);
                 }}
                 onIsAvailableChange={(value) => {
-                  patchForm({ isOpenToTransfer: value, willingToChangeClub: value });
+                  patchForm({
+                    isOpenToTransfer: value,
+                    willingToChangeClub: value,
+                  });
                   if (!value) {
-                    clearValidationErrors(["transferRegions", "transferProvinces", "preferredCategories"]);
+                    clearValidationErrors([
+                      "transferRegions",
+                      "transferProvinces",
+                      "preferredCategories",
+                    ]);
                   }
                 }}
                 onProvincesChange={(nextProvinces) => {
@@ -3483,24 +3516,34 @@ export default function OnboardingProfileScreen() {
                 hideCategories
                 infoMessages={{
                   ITALY: "",
-                  REGIONS: "Indica una o più regioni in cui sei disponibile ad allenare.",
-                  PROVINCES: "Indica una o più province in cui sei disponibile ad allenare.",
+                  REGIONS:
+                    "Indica una o più regioni in cui sei disponibile ad allenare.",
+                  PROVINCES:
+                    "Indica una o più province in cui sei disponibile ad allenare.",
                 }}
                 isAvailable={openToNewRole}
-                onAvailabilityTypeChange={(value) => patchForm({ coachAvailabilityType: value })}
+                onAvailabilityTypeChange={(value) =>
+                  patchForm({ coachAvailabilityType: value })
+                }
                 onCategoriesChange={() => undefined}
                 onIsAvailableChange={(value) => {
                   patchForm({
                     openToNewRole: value,
-                    ...(value ? {} : {
-                      coachAvailableFrom: "",
-                      coachProvincesArray: [],
-                      coachRegionsArray: [],
-                    }),
+                    ...(value
+                      ? {}
+                      : {
+                          coachAvailableFrom: "",
+                          coachProvincesArray: [],
+                          coachRegionsArray: [],
+                        }),
                   });
                 }}
-                onProvincesChange={(value) => patchForm({ coachProvincesArray: value })}
-                onRegionsChange={(value) => patchForm({ coachRegionsArray: value })}
+                onProvincesChange={(value) =>
+                  patchForm({ coachProvincesArray: value })
+                }
+                onRegionsChange={(value) =>
+                  patchForm({ coachRegionsArray: value })
+                }
                 provinces={coachProvincesArray}
                 provincesHelperText="Puoi selezionare più province in cui allenare."
                 provincesLabel="Province di interesse"
@@ -4293,7 +4336,9 @@ export default function OnboardingProfileScreen() {
             hasPlayedFootball={directorHasPlayedFootball}
             isBusy={isBusy}
             onContinue={handleContinueFromDirectorPlayerCareerToggle}
-            onUpdate={(value) => patchForm({ directorHasPlayedFootball: value })}
+            onUpdate={(value) =>
+              patchForm({ directorHasPlayedFootball: value })
+            }
             subtitle="Hai maturato esperienze come calciatore prima di diventare dirigente?"
             title="Carriera da giocatore"
           />
@@ -4429,7 +4474,11 @@ export default function OnboardingProfileScreen() {
                 </OnboardingSectionCard>
 
                 <Button
-                  label={role === "fan" || role === "media" ? "Vai alla Home" : "Vai alla home feed"}
+                  label={
+                    role === "fan" || role === "media"
+                      ? "Vai alla Home"
+                      : "Vai alla home feed"
+                  }
                   onPress={() => finishOnboarding("feed")}
                   variant="primary"
                 />

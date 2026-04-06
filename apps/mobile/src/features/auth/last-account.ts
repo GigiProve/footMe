@@ -14,7 +14,13 @@ export type LastAccount = {
 export async function saveLastAccountProfile(
   account: LastAccount,
 ): Promise<void> {
-  await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(account));
+  await AsyncStorage.setItem(
+    PROFILE_KEY,
+    JSON.stringify({
+      ...account,
+      email: account.email.trim().toLowerCase(),
+    } satisfies LastAccount),
+  );
 }
 
 /** Save credentials (called at sign-in, when we have the password). */
@@ -22,7 +28,13 @@ export async function saveLastAccountCredentials(
   email: string,
   password: string,
 ): Promise<void> {
-  await SecureStore.setItemAsync(PASSWORD_KEY, JSON.stringify({ email, password }));
+  await SecureStore.setItemAsync(
+    PASSWORD_KEY,
+    JSON.stringify({
+      email: email.trim().toLowerCase(),
+      password,
+    }),
+  );
 }
 
 export async function loadLastAccount(): Promise<LastAccount | null> {
@@ -30,7 +42,11 @@ export async function loadLastAccount(): Promise<LastAccount | null> {
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as LastAccount;
+    const parsed = JSON.parse(raw) as LastAccount;
+    return {
+      ...parsed,
+      email: parsed.email.trim().toLowerCase(),
+    };
   } catch {
     return null;
   }
@@ -44,7 +60,11 @@ export async function loadLastCredentials(): Promise<{
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as { email: string; password: string };
+    const parsed = JSON.parse(raw) as { email: string; password: string };
+    return {
+      ...parsed,
+      email: parsed.email.trim().toLowerCase(),
+    };
   } catch {
     return null;
   }
