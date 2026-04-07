@@ -83,15 +83,11 @@ describe("CoachInfoTab", () => {
       );
     });
 
-    expect(tree.root.findByProps({ children: "Disponibilità" })).toBeTruthy();
-    expect(tree.root.findByProps({ children: "Qualifica" })).toBeTruthy();
-    expect(tree.root.findByProps({ children: "Squadre allenate" })).toBeTruthy();
-    expect(tree.root.findByProps({ children: "Filosofia di gioco" })).toBeTruthy();
+    expect(tree.root.findByProps({ children: "Disponibile" })).toBeTruthy();
     expect(tree.root.findByProps({ children: "UEFA B" })).toBeTruthy();
-    expect(tree.root.findByProps({ children: "Promozione" })).toBeTruthy();
-    expect(tree.root.findByProps({ children: "USD Virtus" })).toBeTruthy();
-    expect(tree.root.findByProps({ accessibilityLabel: "Modifica Disponibilità" })).toBeTruthy();
-    expect(tree.root.findByProps({ accessibilityLabel: "Modifica Qualifica" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Modifica disponibilità" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Modifica identità tecnica" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Modifica risultati" })).toBeTruthy();
     expect(tree.root.findByProps({ accessibilityLabel: "Modifica contatti" })).toBeTruthy();
   });
 
@@ -138,17 +134,9 @@ describe("CoachInfoTab", () => {
       );
     });
 
-    expect(tree.root.findByProps({ children: "Nessuna licenza inserita." })).toBeTruthy();
-    expect(
-      tree.root.findByProps({ children: "Nessuna categoria allenata inserita." }),
-    ).toBeTruthy();
-    expect(
-      tree.root.findByProps({ children: "Nessuna squadra allenata inserita." }),
-    ).toBeTruthy();
-    expect(
-      tree.root.findByProps({ children: "Nessuna filosofia di gioco inserita." }),
-    ).toBeTruthy();
+    expect(tree.root.findByProps({ children: "Non disponibile" })).toBeTruthy();
+    expect(tree.root.findByProps({ children: "Nessun risultato inserito." })).toBeTruthy();
     expect(() => tree.root.findByProps({ accessibilityLabel: "Modifica contatti" })).toThrow();
-    expect(() => tree.root.findByProps({ accessibilityLabel: "Modifica Disponibilità" })).toThrow();
+    expect(() => tree.root.findByProps({ accessibilityLabel: "Modifica disponibilità" })).toThrow();
   });
 });

@@ -2132,7 +2132,7 @@ export default function OnboardingProfileScreen() {
           category: entry.category || null,
           coach_profile_id: session.user.id,
           goals: Number.parseInt(entry.goals, 10) || 0,
-          id: entry.id ?? `coach-player-${index}`,
+          id: entry.id ?? globalThis.crypto.randomUUID(),
           position: null,
           season: entry.seasonLabel,
           sort_order: index,

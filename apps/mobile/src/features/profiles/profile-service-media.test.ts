@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
   const coachDirectorEqMock = vi.fn();
   const coachDirectorFirstOrderMock = vi.fn();
   const coachDirectorOrderMock = vi.fn();
+  const coachAchievementsEqMock = vi.fn();
   const coachMaybeSingleMock = vi.fn();
   const coachPlayerEqMock = vi.fn();
   const coachPlayerFirstOrderMock = vi.fn();
@@ -22,6 +23,7 @@ const mocks = vi.hoisted(() => {
   const profileMaybeSingleMock = vi.fn();
 
   return {
+    coachAchievementsEqMock,
     coachCareerEqMock,
     coachCareerFirstOrderMock,
     coachCareerOrderMock,
@@ -99,6 +101,14 @@ const mocks = vi.hoisted(() => {
         };
       }
 
+      if (table === "coach_achievements") {
+        return {
+          select: vi.fn(() => ({
+            eq: coachAchievementsEqMock,
+          })),
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     }),
     privateContactsMaybeSingleMock,
@@ -117,6 +127,7 @@ vi.mock("../../lib/supabase", () => ({
 describe("coach media profile service", () => {
   beforeEach(() => {
     mocks.fromMock.mockClear();
+    mocks.coachAchievementsEqMock.mockReset();
     mocks.coachMaybeSingleMock.mockReset();
     mocks.coachCareerEqMock.mockReset();
     mocks.coachCareerFirstOrderMock.mockReset();
@@ -173,6 +184,9 @@ describe("coach media profile service", () => {
       order: mocks.coachDirectorOrderMock,
     }));
     mocks.coachDirectorOrderMock.mockResolvedValue({ data: [], error: null });
+    mocks.coachAchievementsEqMock.mockImplementation(() => ({
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }));
   });
 
   it("loads coach media items from coach profile", async () => {
