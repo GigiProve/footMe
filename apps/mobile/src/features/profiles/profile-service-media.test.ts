@@ -221,16 +221,23 @@ describe("coach media profile service", () => {
   it("persists coach media items through coach_profiles upsert", async () => {
     await saveCoachProfileMedia({
       coachProfile: {
+        achievements: [],
         availability_type: "ITALY",
         coached_categories: [],
         coached_clubs: [],
+        contract_end: null,
+        current_club: null,
         game_philosophy: null,
         licenses: [],
         media_items: [],
         open_to_new_role: false,
+        play_styles: [],
+        preferred_categories: [],
+        preferred_formation: null,
         preferred_provinces: [],
         preferred_regions: [],
         profile_id: "coach-1",
+        secondary_formations: [],
         technical_video_url: null,
       },
       mediaItems: [

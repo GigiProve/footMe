@@ -51,6 +51,7 @@ type EditSection =
   | "playerPalmares"
   | "coachMedia"
   | "coachInfo"
+  | "coachAchievements"
   | "coachExperiences"
   | "staffInfo"
   | "clubInfo"

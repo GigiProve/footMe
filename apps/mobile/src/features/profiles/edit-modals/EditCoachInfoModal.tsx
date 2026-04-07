@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 
 import { MediaPickerField } from "../../../components/ui/media-picker-field";
 
@@ -17,17 +17,37 @@ import {
   fromDelimitedString,
 } from "../profile-edit-helpers";
 import { validateBirthDateInput } from "../profile-form-utils";
+import { colors, radius, spacing } from "../../../theme/tokens";
+import { AppText } from "../../../ui";
 import { ProfileField as Field } from "../profile-screen-components";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import { updateCompleteProfessionalProfile } from "../profile-service";
 import { EditModalShell } from "./EditModalShell";
 
+const FORMATION_OPTIONS = [
+  "4-3-3", "4-4-2", "4-2-3-1", "3-5-2", "3-4-3", "5-3-2", "4-1-4-1", "4-3-1-2",
+] as const;
+
+const PLAY_STYLE_OPTIONS = [
+  "Costruzione dal basso", "Pressing alto", "Contropiede",
+  "Possesso palla", "Gioco diretto", "Misto", "Valorizzazione giovani",
+] as const;
+
+const PREFERRED_CATEGORY_OPTIONS = [
+  "Serie A", "Serie B", "Serie C", "Serie D",
+  "Eccellenza", "Promozione", "Prima Categoria",
+  "Seconda Categoria", "Juniores", "Allievi", "Giovanissimi",
+] as const;
+
 type CoachFormState = {
   coachedCategories: string;
   coachedClubs: string;
+  contractEnd: string;
+  currentClub: string;
   gamePhilosophy: string;
   licenses: string;
   openToNewRole: boolean;
+  preferredFormation: string;
   technicalVideoUrl: string;
 };
 
@@ -46,9 +66,12 @@ function getInitialFormState(
   return {
     coachedCategories: base.coachedCategories,
     coachedClubs: base.coachedClubs,
+    contractEnd: completeProfile.coachProfile?.contract_end ?? "",
+    currentClub: completeProfile.coachProfile?.current_club ?? "",
     gamePhilosophy: base.gamePhilosophy,
     licenses: base.licenses,
     openToNewRole: base.openToNewRole,
+    preferredFormation: completeProfile.coachProfile?.preferred_formation ?? "",
     technicalVideoUrl: base.technicalVideoUrl,
   };
 }
@@ -66,6 +89,9 @@ export function EditCoachInfoModal({
   const [preferredRegionsArr, setPreferredRegionsArr] = useState<string[]>([]);
   const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("ITALY");
   const [preferredProvincesArr, setPreferredProvincesArr] = useState<string[]>([]);
+  const [secondaryFormations, setSecondaryFormations] = useState<string[]>([]);
+  const [playStyles, setPlayStyles] = useState<string[]>([]);
+  const [preferredCategories, setPreferredCategories] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
@@ -76,6 +102,9 @@ export function EditCoachInfoModal({
       setPreferredRegionsArr(fromDelimitedString(base.preferredRegions));
       setAvailabilityType((base.coachAvailabilityType as AvailabilityType) || "ITALY");
       setPreferredProvincesArr(fromDelimitedString(base.coachPreferredProvinces));
+      setSecondaryFormations(completeProfile.coachProfile?.secondary_formations ?? []);
+      setPlayStyles(completeProfile.coachProfile?.play_styles ?? []);
+      setPreferredCategories(completeProfile.coachProfile?.preferred_categories ?? []);
     }
   }, [visible, completeProfile]);
 
@@ -169,6 +198,14 @@ export function EditCoachInfoModal({
       payload.profile.birth_date = validateBirthDateInput(
         baseState.birthDate,
       ).isoValue;
+      if (payload.coachProfile) {
+        payload.coachProfile.preferred_formation = form.preferredFormation || null;
+        payload.coachProfile.secondary_formations = secondaryFormations;
+        payload.coachProfile.play_styles = playStyles;
+        payload.coachProfile.current_club = form.currentClub || null;
+        payload.coachProfile.contract_end = form.contractEnd || null;
+        payload.coachProfile.preferred_categories = preferredCategories;
+      }
 
       await updateCompleteProfessionalProfile(payload);
       onSaved();
@@ -237,6 +274,121 @@ export function EditCoachInfoModal({
         removable={Boolean(form.technicalVideoUrl)}
       />
 
+      {/* Situazione attuale */}
+      <Field
+        editable
+        label="Club attuale"
+        onChangeText={(value) => updateField("currentClub", value)}
+        placeholder="Nome del club attuale..."
+        value={form.currentClub}
+      />
+
+      <Field
+        editable
+        label="Scadenza contratto"
+        onChangeText={(value) => updateField("contractEnd", value)}
+        placeholder="es. Giugno 2026"
+        value={form.contractEnd}
+      />
+
+      {/* Identità tecnica – modulo */}
+      <View>
+        <AppText style={styles.sectionLabel}>Modulo preferito</AppText>
+        <View style={styles.chipsWrap}>
+          {FORMATION_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt}
+              accessibilityRole="button"
+              onPress={() => updateField("preferredFormation", form.preferredFormation === opt ? "" : opt)}
+              style={[styles.chip, form.preferredFormation === opt && styles.chipSelected]}
+            >
+              <AppText
+                variant="caption"
+                style={[styles.chipText, form.preferredFormation === opt && styles.chipTextSelected]}
+              >
+                {opt}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View>
+        <AppText style={styles.sectionLabel}>Moduli secondari</AppText>
+        <View style={styles.chipsWrap}>
+          {FORMATION_OPTIONS.filter((opt) => opt !== form.preferredFormation).map((opt) => (
+            <Pressable
+              key={opt}
+              accessibilityRole="button"
+              onPress={() =>
+                setSecondaryFormations((prev) =>
+                  prev.includes(opt) ? prev.filter((f) => f !== opt) : [...prev, opt],
+                )
+              }
+              style={[styles.chip, secondaryFormations.includes(opt) && styles.chipSelected]}
+            >
+              <AppText
+                variant="caption"
+                style={[styles.chipText, secondaryFormations.includes(opt) && styles.chipTextSelected]}
+              >
+                {opt}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View>
+        <AppText style={styles.sectionLabel}>Stile di gioco</AppText>
+        <View style={styles.chipsWrap}>
+          {PLAY_STYLE_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt}
+              accessibilityRole="button"
+              onPress={() =>
+                setPlayStyles((prev) =>
+                  prev.includes(opt) ? prev.filter((s) => s !== opt) : [...prev, opt],
+                )
+              }
+              style={[styles.chip, playStyles.includes(opt) && styles.chipSelected]}
+            >
+              <AppText
+                variant="caption"
+                style={[styles.chipText, playStyles.includes(opt) && styles.chipTextSelected]}
+              >
+                {opt}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* Categorie target */}
+      <View>
+        <AppText style={styles.sectionLabel}>Categorie target</AppText>
+        <View style={styles.chipsWrap}>
+          {PREFERRED_CATEGORY_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt}
+              accessibilityRole="button"
+              onPress={() =>
+                setPreferredCategories((prev) =>
+                  prev.includes(opt) ? prev.filter((c) => c !== opt) : [...prev, opt],
+                )
+              }
+              style={[styles.chip, preferredCategories.includes(opt) && styles.chipSelected]}
+            >
+              <AppText
+                variant="caption"
+                style={[styles.chipText, preferredCategories.includes(opt) && styles.chipTextSelected]}
+              >
+                {opt}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
       {/* Availability + geographic selection */}
       <WhereToPlaySection
         availabilityType={availabilityType}
@@ -272,4 +424,36 @@ export function EditCoachInfoModal({
     </EditModalShell>
   );
 }
+
+const styles = StyleSheet.create({
+  chip: {
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[6],
+  },
+  chipSelected: {
+    backgroundColor: colors.textPrimary,
+    borderColor: colors.textPrimary,
+  },
+  chipText: {
+    color: colors.textPrimary,
+    fontWeight: "500",
+  },
+  chipTextSelected: {
+    color: colors.inkInvert,
+  },
+  chipsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
+  },
+  sectionLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: spacing[8],
+  },
+});
 

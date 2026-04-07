@@ -7,6 +7,7 @@ import type { AppRole } from "../../src/features/onboarding/create-initial-profi
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
 import { EditClubInfoModal } from "../../src/features/profiles/edit-modals/EditClubInfoModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
+import { EditCoachAchievementsModal } from "../../src/features/profiles/edit-modals/EditCoachAchievementsModal";
 import { EditCoachInfoModal } from "../../src/features/profiles/edit-modals/EditCoachInfoModal";
 import { EditCoachProfileModal } from "../../src/features/profiles/edit-modals/EditCoachProfileModal";
 import { EditCoachMediaModal } from "../../src/features/profiles/edit-modals/EditCoachMediaModal";
@@ -370,6 +371,13 @@ export default function ProfileScreen() {
                 onClose={handleCloseModal}
                 onSaved={handleSaved}
                 visible={activeModal === "coachExperiences"}
+              />
+              <EditCoachAchievementsModal
+                achievements={completeProfile.coachProfile?.achievements ?? []}
+                coachProfileId={completeProfile.coachProfile?.profile_id ?? ""}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                visible={activeModal === "coachAchievements"}
               />
             </>
           ) : null}

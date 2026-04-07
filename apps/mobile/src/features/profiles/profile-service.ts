@@ -134,17 +134,34 @@ export type CoachDirectorCareerEntryRecord = {
   sort_order: number;
 };
 
+export type CoachAchievementRecord = {
+  id: string;
+  coach_profile_id: string;
+  achievement_type: 'campionato' | 'promozione' | 'coppa' | 'playoff' | 'altro';
+  label: string;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+};
+
 type CoachProfileRecord = {
+  achievements: CoachAchievementRecord[];
   availability_type: string | null;
   coached_categories: string[];
   coached_clubs: string[];
+  contract_end: string | null;
+  current_club: string | null;
   game_philosophy: string | null;
   licenses: string[];
   media_items: CoachMediaItemRecord[];
   open_to_new_role: boolean;
+  play_styles: string[];
+  preferred_categories: string[];
+  preferred_formation: string | null;
   preferred_provinces: string[];
   preferred_regions: string[];
   profile_id: string;
+  secondary_formations: string[];
   technical_video_url: string | null;
 };
 
@@ -319,12 +336,18 @@ export type CompleteProfessionalProfileUpdate = {
     availability_type: string | null;
     coached_categories: string[];
     coached_clubs: string[];
+    contract_end: string | null;
+    current_club: string | null;
     game_philosophy: string | null;
     licenses: string[];
     media_items: CoachMediaItemRecord[];
     open_to_new_role: boolean;
+    play_styles: string[];
+    preferred_categories: string[];
+    preferred_formation: string | null;
     preferred_provinces: string[];
     preferred_regions: string[];
+    secondary_formations: string[];
     technical_video_url: string | null;
   } | null;
   coachCareerEntries?: CoachCareerEntryRecord[];
@@ -522,6 +545,25 @@ function normalizePlayerPalmaresRecord(
   };
 }
 
+function normalizeCoachAchievementRecord(
+  profileId: string,
+  rawEntry: Partial<CoachAchievementRecord>,
+  index: number,
+): CoachAchievementRecord {
+  const validTypes = ['campionato', 'promozione', 'coppa', 'playoff', 'altro'] as const;
+  return {
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-achievement-${index}`),
+    coach_profile_id: normalizeRequiredText(rawEntry.coach_profile_id, profileId),
+    achievement_type: validTypes.includes(rawEntry.achievement_type as typeof validTypes[number])
+      ? (rawEntry.achievement_type as CoachAchievementRecord['achievement_type'])
+      : 'altro',
+    label: normalizeRequiredText(rawEntry.label, ''),
+    description: normalizeOptionalText(rawEntry.description),
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+    created_at: normalizeRequiredText(rawEntry.created_at, new Date().toISOString()),
+  };
+}
+
 function normalizeCoachProfileRecord(
   profileId: string,
   rawProfile: Partial<CoachProfileRecord> | null | undefined,
@@ -531,16 +573,27 @@ function normalizeCoachProfileRecord(
   }
 
   return {
+    achievements: Array.isArray(rawProfile.achievements)
+      ? (rawProfile.achievements as CoachAchievementRecord[]).map((a, i) =>
+          normalizeCoachAchievementRecord(profileId, a, i),
+        )
+      : [],
     availability_type: normalizeOptionalText(rawProfile.availability_type),
     coached_categories: normalizeStringArray(rawProfile.coached_categories),
     coached_clubs: normalizeStringArray(rawProfile.coached_clubs),
+    contract_end: normalizeOptionalText(rawProfile.contract_end),
+    current_club: normalizeOptionalText(rawProfile.current_club),
     game_philosophy: normalizeOptionalText(rawProfile.game_philosophy),
     licenses: normalizeStringArray(rawProfile.licenses),
     media_items: normalizeCoachMediaItems(rawProfile.media_items, []),
     open_to_new_role: normalizeBoolean(rawProfile.open_to_new_role),
+    play_styles: normalizeStringArray(rawProfile.play_styles),
+    preferred_categories: normalizeStringArray(rawProfile.preferred_categories),
+    preferred_formation: normalizeOptionalText(rawProfile.preferred_formation),
     preferred_provinces: normalizeStringArray(rawProfile.preferred_provinces),
     preferred_regions: normalizeStringArray(rawProfile.preferred_regions),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+    secondary_formations: normalizeStringArray(rawProfile.secondary_formations),
     technical_video_url: normalizeOptionalText(rawProfile.technical_video_url),
   } satisfies CoachProfileRecord;
 }
@@ -813,7 +866,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("coach_profiles")
           .select(
-            "profile_id, licenses, coached_clubs, coached_categories, game_philosophy, technical_video_url, media_items, preferred_regions, preferred_provinces, availability_type, open_to_new_role",
+            "profile_id, licenses, coached_clubs, coached_categories, game_philosophy, technical_video_url, media_items, preferred_regions, preferred_provinces, availability_type, open_to_new_role, preferred_formation, secondary_formations, play_styles, current_club, contract_end, preferred_categories",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -915,7 +968,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   }
 
   if (profile.role === "coach") {
-    const [careerResult, playerCareerResult, directorCareerResult] = await Promise.all([
+    const [careerResult, playerCareerResult, directorCareerResult, achievementsResult] = await Promise.all([
       supabase
         .from("coach_career_entries")
         .select(
@@ -940,6 +993,13 @@ export async function getCompleteProfessionalProfile(profileId: string) {
         .eq("coach_profile_id", profileId)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: false }),
+      supabase
+        .from("coach_achievements")
+        .select(
+          "id, coach_profile_id, achievement_type, label, description, sort_order, created_at",
+        )
+        .eq("coach_profile_id", profileId)
+        .order("sort_order", { ascending: true }),
     ]);
 
     if (careerResult.error) {
@@ -952,6 +1012,10 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 
     if (directorCareerResult.error) {
       throw directorCareerResult.error;
+    }
+
+    if (achievementsResult.error) {
+      throw achievementsResult.error;
     }
 
     coachCareerEntries = (careerResult.data ?? []).map((entry, index) =>
@@ -973,6 +1037,10 @@ export async function getCompleteProfessionalProfile(profileId: string) {
         index,
       ),
     );
+
+    if (coachProfile.data) {
+      (coachProfile.data as Record<string, unknown>).achievements = achievementsResult.data ?? [];
+    }
   }
 
   let clubSeasonEntries: ClubSeasonEntryRecord[] = [];
@@ -1450,6 +1518,39 @@ export async function searchTeams(query: string, limit = 5) {
     logoUrl: row.logo_url,
     name: row.name,
   }));
+}
+
+export async function upsertCoachAchievement(
+  data: Omit<CoachAchievementRecord, 'id' | 'created_at'>,
+): Promise<CoachAchievementRecord> {
+  const { data: result, error } = await supabase
+    .from("coach_achievements")
+    .upsert({
+      coach_profile_id: data.coach_profile_id,
+      achievement_type: data.achievement_type,
+      label: data.label,
+      description: data.description ?? null,
+      sort_order: data.sort_order,
+    })
+    .select("id, coach_profile_id, achievement_type, label, description, sort_order, created_at")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return result as CoachAchievementRecord;
+}
+
+export async function deleteCoachAchievement(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("coach_achievements")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function checkDuplicateClubs(clubName: string, city: string) {

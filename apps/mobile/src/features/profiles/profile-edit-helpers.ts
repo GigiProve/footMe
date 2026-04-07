@@ -323,16 +323,22 @@ export function buildFullUpdatePayload(
               formState.coachedCategories,
             ),
             coached_clubs: fromDelimitedString(formState.coachedClubs),
+            contract_end: data.coachProfile?.contract_end ?? null,
+            current_club: data.coachProfile?.current_club ?? null,
             game_philosophy: parseOptionalText(formState.gamePhilosophy),
             licenses: fromDelimitedString(formState.licenses),
             media_items: data.coachProfile?.media_items ?? [],
             open_to_new_role: formState.openToNewRole,
+            play_styles: data.coachProfile?.play_styles ?? [],
+            preferred_categories: data.coachProfile?.preferred_categories ?? [],
+            preferred_formation: data.coachProfile?.preferred_formation ?? null,
             preferred_provinces: fromDelimitedString(
               formState.coachPreferredProvinces,
             ),
             preferred_regions: fromDelimitedString(
               formState.preferredRegions,
             ),
+            secondary_formations: data.coachProfile?.secondary_formations ?? [],
             technical_video_url: parseOptionalText(
               formState.technicalVideoUrl,
             ),
