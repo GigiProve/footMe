@@ -55,6 +55,9 @@ function buildCoachProfile(
       region: "Lombardia",
       role: "coach",
     },
+    staffCareerEntries: [],
+    staffCoachCareerEntries: [],
+    staffPlayerCareerEntries: [],
     staffProfile: null,
     userContacts: {
       email: "coach@example.com",

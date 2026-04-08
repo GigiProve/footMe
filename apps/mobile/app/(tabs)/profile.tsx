@@ -20,7 +20,10 @@ import { EditPlayerPalmaresModal } from "../../src/features/profiles/edit-modals
 import { EditPlayerProfileModal } from "../../src/features/profiles/edit-modals/EditPlayerProfileModal";
 import { EditPlayerSituationModal } from "../../src/features/profiles/edit-modals/EditPlayerSituationModal";
 import { EditPlayerSportsModal } from "../../src/features/profiles/edit-modals/EditPlayerSportsModal";
+import { EditStaffExperiencesModal } from "../../src/features/profiles/edit-modals/EditStaffExperiencesModal";
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
+import { StaffProfileTabView } from "../../src/features/profiles/career/StaffProfileTabView";
+import type { StaffGroupedExperience } from "../../src/features/profiles/career/staff-career-grouping";
 import {
   buildFullUpdatePayload,
   buildHeaderDetails,
@@ -154,6 +157,47 @@ export default function ProfileScreen() {
     );
   }
 
+  async function handleDeleteStaffExperience(
+    group: StaffGroupedExperience,
+    section: "technical" | "coach",
+  ) {
+    if (!completeProfile) return;
+
+    Alert.alert(
+      "Elimina esperienza",
+      `Eliminare l'esperienza con ${group.teamName}?`,
+      [
+        { style: "cancel", text: "Annulla" },
+        {
+          onPress: async () => {
+            try {
+              const baseState = buildInitialState(completeProfile);
+              const payload = buildFullUpdatePayload(completeProfile, baseState);
+              if (section === "technical") {
+                payload.staffCareerEntries =
+                  completeProfile.staffCareerEntries.filter(
+                    (e) => e.id !== group.entryId,
+                  );
+              } else {
+                payload.staffCoachCareerEntries =
+                  completeProfile.staffCoachCareerEntries.filter(
+                    (e) => e.id !== group.entryId,
+                  );
+              }
+              await updateCompleteProfessionalProfile(payload);
+              await loadProfile();
+              Alert.alert("Esperienza eliminata", "La voce è stata rimossa.");
+            } catch {
+              Alert.alert("Errore", "Impossibile eliminare l'esperienza.");
+            }
+          },
+          style: "destructive",
+          text: "Elimina",
+        },
+      ],
+    );
+  }
+
   async function handleDeleteCoachExperience(group: CoachGroupedExperience) {
     if (!completeProfile) return;
 
@@ -264,6 +308,16 @@ export default function ProfileScreen() {
             onEdit={handleEdit}
             onEditExperience={() => handleEdit("coachExperiences")}
             onManageMedia={() => handleEdit("coachMedia")}
+          />
+        ) : completeProfile && role === "staff" ? (
+          <StaffProfileTabView
+            completeProfile={completeProfile}
+            isOwner={true}
+            onAddExperience={() => handleEdit("staffExperiences")}
+            onDeleteExperience={handleDeleteStaffExperience}
+            onDeletePlayerExperience={handleDeleteExperience}
+            onEdit={handleEdit}
+            onEditExperience={() => handleEdit("staffExperiences")}
           />
         ) : completeProfile ? (
           <ProfileReadonlyView
@@ -382,13 +436,21 @@ export default function ProfileScreen() {
             </>
           ) : null}
           {role === "staff" ? (
-            <EditStaffInfoModal
-              completeProfile={completeProfile}
-              onClose={handleCloseModal}
-              onSaved={handleSaved}
-              userId={userId}
-              visible={activeModal === "staffInfo"}
-            />
+            <>
+              <EditStaffInfoModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "staffInfo"}
+              />
+              <EditStaffExperiencesModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                visible={activeModal === "staffExperiences"}
+              />
+            </>
           ) : null}
           {role === "club_admin" ? (
             <>

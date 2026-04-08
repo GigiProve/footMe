@@ -107,6 +107,7 @@ import {
   parsePlayerExperienceForms,
   SENIOR_CATEGORY_OPTIONS,
   YOUTH_CATEGORY_OPTIONS,
+  type PlayerExperienceForm,
 } from "../../src/features/profiles/player-sports";
 import {
   composePhoneNumber,
@@ -128,6 +129,8 @@ import {
   checkDuplicateClubs,
   searchTeams,
   updateCompleteProfessionalProfile,
+  type StaffCareerEntryRecord,
+  type StaffPlayerCareerEntryRecord,
 } from "../../src/features/profiles/profile-service";
 import { supabase } from "../../src/lib/supabase";
 import { colors, radius, spacing } from "../../src/theme/tokens";
@@ -251,6 +254,55 @@ function fromDelimitedString(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function mapCoachCareerEntryToStaffRecord(
+  profileId: string,
+  entry: CoachCareerEntry,
+  index: number,
+): StaffCareerEntryRecord {
+  return {
+    category: entry.category || null,
+    club_id: entry.clubId ?? null,
+    description: null,
+    experience_type: entry.type,
+    head_coach_name: null,
+    id: entry.id,
+    period_end_month: entry.period?.endMonth || null,
+    period_end_year: entry.period?.endYear ? Number(entry.period.endYear) : null,
+    period_start_month: entry.period?.startMonth || null,
+    period_start_year: entry.period?.startYear
+      ? Number(entry.period.startYear)
+      : null,
+    results: [],
+    role: entry.role,
+    season_details: entry.seasonDetails,
+    seasons: entry.seasons,
+    sort_order: index,
+    staff_profile_id: profileId,
+    team_logo_url: entry.teamLogoUrl ?? null,
+    team_name: entry.teamName,
+  };
+}
+
+function mapPlayerExperienceFormToStaffRecord(
+  profileId: string,
+  entry: PlayerExperienceForm,
+  index: number,
+): StaffPlayerCareerEntryRecord {
+  return {
+    appearances: entry.appearances ? Number(entry.appearances) : 0,
+    assists: entry.assists ? Number(entry.assists) : 0,
+    category: entry.category || null,
+    goals: entry.goals ? Number(entry.goals) : 0,
+    id: entry.id ?? `${profileId}-staff-player-${index}`,
+    position: null,
+    season: entry.seasonLabel,
+    sort_order: index,
+    staff_profile_id: profileId,
+    team_logo_url: entry.teamLogoUrl || null,
+    team_name: entry.clubName,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1029,6 +1081,72 @@ export default function OnboardingProfileScreen() {
     });
   }
 
+  async function saveStaffProfessionalProfile({
+    includePlayerCareer = false,
+  }: {
+    includePlayerCareer?: boolean;
+  } = {}) {
+    if (!session?.user) {
+      throw new Error("Sessione non disponibile.");
+    }
+
+    const profileId = session.user.id;
+
+    await ensureInitialProfileCreated();
+
+    await updateCompleteProfessionalProfile({
+      club: null,
+      clubSeasonEntries: [],
+      coachProfile: null,
+      playerCareerEntries: [],
+      playerProfile: null,
+      profile: {
+        avatar_url: parseOptionalText(avatarUrl),
+        bio: parseOptionalText(normalizeProfileBioInput(bio)),
+        birth_date: birthDate,
+        city: null,
+        full_name: fullName,
+        is_open_to_transfer: false,
+        languages: [],
+        nationality,
+        region: null,
+      },
+      profileId,
+      role: role as AppRole,
+      staffCareerEntries: (staffCareerEntries as CoachCareerEntry[]).map(
+        (entry, index) => mapCoachCareerEntryToStaffRecord(profileId, entry, index),
+      ),
+      staffPlayerCareerEntries: includePlayerCareer
+        ? staffPlayerCareerEntries.map((entry, index) =>
+            mapPlayerExperienceFormToStaffRecord(profileId, entry, index),
+          )
+        : [],
+      staffProfile: {
+        certifications: fromDelimitedString(certifications),
+        experience_entries: staffCareerEntries,
+        experience_summary: parseOptionalText(experienceSummary),
+        open_to_work: openToWork,
+        availability_type: openToWork ? staffAvailabilityType : null,
+        available_from: openToWork ? parseOptionalText(staffAvailableFrom) : null,
+        primary_staff_role: staffPrimaryRole || null,
+        preferred_categories: fromDelimitedString(staffPreferredCategories),
+        preferred_provinces: fromDelimitedString(staffPreferredProvinces),
+        preferred_regions: fromDelimitedString(staffPreferredRegions),
+        specialization: mapStaffRoleToSpecialization(staffPrimaryRole),
+        staff_roles: staffRoles,
+      },
+      userContacts: {
+        email: "",
+        facebook: "",
+        instagram: "",
+        phone: composePhoneNumber(phoneCountryCode, phoneNumber),
+        showEmail: false,
+        showFacebook: false,
+        showInstagram: false,
+      },
+    });
+  }
+
   // -----------------------------------------------------------------------
   // Step handlers
   // -----------------------------------------------------------------------
@@ -1580,53 +1698,7 @@ export default function OnboardingProfileScreen() {
     try {
       setIsSubmitting(true);
 
-      await ensureInitialProfileCreated();
-
-      await updateCompleteProfessionalProfile({
-        club: null,
-        clubSeasonEntries: [],
-        coachProfile: null,
-        playerCareerEntries: [],
-        playerProfile: null,
-        profile: {
-          avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(normalizeProfileBioInput(bio)),
-          birth_date: birthDate,
-          city: null,
-          full_name: fullName,
-          is_open_to_transfer: false,
-          languages: [],
-          nationality,
-          region: null,
-        },
-        profileId: session.user.id,
-        role: role as AppRole,
-        staffProfile: {
-          certifications: fromDelimitedString(certifications),
-          experience_entries: staffCareerEntries,
-          experience_summary: parseOptionalText(experienceSummary),
-          open_to_work: openToWork,
-          availability_type: openToWork ? staffAvailabilityType : null,
-          available_from: openToWork
-            ? parseOptionalText(staffAvailableFrom)
-            : null,
-          primary_staff_role: staffPrimaryRole || null,
-          preferred_categories: fromDelimitedString(staffPreferredCategories),
-          preferred_provinces: fromDelimitedString(staffPreferredProvinces),
-          preferred_regions: fromDelimitedString(staffPreferredRegions),
-          specialization: mapStaffRoleToSpecialization(staffPrimaryRole),
-          staff_roles: staffRoles,
-        },
-        userContacts: {
-          email: "",
-          facebook: "",
-          instagram: "",
-          phone: composePhoneNumber(phoneCountryCode, phoneNumber),
-          showEmail: false,
-          showFacebook: false,
-          showInstagram: false,
-        },
-      });
+      await saveStaffProfessionalProfile();
 
       patchForm({ lastCompletedStep: "staff_career" });
       navigateToStep("staff_player_career_toggle");
@@ -1651,9 +1723,27 @@ export default function OnboardingProfileScreen() {
     }
   }
 
-  function handleContinueFromStaffPlayerCareer() {
-    patchForm({ lastCompletedStep: "staff_player_career" });
-    goToCompletion("staff_player_career");
+  async function handleContinueFromStaffPlayerCareer() {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await saveStaffProfessionalProfile({ includePlayerCareer: true });
+
+      patchForm({ lastCompletedStep: "staff_player_career" });
+      goToCompletion("staff_player_career");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso nel completamento profilo.";
+      Alert.alert("Profilo non salvato", message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -2108,7 +2198,7 @@ export default function OnboardingProfileScreen() {
         clubSeasonEntries: [],
         coachCareerEntries: coachCareerEntries.map((entry, index) => ({
           category: entry.category || null,
-          club_id: null,
+          club_id: entry.clubId ?? null,
           coach_profile_id: session.user.id,
           description: null,
           experience_type: entry.type,
@@ -2122,7 +2212,7 @@ export default function OnboardingProfileScreen() {
           season_details: entry.seasonDetails,
           seasons: entry.seasons,
           sort_order: index,
-          team_logo_url: null,
+          team_logo_url: entry.teamLogoUrl ?? null,
           team_name: entry.teamName,
         })),
         coachDirectorCareerEntries: [],

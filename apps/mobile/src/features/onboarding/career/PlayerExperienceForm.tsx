@@ -316,11 +316,9 @@ const periodStyles = StyleSheet.create({
 
 function StatsFields({
   detail,
-  includeMinutes = true,
   onChange,
 }: {
   detail: PlayerSeasonDetail;
-  includeMinutes?: boolean;
   onChange: (field: keyof PlayerSeasonDetail, value: string) => void;
 }) {
   return (
@@ -356,19 +354,6 @@ function StatsFields({
             value={Number(detail.assists || "0")}
           />
         </View>
-        {includeMinutes ? (
-          <View style={statsStyles.cell}>
-            <WheelPicker
-              compact
-              label="Minuti"
-              max={2000}
-              min={0}
-              step={10}
-              onChange={(val) => onChange("minutesPlayed", String(val))}
-              value={Number(detail.minutesPlayed || "0")}
-            />
-          </View>
-        ) : null}
       </View>
       <Input
         label="Premi (opzionale)"
@@ -829,7 +814,6 @@ export function PlayerExperienceForm({
           {statsEnabled ? (
             <StatsFields
               detail={singleSeasonDetail}
-              includeMinutes={false}
               onChange={handleSingleSeasonDetailChange}
             />
           ) : null}

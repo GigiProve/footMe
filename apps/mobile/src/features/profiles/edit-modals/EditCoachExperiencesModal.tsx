@@ -43,6 +43,7 @@ type EditCoachExperiencesModalProps = {
 function recordToForm(entry: CoachCareerEntryRecord): CoachCareerEntry {
   return {
     category: entry.category ?? "",
+    clubId: entry.club_id,
     id: entry.id,
     period:
       entry.experience_type === "CUSTOM_PERIOD"
@@ -64,6 +65,7 @@ function recordToForm(entry: CoachCareerEntryRecord): CoachCareerEntry {
       ]),
     ),
     seasons: entry.seasons,
+    teamLogoUrl: entry.team_logo_url,
     teamName: entry.team_name,
     type: entry.experience_type,
   };
@@ -76,7 +78,7 @@ function formToRecord(
 ): CoachCareerEntryRecord {
   return {
     category: entry.category || previous?.category || null,
-    club_id: previous?.club_id ?? null,
+    club_id: entry.clubId ?? previous?.club_id ?? null,
     coach_profile_id: previous?.coach_profile_id ?? "",
     description: previous?.description ?? null,
     experience_type: entry.type,
@@ -90,7 +92,7 @@ function formToRecord(
     season_details: entry.seasonDetails,
     seasons: entry.seasons,
     sort_order: index,
-    team_logo_url: previous?.team_logo_url ?? null,
+    team_logo_url: entry.teamLogoUrl ?? previous?.team_logo_url ?? null,
     team_name: entry.teamName,
   };
 }

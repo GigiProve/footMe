@@ -6,7 +6,10 @@ export type CoachSeasonDetail = {
 };
 
 export type CoachCareerEntry = {
+  clubId?: string | null;
   id: string;
+  teamCity?: string;
+  teamLogoUrl?: string | null;
   teamName: string;
   category: string; // used for single season; defaults for new seasons
   role: string; // used for single season; defaults for new seasons

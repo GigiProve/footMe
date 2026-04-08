@@ -50,6 +50,7 @@ export type PlayerExperienceForm = {
   clubId: string | null;
   clubName: string;
   goals: string;
+  groupId?: string;
   id?: string;
   minutesPlayed: string;
   periodEndMonth: string;

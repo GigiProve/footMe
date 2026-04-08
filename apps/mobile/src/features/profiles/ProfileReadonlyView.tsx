@@ -54,6 +54,7 @@ type EditSection =
   | "coachAchievements"
   | "coachExperiences"
   | "staffInfo"
+  | "staffExperiences"
   | "clubInfo"
   | "clubSeasons";
 

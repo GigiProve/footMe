@@ -532,6 +532,7 @@ export function playerEntriesToForms(
           clubId: entry.clubId ?? null,
           clubName: entry.teamName,
           goals: detail?.goals || "",
+          groupId: entry.id,
           minutesPlayed: detail?.minutesPlayed || "",
           periodEndMonth: "",
           periodStartMonth: "",
@@ -566,6 +567,7 @@ export function playerEntriesToForms(
           clubId: entry.clubId ?? null,
           clubName: entry.teamName,
           goals: detail?.goals || "",
+          groupId: entry.id,
           minutesPlayed: detail?.minutesPlayed || "",
           periodEndMonth: isLast && entry.period ? entry.period.endMonth || "" : "",
           periodStartMonth: isFirst && entry.period ? entry.period.startMonth || "" : "",
@@ -586,11 +588,27 @@ export function formsToPlayerEntries(
 ): PlayerCareerEntry[] {
   if (forms.length === 0) return [];
 
-  // Group by clubName
   const groups = new Map<string, PlayerExperienceForm[]>();
 
+  function getFallbackGroupKey(form: PlayerExperienceForm): string {
+    const clubKey = (form.clubId?.trim() || form.clubName.trim()).toLowerCase();
+    const categoryKey = form.category.trim().toLowerCase();
+
+    if (form.seasonPeriod === "partial") {
+      return [
+        "partial",
+        clubKey,
+        categoryKey,
+        form.periodStartMonth.trim(),
+        form.periodEndMonth.trim(),
+      ].join(":");
+    }
+
+    return ["full", clubKey, categoryKey].join(":");
+  }
+
   for (const form of forms) {
-    const key = form.clubName;
+    const key = form.groupId?.trim() || getFallbackGroupKey(form);
     const group = groups.get(key) ?? [];
     group.push(form);
     groups.set(key, group);
@@ -623,7 +641,7 @@ export function formsToPlayerEntries(
 
       entries.push({
         clubId: first.clubId,
-        id: generatePlayerEntryId(),
+        id: first.groupId || first.id || generatePlayerEntryId(),
         teamName: first.clubName,
         teamCity: first.teamCity,
         teamLogoUrl: first.teamLogoUrl,
@@ -661,7 +679,7 @@ export function formsToPlayerEntries(
 
       entries.push({
         clubId: first.clubId,
-        id: generatePlayerEntryId(),
+        id: first.groupId || first.id || generatePlayerEntryId(),
         teamName: first.clubName,
         teamCity: first.teamCity,
         teamLogoUrl: first.teamLogoUrl,

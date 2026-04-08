@@ -644,6 +644,45 @@ export function buildCoachProfileHeaderDetails(
   };
 }
 
+export type StaffProfileHeaderDetails = {
+  availabilityBadges: string[];
+  bio: string | null;
+  fullName: string;
+  locationLabel?: string;
+  primaryRole: string;
+  statusBadge?: string;
+};
+
+export function buildStaffProfileHeaderDetails(
+  data: CompleteProfessionalProfile,
+): StaffProfileHeaderDetails | null {
+  if (data.profile.role !== "staff") {
+    return null;
+  }
+
+  const locationLabel = formatLocationSummary(data.profile.city, data.profile.region);
+  const availabilityBadges =
+    data.staffProfile?.availability_type === "REGIONS"
+      ? data.staffProfile.preferred_regions
+      : data.staffProfile?.availability_type === "PROVINCES"
+        ? data.staffProfile.preferred_provinces ?? []
+        : data.staffProfile?.open_to_work
+          ? ["Tutta Italia"]
+          : [];
+
+  return {
+    availabilityBadges,
+    bio: data.profile.bio?.trim() || null,
+    fullName: formatProfileDisplayName(data.profile.full_name, null),
+    locationLabel: locationLabel === "Da completare" ? undefined : locationLabel,
+    primaryRole:
+      data.staffProfile?.primary_staff_role?.trim() ||
+      formatSpecialization(data.staffProfile?.specialization ?? null) ||
+      "Staff tecnico",
+    statusBadge: data.staffProfile?.open_to_work ? "Disponibile" : undefined,
+  };
+}
+
 // ────────────────────────────────
 // Summary section builder for readonly
 // ────────────────────────────────

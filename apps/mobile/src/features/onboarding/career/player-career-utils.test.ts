@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { PlayerCareerEntry } from "./player-career-types";
 import {
+  formsToPlayerEntries,
   getPlayerPeriodOverlapSeasons,
   getOccupiedPlayerSeasonLabels,
   getPlayerEndYearOptions,
   getPlayerSeasonSelectOptions,
+  playerEntriesToForms,
   getPlayerStartYearOptions,
   sanitizePlayerPeriodSelection,
 } from "./player-career-utils";
@@ -133,5 +135,34 @@ describe("player-career-utils", () => {
     );
 
     expect(options.find((option) => option.value === "2017")?.disabled).not.toBe(true);
+  });
+
+  it("preserves separate multi-season groups for the same club when categories differ", () => {
+    const forms = playerEntriesToForms([
+      createEntry({
+        id: "entry-senior",
+        category: "Serie D",
+        seasons: ["2024/2025"],
+        type: "SINGLE_SEASON",
+      }),
+      createEntry({
+        id: "entry-youth",
+        category: "Under 19",
+        seasons: ["2023/2024"],
+        type: "SINGLE_SEASON",
+      }),
+    ]);
+
+    const entries = formsToPlayerEntries(forms);
+
+    expect(entries).toHaveLength(2);
+    expect(entries.map((entry) => entry.id)).toEqual([
+      "entry-senior",
+      "entry-youth",
+    ]);
+    expect(entries.map((entry) => entry.category)).toEqual([
+      "Serie D",
+      "Under 19",
+    ]);
   });
 });

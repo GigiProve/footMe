@@ -108,6 +108,44 @@ export type CoachCareerEntryRecord = {
   sort_order: number;
 };
 
+export type StaffCareerEntryRecord = {
+  id: string;
+  staff_profile_id: string;
+  team_name: string;
+  team_logo_url: string | null;
+  club_id: string | null;
+  category: string | null;
+  role: string;
+  experience_type: "MULTI_SEASON" | "SINGLE_SEASON" | "CUSTOM_PERIOD";
+  seasons: string[];
+  period_start_month: string | null;
+  period_start_year: number | null;
+  period_end_month: string | null;
+  period_end_year: number | null;
+  season_details: Record<string, { category?: string; role?: string }>;
+  results: { label?: string; variant?: string; seasonLabel?: string }[];
+  description: string | null;
+  head_coach_name: string | null;
+  sort_order: number;
+};
+
+// Allenatore sub-role — identical shape
+export type StaffCoachCareerEntryRecord = StaffCareerEntryRecord;
+
+export type StaffPlayerCareerEntryRecord = {
+  id: string;
+  staff_profile_id: string;
+  team_name: string;
+  team_logo_url: string | null;
+  season: string;
+  category: string | null;
+  position: string | null;
+  appearances: number;
+  goals: number;
+  assists: number;
+  sort_order: number;
+};
+
 export type CoachPlayerCareerEntryRecord = {
   id: string;
   coach_profile_id: string;
@@ -165,7 +203,7 @@ type CoachProfileRecord = {
   technical_video_url: string | null;
 };
 
-type StaffProfileRecord = {
+export type StaffProfileRecord = {
   availability_type: string | null;
   available_from: string | null;
   certifications: string[];
@@ -244,6 +282,9 @@ export type CompleteProfessionalProfile = {
   playerPalmares: PlayerPalmaresRecord[];
   playerProfile: PlayerProfileRecord | null;
   profile: BaseProfileRecord;
+  staffCareerEntries: StaffCareerEntryRecord[];
+  staffCoachCareerEntries: StaffCoachCareerEntryRecord[];
+  staffPlayerCareerEntries: StaffPlayerCareerEntryRecord[];
   staffProfile: StaffProfileRecord | null;
   userContacts: UserContactsRecord;
 };
@@ -353,6 +394,9 @@ export type CompleteProfessionalProfileUpdate = {
   coachCareerEntries?: CoachCareerEntryRecord[];
   coachDirectorCareerEntries?: CoachDirectorCareerEntryRecord[];
   coachPlayerCareerEntries?: CoachPlayerCareerEntryRecord[];
+  staffCareerEntries?: StaffCareerEntryRecord[];
+  staffCoachCareerEntries?: StaffCoachCareerEntryRecord[];
+  staffPlayerCareerEntries?: StaffPlayerCareerEntryRecord[];
   playerCareerEntries: PlayerCareerEntryInput[];
   playerPalmares?: PlayerPalmaresInput[];
   playerProfile: {
@@ -407,6 +451,80 @@ export type CompleteProfessionalProfileUpdate = {
   userContacts: UserContactsRecord;
 };
 
+type SupabaseErrorLike = {
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+  message?: string;
+};
+
+function getSupabaseErrorText(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return "";
+  }
+
+  const candidate = error as SupabaseErrorLike;
+
+  return [candidate.code, candidate.message, candidate.details, candidate.hint]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+    .toLowerCase();
+}
+
+function shouldFallbackToLegacyStaffSave(error: unknown) {
+  const errorText = getSupabaseErrorText(error);
+
+  if (!errorText) {
+    return false;
+  }
+
+  const referencesStaffCareerStorage =
+    errorText.includes("save_staff_career_details") ||
+    errorText.includes("staff_career_entries") ||
+    errorText.includes("staff_coach_career_entries") ||
+    errorText.includes("staff_player_career_entries");
+
+  if (!referencesStaffCareerStorage) {
+    return false;
+  }
+
+  return (
+    errorText.includes("could not find the function") ||
+    errorText.includes("schema cache") ||
+    errorText.includes("does not exist") ||
+    errorText.includes("relation") ||
+    errorText.includes("column") ||
+    errorText.includes("pgrst202") ||
+    errorText.includes("pgrst204")
+  );
+}
+
+async function saveLegacyStaffProfile(input: CompleteProfessionalProfileUpdate) {
+  if (!input.staffProfile) {
+    return;
+  }
+
+  const { error } = await supabase.from("staff_profiles").upsert({
+    availability_type: input.staffProfile.availability_type,
+    available_from: input.staffProfile.available_from,
+    certifications: input.staffProfile.certifications,
+    experience_entries: input.staffProfile.experience_entries,
+    experience_summary: input.staffProfile.experience_summary,
+    open_to_work: input.staffProfile.open_to_work,
+    preferred_categories: input.staffProfile.preferred_categories,
+    preferred_provinces: input.staffProfile.preferred_provinces,
+    preferred_regions: input.staffProfile.preferred_regions,
+    primary_staff_role: input.staffProfile.primary_staff_role,
+    profile_id: input.profileId,
+    specialization: input.staffProfile.specialization,
+    staff_roles: input.staffProfile.staff_roles,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 function toPlayerCareerEntryRpcPayload(
   entry: PlayerCareerEntryInput,
   { includeId = true }: { includeId?: boolean } = {},
@@ -453,6 +571,16 @@ function normalizeNumber(value: unknown) {
 
 function normalizeStringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function isUuidLike(value: string | null | undefined) {
+  if (!value) {
+    return false;
+  }
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
 function normalizeRole(value: unknown): AppRole {
@@ -672,6 +800,73 @@ function normalizeCoachDirectorCareerEntryRecord(
   } satisfies CoachDirectorCareerEntryRecord;
 }
 
+function normalizeStaffCareerEntryRecord(
+  profileId: string,
+  rawEntry: Record<string, unknown>,
+  index: number,
+): StaffCareerEntryRecord {
+  return {
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-staff-career-${index}`),
+    staff_profile_id: normalizeRequiredText(rawEntry.staff_profile_id, profileId),
+    team_name: normalizeRequiredText(rawEntry.team_name, ""),
+    team_logo_url: normalizeOptionalText(rawEntry.team_logo_url),
+    club_id:
+      typeof rawEntry.club_id === "string" && rawEntry.club_id.trim()
+        ? rawEntry.club_id
+        : null,
+    category: normalizeOptionalText(rawEntry.category),
+    role: normalizeRequiredText(rawEntry.role, ""),
+    experience_type:
+      rawEntry.experience_type === "MULTI_SEASON" ||
+      rawEntry.experience_type === "CUSTOM_PERIOD"
+        ? rawEntry.experience_type
+        : "SINGLE_SEASON",
+    seasons: normalizeStringArray(rawEntry.seasons),
+    period_start_month: normalizeOptionalText(rawEntry.period_start_month),
+    period_start_year: normalizeNumber(rawEntry.period_start_year),
+    period_end_month: normalizeOptionalText(rawEntry.period_end_month),
+    period_end_year: normalizeNumber(rawEntry.period_end_year),
+    season_details:
+      typeof rawEntry.season_details === "object" &&
+      rawEntry.season_details !== null &&
+      !Array.isArray(rawEntry.season_details)
+        ? (rawEntry.season_details as Record<string, { category?: string; role?: string }>)
+        : {},
+    results: Array.isArray(rawEntry.results) ? rawEntry.results : [],
+    description: normalizeOptionalText(rawEntry.description),
+    head_coach_name: typeof rawEntry.head_coach_name === "string" ? rawEntry.head_coach_name : null,
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+  };
+}
+
+function normalizeStaffCoachCareerEntryRecord(
+  profileId: string,
+  rawEntry: Record<string, unknown>,
+  index: number,
+): StaffCareerEntryRecord {
+  return normalizeStaffCareerEntryRecord(profileId, rawEntry, index);
+}
+
+function normalizeStaffPlayerCareerEntryRecord(
+  profileId: string,
+  rawEntry: Record<string, unknown>,
+  index: number,
+): StaffPlayerCareerEntryRecord {
+  return {
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-staff-player-${index}`),
+    staff_profile_id: normalizeRequiredText(rawEntry.staff_profile_id, profileId),
+    team_name: normalizeRequiredText(rawEntry.team_name, ""),
+    team_logo_url: normalizeOptionalText(rawEntry.team_logo_url),
+    season: normalizeRequiredText(rawEntry.season, ""),
+    category: normalizeOptionalText(rawEntry.category),
+    position: normalizeOptionalText(rawEntry.position),
+    appearances: normalizeNumber(rawEntry.appearances) ?? 0,
+    goals: normalizeNumber(rawEntry.goals) ?? 0,
+    assists: normalizeNumber(rawEntry.assists) ?? 0,
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+  };
+}
+
 function normalizeStaffProfileRecord(
   profileId: string,
   rawProfile: Partial<StaffProfileRecord> | null | undefined,
@@ -791,6 +986,9 @@ export function normalizeUserProfile(input: {
   privateContacts?: {
     phone?: string | null;
   } | null;
+  staffCareerEntries?: Record<string, unknown>[] | null;
+  staffCoachCareerEntries?: Record<string, unknown>[] | null;
+  staffPlayerCareerEntries?: Record<string, unknown>[] | null;
   staffProfile?: Partial<StaffProfileRecord> | null;
 }): CompleteProfessionalProfile {
   return {
@@ -814,6 +1012,15 @@ export function normalizeUserProfile(input: {
     ),
     playerProfile: normalizePlayerProfileRecord(input.profileId, input.playerProfile),
     profile: normalizeBaseProfileRecord(input.profileId, input.profile),
+    staffCareerEntries: (input.staffCareerEntries ?? []).map((entry, index) =>
+      normalizeStaffCareerEntryRecord(input.profileId, entry, index),
+    ),
+    staffCoachCareerEntries: (input.staffCoachCareerEntries ?? []).map((entry, index) =>
+      normalizeStaffCoachCareerEntryRecord(input.profileId, entry, index),
+    ),
+    staffPlayerCareerEntries: (input.staffPlayerCareerEntries ?? []).map((entry, index) =>
+      normalizeStaffPlayerCareerEntryRecord(input.profileId, entry, index),
+    ),
     staffProfile: normalizeStaffProfileRecord(input.profileId, input.staffProfile),
     userContacts: {
       email: input.profileContacts?.email ?? "",
@@ -932,6 +1139,9 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   let coachCareerEntries: CoachCareerEntryRecord[] = [];
   let coachPlayerCareerEntries: CoachPlayerCareerEntryRecord[] = [];
   let coachDirectorCareerEntries: CoachDirectorCareerEntryRecord[] = [];
+  let staffCareerEntries: StaffCareerEntryRecord[] = [];
+  let staffCoachCareerEntries: StaffCoachCareerEntryRecord[] = [];
+  let staffPlayerCareerEntries: StaffPlayerCareerEntryRecord[] = [];
 
   if (profile.role === "player") {
     const [careerResult, palmaresResult] = await Promise.all([
@@ -1043,6 +1253,56 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     }
   }
 
+  if (profile.role === "staff") {
+    const [staffCareerResult, staffCoachCareerResult, staffPlayerCareerResult] = await Promise.all([
+      supabase
+        .from("staff_career_entries")
+        .select(
+          "id, staff_profile_id, team_name, team_logo_url, club_id, category, role, experience_type, seasons, period_start_month, period_start_year, period_end_month, period_end_year, season_details, results, description, head_coach_name, sort_order",
+        )
+        .eq("staff_profile_id", profileId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("staff_coach_career_entries")
+        .select(
+          "id, staff_profile_id, team_name, team_logo_url, club_id, category, role, experience_type, seasons, period_start_month, period_start_year, period_end_month, period_end_year, season_details, results, description, head_coach_name, sort_order",
+        )
+        .eq("staff_profile_id", profileId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("staff_player_career_entries")
+        .select(
+          "id, staff_profile_id, team_name, team_logo_url, season, category, position, appearances, goals, assists, sort_order",
+        )
+        .eq("staff_profile_id", profileId)
+        .order("sort_order", { ascending: true }),
+    ]);
+
+    if (staffCareerResult.error) {
+      throw staffCareerResult.error;
+    }
+
+    if (staffCoachCareerResult.error) {
+      throw staffCoachCareerResult.error;
+    }
+
+    if (staffPlayerCareerResult.error) {
+      throw staffPlayerCareerResult.error;
+    }
+
+    staffCareerEntries = (staffCareerResult.data ?? []).map((entry, index) =>
+      normalizeStaffCareerEntryRecord(profileId, entry as Record<string, unknown>, index),
+    );
+
+    staffCoachCareerEntries = (staffCoachCareerResult.data ?? []).map((entry, index) =>
+      normalizeStaffCoachCareerEntryRecord(profileId, entry as Record<string, unknown>, index),
+    );
+
+    staffPlayerCareerEntries = (staffPlayerCareerResult.data ?? []).map((entry, index) =>
+      normalizeStaffPlayerCareerEntryRecord(profileId, entry as Record<string, unknown>, index),
+    );
+  }
+
   let clubSeasonEntries: ClubSeasonEntryRecord[] = [];
 
   if (profile.role === "club_admin" && club.data) {
@@ -1074,6 +1334,9 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     profile,
     profileContacts: profileContacts.data,
     profileId,
+    staffCareerEntries,
+    staffCoachCareerEntries,
+    staffPlayerCareerEntries,
     staffProfile: (staffProfile.data as Partial<StaffProfileRecord> | null) ?? null,
   });
 }
@@ -1225,24 +1488,79 @@ export async function updateCompleteProfessionalProfile(
   }
 
   if (input.role === "staff" && input.staffProfile) {
-    const { error } = await supabase.from("staff_profiles").upsert({
-      availability_type: input.staffProfile.availability_type,
-      available_from: input.staffProfile.available_from,
-      certifications: input.staffProfile.certifications,
-      experience_entries: input.staffProfile.experience_entries,
-      experience_summary: input.staffProfile.experience_summary,
-      open_to_work: input.staffProfile.open_to_work,
-      primary_staff_role: input.staffProfile.primary_staff_role,
-      preferred_categories: input.staffProfile.preferred_categories,
-      preferred_provinces: input.staffProfile.preferred_provinces,
-      preferred_regions: input.staffProfile.preferred_regions,
-      profile_id: input.profileId,
-      specialization: input.staffProfile.specialization,
-      staff_roles: input.staffProfile.staff_roles,
+    const { error } = await supabase.rpc("save_staff_career_details", {
+      p_profile_id: input.profileId,
+      p_staff_profile: {
+        availability_type: input.staffProfile.availability_type,
+        available_from: input.staffProfile.available_from,
+        certifications: input.staffProfile.certifications,
+        experience_summary: input.staffProfile.experience_summary,
+        open_to_work: input.staffProfile.open_to_work,
+        preferred_categories: input.staffProfile.preferred_categories,
+        preferred_provinces: input.staffProfile.preferred_provinces,
+        preferred_regions: input.staffProfile.preferred_regions,
+        primary_staff_role: input.staffProfile.primary_staff_role,
+        specialization: input.staffProfile.specialization,
+        staff_roles: input.staffProfile.staff_roles,
+      },
+      p_career_entries: (input.staffCareerEntries ?? []).map((entry) => ({
+        category: entry.category,
+        ...(isUuidLike(entry.club_id) ? { club_id: entry.club_id } : {}),
+        description: entry.description,
+        experience_type: entry.experience_type,
+        head_coach_name: entry.head_coach_name,
+        ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
+        period_end_month: entry.period_end_month,
+        period_end_year: entry.period_end_year,
+        period_start_month: entry.period_start_month,
+        period_start_year: entry.period_start_year,
+        results: entry.results,
+        role: entry.role,
+        season_details: entry.season_details,
+        seasons: entry.seasons,
+        sort_order: entry.sort_order,
+        team_logo_url: entry.team_logo_url,
+        team_name: entry.team_name,
+      })),
+      p_coach_career_entries: (input.staffCoachCareerEntries ?? []).map((entry) => ({
+        category: entry.category,
+        ...(isUuidLike(entry.club_id) ? { club_id: entry.club_id } : {}),
+        description: entry.description,
+        experience_type: entry.experience_type,
+        head_coach_name: entry.head_coach_name,
+        ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
+        period_end_month: entry.period_end_month,
+        period_end_year: entry.period_end_year,
+        period_start_month: entry.period_start_month,
+        period_start_year: entry.period_start_year,
+        results: entry.results,
+        role: entry.role,
+        season_details: entry.season_details,
+        seasons: entry.seasons,
+        sort_order: entry.sort_order,
+        team_logo_url: entry.team_logo_url,
+        team_name: entry.team_name,
+      })),
+      p_player_career_entries: (input.staffPlayerCareerEntries ?? []).map((entry) => ({
+        appearances: entry.appearances,
+        assists: entry.assists,
+        category: entry.category,
+        goals: entry.goals,
+        ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
+        position: entry.position,
+        season: entry.season,
+        sort_order: entry.sort_order,
+        team_logo_url: entry.team_logo_url,
+        team_name: entry.team_name,
+      })),
     });
 
     if (error) {
-      throw error;
+      if (shouldFallbackToLegacyStaffSave(error)) {
+        await saveLegacyStaffProfile(input);
+      } else {
+        throw error;
+      }
     }
   }
 

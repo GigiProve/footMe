@@ -127,6 +127,23 @@ const mocks = vi.hoisted(() => {
         };
       }
 
+      if (
+        table === "staff_career_entries" ||
+        table === "staff_coach_career_entries" ||
+        table === "staff_player_career_entries"
+      ) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => ({
+                data: [],
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     }),
     playerCareerEqMock,

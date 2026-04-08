@@ -394,6 +394,175 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       },
     });
 
+    expect(mocks.rpcMock).toHaveBeenCalledWith("save_staff_career_details", {
+      p_profile_id: "profile-1",
+      p_staff_profile: {
+        availability_type: "REGIONS",
+        available_from: "Da luglio",
+        certifications: ["FIGC Match Analysis"],
+        experience_summary: "Analisi video e supporto in campo.",
+        open_to_work: true,
+        preferred_categories: ["Serie D", "Primavera 2"],
+        preferred_provinces: [],
+        preferred_regions: ["Lombardia"],
+        primary_staff_role: "Match analyst",
+        specialization: "match_analyst",
+        staff_roles: ["Match analyst", "Collaboratore tecnico"],
+      },
+      p_career_entries: [],
+      p_coach_career_entries: [],
+      p_player_career_entries: [],
+    });
+  });
+
+  it("omits local non-uuid staff entry ids before calling the staff rpc", async () => {
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "staff",
+      staffCareerEntries: [
+        {
+          category: "Serie D",
+          club_id: null,
+          description: null,
+          experience_type: "SINGLE_SEASON",
+          head_coach_name: null,
+          id: "coach-123",
+          period_end_month: null,
+          period_end_year: null,
+          period_start_month: null,
+          period_start_year: null,
+          results: [],
+          role: "Match analyst",
+          season_details: {},
+          seasons: ["2024/2025"],
+          sort_order: 0,
+          staff_profile_id: "profile-1",
+          team_logo_url: null,
+          team_name: "USD Virtus",
+        },
+      ],
+      staffPlayerCareerEntries: [
+        {
+          appearances: 10,
+          assists: 2,
+          category: "Juniores",
+          goals: 1,
+          id: "player-456",
+          position: null,
+          season: "2018/2019",
+          sort_order: 0,
+          staff_profile_id: "profile-1",
+          team_logo_url: null,
+          team_name: "USD Virtus",
+        },
+      ],
+      staffProfile: {
+        availability_type: "REGIONS",
+        available_from: "Da luglio",
+        certifications: [],
+        experience_entries: [],
+        experience_summary: null,
+        open_to_work: true,
+        primary_staff_role: "Match analyst",
+        preferred_categories: [],
+        preferred_provinces: [],
+        preferred_regions: ["Lombardia"],
+        specialization: "match_analyst",
+        staff_roles: ["Match analyst"],
+      },
+    });
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith("save_staff_career_details", {
+      p_profile_id: "profile-1",
+      p_staff_profile: {
+        availability_type: "REGIONS",
+        available_from: "Da luglio",
+        certifications: [],
+        experience_summary: null,
+        open_to_work: true,
+        preferred_categories: [],
+        preferred_provinces: [],
+        preferred_regions: ["Lombardia"],
+        primary_staff_role: "Match analyst",
+        specialization: "match_analyst",
+        staff_roles: ["Match analyst"],
+      },
+      p_career_entries: [
+        {
+          category: "Serie D",
+          description: null,
+          experience_type: "SINGLE_SEASON",
+          head_coach_name: null,
+          period_end_month: null,
+          period_end_year: null,
+          period_start_month: null,
+          period_start_year: null,
+          results: [],
+          role: "Match analyst",
+          season_details: {},
+          seasons: ["2024/2025"],
+          sort_order: 0,
+          team_logo_url: null,
+          team_name: "USD Virtus",
+        },
+      ],
+      p_coach_career_entries: [],
+      p_player_career_entries: [
+        {
+          appearances: 10,
+          assists: 2,
+          category: "Juniores",
+          goals: 1,
+          position: null,
+          season: "2018/2019",
+          sort_order: 0,
+          team_logo_url: null,
+          team_name: "USD Virtus",
+        },
+      ],
+    });
+  });
+
+  it("falls back to the legacy staff_profiles save when the staff rpc is unavailable", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      error: {
+        code: "PGRST202",
+        message:
+          "Could not find the function public.save_staff_career_details(p_profile_id, p_staff_profile, p_career_entries, p_coach_career_entries, p_player_career_entries) in the schema cache",
+      },
+    });
+
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "staff",
+      staffProfile: {
+        availability_type: "REGIONS",
+        available_from: "Da luglio",
+        certifications: ["FIGC Match Analysis"],
+        experience_entries: [
+          {
+            id: "staff-exp-1",
+            role: "Match analyst",
+            seasons: ["2024/2025"],
+            teamName: "USD Virtus",
+            type: "SINGLE_SEASON",
+          },
+        ],
+        experience_summary: "Analisi video e supporto in campo.",
+        open_to_work: true,
+        primary_staff_role: "Match analyst",
+        preferred_categories: ["Serie D"],
+        preferred_provinces: [],
+        preferred_regions: ["Lombardia"],
+        specialization: "match_analyst",
+        staff_roles: ["Match analyst"],
+      },
+    });
+
     expect(mocks.staffProfilesUpsertMock).toHaveBeenCalledWith({
       availability_type: "REGIONS",
       available_from: "Da luglio",
@@ -401,37 +570,21 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       experience_entries: [
         {
           id: "staff-exp-1",
-          category: "Serie D",
           role: "Match analyst",
           seasons: ["2024/2025"],
           teamName: "USD Virtus",
           type: "SINGLE_SEASON",
-          period: null,
-        },
-        {
-          id: "staff-exp-2",
-          category: "Primavera 2",
-          role: "Collaboratore tecnico",
-          seasons: [],
-          teamName: "USD Virtus",
-          type: "CUSTOM_PERIOD",
-          period: {
-            startMonth: "Gennaio",
-            startYear: "2024",
-            endMonth: "Maggio",
-            endYear: "2024",
-          },
         },
       ],
       experience_summary: "Analisi video e supporto in campo.",
       open_to_work: true,
+      preferred_categories: ["Serie D"],
+      preferred_provinces: [],
       preferred_regions: ["Lombardia"],
       primary_staff_role: "Match analyst",
-      preferred_categories: ["Serie D", "Primavera 2"],
-      preferred_provinces: [],
       profile_id: "profile-1",
       specialization: "match_analyst",
-      staff_roles: ["Match analyst", "Collaboratore tecnico"],
+      staff_roles: ["Match analyst"],
     });
   });
 
