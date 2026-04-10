@@ -5,6 +5,8 @@ import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../src/features/auth/use-session";
 import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
+import { EditAgentProfileModal } from "../../src/features/profiles/edit-modals/EditAgentProfileModal";
+import { EditAgentMediaModal } from "../../src/features/profiles/edit-modals/EditAgentMediaModal";
 import { EditClubInfoModal } from "../../src/features/profiles/edit-modals/EditClubInfoModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
 import { EditCoachAchievementsModal } from "../../src/features/profiles/edit-modals/EditCoachAchievementsModal";
@@ -24,9 +26,11 @@ import { EditStaffExperiencesModal } from "../../src/features/profiles/edit-moda
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
 import { EditStaffMediaModal } from "../../src/features/profiles/edit-modals/EditStaffMediaModal";
 import { StaffProfileTabView } from "../../src/features/profiles/career/StaffProfileTabView";
+import { AgentProfileTabView } from "../../src/features/profiles/career/AgentProfileTabView";
 import type { StaffGroupedExperience } from "../../src/features/profiles/career/staff-career-grouping";
 import {
   buildFullUpdatePayload,
+  buildAgentProfileHeaderDetails,
   buildHeaderDetails,
   buildInitialState,
   buildCoachProfileHeaderDetails,
@@ -44,11 +48,14 @@ import {
   ProfileHeader,
   StaffProfileHeader,
 } from "../../src/features/profiles/profile-screen-components";
+import { AgentProfileHeader } from "../../src/features/profiles/AgentProfileHeader";
 import {
   getCompleteProfessionalProfile,
+  saveAgentProfileMedia,
   updateCompleteProfessionalProfile,
   type CompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
+import { removeMediaFromStorage } from "../../src/features/profiles/media-upload-service";
 import type { GroupedExperience } from "../../src/features/profiles/career/career-grouping";
 import type { CoachGroupedExperience } from "../../src/features/profiles/career/coach-career-grouping";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
@@ -63,6 +70,7 @@ export default function ProfileScreen() {
     useState<CompleteProfessionalProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<EditSection | null>(null);
+  const [agentMediaEditingItemId, setAgentMediaEditingItemId] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
     if (!userId) {
@@ -104,6 +112,11 @@ export default function ProfileScreen() {
       completeProfile ? buildCoachProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
+  const agentHeaderDetails = useMemo(
+    () =>
+      completeProfile ? buildAgentProfileHeaderDetails(completeProfile) : null,
+    [completeProfile],
+  );
   const staffHeaderDetails = useMemo(
     () =>
       completeProfile ? buildStaffProfileHeaderDetails(completeProfile) : null,
@@ -122,15 +135,22 @@ export default function ProfileScreen() {
 
   function handleCloseModal() {
     setActiveModal(null);
+    setAgentMediaEditingItemId(null);
   }
 
   async function handleSaved() {
     setActiveModal(null);
+    setAgentMediaEditingItemId(null);
     await Promise.all([loadProfile(), refreshProfile()]);
     Alert.alert(
       "Profilo aggiornato",
       "Le informazioni professionali sono state salvate.",
     );
+  }
+
+  function handleManageAgentMedia(itemId: string | null = null) {
+    setAgentMediaEditingItemId(itemId);
+    setActiveModal("agentMedia");
   }
 
   async function handleDeleteExperience(group: GroupedExperience) {
@@ -238,6 +258,56 @@ export default function ProfileScreen() {
     );
   }
 
+  function handleDeleteAgentMedia(itemId: string) {
+    if (!completeProfile?.agentProfile) {
+      return;
+    }
+
+    if (!userId) {
+      return;
+    }
+
+    const itemToDelete =
+      completeProfile.agentProfile.media_items.find((item) => item.id === itemId) ?? null;
+
+    if (!itemToDelete) {
+      return;
+    }
+
+    Alert.alert(
+      "Elimina contenuto",
+      "Rimuovere questo contenuto dal portfolio media?",
+      [
+        { style: "cancel", text: "Annulla" },
+        {
+          onPress: async () => {
+            try {
+              const nextItems = completeProfile.agentProfile?.media_items.filter(
+                (item) => item.id !== itemId,
+              ) ?? [];
+
+              await saveAgentProfileMedia({
+                agentProfile: completeProfile.agentProfile!,
+                mediaItems: nextItems,
+                profileId: userId,
+              });
+
+              await Promise.allSettled([removeMediaFromStorage(itemToDelete.url)]);
+              await loadProfile();
+              Alert.alert("Contenuto eliminato", "Il portfolio media è stato aggiornato.");
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "Impossibile eliminare il contenuto.";
+              Alert.alert("Errore", message);
+            }
+          },
+          style: "destructive",
+          text: "Elimina",
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAwareForm
@@ -293,6 +363,18 @@ export default function ProfileScreen() {
             primaryRole={staffHeaderDetails.primaryRole}
             statusBadge={staffHeaderDetails.statusBadge}
           />
+        ) : completeProfile && role === "agent" && agentHeaderDetails ? (
+          <AgentProfileHeader
+            agencyLabel={agentHeaderDetails.agencyLabel}
+            avatarUrl={completeProfile.profile.avatar_url}
+            bio={agentHeaderDetails.bio}
+            fullName={agentHeaderDetails.fullName}
+            locationLabel={agentHeaderDetails.locationLabel}
+            onEditAvatarPress={() => handleEdit("bio")}
+            onEditProfilePress={() => handleEdit("agentProfile")}
+            primaryRole={agentHeaderDetails.primaryRole}
+            statusBadge={agentHeaderDetails.statusBadge}
+          />
         ) : completeProfile && headerDetails ? (
           <ProfileHeader
             avatarUrl={completeProfile.profile.avatar_url}
@@ -339,6 +421,15 @@ export default function ProfileScreen() {
             onEdit={handleEdit}
             onEditExperience={() => handleEdit("staffExperiences")}
             onManageMedia={() => handleEdit("staffMedia")}
+          />
+        ) : completeProfile && role === "agent" ? (
+          <AgentProfileTabView
+            completeProfile={completeProfile}
+            isOwner={true}
+            onDeleteMedia={handleDeleteAgentMedia}
+            onEdit={handleEdit}
+            onEditMedia={(itemId) => handleManageAgentMedia(itemId)}
+            onManageMedia={() => handleManageAgentMedia()}
           />
         ) : completeProfile ? (
           <ProfileReadonlyView
@@ -477,6 +568,25 @@ export default function ProfileScreen() {
                 onSaved={handleSaved}
                 userId={userId}
                 visible={activeModal === "staffMedia"}
+              />
+            </>
+          ) : null}
+          {role === "agent" ? (
+            <>
+              <EditAgentMediaModal
+                completeProfile={completeProfile}
+                editingItemId={agentMediaEditingItemId}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "agentMedia"}
+              />
+              <EditAgentProfileModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "agentProfile"}
               />
             </>
           ) : null}

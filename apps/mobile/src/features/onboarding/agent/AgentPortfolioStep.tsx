@@ -1,75 +1,82 @@
 import { Pressable, StyleSheet, View } from "react-native";
 
-import { colors, radius, spacing } from "../../../theme/tokens";
-import { AppText, Button } from "../../../ui";
-import { OnboardingSectionCard } from "../onboarding-ui";
 import {
-  AGENT_PLAYER_ROLE_OPTIONS,
-  AGENT_PLAYER_TYPE_OPTIONS,
-} from "./agent-options";
-import type { PlayerPosition } from "../../profiles/player-sports";
+  AGENT_OPERATING_MACRO_AREA_OPTIONS,
+  AGENT_OPERATIONAL_FOCUS_OPTIONS,
+} from "../../profiles/agent-profile";
+import { colors, radius, spacing } from "../../../theme/tokens";
+import { AppText, Button, Input } from "../../../ui";
+import { OnboardingSectionCard } from "../onboarding-ui";
 
 type AgentPortfolioStepProps = {
   isBusy: boolean;
-  mainPlayerRoles: PlayerPosition[];
   onContinue: () => void;
-  onUpdateMainRoles: (roles: PlayerPosition[]) => void;
-  onUpdatePlayerTypes: (types: string[]) => void;
-  playerTypes: string[];
+  onUpdateMacroAreas: (values: string[]) => void;
+  onUpdateNote: (value: string) => void;
+  onUpdateOperationalFocuses: (values: string[]) => void;
+  onUpdateOperatingRegions: (value: string) => void;
+  operationalFocuses: string[];
+  operationalNote: string;
+  operatingMacroAreas: string[];
+  operatingRegions: string;
   validationErrors: Partial<Record<string, string>>;
 };
 
 export function AgentPortfolioStep({
   isBusy,
-  mainPlayerRoles,
   onContinue,
-  onUpdateMainRoles,
-  onUpdatePlayerTypes,
-  playerTypes,
+  onUpdateMacroAreas,
+  onUpdateNote,
+  onUpdateOperationalFocuses,
+  onUpdateOperatingRegions,
+  operationalFocuses,
+  operationalNote,
+  operatingMacroAreas,
+  operatingRegions,
   validationErrors,
 }: AgentPortfolioStepProps) {
-  function toggleType(type: string) {
-    const nextTypes = playerTypes.includes(type)
-      ? playerTypes.filter((entry) => entry !== type)
-      : [...playerTypes, type];
-    onUpdatePlayerTypes(nextTypes);
-  }
-
-  function toggleRole(role: PlayerPosition) {
-    const nextRoles = mainPlayerRoles.includes(role)
-      ? mainPlayerRoles.filter((entry) => entry !== role)
-      : [...mainPlayerRoles, role];
-    onUpdateMainRoles(nextRoles);
+  function toggleValue(
+    value: string,
+    currentValues: string[],
+    onChange: (values: string[]) => void,
+  ) {
+    onChange(
+      currentValues.includes(value)
+        ? currentValues.filter((entry) => entry !== value)
+        : [...currentValues, value],
+    );
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <AppText variant="displaySm">Profilo calciatori</AppText>
+        <AppText variant="displaySm">Modalità operativa</AppText>
         <AppText variant="bodySm" color="secondary">
-          Specifica quali calciatori rappresenti o segui piu' spesso.
+          Definisci come lavori con club e calciatori e in quali aree operi più spesso.
         </AppText>
       </View>
 
       <OnboardingSectionCard>
         <View style={styles.fieldGroup}>
           <AppText variant="caption" color="muted">
-            Tipologia calciatori
+            Focus operativi
           </AppText>
           <View style={styles.chips}>
-            {AGENT_PLAYER_TYPE_OPTIONS.map((option) => {
-              const active = playerTypes.includes(option);
+            {AGENT_OPERATIONAL_FOCUS_OPTIONS.map((option) => {
+              const isActive = operationalFocuses.includes(option);
               return (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
+                  accessibilityState={{ selected: isActive }}
                   key={option}
-                  onPress={() => toggleType(option)}
-                  style={[styles.chip, active ? styles.chipActive : null]}
+                  onPress={() =>
+                    toggleValue(option, operationalFocuses, onUpdateOperationalFocuses)
+                  }
+                  style={[styles.chip, isActive ? styles.chipActive : null]}
                 >
                   <AppText
+                    color={isActive ? "inverse" : "primary"}
                     variant="bodySm"
-                    style={active ? styles.chipTextActive : undefined}
                   >
                     {option}
                   </AppText>
@@ -77,44 +84,56 @@ export function AgentPortfolioStep({
               );
             })}
           </View>
-          {validationErrors.agentPlayerTypes ? (
-            <AppText variant="bodySm" color="danger">
-              {validationErrors.agentPlayerTypes}
+          {validationErrors.agentOperationalFocuses ? (
+            <AppText color="danger" variant="bodySm">
+              {validationErrors.agentOperationalFocuses}
             </AppText>
           ) : null}
         </View>
 
         <View style={styles.fieldGroup}>
           <AppText variant="caption" color="muted">
-            Ruoli principali
+            Macro aree operative
           </AppText>
           <View style={styles.chips}>
-            {AGENT_PLAYER_ROLE_OPTIONS.map((option) => {
-              const active = mainPlayerRoles.includes(option.value);
+            {AGENT_OPERATING_MACRO_AREA_OPTIONS.map((option) => {
+              const isActive = operatingMacroAreas.includes(option);
               return (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  key={option.value}
-                  onPress={() => toggleRole(option.value)}
-                  style={[styles.chip, active ? styles.chipActive : null]}
+                  accessibilityState={{ selected: isActive }}
+                  key={option}
+                  onPress={() =>
+                    toggleValue(option, operatingMacroAreas, onUpdateMacroAreas)
+                  }
+                  style={[styles.chip, isActive ? styles.chipActive : null]}
                 >
                   <AppText
+                    color={isActive ? "inverse" : "primary"}
                     variant="bodySm"
-                    style={active ? styles.chipTextActive : undefined}
                   >
-                    {option.label}
+                    {option}
                   </AppText>
                 </Pressable>
               );
             })}
           </View>
-          {validationErrors.agentMainPlayerRoles ? (
-            <AppText variant="bodySm" color="danger">
-              {validationErrors.agentMainPlayerRoles}
-            </AppText>
-          ) : null}
         </View>
+
+        <Input
+          label="Regioni in cui operi"
+          onChangeText={onUpdateOperatingRegions}
+          placeholder="Es. Lombardia, Veneto, Emilia-Romagna"
+          value={operatingRegions}
+        />
+
+        <Input
+          label="Nota operativa"
+          multiline
+          onChangeText={onUpdateNote}
+          placeholder="Es. Inserimento in prima squadra e valorizzazione Under tra Serie D ed Eccellenza."
+          value={operationalNote}
+        />
       </OnboardingSectionCard>
 
       <Button
@@ -140,10 +159,6 @@ const styles = StyleSheet.create({
   chipActive: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
-  },
-  chipTextActive: {
-    color: colors.inkInvert,
-    fontWeight: "600",
   },
   chips: {
     flexDirection: "row",

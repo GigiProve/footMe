@@ -59,6 +59,11 @@ import { AgentFootballExperienceStep } from "../../src/features/onboarding/agent
 import { AgentPlayersStep } from "../../src/features/onboarding/agent/AgentPlayersStep";
 import { AgentPortfolioStep } from "../../src/features/onboarding/agent/AgentPortfolioStep";
 import { AgentVerificationStep } from "../../src/features/onboarding/agent/AgentVerificationStep";
+import {
+  deriveLegacyMainPlayerRoles,
+  deriveLegacyManagedPlayersCount,
+  deriveLegacyPlayerTypes,
+} from "../../src/features/profiles/agent-profile";
 import type { CoachCareerEntry } from "../../src/features/onboarding/coach/coach-career-types";
 import {
   AVAILABLE_FROM_OPTIONS,
@@ -127,6 +132,7 @@ import {
 } from "../../src/features/profiles/media-upload-service";
 import {
   checkDuplicateClubs,
+  searchAgentPlayerCandidates,
   searchTeams,
   updateCompleteProfessionalProfile,
   type StaffCareerEntryRecord,
@@ -506,18 +512,23 @@ export default function OnboardingProfileScreen() {
   const {
     agentAgencyLogoUrl,
     agentAgencyName,
+    agentAgencyRole,
+    agentAgencyStartYear,
+    agentCareerEntries,
     agentFederation,
     agentHasOtherFootballExperience,
     agentHasPlayedFootball,
     agentIsFederationLicensed,
     agentLanguages,
-    agentMainPlayerRoles,
-    agentManagedPlayersCount,
+    agentManagedPlayerEntries,
     agentOpenToClubs,
     agentOpenToPlayers,
+    agentOperationalFocuses,
+    agentOperationalNote,
     agentOtherFootballRoles,
+    agentOperatingMacroAreas,
+    agentOperatingRegions,
     agentPlayerCareerEntries,
-    agentPlayerTypes,
     availabilityType,
     avatarUrl,
     bio,
@@ -1597,23 +1608,66 @@ export default function OnboardingProfileScreen() {
 
       await ensureInitialProfileCreated();
 
+      const derivedMainRoles = deriveLegacyMainPlayerRoles(agentManagedPlayerEntries);
+      const derivedManagedPlayersCount = deriveLegacyManagedPlayersCount(
+        agentManagedPlayerEntries,
+      );
+      const derivedPlayerTypes = deriveLegacyPlayerTypes(agentManagedPlayerEntries);
+
       await updateCompleteProfessionalProfile({
+        agentCareerEntries: agentCareerEntries
+          .filter((entry) => entry.agency_name.trim())
+          .map((entry, index) => ({
+            agency_logo_url: entry.agency_logo_url,
+            agency_name: entry.agency_name.trim(),
+            agent_profile_id: session.user.id,
+            id: entry.id,
+            period_end_month: null,
+            period_end_year: entry.period_end_year,
+            period_start_month: null,
+            period_start_year: entry.period_start_year,
+            role: entry.role.trim() || "Agente",
+            sort_order: index,
+          })),
+        agentManagedPlayerEntries: agentManagedPlayerEntries
+          .filter((entry) => entry.display_name.trim())
+          .map((entry, index) => ({
+            agent_profile_id: session.user.id,
+            avatar_url: entry.avatar_url,
+            birth_year: entry.birth_year,
+            category_label: entry.category_label,
+            display_name: entry.display_name.trim(),
+            id: entry.id,
+            is_free_agent: entry.is_free_agent,
+            linked_profile_id: entry.linked_profile_id,
+            primary_position: entry.primary_position,
+            sort_order: index,
+          })),
         agentProfile: {
           agency_logo_url: parseOptionalText(agentAgencyLogoUrl),
           agency_name: parseOptionalText(agentAgencyName),
+          agency_role: parseOptionalText(agentAgencyRole),
           federation: agentIsFederationLicensed
             ? parseOptionalText(agentFederation)
             : null,
           has_other_football_experience: agentHasOtherFootballExperience,
           has_played_football: agentHasPlayedFootball,
           is_federation_licensed: agentIsFederationLicensed,
-          main_player_roles: agentMainPlayerRoles,
-          managed_players_count: parseOptionalText(agentManagedPlayersCount),
+          main_player_roles: derivedMainRoles,
+          managed_players_count: derivedManagedPlayersCount,
           open_to_clubs: agentOpenToClubs,
           open_to_players: agentOpenToPlayers,
+          operational_focuses: agentOperationalFocuses,
+          operational_note: parseOptionalText(agentOperationalNote),
+          operating_macro_areas: agentOperatingMacroAreas,
+          operating_regions: fromDelimitedString(agentOperatingRegions),
           other_football_roles: agentOtherFootballRoles,
+          period_end_month: null,
+          period_end_year: null,
+          period_start_month: null,
+          period_start_year: parseWheelValue(agentAgencyStartYear),
           player_career_entries: agentPlayerCareerEntries,
-          player_types: agentPlayerTypes,
+          player_types: derivedPlayerTypes,
         },
         club: null,
         clubSeasonEntries: [],
@@ -3486,10 +3540,14 @@ export default function OnboardingProfileScreen() {
 
         {step === "agent_agency" ? (
           <AgentAgencyStep
+            agencyRole={agentAgencyRole}
+            agencyStartYear={agentAgencyStartYear}
+            careerEntries={agentCareerEntries}
             agencyLogoUrl={agentAgencyLogoUrl}
             agencyName={agentAgencyName}
-            errorMessage={validationErrors.agentAgencyName}
+            errorMessage={validationErrors}
             isUploading={uploadingField === "agent-agency-logo"}
+            onCareerEntriesChange={(entries) => patchForm({ agentCareerEntries: entries })}
             onContinue={handleContinueFromAgentAgency}
             onPickLogo={() =>
               handleMediaUpload({
@@ -3506,15 +3564,16 @@ export default function OnboardingProfileScreen() {
 
         {step === "agent_players" ? (
           <AgentPlayersStep
-            errorMessage={validationErrors.agentManagedPlayersCount}
+            errorMessage={validationErrors.agentManagedPlayerEntries}
             isBusy={isBusy}
-            managedPlayersCount={agentManagedPlayersCount}
+            managedPlayerEntries={agentManagedPlayerEntries}
             onContinue={handleContinueFromAgentPlayers}
-            onUpdate={(value) =>
-              updateValue("agentManagedPlayersCount", value, [
-                "agentManagedPlayersCount",
-              ])
+            onUpdate={(entries) =>
+              patchForm({
+                agentManagedPlayerEntries: entries,
+              })
             }
+            searchPlayers={searchAgentPlayerCandidates}
           />
         ) : null}
 
@@ -3571,15 +3630,23 @@ export default function OnboardingProfileScreen() {
         {step === "agent_portfolio" ? (
           <AgentPortfolioStep
             isBusy={isBusy}
-            mainPlayerRoles={agentMainPlayerRoles}
             onContinue={handleContinueFromAgentPortfolio}
-            onUpdateMainRoles={(roles) =>
-              patchForm({ agentMainPlayerRoles: roles })
+            onUpdateMacroAreas={(values) =>
+              patchForm({ agentOperatingMacroAreas: values })
             }
-            onUpdatePlayerTypes={(types) =>
-              patchForm({ agentPlayerTypes: types })
+            onUpdateNote={(value) =>
+              patchForm({ agentOperationalNote: value })
             }
-            playerTypes={agentPlayerTypes}
+            onUpdateOperationalFocuses={(values) =>
+              patchForm({ agentOperationalFocuses: values })
+            }
+            onUpdateOperatingRegions={(value) =>
+              patchForm({ agentOperatingRegions: value })
+            }
+            operationalFocuses={agentOperationalFocuses}
+            operationalNote={agentOperationalNote}
+            operatingMacroAreas={agentOperatingMacroAreas}
+            operatingRegions={agentOperatingRegions}
             validationErrors={validationErrors}
           />
         ) : null}

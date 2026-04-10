@@ -547,6 +547,15 @@ export type CoachProfileHeaderDetails = {
   teamLabel?: string;
 };
 
+export type AgentProfileHeaderDetails = {
+  agencyLabel?: string;
+  bio: string | null;
+  fullName: string;
+  locationLabel?: string;
+  primaryRole: string;
+  statusBadge?: string;
+};
+
 export function buildPlayerProfileHeaderDetails(
   data: CompleteProfessionalProfile,
 ): PlayerProfileHeaderDetails | null {
@@ -641,6 +650,30 @@ export function buildCoachProfileHeaderDetails(
       ? "Disponibile per nuove panchine"
       : undefined,
     teamLabel: latestEntry?.team_name?.trim() || data.coachProfile?.coached_clubs?.[0] || undefined,
+  };
+}
+
+export function buildAgentProfileHeaderDetails(
+  data: CompleteProfessionalProfile,
+): AgentProfileHeaderDetails | null {
+  if (data.profile.role !== "agent") {
+    return null;
+  }
+
+  const locationLabel = formatLocationSummary(data.profile.city, data.profile.region);
+  const federation = data.agentProfile?.federation?.trim();
+
+  return {
+    agencyLabel: data.agentProfile?.agency_name?.trim() || undefined,
+    bio: data.profile.bio?.trim() || null,
+    fullName: formatProfileDisplayName(data.profile.full_name, null),
+    locationLabel: locationLabel === "Da completare" ? undefined : locationLabel,
+    primaryRole: data.agentProfile?.agency_role?.trim() || "Agente sportivo",
+    statusBadge: data.agentProfile?.is_federation_licensed
+      ? federation
+        ? `Licenza ${federation}`
+        : "Agente verificato"
+      : undefined,
   };
 }
 

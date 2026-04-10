@@ -213,8 +213,7 @@ describe("onboarding-form", () => {
     });
 
     expect(errors).toEqual({
-      agentMainPlayerRoles: "Seleziona almeno un ruolo principale.",
-      agentPlayerTypes: "Seleziona almeno un profilo di calciatore.",
+      agentOperationalFocuses: "Seleziona almeno una modalità operativa.",
     });
   });
 

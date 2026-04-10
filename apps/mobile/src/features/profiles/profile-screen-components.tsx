@@ -13,7 +13,7 @@ type ProfileHeaderProps = {
   clubMode?: boolean;
   fullName: string;
   isEditing?: boolean;
-  onEditPress: () => void;
+  onEditPress?: () => void;
   primaryMeta: string;
   secondaryMeta?: string;
 };
@@ -203,22 +203,26 @@ export function PlayerProfileHeader({
                 onPress={onEditProfilePress}
                 variant="primary"
               />
-            ) : (
+            ) : onFollowPress || onContactPress ? (
               <>
-                <HeaderActionButton
-                  icon="person-add-outline"
-                  label="Segui"
-                  onPress={onFollowPress}
-                  variant="primary"
-                />
-                <HeaderActionButton
-                  icon="chatbubble-ellipses-outline"
-                  label="Contatta"
-                  onPress={onContactPress}
-                  variant="secondary"
-                />
+                {onFollowPress ? (
+                  <HeaderActionButton
+                    icon="person-add-outline"
+                    label="Segui"
+                    onPress={onFollowPress}
+                    variant="primary"
+                  />
+                ) : null}
+                {onContactPress ? (
+                  <HeaderActionButton
+                    icon="chatbubble-ellipses-outline"
+                    label="Contatta"
+                    onPress={onContactPress}
+                    variant="secondary"
+                  />
+                ) : null}
               </>
-            )}
+            ) : null}
           </View>
         </View>
       </View>
@@ -366,22 +370,26 @@ export function CoachProfileHeader({
                 onPress={onEditProfilePress}
                 variant="primary"
               />
-            ) : (
+            ) : onFollowPress || onContactPress ? (
               <>
-                <HeaderActionButton
-                  icon="person-add-outline"
-                  label="Segui"
-                  onPress={onFollowPress}
-                  variant="primary"
-                />
-                <HeaderActionButton
-                  icon="chatbubble-ellipses-outline"
-                  label="Contatta"
-                  onPress={onContactPress}
-                  variant="secondary"
-                />
+                {onFollowPress ? (
+                  <HeaderActionButton
+                    icon="person-add-outline"
+                    label="Segui"
+                    onPress={onFollowPress}
+                    variant="primary"
+                  />
+                ) : null}
+                {onContactPress ? (
+                  <HeaderActionButton
+                    icon="chatbubble-ellipses-outline"
+                    label="Contatta"
+                    onPress={onContactPress}
+                    variant="secondary"
+                  />
+                ) : null}
               </>
-            )}
+            ) : null}
           </View>
         </View>
       </View>
@@ -504,22 +512,26 @@ export function StaffProfileHeader({
                 onPress={onEditProfilePress}
                 variant="primary"
               />
-            ) : (
+            ) : onFollowPress || onContactPress ? (
               <>
-                <HeaderActionButton
-                  icon="person-add-outline"
-                  label="Segui"
-                  onPress={onFollowPress}
-                  variant="primary"
-                />
-                <HeaderActionButton
-                  icon="chatbubble-ellipses-outline"
-                  label="Contatta"
-                  onPress={onContactPress}
-                  variant="secondary"
-                />
+                {onFollowPress ? (
+                  <HeaderActionButton
+                    icon="person-add-outline"
+                    label="Segui"
+                    onPress={onFollowPress}
+                    variant="primary"
+                  />
+                ) : null}
+                {onContactPress ? (
+                  <HeaderActionButton
+                    icon="chatbubble-ellipses-outline"
+                    label="Contatta"
+                    onPress={onContactPress}
+                    variant="secondary"
+                  />
+                ) : null}
               </>
-            )}
+            ) : null}
           </View>
         </View>
       </View>
@@ -605,23 +617,25 @@ export function ProfileHeader({
               }
             />
           )}
-          <Pressable
-            accessibilityLabel={actionLabel}
-            accessibilityRole="button"
-            accessibilityState={{ selected: isEditing }}
-            hitSlop={12}
-            onPress={onEditPress}
-            style={({ pressed }) => [
-              styles.editButton,
-              pressed ? styles.pressed : null,
-            ]}
-          >
-            <Ionicons
-              color={colors.textSecondary}
-              name={isEditing ? "close-outline" : "create-outline"}
-              size={18}
-            />
-          </Pressable>
+          {onEditPress ? (
+            <Pressable
+              accessibilityLabel={actionLabel}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isEditing }}
+              hitSlop={12}
+              onPress={onEditPress}
+              style={({ pressed }) => [
+                styles.editButton,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              <Ionicons
+                color={colors.textSecondary}
+                name={isEditing ? "close-outline" : "create-outline"}
+                size={18}
+              />
+            </Pressable>
+          ) : null}
         </View>
         <View style={styles.identityCopy}>
           <AppText variant="headingLg">{fullName}</AppText>

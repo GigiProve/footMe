@@ -13,6 +13,9 @@ function buildCoachProfile(
   overrides: Partial<CompleteProfessionalProfile> = {},
 ): CompleteProfessionalProfile {
   return {
+    agentCareerEntries: [],
+    agentManagedPlayerEntries: [],
+    agentProfile: null,
     club: null,
     clubSeasonEntries: [],
     coachCareerEntries: [],

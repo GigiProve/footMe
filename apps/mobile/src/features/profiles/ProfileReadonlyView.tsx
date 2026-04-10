@@ -39,6 +39,8 @@ import { searchTeams, type CompleteProfessionalProfile } from "./profile-service
 import type { AppRole } from "../onboarding/create-initial-profile";
 
 type EditSection =
+  | "agentProfile"
+  | "agentMedia"
   | "editPlayerProfile"
   | "editCoachProfile"
   | "personalInfo"
@@ -61,7 +63,8 @@ type EditSection =
 
 type ProfileReadonlyViewProps = {
   completeProfile: CompleteProfessionalProfile;
-  onEdit: (section: EditSection) => void;
+  editable?: boolean;
+  onEdit?: (section: EditSection) => void;
   role: AppRole;
 };
 
@@ -69,9 +72,11 @@ export type { EditSection };
 
 export function ProfileReadonlyView({
   completeProfile,
+  editable,
   onEdit,
   role,
 }: ProfileReadonlyViewProps) {
+  const isEditable = editable ?? Boolean(onEdit);
   const summarySections = useMemo(
     () => buildSummarySections(completeProfile),
     [completeProfile],
@@ -92,12 +97,15 @@ export function ProfileReadonlyView({
     [completeProfile.clubSeasonEntries],
   );
 
+  const edit = (section: EditSection) =>
+    isEditable && onEdit ? () => onEdit(section) : undefined;
+
   return (
     <>
       {/* Personal Info (non club_admin) */}
       {role !== "club_admin" ? (
         <SectionCard
-          onEdit={() => onEdit("personalInfo")}
+          onEdit={edit("personalInfo")}
           title="Informazioni personali"
           variant="flat"
         >
@@ -153,7 +161,7 @@ export function ProfileReadonlyView({
       {role === "club_admin" ? (
         <SectionCard
           description="Storico delle categorie in cui il club ha militato."
-          onEdit={() => onEdit("clubSeasons")}
+          onEdit={edit("clubSeasons")}
           title="Storico stagioni"
           variant="flat"
         >
@@ -165,7 +173,7 @@ export function ProfileReadonlyView({
       {role === "player" ? (
         <SectionCard
           description="Squadra, categoria, stagione e numeri chiave del percorso calcistico."
-          onEdit={() => onEdit("playerExperiences")}
+          onEdit={edit("playerExperiences")}
           title="Esperienze calcistiche"
           variant="flat"
         >
@@ -181,7 +189,7 @@ export function ProfileReadonlyView({
       {/* Bio / Presentation */}
       <SectionCard
         description="Disponibilità e descrizione pubblica del profilo"
-        onEdit={() => onEdit("bio")}
+        onEdit={edit("bio")}
         title="Presentazione"
         variant="flat"
       >
@@ -196,7 +204,7 @@ export function ProfileReadonlyView({
           <SectionCard
             description={section.subtitle}
             key={section.title}
-            onEdit={editTarget ? () => onEdit(editTarget) : undefined}
+            onEdit={editTarget && isEditable && onEdit ? () => onEdit(editTarget) : undefined}
             title={section.title}
             variant="flat"
           >
@@ -252,7 +260,7 @@ export function ProfileReadonlyView({
       {role === "player" ? (
         <SectionCard
           description="Ruolo e piede preferito leggibili rapidamente anche in consultazione."
-          onEdit={() => onEdit("playerSports")}
+          onEdit={edit("playerSports")}
           title="Profilo sportivo"
           variant="flat"
         >
@@ -274,7 +282,7 @@ export function ProfileReadonlyView({
       {/* Media sections */}
       {role === "player" ? (
         <SectionCard
-          onEdit={() => onEdit("playerSports")}
+          onEdit={edit("playerSports")}
           title="Media"
           variant="flat"
         >
@@ -289,7 +297,7 @@ export function ProfileReadonlyView({
 
       {role === "coach" ? (
         <SectionCard
-          onEdit={() => onEdit("coachMedia")}
+          onEdit={edit("coachMedia")}
           title="Media"
           variant="flat"
         >
@@ -304,7 +312,7 @@ export function ProfileReadonlyView({
 
       {role === "club_admin" ? (
         <SectionCard
-          onEdit={() => onEdit("clubInfo")}
+          onEdit={edit("clubInfo")}
           title="Media"
           variant="flat"
         >
@@ -321,10 +329,14 @@ export function ProfileReadonlyView({
       ) : null}
 
       {/* Contacts — ContactSection already wraps in ProfileSectionCard, render standalone */}
-      <ContactSectionWithEdit
-        completeProfile={completeProfile}
-        onEdit={() => onEdit("contact")}
-      />
+      {isEditable && onEdit ? (
+        <ContactSectionWithEdit
+          completeProfile={completeProfile}
+          onEdit={() => onEdit("contact")}
+        />
+      ) : (
+        <ContactSection contacts={completeProfile.userContacts} variant="flat" />
+      )}
     </>
   );
 }
@@ -372,6 +384,8 @@ const readonlyStyles = StyleSheet.create({
 
 function getEditTarget(role: AppRole): EditSection | null {
   switch (role) {
+    case "agent":
+      return "agentProfile";
     case "player":
       return "playerSports";
     case "coach":

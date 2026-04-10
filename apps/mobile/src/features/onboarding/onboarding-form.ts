@@ -4,6 +4,10 @@ import {
   isPhoneNumberValid,
   splitPhoneNumber,
 } from "../profiles/profile-form-utils";
+import type {
+  AgentCareerEntryDraft,
+  AgentManagedPlayerEntryDraft,
+} from "../profiles/agent-profile";
 import type { PlayerExperienceForm, PlayerPosition, PreferredFoot } from "../profiles/player-sports";
 import { normalizePlayerPositions } from "../profiles/player-sports";
 import type { UploadedMediaItem } from "../profiles/media-upload-service";
@@ -83,6 +87,9 @@ export type LegalStatus = "has_permit" | "no_permit" | "pending_permit" | "";
 export type OnboardingFormState = {
   agentAgencyLogoUrl: string;
   agentAgencyName: string;
+  agentAgencyRole: string;
+  agentAgencyStartYear: string;
+  agentCareerEntries: AgentCareerEntryDraft[];
   agentFederation: string;
   agentHasOtherFootballExperience: boolean;
   agentHasPlayedFootball: boolean;
@@ -90,9 +97,14 @@ export type OnboardingFormState = {
   agentLanguages: string[];
   agentMainPlayerRoles: PlayerPosition[];
   agentManagedPlayersCount: string;
+  agentManagedPlayerEntries: AgentManagedPlayerEntryDraft[];
   agentOpenToClubs: boolean;
   agentOpenToPlayers: boolean;
+  agentOperationalFocuses: string[];
+  agentOperationalNote: string;
   agentOtherFootballRoles: string[];
+  agentOperatingMacroAreas: string[];
+  agentOperatingRegions: string;
   agentPlayerCareerEntries: PlayerExperienceForm[];
   agentPlayerTypes: string[];
   availabilityType: AvailabilityType;
@@ -742,6 +754,9 @@ export const onboardingStepOrder = defaultStepOrder;
 export const defaultOnboardingFormState: OnboardingFormState = {
   agentAgencyLogoUrl: "",
   agentAgencyName: "",
+  agentAgencyRole: "",
+  agentAgencyStartYear: "",
+  agentCareerEntries: [],
   agentFederation: "",
   agentHasOtherFootballExperience: false,
   agentHasPlayedFootball: false,
@@ -749,9 +764,14 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   agentLanguages: [],
   agentMainPlayerRoles: [],
   agentManagedPlayersCount: "",
+  agentManagedPlayerEntries: [],
   agentOpenToClubs: true,
   agentOpenToPlayers: true,
+  agentOperationalFocuses: [],
+  agentOperationalNote: "",
   agentOtherFootballRoles: [],
+  agentOperatingMacroAreas: [],
+  agentOperatingRegions: "",
   agentPlayerCareerEntries: [],
   agentPlayerTypes: [],
   availabilityType: "ITALY",
@@ -1018,6 +1038,36 @@ export function normalizeOnboardingDraft(
     coachLanguages: Array.isArray(value.coachLanguages)
       ? value.coachLanguages.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.coachLanguages,
+    agentAgencyRole:
+      typeof value.agentAgencyRole === "string"
+        ? value.agentAgencyRole
+        : defaultOnboardingFormState.agentAgencyRole,
+    agentAgencyStartYear:
+      typeof value.agentAgencyStartYear === "string"
+        ? value.agentAgencyStartYear
+        : defaultOnboardingFormState.agentAgencyStartYear,
+    agentCareerEntries: Array.isArray(value.agentCareerEntries)
+      ? value.agentCareerEntries
+          .filter((entry): entry is AgentCareerEntryDraft => Boolean(entry && typeof entry === "object"))
+          .map((entry) => ({
+            agency_logo_url:
+              typeof entry.agency_logo_url === "string" ? entry.agency_logo_url : null,
+            agency_name: typeof entry.agency_name === "string" ? entry.agency_name : "",
+            id:
+              typeof entry.id === "string"
+                ? entry.id
+                : defaultOnboardingFormState.agentCareerEntries[0]?.id ?? "",
+            period_end_month:
+              typeof entry.period_end_month === "string" ? entry.period_end_month : null,
+            period_end_year:
+              typeof entry.period_end_year === "number" ? entry.period_end_year : null,
+            period_start_month:
+              typeof entry.period_start_month === "string" ? entry.period_start_month : null,
+            period_start_year:
+              typeof entry.period_start_year === "number" ? entry.period_start_year : null,
+            role: typeof entry.role === "string" ? entry.role : "",
+          }))
+      : defaultOnboardingFormState.agentCareerEntries,
     agentHasOtherFootballExperience: value.agentHasOtherFootballExperience === true,
     agentHasPlayedFootball: value.agentHasPlayedFootball === true,
     agentIsFederationLicensed: value.agentIsFederationLicensed === true,
@@ -1025,9 +1075,47 @@ export function normalizeOnboardingDraft(
       ? value.agentLanguages.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.agentLanguages,
     agentMainPlayerRoles: normalizePlayerPositions(value.agentMainPlayerRoles),
+    agentManagedPlayerEntries: Array.isArray(value.agentManagedPlayerEntries)
+      ? value.agentManagedPlayerEntries
+          .filter((entry): entry is AgentManagedPlayerEntryDraft => Boolean(entry && typeof entry === "object"))
+          .map((entry) => ({
+            avatar_url: typeof entry.avatar_url === "string" ? entry.avatar_url : null,
+            birth_year: typeof entry.birth_year === "number" ? entry.birth_year : null,
+            category_label:
+              typeof entry.category_label === "string" ? entry.category_label : null,
+            display_name:
+              typeof entry.display_name === "string" ? entry.display_name : "",
+            id:
+              typeof entry.id === "string"
+                ? entry.id
+                : defaultOnboardingFormState.agentManagedPlayerEntries[0]?.id ?? "",
+            is_free_agent: entry.is_free_agent === true,
+            linked_profile_id:
+              typeof entry.linked_profile_id === "string" ? entry.linked_profile_id : null,
+            primary_position: normalizePlayerPositions(entry.primary_position)[0] ?? null,
+          }))
+      : defaultOnboardingFormState.agentManagedPlayerEntries,
+    agentManagedPlayersCount:
+      typeof value.agentManagedPlayersCount === "string"
+        ? value.agentManagedPlayersCount
+        : defaultOnboardingFormState.agentManagedPlayersCount,
+    agentOperationalFocuses: Array.isArray(value.agentOperationalFocuses)
+      ? value.agentOperationalFocuses.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.agentOperationalFocuses,
+    agentOperationalNote:
+      typeof value.agentOperationalNote === "string"
+        ? value.agentOperationalNote
+        : defaultOnboardingFormState.agentOperationalNote,
     agentOtherFootballRoles: Array.isArray(value.agentOtherFootballRoles)
       ? value.agentOtherFootballRoles.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.agentOtherFootballRoles,
+    agentOperatingMacroAreas: Array.isArray(value.agentOperatingMacroAreas)
+      ? value.agentOperatingMacroAreas.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.agentOperatingMacroAreas,
+    agentOperatingRegions:
+      typeof value.agentOperatingRegions === "string"
+        ? value.agentOperatingRegions
+        : defaultOnboardingFormState.agentOperatingRegions,
     agentPlayerCareerEntries: Array.isArray(value.agentPlayerCareerEntries)
       ? value.agentPlayerCareerEntries
       : defaultOnboardingFormState.agentPlayerCareerEntries,
@@ -1835,21 +1923,25 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
 function mapAgentAgencyValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
   if (!form.agentAgencyName.trim()) {
-    return {
-      agentAgencyName: "Inserisci il nome dell'agenzia o dello studio.",
-    };
+    errors.agentAgencyName = "Inserisci il nome dell'agenzia o dello studio.";
   }
 
-  return {};
+  if (!form.agentAgencyRole.trim()) {
+    errors.agentAgencyRole = "Inserisci il ruolo attuale in agenzia.";
+  }
+
+  return errors;
 }
 
 function mapAgentPlayersValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
-  if (!form.agentManagedPlayersCount) {
+  if (form.agentManagedPlayerEntries.length === 0) {
     return {
-      agentManagedPlayersCount: "Seleziona la fascia di calciatori seguiti.",
+      agentManagedPlayerEntries: "Aggiungi almeno un calciatore al portfolio.",
     };
   }
 
@@ -1874,17 +1966,13 @@ function mapAgentFootballExperienceValidationError(
 function mapAgentPortfolioValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
-  const errors: OnboardingValidationErrors = {};
-
-  if (form.agentPlayerTypes.length === 0) {
-    errors.agentPlayerTypes = "Seleziona almeno un profilo di calciatore.";
+  if (form.agentOperationalFocuses.length === 0) {
+    return {
+      agentOperationalFocuses: "Seleziona almeno una modalità operativa.",
+    };
   }
 
-  if (form.agentMainPlayerRoles.length === 0) {
-    errors.agentMainPlayerRoles = "Seleziona almeno un ruolo principale.";
-  }
-
-  return errors;
+  return {};
 }
 
 function mapAgentAvailabilityValidationError(

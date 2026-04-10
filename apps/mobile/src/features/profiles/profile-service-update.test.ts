@@ -714,12 +714,41 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     });
   });
 
-  it("persists agent-specific onboarding data in agent_profiles", async () => {
+  it("persists agent-specific onboarding data through the agent rpc", async () => {
     await updateCompleteProfessionalProfile({
       ...buildUpdateInput(),
+      agentCareerEntries: [
+        {
+          agency_logo_url: null,
+          agency_name: "Agency Before",
+          agent_profile_id: "profile-1",
+          id: "11111111-1111-4111-8111-111111111111",
+          period_end_month: null,
+          period_end_year: 2020,
+          period_start_month: null,
+          period_start_year: 2018,
+          role: "Scout",
+          sort_order: 0,
+        },
+      ],
+      agentManagedPlayerEntries: [
+        {
+          agent_profile_id: "profile-1",
+          avatar_url: "https://example.com/player.png",
+          birth_year: 2004,
+          category_label: "Serie D",
+          display_name: "Luca Bianchi",
+          id: "22222222-2222-4222-8222-222222222222",
+          is_free_agent: false,
+          linked_profile_id: "33333333-3333-4333-8333-333333333333",
+          primary_position: "defender",
+          sort_order: 0,
+        },
+      ],
       agentProfile: {
         agency_logo_url: "https://example.com/agency.png",
         agency_name: "MB Football Management",
+        agency_role: "Founder",
         federation: "FIGC (Italia)",
         has_other_football_experience: true,
         has_played_football: true,
@@ -728,7 +757,15 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         managed_players_count: "5-15 calciatori",
         open_to_clubs: true,
         open_to_players: false,
+        operational_focuses: ["Valorizzazione giovani", "Mercato dilettanti"],
+        operational_note: "Lavoro tra Serie D ed Eccellenza nel Nord Italia.",
+        operating_macro_areas: ["Nord Italia"],
+        operating_regions: ["Lombardia", "Veneto"],
         other_football_roles: ["Ex calciatore", "Scout"],
+        period_end_month: null,
+        period_end_year: null,
+        period_start_month: null,
+        period_start_year: 2021,
         player_career_entries: [
           {
             id: "agent-player-exp-1",
@@ -746,29 +783,66 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       staffProfile: null,
     });
 
-    expect(mocks.agentProfilesUpsertMock).toHaveBeenCalledWith({
-      agency_logo_url: "https://example.com/agency.png",
-      agency_name: "MB Football Management",
-      federation: "FIGC (Italia)",
-      has_other_football_experience: true,
-      has_played_football: true,
-      is_federation_licensed: true,
-      main_player_roles: ["defender", "midfielder"],
-      managed_players_count: "5-15 calciatori",
-      open_to_clubs: true,
-      open_to_players: false,
-      other_football_roles: ["Ex calciatore", "Scout"],
-      player_career_entries: [
+    expect(mocks.rpcMock).toHaveBeenCalledWith("save_agent_profile_details", {
+      p_agent_profile: {
+        agency_logo_url: "https://example.com/agency.png",
+        agency_name: "MB Football Management",
+        agency_role: "Founder",
+        federation: "FIGC (Italia)",
+        has_other_football_experience: true,
+        has_played_football: true,
+        is_federation_licensed: true,
+        main_player_roles: ["defender", "midfielder"],
+        managed_players_count: "5-15 calciatori",
+        open_to_clubs: true,
+        open_to_players: false,
+        operational_focuses: ["Valorizzazione giovani", "Mercato dilettanti"],
+        operational_note: "Lavoro tra Serie D ed Eccellenza nel Nord Italia.",
+        operating_macro_areas: ["Nord Italia"],
+        operating_regions: ["Lombardia", "Veneto"],
+        other_football_roles: ["Ex calciatore", "Scout"],
+        period_end_month: null,
+        period_end_year: null,
+        period_start_month: null,
+        period_start_year: 2021,
+        player_career_entries: [
+          {
+            id: "agent-player-exp-1",
+            category: "Serie D",
+            teamName: "ASD Test",
+            seasons: ["2020/2021"],
+            type: "FIRST_TEAM",
+          },
+        ],
+        player_types: ["Giovani", "Senior"],
+      },
+      p_career_entries: [
         {
-          id: "agent-player-exp-1",
-          category: "Serie D",
-          teamName: "ASD Test",
-          seasons: ["2020/2021"],
-          type: "FIRST_TEAM",
+          agency_logo_url: null,
+          agency_name: "Agency Before",
+          id: "11111111-1111-4111-8111-111111111111",
+          period_end_month: null,
+          period_end_year: 2020,
+          period_start_month: null,
+          period_start_year: 2018,
+          role: "Scout",
+          sort_order: 0,
         },
       ],
-      player_types: ["Giovani", "Senior"],
-      profile_id: "profile-1",
+      p_managed_player_entries: [
+        {
+          avatar_url: "https://example.com/player.png",
+          birth_year: 2004,
+          category_label: "Serie D",
+          display_name: "Luca Bianchi",
+          id: "22222222-2222-4222-8222-222222222222",
+          is_free_agent: false,
+          linked_profile_id: "33333333-3333-4333-8333-333333333333",
+          primary_position: "defender",
+          sort_order: 0,
+        },
+      ],
+      p_profile_id: "profile-1",
     });
   });
 

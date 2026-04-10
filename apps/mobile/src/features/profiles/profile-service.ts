@@ -18,6 +18,16 @@ import {
   normalizeCoachMediaItems,
   type CoachMediaItemRecord,
 } from "./coach-media";
+import type {
+  AgentCareerEntryRecord,
+  AgentManagedPlayerEntryRecord,
+  AgentPlayerCandidate,
+  AgentProfileRecord,
+} from "./agent-profile";
+import {
+  normalizeAgentMediaItems,
+  type AgentMediaItemRecord,
+} from "./agent-media";
 import {
   normalizePlayerMediaItems,
   type PlayerMediaItemRecord,
@@ -26,6 +36,13 @@ import {
   normalizeStaffMediaItems,
   type StaffMediaItemRecord,
 } from "./staff-media";
+
+export type {
+  AgentCareerEntryRecord,
+  AgentManagedPlayerEntryRecord,
+  AgentPlayerCandidate,
+  AgentProfileRecord,
+} from "./agent-profile";
 
 type BaseProfileRecord = {
   age: number | null;
@@ -277,6 +294,9 @@ export type ClubSeasonEntryRecord = {
 };
 
 export type CompleteProfessionalProfile = {
+  agentCareerEntries: AgentCareerEntryRecord[];
+  agentManagedPlayerEntries: AgentManagedPlayerEntryRecord[];
+  agentProfile: AgentProfileRecord | null;
   club: ClubRecord | null;
   clubSeasonEntries: ClubSeasonEntryRecord[];
   coachCareerEntries: CoachCareerEntryRecord[];
@@ -319,6 +339,7 @@ export type CompleteProfessionalProfileUpdate = {
   agentProfile?: {
     agency_logo_url: string | null;
     agency_name: string | null;
+    agency_role: string | null;
     federation: string | null;
     has_other_football_experience: boolean;
     has_played_football: boolean;
@@ -327,7 +348,15 @@ export type CompleteProfessionalProfileUpdate = {
     managed_players_count: string | null;
     open_to_clubs: boolean;
     open_to_players: boolean;
+    operational_focuses: string[];
+    operational_note: string | null;
+    operating_macro_areas: string[];
+    operating_regions: string[];
     other_football_roles: string[];
+    period_end_month: string | null;
+    period_end_year: number | null;
+    period_start_month: string | null;
+    period_start_year: number | null;
     player_career_entries: unknown[];
     player_types: string[];
   } | null;
@@ -377,6 +406,8 @@ export type CompleteProfessionalProfileUpdate = {
     region: string;
     website_url: string | null;
   } | null;
+  agentCareerEntries?: AgentCareerEntryRecord[];
+  agentManagedPlayerEntries?: AgentManagedPlayerEntryRecord[];
   clubSeasonEntries: ClubSeasonEntryInput[];
   coachProfile: {
     availability_type: string | null;
@@ -731,6 +762,89 @@ function normalizeCoachProfileRecord(
   } satisfies CoachProfileRecord;
 }
 
+function normalizeAgentProfileRecord(
+  profileId: string,
+  rawProfile: Partial<AgentProfileRecord> | null | undefined,
+) {
+  if (!rawProfile) {
+    return null;
+  }
+
+  return {
+    agency_logo_url: normalizeOptionalText(rawProfile.agency_logo_url),
+    agency_name: normalizeOptionalText(rawProfile.agency_name),
+    agency_role: normalizeOptionalText(rawProfile.agency_role),
+    federation: normalizeOptionalText(rawProfile.federation),
+    has_other_football_experience: normalizeBoolean(
+      rawProfile.has_other_football_experience,
+    ),
+    has_played_football: normalizeBoolean(rawProfile.has_played_football),
+    is_federation_licensed: normalizeBoolean(rawProfile.is_federation_licensed),
+    main_player_roles: normalizePlayerPositions(rawProfile.main_player_roles),
+    managed_players_count: normalizeOptionalText(rawProfile.managed_players_count),
+    media_items: normalizeAgentMediaItems(rawProfile.media_items),
+    open_to_clubs: normalizeBoolean(rawProfile.open_to_clubs, true),
+    open_to_players: normalizeBoolean(rawProfile.open_to_players, true),
+    operational_focuses: normalizeStringArray(rawProfile.operational_focuses),
+    operational_note: normalizeOptionalText(rawProfile.operational_note),
+    operating_macro_areas: normalizeStringArray(rawProfile.operating_macro_areas),
+    operating_regions: normalizeStringArray(rawProfile.operating_regions),
+    other_football_roles: normalizeStringArray(rawProfile.other_football_roles),
+    period_end_month: normalizeOptionalText(rawProfile.period_end_month),
+    period_end_year: normalizeNumber(rawProfile.period_end_year),
+    period_start_month: normalizeOptionalText(rawProfile.period_start_month),
+    period_start_year: normalizeNumber(rawProfile.period_start_year),
+    player_career_entries: Array.isArray(rawProfile.player_career_entries)
+      ? rawProfile.player_career_entries
+      : [],
+    player_types: normalizeStringArray(rawProfile.player_types),
+    profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+  } satisfies AgentProfileRecord;
+}
+
+function normalizeAgentCareerEntryRecord(
+  profileId: string,
+  rawEntry: Partial<AgentCareerEntryRecord>,
+  index: number,
+) {
+  return {
+    agency_logo_url: normalizeOptionalText(rawEntry.agency_logo_url),
+    agency_name: normalizeRequiredText(rawEntry.agency_name, ""),
+    agent_profile_id: normalizeRequiredText(rawEntry.agent_profile_id, profileId),
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-agent-career-${index}`),
+    period_end_month: normalizeOptionalText(rawEntry.period_end_month),
+    period_end_year: normalizeNumber(rawEntry.period_end_year),
+    period_start_month: normalizeOptionalText(rawEntry.period_start_month),
+    period_start_year: normalizeNumber(rawEntry.period_start_year),
+    role: normalizeRequiredText(rawEntry.role, "Agente"),
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+  } satisfies AgentCareerEntryRecord;
+}
+
+function normalizeAgentManagedPlayerEntryRecord(
+  profileId: string,
+  rawEntry: Partial<AgentManagedPlayerEntryRecord>,
+  index: number,
+) {
+  return {
+    agent_profile_id: normalizeRequiredText(rawEntry.agent_profile_id, profileId),
+    avatar_url: normalizeOptionalText(rawEntry.avatar_url),
+    birth_year: normalizeNumber(rawEntry.birth_year),
+    category_label: normalizeOptionalText(rawEntry.category_label),
+    display_name: normalizeRequiredText(rawEntry.display_name, "Calciatore"),
+    id: normalizeRequiredText(rawEntry.id, `${profileId}-agent-player-${index}`),
+    is_free_agent: normalizeBoolean(rawEntry.is_free_agent),
+    linked_profile_id:
+      typeof rawEntry.linked_profile_id === "string" && rawEntry.linked_profile_id.trim()
+        ? rawEntry.linked_profile_id
+        : null,
+    primary_position: isPlayerPosition(rawEntry.primary_position)
+      ? rawEntry.primary_position
+      : null,
+    sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+  } satisfies AgentManagedPlayerEntryRecord;
+}
+
 function normalizeCoachCareerEntryRecord(
   profileId: string,
   rawEntry: Partial<CoachCareerEntryRecord>,
@@ -964,6 +1078,9 @@ function normalizePlayerCareerEntryRecord(
 }
 
 export function normalizeUserProfile(input: {
+  agentCareerEntries?: Partial<AgentCareerEntryRecord>[] | null;
+  agentManagedPlayerEntries?: Partial<AgentManagedPlayerEntryRecord>[] | null;
+  agentProfile?: Partial<AgentProfileRecord> | null;
   club?: Partial<ClubRecord> | null;
   clubSeasonEntries?: ClubSeasonEntryRecord[];
   coachCareerEntries?: Partial<CoachCareerEntryRecord>[] | null;
@@ -998,6 +1115,13 @@ export function normalizeUserProfile(input: {
   staffProfile?: Partial<StaffProfileRecord> | null;
 }): CompleteProfessionalProfile {
   return {
+    agentCareerEntries: (input.agentCareerEntries ?? []).map((entry, index) =>
+      normalizeAgentCareerEntryRecord(input.profileId, entry, index),
+    ),
+    agentManagedPlayerEntries: (input.agentManagedPlayerEntries ?? []).map((entry, index) =>
+      normalizeAgentManagedPlayerEntryRecord(input.profileId, entry, index),
+    ),
+    agentProfile: normalizeAgentProfileRecord(input.profileId, input.agentProfile),
     club: normalizeClubRecord(input.profileId, input.club),
     clubSeasonEntries: input.clubSeasonEntries ?? [],
     coachCareerEntries: (input.coachCareerEntries ?? []).map((entry, index) =>
@@ -1064,7 +1188,15 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   }
 
   const profile = normalizeBaseProfileRecord(profileId, profileData as Partial<BaseProfileRecord>);
-  const [playerProfile, coachProfile, staffProfile, club, profileContacts, privateContacts] =
+  const [
+    playerProfile,
+    coachProfile,
+    staffProfile,
+    agentProfile,
+    club,
+    profileContacts,
+    privateContacts,
+  ] =
     await Promise.all([
     profile.role === "player"
       ? supabase
@@ -1089,6 +1221,15 @@ export async function getCompleteProfessionalProfile(profileId: string) {
           .from("staff_profiles")
           .select(
             "profile_id, specialization, availability_type, available_from, preferred_categories, preferred_provinces, primary_staff_role, staff_roles, experience_entries, experience_summary, certifications, preferred_regions, open_to_work, media_items",
+          )
+          .eq("profile_id", profileId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    profile.role === "agent"
+      ? supabase
+          .from("agent_profiles")
+          .select(
+            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -1128,6 +1269,10 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     throw staffProfile.error;
   }
 
+  if (agentProfile.error) {
+    throw agentProfile.error;
+  }
+
   if (club.error) {
     throw club.error;
   }
@@ -1142,6 +1287,8 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 
   let playerCareerEntries: PlayerCareerEntryRecord[] = [];
   let playerPalmares: PlayerPalmaresRecord[] = [];
+  let agentCareerEntries: AgentCareerEntryRecord[] = [];
+  let agentManagedPlayerEntries: AgentManagedPlayerEntryRecord[] = [];
   let coachCareerEntries: CoachCareerEntryRecord[] = [];
   let coachPlayerCareerEntries: CoachPlayerCareerEntryRecord[] = [];
   let coachDirectorCareerEntries: CoachDirectorCareerEntryRecord[] = [];
@@ -1309,6 +1456,49 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     );
   }
 
+  if (profile.role === "agent") {
+    const [careerResult, managedPlayersResult] = await Promise.all([
+      supabase
+        .from("agent_career_entries")
+        .select(
+          "id, agent_profile_id, agency_name, agency_logo_url, role, period_start_month, period_start_year, period_end_month, period_end_year, sort_order",
+        )
+        .eq("agent_profile_id", profileId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("agent_managed_player_entries")
+        .select(
+          "id, agent_profile_id, linked_profile_id, display_name, avatar_url, primary_position, birth_year, category_label, is_free_agent, sort_order",
+        )
+        .eq("agent_profile_id", profileId)
+        .order("sort_order", { ascending: true }),
+    ]);
+
+    if (careerResult.error) {
+      throw careerResult.error;
+    }
+
+    if (managedPlayersResult.error) {
+      throw managedPlayersResult.error;
+    }
+
+    agentCareerEntries = (careerResult.data ?? []).map((entry, index) =>
+      normalizeAgentCareerEntryRecord(
+        profileId,
+        entry as Partial<AgentCareerEntryRecord>,
+        index,
+      ),
+    );
+
+    agentManagedPlayerEntries = (managedPlayersResult.data ?? []).map((entry, index) =>
+      normalizeAgentManagedPlayerEntryRecord(
+        profileId,
+        entry as Partial<AgentManagedPlayerEntryRecord>,
+        index,
+      ),
+    );
+  }
+
   let clubSeasonEntries: ClubSeasonEntryRecord[] = [];
 
   if (profile.role === "club_admin" && club.data) {
@@ -1327,6 +1517,9 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   }
 
   return normalizeUserProfile({
+    agentCareerEntries,
+    agentManagedPlayerEntries,
+    agentProfile: (agentProfile.data as Partial<AgentProfileRecord> | null) ?? null,
     club: (club.data as Partial<ClubRecord> | null) ?? null,
     clubSeasonEntries,
     coachCareerEntries,
@@ -1571,22 +1764,31 @@ export async function updateCompleteProfessionalProfile(
   }
 
   if (input.role === "agent" && input.agentProfile) {
-    const { error } = await supabase.from("agent_profiles").upsert({
-      agency_logo_url: input.agentProfile.agency_logo_url,
-      agency_name: input.agentProfile.agency_name,
-      federation: input.agentProfile.federation,
-      has_other_football_experience:
-        input.agentProfile.has_other_football_experience,
-      has_played_football: input.agentProfile.has_played_football,
-      is_federation_licensed: input.agentProfile.is_federation_licensed,
-      main_player_roles: input.agentProfile.main_player_roles,
-      managed_players_count: input.agentProfile.managed_players_count,
-      open_to_clubs: input.agentProfile.open_to_clubs,
-      open_to_players: input.agentProfile.open_to_players,
-      other_football_roles: input.agentProfile.other_football_roles,
-      player_career_entries: input.agentProfile.player_career_entries,
-      player_types: input.agentProfile.player_types,
-      profile_id: input.profileId,
+    const { error } = await supabase.rpc("save_agent_profile_details", {
+      p_agent_profile: input.agentProfile,
+      p_career_entries: (input.agentCareerEntries ?? []).map((entry, index) => ({
+        agency_logo_url: entry.agency_logo_url,
+        agency_name: entry.agency_name,
+        ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
+        period_end_month: entry.period_end_month,
+        period_end_year: entry.period_end_year,
+        period_start_month: entry.period_start_month,
+        period_start_year: entry.period_start_year,
+        role: entry.role,
+        sort_order: entry.sort_order ?? index,
+      })),
+      p_managed_player_entries: (input.agentManagedPlayerEntries ?? []).map((entry, index) => ({
+        avatar_url: entry.avatar_url,
+        birth_year: entry.birth_year,
+        category_label: entry.category_label,
+        display_name: entry.display_name,
+        ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
+        is_free_agent: entry.is_free_agent,
+        ...(isUuidLike(entry.linked_profile_id) ? { linked_profile_id: entry.linked_profile_id } : {}),
+        primary_position: entry.primary_position,
+        sort_order: entry.sort_order ?? index,
+      })),
+      p_profile_id: input.profileId,
     });
 
     if (error) {
@@ -1838,6 +2040,43 @@ export async function saveStaffProfileMedia(input: {
   }
 }
 
+export async function saveAgentProfileMedia(input: {
+  agentProfile: NonNullable<CompleteProfessionalProfile["agentProfile"]>;
+  mediaItems: AgentMediaItemRecord[];
+  profileId: string;
+}) {
+  const { error } = await supabase.from("agent_profiles").upsert({
+    agency_logo_url: input.agentProfile.agency_logo_url,
+    agency_name: input.agentProfile.agency_name,
+    agency_role: input.agentProfile.agency_role,
+    federation: input.agentProfile.federation,
+    has_other_football_experience: input.agentProfile.has_other_football_experience,
+    has_played_football: input.agentProfile.has_played_football,
+    is_federation_licensed: input.agentProfile.is_federation_licensed,
+    main_player_roles: input.agentProfile.main_player_roles,
+    managed_players_count: input.agentProfile.managed_players_count,
+    media_items: input.mediaItems,
+    open_to_clubs: input.agentProfile.open_to_clubs,
+    open_to_players: input.agentProfile.open_to_players,
+    operational_focuses: input.agentProfile.operational_focuses,
+    operational_note: input.agentProfile.operational_note,
+    operating_macro_areas: input.agentProfile.operating_macro_areas,
+    operating_regions: input.agentProfile.operating_regions,
+    other_football_roles: input.agentProfile.other_football_roles,
+    period_end_month: input.agentProfile.period_end_month,
+    period_end_year: input.agentProfile.period_end_year,
+    period_start_month: input.agentProfile.period_start_month,
+    period_start_year: input.agentProfile.period_start_year,
+    player_career_entries: input.agentProfile.player_career_entries,
+    player_types: input.agentProfile.player_types,
+    profile_id: input.profileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function searchTeams(query: string, limit = 5) {
   const trimmedQuery = query.trim();
 
@@ -1866,6 +2105,45 @@ export async function searchTeams(query: string, limit = 5) {
     isCustom: row.is_community,
     logoUrl: row.logo_url,
     name: row.name,
+  }));
+}
+
+export async function searchAgentPlayerCandidates(query: string, limit = 8) {
+  const trimmedQuery = query.trim();
+
+  if (trimmedQuery.length < 2) {
+    return [] as AgentPlayerCandidate[];
+  }
+
+  const { data, error } = await supabase.rpc("search_agent_player_candidates", {
+    p_limit: limit,
+    p_query: trimmedQuery,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as {
+    avatar_url: string | null;
+    birth_year: number | null;
+    category_label: string | null;
+    full_name: string;
+    is_free_agent: boolean | null;
+    primary_position: PlayerPosition | null;
+    profile_id: string;
+    region: string | null;
+  }[]).map((row) => ({
+    avatar_url: row.avatar_url,
+    birth_year: normalizeNumber(row.birth_year),
+    category_label: row.category_label,
+    full_name: row.full_name,
+    is_free_agent: Boolean(row.is_free_agent),
+    primary_position: isPlayerPosition(row.primary_position)
+      ? row.primary_position
+      : null,
+    profile_id: row.profile_id,
+    region: row.region,
   }));
 }
 
