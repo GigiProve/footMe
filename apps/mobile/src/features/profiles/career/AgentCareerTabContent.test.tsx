@@ -145,7 +145,8 @@ describe("AgentCareerTabContent", () => {
     });
 
     expect(tree.root.findByProps({ children: "MB Football Management" })).toBeTruthy();
-    expect(tree.root.findByProps({ children: "3 giocatori gestiti" })).toBeTruthy();
+    expect(tree.root.findByProps({ children: 3 })).toBeTruthy();
+    expect(tree.root.findByProps({ children: " giocatori gestiti" })).toBeTruthy();
     expect(tree.root.findByProps({ children: "Serie D" })).toBeTruthy();
     expect(tree.root.findByProps({ children: "Under" })).toBeTruthy();
     expect(tree.root.findByProps({ children: "Svincolati" })).toBeTruthy();

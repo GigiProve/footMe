@@ -8,7 +8,7 @@ import {
   buildAgentPlayerTypeTags,
   buildOperationalModeItems,
   formatAgentPeriod,
-  getAgentManagedPlayersLabel,
+  getAgentManagedPlayersCount,
 } from "../agent-profile";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import { colors, radius, spacing } from "../../../theme/tokens";
@@ -34,228 +34,216 @@ export function AgentCareerTabContent({
     startMonth: agentProfile?.period_start_month,
     startYear: agentProfile?.period_start_year,
   });
-  const managedPlayersLabel = getAgentManagedPlayersLabel(
+  const managedPlayersCount = getAgentManagedPlayersCount(
     completeProfile.agentManagedPlayerEntries,
     agentProfile?.managed_players_count,
-  );
-  const categoryDistribution = buildAgentCategoryDistribution(
-    completeProfile.agentManagedPlayerEntries,
   );
   const categorySummary = buildAgentCategorySummary(
     completeProfile.agentManagedPlayerEntries,
     agentProfile?.player_types ?? [],
+  );
+  const categoryDistribution = buildAgentCategoryDistribution(
+    completeProfile.agentManagedPlayerEntries,
   );
   const playerRoleTags = buildAgentPlayerTypeTags(
     completeProfile.agentManagedPlayerEntries,
     agentProfile?.main_player_roles ?? [],
   );
   const ageBandTags = buildAgentAgeBandTags(completeProfile.agentManagedPlayerEntries);
+  const allTags = [...playerRoleTags, ...ageBandTags];
   const operationalItems = buildOperationalModeItems(agentProfile);
+  const totalPlayers = completeProfile.agentManagedPlayerEntries.length;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <AppText variant="overline">Carriera</AppText>
-        {isOwner ? (
-          <Pressable
-            accessibilityLabel="Modifica carriera agente"
-            hitSlop={8}
-            onPress={onEdit}
-            style={styles.editButton}
-          >
-            <Ionicons color={colors.textSecondary} name="create-outline" size={18} />
-          </Pressable>
-        ) : null}
-      </View>
+    <View>
+      {/* Main experience block */}
+      <View style={styles.mainBlock}>
+        <View style={styles.mainBlockHeader}>
+          <AppText variant="displaySm">{currentAgency}</AppText>
+          {isOwner ? (
+            <Pressable
+              accessibilityLabel="Modifica carriera agente"
+              hitSlop={8}
+              onPress={onEdit}
+              style={styles.editButton}
+            >
+              <Ionicons color={colors.textSecondary} name="create-outline" size={18} />
+            </Pressable>
+          ) : null}
+        </View>
 
-      <View style={styles.currentAgencyBlock}>
-        <AppText variant="displaySm">{currentAgency}</AppText>
-        <View style={styles.currentMetaRow}>
+        <View style={styles.roleRow}>
           <AppText color="accent" variant="titleSm">
             {currentRole}
           </AppText>
-          <AppText color="secondary" variant="titleSm">
+          <View style={styles.dot} />
+          <AppText color="secondary" variant="bodySm">
             {currentPeriod}
           </AppText>
         </View>
-      </View>
 
-      <View style={styles.highlightBox}>
-        <View style={styles.highlightAccent} />
-        <View style={styles.highlightContent}>
-          <AppText variant="headingLg">{managedPlayersLabel}</AppText>
-          <AppText color="secondary" variant="bodySm">
-            {categorySummary}
-          </AppText>
+        <View style={styles.highlightBox}>
+          <View style={styles.highlightAccent} />
+          <View style={styles.highlightContent}>
+            <View style={styles.highlightCountRow}>
+              {managedPlayersCount !== null ? (
+                <>
+                  <AppText variant="displaySm">{managedPlayersCount}</AppText>
+                  <AppText style={styles.highlightCountLabel} variant="titleSm">
+                    {managedPlayersCount === 1 ? " giocatore gestito" : " giocatori gestiti"}
+                  </AppText>
+                </>
+              ) : (
+                <AppText variant="titleSm">Portfolio in definizione</AppText>
+              )}
+            </View>
+            <AppText color="secondary" variant="bodySm">
+              {categorySummary}
+            </AppText>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <AppText variant="titleSm">Distribuzione giocatori</AppText>
-        {categoryDistribution.length > 0 ? (
-          <View style={styles.distributionList}>
-            {categoryDistribution.map((item) => {
-              const percentage = Math.max(
-                12,
-                Math.round(
-                  (item.count / completeProfile.agentManagedPlayerEntries.length) * 100,
-                ),
-              );
-
-              return (
-                <View key={item.label} style={styles.distributionRow}>
-                  <View style={styles.distributionHeader}>
-                    <AppText variant="bodySm">{item.label}</AppText>
-                    <AppText color="secondary" variant="bodySm">
+        <View style={styles.section}>
+          <AppText color="secondary" variant="overline">
+            Distribuzione giocatori
+          </AppText>
+          {categoryDistribution.length > 0 ? (
+            <View style={styles.distList}>
+              {categoryDistribution.map((item) => {
+                const pct = Math.max(8, Math.round((item.count / totalPlayers) * 100));
+                return (
+                  <View key={item.label} style={styles.distRow}>
+                    <AppText style={styles.distLabel} variant="bodySm">
+                      {item.label}
+                    </AppText>
+                    <View style={styles.distTrack}>
+                      <View style={[styles.distFill, { width: `${pct}%` }]} />
+                    </View>
+                    <AppText color="primary" style={styles.distValue} variant="bodySm">
                       {item.count}
                     </AppText>
                   </View>
-                  <View style={styles.distributionTrack}>
-                    <View style={[styles.distributionBar, { width: `${percentage}%` }]} />
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        ) : (
-          <AppText color="secondary" variant="bodySm">
-            Nessuna distribuzione disponibile finché il portfolio non viene compilato.
+                );
+              })}
+            </View>
+          ) : (
+            <AppText color="secondary" variant="bodySm">
+              Nessuna distribuzione disponibile.
+            </AppText>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <AppText color="secondary" variant="overline">
+            Tipologia giocatori
           </AppText>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <AppText variant="titleSm">Tipologia giocatori</AppText>
-        <View style={styles.tagsBlock}>
-          {playerRoleTags.length > 0 ? (
-            <>
-              <AppText color="secondary" variant="caption">
-                Ruoli seguiti
-              </AppText>
-              <View style={styles.tagWrap}>
-                {playerRoleTags.map((tag) => (
-                  <View key={tag} style={styles.tag}>
-                    <AppText variant="bodySm">{tag}</AppText>
-                  </View>
-                ))}
-              </View>
-            </>
-          ) : null}
-
-          {ageBandTags.length > 0 ? (
-            <>
-              <AppText color="secondary" variant="caption">
-                Fasce d&apos;età
-              </AppText>
-              <View style={styles.tagWrap}>
-                {ageBandTags.map((tag) => (
-                  <View key={tag} style={styles.tag}>
-                    <AppText variant="bodySm">{tag}</AppText>
-                  </View>
-                ))}
-              </View>
-            </>
-          ) : null}
-
-          {playerRoleTags.length === 0 && ageBandTags.length === 0 ? (
+          {allTags.length > 0 ? (
+            <View style={styles.tagWrap}>
+              {allTags.map((tag) => (
+                <View key={tag} style={styles.tag}>
+                  <AppText variant="bodySm">{tag}</AppText>
+                </View>
+              ))}
+            </View>
+          ) : (
             <AppText color="secondary" variant="bodySm">
               Completa il portfolio per mostrare ruoli e fasce d&apos;età prevalenti.
             </AppText>
-          ) : null}
+          )}
+        </View>
+
+        <View style={[styles.section, styles.lastSection]}>
+          <AppText color="secondary" variant="overline">
+            Modalità operativa
+          </AppText>
+          {operationalItems.length > 0 ? (
+            <View style={styles.operationalList}>
+              {operationalItems.map((item) => (
+                <View key={item} style={styles.operationalRow}>
+                  <Ionicons color={colors.accent} name="chevron-forward" size={16} />
+                  <AppText style={styles.operationalText} variant="bodySm">
+                    {item}
+                  </AppText>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <AppText color="secondary" variant="bodySm">
+              Nessuna modalità operativa inserita.
+            </AppText>
+          )}
         </View>
       </View>
 
-      <View style={styles.section}>
-        <AppText variant="titleSm">Modalità operativa</AppText>
-        {operationalItems.length > 0 ? (
-          <View style={styles.operationalList}>
-            {operationalItems.map((item) => (
-              <View key={item} style={styles.operationalRow}>
-                <Ionicons color={colors.accent} name="chevron-forward" size={16} />
-                <AppText style={styles.operationalText} variant="bodySm">
-                  {item}
-                </AppText>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <AppText color="secondary" variant="bodySm">
-            Nessuna modalità operativa inserita.
+      {/* Previous career entries */}
+      {completeProfile.agentCareerEntries.map((entry, index) => (
+        <View
+          key={entry.id}
+          style={[
+            styles.secondaryBlock,
+            index === completeProfile.agentCareerEntries.length - 1
+              ? styles.secondaryBlockLast
+              : null,
+          ]}
+        >
+          <AppText color="secondary" variant="headingMd">
+            {entry.agency_name}
           </AppText>
-        )}
-      </View>
-
-      <View style={[styles.section, styles.previousSection]}>
-        <AppText variant="titleSm">Esperienze precedenti</AppText>
-        {completeProfile.agentCareerEntries.length > 0 ? (
-          <View style={styles.previousList}>
-            {completeProfile.agentCareerEntries.map((entry) => (
-              <View key={entry.id} style={styles.previousItem}>
-                <AppText color="secondary" variant="headingMd">
-                  {entry.agency_name}
-                </AppText>
-                <AppText color="accent" variant="bodySm">
-                  {entry.role}
-                </AppText>
-                <AppText color="secondary" variant="bodySm">
-                  {formatAgentPeriod({
-                    endMonth: entry.period_end_month,
-                    endYear: entry.period_end_year,
-                    startMonth: entry.period_start_month,
-                    startYear: entry.period_start_year,
-                  })}
-                </AppText>
-              </View>
-            ))}
+          <View style={styles.roleRow}>
+            <AppText color="secondary" variant="bodySm">
+              {entry.role}
+            </AppText>
+            <View style={styles.dot} />
+            <AppText color="secondary" variant="bodySm">
+              {formatAgentPeriod({
+                endMonth: entry.period_end_month,
+                endYear: entry.period_end_year,
+                startMonth: entry.period_start_month,
+                startYear: entry.period_start_year,
+              })}
+            </AppText>
           </View>
-        ) : (
-          <AppText color="secondary" variant="bodySm">
-            Nessuna esperienza precedente inserita.
-          </AppText>
-        )}
-      </View>
+        </View>
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.surface,
-    gap: spacing[20],
-    paddingHorizontal: spacing[20],
-    paddingTop: spacing[18],
-    paddingBottom: spacing[24],
-  },
-  currentAgencyBlock: {
-    gap: spacing[6],
-  },
-  currentMetaRow: {
-    alignItems: "baseline",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[10],
-  },
-  distributionBar: {
+  distFill: {
     backgroundColor: colors.accent,
     borderRadius: radius.full,
-    height: 10,
+    height: 6,
   },
-  distributionHeader: {
+  distLabel: {
+    width: 88,
+  },
+  distList: {
+    gap: spacing[10],
+  },
+  distRow: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  distributionList: {
     gap: spacing[12],
   },
-  distributionRow: {
-    gap: spacing[6],
-  },
-  distributionTrack: {
+  distTrack: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.full,
-    height: 10,
+    flex: 1,
+    height: 6,
     overflow: "hidden",
+  },
+  distValue: {
+    fontWeight: "700",
+    textAlign: "right",
+    width: 24,
+  },
+  dot: {
+    backgroundColor: colors.textSecondary,
+    borderRadius: radius.full,
+    height: 4,
+    opacity: 0.5,
+    width: 4,
   },
   editButton: {
     alignItems: "center",
@@ -264,11 +252,6 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     width: 32,
-  },
-  headerRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
   },
   highlightAccent: {
     backgroundColor: colors.accent,
@@ -280,12 +263,39 @@ const styles = StyleSheet.create({
     borderRadius: radius[16],
     flexDirection: "row",
     gap: spacing[12],
+    marginTop: spacing[20],
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[16],
   },
   highlightContent: {
     flex: 1,
+    gap: spacing[6],
+  },
+  highlightCountLabel: {
+    alignSelf: "flex-end",
+    marginBottom: 2,
+  },
+  highlightCountRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
     gap: spacing[4],
+  },
+  lastSection: {
+    marginBottom: 0,
+  },
+  mainBlock: {
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingBottom: spacing[32],
+    paddingHorizontal: spacing[24],
+    paddingTop: spacing[28],
+  },
+  mainBlockHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: spacing[6],
   },
   operationalList: {
     gap: spacing[10],
@@ -298,36 +308,36 @@ const styles = StyleSheet.create({
   operationalText: {
     flex: 1,
   },
-  previousItem: {
-    borderTopColor: colors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: spacing[4],
-    paddingTop: spacing[14],
+  roleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
   },
-  previousList: {
-    gap: spacing[4],
+  secondaryBlock: {
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: spacing[6],
+    paddingHorizontal: spacing[24],
+    paddingVertical: spacing[24],
   },
-  previousSection: {
-    gap: spacing[12],
+  secondaryBlockLast: {
+    borderBottomWidth: 0,
   },
   section: {
-    borderTopColor: colors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: spacing[12],
-    paddingTop: spacing[18],
+    gap: spacing[14],
+    marginTop: spacing[24],
   },
   tag: {
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing[12],
+    borderRadius: radius[16],
+    paddingHorizontal: spacing[14],
     paddingVertical: spacing[8],
   },
   tagWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing[8],
-  },
-  tagsBlock: {
     gap: spacing[8],
   },
 });
