@@ -39,6 +39,7 @@ import { searchTeams, type CompleteProfessionalProfile } from "./profile-service
 import type { AppRole } from "../onboarding/create-initial-profile";
 
 type EditSection =
+  | "agentProfile"
   | "editPlayerProfile"
   | "editCoachProfile"
   | "personalInfo"
@@ -372,6 +373,8 @@ const readonlyStyles = StyleSheet.create({
 
 function getEditTarget(role: AppRole): EditSection | null {
   switch (role) {
+    case "agent":
+      return "agentProfile";
     case "player":
       return "playerSports";
     case "coach":

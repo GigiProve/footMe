@@ -5,6 +5,7 @@ import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../src/features/auth/use-session";
 import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
+import { EditAgentProfileModal } from "../../src/features/profiles/edit-modals/EditAgentProfileModal";
 import { EditClubInfoModal } from "../../src/features/profiles/edit-modals/EditClubInfoModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
 import { EditCoachAchievementsModal } from "../../src/features/profiles/edit-modals/EditCoachAchievementsModal";
@@ -24,9 +25,11 @@ import { EditStaffExperiencesModal } from "../../src/features/profiles/edit-moda
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
 import { EditStaffMediaModal } from "../../src/features/profiles/edit-modals/EditStaffMediaModal";
 import { StaffProfileTabView } from "../../src/features/profiles/career/StaffProfileTabView";
+import { AgentProfileTabView } from "../../src/features/profiles/career/AgentProfileTabView";
 import type { StaffGroupedExperience } from "../../src/features/profiles/career/staff-career-grouping";
 import {
   buildFullUpdatePayload,
+  buildAgentProfileHeaderDetails,
   buildHeaderDetails,
   buildInitialState,
   buildCoachProfileHeaderDetails,
@@ -44,6 +47,7 @@ import {
   ProfileHeader,
   StaffProfileHeader,
 } from "../../src/features/profiles/profile-screen-components";
+import { AgentProfileHeader } from "../../src/features/profiles/AgentProfileHeader";
 import {
   getCompleteProfessionalProfile,
   updateCompleteProfessionalProfile,
@@ -102,6 +106,11 @@ export default function ProfileScreen() {
   const coachHeaderDetails = useMemo(
     () =>
       completeProfile ? buildCoachProfileHeaderDetails(completeProfile) : null,
+    [completeProfile],
+  );
+  const agentHeaderDetails = useMemo(
+    () =>
+      completeProfile ? buildAgentProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
   const staffHeaderDetails = useMemo(
@@ -293,6 +302,17 @@ export default function ProfileScreen() {
             primaryRole={staffHeaderDetails.primaryRole}
             statusBadge={staffHeaderDetails.statusBadge}
           />
+        ) : completeProfile && role === "agent" && agentHeaderDetails ? (
+          <AgentProfileHeader
+            agencyLabel={agentHeaderDetails.agencyLabel}
+            avatarUrl={completeProfile.profile.avatar_url}
+            bio={agentHeaderDetails.bio}
+            fullName={agentHeaderDetails.fullName}
+            locationLabel={agentHeaderDetails.locationLabel}
+            onEditProfilePress={() => handleEdit("agentProfile")}
+            primaryRole={agentHeaderDetails.primaryRole}
+            statusBadge={agentHeaderDetails.statusBadge}
+          />
         ) : completeProfile && headerDetails ? (
           <ProfileHeader
             avatarUrl={completeProfile.profile.avatar_url}
@@ -339,6 +359,12 @@ export default function ProfileScreen() {
             onEdit={handleEdit}
             onEditExperience={() => handleEdit("staffExperiences")}
             onManageMedia={() => handleEdit("staffMedia")}
+          />
+        ) : completeProfile && role === "agent" ? (
+          <AgentProfileTabView
+            completeProfile={completeProfile}
+            isOwner={true}
+            onEdit={handleEdit}
           />
         ) : completeProfile ? (
           <ProfileReadonlyView
@@ -479,6 +505,15 @@ export default function ProfileScreen() {
                 visible={activeModal === "staffMedia"}
               />
             </>
+          ) : null}
+          {role === "agent" ? (
+            <EditAgentProfileModal
+              completeProfile={completeProfile}
+              onClose={handleCloseModal}
+              onSaved={handleSaved}
+              userId={userId}
+              visible={activeModal === "agentProfile"}
+            />
           ) : null}
           {role === "club_admin" ? (
             <>
