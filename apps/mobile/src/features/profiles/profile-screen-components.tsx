@@ -426,6 +426,140 @@ export function CoachProfileHeader({
   );
 }
 
+type StaffProfileHeaderProps = {
+  availabilityBadges?: string[];
+  avatarUrl: string | null | undefined;
+  bio?: string | null;
+  coverImageUrl?: string | null;
+  fullName: string;
+  locationLabel?: string;
+  mode: PlayerProfileHeaderMode;
+  onContactPress?: () => void;
+  onEditProfilePress?: () => void;
+  onFollowPress?: () => void;
+  primaryRole: string;
+  statusBadge?: string;
+};
+
+export function StaffProfileHeader({
+  availabilityBadges = [],
+  avatarUrl,
+  bio,
+  coverImageUrl,
+  fullName,
+  locationLabel,
+  mode,
+  onContactPress,
+  onEditProfilePress,
+  onFollowPress,
+  primaryRole,
+  statusBadge,
+}: StaffProfileHeaderProps) {
+  const resolvedAvatarUrl = withDefaultProfileAvatar(avatarUrl);
+
+  return (
+    <View style={styles.playerHeaderSurface}>
+      <View style={styles.playerHeroBlock}>
+        <Image
+          accessibilityLabel="Copertina profilo staff"
+          source={{ uri: coverImageUrl || DEFAULT_PLAYER_COVER_URI }}
+          style={styles.playerCoverImage}
+        />
+        <View pointerEvents="none" style={styles.playerCoverOverlay} />
+        <View style={styles.playerAvatarShell}>
+          <Avatar name={fullName} size="xl" uri={resolvedAvatarUrl} />
+        </View>
+        <View style={styles.playerHeroContent}>
+          <View style={styles.playerIdentityStack}>
+            <AppText variant="headingLg">{fullName}</AppText>
+            <View style={styles.playerRoleRow}>
+              <AppText color="accent" style={styles.playerPrimaryRole} variant="titleSm">
+                {primaryRole}
+              </AppText>
+            </View>
+            {locationLabel ? (
+              <View style={styles.playerMetaRow}>
+                <Ionicons color={colors.textSecondary} name="location-outline" size={15} />
+                <AppText color="secondary" variant="bodySm">
+                  {locationLabel}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
+
+          {statusBadge ? (
+            <View style={styles.playerStatusBadge}>
+              <Ionicons color={colors.successForeground} name="checkmark-circle" size={16} />
+              <AppText color="success" variant="caption">
+                {statusBadge}
+              </AppText>
+            </View>
+          ) : null}
+
+          <View style={styles.playerActionsRow}>
+            {mode === "owner" ? (
+              <HeaderActionButton
+                icon="create-outline"
+                label="Modifica profilo"
+                onPress={onEditProfilePress}
+                variant="primary"
+              />
+            ) : (
+              <>
+                <HeaderActionButton
+                  icon="person-add-outline"
+                  label="Segui"
+                  onPress={onFollowPress}
+                  variant="primary"
+                />
+                <HeaderActionButton
+                  icon="chatbubble-ellipses-outline"
+                  label="Contatta"
+                  onPress={onContactPress}
+                  variant="secondary"
+                />
+              </>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {bio?.trim() || availabilityBadges.length > 0 ? (
+        <>
+          <Divider />
+          <View style={styles.playerSummarySection}>
+            {bio?.trim() ? (
+              <View style={styles.playerInfoBlock}>
+                <AppText color="secondary" variant="overline">
+                  Bio
+                </AppText>
+                <AppText numberOfLines={3} variant="bodySm">
+                  {bio.trim()}
+                </AppText>
+              </View>
+            ) : null}
+
+            {bio?.trim() && availabilityBadges.length > 0 ? <Divider /> : null}
+
+            {availabilityBadges.length > 0 ? (
+              <View style={styles.playerInfoBlock}>
+                <AppText color="secondary" variant="overline">
+                  Disponibilita'
+                </AppText>
+                <View style={styles.playerChipWrap}>
+                  {availabilityBadges.map((badge) => (
+                    <Badge key={badge} label={badge} variant="success" />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
 export function ProfileHeader({
   avatarUrl,
   badges = [],

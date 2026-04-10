@@ -31,6 +31,7 @@ import {
   buildInitialState,
   buildCoachProfileHeaderDetails,
   buildPlayerProfileHeaderDetails,
+  buildStaffProfileHeaderDetails,
 } from "../../src/features/profiles/profile-edit-helpers";
 import { validateBirthDateInput } from "../../src/features/profiles/profile-form-utils";
 import {
@@ -41,6 +42,7 @@ import {
   CoachProfileHeader,
   PlayerProfileHeader,
   ProfileHeader,
+  StaffProfileHeader,
 } from "../../src/features/profiles/profile-screen-components";
 import {
   getCompleteProfessionalProfile,
@@ -100,6 +102,11 @@ export default function ProfileScreen() {
   const coachHeaderDetails = useMemo(
     () =>
       completeProfile ? buildCoachProfileHeaderDetails(completeProfile) : null,
+    [completeProfile],
+  );
+  const staffHeaderDetails = useMemo(
+    () =>
+      completeProfile ? buildStaffProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
 
@@ -273,6 +280,18 @@ export default function ProfileScreen() {
             primaryRole={coachHeaderDetails.primaryRole}
             statusBadge={coachHeaderDetails.statusBadge}
             teamLabel={coachHeaderDetails.teamLabel}
+          />
+        ) : completeProfile && role === "staff" && staffHeaderDetails ? (
+          <StaffProfileHeader
+            availabilityBadges={staffHeaderDetails.availabilityBadges}
+            avatarUrl={completeProfile.profile.avatar_url}
+            bio={staffHeaderDetails.bio}
+            fullName={staffHeaderDetails.fullName}
+            locationLabel={staffHeaderDetails.locationLabel}
+            mode="owner"
+            onEditProfilePress={() => handleEdit("staffInfo")}
+            primaryRole={staffHeaderDetails.primaryRole}
+            statusBadge={staffHeaderDetails.statusBadge}
           />
         ) : completeProfile && headerDetails ? (
           <ProfileHeader

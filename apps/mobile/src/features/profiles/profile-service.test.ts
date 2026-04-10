@@ -429,6 +429,7 @@ describe("getCompleteProfessionalProfile", () => {
       certifications: [],
       experience_entries: [],
       experience_summary: null,
+      media_items: [],
       open_to_work: false,
       primary_staff_role: null,
       preferred_categories: [],
