@@ -49,7 +49,7 @@ export function CoachProfileTabView({
           isLiked: false,
           isSaved: false,
           likeCount: 0,
-          tag: { icon: tagMeta.icon, label: tagMeta.label },
+          ...(tagMeta ? { tag: { icon: tagMeta.icon, label: tagMeta.label } } : {}),
           thumbnailUrl:
             item.thumbnail_url ??
             withDefaultProfileAvatar(completeProfile.profile.avatar_url),

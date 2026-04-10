@@ -50,7 +50,7 @@ export type MediaContentItem = {
   isLiked: boolean;
   isSaved: boolean;
   likeCount: number;
-  tag: MediaContentTag;
+  tag?: MediaContentTag;
   thumbnailUrl: string;
   type: "image" | "video";
   videoUrl?: string;
@@ -206,7 +206,7 @@ export function MediaTabContent({
 
     Alert.alert(
       "Modifica contenuto",
-      `La scheda di modifica per "${currentItem.tag.label}" verra' collegata al form media dedicato.`,
+      `La scheda di modifica per "${currentItem.tag?.label ?? "Media"}" verra' collegata al form media dedicato.`,
     );
   }
 
@@ -239,7 +239,7 @@ export function MediaTabContent({
     <View style={styles.root}>
       <View style={styles.header}>
         <AppText variant="titleSm">Media</AppText>
-        {mode === "owner" ? (
+        {mode === "owner" && orderedItems.length > 0 ? (
           <Button
             accessibilityLabel="Aggiungi contenuto"
             label="+ Aggiungi contenuto"
@@ -259,7 +259,7 @@ export function MediaTabContent({
           {orderedItems.map((item) => (
             <View key={item.id} style={styles.gridCell}>
               <Pressable
-                accessibilityLabel={`Apri contenuto ${item.tag.label}`}
+                accessibilityLabel={`Apri contenuto ${item.tag?.label ?? "Media"}`}
                 disabled={isGridInteractionLocked}
                 onPress={() => handleOpenItem(item.id)}
                 style={({ pressed }) => [
@@ -271,12 +271,14 @@ export function MediaTabContent({
               >
                 <Image source={{ uri: item.thumbnailUrl }} style={styles.gridImage} />
                 <View style={styles.gridShade} />
-                <View style={styles.tagBadge}>
-                  <Ionicons color={colors.inkInvert} name={item.tag.icon} size={11} />
-                  <AppText color="inverse" style={styles.tagText} variant="caption">
-                    {item.tag.label}
-                  </AppText>
-                </View>
+                {item.tag ? (
+                  <View style={styles.tagBadge}>
+                    <Ionicons color={colors.inkInvert} name={item.tag.icon} size={11} />
+                    <AppText color="inverse" numberOfLines={1} style={styles.tagText} variant="caption">
+                      {item.tag.label}
+                    </AppText>
+                  </View>
+                ) : null}
                 {item.type === "video" ? (
                   <View style={styles.videoBadge}>
                     <Ionicons color={colors.inkInvert} name="play" size={12} />
@@ -476,7 +478,7 @@ export function MediaTabContent({
 
             <VideoPlayerModal
               onClose={() => setIsVideoPlayerOpen(false)}
-              title={currentViewerItem.tag.label}
+              title={currentViewerItem.tag?.label ?? "Media"}
               url={currentViewerItem.videoUrl ?? ""}
               visible={isVideoPlayerOpen}
             />
@@ -622,14 +624,18 @@ const styles = StyleSheet.create({
     borderRadius: radius[6],
     borderWidth: 1,
     flexDirection: "row",
+    flexShrink: 1,
     gap: 4,
     left: spacing[6],
+    maxWidth: "82%",
     paddingHorizontal: spacing[6],
     paddingVertical: 4,
     position: "absolute",
+    right: spacing[6],
     top: spacing[6],
   },
   tagText: {
+    flexShrink: 1,
     fontSize: 11,
     lineHeight: 14,
   },

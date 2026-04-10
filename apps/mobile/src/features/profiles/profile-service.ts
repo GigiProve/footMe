@@ -22,6 +22,10 @@ import {
   normalizePlayerMediaItems,
   type PlayerMediaItemRecord,
 } from "./player-media";
+import {
+  normalizeStaffMediaItems,
+  type StaffMediaItemRecord,
+} from "./staff-media";
 
 type BaseProfileRecord = {
   age: number | null;
@@ -209,6 +213,7 @@ export type StaffProfileRecord = {
   certifications: string[];
   experience_entries: unknown[];
   experience_summary: string | null;
+  media_items: StaffMediaItemRecord[];
   open_to_work: boolean;
   primary_staff_role: string | null;
   preferred_categories: string[];
@@ -883,6 +888,7 @@ function normalizeStaffProfileRecord(
       ? rawProfile.experience_entries
       : [],
     experience_summary: normalizeOptionalText(rawProfile.experience_summary),
+    media_items: normalizeStaffMediaItems(rawProfile.media_items),
     open_to_work: normalizeBoolean(rawProfile.open_to_work),
     primary_staff_role: normalizeOptionalText(rawProfile.primary_staff_role),
     preferred_categories: normalizeStringArray(rawProfile.preferred_categories),
@@ -1082,7 +1088,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("staff_profiles")
           .select(
-            "profile_id, specialization, availability_type, available_from, preferred_categories, preferred_provinces, primary_staff_role, staff_roles, experience_entries, experience_summary, certifications, preferred_regions, open_to_work",
+            "profile_id, specialization, availability_type, available_from, preferred_categories, preferred_provinces, primary_staff_role, staff_roles, experience_entries, experience_summary, certifications, preferred_regions, open_to_work, media_items",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -1800,6 +1806,31 @@ export async function saveCoachProfileMedia(input: {
     preferred_regions: input.coachProfile.preferred_regions,
     profile_id: input.profileId,
     technical_video_url: input.coachProfile.technical_video_url,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function saveStaffProfileMedia(input: {
+  mediaItems: StaffMediaItemRecord[];
+  staffProfile: NonNullable<CompleteProfessionalProfile["staffProfile"]>;
+  profileId: string;
+}) {
+  const { error } = await supabase.from("staff_profiles").upsert({
+    availability_type: input.staffProfile.availability_type,
+    certifications: input.staffProfile.certifications,
+    experience_summary: input.staffProfile.experience_summary,
+    media_items: input.mediaItems,
+    open_to_work: input.staffProfile.open_to_work,
+    preferred_categories: input.staffProfile.preferred_categories,
+    preferred_provinces: input.staffProfile.preferred_provinces,
+    preferred_regions: input.staffProfile.preferred_regions,
+    primary_staff_role: input.staffProfile.primary_staff_role,
+    profile_id: input.profileId,
+    specialization: input.staffProfile.specialization,
+    staff_roles: input.staffProfile.staff_roles,
   });
 
   if (error) {

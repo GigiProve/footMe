@@ -76,7 +76,7 @@ export function EditPlayerMediaModal({
               description: null,
               id: createPlayerMediaId(index),
               is_featured: false,
-              tag: "highlights" as PlayerMediaTag,
+              tag: null,
               thumbnail_url: upload.type === "image" ? upload.url : null,
               type: upload.type === "video" ? "video" : "image",
               url: upload.url,
@@ -98,7 +98,7 @@ export function EditPlayerMediaModal({
     setItems((currentItems) => currentItems.filter((item) => item.id !== itemId));
   }
 
-  function handleTagChange(itemId: string, tag: PlayerMediaTag) {
+  function handleTagChange(itemId: string, tag: PlayerMediaTag | null) {
     setItems((currentItems) =>
       currentItems.map((item) => (item.id === itemId ? { ...item, tag } : item)),
     );
@@ -185,68 +185,73 @@ export function EditPlayerMediaModal({
 
       {items.length > 0 ? (
         <View style={styles.list}>
-          {items.map((item) => {
-            const tagMeta = getPlayerMediaTagMeta(item.tag);
-
-            return (
-              <Card key={item.id} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.previewFrame}>
-                    {item.type === "image" && item.thumbnail_url ? (
-                      <Image source={{ uri: item.thumbnail_url }} style={styles.previewImage} />
-                    ) : (
-                      <View style={styles.videoPreview}>
-                        <Ionicons color={colors.accent} name="play-circle" size={28} />
-                        <AppText color="secondary" variant="caption">
-                          Video
-                        </AppText>
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={styles.cardHeaderInfo}>
-                    <View style={styles.currentTag}>
-                      <Ionicons color={colors.accentStrong} name={tagMeta.icon} size={14} />
-                      <AppText color="accentStrong" variant="caption">
-                        {tagMeta.label}
+          {items.map((item) => (
+            <Card key={item.id} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.previewFrame}>
+                  {item.type === "image" && item.thumbnail_url ? (
+                    <Image source={{ uri: item.thumbnail_url }} style={styles.previewImage} />
+                  ) : (
+                    <View style={styles.videoPreview}>
+                      <Ionicons color={colors.accent} name="play-circle" size={28} />
+                      <AppText color="secondary" variant="caption">
+                        Video
                       </AppText>
                     </View>
-                    <Button
-                      label={item.is_featured ? "In evidenza" : "Metti in evidenza"}
-                      onPress={() => handleToggleFeatured(item.id)}
-                      size="sm"
-                      variant={item.is_featured ? "primary" : "secondary"}
-                    />
-                    <Button
-                      label="Rimuovi"
-                      onPress={() => handleRemoveItem(item.id)}
-                      size="sm"
-                      variant="danger"
-                    />
-                  </View>
+                  )}
                 </View>
 
-                <View style={styles.field}>
-                  <AppText color="secondary" variant="caption">
-                    Tag contenuto
-                  </AppText>
-                  <ChipGroup
-                    onChange={(value) => handleTagChange(item.id, value)}
-                    options={PLAYER_MEDIA_TAG_OPTIONS}
-                    value={item.tag}
+                <View style={styles.cardHeaderInfo}>
+                  {item.tag !== null ? (
+                    (() => {
+                      const meta = getPlayerMediaTagMeta(item.tag);
+                      return meta ? (
+                        <View style={styles.currentTag}>
+                          <Ionicons color={colors.accentStrong} name={meta.icon} size={14} />
+                          <AppText color="accentStrong" variant="caption">{meta.label}</AppText>
+                        </View>
+                      ) : null;
+                    })()
+                  ) : (
+                    <View style={styles.currentTag}>
+                      <AppText color="secondary" variant="caption">Nessun tag</AppText>
+                    </View>
+                  )}
+                  <Button
+                    label={item.is_featured ? "In evidenza" : "Metti in evidenza"}
+                    onPress={() => handleToggleFeatured(item.id)}
+                    size="sm"
+                    variant={item.is_featured ? "primary" : "secondary"}
+                  />
+                  <Button
+                    label="Rimuovi"
+                    onPress={() => handleRemoveItem(item.id)}
+                    size="sm"
+                    variant="danger"
                   />
                 </View>
+              </View>
 
-                <Input
-                  label="Descrizione"
-                  multiline
-                  onChangeText={(value) => handleDescriptionChange(item.id, value)}
-                  placeholder="Aggiungi una breve descrizione del contenuto"
-                  value={item.description ?? ""}
+              <View style={styles.field}>
+                <AppText color="secondary" variant="caption">
+                  Tag contenuto
+                </AppText>
+                <ChipGroup
+                  onChange={(value) => handleTagChange(item.id, value)}
+                  options={PLAYER_MEDIA_TAG_OPTIONS}
+                  value={item.tag}
                 />
-              </Card>
-            );
-          })}
+              </View>
+
+              <Input
+                label="Descrizione"
+                multiline
+                onChangeText={(value) => handleDescriptionChange(item.id, value)}
+                placeholder="Aggiungi una breve descrizione del contenuto"
+                value={item.description ?? ""}
+              />
+            </Card>
+          ))}
         </View>
       ) : null}
     </EditModalShell>

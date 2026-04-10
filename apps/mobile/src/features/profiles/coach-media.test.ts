@@ -7,9 +7,10 @@ import {
 } from "./coach-media";
 
 describe("coach-media", () => {
-  it("normalizes unsupported tags to training", () => {
-    expect(normalizeCoachMediaTag("unknown")).toBe("training");
-    expect(getCoachMediaTagMeta("training").label).toBe("Allenamento");
+  it("normalizes unsupported tags to null", () => {
+    expect(normalizeCoachMediaTag("unknown")).toBe(null);
+    expect(getCoachMediaTagMeta("training")?.label).toBe("Allenamento");
+    expect(getCoachMediaTagMeta(null)).toBe(null);
   });
 
   it("normalizes coach media records and infers media type", () => {

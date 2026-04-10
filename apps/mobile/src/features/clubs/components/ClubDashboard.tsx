@@ -331,7 +331,7 @@ export function ClubDashboard() {
           title="Rosa"
         >
           <ChipGroup<RosterFilter>
-            onChange={setRosterFilter}
+            onChange={(value) => { if (value !== null) setRosterFilter(value); }}
             options={filterOptions}
             value={rosterFilter}
           />

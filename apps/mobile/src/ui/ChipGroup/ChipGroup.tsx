@@ -9,10 +9,10 @@ type ChipOption<T extends string> = {
 };
 
 type ChipGroupProps<T extends string> = {
-  onChange: (value: T) => void;
+  onChange: (value: T | null) => void;
   options: readonly ChipOption<T>[];
   size?: ButtonSize;
-  value: T;
+  value: T | null;
 };
 
 export function ChipGroup<T extends string>({
@@ -27,7 +27,7 @@ export function ChipGroup<T extends string>({
         <Button
           key={option.value}
           label={option.label}
-          onPress={() => onChange(option.value)}
+          onPress={() => onChange(option.value === value ? null : option.value)}
           selected={option.value === value}
           size={size}
           variant="chipAction"

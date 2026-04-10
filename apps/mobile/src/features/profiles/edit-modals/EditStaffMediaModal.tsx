@@ -6,11 +6,11 @@ import { MediaPickerField } from "../../../components/ui/media-picker-field";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button, Card, ChipGroup, Input } from "../../../ui";
 import {
-  COACH_MEDIA_TAG_OPTIONS,
-  getCoachMediaTagMeta,
-  type CoachMediaItemRecord,
-  type CoachMediaTag,
-} from "../coach-media";
+  STAFF_MEDIA_TAG_OPTIONS,
+  getStaffMediaTagMeta,
+  type StaffMediaItemRecord,
+  type StaffMediaTag,
+} from "../staff-media";
 import {
   pickAndUploadMedia,
   ProfileMediaUploadError,
@@ -18,10 +18,10 @@ import {
   type UploadedMediaItem,
 } from "../media-upload-service";
 import type { CompleteProfessionalProfile } from "../profile-service";
-import { saveCoachProfileMedia } from "../profile-service";
+import { saveStaffProfileMedia } from "../profile-service";
 import { EditModalShell } from "./EditModalShell";
 
-type EditCoachMediaModalProps = {
+type EditStaffMediaModalProps = {
   completeProfile: CompleteProfessionalProfile;
   onClose: () => void;
   onSaved: () => void;
@@ -29,18 +29,18 @@ type EditCoachMediaModalProps = {
   visible: boolean;
 };
 
-export function EditCoachMediaModal({
+export function EditStaffMediaModal({
   completeProfile,
   onClose,
   onSaved,
   userId,
   visible,
-}: EditCoachMediaModalProps) {
+}: EditStaffMediaModalProps) {
   const originalItems = useMemo(
-    () => completeProfile.coachProfile?.media_items ?? [],
-    [completeProfile.coachProfile?.media_items],
+    () => completeProfile.staffProfile?.media_items ?? [],
+    [completeProfile.staffProfile?.media_items],
   );
-  const [items, setItems] = useState<CoachMediaItemRecord[]>(originalItems);
+  const [items, setItems] = useState<StaffMediaItemRecord[]>(originalItems);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -58,7 +58,7 @@ export function EditCoachMediaModal({
     try {
       const uploads: UploadedMediaItem[] = await pickAndUploadMedia({
         allowsMultipleSelection: true,
-        folder: "coach-media",
+        folder: "staff-media",
         mediaTypes: ["images", "videos"],
         userId,
       });
@@ -74,13 +74,13 @@ export function EditCoachMediaModal({
             ({
               created_at: new Date().toISOString(),
               description: null,
-              id: createCoachMediaId(index),
+              id: createStaffMediaId(index),
               is_featured: false,
               tag: null,
               thumbnail_url: upload.type === "image" ? upload.url : null,
               type: upload.type === "video" ? "video" : "image",
               url: upload.url,
-            }) satisfies CoachMediaItemRecord,
+            }) satisfies StaffMediaItemRecord,
         ),
       ]);
     } catch (error) {
@@ -98,7 +98,7 @@ export function EditCoachMediaModal({
     setItems((currentItems) => currentItems.filter((item) => item.id !== itemId));
   }
 
-  function handleTagChange(itemId: string, tag: CoachMediaTag | null) {
+  function handleTagChange(itemId: string, tag: StaffMediaTag | null) {
     setItems((currentItems) =>
       currentItems.map((item) => (item.id === itemId ? { ...item, tag } : item)),
     );
@@ -128,17 +128,17 @@ export function EditCoachMediaModal({
   }
 
   async function handleSave() {
-    if (!completeProfile.coachProfile) {
-      Alert.alert("Errore", "Profilo allenatore non disponibile.");
+    if (!completeProfile.staffProfile) {
+      Alert.alert("Errore", "Profilo staff non disponibile.");
       return;
     }
 
     setIsSaving(true);
 
     try {
-      await saveCoachProfileMedia({
-        coachProfile: completeProfile.coachProfile,
+      await saveStaffProfileMedia({
         mediaItems: items,
+        staffProfile: completeProfile.staffProfile,
         profileId: userId,
       });
 
@@ -204,7 +204,7 @@ export function EditCoachMediaModal({
                 <View style={styles.cardHeaderInfo}>
                   {item.tag !== null ? (
                     (() => {
-                      const meta = getCoachMediaTagMeta(item.tag);
+                      const meta = getStaffMediaTagMeta(item.tag);
                       return meta ? (
                         <View style={styles.currentTag}>
                           <Ionicons color={colors.accentStrong} name={meta.icon} size={14} />
@@ -238,7 +238,7 @@ export function EditCoachMediaModal({
                 </AppText>
                 <ChipGroup
                   onChange={(value) => handleTagChange(item.id, value)}
-                  options={COACH_MEDIA_TAG_OPTIONS}
+                  options={STAFF_MEDIA_TAG_OPTIONS}
                   value={item.tag}
                 />
               </View>
@@ -258,12 +258,12 @@ export function EditCoachMediaModal({
   );
 }
 
-function createCoachMediaId(index: number) {
+function createStaffMediaId(index: number) {
   if (globalThis.crypto?.randomUUID) {
     return globalThis.crypto.randomUUID();
   }
 
-  return `coach-media-${Date.now()}-${index}`;
+  return `staff-media-${Date.now()}-${index}`;
 }
 
 const styles = StyleSheet.create({

@@ -22,6 +22,7 @@ import { EditPlayerSituationModal } from "../../src/features/profiles/edit-modal
 import { EditPlayerSportsModal } from "../../src/features/profiles/edit-modals/EditPlayerSportsModal";
 import { EditStaffExperiencesModal } from "../../src/features/profiles/edit-modals/EditStaffExperiencesModal";
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
+import { EditStaffMediaModal } from "../../src/features/profiles/edit-modals/EditStaffMediaModal";
 import { StaffProfileTabView } from "../../src/features/profiles/career/StaffProfileTabView";
 import type { StaffGroupedExperience } from "../../src/features/profiles/career/staff-career-grouping";
 import {
@@ -318,6 +319,7 @@ export default function ProfileScreen() {
             onDeletePlayerExperience={handleDeleteExperience}
             onEdit={handleEdit}
             onEditExperience={() => handleEdit("staffExperiences")}
+            onManageMedia={() => handleEdit("staffMedia")}
           />
         ) : completeProfile ? (
           <ProfileReadonlyView
@@ -449,6 +451,13 @@ export default function ProfileScreen() {
                 onClose={handleCloseModal}
                 onSaved={handleSaved}
                 visible={activeModal === "staffExperiences"}
+              />
+              <EditStaffMediaModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "staffMedia"}
               />
             </>
           ) : null}

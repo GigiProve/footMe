@@ -19,21 +19,23 @@ export type PlayerMediaItemRecord = {
   description: string | null;
   id: string;
   is_featured: boolean;
-  tag: PlayerMediaTag;
+  tag: PlayerMediaTag | null;
   thumbnail_url: string | null;
   type: "image" | "video";
   url: string;
 };
 
-export function getPlayerMediaTagMeta(tag: PlayerMediaTag) {
-  return (
-    PLAYER_MEDIA_TAG_OPTIONS.find((option) => option.value === tag) ??
-    PLAYER_MEDIA_TAG_OPTIONS[2]
-  );
+export function getPlayerMediaTagMeta(
+  tag: PlayerMediaTag | null,
+): (typeof PLAYER_MEDIA_TAG_OPTIONS)[number] | null {
+  if (tag === null) return null;
+  return PLAYER_MEDIA_TAG_OPTIONS.find((option) => option.value === tag) ?? null;
 }
 
-export function normalizePlayerMediaTag(value: unknown): PlayerMediaTag {
-  return value === "goal" || value === "assist" || value === "save" ? value : "highlights";
+export function normalizePlayerMediaTag(value: unknown): PlayerMediaTag | null {
+  return value === "goal" || value === "assist" || value === "save" || value === "highlights"
+    ? value
+    : null;
 }
 
 export function inferPlayerMediaTypeFromUrl(value: string): "image" | "video" {
@@ -60,7 +62,7 @@ export function normalizePlayerMediaItems(
         description: null,
         id: `legacy-media-${index}`,
         is_featured: false,
-        tag: "highlights",
+        tag: null,
         thumbnail_url: type === "image" ? url : null,
         type,
         url,

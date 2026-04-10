@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-export const COACH_MEDIA_TAG_OPTIONS = [
+export const STAFF_MEDIA_TAG_OPTIONS = [
   { icon: "barbell-outline", label: "Allenamento", value: "training" },
   { icon: "git-network-outline", label: "Tattica", value: "tactics" },
   { icon: "football-outline", label: "Partita", value: "match" },
@@ -17,27 +17,27 @@ export const COACH_MEDIA_TAG_OPTIONS = [
   value: string;
 }[];
 
-export type CoachMediaTag = (typeof COACH_MEDIA_TAG_OPTIONS)[number]["value"];
+export type StaffMediaTag = (typeof STAFF_MEDIA_TAG_OPTIONS)[number]["value"];
 
-export type CoachMediaItemRecord = {
+export type StaffMediaItemRecord = {
   created_at: string | null;
   description: string | null;
   id: string;
   is_featured: boolean;
-  tag: CoachMediaTag | null;
+  tag: StaffMediaTag | null;
   thumbnail_url: string | null;
   type: "image" | "video";
   url: string;
 };
 
-export function getCoachMediaTagMeta(
-  tag: CoachMediaTag | null,
-): (typeof COACH_MEDIA_TAG_OPTIONS)[number] | null {
+export function getStaffMediaTagMeta(
+  tag: StaffMediaTag | null,
+): (typeof STAFF_MEDIA_TAG_OPTIONS)[number] | null {
   if (tag === null) return null;
-  return COACH_MEDIA_TAG_OPTIONS.find((option) => option.value === tag) ?? null;
+  return STAFF_MEDIA_TAG_OPTIONS.find((option) => option.value === tag) ?? null;
 }
 
-export function normalizeCoachMediaTag(value: unknown): CoachMediaTag | null {
+export function normalizeStaffMediaTag(value: unknown): StaffMediaTag | null {
   return value === "training" ||
     value === "tactics" ||
     value === "match" ||
@@ -51,42 +51,42 @@ export function normalizeCoachMediaTag(value: unknown): CoachMediaTag | null {
     : null;
 }
 
-export function inferCoachMediaTypeFromUrl(value: string): "image" | "video" {
+export function inferStaffMediaTypeFromUrl(value: string): "image" | "video" {
   return /\.(mp4|mov|m4v|webm|avi|mkv)(\?.*)?$/i.test(value) ? "video" : "image";
 }
 
-export function normalizeCoachMediaItems(
+export function normalizeStaffMediaItems(
   value: unknown,
   fallbackUrls: string[] = [],
-): CoachMediaItemRecord[] {
+): StaffMediaItemRecord[] {
   if (Array.isArray(value) && value.length > 0) {
     return value
-      .map((entry, index) => normalizeCoachMediaItem(entry, index))
-      .filter((entry): entry is CoachMediaItemRecord => entry !== null);
+      .map((entry, index) => normalizeStaffMediaItem(entry, index))
+      .filter((entry): entry is StaffMediaItemRecord => entry !== null);
   }
 
   return fallbackUrls
     .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     .map((url, index) => {
-      const type = inferCoachMediaTypeFromUrl(url);
+      const type = inferStaffMediaTypeFromUrl(url);
 
       return {
         created_at: null,
         description: null,
-        id: `legacy-coach-media-${index}`,
+        id: `legacy-staff-media-${index}`,
         is_featured: false,
         tag: null,
         thumbnail_url: type === "image" ? url : null,
         type,
         url,
-      } satisfies CoachMediaItemRecord;
+      } satisfies StaffMediaItemRecord;
     });
 }
 
-function normalizeCoachMediaItem(
+function normalizeStaffMediaItem(
   value: unknown,
   index: number,
-): CoachMediaItemRecord | null {
+): StaffMediaItemRecord | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -101,7 +101,7 @@ function normalizeCoachMediaItem(
   const type =
     entry.type === "video" || entry.type === "image"
       ? entry.type
-      : inferCoachMediaTypeFromUrl(url);
+      : inferStaffMediaTypeFromUrl(url);
 
   return {
     created_at:
@@ -115,9 +115,9 @@ function normalizeCoachMediaItem(
     id:
       typeof entry.id === "string" && entry.id.trim()
         ? entry.id
-        : `coach-media-${index}`,
+        : `staff-media-${index}`,
     is_featured: typeof entry.is_featured === "boolean" ? entry.is_featured : false,
-    tag: normalizeCoachMediaTag(entry.tag),
+    tag: normalizeStaffMediaTag(entry.tag),
     thumbnail_url:
       typeof entry.thumbnail_url === "string" && entry.thumbnail_url.trim()
         ? entry.thumbnail_url.trim()
@@ -126,5 +126,5 @@ function normalizeCoachMediaItem(
           : null,
     type,
     url,
-  } satisfies CoachMediaItemRecord;
+  } satisfies StaffMediaItemRecord;
 }

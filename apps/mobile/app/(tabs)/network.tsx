@@ -367,7 +367,7 @@ export default function NetworkScreen() {
         </Card>
 
         <Card>
-          <ChipGroup onChange={setMode} options={modeOptions} value={mode} />
+          <ChipGroup onChange={(value) => { if (value !== null) setMode(value); }} options={modeOptions} value={mode} />
 
           <Input
             onChangeText={setQuery}
@@ -389,7 +389,7 @@ export default function NetworkScreen() {
             <View style={styles.filterSection}>
               <AppText variant="caption">Ruolo</AppText>
               <ChipGroup
-                onChange={setRoleFilter}
+                onChange={(value) => { if (value !== null) setRoleFilter(value); }}
                 options={roleOptions}
                 value={roleFilter}
               />
@@ -399,7 +399,7 @@ export default function NetworkScreen() {
           <View style={styles.filterSection}>
             <AppText variant="caption">Posizione</AppText>
             <ChipGroup
-              onChange={setPositionFilter}
+              onChange={(value) => { if (value !== null) setPositionFilter(value); }}
               options={positionOptions}
               value={positionFilter}
             />

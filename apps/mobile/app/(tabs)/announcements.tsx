@@ -370,7 +370,7 @@ export default function AnnouncementsScreen() {
             value={form.title}
           />
           <ChipGroup
-            onChange={(value) => patchForm("roleRequired", value)}
+            onChange={(value) => { if (value !== null) patchForm("roleRequired", value); }}
             options={positions}
             value={form.roleRequired}
           />
