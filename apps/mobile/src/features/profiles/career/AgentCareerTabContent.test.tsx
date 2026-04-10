@@ -75,6 +75,7 @@ function buildAgentProfile(
       is_federation_licensed: true,
       main_player_roles: ["defender", "midfielder"],
       managed_players_count: "3 giocatori",
+      media_items: [],
       open_to_clubs: true,
       open_to_players: true,
       operational_focuses: ["Valorizzazione giovani", "Mercato dilettanti"],

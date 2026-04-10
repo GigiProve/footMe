@@ -55,6 +55,13 @@ export const Keyboard = {
     keyboardListeners.get(eventName)?.forEach((callback) => callback(payload));
   },
 };
+export const Linking = {
+  addEventListener: () => ({
+    remove: () => undefined,
+  }),
+  getInitialURL: async () => null,
+  openURL: async () => true,
+};
 export const Dimensions = {
   get: () => ({
     height: 812,

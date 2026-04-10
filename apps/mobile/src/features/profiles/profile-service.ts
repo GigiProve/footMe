@@ -25,6 +25,10 @@ import type {
   AgentProfileRecord,
 } from "./agent-profile";
 import {
+  normalizeAgentMediaItems,
+  type AgentMediaItemRecord,
+} from "./agent-media";
+import {
   normalizePlayerMediaItems,
   type PlayerMediaItemRecord,
 } from "./player-media";
@@ -778,6 +782,7 @@ function normalizeAgentProfileRecord(
     is_federation_licensed: normalizeBoolean(rawProfile.is_federation_licensed),
     main_player_roles: normalizePlayerPositions(rawProfile.main_player_roles),
     managed_players_count: normalizeOptionalText(rawProfile.managed_players_count),
+    media_items: normalizeAgentMediaItems(rawProfile.media_items),
     open_to_clubs: normalizeBoolean(rawProfile.open_to_clubs, true),
     open_to_players: normalizeBoolean(rawProfile.open_to_players, true),
     operational_focuses: normalizeStringArray(rawProfile.operational_focuses),
@@ -1224,7 +1229,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("agent_profiles")
           .select(
-            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions",
+            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -2028,6 +2033,43 @@ export async function saveStaffProfileMedia(input: {
     profile_id: input.profileId,
     specialization: input.staffProfile.specialization,
     staff_roles: input.staffProfile.staff_roles,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function saveAgentProfileMedia(input: {
+  agentProfile: NonNullable<CompleteProfessionalProfile["agentProfile"]>;
+  mediaItems: AgentMediaItemRecord[];
+  profileId: string;
+}) {
+  const { error } = await supabase.from("agent_profiles").upsert({
+    agency_logo_url: input.agentProfile.agency_logo_url,
+    agency_name: input.agentProfile.agency_name,
+    agency_role: input.agentProfile.agency_role,
+    federation: input.agentProfile.federation,
+    has_other_football_experience: input.agentProfile.has_other_football_experience,
+    has_played_football: input.agentProfile.has_played_football,
+    is_federation_licensed: input.agentProfile.is_federation_licensed,
+    main_player_roles: input.agentProfile.main_player_roles,
+    managed_players_count: input.agentProfile.managed_players_count,
+    media_items: input.mediaItems,
+    open_to_clubs: input.agentProfile.open_to_clubs,
+    open_to_players: input.agentProfile.open_to_players,
+    operational_focuses: input.agentProfile.operational_focuses,
+    operational_note: input.agentProfile.operational_note,
+    operating_macro_areas: input.agentProfile.operating_macro_areas,
+    operating_regions: input.agentProfile.operating_regions,
+    other_football_roles: input.agentProfile.other_football_roles,
+    period_end_month: input.agentProfile.period_end_month,
+    period_end_year: input.agentProfile.period_end_year,
+    period_start_month: input.agentProfile.period_start_month,
+    period_start_year: input.agentProfile.period_start_year,
+    player_career_entries: input.agentProfile.player_career_entries,
+    player_types: input.agentProfile.player_types,
+    profile_id: input.profileId,
   });
 
   if (error) {

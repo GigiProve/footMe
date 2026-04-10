@@ -1,4 +1,5 @@
 import type { PlayerPosition } from "./player-sports";
+import type { AgentMediaItemRecord } from "./agent-media";
 import { getPlayerPositionLabel, isPlayerPosition } from "./player-sports";
 
 export type AgentProfileRecord = {
@@ -11,6 +12,7 @@ export type AgentProfileRecord = {
   is_federation_licensed: boolean;
   main_player_roles: PlayerPosition[];
   managed_players_count: string | null;
+  media_items: AgentMediaItemRecord[];
   open_to_clubs: boolean;
   open_to_players: boolean;
   operational_focuses: string[];
@@ -86,6 +88,16 @@ export type AgentPlayerCandidate = {
   region: string | null;
 };
 
+export type AgentManagedPlayerAgeFilter = "U19" | "U23" | "Over";
+export type AgentManagedPlayerStatusFilter = "free_agent" | "non_free_agent";
+
+export type AgentManagedPlayersFilters = {
+  age: AgentManagedPlayerAgeFilter | null;
+  category: string | null;
+  role: PlayerPosition | null;
+  status: AgentManagedPlayerStatusFilter | null;
+};
+
 export const AGENT_OPERATIONAL_FOCUS_OPTIONS = [
   "Inserimento in prima squadra",
   "Valorizzazione giovani",
@@ -109,6 +121,12 @@ const AGENT_POSITION_LABELS: Partial<Record<PlayerPosition, string>> = {
   goalkeeper: "Portieri",
   midfielder: "Centrocampisti",
 };
+
+const AGE_FILTER_ORDER: AgentManagedPlayerAgeFilter[] = ["U19", "U23", "Over"];
+const STATUS_FILTER_ORDER: AgentManagedPlayerStatusFilter[] = [
+  "free_agent",
+  "non_free_agent",
+];
 
 export function createLocalUuid() {
   if (typeof globalThis.crypto?.randomUUID === "function") {
@@ -292,7 +310,7 @@ export function buildAgentCategorySummary(
     return fallbackTypes.join(" • ");
   }
 
-  return "Categorie da definire";
+  return "Portfolio in definizione";
 }
 
 export function buildAgentPlayerTypeTags(
@@ -343,6 +361,138 @@ export function buildAgentAgeBandTags(
   return [...counts.entries()]
     .sort((left, right) => right[1] - left[1])
     .map(([label]) => label);
+}
+
+export function getAgentManagedPlayerAge(
+  birthYear: number | null | undefined,
+  currentYear = new Date().getFullYear(),
+) {
+  if (!birthYear) {
+    return null;
+  }
+
+  return currentYear - birthYear;
+}
+
+export function getAgentManagedPlayerAgeBand(
+  birthYear: number | null | undefined,
+  currentYear = new Date().getFullYear(),
+): AgentManagedPlayerAgeFilter | null {
+  const age = getAgentManagedPlayerAge(birthYear, currentYear);
+
+  if (age === null) {
+    return null;
+  }
+
+  if (age <= 19) {
+    return "U19";
+  }
+
+  if (age <= 23) {
+    return "U23";
+  }
+
+  return "Over";
+}
+
+export function getAgentManagedPlayerStatusLabel(
+  status: AgentManagedPlayerStatusFilter,
+) {
+  return status === "free_agent" ? "Svincolato" : "Non svincolato";
+}
+
+export function buildAgentManagedPlayerFilterOptions(
+  entries: AgentManagedPlayerEntryRecord[] | AgentManagedPlayerEntryDraft[],
+) {
+  const categories = new Set<string>();
+  const roles = new Set<PlayerPosition>();
+  const ages = new Set<AgentManagedPlayerAgeFilter>();
+  const statuses = new Set<AgentManagedPlayerStatusFilter>();
+
+  entries.forEach((entry) => {
+    if (entry.category_label?.trim()) {
+      categories.add(entry.category_label.trim());
+    }
+
+    if (entry.primary_position) {
+      roles.add(entry.primary_position);
+    }
+
+    const ageBand = getAgentManagedPlayerAgeBand(entry.birth_year);
+
+    if (ageBand) {
+      ages.add(ageBand);
+    }
+
+    statuses.add(entry.is_free_agent ? "free_agent" : "non_free_agent");
+  });
+
+  return {
+    ages: AGE_FILTER_ORDER.filter((value) => ages.has(value)),
+    categories: [...categories],
+    roles: [...roles],
+    statuses: STATUS_FILTER_ORDER.filter((value) => statuses.has(value)),
+  };
+}
+
+export function filterAgentManagedPlayers(
+  entries: AgentManagedPlayerEntryRecord[] | AgentManagedPlayerEntryDraft[],
+  filters: AgentManagedPlayersFilters,
+  currentYear = new Date().getFullYear(),
+) {
+  return entries.filter((entry) => {
+    if (filters.category && entry.category_label?.trim() !== filters.category) {
+      return false;
+    }
+
+    if (filters.role && entry.primary_position !== filters.role) {
+      return false;
+    }
+
+    if (
+      filters.age &&
+      getAgentManagedPlayerAgeBand(entry.birth_year, currentYear) !== filters.age
+    ) {
+      return false;
+    }
+
+    if (filters.status === "free_agent" && !entry.is_free_agent) {
+      return false;
+    }
+
+    if (filters.status === "non_free_agent" && entry.is_free_agent) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+export function formatAgentManagedPlayerLine(
+  entry: AgentManagedPlayerEntryRecord | AgentManagedPlayerEntryDraft,
+  currentYear = new Date().getFullYear(),
+) {
+  const parts: string[] = [];
+
+  if (entry.primary_position) {
+    parts.push(getPlayerPositionLabel(entry.primary_position));
+  }
+
+  if (entry.category_label?.trim()) {
+    parts.push(entry.category_label.trim());
+  }
+
+  const ageBand = getAgentManagedPlayerAgeBand(entry.birth_year, currentYear);
+
+  if (ageBand) {
+    parts.push(ageBand);
+  }
+
+  if (entry.is_free_agent) {
+    parts.push("Svincolato");
+  }
+
+  return parts.join(" • ");
 }
 
 export function buildOperationalModeItems(profile: AgentProfileRecord | null) {
@@ -402,7 +552,7 @@ function getCategoryBucket(categoryLabel: string | null, isFreeAgent: boolean) {
   }
 
   if (!categoryLabel?.trim()) {
-    return "Da definire";
+    return "Svincolati";
   }
 
   return isYouthCategory(categoryLabel) ? "Under" : categoryLabel.trim();

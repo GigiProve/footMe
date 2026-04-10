@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { withDefaultProfileAvatar } from "./profile-avatar";
@@ -11,6 +11,7 @@ type AgentProfileHeaderProps = {
   bio?: string | null;
   fullName: string;
   locationLabel?: string;
+  onEditAvatarPress?: () => void;
   onEditProfilePress?: () => void;
   primaryRole: string;
   statusBadge?: string;
@@ -22,6 +23,7 @@ export function AgentProfileHeader({
   bio,
   fullName,
   locationLabel,
+  onEditAvatarPress,
   onEditProfilePress,
   primaryRole,
   statusBadge,
@@ -43,7 +45,21 @@ export function AgentProfileHeader({
       </View>
 
       <View style={styles.identityRow}>
-        <Avatar name={fullName} size="lg" uri={withDefaultProfileAvatar(avatarUrl)} />
+        {onEditAvatarPress ? (
+          <Pressable
+            accessibilityLabel="Cambia foto profilo"
+            accessibilityRole="button"
+            onPress={onEditAvatarPress}
+            style={styles.avatarWrapper}
+          >
+            <Avatar name={fullName} size="lg" uri={withDefaultProfileAvatar(avatarUrl)} />
+            <View style={styles.avatarEditBadge}>
+              <Ionicons color={colors.inkInvert} name="camera-outline" size={14} />
+            </View>
+          </Pressable>
+        ) : (
+          <Avatar name={fullName} size="lg" uri={withDefaultProfileAvatar(avatarUrl)} />
+        )}
         <View style={styles.identityContent}>
           <AppText variant="displaySm">{fullName}</AppText>
           <AppText color="accent" variant="titleSm">
@@ -74,18 +90,36 @@ export function AgentProfileHeader({
         </AppText>
       ) : null}
 
-      <Button
-        label="Modifica profilo"
-        leftIcon={<Ionicons color={colors.inkInvert} name="create-outline" size={18} />}
-        onPress={onEditProfilePress}
-        size="sm"
-        variant="primary"
-      />
+      {onEditProfilePress ? (
+        <Button
+          label="Modifica profilo"
+          leftIcon={<Ionicons color={colors.inkInvert} name="create-outline" size={18} />}
+          onPress={onEditProfilePress}
+          size="sm"
+          variant="primary"
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  avatarEditBadge: {
+    alignItems: "center",
+    backgroundColor: colors.accent,
+    borderColor: colors.surface,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    bottom: 0,
+    height: 24,
+    justifyContent: "center",
+    position: "absolute",
+    right: 0,
+    width: 24,
+  },
+  avatarWrapper: {
+    position: "relative",
+  },
   container: {
     backgroundColor: colors.surface,
     gap: spacing[14],
