@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 
+import { InterestCategoriesSelector } from "../../../components/ui/interest-categories-selector";
+import { SelectField } from "../../../components/ui/select-field";
 import type { StaffSpecialization } from "../../onboarding/create-initial-profile";
 import type { AvailabilityType } from "../../onboarding/onboarding-form";
+import { AVAILABLE_FROM_OPTIONS } from "../../onboarding/coach/CoachRoleStep";
 import { WhereToPlaySection } from "../../onboarding/where-to-play-section";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import { updateCompleteProfessionalProfile } from "../profile-service";
@@ -37,8 +40,10 @@ export function EditStaffInfoModal({
     useState<StaffSpecialization>("fitness_coach");
   const [experienceSummary, setExperienceSummary] = useState("");
   const [certifications, setCertifications] = useState("");
+  const [preferredCategories, setPreferredCategories] = useState<string[]>([]);
   const [preferredRegions, setPreferredRegions] = useState<string[]>([]);
   const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("ITALY");
+  const [availableFrom, setAvailableFrom] = useState("");
   const [preferredProvinces, setPreferredProvinces] = useState<string[]>([]);
   const [openToWork, setOpenToWork] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,8 +54,10 @@ export function EditStaffInfoModal({
       setSpecialization(initial.specialization);
       setExperienceSummary(initial.experienceSummary);
       setCertifications(initial.certifications);
+      setPreferredCategories(fromDelimitedString(initial.staffPreferredCategories));
       setPreferredRegions(fromDelimitedString(initial.preferredRegions));
       setAvailabilityType((initial.staffAvailabilityType as AvailabilityType) || "ITALY");
+      setAvailableFrom(initial.staffAvailableFrom);
       setPreferredProvinces(fromDelimitedString(initial.staffPreferredProvinces));
       setOpenToWork(initial.openToWork);
     }
@@ -68,6 +75,8 @@ export function EditStaffInfoModal({
         openToWork,
         preferredRegions: preferredRegions.join(", "),
         staffAvailabilityType: availabilityType,
+        staffAvailableFrom: availableFrom,
+        staffPreferredCategories: preferredCategories.join(", "),
         staffPreferredProvinces: preferredProvinces.join(", "),
         specialization,
       };
@@ -148,6 +157,8 @@ export function EditStaffInfoModal({
         onIsAvailableChange={(value) => {
           setOpenToWork(value);
           if (!value) {
+            setAvailableFrom("");
+            setPreferredCategories([]);
             setPreferredRegions([]);
             setPreferredProvinces([]);
             setAvailabilityType("ITALY");
@@ -164,6 +175,24 @@ export function EditStaffInfoModal({
         toggleLabel="Disponibile a nuove collaborazioni"
         toggleSubtitle="Il tuo profilo può comparire tra gli staff tecnici disponibili."
       />
+
+      {openToWork ? (
+        <InterestCategoriesSelector
+          label="Categorie di interesse"
+          onChange={setPreferredCategories}
+          value={preferredCategories}
+        />
+      ) : null}
+
+      {openToWork ? (
+        <SelectField
+          label="Disponibile da"
+          onChange={setAvailableFrom}
+          options={AVAILABLE_FROM_OPTIONS}
+          placeholder="Seleziona disponibilità"
+          value={availableFrom}
+        />
+      ) : null}
     </EditModalShell>
   );
 }

@@ -1,5 +1,8 @@
 import { getPlayerPositionLabel } from "./player-sports";
-import type { CoachPlayerCareerEntryRecord } from "./profile-service";
+import type {
+  CoachPlayerCareerEntryRecord,
+  StaffPlayerCareerEntryRecord,
+} from "./profile-service";
 
 const roleLabels: Record<string, string> = {
   agent: "Procuratore",
@@ -46,7 +49,7 @@ export type PlayerBackground = {
 };
 
 export function computePlayerBackground(
-  entries: CoachPlayerCareerEntryRecord[],
+  entries: (CoachPlayerCareerEntryRecord | StaffPlayerCareerEntryRecord)[],
 ): PlayerBackground {
   if (!entries.length) {
     return { primaryPosition: null, careerYears: 0, topCategory: null, totalAppearances: 0, totalGoals: 0, totalAssists: 0 };

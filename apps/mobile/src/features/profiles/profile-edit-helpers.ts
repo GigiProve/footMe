@@ -169,6 +169,8 @@ export type ProfileFormState = {
   secondaryPositions: PlayerPosition[];
   specialization: StaffSpecialization;
   staffAvailabilityType: string;
+  staffAvailableFrom: string;
+  staffPreferredCategories: string;
   staffPreferredProvinces: string;
   technicalVideoUrl: string;
   transferProvinces: string;
@@ -260,6 +262,8 @@ export function buildInitialState(
     secondaryPositions: playerProfile?.secondary_positions ?? [],
     specialization: staffProfile?.specialization ?? "fitness_coach",
     staffAvailabilityType: staffProfile?.availability_type ?? "ITALY",
+    staffAvailableFrom: staffProfile?.available_from ?? "",
+    staffPreferredCategories: toDelimitedString(staffProfile?.preferred_categories),
     staffPreferredProvinces: toDelimitedString(staffProfile?.preferred_provinces),
     technicalVideoUrl: coachProfile?.technical_video_url ?? "",
     transferProvinces: toDelimitedString(playerProfile?.transfer_provinces),
@@ -405,7 +409,7 @@ export function buildFullUpdatePayload(
       data.profile.role === "staff"
         ? {
             availability_type: formState.staffAvailabilityType || null,
-            available_from: data.staffProfile?.available_from ?? null,
+            available_from: parseOptionalText(formState.staffAvailableFrom),
             certifications: fromDelimitedString(formState.certifications),
             experience_entries: data.staffProfile?.experience_entries ?? [],
             experience_summary: parseOptionalText(
@@ -413,7 +417,9 @@ export function buildFullUpdatePayload(
             ),
             open_to_work: formState.openToWork,
             primary_staff_role: data.staffProfile?.primary_staff_role ?? null,
-            preferred_categories: data.staffProfile?.preferred_categories ?? [],
+            preferred_categories: fromDelimitedString(
+              formState.staffPreferredCategories,
+            ),
             preferred_provinces: fromDelimitedString(
               formState.staffPreferredProvinces,
             ),
