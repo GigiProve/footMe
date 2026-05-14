@@ -18,7 +18,7 @@ import type {
 } from "../club-service";
 import type { ClubTeam } from "../team-service";
 
-type ClubHeaderTab = "team" | "roster" | "media";
+export type ClubHeaderTab = "team" | "roster" | "media";
 
 type MetadataItem = {
   icon: ComponentProps<typeof Ionicons>["name"];
@@ -26,10 +26,14 @@ type MetadataItem = {
 };
 
 type PublicClubHeaderProps = {
+  activeTab?: ClubHeaderTab;
+  affiliationLabel?: string | null;
   club: PublicClubProfile;
   isFollowed: boolean;
   isFollowing: boolean;
+  mode?: "owner" | "visitor";
   onContactPress: () => void;
+  onTabChange?: (tab: ClubHeaderTab) => void;
   onToggleFollow: () => void;
   stats: ClubHeaderStats;
   style?: StyleProp<ViewStyle>;
@@ -43,19 +47,33 @@ const tabs: { label: string; value: ClubHeaderTab }[] = [
 ];
 
 export function PublicClubHeader({
+  activeTab: controlledActiveTab,
+  affiliationLabel,
   club,
   isFollowed,
   isFollowing,
+  mode = "visitor",
   onContactPress,
+  onTabChange,
   onToggleFollow,
   stats,
   style,
   teams,
 }: PublicClubHeaderProps) {
-  const [activeTab, setActiveTab] = useState<ClubHeaderTab>("team");
+  const [uncontrolledActiveTab, setUncontrolledActiveTab] =
+    useState<ClubHeaderTab>("team");
+  const activeTab = controlledActiveTab ?? uncontrolledActiveTab;
   const categoryLabel = getClubCategoryLabel(club, teams);
   const metadataItems = getMetadataItems(club);
   const initials = getClubInitials(club.name);
+
+  function handleTabChange(tab: ClubHeaderTab) {
+    if (!controlledActiveTab) {
+      setUncontrolledActiveTab(tab);
+    }
+
+    onTabChange?.(tab);
+  }
 
   return (
     <View style={[styles.container, style]} testID="club-profile-header">
@@ -97,6 +115,15 @@ export function PublicClubHeader({
             </AppText>
           </View>
         </View>
+
+        {affiliationLabel ? (
+          <View style={styles.affiliationBadge} testID="club-affiliation-badge">
+            <Ionicons color={colors.accent} name="git-network-outline" size={14} />
+            <AppText color="accent" numberOfLines={2} style={styles.affiliationText} variant="caption">
+              {affiliationLabel}
+            </AppText>
+          </View>
+        ) : null}
 
         {metadataItems.length > 0 ? (
           <View style={styles.metadataRow}>
@@ -145,7 +172,9 @@ export function PublicClubHeader({
 
         <View style={styles.actionsRow}>
           <Button
-            label={isFollowed ? "Seguito" : "Segui"}
+            label={
+              mode === "owner" ? "Modifica dati" : isFollowed ? "Seguito" : "Segui"
+            }
             loading={isFollowing}
             onPress={onToggleFollow}
             size="sm"
@@ -171,7 +200,7 @@ export function PublicClubHeader({
               accessibilityRole="button"
               accessibilityState={{ selected: isActive }}
               key={tab.value}
-              onPress={() => setActiveTab(tab.value)}
+              onPress={() => handleTabChange(tab.value)}
               style={styles.tab}
               testID={`club-tab-${tab.value}`}
             >
@@ -278,6 +307,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing[12],
     width: "100%",
+  },
+  affiliationBadge: {
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius[8],
+    flexDirection: "row",
+    gap: spacing[6],
+    paddingHorizontal: spacing[10],
+    paddingVertical: spacing[8],
+  },
+  affiliationText: {
+    flexShrink: 1,
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: 16,
   },
   activeTabIndicator: {
     backgroundColor: colors.textPrimary,

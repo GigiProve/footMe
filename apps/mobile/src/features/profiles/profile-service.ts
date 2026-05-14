@@ -264,12 +264,15 @@ type ClubRecord = {
   gallery_urls: string[];
   headquarters_address: string | null;
   id: string;
+  key_results: string[];
   league: string | null;
   logo_url: string | null;
   name: string;
   owner_profile_id: string;
   region: string;
+  sports_focus: string | null;
   stadium: string | null;
+  top_level_reached: string | null;
   verification_status: string;
   website_url: string | null;
 };
@@ -1077,12 +1080,15 @@ function normalizeClubRecord(profileId: string, rawClub: Partial<ClubRecord> | n
     gallery_urls: normalizeStringArray(rawClub.gallery_urls),
     headquarters_address: normalizeOptionalText(rawClub.headquarters_address),
     id: normalizeRequiredText(rawClub.id, profileId),
+    key_results: normalizeStringArray(rawClub.key_results),
     league: normalizeOptionalText(rawClub.league),
     logo_url: normalizeOptionalText(rawClub.logo_url),
     name: normalizeRequiredText(rawClub.name, ""),
     owner_profile_id: normalizeRequiredText(rawClub.owner_profile_id, profileId),
     region: normalizeRequiredText(rawClub.region, ""),
+    sports_focus: normalizeOptionalText(rawClub.sports_focus),
     stadium: normalizeOptionalText(rawClub.stadium),
+    top_level_reached: normalizeOptionalText(rawClub.top_level_reached),
     verification_status: normalizeRequiredText(rawClub.verification_status, "unverified"),
     website_url: normalizeOptionalText(rawClub.website_url),
   } satisfies ClubRecord;
@@ -1277,7 +1283,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("clubs")
           .select(
-            "id, owner_profile_id, name, city, region, category, league, stadium, description, logo_url, gallery_urls, founding_year, club_colors, country, headquarters_address, club_email, club_phone, website_url, field_address, verification_status",
+            "id, owner_profile_id, name, city, region, category, league, stadium, description, logo_url, gallery_urls, founding_year, club_colors, country, headquarters_address, club_email, club_phone, website_url, field_address, verification_status, sports_focus, top_level_reached, key_results",
           )
           .eq("owner_profile_id", profileId)
           .maybeSingle()

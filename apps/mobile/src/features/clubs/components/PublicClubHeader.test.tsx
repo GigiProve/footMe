@@ -26,14 +26,18 @@ const baseClub: PublicClubProfile = {
   description: null,
   field_address: null,
   founding_year: 1907,
+  gallery_urls: [],
   headquarters_address: null,
   id: "club-1",
+  key_results: [],
   league: "Lega Nazionale Dilettanti",
   logo_url: "https://example.com/logo.png",
   name: "AC Como",
   owner_full_name: null,
   region: "Lombardia",
+  sports_focus: null,
   stadium: "Stadio Giuseppe Sinigaglia",
+  top_level_reached: null,
   verification_status: "verified",
   website_url: "https://accomo.test",
 };
@@ -146,5 +150,39 @@ describe("PublicClubHeader", () => {
     );
 
     expect(tree.root.findByProps({ children: "Eccellenza" })).toBeTruthy();
+  });
+
+  it("supports controlled tabs and owner mode actions", () => {
+    const onTabChange = vi.fn();
+    const tree = render(
+      <PublicClubHeader
+        activeTab="media"
+        affiliationLabel="Società affiliata ad AC Como"
+        club={baseClub}
+        isFollowed={false}
+        isFollowing={false}
+        mode="owner"
+        onContactPress={vi.fn()}
+        onTabChange={onTabChange}
+        onToggleFollow={vi.fn()}
+        stats={baseStats}
+        teams={baseTeams}
+      />,
+    );
+    const root = tree.root;
+
+    expect(root.findByProps({ children: "Modifica dati" })).toBeTruthy();
+    expect(root.findByProps({ children: "Società affiliata ad AC Como" }))
+      .toBeTruthy();
+    expect(root.findByProps({ testID: "club-tab-media" }).props.accessibilityState)
+      .toEqual({ selected: true });
+
+    act(() => {
+      root.findByProps({ testID: "club-tab-roster" }).props.onPress();
+    });
+
+    expect(onTabChange).toHaveBeenCalledWith("roster");
+    expect(root.findByProps({ testID: "club-tab-media" }).props.accessibilityState)
+      .toEqual({ selected: true });
   });
 });

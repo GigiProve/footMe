@@ -17,14 +17,21 @@ import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-
 import { useSession } from "../../src/features/auth/use-session";
 import {
   fetchClubFollowState,
+  fetchPublicClubRoster,
   fetchPublicClubHeaderStats,
   fetchPublicClubProfile,
+  fetchPublicClubSquadraOverview,
   followClub,
   unfollowClub,
   type ClubHeaderStats,
+  type PublicClubMember,
   type PublicClubProfile,
+  type PublicClubSquadraOverview,
 } from "../../src/features/clubs/club-service";
-import { PublicClubHeader } from "../../src/features/clubs/components/PublicClubHeader";
+import {
+  PublicClubProfileView,
+} from "../../src/features/clubs/components/PublicClubProfileView";
+import type { ClubHeaderTab } from "../../src/features/clubs/components/PublicClubHeader";
 import { fetchClubTeams, type ClubTeam } from "../../src/features/clubs/team-service";
 import { colors, spacing } from "../../src/theme/tokens";
 import { AppText, Button } from "../../src/ui";
@@ -35,6 +42,14 @@ const emptyHeaderStats: ClubHeaderStats = {
   staffCount: 0,
 };
 
+const emptyOverview: PublicClubSquadraOverview = {
+  affiliations: [],
+  parentAffiliation: null,
+  positionPreview: [],
+  positionsTotal: 0,
+  seasonSummaries: [],
+};
+
 export default function ClubProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useSession();
@@ -43,9 +58,13 @@ export default function ClubProfileScreen() {
   const [club, setClub] = useState<PublicClubProfile | null>(null);
   const [teams, setTeams] = useState<ClubTeam[]>([]);
   const [stats, setStats] = useState<ClubHeaderStats>(emptyHeaderStats);
+  const [overview, setOverview] =
+    useState<PublicClubSquadraOverview>(emptyOverview);
+  const [members, setMembers] = useState<PublicClubMember[]>([]);
   const [isFollowed, setIsFollowed] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<ClubHeaderTab>("team");
 
   const loadClub = useCallback(async () => {
     if (!id) {
@@ -57,24 +76,37 @@ export default function ClubProfileScreen() {
 
     try {
       const profileId = profile?.id ?? null;
-      const [clubData, teamsData, statsData, followState] = await Promise.all([
+      const [
+        clubData,
+        teamsData,
+        statsData,
+        followState,
+        overviewData,
+        membersData,
+      ] = await Promise.all([
         fetchPublicClubProfile(id),
         fetchClubTeams(id),
         fetchPublicClubHeaderStats(id).catch(() => emptyHeaderStats),
         profileId
           ? fetchClubFollowState(profileId, id).catch(() => false)
           : Promise.resolve(false),
+        fetchPublicClubSquadraOverview(id).catch(() => emptyOverview),
+        fetchPublicClubRoster(id).catch(() => []),
       ]);
 
       setClub(clubData);
       setTeams(teamsData);
       setStats(statsData);
       setIsFollowed(followState);
+      setOverview(overviewData);
+      setMembers(membersData);
     } catch {
       Alert.alert("Errore", "Impossibile caricare il profilo società.");
       setClub(null);
       setTeams([]);
       setStats(emptyHeaderStats);
+      setOverview(emptyOverview);
+      setMembers([]);
       setIsFollowed(false);
     } finally {
       setIsLoading(false);
@@ -163,6 +195,22 @@ export default function ClubProfileScreen() {
     ]);
   }
 
+  function handleOpenPositions() {
+    if (!club) {
+      return;
+    }
+
+    router.push(`/club/${club.id}/positions` as never);
+  }
+
+  function handleOpenTeam(teamId: string) {
+    router.push(`/club/team/${teamId}` as never);
+  }
+
+  function handleOpenAffiliate(affiliateClubId: string) {
+    router.push(`/club/${affiliateClubId}` as never);
+  }
+
   if (isLoading) {
     return (
       <Screen>
@@ -211,16 +259,24 @@ export default function ClubProfileScreen() {
           <View style={styles.topBarButton} />
         </View>
 
-        <PublicClubHeader
-          club={club}
-          isFollowed={isFollowed}
-          isFollowing={isFollowing}
-          onContactPress={handleContactPress}
-          onToggleFollow={handleToggleFollow}
-          stats={stats}
-          style={styles.publicHeader}
-          teams={teams}
-        />
+        <View style={styles.publicProfileView}>
+          <PublicClubProfileView
+            activeTab={activeTab}
+            club={club}
+            isFollowed={isFollowed}
+            isFollowing={isFollowing}
+            members={members}
+            onContactPress={handleContactPress}
+            onOpenAffiliate={handleOpenAffiliate}
+            onOpenPositions={handleOpenPositions}
+            onOpenTeam={handleOpenTeam}
+            onTabChange={setActiveTab}
+            onToggleFollow={handleToggleFollow}
+            overview={overview}
+            stats={stats}
+            teams={teams}
+          />
+        </View>
       </KeyboardAwareScrollView>
     </Screen>
   );
@@ -248,7 +304,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
   },
-  publicHeader: {
+  publicProfileView: {
     marginHorizontal: -spacing[20],
   },
   scrollContent: {

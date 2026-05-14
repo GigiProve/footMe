@@ -6,18 +6,23 @@ import {
   StyleSheet,
   type AlertButton,
 } from "react-native";
+import { useRouter } from "expo-router";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../src/features/auth/use-session";
 import {
-  fetchClubFollowState,
   fetchPublicClubHeaderStats,
-  followClub,
-  unfollowClub,
+  fetchPublicClubRoster,
+  fetchPublicClubSquadraOverview,
   type ClubHeaderStats,
+  type PublicClubMember,
   type PublicClubProfile,
+  type PublicClubSquadraOverview,
 } from "../../src/features/clubs/club-service";
-import { PublicClubHeader } from "../../src/features/clubs/components/PublicClubHeader";
+import {
+  PublicClubProfileView,
+} from "../../src/features/clubs/components/PublicClubProfileView";
+import type { ClubHeaderTab } from "../../src/features/clubs/components/PublicClubHeader";
 import { fetchClubTeams, type ClubTeam } from "../../src/features/clubs/team-service";
 import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
@@ -25,6 +30,9 @@ import { EditAgentProfileModal } from "../../src/features/profiles/edit-modals/E
 import { EditAgentMediaModal } from "../../src/features/profiles/edit-modals/EditAgentMediaModal";
 import { EditClubInfoModal } from "../../src/features/profiles/edit-modals/EditClubInfoModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
+import { EditClubSportProfileModal } from "../../src/features/profiles/edit-modals/EditClubSportProfileModal";
+import { EditClubAffiliationsModal } from "../../src/features/profiles/edit-modals/EditClubAffiliationsModal";
+import { EditTeamsModal } from "../../src/features/profiles/edit-modals/EditTeamsModal";
 import { EditCoachAchievementsModal } from "../../src/features/profiles/edit-modals/EditCoachAchievementsModal";
 import { EditCoachInfoModal } from "../../src/features/profiles/edit-modals/EditCoachInfoModal";
 import { EditCoachProfileModal } from "../../src/features/profiles/edit-modals/EditCoachProfileModal";
@@ -85,16 +93,27 @@ const emptyClubHeaderStats: ClubHeaderStats = {
   staffCount: 0,
 };
 
+const emptyClubOverview: PublicClubSquadraOverview = {
+  affiliations: [],
+  parentAffiliation: null,
+  positionPreview: [],
+  positionsTotal: 0,
+  seasonSummaries: [],
+};
+
 export default function ProfileScreen() {
   const { profile, refreshProfile, session } = useSession();
+  const router = useRouter();
   const userId = session?.user.id ?? null;
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
   const [clubTeams, setClubTeams] = useState<ClubTeam[]>([]);
   const [clubHeaderStats, setClubHeaderStats] =
     useState<ClubHeaderStats>(emptyClubHeaderStats);
-  const [isClubFollowed, setIsClubFollowed] = useState(false);
-  const [isClubFollowing, setIsClubFollowing] = useState(false);
+  const [clubOverview, setClubOverview] =
+    useState<PublicClubSquadraOverview>(emptyClubOverview);
+  const [clubMembers, setClubMembers] = useState<PublicClubMember[]>([]);
+  const [activeClubTab, setActiveClubTab] = useState<ClubHeaderTab>("team");
   const [isLoading, setIsLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<EditSection | null>(null);
   const [agentMediaEditingItemId, setAgentMediaEditingItemId] = useState<string | null>(null);
@@ -112,26 +131,32 @@ export default function ProfileScreen() {
       setCompleteProfile(data);
 
       if (data.club?.id) {
-        const [teams, stats, followState] = await Promise.all([
+        const [teams, stats, overview, members] = await Promise.all([
           fetchClubTeams(data.club.id),
           fetchPublicClubHeaderStats(data.club.id).catch(
             () => emptyClubHeaderStats,
           ),
-          fetchClubFollowState(userId, data.club.id).catch(() => false),
+          fetchPublicClubSquadraOverview(data.club.id).catch(
+            () => emptyClubOverview,
+          ),
+          fetchPublicClubRoster(data.club.id).catch(() => []),
         ]);
 
         setClubTeams(teams);
         setClubHeaderStats(stats);
-        setIsClubFollowed(followState);
+        setClubOverview(overview);
+        setClubMembers(members);
       } else {
         setClubTeams([]);
         setClubHeaderStats(emptyClubHeaderStats);
-        setIsClubFollowed(false);
+        setClubOverview(emptyClubOverview);
+        setClubMembers([]);
       }
     } catch (error) {
       setClubTeams([]);
       setClubHeaderStats(emptyClubHeaderStats);
-      setIsClubFollowed(false);
+      setClubOverview(emptyClubOverview);
+      setClubMembers([]);
       const message =
         error instanceof Error
           ? error.message
@@ -196,29 +221,6 @@ export default function ProfileScreen() {
     );
   }
 
-  async function handleToggleClubFollow() {
-    if (!userId || !completeProfile?.club) {
-      return;
-    }
-
-    try {
-      setIsClubFollowing(true);
-
-      if (isClubFollowed) {
-        await unfollowClub(userId, completeProfile.club.id);
-        setIsClubFollowed(false);
-        return;
-      }
-
-      await followClub(userId, completeProfile.club.id);
-      setIsClubFollowed(true);
-    } catch {
-      Alert.alert("Errore", "Non siamo riusciti ad aggiornare il follow.");
-    } finally {
-      setIsClubFollowing(false);
-    }
-  }
-
   function handleClubContactPress() {
     if (!completeProfile?.club) {
       return;
@@ -273,6 +275,22 @@ export default function ProfileScreen() {
   function handleManageAgentMedia(itemId: string | null = null) {
     setAgentMediaEditingItemId(itemId);
     setActiveModal("agentMedia");
+  }
+
+  function handleOpenClubPositions() {
+    if (!completeProfile?.club) {
+      return;
+    }
+
+    router.push(`/club/${completeProfile.club.id}/positions` as never);
+  }
+
+  function handleOpenClubTeam(teamId: string) {
+    router.push(`/club/team/${teamId}` as never);
+  }
+
+  function handleOpenAffiliateClub(clubId: string) {
+    router.push(`/club/${clubId}` as never);
   }
 
   async function handleDeleteExperience(group: GroupedExperience) {
@@ -436,14 +454,25 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         {completeProfile && role === "club_admin" && completeProfile.club ? (
-          <PublicClubHeader
+          <PublicClubProfileView
+            activeTab={activeClubTab}
             club={toPublicClubProfile(completeProfile.club)}
-            isFollowed={isClubFollowed}
-            isFollowing={isClubFollowing}
+            isFollowed={false}
+            isFollowing={false}
+            isOwner
+            members={clubMembers}
             onContactPress={handleClubContactPress}
-            onToggleFollow={handleToggleClubFollow}
+            onEditAffiliations={() => handleEdit("clubAffiliations")}
+            onEditSeasons={() => handleEdit("clubSeasons")}
+            onEditSportProfile={() => handleEdit("clubSportProfile")}
+            onEditTeams={() => handleEdit("clubTeams")}
+            onOpenAffiliate={handleOpenAffiliateClub}
+            onOpenPositions={handleOpenClubPositions}
+            onOpenTeam={handleOpenClubTeam}
+            onTabChange={setActiveClubTab}
+            onToggleFollow={() => handleEdit("clubInfo")}
+            overview={clubOverview}
             stats={clubHeaderStats}
-            style={styles.clubPublicHeader}
             teams={clubTeams}
           />
         ) : completeProfile && role === "player" && playerHeaderDetails ? (
@@ -739,6 +768,32 @@ export default function ProfileScreen() {
                 userId={userId}
                 visible={activeModal === "clubSeasons"}
               />
+              <EditClubSportProfileModal
+                completeProfile={completeProfile}
+                onClose={handleCloseModal}
+                onSaved={handleSaved}
+                userId={userId}
+                visible={activeModal === "clubSportProfile"}
+              />
+              {completeProfile.club ? (
+                <>
+                  <EditTeamsModal
+                    clubId={completeProfile.club.id}
+                    clubName={completeProfile.club.name}
+                    onClose={handleCloseModal}
+                    onSaved={handleSaved}
+                    teams={clubTeams}
+                    visible={activeModal === "clubTeams"}
+                  />
+                  <EditClubAffiliationsModal
+                    clubId={completeProfile.club.id}
+                    initialAffiliations={clubOverview.affiliations}
+                    onClose={handleCloseModal}
+                    onSaved={handleSaved}
+                    visible={activeModal === "clubAffiliations"}
+                  />
+                </>
+              ) : null}
             </>
           ) : null}
         </>
@@ -760,14 +815,18 @@ function toPublicClubProfile(
     description: club.description,
     field_address: club.field_address,
     founding_year: club.founding_year,
+    gallery_urls: club.gallery_urls,
     headquarters_address: club.headquarters_address,
     id: club.id,
+    key_results: club.key_results,
     league: club.league,
     logo_url: club.logo_url,
     name: club.name,
     owner_full_name: null,
     region: club.region,
+    sports_focus: club.sports_focus,
     stadium: club.stadium,
+    top_level_reached: club.top_level_reached,
     verification_status: club.verification_status,
     website_url: club.website_url,
   };
@@ -784,15 +843,12 @@ function normalizeExternalUrl(url: string) {
 }
 
 const styles = StyleSheet.create({
-  clubPublicHeader: {
-    paddingTop: 64,
-  },
   screen: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
   },
   scrollContent: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     paddingBottom: 0,
   },
 });

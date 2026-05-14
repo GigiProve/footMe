@@ -59,7 +59,10 @@ type EditSection =
   | "staffExperiences"
   | "staffMedia"
   | "clubInfo"
-  | "clubSeasons";
+  | "clubSeasons"
+  | "clubSportProfile"
+  | "clubAffiliations"
+  | "clubTeams";
 
 type ProfileReadonlyViewProps = {
   completeProfile: CompleteProfessionalProfile;
