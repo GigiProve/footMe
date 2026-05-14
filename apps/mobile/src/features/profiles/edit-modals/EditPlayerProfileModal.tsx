@@ -6,6 +6,7 @@ import { MediaPickerField } from "../../../components/ui/media-picker-field";
 import { WheelPicker } from "../../../components/ui/wheel-picker";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button, Input, SectionCard, Toggle } from "../../../ui";
+import type { ProfileGender } from "../../onboarding/create-initial-profile";
 import { BioInput } from "../bio-section";
 import { ContactSection } from "../contact-section";
 import {
@@ -44,7 +45,6 @@ import {
   type PlayerPosition,
   type PreferredFoot,
 } from "../player-sports";
-import { PersonalInfoSection } from "../personal-info-section";
 import { PlayerCharacteristicsSection } from "../player-sports-section";
 import {
   type CompleteProfessionalProfile,
@@ -55,6 +55,7 @@ import { supabase } from "../../../lib/supabase";
 import { WhereToPlaySection } from "../../onboarding/where-to-play-section";
 import type { AvailabilityType } from "../../onboarding/onboarding-form";
 import { EditModalShell } from "./EditModalShell";
+import { OnboardingBaseFieldsSection } from "./OnboardingBaseFieldsSection";
 
 // ────────────────────────────────
 // Types
@@ -75,7 +76,15 @@ type UnifiedPlayerFormState = {
   fullName: string;
   birthDate: string;
   city: string;
+  currentLocationCity: string;
+  currentLocationCountry: string;
+  domicile: string;
+  gender: ProfileGender | "";
+  legalStatus: string;
   region: string;
+  residence: string;
+  residenceCountry: string;
+  useResidenceForDomicile: boolean;
   nationality: string;
   languages: string[];
   primaryPosition: PlayerPosition;
@@ -152,8 +161,16 @@ function buildFormFromProfile(
     fullName: base.fullName,
     birthDate: base.birthDate,
     city: base.city,
+    currentLocationCity: base.currentLocationCity,
+    currentLocationCountry: base.currentLocationCountry,
+    domicile: base.domicile,
     region: base.region,
+    gender: base.gender,
+    legalStatus: base.legalStatus,
     nationality: base.nationality,
+    residence: base.residence,
+    residenceCountry: base.residenceCountry,
+    useResidenceForDomicile: base.useResidenceForDomicile,
     languages: fromDelimitedString(base.languages),
     primaryPosition: base.primaryPosition,
     secondaryPositions: base.secondaryPositions,
@@ -242,6 +259,14 @@ export function EditPlayerProfileModal({
   // ── Handlers ──
   function handleCitySuggestionPress(suggestion: ItalianCityOption) {
     setForm((prev) => ({ ...prev, city: suggestion.name, region: suggestion.region }));
+  }
+
+  function handleResidenceSuggestionPress(suggestion: ItalianCityOption) {
+    setForm((prev) => ({ ...prev, residence: suggestion.name }));
+  }
+
+  function handleDomicileSuggestionPress(suggestion: ItalianCityOption) {
+    setForm((prev) => ({ ...prev, domicile: suggestion.name }));
   }
 
   function handlePrimaryPositionChange(value: PlayerPosition) {
@@ -391,8 +416,16 @@ export function EditPlayerProfileModal({
         fullName: form.fullName,
         birthDate: form.birthDate,
         city: form.city,
+        currentLocationCity: form.currentLocationCity,
+        currentLocationCountry: form.currentLocationCountry,
+        domicile: form.domicile,
         region: form.region,
+        gender: form.gender,
+        legalStatus: form.legalStatus,
         nationality: form.nationality,
+        residence: form.residence,
+        residenceCountry: form.residenceCountry,
+        useResidenceForDomicile: form.useResidenceForDomicile,
         languages: toDelimitedString(form.languages),
         primaryPosition: form.primaryPosition,
         secondaryPositions: form.secondaryPositions,
@@ -481,26 +514,45 @@ export function EditPlayerProfileModal({
 
       {/* Dati personali */}
       <SectionCard title="Dati personali">
-        <PersonalInfoSection
+        <OnboardingBaseFieldsSection
           birthDate={form.birthDate}
           birthDateHelperText={birthDateHelperText}
           city={form.city}
           cityHelperText={cityHelperText}
           citySuggestions={citySuggestions}
-          editable
+          currentLocationCity={form.currentLocationCity}
+          currentLocationCountry={form.currentLocationCountry}
+          domicile={form.domicile}
           fullName={form.fullName}
+          gender={form.gender}
           languages={form.languages}
+          legalStatus={form.legalStatus}
           nationality={form.nationality}
           nationalityOptions={nationalityOptions}
-          onBirthDateChange={(v) => patch("birthDate", v)}
-          onCityChange={(v) => patch("city", v)}
+          onBirthDateChange={(value) => patch("birthDate", value)}
+          onCityChange={(value) => patch("city", value)}
           onCitySuggestionPress={handleCitySuggestionPress}
-          onFullNameChange={(v) => patch("fullName", v)}
-          onLanguagesChange={(v) => patch("languages", v)}
-          onNationalityChange={(v) => patch("nationality", v)}
-          onRegionChange={(v) => patch("region", v)}
+          onCurrentLocationCityChange={(value) => patch("currentLocationCity", value)}
+          onCurrentLocationCountryChange={(value) => patch("currentLocationCountry", value)}
+          onDomicileChange={(value) => patch("domicile", value)}
+          onDomicileSelect={handleDomicileSuggestionPress}
+          onFullNameChange={(value) => patch("fullName", value)}
+          onGenderChange={(value) => patch("gender", value)}
+          onLanguagesChange={(value) => patch("languages", value)}
+          onLegalStatusChange={(value) => patch("legalStatus", value)}
+          onNationalityChange={(value) => patch("nationality", value)}
+          onRegionChange={(value) => patch("region", value)}
+          onResidenceChange={(value) => patch("residence", value)}
+          onResidenceCountryChange={(value) => patch("residenceCountry", value)}
+          onResidenceSelect={handleResidenceSuggestionPress}
+          onUseResidenceForDomicileChange={(value) =>
+            patch("useResidenceForDomicile", value)
+          }
           region={form.region}
           regionOptions={regionOptions}
+          residence={form.residence}
+          residenceCountry={form.residenceCountry}
+          useResidenceForDomicile={form.useResidenceForDomicile}
         />
       </SectionCard>
 

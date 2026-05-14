@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 
+import { SelectField } from "../../../components/ui/select-field";
 import { MediaPickerField } from "../../../components/ui/media-picker-field";
 import { withDefaultProfileAvatar } from "../profile-avatar";
 import { ContactSection } from "../contact-section";
 import { BioInput } from "../bio-section";
-import { PersonalInfoSection } from "../personal-info-section";
 import {
   buildFullUpdatePayload,
   buildInitialState,
@@ -44,29 +44,42 @@ import { AppText, Input, SectionCard } from "../../../ui";
 import { EditModalShell } from "./EditModalShell";
 import { WhereToPlaySection } from "../../onboarding/where-to-play-section";
 import type { AvailabilityType } from "../../onboarding/onboarding-form";
+import { AVAILABLE_FROM_OPTIONS, COACH_PRIMARY_ROLE_OPTIONS } from "../../onboarding/coach/CoachRoleStep";
+import type { ProfileGender } from "../../onboarding/create-initial-profile";
+import { OnboardingBaseFieldsSection } from "./OnboardingBaseFieldsSection";
 
 type UnifiedCoachFormState = {
   avatarUrl: string;
   bio: string;
   birthDate: string;
   city: string;
+  coachAvailableFrom: string;
+  coachPrimaryRole: string;
   coachedCategories: string;
   coachedClubs: string;
   contactEmail: string;
   contactFacebook: string;
   contactInstagram: string;
   contactPhone: string;
+  currentLocationCity: string;
+  currentLocationCountry: string;
+  domicile: string;
   fullName: string;
   gamePhilosophy: string;
+  gender: ProfileGender | "";
+  legalStatus: string;
   languages: string[];
   licenses: string;
   nationality: string;
   openToNewRole: boolean;
   region: string;
+  residence: string;
+  residenceCountry: string;
   showContactEmail: boolean;
   showContactFacebook: boolean;
   showContactInstagram: boolean;
   technicalVideoUrl: string;
+  useResidenceForDomicile: boolean;
 };
 
 type Props = {
@@ -87,23 +100,33 @@ function buildFormFromProfile(
     bio: base.bio,
     birthDate: base.birthDate,
     city: base.city,
+    coachAvailableFrom: base.coachAvailableFrom,
+    coachPrimaryRole: base.coachPrimaryRole,
     coachedCategories: base.coachedCategories,
     coachedClubs: base.coachedClubs,
     contactEmail: base.contactEmail,
     contactFacebook: base.contactFacebook,
     contactInstagram: base.contactInstagram,
     contactPhone: base.contactPhone,
+    currentLocationCity: base.currentLocationCity,
+    currentLocationCountry: base.currentLocationCountry,
+    domicile: base.domicile,
     fullName: base.fullName,
     gamePhilosophy: base.gamePhilosophy,
+    gender: base.gender,
+    legalStatus: base.legalStatus,
     languages: fromDelimitedString(base.languages),
     licenses: base.licenses,
     nationality: base.nationality,
     openToNewRole: base.openToNewRole,
     region: base.region,
+    residence: base.residence,
+    residenceCountry: base.residenceCountry,
     showContactEmail: base.showContactEmail,
     showContactFacebook: base.showContactFacebook,
     showContactInstagram: base.showContactInstagram,
     technicalVideoUrl: base.technicalVideoUrl,
+    useResidenceForDomicile: base.useResidenceForDomicile,
   };
 }
 
@@ -179,6 +202,20 @@ export function EditCoachProfileModal({
       ...prev,
       city: suggestion.name,
       region: suggestion.region,
+    }));
+  }
+
+  function handleResidenceSuggestionPress(suggestion: ItalianCityOption) {
+    setForm((prev) => ({
+      ...prev,
+      residence: suggestion.name,
+    }));
+  }
+
+  function handleDomicileSuggestionPress(suggestion: ItalianCityOption) {
+    setForm((prev) => ({
+      ...prev,
+      domicile: suggestion.name,
     }));
   }
 
@@ -364,6 +401,8 @@ export function EditCoachProfileModal({
         bio: normalizeProfileBioInput(form.bio),
         birthDate: form.birthDate,
         city: form.city,
+        coachAvailableFrom: form.coachAvailableFrom,
+        coachPrimaryRole: form.coachPrimaryRole,
         coachedCategories: form.coachedCategories,
         coachedClubs: form.coachedClubs,
         coachAvailabilityType: availabilityType,
@@ -372,18 +411,26 @@ export function EditCoachProfileModal({
         contactFacebook: normalizedFacebook ?? "",
         contactInstagram: normalizedInstagram ?? "",
         contactPhone: normalizedPhone,
+        currentLocationCity: form.currentLocationCity,
+        currentLocationCountry: form.currentLocationCountry,
+        domicile: form.domicile,
         fullName: trimmedName,
         gamePhilosophy: form.gamePhilosophy,
+        gender: form.gender,
+        legalStatus: form.legalStatus,
         languages: toDelimitedString(form.languages),
         licenses: form.licenses,
         nationality: form.nationality,
         openToNewRole: form.openToNewRole,
         preferredRegions: toDelimitedString(preferredRegions),
         region: form.region,
+        residence: form.residence,
+        residenceCountry: form.residenceCountry,
         showContactEmail: form.showContactEmail,
         showContactFacebook: form.showContactFacebook,
         showContactInstagram: form.showContactInstagram,
         technicalVideoUrl: form.technicalVideoUrl,
+        useResidenceForDomicile: form.useResidenceForDomicile,
       };
 
       const payload = buildFullUpdatePayload(completeProfile, merged);
@@ -432,30 +479,60 @@ export function EditCoachProfileModal({
       </SectionCard>
 
       <SectionCard title="Dati personali">
-        <PersonalInfoSection
+        <OnboardingBaseFieldsSection
           birthDate={form.birthDate}
           birthDateHelperText={birthDateHelperText}
           city={form.city}
           cityHelperText={cityHelperText}
           citySuggestions={citySuggestions}
-          editable
+          currentLocationCity={form.currentLocationCity}
+          currentLocationCountry={form.currentLocationCountry}
+          domicile={form.domicile}
           fullName={form.fullName}
+          gender={form.gender}
           languages={form.languages}
+          legalStatus={form.legalStatus}
           nationality={form.nationality}
           nationalityOptions={nationalityOptions}
           onBirthDateChange={(value) => patch("birthDate", value)}
           onCityChange={(value) => patch("city", value)}
           onCitySuggestionPress={handleCitySuggestionPress}
+          onCurrentLocationCityChange={(value) => patch("currentLocationCity", value)}
+          onCurrentLocationCountryChange={(value) =>
+            patch("currentLocationCountry", value)
+          }
+          onDomicileChange={(value) => patch("domicile", value)}
+          onDomicileSelect={handleDomicileSuggestionPress}
           onFullNameChange={(value) => patch("fullName", value)}
+          onGenderChange={(value) => patch("gender", value)}
           onLanguagesChange={(value) => patch("languages", value)}
+          onLegalStatusChange={(value) => patch("legalStatus", value)}
           onNationalityChange={(value) => patch("nationality", value)}
           onRegionChange={(value) => patch("region", value)}
+          onResidenceChange={(value) => patch("residence", value)}
+          onResidenceCountryChange={(value) => patch("residenceCountry", value)}
+          onResidenceSelect={handleResidenceSuggestionPress}
+          onUseResidenceForDomicileChange={(value) =>
+            patch("useResidenceForDomicile", value)
+          }
           region={form.region}
           regionOptions={regionOptions}
+          residence={form.residence}
+          residenceCountry={form.residenceCountry}
+          useResidenceForDomicile={form.useResidenceForDomicile}
         />
       </SectionCard>
 
       <SectionCard title="Profilo allenatore">
+        <SelectField
+          allowClear
+          clearLabel="Rimuovi ruolo"
+          label="Ruolo principale"
+          onChange={(value) => patch("coachPrimaryRole", value)}
+          options={COACH_PRIMARY_ROLE_OPTIONS}
+          placeholder="Seleziona ruolo"
+          value={form.coachPrimaryRole}
+        />
         <Input
           label="Licenze"
           onChangeText={(value) => patch("licenses", value)}
@@ -495,6 +572,7 @@ export function EditCoachProfileModal({
               setAvailabilityType("ITALY");
               setPreferredRegions([]);
               setPreferredProvinces([]);
+              patch("coachAvailableFrom", "");
             }
           }}
           onProvincesChange={setPreferredProvinces}
@@ -508,6 +586,17 @@ export function EditCoachProfileModal({
           toggleLabel="Disponibile per nuove panchine"
           toggleSubtitle="Il tuo profilo può comparire tra gli allenatori disponibili."
         />
+        {form.openToNewRole ? (
+          <SelectField
+            allowClear
+            clearLabel="Rimuovi disponibilità"
+            label="Disponibile da"
+            onChange={(value) => patch("coachAvailableFrom", value)}
+            options={AVAILABLE_FROM_OPTIONS}
+            placeholder="Seleziona disponibilità"
+            value={form.coachAvailableFrom}
+          />
+        ) : null}
       </SectionCard>
 
       <SectionCard title="Filosofia di gioco">

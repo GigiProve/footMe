@@ -99,8 +99,12 @@ describe("createInitialProfile", () => {
     clubWebsite: "",
     clubYouthCategories: [] as string[],
 
+    currentLocationCity: "",
+    currentLocationCountry: "",
+    legalStatus: "",
     repEmail: "",
     repPhone: "",
+    residenceCountry: "",
     staffAvailableFrom: "",
     staffPrimaryRole: "",
     staffRoles: [] as StaffRole[],
@@ -154,13 +158,17 @@ describe("createInitialProfile", () => {
     expect(upsertMocks.profiles).toHaveBeenCalledWith({
       avatar_url: "https://example.com/avatar.jpg",
       birth_date: "1998-05-12",
+      current_location_city: null,
+      current_location_country: null,
       domicile: "Assisi",
       full_name: "Marco Rossi",
       gender: "male",
       id: "user-2",
+      legal_status: null,
       nationality: "IT",
       phone_number: null,
       residence: "Perugia",
+      residence_country: null,
       role: "player",
     });
     expect(upsertMocks.profile_private_contacts).toHaveBeenCalledWith({
@@ -318,9 +326,13 @@ describe("createInitialProfile", () => {
       }),
     ).toMatchObject({
       birthDate: "1998-05-12",
+      currentLocationCity: null,
+      currentLocationCountry: null,
       domicile: null,
+      legalStatus: null,
       nationality: null,
       residence: null,
+      residenceCountry: null,
     });
   });
 
@@ -346,7 +358,11 @@ describe("createInitialProfile", () => {
 
     expect(upsertMocks.profiles).toHaveBeenCalledWith(
       expect.objectContaining({
+        current_location_city: null,
+        current_location_country: null,
+        legal_status: null,
         role: "agent",
+        residence_country: null,
       }),
     );
     expect(upsertMocks.agent_profiles).toHaveBeenCalledWith({
@@ -428,6 +444,40 @@ describe("createInitialProfile", () => {
     expect(upsertMocks.profiles).toHaveBeenCalledWith(
       expect.objectContaining({
         avatar_url: null,
+      }),
+    );
+  });
+
+  it("persists international residence and legal-status fields when provided", async () => {
+    await createInitialProfile({
+      ...defaultClubFields,
+      avatarUrl: "",
+      birthDate: "1998-05-12",
+      clubCity: "",
+      clubName: "",
+      clubRegion: "",
+      currentLocationCity: "Bruxelles",
+      currentLocationCountry: "BE",
+      domicile: "",
+      fullName: "Marco Rossi",
+      gender: "male",
+      legalStatus: "pending_permit",
+      nationality: "BR",
+      phoneNumber: "",
+      primaryPosition: "forward",
+      residence: "",
+      residenceCountry: "IT",
+      role: "player",
+      staffSpecialization: "fitness_coach",
+      userId: "user-7",
+    });
+
+    expect(upsertMocks.profiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        current_location_city: "Bruxelles",
+        current_location_country: "BE",
+        legal_status: "pending_permit",
+        residence_country: "IT",
       }),
     );
   });

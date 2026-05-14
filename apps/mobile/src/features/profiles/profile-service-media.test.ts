@@ -237,6 +237,7 @@ describe("coach media profile service", () => {
       coachProfile: {
         achievements: [],
         availability_type: "ITALY",
+        available_from: null,
         coached_categories: [],
         coached_clubs: [],
         contract_end: null,
@@ -250,6 +251,7 @@ describe("coach media profile service", () => {
         preferred_formation: null,
         preferred_provinces: [],
         preferred_regions: [],
+        primary_role: null,
         profile_id: "coach-1",
         secondary_formations: [],
         technical_video_url: null,
@@ -271,8 +273,11 @@ describe("coach media profile service", () => {
 
     expect(mocks.coachProfilesUpsertMock).toHaveBeenCalledWith({
       availability_type: "ITALY",
+      available_from: null,
       coached_categories: [],
       coached_clubs: [],
+      contract_end: null,
+      current_club: null,
       game_philosophy: null,
       licenses: [],
       media_items: [
@@ -288,9 +293,14 @@ describe("coach media profile service", () => {
         },
       ],
       open_to_new_role: false,
+      play_styles: [],
+      preferred_categories: [],
+      preferred_formation: null,
       preferred_provinces: [],
       preferred_regions: [],
+      primary_role: null,
       profile_id: "coach-1",
+      secondary_formations: [],
       technical_video_url: null,
     });
   });

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 
+import { MediaPickerField } from "../../../components/ui/media-picker-field";
 import {
   AGENT_OPERATING_MACRO_AREA_OPTIONS,
   AGENT_OPERATIONAL_FOCUS_OPTIONS,
@@ -13,15 +14,33 @@ import {
 } from "../agent-profile";
 import { AgentCareerEntriesEditor } from "../agent/AgentCareerEntriesEditor";
 import { AgentManagedPlayersEditor } from "../agent/AgentManagedPlayersEditor";
-import { validateBirthDateInput } from "../profile-form-utils";
 import {
-  searchAgentPlayerCandidates,
-  updateCompleteProfessionalProfile,
-  type CompleteProfessionalProfile,
-} from "../profile-service";
+  buildFullUpdatePayload,
+  buildInitialState,
+  fromDelimitedString,
+  toDelimitedString,
+} from "../profile-edit-helpers";
+import {
+  ensureOption,
+  getRegionFromCity,
+  isRegionConsistentWithCity,
+  NATIONALITY_OPTIONS,
+  REGION_OPTIONS,
+  searchItalianCities,
+  validateBirthDateInput,
+  type ItalianCityOption,
+} from "../profile-form-utils";
+import { searchAgentPlayerCandidates, updateCompleteProfessionalProfile, type CompleteProfessionalProfile } from "../profile-service";
+import {
+  pickAndUploadMedia,
+  ProfileMediaUploadError,
+  removeMediaFromStorage,
+  type UploadedMediaItem,
+} from "../media-upload-service";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Input, Toggle } from "../../../ui";
 import { EditModalShell } from "./EditModalShell";
+import { OnboardingBaseFieldsSection } from "./OnboardingBaseFieldsSection";
 
 type EditAgentProfileModalProps = {
   completeProfile: CompleteProfessionalProfile;
@@ -32,12 +51,21 @@ type EditAgentProfileModalProps = {
 };
 
 type AgentProfileFormState = {
+  agencyLogoUrl: string;
   agencyName: string;
   agencyRole: string;
+  birthDate: string;
+  city: string;
+  currentLocationCity: string;
+  currentLocationCountry: string;
   federation: string;
+  fullName: string;
   hasOtherFootballExperience: boolean;
   hasPlayedFootball: boolean;
   isFederationLicensed: boolean;
+  languages: string[];
+  legalStatus: string;
+  nationality: string;
   openToClubs: boolean;
   openToPlayers: boolean;
   operationalFocuses: string[];
@@ -46,16 +74,34 @@ type AgentProfileFormState = {
   operatingRegions: string;
   otherFootballRoles: string;
   periodStartYear: string;
+  region: string;
+  residence: string;
+  residenceCountry: string;
+  useResidenceForDomicile: boolean;
 };
 
-function getInitialFormState(agentProfile: AgentProfileRecord | null): AgentProfileFormState {
+function getInitialFormState(
+  completeProfile: CompleteProfessionalProfile,
+): AgentProfileFormState {
+  const agentProfile = completeProfile.agentProfile;
+  const base = buildInitialState(completeProfile);
+
   return {
+    agencyLogoUrl: agentProfile?.agency_logo_url ?? "",
     agencyName: agentProfile?.agency_name ?? "",
     agencyRole: agentProfile?.agency_role ?? "",
+    birthDate: base.birthDate,
+    city: base.city,
+    currentLocationCity: base.currentLocationCity,
+    currentLocationCountry: base.currentLocationCountry,
     federation: agentProfile?.federation ?? "",
+    fullName: base.fullName,
     hasOtherFootballExperience: agentProfile?.has_other_football_experience ?? false,
     hasPlayedFootball: agentProfile?.has_played_football ?? false,
     isFederationLicensed: agentProfile?.is_federation_licensed ?? false,
+    languages: fromDelimitedString(base.languages),
+    legalStatus: base.legalStatus,
+    nationality: base.nationality,
     openToClubs: agentProfile?.open_to_clubs ?? true,
     openToPlayers: agentProfile?.open_to_players ?? true,
     operationalFocuses: agentProfile?.operational_focuses ?? [],
@@ -66,6 +112,10 @@ function getInitialFormState(agentProfile: AgentProfileRecord | null): AgentProf
     periodStartYear: agentProfile?.period_start_year
       ? String(agentProfile.period_start_year)
       : "",
+    region: base.region,
+    residence: base.residence,
+    residenceCountry: base.residenceCountry,
+    useResidenceForDomicile: base.useResidenceForDomicile,
   };
 }
 
@@ -109,7 +159,7 @@ export function EditAgentProfileModal({
   visible,
 }: EditAgentProfileModalProps) {
   const [form, setForm] = useState<AgentProfileFormState>(() =>
-    getInitialFormState(completeProfile.agentProfile),
+    getInitialFormState(completeProfile),
   );
   const [careerEntries, setCareerEntries] = useState<AgentCareerEntryDraft[]>(() =>
     mapCareerEntries(completeProfile),
@@ -118,15 +168,17 @@ export function EditAgentProfileModal({
     mapManagedPlayers(completeProfile),
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) {
       return;
     }
 
-    setForm(getInitialFormState(completeProfile.agentProfile));
+    setForm(getInitialFormState(completeProfile));
     setCareerEntries(mapCareerEntries(completeProfile));
     setManagedPlayers(mapManagedPlayers(completeProfile));
+    setUploadingField(null);
   }, [completeProfile, visible]);
 
   function patchForm<Key extends keyof AgentProfileFormState>(
@@ -135,6 +187,34 @@ export function EditAgentProfileModal({
   ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
+
+  const citySuggestions = useMemo(
+    () => searchItalianCities(form.city),
+    [form.city],
+  );
+  const nationalityOptions = useMemo(
+    () => ensureOption(NATIONALITY_OPTIONS, form.nationality),
+    [form.nationality],
+  );
+  const regionOptions = useMemo(
+    () => ensureOption(REGION_OPTIONS, form.region),
+    [form.region],
+  );
+  const birthDateHelperText = useMemo(() => {
+    const result = validateBirthDateInput(form.birthDate);
+    return !result.isValid ? (result.message ?? undefined) : undefined;
+  }, [form.birthDate]);
+  const cityHelperText = useMemo(() => {
+    if (!form.city.trim()) {
+      return undefined;
+    }
+
+    if (!isRegionConsistentWithCity(form.city, form.region)) {
+      return "La regione selezionata non corrisponde alla città.";
+    }
+
+    return undefined;
+  }, [form.city, form.region]);
 
   function toggleSelection(
     key: "operationalFocuses" | "operatingMacroAreas",
@@ -149,16 +229,126 @@ export function EditAgentProfileModal({
     );
   }
 
+  function handleCitySuggestionPress(suggestion: ItalianCityOption) {
+    setForm((current) => ({
+      ...current,
+      city: suggestion.name,
+      region: suggestion.region,
+    }));
+  }
+
+  function handleResidenceSuggestionPress(suggestion: ItalianCityOption) {
+    setForm((current) => ({
+      ...current,
+      residence: suggestion.name,
+    }));
+  }
+
+  async function handleAgencyLogoPick() {
+    setUploadingField("agencyLogoUrl");
+
+    try {
+      const results: UploadedMediaItem[] = await pickAndUploadMedia({
+        folder: "agent-logos",
+        mediaTypes: ["images"],
+        userId,
+      });
+
+      if (results.length === 0) {
+        setUploadingField(null);
+        return;
+      }
+
+      const previousUrl = form.agencyLogoUrl;
+      patchForm("agencyLogoUrl", results[0].url);
+
+      if (previousUrl) {
+        try {
+          await removeMediaFromStorage(previousUrl);
+        } catch {
+          // Best-effort cleanup.
+        }
+      }
+    } catch (error) {
+      Alert.alert(
+        "Errore",
+        error instanceof ProfileMediaUploadError
+          ? error.message
+          : "Caricamento logo non riuscito.",
+      );
+    } finally {
+      setUploadingField(null);
+    }
+  }
+
+  async function handleAgencyLogoRemove() {
+    const previousUrl = form.agencyLogoUrl;
+    patchForm("agencyLogoUrl", "");
+
+    if (previousUrl) {
+      try {
+        await removeMediaFromStorage(previousUrl);
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
   async function handleSave() {
     if (!completeProfile.agentProfile && !form.agencyName.trim()) {
       Alert.alert("Profilo incompleto", "Inserisci almeno il nome dell'agenzia attuale.");
       return;
     }
 
+    const birthDateResult = validateBirthDateInput(form.birthDate);
+    if (!birthDateResult.isValid) {
+      Alert.alert(
+        "Data di nascita non valida",
+        birthDateResult.message ?? "Controlla il formato della data.",
+      );
+      return;
+    }
+
+    if (form.city.trim()) {
+      const regionFromCity = getRegionFromCity(form.city);
+      if (!regionFromCity) {
+        Alert.alert(
+          "Città non valida",
+          "La città inserita non è stata trovata. Seleziona una città dai suggerimenti.",
+        );
+        return;
+      }
+
+      if (form.region.trim() && !isRegionConsistentWithCity(form.city, form.region)) {
+        Alert.alert(
+          "Regione non coerente",
+          "La regione selezionata non corrisponde alla città inserita.",
+        );
+        return;
+      }
+    }
+
     setIsSaving(true);
 
     try {
-      const birthDate = validateBirthDateInput(completeProfile.profile.birth_date).isoValue;
+      const baseState = buildInitialState(completeProfile);
+      const mergedState = {
+        ...baseState,
+        birthDate: form.birthDate,
+        city: form.city,
+        currentLocationCity: form.currentLocationCity,
+        currentLocationCountry: form.currentLocationCountry,
+        fullName: form.fullName,
+        languages: toDelimitedString(form.languages),
+        legalStatus: form.legalStatus,
+        nationality: form.nationality,
+        region: form.region,
+        residence: form.residence,
+        residenceCountry: form.residenceCountry,
+        useResidenceForDomicile: form.useResidenceForDomicile,
+      };
+      const basePayload = buildFullUpdatePayload(completeProfile, mergedState);
+      basePayload.profile.birth_date = birthDateResult.isoValue;
       const sanitizedCareerEntries = careerEntries.filter(
         (entry) => entry.agency_name.trim().length > 0,
       );
@@ -197,7 +387,7 @@ export function EditAgentProfileModal({
           sort_order: index,
         })),
         agentProfile: {
-          agency_logo_url: completeProfile.agentProfile?.agency_logo_url ?? null,
+          agency_logo_url: form.agencyLogoUrl.trim() || null,
           agency_name: form.agencyName.trim() || null,
           agency_role: form.agencyRole.trim() || null,
           federation: form.isFederationLicensed ? form.federation.trim() || null : null,
@@ -224,26 +414,9 @@ export function EditAgentProfileModal({
           player_career_entries: completeProfile.agentProfile?.player_career_entries ?? [],
           player_types: derivedPlayerTypes,
         },
-        club: null,
-        clubSeasonEntries: [],
-        coachProfile: null,
-        playerCareerEntries: [],
-        playerProfile: null,
-        profile: {
-          avatar_url: completeProfile.profile.avatar_url,
-          bio: completeProfile.profile.bio,
-          birth_date: birthDate,
-          city: completeProfile.profile.city,
-          full_name: completeProfile.profile.full_name,
-          is_open_to_transfer: completeProfile.profile.is_open_to_transfer,
-          languages: completeProfile.profile.languages,
-          nationality: completeProfile.profile.nationality,
-          region: completeProfile.profile.region,
-        },
+        ...basePayload,
         profileId: userId,
         role: "agent",
-        staffProfile: null,
-        userContacts: completeProfile.userContacts,
       });
 
       onSaved();
@@ -267,6 +440,63 @@ export function EditAgentProfileModal({
       title="Profilo agente"
       visible={visible}
     >
+      <OnboardingBaseFieldsSection
+        birthDate={form.birthDate}
+        birthDateHelperText={birthDateHelperText}
+        city={form.city}
+        cityHelperText={cityHelperText}
+        citySuggestions={citySuggestions}
+        currentLocationCity={form.currentLocationCity}
+        currentLocationCountry={form.currentLocationCountry}
+        domicile=""
+        fullName={form.fullName}
+        gender=""
+        includeGender={false}
+        languages={form.languages}
+        legalStatus={form.legalStatus}
+        nationality={form.nationality}
+        nationalityOptions={nationalityOptions}
+        onBirthDateChange={(value) => patchForm("birthDate", value)}
+        onCityChange={(value) => patchForm("city", value)}
+        onCitySuggestionPress={handleCitySuggestionPress}
+        onCurrentLocationCityChange={(value) => patchForm("currentLocationCity", value)}
+        onCurrentLocationCountryChange={(value) =>
+          patchForm("currentLocationCountry", value)
+        }
+        onDomicileChange={() => undefined}
+        onDomicileSelect={() => undefined}
+        onFullNameChange={(value) => patchForm("fullName", value)}
+        onGenderChange={() => undefined}
+        onLanguagesChange={(value) => patchForm("languages", value)}
+        onLegalStatusChange={(value) => patchForm("legalStatus", value)}
+        onNationalityChange={(value) => patchForm("nationality", value)}
+        onRegionChange={(value) => patchForm("region", value)}
+        onResidenceChange={(value) => patchForm("residence", value)}
+        onResidenceCountryChange={(value) => patchForm("residenceCountry", value)}
+        onResidenceSelect={handleResidenceSuggestionPress}
+        onUseResidenceForDomicileChange={(value) =>
+          patchForm("useResidenceForDomicile", value)
+        }
+        region={form.region}
+        regionOptions={regionOptions}
+        residence={form.residence}
+        residenceCountry={form.residenceCountry}
+        showItalianDomicile={false}
+        useResidenceForDomicile={form.useResidenceForDomicile}
+      />
+
+      <MediaPickerField
+        buttonLabel="Carica logo"
+        helperText="Carica o aggiorna il logo dell'agenzia."
+        isUploading={uploadingField === "agencyLogoUrl"}
+        label="Logo agenzia"
+        onPick={handleAgencyLogoPick}
+        onRemove={handleAgencyLogoRemove}
+        previewUrl={form.agencyLogoUrl || null}
+        removable={Boolean(form.agencyLogoUrl)}
+        removeLabel="Rimuovi logo"
+      />
+
       <Input
         label="Agenzia attuale"
         onChangeText={(value) => patchForm("agencyName", value)}

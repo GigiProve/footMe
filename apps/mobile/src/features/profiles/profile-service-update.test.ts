@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { updateCompleteProfessionalProfile } from "./profile-service";
 
 const mocks = vi.hoisted(() => {
+  const profileUpdateMock = vi.fn();
   const profileUpdateEqMock = vi.fn();
   const profileUpdateMaybeSingleMock = vi.fn();
   const profileContactsUpsertMock = vi.fn();
@@ -22,23 +23,27 @@ const mocks = vi.hoisted(() => {
     privateContactsUpsertMock,
     profileContactsUpsertMock,
     profileUpdateEqMock,
+    profileUpdateMock,
     profileUpdateMaybeSingleMock,
     rpcMock,
     staffProfilesUpsertMock,
     fromMock: vi.fn((table: string) => {
       if (table === "profiles") {
         return {
-          update: vi.fn(() => ({
-            eq: vi.fn((...args: unknown[]) => {
-              profileUpdateEqMock(...args);
+          update: vi.fn((...args: unknown[]) => {
+            profileUpdateMock(...args);
+            return {
+              eq: vi.fn((...args: unknown[]) => {
+                profileUpdateEqMock(...args);
 
-              return {
-                select: vi.fn(() => ({
-                  maybeSingle: profileUpdateMaybeSingleMock,
-                })),
-              };
-            }),
-          })),
+                return {
+                  select: vi.fn(() => ({
+                    maybeSingle: profileUpdateMaybeSingleMock,
+                  })),
+                };
+              }),
+            };
+          }),
         };
       }
 
@@ -154,6 +159,7 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
   beforeEach(() => {
     mocks.fromMock.mockClear();
     mocks.profileUpdateEqMock.mockReset();
+    mocks.profileUpdateMock.mockReset();
     mocks.profileUpdateMaybeSingleMock.mockReset();
     mocks.profileContactsUpsertMock.mockReset();
     mocks.privateContactsUpsertMock.mockReset();
@@ -632,6 +638,7 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       ],
       coachProfile: {
         availability_type: "REGIONS",
+        available_from: "Da luglio",
         coached_categories: ["Promozione"],
         coached_clubs: ["USD Virtus"],
         contract_end: null,
@@ -645,6 +652,7 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         preferred_formation: null,
         preferred_provinces: [],
         preferred_regions: ["Lombardia"],
+        primary_role: "Allenatore",
         secondary_formations: [],
         technical_video_url: "https://example.com/coach-video.mp4",
       },
@@ -679,6 +687,7 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       ],
       p_coach_profile: {
         availability_type: "REGIONS",
+        available_from: "Da luglio",
         coached_categories: ["Promozione"],
         coached_clubs: ["USD Virtus"],
         contract_end: null,
@@ -692,6 +701,7 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         preferred_formation: null,
         preferred_provinces: [],
         preferred_regions: ["Lombardia"],
+        primary_role: "Allenatore",
         secondary_formations: [],
         technical_video_url: "https://example.com/coach-video.mp4",
       },
@@ -711,6 +721,41 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         },
       ],
       p_profile_id: "profile-1",
+    });
+  });
+
+  it("updates onboarding-aligned profile fields when they are provided", async () => {
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      profile: {
+        ...buildUpdateInput().profile,
+        current_location_city: "Bruxelles",
+        current_location_country: "BE",
+        domicile: "Assisi",
+        gender: "male",
+        legal_status: "pending_permit",
+        residence: "Perugia",
+        residence_country: "IT",
+      },
+    });
+
+    expect(mocks.profileUpdateMock).toHaveBeenCalledWith({
+      avatar_url: null,
+      bio: "Attaccante rapido",
+      birth_date: "2000-01-01",
+      city: "Perugia",
+      current_location_city: "Bruxelles",
+      current_location_country: "BE",
+      domicile: "Assisi",
+      full_name: "Marco Rossi",
+      gender: "male",
+      is_open_to_transfer: true,
+      languages: [],
+      legal_status: "pending_permit",
+      nationality: "IT",
+      region: "Umbria",
+      residence: "Perugia",
+      residence_country: "IT",
     });
   });
 

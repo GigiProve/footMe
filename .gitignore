@@ -15,3 +15,5 @@ apps/mobile/.env.*
 supabase/.temp/cli-latest
 .claude
 supabase/config.toml
+.agents
+.codex

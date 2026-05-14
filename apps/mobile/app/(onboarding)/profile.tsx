@@ -1067,18 +1067,20 @@ export default function OnboardingProfileScreen() {
       clubTotalMembers,
       clubWebsite,
       clubYouthCategories,
+      currentLocationCity,
+      currentLocationCountry,
       domicile:
-        nationalityCategory === "italy"
-          ? getEffectiveDomicile(form)
-          : currentLocationCity,
+        nationalityCategory === "italy" ? getEffectiveDomicile(form) : "",
       fullName,
       gender: gender as ProfileGender,
+      legalStatus,
       nationality,
       phoneNumber: composePhoneNumber(phoneCountryCode, phoneNumber),
       primaryPosition: primaryPosition || DEFAULT_PLAYER_PRIMARY_POSITION,
       repEmail,
       repPhone: composePhoneNumber(repPhoneCountryCode, repPhone),
-      residence: nationalityCategory === "italy" ? residence : residenceCountry,
+      residence: nationalityCategory === "italy" ? residence : "",
+      residenceCountry,
       role: role as AppRole,
       staffAvailableFrom,
       staffPrimaryRole,
@@ -1090,6 +1092,63 @@ export default function OnboardingProfileScreen() {
     patchForm({
       hasCreatedProfile: true,
     });
+  }
+
+  function buildOnboardingProfilePayload({
+    bioValue,
+    isOpenToTransferValue = false,
+    languages = [],
+  }: {
+    bioValue: string;
+    isOpenToTransferValue?: boolean;
+    languages?: string[];
+  }) {
+    return {
+      avatar_url: parseOptionalText(avatarUrl),
+      bio: parseOptionalText(normalizeProfileBioInput(bioValue)),
+      birth_date: birthDate,
+      city:
+        nationalityCategory === "italy"
+          ? parseOptionalText(residence)
+          : parseOptionalText(currentLocationCity),
+      current_location_city:
+        nationalityCategory === "italy"
+          ? null
+          : parseOptionalText(currentLocationCity),
+      current_location_country:
+        nationalityCategory === "italy"
+          ? null
+          : parseOptionalText(currentLocationCountry),
+      domicile:
+        nationalityCategory === "italy"
+          ? parseOptionalText(getEffectiveDomicile(form))
+          : null,
+      full_name: fullName,
+      gender:
+        gender === "male" ||
+        gender === "female" ||
+        gender === "non_binary" ||
+        gender === "prefer_not_to_say"
+          ? gender
+          : null,
+      is_open_to_transfer: isOpenToTransferValue,
+      legal_status:
+        nationalityCategory === "non_eu"
+          ? parseOptionalText(legalStatus)
+          : null,
+      languages,
+      nationality: parseOptionalText(nationality),
+      region:
+        nationalityCategory === "italy"
+          ? parseOptionalText(residenceRegion)
+          : null,
+      residence:
+        nationalityCategory === "italy" ? parseOptionalText(residence) : null,
+      residence_country:
+        nationalityCategory === "italy"
+          ? null
+          : parseOptionalText(residenceCountry),
+    };
   }
 
   async function saveStaffProfessionalProfile({
@@ -1111,17 +1170,9 @@ export default function OnboardingProfileScreen() {
       coachProfile: null,
       playerCareerEntries: [],
       playerProfile: null,
-      profile: {
-        avatar_url: parseOptionalText(avatarUrl),
-        bio: parseOptionalText(normalizeProfileBioInput(bio)),
-        birth_date: birthDate,
-        city: null,
-        full_name: fullName,
-        is_open_to_transfer: false,
-        languages: [],
-        nationality,
-        region: null,
-      },
+      profile: buildOnboardingProfilePayload({
+        bioValue: bio,
+      }),
       profileId,
       role: role as AppRole,
       staffCareerEntries: (staffCareerEntries as CoachCareerEntry[]).map(
@@ -1323,6 +1374,9 @@ export default function OnboardingProfileScreen() {
           role === "coach"
             ? {
                 availability_type: coachAvailabilityType || null,
+                available_from: openToNewRole
+                  ? parseOptionalText(coachAvailableFrom)
+                  : null,
                 coached_categories: fromDelimitedString(coachedCategories),
                 coached_clubs: fromDelimitedString(coachedClubs),
                 contract_end: null,
@@ -1336,23 +1390,17 @@ export default function OnboardingProfileScreen() {
                 preferred_formation: null,
                 preferred_provinces: coachProvincesArray,
                 preferred_regions: fromDelimitedString(coachPreferredRegions),
+                primary_role: parseOptionalText(coachPrimaryRole),
                 secondary_formations: [],
                 technical_video_url: parseOptionalText(technicalVideoUrl),
               }
             : null,
         playerCareerEntries: [],
         playerProfile: null,
-        profile: {
-          avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(normalizeProfileBioInput(bio)),
-          birth_date: birthDate,
-          city: null,
-          full_name: fullName,
-          is_open_to_transfer: isOpenToTransfer,
-          languages: [],
-          nationality,
-          region: null,
-        },
+        profile: buildOnboardingProfilePayload({
+          bioValue: bio,
+          isOpenToTransferValue: isOpenToTransfer,
+        }),
         profileId: session.user.id,
         role: role as AppRole,
         staffProfile:
@@ -1455,17 +1503,10 @@ export default function OnboardingProfileScreen() {
           weight_kg: parseOptionalNumber(weightKg),
           willing_to_change_club: willingToChangeClub,
         },
-        profile: {
-          avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(normalizeProfileBioInput(bio)),
-          birth_date: birthDate,
-          city: null,
-          full_name: fullName,
-          is_open_to_transfer: isOpenToTransfer,
-          languages: [],
-          nationality,
-          region: null,
-        },
+        profile: buildOnboardingProfilePayload({
+          bioValue: bio,
+          isOpenToTransferValue: isOpenToTransfer,
+        }),
         profileId: session.user.id,
         role: role as AppRole,
         staffProfile: null,
@@ -1674,17 +1715,10 @@ export default function OnboardingProfileScreen() {
         coachProfile: null,
         playerCareerEntries: [],
         playerProfile: null,
-        profile: {
-          avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(normalizeProfileBioInput(bio)),
-          birth_date: birthDate,
-          city: parseOptionalText(residence),
-          full_name: fullName,
-          is_open_to_transfer: false,
+        profile: buildOnboardingProfilePayload({
+          bioValue: bio,
           languages: agentLanguages,
-          nationality,
-          region: parseOptionalText(residenceRegion),
-        },
+        }),
         profileId: session.user.id,
         role: role as AppRole,
         staffProfile: null,
@@ -1958,17 +1992,10 @@ export default function OnboardingProfileScreen() {
         },
         playerCareerEntries: [],
         playerProfile: null,
-        profile: {
-          avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(normalizeProfileBioInput(directorBio)),
-          birth_date: birthDate,
-          city: parseOptionalText(residence),
-          full_name: fullName,
-          is_open_to_transfer: false,
+        profile: buildOnboardingProfilePayload({
+          bioValue: directorBio,
           languages: directorLanguages,
-          nationality,
-          region: parseOptionalText(residenceRegion),
-        },
+        }),
         profileId: session.user.id,
         role: role as AppRole,
         staffProfile: null,
@@ -2077,15 +2104,10 @@ export default function OnboardingProfileScreen() {
         playerCareerEntries: [],
         playerProfile: null,
         profile: {
-          avatar_url: parseOptionalText(avatarUrl),
+          ...buildOnboardingProfilePayload({
+            bioValue: "",
+          }),
           bio: null,
-          birth_date: birthDate,
-          city: null,
-          full_name: fullName,
-          is_open_to_transfer: false,
-          languages: [],
-          nationality: null,
-          region: null,
         },
         profileId: session.user.id,
         role: role as AppRole,
@@ -2153,19 +2175,9 @@ export default function OnboardingProfileScreen() {
         },
         playerCareerEntries: [],
         playerProfile: null,
-        profile: {
-          avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(
-            normalizeProfileBioInput(mediaEntityDescription),
-          ),
-          birth_date: birthDate,
-          city: null,
-          full_name: fullName,
-          is_open_to_transfer: false,
-          languages: [],
-          nationality: null,
-          region: null,
-        },
+        profile: buildOnboardingProfilePayload({
+          bioValue: mediaEntityDescription,
+        }),
         profileId: session.user.id,
         role: role as AppRole,
         staffProfile: null,
@@ -2285,6 +2297,9 @@ export default function OnboardingProfileScreen() {
         })),
         coachProfile: {
           availability_type: coachAvailabilityType || null,
+          available_from: openToNewRole
+            ? parseOptionalText(coachAvailableFrom)
+            : null,
           coached_categories: coachCategoriesArray,
           coached_clubs: [],
           contract_end: null,
@@ -2293,27 +2308,21 @@ export default function OnboardingProfileScreen() {
           licenses: coachLicenseType ? [coachLicenseType] : [],
           media_items: [],
           open_to_new_role: openToNewRole,
-          play_styles: [],
+          play_styles: coachPlayStyle ? [coachPlayStyle] : [],
           preferred_categories: [],
-          preferred_formation: null,
+          preferred_formation: parseOptionalText(coachFormation),
           preferred_provinces: coachProvincesArray,
           preferred_regions: coachRegionsArray,
+          primary_role: parseOptionalText(coachPrimaryRole),
           secondary_formations: [],
           technical_video_url: null,
         },
         playerCareerEntries: [],
         playerProfile: null,
-        profile: {
-          avatar_url: parseOptionalText(avatarUrl),
-          bio: parseOptionalText(normalizeProfileBioInput(form.bio)),
-          birth_date: birthDate,
-          city: null,
-          full_name: fullName,
-          is_open_to_transfer: false,
+        profile: buildOnboardingProfilePayload({
+          bioValue: form.bio,
           languages: coachLanguages,
-          nationality,
-          region: null,
-        },
+        }),
         profileId: session.user.id,
         role: role as AppRole,
         staffProfile: null,

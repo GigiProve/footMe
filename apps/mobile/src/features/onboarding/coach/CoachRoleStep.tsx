@@ -9,7 +9,7 @@ import { OnboardingSectionCard } from "../onboarding-ui";
 // Options
 // ---------------------------------------------------------------------------
 
-const COACH_PRIMARY_ROLE_OPTIONS: { label: string; value: string }[] = [
+export const COACH_PRIMARY_ROLE_OPTIONS: { label: string; value: string }[] = [
   { label: "Allenatore", value: "Allenatore" },
   { label: "Vice allenatore", value: "Vice allenatore" },
   { label: "Collaboratore tecnico", value: "Collaboratore tecnico" },
@@ -17,7 +17,7 @@ const COACH_PRIMARY_ROLE_OPTIONS: { label: string; value: string }[] = [
   { label: "Preparatore atletico", value: "Preparatore atletico" },
 ];
 
-const LICENSE_TYPE_OPTIONS: { label: string; value: string }[] = [
+export const LICENSE_TYPE_OPTIONS: { label: string; value: string }[] = [
   { label: "UEFA Pro", value: "UEFA Pro" },
   { label: "UEFA A", value: "UEFA A" },
   { label: "UEFA B", value: "UEFA B" },

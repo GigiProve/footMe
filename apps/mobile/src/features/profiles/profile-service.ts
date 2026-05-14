@@ -1,5 +1,6 @@
 import type {
   AppRole,
+  ProfileGender,
   StaffSpecialization,
 } from "../onboarding/create-initial-profile";
 
@@ -50,12 +51,19 @@ type BaseProfileRecord = {
   bio: string | null;
   birth_date: string | null;
   city: string | null;
+  current_location_city: string | null;
+  current_location_country: string | null;
+  domicile: string | null;
   full_name: string;
+  gender: ProfileGender | null;
   id: string;
   is_open_to_transfer: boolean;
+  legal_status: string | null;
   languages: string[];
   nationality: string | null;
   region: string | null;
+  residence: string | null;
+  residence_country: string | null;
   role: AppRole;
 };
 
@@ -206,6 +214,7 @@ export type CoachAchievementRecord = {
 type CoachProfileRecord = {
   achievements: CoachAchievementRecord[];
   availability_type: string | null;
+  available_from: string | null;
   coached_categories: string[];
   coached_clubs: string[];
   contract_end: string | null;
@@ -219,6 +228,7 @@ type CoachProfileRecord = {
   preferred_formation: string | null;
   preferred_provinces: string[];
   preferred_regions: string[];
+  primary_role: string | null;
   profile_id: string;
   secondary_formations: string[];
   technical_video_url: string | null;
@@ -411,6 +421,7 @@ export type CompleteProfessionalProfileUpdate = {
   clubSeasonEntries: ClubSeasonEntryInput[];
   coachProfile: {
     availability_type: string | null;
+    available_from: string | null;
     coached_categories: string[];
     coached_clubs: string[];
     contract_end: string | null;
@@ -424,6 +435,7 @@ export type CompleteProfessionalProfileUpdate = {
     preferred_formation: string | null;
     preferred_provinces: string[];
     preferred_regions: string[];
+    primary_role: string | null;
     secondary_formations: string[];
     technical_video_url: string | null;
   } | null;
@@ -462,11 +474,18 @@ export type CompleteProfessionalProfileUpdate = {
     bio: string | null;
     birth_date: string | null;
     city: string | null;
+    current_location_city?: string | null;
+    current_location_country?: string | null;
+    domicile?: string | null;
     full_name: string;
+    gender?: ProfileGender | null;
     is_open_to_transfer: boolean;
+    legal_status?: string | null;
     languages: string[];
     nationality: string | null;
     region: string | null;
+    residence?: string | null;
+    residence_country?: string | null;
   };
   profileId: string;
   role: AppRole;
@@ -631,6 +650,15 @@ function normalizeRole(value: unknown): AppRole {
     : "player";
 }
 
+function normalizeProfileGender(value: unknown): ProfileGender | null {
+  return value === "male" ||
+    value === "female" ||
+    value === "non_binary" ||
+    value === "prefer_not_to_say"
+    ? value
+    : null;
+}
+
 function normalizeBaseProfileRecord(
   profileId: string,
   rawProfile: Partial<BaseProfileRecord> | null | undefined,
@@ -641,12 +669,19 @@ function normalizeBaseProfileRecord(
     bio: normalizeOptionalText(rawProfile?.bio),
     birth_date: normalizeOptionalText(rawProfile?.birth_date),
     city: normalizeOptionalText(rawProfile?.city),
+    current_location_city: normalizeOptionalText(rawProfile?.current_location_city),
+    current_location_country: normalizeOptionalText(rawProfile?.current_location_country),
+    domicile: normalizeOptionalText(rawProfile?.domicile),
     full_name: normalizeRequiredText(rawProfile?.full_name, "Profilo FootMe"),
+    gender: normalizeProfileGender(rawProfile?.gender),
     id: normalizeRequiredText(rawProfile?.id, profileId),
     is_open_to_transfer: normalizeBoolean(rawProfile?.is_open_to_transfer),
+    legal_status: normalizeOptionalText(rawProfile?.legal_status),
     languages: normalizeStringArray(rawProfile?.languages),
     nationality: normalizeOptionalText(rawProfile?.nationality),
     region: normalizeOptionalText(rawProfile?.region),
+    residence: normalizeOptionalText(rawProfile?.residence),
+    residence_country: normalizeOptionalText(rawProfile?.residence_country),
     role: normalizeRole(rawProfile?.role),
   };
 }
@@ -743,6 +778,7 @@ function normalizeCoachProfileRecord(
         )
       : [],
     availability_type: normalizeOptionalText(rawProfile.availability_type),
+    available_from: normalizeOptionalText(rawProfile.available_from),
     coached_categories: normalizeStringArray(rawProfile.coached_categories),
     coached_clubs: normalizeStringArray(rawProfile.coached_clubs),
     contract_end: normalizeOptionalText(rawProfile.contract_end),
@@ -756,6 +792,7 @@ function normalizeCoachProfileRecord(
     preferred_formation: normalizeOptionalText(rawProfile.preferred_formation),
     preferred_provinces: normalizeStringArray(rawProfile.preferred_provinces),
     preferred_regions: normalizeStringArray(rawProfile.preferred_regions),
+    primary_role: normalizeOptionalText(rawProfile.primary_role),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
     secondary_formations: normalizeStringArray(rawProfile.secondary_formations),
     technical_video_url: normalizeOptionalText(rawProfile.technical_video_url),
@@ -1174,7 +1211,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   const { data: profileData, error: profileError } = await supabase
     .from("profiles_with_age")
     .select(
-      "id, full_name, role, birth_date, age, nationality, bio, avatar_url, region, city, is_open_to_transfer, languages",
+      "id, full_name, role, birth_date, age, nationality, bio, avatar_url, region, city, gender, residence, domicile, residence_country, current_location_country, current_location_city, legal_status, is_open_to_transfer, languages",
     )
     .eq("id", profileId)
     .maybeSingle();
@@ -1211,7 +1248,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("coach_profiles")
           .select(
-            "profile_id, licenses, coached_clubs, coached_categories, game_philosophy, technical_video_url, media_items, preferred_regions, preferred_provinces, availability_type, open_to_new_role, preferred_formation, secondary_formations, play_styles, current_club, contract_end, preferred_categories",
+            "profile_id, licenses, coached_clubs, coached_categories, game_philosophy, technical_video_url, media_items, preferred_regions, preferred_provinces, availability_type, available_from, open_to_new_role, primary_role, preferred_formation, secondary_formations, play_styles, current_club, contract_end, preferred_categories",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -1543,19 +1580,50 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 export async function updateCompleteProfessionalProfile(
   input: CompleteProfessionalProfileUpdate,
 ) {
+  const profileUpdatePayload: Record<string, unknown> = {
+    avatar_url: input.profile.avatar_url,
+    bio: input.profile.bio,
+    birth_date: input.profile.birth_date,
+    city: input.profile.city,
+    full_name: input.profile.full_name,
+    is_open_to_transfer: input.profile.is_open_to_transfer,
+    languages: input.profile.languages,
+    nationality: input.profile.nationality,
+    region: input.profile.region,
+  };
+
+  if ("current_location_city" in input.profile) {
+    profileUpdatePayload.current_location_city = input.profile.current_location_city ?? null;
+  }
+
+  if ("current_location_country" in input.profile) {
+    profileUpdatePayload.current_location_country =
+      input.profile.current_location_country ?? null;
+  }
+
+  if ("domicile" in input.profile) {
+    profileUpdatePayload.domicile = input.profile.domicile ?? null;
+  }
+
+  if ("gender" in input.profile) {
+    profileUpdatePayload.gender = input.profile.gender ?? null;
+  }
+
+  if ("legal_status" in input.profile) {
+    profileUpdatePayload.legal_status = input.profile.legal_status ?? null;
+  }
+
+  if ("residence" in input.profile) {
+    profileUpdatePayload.residence = input.profile.residence ?? null;
+  }
+
+  if ("residence_country" in input.profile) {
+    profileUpdatePayload.residence_country = input.profile.residence_country ?? null;
+  }
+
   const { data: updatedProfile, error: profileError } = await supabase
     .from("profiles")
-    .update({
-      avatar_url: input.profile.avatar_url,
-      bio: input.profile.bio,
-      birth_date: input.profile.birth_date,
-      city: input.profile.city,
-      full_name: input.profile.full_name,
-      is_open_to_transfer: input.profile.is_open_to_transfer,
-      languages: input.profile.languages,
-      nationality: input.profile.nationality,
-      region: input.profile.region,
-    })
+    .update(profileUpdatePayload)
     .eq("id", input.profileId)
     .select("id")
     .maybeSingle();
@@ -1998,15 +2066,23 @@ export async function saveCoachProfileMedia(input: {
 }) {
   const { error } = await supabase.from("coach_profiles").upsert({
     availability_type: input.coachProfile.availability_type,
+    available_from: input.coachProfile.available_from,
     coached_categories: input.coachProfile.coached_categories,
     coached_clubs: input.coachProfile.coached_clubs,
+    contract_end: input.coachProfile.contract_end,
+    current_club: input.coachProfile.current_club,
     game_philosophy: input.coachProfile.game_philosophy,
     licenses: input.coachProfile.licenses,
     media_items: input.mediaItems,
     open_to_new_role: input.coachProfile.open_to_new_role,
+    play_styles: input.coachProfile.play_styles,
+    preferred_categories: input.coachProfile.preferred_categories,
+    preferred_formation: input.coachProfile.preferred_formation,
     preferred_provinces: input.coachProfile.preferred_provinces,
     preferred_regions: input.coachProfile.preferred_regions,
+    primary_role: input.coachProfile.primary_role,
     profile_id: input.profileId,
+    secondary_formations: input.coachProfile.secondary_formations,
     technical_video_url: input.coachProfile.technical_video_url,
   });
 

@@ -1,4 +1,9 @@
-import type { AppRole, StaffSpecialization } from "../onboarding/create-initial-profile";
+import type {
+  AppRole,
+  ProfileGender,
+  StaffSpecialization,
+} from "../onboarding/create-initial-profile";
+import { mapStaffRoleToSpecialization } from "../onboarding/onboarding-types";
 import type {
   CompleteProfessionalProfile,
   CompleteProfessionalProfileUpdate,
@@ -18,6 +23,7 @@ import {
   calculateAge,
   formatOptionalSummary,
   formatProfileDisplayName,
+  getNationalityCategory,
   getOptionLabel,
   REGION_OPTIONS,
 } from "./profile-form-utils";
@@ -142,15 +148,19 @@ export type ProfileFormState = {
   clubRegion: string;
   clubWebsite: string;
   coachAvailabilityType: string;
+  coachAvailableFrom: string;
   coachPreferredProvinces: string;
+  coachPrimaryRole: string;
   coachedCategories: string;
   coachedClubs: string;
   fullName: string;
   gamePhilosophy: string;
+  gender: ProfileGender | "";
   heightCm: string;
   highlightVideoUrl: string;
   availabilityType: string;
   isOpenToTransfer: boolean;
+  legalStatus: string;
   languages: string;
   licenses: string;
   nationality: string;
@@ -161,6 +171,8 @@ export type ProfileFormState = {
   preferredRegions: string;
   primaryPosition: PlayerPosition;
   region: string;
+  residence: string;
+  residenceCountry: string;
   showContactEmail: boolean;
   showContactFacebook: boolean;
   showContactInstagram: boolean;
@@ -168,6 +180,8 @@ export type ProfileFormState = {
   showRegionsBadge: boolean;
   secondaryPositions: PlayerPosition[];
   specialization: StaffSpecialization;
+  staffPrimaryRole: string;
+  staffRoles: string;
   staffAvailabilityType: string;
   staffAvailableFrom: string;
   staffPreferredCategories: string;
@@ -175,6 +189,10 @@ export type ProfileFormState = {
   technicalVideoUrl: string;
   transferProvinces: string;
   transferRegions: string;
+  currentLocationCity: string;
+  currentLocationCountry: string;
+  domicile: string;
+  useResidenceForDomicile: boolean;
   weightKg: string;
   willingToChangeClub: boolean;
   city: string;
@@ -193,6 +211,8 @@ export function buildInitialState(
   const coachProfile = data.coachProfile;
   const staffProfile = data.staffProfile;
   const club = data.club;
+  const residence = data.profile.residence ?? data.profile.city ?? "";
+  const domicile = data.profile.domicile ?? "";
 
   return {
     avatarUrl: data.profile.avatar_url ?? "",
@@ -231,16 +251,24 @@ export function buildInitialState(
     clubRegion: club?.region ?? "",
     clubWebsite: club?.website_url ?? "",
     coachAvailabilityType: coachProfile?.availability_type ?? "ITALY",
+    coachAvailableFrom: coachProfile?.available_from ?? "",
     coachPreferredProvinces: toDelimitedString(coachProfile?.preferred_provinces),
+    coachPrimaryRole: coachProfile?.primary_role ?? "",
     coachedCategories: toDelimitedString(coachProfile?.coached_categories),
     coachedClubs: toDelimitedString(coachProfile?.coached_clubs),
+    currentLocationCity:
+      data.profile.current_location_city ?? data.profile.city ?? "",
+    currentLocationCountry: data.profile.current_location_country ?? "",
+    domicile,
     experienceSummary: staffProfile?.experience_summary ?? "",
     fullName: data.profile.full_name,
     gamePhilosophy: coachProfile?.game_philosophy ?? "",
+    gender: data.profile.gender ?? "",
     heightCm: playerProfile?.height_cm ? String(playerProfile.height_cm) : "",
     highlightVideoUrl: playerProfile?.highlight_video_url ?? "",
     availabilityType: playerProfile?.availability_type ?? "ITALY",
     isOpenToTransfer: data.profile.is_open_to_transfer,
+    legalStatus: data.profile.legal_status ?? "",
     languages: toDelimitedString(data.profile.languages),
     licenses: toDelimitedString(coachProfile?.licenses),
     nationality: data.profile.nationality ?? "",
@@ -254,6 +282,8 @@ export function buildInitialState(
     primaryPosition:
       playerProfile?.primary_position ?? DEFAULT_PLAYER_PRIMARY_POSITION,
     region: data.profile.region ?? "",
+    residence,
+    residenceCountry: data.profile.residence_country ?? "",
     showContactEmail: data.userContacts.showEmail,
     showContactFacebook: data.userContacts.showFacebook,
     showContactInstagram: data.userContacts.showInstagram,
@@ -261,6 +291,8 @@ export function buildInitialState(
     showRegionsBadge: playerProfile?.show_regions_badge ?? false,
     secondaryPositions: playerProfile?.secondary_positions ?? [],
     specialization: staffProfile?.specialization ?? "fitness_coach",
+    staffPrimaryRole: staffProfile?.primary_staff_role ?? "",
+    staffRoles: toDelimitedString(staffProfile?.staff_roles),
     staffAvailabilityType: staffProfile?.availability_type ?? "ITALY",
     staffAvailableFrom: staffProfile?.available_from ?? "",
     staffPreferredCategories: toDelimitedString(staffProfile?.preferred_categories),
@@ -268,6 +300,8 @@ export function buildInitialState(
     technicalVideoUrl: coachProfile?.technical_video_url ?? "",
     transferProvinces: toDelimitedString(playerProfile?.transfer_provinces),
     transferRegions: toDelimitedString(playerProfile?.transfer_regions),
+    useResidenceForDomicile:
+      domicile.trim().length === 0 || domicile.trim() === residence.trim(),
     weightKg: playerProfile?.weight_kg ? String(playerProfile.weight_kg) : "",
     willingToChangeClub: playerProfile?.willing_to_change_club ?? false,
     openToTrials: playerProfile?.open_to_trials ?? false,
@@ -287,6 +321,37 @@ export function buildFullUpdatePayload(
   formState: ProfileFormState,
 ): CompleteProfessionalProfileUpdate {
   const parsedCareerEntries = parsePlayerExperienceForms(formState.careerEntries);
+  const nationalityCategory = getNationalityCategory(formState.nationality);
+  const normalizedResidence = parseOptionalText(formState.residence);
+  const normalizedCurrentLocationCity = parseOptionalText(
+    formState.currentLocationCity,
+  );
+  const resolvedCity =
+    parseOptionalText(formState.city) ??
+    (nationalityCategory === "italy"
+      ? normalizedResidence
+      : normalizedCurrentLocationCity);
+  const resolvedDomicile =
+    nationalityCategory === "italy"
+      ? parseOptionalText(
+          formState.useResidenceForDomicile
+            ? formState.residence
+            : formState.domicile,
+        )
+      : null;
+  const resolvedStaffRoles = fromDelimitedString(formState.staffRoles);
+  const resolvedStaffPrimaryRole =
+    parseOptionalText(formState.staffPrimaryRole) ?? resolvedStaffRoles[0] ?? null;
+  const resolvedStaffSpecialization = mapStaffRoleToSpecialization(
+    resolvedStaffPrimaryRole ?? formState.specialization,
+  );
+  const normalizedGender =
+    formState.gender === "male" ||
+    formState.gender === "female" ||
+    formState.gender === "non_binary" ||
+    formState.gender === "prefer_not_to_say"
+      ? formState.gender
+      : null;
 
   return {
     club:
@@ -323,6 +388,9 @@ export function buildFullUpdatePayload(
       data.profile.role === "coach"
         ? {
             availability_type: formState.coachAvailabilityType || null,
+            available_from: formState.openToNewRole
+              ? parseOptionalText(formState.coachAvailableFrom)
+              : null,
             coached_categories: fromDelimitedString(
               formState.coachedCategories,
             ),
@@ -342,6 +410,7 @@ export function buildFullUpdatePayload(
             preferred_regions: fromDelimitedString(
               formState.preferredRegions,
             ),
+            primary_role: parseOptionalText(formState.coachPrimaryRole),
             secondary_formations: data.coachProfile?.secondary_formations ?? [],
             technical_video_url: parseOptionalText(
               formState.technicalVideoUrl,
@@ -396,12 +465,29 @@ export function buildFullUpdatePayload(
       avatar_url: parseOptionalText(formState.avatarUrl),
       bio: parseOptionalText(formState.bio),
       birth_date: null, // Must be set by the calling modal after validation
-      city: parseOptionalText(formState.city),
+      city: resolvedCity,
+      current_location_city:
+        nationalityCategory === "italy" ? null : normalizedCurrentLocationCity,
+      current_location_country:
+        nationalityCategory === "italy"
+          ? null
+          : parseOptionalText(formState.currentLocationCountry),
+      domicile: resolvedDomicile,
       full_name: formState.fullName.trim(),
+      gender: normalizedGender,
       is_open_to_transfer: formState.isOpenToTransfer,
+      legal_status:
+        nationalityCategory === "non_eu"
+          ? parseOptionalText(formState.legalStatus)
+          : null,
       languages: fromDelimitedString(formState.languages),
       nationality: parseOptionalText(formState.nationality),
       region: parseOptionalText(formState.region),
+      residence: nationalityCategory === "italy" ? normalizedResidence : null,
+      residence_country:
+        nationalityCategory === "italy"
+          ? null
+          : parseOptionalText(formState.residenceCountry),
     },
     profileId: data.profile.id,
     role: data.profile.role,
@@ -416,7 +502,7 @@ export function buildFullUpdatePayload(
               formState.experienceSummary,
             ),
             open_to_work: formState.openToWork,
-            primary_staff_role: data.staffProfile?.primary_staff_role ?? null,
+            primary_staff_role: resolvedStaffPrimaryRole,
             preferred_categories: fromDelimitedString(
               formState.staffPreferredCategories,
             ),
@@ -426,8 +512,8 @@ export function buildFullUpdatePayload(
             preferred_regions: fromDelimitedString(
               formState.preferredRegions,
             ),
-            specialization: formState.specialization,
-            staff_roles: data.staffProfile?.staff_roles ?? [],
+            specialization: resolvedStaffSpecialization,
+            staff_roles: resolvedStaffRoles,
           }
         : null,
     userContacts: {
@@ -451,7 +537,7 @@ export function buildHeaderDetails(data: CompleteProfessionalProfile) {
   const age = data.profile.age ?? calculateAge(data.profile.birth_date);
   const fullName = data.profile.full_name + (age ? `, ${age}` : "");
   const primaryMeta = formatLocationSummary(
-    data.profile.city,
+    data.profile.city ?? data.profile.residence ?? data.profile.current_location_city,
     data.profile.region,
   );
 
@@ -583,7 +669,7 @@ export function buildPlayerProfileHeaderDetails(
     .filter(Boolean)
     .join(" · ");
   const locationLabel = formatLocationSummary(
-    data.profile.city,
+    data.profile.city ?? data.profile.residence ?? data.profile.current_location_city,
     data.profile.region,
   );
   const isAvailable =
@@ -651,7 +737,10 @@ export function buildCoachProfileHeaderDetails(
     fullName: formatProfileDisplayName(data.profile.full_name, null),
     licenseBadges: data.coachProfile?.licenses ?? [],
     locationLabel: locationLabel === "Da completare" ? undefined : locationLabel,
-    primaryRole: latestEntry?.role?.trim() || "Allenatore",
+    primaryRole:
+      latestEntry?.role?.trim() ||
+      data.coachProfile?.primary_role?.trim() ||
+      "Allenatore",
     statusBadge: data.coachProfile?.open_to_new_role
       ? "Disponibile per nuove panchine"
       : undefined,
@@ -666,7 +755,10 @@ export function buildAgentProfileHeaderDetails(
     return null;
   }
 
-  const locationLabel = formatLocationSummary(data.profile.city, data.profile.region);
+  const locationLabel = formatLocationSummary(
+    data.profile.city ?? data.profile.residence ?? data.profile.current_location_city,
+    data.profile.region,
+  );
   const federation = data.agentProfile?.federation?.trim();
 
   return {
@@ -699,7 +791,10 @@ export function buildStaffProfileHeaderDetails(
     return null;
   }
 
-  const locationLabel = formatLocationSummary(data.profile.city, data.profile.region);
+  const locationLabel = formatLocationSummary(
+    data.profile.city ?? data.profile.residence ?? data.profile.current_location_city,
+    data.profile.region,
+  );
   const availabilityBadges =
     data.staffProfile?.availability_type === "REGIONS"
       ? data.staffProfile.preferred_regions

@@ -38,15 +38,19 @@ type CreateInitialProfileInput = {
   clubWebsite: string;
   clubYouthCategories: string[];
 
+  currentLocationCity: string;
+  currentLocationCountry: string;
   domicile: string;
   fullName: string;
   gender: ProfileGender;
+  legalStatus: string;
   nationality: string;
   phoneNumber: string;
   primaryPosition: PlayerPosition;
   repEmail: string;
   repPhone: string;
   residence: string;
+  residenceCountry: string;
   role: AppRole;
   staffAvailableFrom: string;
   staffPrimaryRole: string;
@@ -58,11 +62,15 @@ type CreateInitialProfileInput = {
 type ValidatedBaseProfileStep = {
   avatarUrl: string | null;
   birthDate: string;
+  currentLocationCity: string | null;
+  currentLocationCountry: string | null;
   domicile: string | null;
   fullName: string;
+  legalStatus: string | null;
   nationality: string | null;
   phoneNumber: string | null;
   residence: string | null;
+  residenceCountry: string | null;
 };
 
 export class BaseProfileValidationError extends Error {
@@ -94,11 +102,15 @@ function parseOptionalInteger(value: string): number | null {
 export function validateBaseProfileStep(input: CreateInitialProfileInput): ValidatedBaseProfileStep {
   const avatarUrl = parseOptionalText(input.avatarUrl);
   const birthDate = input.birthDate.trim();
+  const currentLocationCity = parseOptionalText(input.currentLocationCity);
+  const currentLocationCountry = parseOptionalText(input.currentLocationCountry);
   const domicile = parseOptionalText(input.domicile);
   const fullName = input.fullName.trim();
+  const legalStatus = parseOptionalText(input.legalStatus);
   const nationality = parseOptionalText(input.nationality);
   const phoneNumber = parseOptionalText(normalizePhoneInput(input.phoneNumber));
   const residence = parseOptionalText(input.residence);
+  const residenceCountry = parseOptionalText(input.residenceCountry);
 
   if (!fullName) {
     throw new BaseProfileValidationError("Inserisci nome e cognome prima di continuare.", [
@@ -136,29 +148,49 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
   return {
     avatarUrl,
     birthDate,
+    currentLocationCity,
+    currentLocationCountry,
     domicile,
     fullName,
+    legalStatus,
     nationality,
     phoneNumber,
     residence,
+    residenceCountry,
   };
 }
 
 export async function createInitialProfile(input: CreateInitialProfileInput) {
-  const { avatarUrl, birthDate, domicile, fullName, nationality, phoneNumber, residence } =
+  const {
+    avatarUrl,
+    birthDate,
+    currentLocationCity,
+    currentLocationCountry,
+    domicile,
+    fullName,
+    legalStatus,
+    nationality,
+    phoneNumber,
+    residence,
+    residenceCountry,
+  } =
     validateBaseProfileStep(input);
 
   const { error: profileError } = await supabase.from("profiles").upsert({
     avatar_url: avatarUrl,
     birth_date: birthDate || null,
+    current_location_city: currentLocationCity,
+    current_location_country: currentLocationCountry,
     domicile,
     id: input.userId,
     gender: input.gender || null,
+    legal_status: legalStatus,
     role: input.role,
     full_name: fullName,
     nationality,
     phone_number: null,
     residence,
+    residence_country: residenceCountry,
   });
 
   if (profileError) {
