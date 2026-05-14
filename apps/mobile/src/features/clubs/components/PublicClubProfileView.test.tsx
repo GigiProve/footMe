@@ -1,6 +1,6 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   ClubHeaderStats,
@@ -8,7 +8,41 @@ import type {
   PublicClubProfile,
   PublicClubSquadraOverview,
 } from "../club-service";
+import type { ClubMediaPost } from "../club-media-service";
 import type { ClubTeam } from "../team-service";
+
+const mediaMocks = vi.hoisted(() => ({
+  addClubMediaComment: vi.fn(),
+  createClubMediaPost: vi.fn(),
+  fetchClubMediaFeed: vi.fn(),
+  fetchClubMediaPostDetail: vi.fn(),
+  toggleClubMediaLike: vi.fn(),
+  toggleSavedClubMedia: vi.fn(),
+}));
+
+vi.mock("../../../components/ui/video-player-modal", () => ({
+  VideoPlayerModal: (props: Record<string, unknown>) =>
+    React.createElement("mock-video-player-modal", props),
+}));
+
+vi.mock("../club-media-service", () => ({
+  addClubMediaComment: mediaMocks.addClubMediaComment,
+  createClubMediaPost: mediaMocks.createClubMediaPost,
+  fetchClubMediaFeed: mediaMocks.fetchClubMediaFeed,
+  fetchClubMediaPostDetail: mediaMocks.fetchClubMediaPostDetail,
+  toggleClubMediaLike: mediaMocks.toggleClubMediaLike,
+  toggleSavedClubMedia: mediaMocks.toggleSavedClubMedia,
+}));
+
+vi.mock("../../profiles/profile-service", () => ({
+  searchAgentPlayerCandidates: vi.fn(async () => []),
+}));
+
+vi.mock("../../profiles/media-upload-service", () => ({
+  pickAndUploadMedia: vi.fn(async () => []),
+  ProfileMediaUploadError: class ProfileMediaUploadError extends Error {},
+}));
+
 import { PublicClubProfileView } from "./PublicClubProfileView";
 
 function render(element: React.ReactElement) {
@@ -16,6 +50,20 @@ function render(element: React.ReactElement) {
 
   act(() => {
     tree = TestRenderer.create(element);
+  });
+
+  return tree;
+}
+
+async function renderAsync(element: React.ReactElement) {
+  let tree!: TestRenderer.ReactTestRenderer;
+
+  await act(async () => {
+    tree = TestRenderer.create(element);
+  });
+
+  await act(async () => {
+    await Promise.resolve();
   });
 
   return tree;
@@ -291,6 +339,144 @@ const rosterMembers: PublicClubMember[] = [
   },
 ];
 
+const mediaPosts: ClubMediaPost[] = [
+  {
+    attachment_label: null,
+    body: "Le migliori azioni della partita e i momenti decisivi.",
+    club_id: "club-1",
+    comment_count: 1,
+    comments: [],
+    created_at: "2026-05-14T08:00:00Z",
+    created_by_profile_id: "owner-1",
+    event_date: null,
+    excerpt: "Le migliori azioni della partita",
+    external_url: null,
+    id: "media-highlights",
+    interviewee_name: null,
+    is_liked: false,
+    is_saved: false,
+    kind: "highlights",
+    like_count: 4,
+    player_birth_year: null,
+    player_name: null,
+    player_previous_club: null,
+    player_role: null,
+    published_at: "2026-05-14T08:00:00Z",
+    saved_count: 0,
+    status: "published",
+    tagged_profiles: [],
+    thumbnail_url: "https://cdn.test/highlights.jpg",
+    title: "AC Como 2-1 Lecco",
+    updated_at: "2026-05-14T08:00:00Z",
+    video_duration_seconds: 154,
+    visual_type: "video",
+    visual_url: "https://cdn.test/highlights.mp4",
+  },
+  {
+    attachment_label: null,
+    body: "Il tecnico commenta prestazione e obiettivi.",
+    club_id: "club-1",
+    comment_count: 0,
+    comments: [],
+    created_at: "2026-05-13T08:00:00Z",
+    created_by_profile_id: "owner-1",
+    event_date: null,
+    excerpt: "Le parole del mister dopo la gara",
+    external_url: null,
+    id: "media-interview",
+    interviewee_name: "Giovanni Riva",
+    is_liked: false,
+    is_saved: false,
+    kind: "interview",
+    like_count: 1,
+    player_birth_year: null,
+    player_name: null,
+    player_previous_club: null,
+    player_role: null,
+    published_at: "2026-05-13T08:00:00Z",
+    saved_count: 0,
+    status: "published",
+    tagged_profiles: [],
+    thumbnail_url: "https://cdn.test/interview.jpg",
+    title: "Le parole del mister",
+    updated_at: "2026-05-13T08:00:00Z",
+    video_duration_seconds: 72,
+    visual_type: "video",
+    visual_url: "https://cdn.test/interview.mp4",
+  },
+  {
+    attachment_label: null,
+    body: "La societa' da' il benvenuto a Marco Rossi.",
+    club_id: "club-1",
+    comment_count: 0,
+    comments: [],
+    created_at: "2026-05-12T08:00:00Z",
+    created_by_profile_id: "owner-1",
+    event_date: null,
+    excerpt: "Benvenuto Marco Rossi",
+    external_url: null,
+    id: "media-market",
+    interviewee_name: null,
+    is_liked: true,
+    is_saved: false,
+    kind: "market",
+    like_count: 8,
+    player_birth_year: 2006,
+    player_name: "Marco Rossi",
+    player_previous_club: "Lecco Academy",
+    player_role: "Attaccante",
+    published_at: "2026-05-12T08:00:00Z",
+    saved_count: 0,
+    status: "published",
+    tagged_profiles: [
+      {
+        avatar_url: null,
+        display_name: "Marco Rossi",
+        profile_id: "profile-player-2",
+        role: "player",
+      },
+    ],
+    thumbnail_url: "https://cdn.test/market.jpg",
+    title: "Marco Rossi e' un nuovo giocatore",
+    updated_at: "2026-05-12T08:00:00Z",
+    video_duration_seconds: null,
+    visual_type: "image",
+    visual_url: "https://cdn.test/market.jpg",
+  },
+  {
+    attachment_label: "Calendario aggiornato.pdf",
+    body: "La societa' comunica una variazione degli orari.",
+    club_id: "club-1",
+    comment_count: 0,
+    comments: [],
+    created_at: "2026-05-11T08:00:00Z",
+    created_by_profile_id: "owner-1",
+    event_date: null,
+    excerpt: "Aggiornamento calendario allenamenti",
+    external_url: "https://club.test/calendario",
+    id: "media-statement",
+    interviewee_name: null,
+    is_liked: false,
+    is_saved: true,
+    kind: "statement",
+    like_count: 0,
+    player_birth_year: null,
+    player_name: null,
+    player_previous_club: null,
+    player_role: null,
+    published_at: "2026-05-11T08:00:00Z",
+    saved_count: 2,
+    status: "published",
+    tagged_profiles: [],
+    thumbnail_url: null,
+    title: "Aggiornamento calendario allenamenti",
+    updated_at: "2026-05-11T08:00:00Z",
+    video_duration_seconds: null,
+    visual_type: null,
+    visual_url: null,
+  },
+];
+
 function createProps(overrides: Partial<React.ComponentProps<typeof PublicClubProfileView>> = {}) {
   return {
     activeTab: "team" as const,
@@ -314,6 +500,17 @@ function createProps(overrides: Partial<React.ComponentProps<typeof PublicClubPr
 }
 
 describe("PublicClubProfileView", () => {
+  beforeEach(() => {
+    mediaMocks.fetchClubMediaFeed.mockReset();
+    mediaMocks.fetchClubMediaPostDetail.mockReset();
+    mediaMocks.createClubMediaPost.mockReset();
+    mediaMocks.addClubMediaComment.mockReset();
+    mediaMocks.toggleClubMediaLike.mockReset();
+    mediaMocks.toggleSavedClubMedia.mockReset();
+    mediaMocks.fetchClubMediaFeed.mockResolvedValue([]);
+    mediaMocks.fetchClubMediaPostDetail.mockResolvedValue(null);
+  });
+
   it("renders the Squadra tab sections in the required order", () => {
     const tree = render(<PublicClubProfileView {...createProps()} />);
     const sectionIds = Array.from(
@@ -494,5 +691,150 @@ describe("PublicClubProfileView", () => {
         )
         .some((node) => typeof node.props.onPress === "function"),
     ).toBe(false);
+  });
+
+  it("renders the Media tab filters, compact rows and owner publish entry", async () => {
+    mediaMocks.fetchClubMediaFeed.mockResolvedValue(mediaPosts);
+    const tree = await renderAsync(
+      <PublicClubProfileView
+        {...createProps({
+          activeTab: "media",
+          isOwner: true,
+          viewerProfileId: "owner-1",
+        })}
+      />,
+    );
+
+    for (const filter of [
+      "all",
+      "highlights",
+      "interview",
+      "market",
+      "statement",
+      "training",
+      "event",
+    ]) {
+      expect(tree.root.findByProps({ testID: `club-media-filter-${filter}` }))
+        .toBeTruthy();
+    }
+
+    expect(hasText(tree.root, "Under 19")).toBe(false);
+    expect(tree.root.findByProps({ testID: "club-media-publish-button" }))
+      .toBeTruthy();
+    expect(tree.root.findByProps({ testID: "club-media-row-media-highlights" }))
+      .toBeTruthy();
+    expect(tree.root.findByProps({ testID: "club-media-row-thumbnail-media-highlights" }))
+      .toBeTruthy();
+    expect(hasText(tree.root, "Marco Rossi e' un nuovo giocatore")).toBe(true);
+  });
+
+  it("filters Media rows by content type only", async () => {
+    mediaMocks.fetchClubMediaFeed.mockResolvedValue(mediaPosts);
+    const tree = await renderAsync(
+      <PublicClubProfileView {...createProps({ activeTab: "media" })} />,
+    );
+
+    act(() => {
+      tree.root.findByProps({ testID: "club-media-filter-market" }).props.onPress();
+    });
+
+    expect(tree.root.findByProps({ testID: "club-media-row-media-market" }))
+      .toBeTruthy();
+    expect(() =>
+      tree.root.findByProps({ testID: "club-media-row-media-highlights" }),
+    ).toThrow();
+    expect(() =>
+      tree.root.findByProps({ testID: "club-media-row-media-statement" }),
+    ).toThrow();
+  });
+
+  it("hides the publish action for visitors", async () => {
+    mediaMocks.fetchClubMediaFeed.mockResolvedValue(mediaPosts);
+    const tree = await renderAsync(
+      <PublicClubProfileView
+        {...createProps({
+          activeTab: "media",
+          isOwner: false,
+          viewerProfileId: "visitor-1",
+        })}
+      />,
+    );
+
+    expect(
+      tree.root.findAllByProps({ testID: "club-media-publish-button" }),
+    ).toHaveLength(0);
+  });
+
+  it("opens the owner create menu with all publishable media types", async () => {
+    mediaMocks.fetchClubMediaFeed.mockResolvedValue(mediaPosts);
+    const tree = await renderAsync(
+      <PublicClubProfileView
+        {...createProps({
+          activeTab: "media",
+          isOwner: true,
+          viewerProfileId: "owner-1",
+        })}
+      />,
+    );
+
+    act(() => {
+      tree.root.findByProps({ testID: "club-media-publish-button" }).props.onPress();
+    });
+
+    expect(tree.root.findByProps({ testID: "club-media-create-menu" }))
+      .toBeTruthy();
+    for (const kind of [
+      "highlights",
+      "interview",
+      "market",
+      "statement",
+      "training",
+      "event",
+    ]) {
+      expect(tree.root.findByProps({ testID: `club-media-create-option-${kind}` }))
+        .toBeTruthy();
+    }
+    expect(hasText(tree.root, "Carica video partita o azioni")).toBe(true);
+    expect(hasText(tree.root, "Annuncia un nuovo giocatore")).toBe(true);
+  });
+
+  it("opens adaptive detail layouts for highlights, interview, market and statement", async () => {
+    mediaMocks.fetchClubMediaFeed.mockResolvedValue(mediaPosts);
+    mediaMocks.fetchClubMediaPostDetail.mockImplementation(async (postId: string) =>
+      mediaPosts.find((post) => post.id === postId) ?? null,
+    );
+    const tree = await renderAsync(
+      <PublicClubProfileView
+        {...createProps({
+          activeTab: "media",
+          viewerProfileId: "visitor-1",
+        })}
+      />,
+    );
+
+    for (const [rowId, detailId, expectedText] of [
+      ["media-highlights", "highlights", "Mi piace 4"],
+      ["media-interview", "interview", "Intervistato"],
+      ["media-market", "market", "Profilo giocatore taggato"],
+      ["media-statement", "statement", "Calendario aggiornato.pdf"],
+    ]) {
+      await act(async () => {
+        tree.root.findByProps({ testID: `club-media-row-${rowId}` }).props.onPress();
+      });
+
+      expect(tree.root.findByProps({ testID: `club-media-detail-${detailId}` }))
+        .toBeTruthy();
+      expect(hasText(tree.root, expectedText)).toBe(true);
+
+      act(() => {
+        tree.root
+          .findAll(
+            (node) =>
+              node.props.accessibilityLabel === "Chiudi contenuto media" &&
+              typeof node.props.onPress === "function",
+          )[0]
+          .props.onPress();
+      });
+    }
   });
 });

@@ -20,6 +20,7 @@ import {
   PublicClubHeader,
   type ClubHeaderTab,
 } from "./PublicClubHeader";
+import { ClubMediaTabContent } from "./ClubMediaTabContent";
 
 type PublicClubProfileViewProps = {
   activeTab: ClubHeaderTab;
@@ -43,6 +44,7 @@ type PublicClubProfileViewProps = {
   stats: ClubHeaderStats;
   teamProfiles?: Record<string, ClubTeamProfileDetails>;
   teams: ClubTeam[];
+  viewerProfileId?: string | null;
 };
 
 const roleLabels: Record<string, string> = {
@@ -113,6 +115,7 @@ export function PublicClubProfileView({
   stats,
   teamProfiles = {},
   teams,
+  viewerProfileId = null,
 }: PublicClubProfileViewProps) {
   const affiliationLabel = overview.parentAffiliation
     ? `Società affiliata ad ${overview.parentAffiliation.name}`
@@ -158,7 +161,12 @@ export function PublicClubProfileView({
           teams={teams}
         />
       ) : (
-        <ClubMediaTab club={club} />
+        <ClubMediaTabContent
+          club={club}
+          isOwner={isOwner}
+          onOpenProfile={onOpenProfile}
+          viewerProfileId={viewerProfileId}
+        />
       )}
     </View>
   );
@@ -1271,28 +1279,6 @@ function formatPlayersCount(count: number) {
 
 function slugTestId(value: string) {
   return value.toLowerCase().replace(/\s+/g, "-");
-}
-
-function ClubMediaTab({ club }: { club: PublicClubProfile }) {
-  return (
-    <View style={styles.tabContent}>
-      <Section sectionId="media" title="Media">
-        {club.gallery_urls.length === 0 ? (
-          <EmptyState
-            description="La società non ha ancora pubblicato contenuti media."
-            icon="images-outline"
-            title="Media da completare"
-          />
-        ) : (
-          <View style={styles.mediaGrid}>
-            {club.gallery_urls.slice(0, 6).map((url) => (
-              <Image key={url} source={{ uri: url }} style={styles.mediaItem} />
-            ))}
-          </View>
-        )}
-      </Section>
-    </View>
-  );
 }
 
 function CompactEmpty({

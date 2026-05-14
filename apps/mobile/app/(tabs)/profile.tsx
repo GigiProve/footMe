@@ -494,6 +494,7 @@ export default function ProfileScreen() {
             stats={clubHeaderStats}
             teamProfiles={clubTeamProfiles}
             teams={clubTeams}
+            viewerProfileId={userId}
           />
         ) : completeProfile && role === "player" && playerHeaderDetails ? (
           <PlayerProfileHeader

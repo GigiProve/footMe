@@ -294,6 +294,7 @@ export default function ClubProfileScreen() {
             stats={stats}
             teamProfiles={teamProfiles}
             teams={teams}
+            viewerProfileId={profile?.id ?? null}
           />
         </View>
       </KeyboardAwareScrollView>
