@@ -33,6 +33,19 @@ function hasText(root: TestRenderer.ReactTestInstance, value: string) {
   }).length > 0;
 }
 
+function findPressableByTestId(root: TestRenderer.ReactTestInstance, testID: string) {
+  const node = root.findAll(
+    (entry) =>
+      entry.props.testID === testID && typeof entry.props.onPress === "function",
+  )[0];
+
+  if (!node) {
+    throw new Error(`Pressable not found for ${testID}`);
+  }
+
+  return node;
+}
+
 const club: PublicClubProfile = {
   category: "Serie D",
   city: "Como",
@@ -93,6 +106,25 @@ const teams: ClubTeam[] = [
     team_type: "youth",
   },
 ];
+
+const teamProfiles = {
+  "team-1": {
+    competition_name: "Serie D Girone B",
+    group_name: "B",
+    media_urls: [],
+    promoted_players_count: 0,
+    recent_results: [],
+    team_id: "team-1",
+  },
+  "team-2": {
+    competition_name: "Under 17 Elite",
+    group_name: "A",
+    media_urls: [],
+    promoted_players_count: 0,
+    recent_results: [],
+    team_id: "team-2",
+  },
+};
 
 const overview: PublicClubSquadraOverview = {
   affiliations: [
@@ -172,6 +204,93 @@ const overview: PublicClubSquadraOverview = {
 
 const members: PublicClubMember[] = [];
 
+const rosterMembers: PublicClubMember[] = [
+  {
+    avatar_url: null,
+    birth_date: "2006-01-10",
+    contract_status: null,
+    current_condition: null,
+    full_name: "Luca Portieri",
+    id: "member-player-1",
+    manual_name: null,
+    member_role: "player",
+    primary_position: "goalkeeper",
+    profile_id: "profile-player-1",
+    staff_title: null,
+    team_id: "team-1",
+  },
+  {
+    avatar_url: null,
+    birth_date: "2007-04-12",
+    contract_status: "free_agent",
+    current_condition: null,
+    full_name: "Marco Attaccante",
+    id: "member-player-2",
+    manual_name: null,
+    member_role: "player",
+    primary_position: "striker",
+    profile_id: "profile-player-2",
+    staff_title: null,
+    team_id: "team-2",
+  },
+  {
+    avatar_url: null,
+    birth_date: "2007-09-22",
+    contract_status: null,
+    current_condition: null,
+    full_name: "Paolo Regista",
+    id: "member-player-3",
+    manual_name: null,
+    member_role: "player",
+    primary_position: "central_midfielder",
+    profile_id: "profile-player-3",
+    staff_title: null,
+    team_id: "team-2",
+  },
+  {
+    avatar_url: null,
+    birth_date: null,
+    contract_status: null,
+    current_condition: null,
+    full_name: "Giovanni Riva",
+    id: "member-coach-1",
+    manual_name: null,
+    member_role: "coach",
+    primary_position: null,
+    profile_id: "profile-coach-1",
+    staff_title: "Allenatore",
+    team_id: "team-1",
+  },
+  {
+    avatar_url: null,
+    birth_date: null,
+    contract_status: null,
+    current_condition: null,
+    full_name: "Marco Bianchi",
+    id: "member-director-1",
+    manual_name: null,
+    member_role: "director",
+    primary_position: null,
+    profile_id: "profile-director-1",
+    staff_title: "Direttore sportivo",
+    team_id: null,
+  },
+  {
+    avatar_url: null,
+    birth_date: null,
+    contract_status: null,
+    current_condition: null,
+    full_name: null,
+    id: "member-operation-1",
+    manual_name: "Sara Costa",
+    member_role: "staff",
+    primary_position: null,
+    profile_id: null,
+    staff_title: "Segreteria sportiva",
+    team_id: null,
+  },
+];
+
 function createProps(overrides: Partial<React.ComponentProps<typeof PublicClubProfileView>> = {}) {
   return {
     activeTab: "team" as const,
@@ -182,11 +301,13 @@ function createProps(overrides: Partial<React.ComponentProps<typeof PublicClubPr
     onContactPress: vi.fn(),
     onOpenAffiliate: vi.fn(),
     onOpenPositions: vi.fn(),
+    onOpenProfile: vi.fn(),
     onOpenTeam: vi.fn(),
     onTabChange: vi.fn(),
     onToggleFollow: vi.fn(),
     overview,
     stats,
+    teamProfiles,
     teams,
     ...overrides,
   };
@@ -262,5 +383,116 @@ describe("PublicClubProfileView", () => {
     expect(onOpenTeam).toHaveBeenCalledWith("team-1");
     expect(onOpenAffiliate).toHaveBeenCalledWith("affiliate-1");
     expect(onOpenPositions).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows Rose by default and updates team and role filters in place", () => {
+    const onOpenProfile = vi.fn();
+    const onOpenTeam = vi.fn();
+    const tree = render(
+      <PublicClubProfileView
+        {...createProps({
+          activeTab: "roster",
+          members: rosterMembers,
+          onOpenProfile,
+          onOpenTeam,
+        })}
+      />,
+    );
+
+    expect(hasText(tree.root, "Rose")).toBe(true);
+    expect(hasText(tree.root, "Vedi rosa")).toBe(false);
+    expect(tree.root.findByProps({ testID: "club-roster-player-row-member-player-1" }))
+      .toBeTruthy();
+
+    act(() => {
+      tree.root
+        .findByProps({ testID: "club-roster-team-chip-team-2" })
+        .props.onPress();
+    });
+
+    expect(onOpenTeam).not.toHaveBeenCalled();
+    expect(tree.root.findByProps({ testID: "club-roster-player-row-member-player-2" }))
+      .toBeTruthy();
+    expect(tree.root.findByProps({ testID: "club-roster-player-row-member-player-3" }))
+      .toBeTruthy();
+    expect(() =>
+      tree.root.findByProps({ testID: "club-roster-player-row-member-player-1" }),
+    ).toThrow();
+
+    act(() => {
+      tree.root
+        .findByProps({ testID: "club-roster-role-filter-forwards" })
+        .props.onPress();
+    });
+
+    expect(tree.root.findByProps({ testID: "club-roster-player-row-member-player-2" }))
+      .toBeTruthy();
+    expect(() =>
+      tree.root.findByProps({ testID: "club-roster-player-row-member-player-3" }),
+    ).toThrow();
+
+    act(() => {
+      findPressableByTestId(
+        tree.root,
+        "club-roster-player-row-member-player-2",
+      ).props.onPress();
+    });
+
+    expect(onOpenProfile).toHaveBeenCalledWith("profile-player-2");
+  });
+
+  it("navigates internal Organico sections and only links connected people", () => {
+    const onOpenProfile = vi.fn();
+    const tree = render(
+      <PublicClubProfileView
+        {...createProps({
+          activeTab: "roster",
+          members: rosterMembers,
+          onOpenProfile,
+        })}
+      />,
+    );
+
+    for (const section of ["rosters", "staff", "directors", "operations"]) {
+      expect(
+        tree.root.findByProps({ testID: `club-roster-section-tab-${section}` }),
+      ).toBeTruthy();
+    }
+
+    act(() => {
+      tree.root
+        .findByProps({ testID: "club-roster-section-tab-staff" })
+        .props.onPress();
+    });
+    expect(hasText(tree.root, "Staff tecnico")).toBe(true);
+    act(() => {
+      findPressableByTestId(
+        tree.root,
+        "club-roster-person-row-member-coach-1",
+      ).props.onPress();
+    });
+    expect(onOpenProfile).toHaveBeenCalledWith("profile-coach-1");
+
+    act(() => {
+      tree.root
+        .findByProps({ testID: "club-roster-section-tab-directors" })
+        .props.onPress();
+    });
+    expect(hasText(tree.root, "Direzione sportiva")).toBe(true);
+
+    act(() => {
+      tree.root
+        .findByProps({ testID: "club-roster-section-tab-operations" })
+        .props.onPress();
+    });
+    expect(hasText(tree.root, "Segreteria sportiva")).toBe(true);
+    expect(
+      tree.root
+        .findAll(
+          (node) =>
+            node.props.testID === "club-roster-person-row-member-operation-1",
+        )
+        .some((node) => typeof node.props.onPress === "function"),
+    ).toBe(false);
   });
 });

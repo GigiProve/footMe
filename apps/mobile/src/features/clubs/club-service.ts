@@ -1,4 +1,8 @@
 import { supabase } from "../../lib/supabase";
+import {
+  isPlayerPosition,
+  type PlayerPosition,
+} from "../profiles/player-sports";
 import type { ClubTeam } from "./team-service";
 
 export type PublicClubProfile = {
@@ -70,10 +74,14 @@ export type ClubParentAffiliation = {
 
 export type PublicClubMember = {
   avatar_url: string | null;
+  birth_date: string | null;
+  contract_status: string | null;
+  current_condition: string | null;
   full_name: string | null;
   id: string;
   manual_name: string | null;
   member_role: string;
+  primary_position: PlayerPosition | null;
   profile_id: string | null;
   staff_title: string | null;
   team_id: string | null;
@@ -457,17 +465,31 @@ export async function fetchPublicClubRoster(
   const profileIds = rows
     .map((row) => row.profile_id)
     .filter((id): id is string => Boolean(id));
-  const profilesById = await loadProfilesById(profileIds);
+  const playerProfileIds = rows
+    .filter((row) => row.member_role === "player")
+    .map((row) => row.profile_id)
+    .filter((id): id is string => Boolean(id));
+  const [profilesById, playerProfilesById] = await Promise.all([
+    loadProfilesById(profileIds),
+    loadPlayerProfilesById(playerProfileIds),
+  ]);
 
   return rows.map((row) => {
     const profile = row.profile_id ? profilesById.get(row.profile_id) : null;
+    const playerProfile = row.profile_id
+      ? playerProfilesById.get(row.profile_id)
+      : null;
 
     return {
       avatar_url: profile?.avatar_url ?? null,
+      birth_date: profile?.birth_date ?? null,
+      contract_status: playerProfile?.contract_status ?? null,
+      current_condition: playerProfile?.current_condition ?? null,
       full_name: profile?.full_name ?? null,
       id: row.id,
       manual_name: row.manual_name ?? null,
       member_role: row.member_role,
+      primary_position: playerProfile?.primary_position ?? null,
       profile_id: row.profile_id ?? null,
       staff_title: row.staff_title ?? null,
       team_id: row.team_id ?? null,
@@ -800,7 +822,11 @@ async function loadProfilesById(profileIds: string[]) {
   const uniqueProfileIds = Array.from(new Set(profileIds));
   const profilesById = new Map<
     string,
-    { avatar_url: string | null; full_name: string | null }
+    {
+      avatar_url: string | null;
+      birth_date: string | null;
+      full_name: string | null;
+    }
   >();
 
   if (uniqueProfileIds.length === 0) {
@@ -809,7 +835,7 @@ async function loadProfilesById(profileIds: string[]) {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, avatar_url")
+    .select("id, full_name, avatar_url, birth_date")
     .in("id", uniqueProfileIds);
 
   if (error) {
@@ -818,12 +844,56 @@ async function loadProfilesById(profileIds: string[]) {
 
   for (const profile of (data ?? []) as {
     avatar_url: string | null;
+    birth_date: string | null;
     full_name: string | null;
     id: string;
   }[]) {
     profilesById.set(profile.id, {
       avatar_url: profile.avatar_url ?? null,
+      birth_date: profile.birth_date ?? null,
       full_name: profile.full_name ?? null,
+    });
+  }
+
+  return profilesById;
+}
+
+async function loadPlayerProfilesById(profileIds: string[]) {
+  const uniqueProfileIds = Array.from(new Set(profileIds));
+  const profilesById = new Map<
+    string,
+    {
+      contract_status: string | null;
+      current_condition: string | null;
+      primary_position: PlayerPosition | null;
+    }
+  >();
+
+  if (uniqueProfileIds.length === 0) {
+    return profilesById;
+  }
+
+  const { data, error } = await supabase
+    .from("player_profiles")
+    .select("profile_id, primary_position, contract_status, current_condition")
+    .in("profile_id", uniqueProfileIds);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const profile of (data ?? []) as {
+    contract_status: string | null;
+    current_condition: string | null;
+    primary_position: string | null;
+    profile_id: string;
+  }[]) {
+    profilesById.set(profile.profile_id, {
+      contract_status: profile.contract_status ?? null,
+      current_condition: profile.current_condition ?? null,
+      primary_position: isPlayerPosition(profile.primary_position)
+        ? profile.primary_position
+        : null,
     });
   }
 

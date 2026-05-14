@@ -23,7 +23,12 @@ import {
   PublicClubProfileView,
 } from "../../src/features/clubs/components/PublicClubProfileView";
 import type { ClubHeaderTab } from "../../src/features/clubs/components/PublicClubHeader";
-import { fetchClubTeams, type ClubTeam } from "../../src/features/clubs/team-service";
+import {
+  fetchClubTeamProfiles,
+  fetchClubTeams,
+  type ClubTeam,
+  type ClubTeamProfileDetails,
+} from "../../src/features/clubs/team-service";
 import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
 import { EditAgentProfileModal } from "../../src/features/profiles/edit-modals/EditAgentProfileModal";
@@ -108,6 +113,9 @@ export default function ProfileScreen() {
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
   const [clubTeams, setClubTeams] = useState<ClubTeam[]>([]);
+  const [clubTeamProfiles, setClubTeamProfiles] = useState<
+    Record<string, ClubTeamProfileDetails>
+  >({});
   const [clubHeaderStats, setClubHeaderStats] =
     useState<ClubHeaderStats>(emptyClubHeaderStats);
   const [clubOverview, setClubOverview] =
@@ -141,19 +149,25 @@ export default function ProfileScreen() {
           ),
           fetchPublicClubRoster(data.club.id).catch(() => []),
         ]);
+        const teamProfiles = await fetchClubTeamProfiles(
+          teams.map((team) => team.id),
+        ).catch(() => ({}));
 
         setClubTeams(teams);
+        setClubTeamProfiles(teamProfiles);
         setClubHeaderStats(stats);
         setClubOverview(overview);
         setClubMembers(members);
       } else {
         setClubTeams([]);
+        setClubTeamProfiles({});
         setClubHeaderStats(emptyClubHeaderStats);
         setClubOverview(emptyClubOverview);
         setClubMembers([]);
       }
     } catch (error) {
       setClubTeams([]);
+      setClubTeamProfiles({});
       setClubHeaderStats(emptyClubHeaderStats);
       setClubOverview(emptyClubOverview);
       setClubMembers([]);
@@ -291,6 +305,10 @@ export default function ProfileScreen() {
 
   function handleOpenAffiliateClub(clubId: string) {
     router.push(`/club/${clubId}` as never);
+  }
+
+  function handleOpenProfile(profileId: string) {
+    router.push(`/profile/${profileId}` as never);
   }
 
   async function handleDeleteExperience(group: GroupedExperience) {
@@ -468,11 +486,13 @@ export default function ProfileScreen() {
             onEditTeams={() => handleEdit("clubTeams")}
             onOpenAffiliate={handleOpenAffiliateClub}
             onOpenPositions={handleOpenClubPositions}
+            onOpenProfile={handleOpenProfile}
             onOpenTeam={handleOpenClubTeam}
             onTabChange={setActiveClubTab}
             onToggleFollow={() => handleEdit("clubInfo")}
             overview={clubOverview}
             stats={clubHeaderStats}
+            teamProfiles={clubTeamProfiles}
             teams={clubTeams}
           />
         ) : completeProfile && role === "player" && playerHeaderDetails ? (

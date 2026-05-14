@@ -32,7 +32,12 @@ import {
   PublicClubProfileView,
 } from "../../src/features/clubs/components/PublicClubProfileView";
 import type { ClubHeaderTab } from "../../src/features/clubs/components/PublicClubHeader";
-import { fetchClubTeams, type ClubTeam } from "../../src/features/clubs/team-service";
+import {
+  fetchClubTeamProfiles,
+  fetchClubTeams,
+  type ClubTeam,
+  type ClubTeamProfileDetails,
+} from "../../src/features/clubs/team-service";
 import { colors, spacing } from "../../src/theme/tokens";
 import { AppText, Button } from "../../src/ui";
 
@@ -57,6 +62,9 @@ export default function ClubProfileScreen() {
 
   const [club, setClub] = useState<PublicClubProfile | null>(null);
   const [teams, setTeams] = useState<ClubTeam[]>([]);
+  const [teamProfiles, setTeamProfiles] = useState<
+    Record<string, ClubTeamProfileDetails>
+  >({});
   const [stats, setStats] = useState<ClubHeaderStats>(emptyHeaderStats);
   const [overview, setOverview] =
     useState<PublicClubSquadraOverview>(emptyOverview);
@@ -93,9 +101,13 @@ export default function ClubProfileScreen() {
         fetchPublicClubSquadraOverview(id).catch(() => emptyOverview),
         fetchPublicClubRoster(id).catch(() => []),
       ]);
+      const teamProfilesData = await fetchClubTeamProfiles(
+        teamsData.map((team) => team.id),
+      ).catch(() => ({}));
 
       setClub(clubData);
       setTeams(teamsData);
+      setTeamProfiles(teamProfilesData);
       setStats(statsData);
       setIsFollowed(followState);
       setOverview(overviewData);
@@ -104,6 +116,7 @@ export default function ClubProfileScreen() {
       Alert.alert("Errore", "Impossibile caricare il profilo società.");
       setClub(null);
       setTeams([]);
+      setTeamProfiles({});
       setStats(emptyHeaderStats);
       setOverview(emptyOverview);
       setMembers([]);
@@ -211,6 +224,10 @@ export default function ClubProfileScreen() {
     router.push(`/club/${affiliateClubId}` as never);
   }
 
+  function handleOpenProfile(profileId: string) {
+    router.push(`/profile/${profileId}` as never);
+  }
+
   if (isLoading) {
     return (
       <Screen>
@@ -269,11 +286,13 @@ export default function ClubProfileScreen() {
             onContactPress={handleContactPress}
             onOpenAffiliate={handleOpenAffiliate}
             onOpenPositions={handleOpenPositions}
+            onOpenProfile={handleOpenProfile}
             onOpenTeam={handleOpenTeam}
             onTabChange={setActiveTab}
             onToggleFollow={handleToggleFollow}
             overview={overview}
             stats={stats}
+            teamProfiles={teamProfiles}
             teams={teams}
           />
         </View>

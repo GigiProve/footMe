@@ -490,8 +490,20 @@ describe("club-service", () => {
         data: [
           {
             avatar_url: "https://cdn.test/avatar.jpg",
+            birth_date: "2006-03-15",
             full_name: "Luca Bianchi",
             id: "profile-1",
+          },
+        ],
+        error: null,
+      },
+      {
+        data: [
+          {
+            contract_status: "free_agent",
+            current_condition: "Disponibile",
+            primary_position: "striker",
+            profile_id: "profile-1",
           },
         ],
         error: null,
@@ -503,24 +515,40 @@ describe("club-service", () => {
     expect(roster).toEqual([
       expect.objectContaining({
         avatar_url: "https://cdn.test/avatar.jpg",
+        birth_date: "2006-03-15",
+        contract_status: "free_agent",
+        current_condition: "Disponibile",
         full_name: "Luca Bianchi",
         id: "member-1",
+        primary_position: "striker",
         team_id: "team-1",
       }),
       expect.objectContaining({
+        birth_date: null,
+        contract_status: null,
+        current_condition: null,
         full_name: null,
         manual_name: "Preparatore atletico",
+        primary_position: null,
         staff_title: "Preparatore",
       }),
     ]);
     expect(mocks.operations[0].filters).toEqual(
       expect.arrayContaining([
         { column: "club_id", value: "club-1" },
+        { column: "status", value: "active" },
         { column: "team_id", value: "team-1" },
       ]),
     );
     expect(mocks.operations[1].inFilters).toEqual([
       { column: "id", value: ["profile-1"] },
+    ]);
+    expect(mocks.operations[1].selectArgs[0]).toContain("birth_date");
+    expect(mocks.operations[2]).toEqual(
+      expect.objectContaining({ action: "select", table: "player_profiles" }),
+    );
+    expect(mocks.operations[2].inFilters).toEqual([
+      { column: "profile_id", value: ["profile-1"] },
     ]);
   });
 

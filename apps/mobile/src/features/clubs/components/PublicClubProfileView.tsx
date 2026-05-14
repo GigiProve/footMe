@@ -1,9 +1,13 @@
-import type { ReactNode } from "react";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { useMemo, useState, type ReactNode } from "react";
+import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing, typography } from "../../../theme/tokens";
 import { AppText, EmptyState } from "../../../ui";
+import {
+  getPlayerPositionLabel,
+  type PlayerPosition,
+} from "../../profiles/player-sports";
 import type {
   ClubHeaderStats,
   ClubPositionSummary,
@@ -11,7 +15,7 @@ import type {
   PublicClubProfile,
   PublicClubSquadraOverview,
 } from "../club-service";
-import type { ClubTeam } from "../team-service";
+import type { ClubTeam, ClubTeamProfileDetails } from "../team-service";
 import {
   PublicClubHeader,
   type ClubHeaderTab,
@@ -31,11 +35,13 @@ type PublicClubProfileViewProps = {
   onEditTeams?: () => void;
   onOpenAffiliate: (clubId: string) => void;
   onOpenPositions: () => void;
+  onOpenProfile: (profileId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onTabChange: (tab: ClubHeaderTab) => void;
   onToggleFollow: () => void;
   overview: PublicClubSquadraOverview;
   stats: ClubHeaderStats;
+  teamProfiles?: Record<string, ClubTeamProfileDetails>;
   teams: ClubTeam[];
 };
 
@@ -49,6 +55,41 @@ const roleLabels: Record<string, string> = {
   player: "Giocatore",
   staff: "Staff",
 };
+
+type OrganicoSection = "rosters" | "staff" | "directors" | "operations";
+
+type RoleFilter = "all" | "goalkeepers" | "defenders" | "midfielders" | "forwards";
+
+type PlayerDepartment = Exclude<RoleFilter, "all">;
+
+const organicoSections: { label: string; value: OrganicoSection }[] = [
+  { label: "Rose", value: "rosters" },
+  { label: "Staff", value: "staff" },
+  { label: "Dirigenza", value: "directors" },
+  { label: "Area operativa", value: "operations" },
+];
+
+const roleFilters: { label: string; value: RoleFilter }[] = [
+  { label: "Tutti", value: "all" },
+  { label: "Portieri", value: "goalkeepers" },
+  { label: "Difensori", value: "defenders" },
+  { label: "Centrocampisti", value: "midfielders" },
+  { label: "Attaccanti", value: "forwards" },
+];
+
+const playerDepartmentLabels: Record<PlayerDepartment, string> = {
+  defenders: "DIF",
+  forwards: "ATT",
+  goalkeepers: "POR",
+  midfielders: "CEN",
+};
+
+const playerDepartmentOrder: PlayerDepartment[] = [
+  "goalkeepers",
+  "defenders",
+  "midfielders",
+  "forwards",
+];
 
 export function PublicClubProfileView({
   activeTab,
@@ -64,11 +105,13 @@ export function PublicClubProfileView({
   onEditTeams,
   onOpenAffiliate,
   onOpenPositions,
+  onOpenProfile,
   onOpenTeam,
   onTabChange,
   onToggleFollow,
   overview,
   stats,
+  teamProfiles = {},
   teams,
 }: PublicClubProfileViewProps) {
   const affiliationLabel = overview.parentAffiliation
@@ -107,7 +150,13 @@ export function PublicClubProfileView({
           teams={teams}
         />
       ) : activeTab === "roster" ? (
-        <ClubRosterTab members={members} />
+        <ClubRosterTab
+          club={club}
+          members={members}
+          onOpenProfile={onOpenProfile}
+          teamProfiles={teamProfiles}
+          teams={teams}
+        />
       ) : (
         <ClubMediaTab club={club} />
       )}
@@ -495,69 +544,733 @@ function AffiliateRow({
   );
 }
 
-function ClubRosterTab({ members }: { members: PublicClubMember[] }) {
-  const players = members.filter((member) => member.member_role === "player");
-  const staff = members.filter((member) => member.member_role !== "player");
+function ClubRosterTab({
+  club,
+  members,
+  onOpenProfile,
+  teamProfiles,
+  teams,
+}: {
+  club: PublicClubProfile;
+  members: PublicClubMember[];
+  onOpenProfile: (profileId: string) => void;
+  teamProfiles: Record<string, ClubTeamProfileDetails>;
+  teams: ClubTeam[];
+}) {
+  const [activeSection, setActiveSection] =
+    useState<OrganicoSection>("rosters");
 
   return (
     <View style={styles.tabContent}>
-      <Section sectionId="roster" title="Organico">
-        {members.length === 0 ? (
-          <EmptyState
-            description="La società non ha ancora pubblicato giocatori o staff."
-            icon="people-outline"
-            title="Organico da completare"
-          />
-        ) : (
-          <View style={styles.rosterGroups}>
-            <RosterGroup members={players} title="Giocatori" />
-            <RosterGroup members={staff} title="Staff" />
-          </View>
-        )}
-      </Section>
+      <View style={styles.organicoIntro} testID="club-section-roster">
+        <AppText style={styles.organicoTitle} variant="headingSm">
+          Organico
+        </AppText>
+        <AppText color="secondary" style={styles.organicoSubtitle} variant="bodySm">
+          Consulta rose, staff e struttura della società.
+        </AppText>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.secondaryTabs}
+        contentContainerStyle={styles.secondaryTabsContent}
+      >
+        {organicoSections.map((section) => {
+          const isActive = activeSection === section.value;
+
+          return (
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              key={section.value}
+              onPress={() => setActiveSection(section.value)}
+              style={styles.secondaryTab}
+              testID={`club-roster-section-tab-${section.value}`}
+            >
+              <AppText
+                color={isActive ? "accent" : "secondary"}
+                style={[
+                  styles.secondaryTabLabel,
+                  isActive ? styles.secondaryTabLabelActive : null,
+                ]}
+                variant="bodySm"
+              >
+                {section.label}
+              </AppText>
+              {isActive ? <View style={styles.secondaryTabIndicator} /> : null}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {activeSection === "rosters" ? (
+        <RosterSquadsSection
+          club={club}
+          members={members}
+          onOpenProfile={onOpenProfile}
+          teamProfiles={teamProfiles}
+          teams={teams}
+        />
+      ) : activeSection === "staff" ? (
+        <PeopleSection
+          emptyDescription="La società non ha ancora pubblicato lo staff tecnico."
+          emptyIcon="people-outline"
+          emptyTitle="Staff da completare"
+          groups={buildStaffGroups(members, teams)}
+          onOpenProfile={onOpenProfile}
+          subtitle="Staff suddiviso per squadra e area sportiva"
+          title="Staff tecnico"
+        />
+      ) : activeSection === "directors" ? (
+        <PeopleSection
+          emptyDescription="La società non ha ancora pubblicato figure dirigenziali."
+          emptyIcon="briefcase-outline"
+          emptyTitle="Dirigenza da completare"
+          groups={buildDirectorGroups(members)}
+          onOpenProfile={onOpenProfile}
+          subtitle="Figure gestionali e sportive della società"
+          title="Dirigenza"
+        />
+      ) : (
+        <PeopleSection
+          emptyDescription="La società non ha ancora pubblicato figure operative."
+          emptyIcon="construct-outline"
+          emptyTitle="Area operativa da completare"
+          groups={buildOperationalGroups(members)}
+          onOpenProfile={onOpenProfile}
+          subtitle="Figure organizzative e di supporto"
+          title="Area operativa"
+        />
+      )}
     </View>
   );
 }
 
-function RosterGroup({
+function RosterSquadsSection({
+  club,
   members,
-  title,
+  onOpenProfile,
+  teamProfiles,
+  teams,
 }: {
+  club: PublicClubProfile;
   members: PublicClubMember[];
-  title: string;
+  onOpenProfile: (profileId: string) => void;
+  teamProfiles: Record<string, ClubTeamProfileDetails>;
+  teams: ClubTeam[];
 }) {
-  if (members.length === 0) {
-    return null;
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const sortedTeams = useMemo(
+    () => [...teams].sort((left, right) => left.sort_order - right.sort_order),
+    [teams],
+  );
+  const players = members.filter((member) => member.member_role === "player");
+  const defaultTeam =
+    sortedTeams.find((team) => team.team_type === "senior") ?? sortedTeams[0] ?? null;
+  const selectedTeam =
+    sortedTeams.find((team) => team.id === selectedTeamId) ?? defaultTeam;
+  const isDefaultTeamSelected = selectedTeam?.id === defaultTeam?.id;
+  const selectedPlayers = selectedTeam
+    ? players.filter(
+        (member) =>
+          member.team_id === selectedTeam.id ||
+          (!member.team_id && isDefaultTeamSelected),
+      )
+    : players;
+  const filteredPlayers =
+    roleFilter === "all"
+      ? selectedPlayers
+      : selectedPlayers.filter(
+          (member) => getPlayerDepartment(member.primary_position) === roleFilter,
+        );
+
+  function handleTeamSelect(teamId: string) {
+    setSelectedTeamId(teamId);
+    setRoleFilter("all");
   }
 
   return (
-    <View style={styles.rosterGroup}>
-      <AppText color="secondary" style={styles.overline} variant="caption">
-        {title}
-      </AppText>
-      {members.map((member) => (
-        <View key={member.id} style={styles.memberRow}>
-          <View style={styles.memberAvatar}>
-            {member.avatar_url ? (
-              <Image source={{ uri: member.avatar_url }} style={styles.memberImage} />
-            ) : (
-              <AppText color="secondary" variant="caption">
-                {getInitials(member.full_name ?? member.manual_name ?? "FM")}
-              </AppText>
-            )}
-          </View>
-          <View style={styles.rowText}>
-            <AppText numberOfLines={1} style={styles.rowTitle} variant="bodySm">
-              {member.full_name ?? member.manual_name ?? "Membro squadra"}
-            </AppText>
-            <AppText color="secondary" numberOfLines={1} variant="caption">
-              {member.staff_title ?? formatRole(member.member_role)}
-            </AppText>
-          </View>
-        </View>
-      ))}
+    <View style={styles.organicoBody} testID="club-roster-section-rosters">
+      <SectionIntro
+        subtitle="Seleziona una squadra per consultare la rosa"
+        title="Rose"
+      />
+
+      {players.length === 0 ? (
+        <EmptyState
+          description="La società non ha ancora pubblicato giocatori."
+          icon="people-outline"
+          title="Rose da completare"
+        />
+      ) : (
+        <>
+          {sortedTeams.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.chipScroll}
+              contentContainerStyle={styles.chipScrollContent}
+            >
+              {sortedTeams.map((team) => {
+                const isSelected = selectedTeam?.id === team.id;
+
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    key={team.id}
+                    onPress={() => handleTeamSelect(team.id)}
+                    style={[
+                      styles.teamChip,
+                      isSelected ? styles.teamChipActive : null,
+                    ]}
+                    testID={`club-roster-team-chip-${team.id}`}
+                  >
+                    <AppText
+                      color={isSelected ? "accent" : "secondary"}
+                      style={[
+                        styles.teamChipText,
+                        isSelected ? styles.teamChipTextActive : null,
+                      ]}
+                      variant="bodySm"
+                    >
+                      {getTeamDisplayName(team)}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : null}
+
+          <RosterSummary
+            club={club}
+            players={selectedPlayers}
+            team={selectedTeam}
+            teamProfile={selectedTeam ? teamProfiles[selectedTeam.id] : undefined}
+          />
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipScroll}
+            contentContainerStyle={styles.filterScrollContent}
+          >
+            {roleFilters.map((filter) => {
+              const isSelected = roleFilter === filter.value;
+
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                  key={filter.value}
+                  onPress={() => setRoleFilter(filter.value)}
+                  style={[
+                    styles.filterChip,
+                    isSelected ? styles.filterChipActive : null,
+                  ]}
+                  testID={`club-roster-role-filter-${filter.value}`}
+                >
+                  <AppText
+                    color={isSelected ? "inverse" : "secondary"}
+                    style={styles.filterChipText}
+                    variant="bodySm"
+                  >
+                    {filter.label}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {filteredPlayers.length > 0 ? (
+            <View style={styles.personList}>
+              {filteredPlayers.map((member) => (
+                <PersonRow
+                  key={member.id}
+                  member={member}
+                  onOpenProfile={onOpenProfile}
+                  subtitle={buildPlayerSubtitle(member)}
+                  testID={`club-roster-player-row-${member.id}`}
+                />
+              ))}
+            </View>
+          ) : (
+            <CompactEmpty
+              icon="people-outline"
+              label="Nessun giocatore in questo reparto."
+            />
+          )}
+        </>
+      )}
     </View>
   );
+}
+
+function RosterSummary({
+  club,
+  players,
+  team,
+  teamProfile,
+}: {
+  club: PublicClubProfile;
+  players: PublicClubMember[];
+  team: ClubTeam | null;
+  teamProfile?: ClubTeamProfileDetails;
+}) {
+  const distribution = getRosterDistribution(players);
+  const summaryTitle = team ? getTeamDisplayName(team) : club.name;
+  const competitionLabel = buildTeamCompetitionLabel(team, teamProfile, club);
+
+  return (
+    <View style={styles.rosterSummary} testID="club-roster-team-summary">
+      <View style={styles.rosterSummaryAccent} />
+      <View style={styles.rosterSummaryContent}>
+        <AppText numberOfLines={1} style={styles.rosterSummaryTitle} variant="titleSm">
+          {summaryTitle}
+        </AppText>
+        <AppText color="secondary" numberOfLines={1} variant="bodySm">
+          {competitionLabel}
+        </AppText>
+        <View style={styles.rosterSummaryBottom}>
+          <View style={styles.rosterCount}>
+            <Ionicons color={colors.accent} name="people-outline" size={17} />
+            <AppText style={styles.rosterCountText} variant="bodySm">
+              {formatPlayersCount(players.length)}
+            </AppText>
+          </View>
+          <View style={styles.distributionList}>
+            {distribution.map((item) => (
+              <View key={item.department} style={styles.distributionChip}>
+                <AppText color="secondary" style={styles.distributionText} variant="caption">
+                  {item.count} {playerDepartmentLabels[item.department]}
+                </AppText>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function SectionIntro({ subtitle, title }: { subtitle: string; title: string }) {
+  return (
+    <View style={styles.organicoSectionHeader}>
+      <AppText style={styles.sectionTitle} variant="titleSm">
+        {title}
+      </AppText>
+      <AppText color="secondary" variant="bodySm">
+        {subtitle}
+      </AppText>
+    </View>
+  );
+}
+
+function PeopleSection({
+  emptyDescription,
+  emptyIcon,
+  emptyTitle,
+  groups,
+  onOpenProfile,
+  subtitle,
+  title,
+}: {
+  emptyDescription: string;
+  emptyIcon: keyof typeof Ionicons.glyphMap;
+  emptyTitle: string;
+  groups: PersonGroup[];
+  onOpenProfile: (profileId: string) => void;
+  subtitle: string;
+  title: string;
+}) {
+  const visibleGroups = groups.filter((group) => group.members.length > 0);
+
+  return (
+    <View style={styles.organicoBody} testID={`club-roster-section-${slugTestId(title)}`}>
+      <SectionIntro subtitle={subtitle} title={title} />
+      {visibleGroups.length === 0 ? (
+        <EmptyState
+          description={emptyDescription}
+          icon={emptyIcon}
+          title={emptyTitle}
+        />
+      ) : (
+        <View style={styles.peopleGroups}>
+          {visibleGroups.map((group) => (
+            <PeopleGroupView
+              group={group}
+              key={group.title}
+              onOpenProfile={onOpenProfile}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+type PersonGroup = {
+  icon: keyof typeof Ionicons.glyphMap;
+  members: PublicClubMember[];
+  title: string;
+};
+
+function PeopleGroupView({
+  group,
+  onOpenProfile,
+}: {
+  group: PersonGroup;
+  onOpenProfile: (profileId: string) => void;
+}) {
+  return (
+    <View style={styles.peopleGroup}>
+      <View style={styles.groupTitleRow}>
+        <Ionicons color={colors.textMuted} name={group.icon} size={14} />
+        <AppText color="secondary" style={styles.groupTitle} variant="caption">
+          {group.title}
+        </AppText>
+        <View style={styles.groupTitleDivider} />
+      </View>
+      <View style={styles.personList}>
+        {group.members.map((member) => (
+          <PersonRow
+            key={member.id}
+            member={member}
+            onOpenProfile={onOpenProfile}
+            subtitle={member.staff_title ?? formatRole(member.member_role)}
+            testID={`club-roster-person-row-${member.id}`}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function PersonRow({
+  member,
+  onOpenProfile,
+  subtitle,
+  testID,
+}: {
+  member: PublicClubMember;
+  onOpenProfile: (profileId: string) => void;
+  subtitle: string;
+  testID: string;
+}) {
+  const name = member.full_name ?? member.manual_name ?? "Membro squadra";
+  const canOpenProfile = Boolean(member.profile_id);
+  const content = (
+    <>
+      <View style={styles.memberAvatar}>
+        {member.avatar_url ? (
+          <Image source={{ uri: member.avatar_url }} style={styles.memberImage} />
+        ) : (
+          <AppText color="secondary" variant="caption">
+            {getInitials(name)}
+          </AppText>
+        )}
+      </View>
+      <View style={styles.rowText}>
+        <AppText numberOfLines={1} style={styles.rowTitle} variant="bodySm">
+          {name}
+        </AppText>
+        <AppText color="secondary" numberOfLines={1} variant="caption">
+          {subtitle}
+        </AppText>
+      </View>
+      {canOpenProfile ? (
+        <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
+      ) : null}
+    </>
+  );
+
+  if (canOpenProfile && member.profile_id) {
+    return (
+      <Pressable
+        accessibilityLabel={`Apri profilo di ${name}`}
+        accessibilityRole="button"
+        onPress={() => onOpenProfile(member.profile_id!)}
+        style={({ pressed }) => [
+          styles.memberRow,
+          pressed ? styles.memberRowPressed : null,
+        ]}
+        testID={testID}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={styles.memberRow} testID={testID}>
+      {content}
+    </View>
+  );
+}
+
+function buildStaffGroups(members: PublicClubMember[], teams: ClubTeam[]): PersonGroup[] {
+  const technicalMembers = members.filter(isTechnicalStaffMember);
+  const teamGroups = [...teams]
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map((team) => ({
+      icon: "shield-outline" as const,
+      members: technicalMembers.filter((member) => member.team_id === team.id),
+      title: getTeamDisplayName(team),
+    }));
+  const knownTeamIds = new Set(teams.map((team) => team.id));
+  const crossAreaMembers = technicalMembers.filter(
+    (member) => !member.team_id || !knownTeamIds.has(member.team_id),
+  );
+
+  return [
+    ...teamGroups,
+    {
+      icon: "pulse-outline",
+      members: crossAreaMembers,
+      title: "Area trasversale",
+    },
+  ];
+}
+
+function buildDirectorGroups(members: PublicClubMember[]): PersonGroup[] {
+  const directors = members.filter((member) => member.member_role === "director");
+
+  return [
+    {
+      icon: "briefcase-outline",
+      members: directors.filter(
+        (member) => classifyDirectorArea(member) === "Direzione sportiva",
+      ),
+      title: "Direzione sportiva",
+    },
+    {
+      icon: "school-outline",
+      members: directors.filter(
+        (member) => classifyDirectorArea(member) === "Settore giovanile",
+      ),
+      title: "Settore giovanile",
+    },
+    {
+      icon: "business-outline",
+      members: directors.filter(
+        (member) => classifyDirectorArea(member) === "Area gestionale",
+      ),
+      title: "Area gestionale",
+    },
+  ];
+}
+
+function buildOperationalGroups(members: PublicClubMember[]): PersonGroup[] {
+  const operationalMembers = members.filter(
+    (member) => member.member_role === "staff" && !isTechnicalStaffMember(member),
+  );
+
+  return [
+    {
+      icon: "folder-open-outline",
+      members: operationalMembers.filter(
+        (member) => classifyOperationalArea(member) === "Segreteria sportiva",
+      ),
+      title: "Segreteria sportiva",
+    },
+    {
+      icon: "megaphone-outline",
+      members: operationalMembers.filter(
+        (member) => classifyOperationalArea(member) === "Comunicazione",
+      ),
+      title: "Comunicazione",
+    },
+    {
+      icon: "construct-outline",
+      members: operationalMembers.filter(
+        (member) => classifyOperationalArea(member) === "Logistica e impianti",
+      ),
+      title: "Logistica e impianti",
+    },
+    {
+      icon: "people-outline",
+      members: operationalMembers.filter(
+        (member) => classifyOperationalArea(member) === "Supporto operativo",
+      ),
+      title: "Supporto operativo",
+    },
+  ];
+}
+
+function isTechnicalStaffMember(member: PublicClubMember) {
+  if (member.member_role === "coach") {
+    return true;
+  }
+
+  if (member.member_role !== "staff") {
+    return false;
+  }
+
+  const role = normalizeRoleText(member.staff_title);
+
+  return [
+    "allen",
+    "analyst",
+    "collaboratore",
+    "fisi",
+    "match",
+    "medic",
+    "portier",
+    "prepar",
+    "tecnic",
+    "trainer",
+  ].some((keyword) => role.includes(keyword));
+}
+
+function classifyDirectorArea(member: PublicClubMember) {
+  const role = normalizeRoleText(member.staff_title);
+
+  if (
+    ["direttore sportivo", "scouting", "scout", "area tecnica"].some((keyword) =>
+      role.includes(keyword),
+    )
+  ) {
+    return "Direzione sportiva";
+  }
+
+  if (
+    ["academy", "giovanile", "settore giovanile", "vivaio", "under"].some(
+      (keyword) => role.includes(keyword),
+    )
+  ) {
+    return "Settore giovanile";
+  }
+
+  return "Area gestionale";
+}
+
+function classifyOperationalArea(member: PublicClubMember) {
+  const role = normalizeRoleText(member.staff_title);
+
+  if (
+    ["segreter", "tesserament"].some((keyword) => role.includes(keyword))
+  ) {
+    return "Segreteria sportiva";
+  }
+
+  if (
+    ["comunic", "marketing", "media", "social", "stampa"].some((keyword) =>
+      role.includes(keyword),
+    )
+  ) {
+    return "Comunicazione";
+  }
+
+  if (
+    ["campo", "impiant", "logistic", "magazz", "struttur", "trasport"].some(
+      (keyword) => role.includes(keyword),
+    )
+  ) {
+    return "Logistica e impianti";
+  }
+
+  return "Supporto operativo";
+}
+
+function normalizeRoleText(value: string | null | undefined) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function getPlayerDepartment(
+  position: PlayerPosition | null | undefined,
+): PlayerDepartment | null {
+  switch (position) {
+    case "goalkeeper":
+      return "goalkeepers";
+    case "defender":
+    case "center_back":
+    case "right_back":
+    case "left_back":
+      return "defenders";
+    case "midfielder":
+    case "defensive_midfielder":
+    case "central_midfielder":
+    case "attacking_midfielder":
+      return "midfielders";
+    case "forward":
+    case "right_winger":
+    case "left_winger":
+    case "striker":
+      return "forwards";
+    default:
+      return null;
+  }
+}
+
+function getRosterDistribution(players: PublicClubMember[]) {
+  return playerDepartmentOrder.map((department) => ({
+    count: players.filter(
+      (player) => getPlayerDepartment(player.primary_position) === department,
+    ).length,
+    department,
+  }));
+}
+
+function buildPlayerSubtitle(member: PublicClubMember) {
+  return [
+    getPlayerPositionLabel(member.primary_position, "Ruolo da completare"),
+    getBirthYear(member.birth_date),
+    formatMemberStatus(member.contract_status ?? member.current_condition),
+  ]
+    .filter((entry): entry is string => Boolean(entry))
+    .join(" • ");
+}
+
+function getBirthYear(birthDate: string | null) {
+  if (!birthDate) {
+    return null;
+  }
+
+  const year = birthDate.slice(0, 4);
+  return /^\d{4}$/.test(year) ? year : null;
+}
+
+function formatMemberStatus(value: string | null) {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.toLowerCase().replace(/[_-]/g, " ");
+  const knownLabels: Record<string, string> = {
+    "free agent": "Svincolato",
+    available: "Disponibile",
+    contracted: "Sotto contratto",
+    "under contract": "Sotto contratto",
+  };
+
+  return knownLabels[normalized] ?? trimmed;
+}
+
+function buildTeamCompetitionLabel(
+  team: ClubTeam | null,
+  teamProfile: ClubTeamProfileDetails | undefined,
+  club: PublicClubProfile,
+) {
+  const competition = teamProfile?.competition_name?.trim();
+
+  if (team) {
+    return [team.category, competition].filter(Boolean).join(" • ");
+  }
+
+  return club.category ?? "Squadra da definire";
+}
+
+function formatPlayersCount(count: number) {
+  return count === 1 ? "1 giocatore" : `${count} giocatori`;
+}
+
+function slugTestId(value: string) {
+  return value.toLowerCase().replace(/\s+/g, "-");
 }
 
 function ClubMediaTab({ club }: { club: PublicClubProfile }) {
@@ -789,14 +1502,82 @@ const styles = StyleSheet.create({
     borderRadius: radius[8],
     width: "31.8%",
   },
+  chipScroll: {
+    marginHorizontal: -spacing[20],
+  },
+  chipScrollContent: {
+    gap: spacing[10],
+    paddingHorizontal: spacing[20],
+    paddingBottom: spacing[18],
+  },
+  distributionChip: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius[6],
+    borderWidth: 1,
+    paddingHorizontal: spacing[8],
+    paddingVertical: spacing[4],
+  },
+  distributionList: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[6],
+    justifyContent: "flex-end",
+  },
+  distributionText: {
+    fontSize: typography.fontSize[11],
+    fontWeight: typography.fontWeight.bold,
+  },
+  filterChip: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 38,
+    paddingHorizontal: spacing[14],
+  },
+  filterChipActive: {
+    backgroundColor: colors.textPrimary,
+    borderColor: colors.textPrimary,
+  },
+  filterChipText: {
+    fontWeight: typography.fontWeight.semibold,
+  },
+  filterScrollContent: {
+    gap: spacing[10],
+    paddingHorizontal: spacing[20],
+    paddingBottom: spacing[16],
+  },
+  groupTitle: {
+    fontSize: typography.fontSize[11],
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 0,
+    textTransform: "uppercase",
+  },
+  groupTitleDivider: {
+    backgroundColor: colors.border,
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  groupTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[8],
+    paddingHorizontal: spacing[20],
+  },
   memberAvatar: {
     alignItems: "center",
     backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderWidth: 1,
     borderRadius: radius.full,
-    height: 38,
+    height: 42,
     justifyContent: "center",
     overflow: "hidden",
-    width: 38,
+    width: 42,
   },
   memberImage: {
     height: "100%",
@@ -808,7 +1589,34 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: spacing[12],
+    minHeight: 58,
     paddingVertical: spacing[10],
+  },
+  memberRowPressed: {
+    opacity: 0.62,
+  },
+  organicoBody: {
+    backgroundColor: colors.background,
+    gap: spacing[14],
+    paddingHorizontal: spacing[20],
+    paddingTop: spacing[22],
+  },
+  organicoIntro: {
+    backgroundColor: colors.background,
+    gap: spacing[6],
+    paddingHorizontal: spacing[20],
+    paddingTop: spacing[24],
+    paddingBottom: spacing[16],
+  },
+  organicoSectionHeader: {
+    gap: spacing[6],
+  },
+  organicoSubtitle: {
+    lineHeight: 20,
+  },
+  organicoTitle: {
+    fontSize: typography.fontSize[24],
+    fontWeight: typography.fontWeight.bold,
   },
   openLabel: {
     fontWeight: typography.fontWeight.bold,
@@ -857,11 +1665,56 @@ const styles = StyleSheet.create({
     gap: spacing[14],
     padding: spacing[16],
   },
+  peopleGroup: {
+    gap: spacing[8],
+  },
+  peopleGroups: {
+    gap: spacing[22],
+  },
+  personList: {
+    backgroundColor: colors.background,
+  },
   rosterGroup: {
     gap: spacing[8],
   },
   rosterGroups: {
     gap: spacing[18],
+  },
+  rosterCount: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[6],
+  },
+  rosterCountText: {
+    fontWeight: typography.fontWeight.bold,
+  },
+  rosterSummary: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius[8],
+    borderWidth: 1,
+    flexDirection: "row",
+    overflow: "hidden",
+  },
+  rosterSummaryAccent: {
+    backgroundColor: colors.accent,
+    width: 4,
+  },
+  rosterSummaryBottom: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[12],
+    justifyContent: "space-between",
+    paddingTop: spacing[14],
+  },
+  rosterSummaryContent: {
+    flex: 1,
+    padding: spacing[16],
+  },
+  rosterSummaryTitle: {
+    fontWeight: typography.fontWeight.heavy,
+    marginBottom: spacing[4],
   },
   rowText: {
     flex: 1,
@@ -901,6 +1754,35 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize[18],
     fontWeight: typography.fontWeight.bold,
+  },
+  secondaryTab: {
+    justifyContent: "center",
+    minHeight: 48,
+    position: "relative",
+  },
+  secondaryTabIndicator: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.full,
+    bottom: -1,
+    height: 3,
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
+  secondaryTabLabel: {
+    fontWeight: typography.fontWeight.semibold,
+  },
+  secondaryTabLabelActive: {
+    fontWeight: typography.fontWeight.bold,
+  },
+  secondaryTabs: {
+    backgroundColor: colors.background,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  secondaryTabsContent: {
+    gap: spacing[24],
+    paddingHorizontal: spacing[20],
   },
   softBadge: {
     backgroundColor: colors.accentSoft,
@@ -950,6 +1832,26 @@ const styles = StyleSheet.create({
     minHeight: 68,
     overflow: "hidden",
     padding: spacing[14],
+  },
+  teamChip: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: "transparent",
+    borderRadius: radius.full,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 40,
+    paddingHorizontal: spacing[16],
+  },
+  teamChipActive: {
+    backgroundColor: colors.accentSoft,
+    borderColor: "rgba(10, 102, 194, 0.2)",
+  },
+  teamChipText: {
+    fontWeight: typography.fontWeight.semibold,
+  },
+  teamChipTextActive: {
+    fontWeight: typography.fontWeight.bold,
   },
   viewAllPositions: {
     alignItems: "center",
