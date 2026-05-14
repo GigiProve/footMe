@@ -269,6 +269,7 @@ type ClubRecord = {
   name: string;
   owner_profile_id: string;
   region: string;
+  stadium: string | null;
   verification_status: string;
   website_url: string | null;
 };
@@ -1081,6 +1082,7 @@ function normalizeClubRecord(profileId: string, rawClub: Partial<ClubRecord> | n
     name: normalizeRequiredText(rawClub.name, ""),
     owner_profile_id: normalizeRequiredText(rawClub.owner_profile_id, profileId),
     region: normalizeRequiredText(rawClub.region, ""),
+    stadium: normalizeOptionalText(rawClub.stadium),
     verification_status: normalizeRequiredText(rawClub.verification_status, "unverified"),
     website_url: normalizeOptionalText(rawClub.website_url),
   } satisfies ClubRecord;
@@ -1275,7 +1277,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("clubs")
           .select(
-            "id, owner_profile_id, name, city, region, category, league, description, logo_url, gallery_urls, founding_year, club_colors, country, headquarters_address, club_email, club_phone, website_url, field_address, verification_status",
+            "id, owner_profile_id, name, city, region, category, league, stadium, description, logo_url, gallery_urls, founding_year, club_colors, country, headquarters_address, club_email, club_phone, website_url, field_address, verification_status",
           )
           .eq("owner_profile_id", profileId)
           .maybeSingle()

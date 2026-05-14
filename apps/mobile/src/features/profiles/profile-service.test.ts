@@ -342,6 +342,7 @@ describe("getCompleteProfessionalProfile", () => {
       name: "FC Roma",
       owner_profile_id: "profile-9",
       region: "Lazio",
+      stadium: null,
       verification_status: "unverified",
       website_url: null,
     };

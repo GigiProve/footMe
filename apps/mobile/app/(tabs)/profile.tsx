@@ -1,8 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, SafeAreaView, StyleSheet } from "react-native";
+import {
+  Alert,
+  Linking,
+  SafeAreaView,
+  StyleSheet,
+  type AlertButton,
+} from "react-native";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../src/features/auth/use-session";
+import {
+  fetchClubFollowState,
+  fetchPublicClubHeaderStats,
+  followClub,
+  unfollowClub,
+  type ClubHeaderStats,
+  type PublicClubProfile,
+} from "../../src/features/clubs/club-service";
+import { PublicClubHeader } from "../../src/features/clubs/components/PublicClubHeader";
+import { fetchClubTeams, type ClubTeam } from "../../src/features/clubs/team-service";
 import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
 import { EditAgentProfileModal } from "../../src/features/profiles/edit-modals/EditAgentProfileModal";
@@ -63,11 +79,22 @@ import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabVie
 import { colors } from "../../src/theme/tokens";
 import { AppText } from "../../src/ui";
 
+const emptyClubHeaderStats: ClubHeaderStats = {
+  activeTeamsCount: 0,
+  playersCount: 0,
+  staffCount: 0,
+};
+
 export default function ProfileScreen() {
   const { profile, refreshProfile, session } = useSession();
   const userId = session?.user.id ?? null;
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
+  const [clubTeams, setClubTeams] = useState<ClubTeam[]>([]);
+  const [clubHeaderStats, setClubHeaderStats] =
+    useState<ClubHeaderStats>(emptyClubHeaderStats);
+  const [isClubFollowed, setIsClubFollowed] = useState(false);
+  const [isClubFollowing, setIsClubFollowing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<EditSection | null>(null);
   const [agentMediaEditingItemId, setAgentMediaEditingItemId] = useState<string | null>(null);
@@ -83,7 +110,28 @@ export default function ProfileScreen() {
       setIsLoading(true);
       const data = await getCompleteProfessionalProfile(userId);
       setCompleteProfile(data);
+
+      if (data.club?.id) {
+        const [teams, stats, followState] = await Promise.all([
+          fetchClubTeams(data.club.id),
+          fetchPublicClubHeaderStats(data.club.id).catch(
+            () => emptyClubHeaderStats,
+          ),
+          fetchClubFollowState(userId, data.club.id).catch(() => false),
+        ]);
+
+        setClubTeams(teams);
+        setClubHeaderStats(stats);
+        setIsClubFollowed(followState);
+      } else {
+        setClubTeams([]);
+        setClubHeaderStats(emptyClubHeaderStats);
+        setIsClubFollowed(false);
+      }
     } catch (error) {
+      setClubTeams([]);
+      setClubHeaderStats(emptyClubHeaderStats);
+      setIsClubFollowed(false);
       const message =
         error instanceof Error
           ? error.message
@@ -146,6 +194,80 @@ export default function ProfileScreen() {
       "Profilo aggiornato",
       "Le informazioni professionali sono state salvate.",
     );
+  }
+
+  async function handleToggleClubFollow() {
+    if (!userId || !completeProfile?.club) {
+      return;
+    }
+
+    try {
+      setIsClubFollowing(true);
+
+      if (isClubFollowed) {
+        await unfollowClub(userId, completeProfile.club.id);
+        setIsClubFollowed(false);
+        return;
+      }
+
+      await followClub(userId, completeProfile.club.id);
+      setIsClubFollowed(true);
+    } catch {
+      Alert.alert("Errore", "Non siamo riusciti ad aggiornare il follow.");
+    } finally {
+      setIsClubFollowing(false);
+    }
+  }
+
+  function handleClubContactPress() {
+    if (!completeProfile?.club) {
+      return;
+    }
+
+    const club = completeProfile.club;
+    const contactOptions: AlertButton[] = [];
+
+    if (club.club_email) {
+      contactOptions.push({
+        onPress: () => Linking.openURL(`mailto:${club.club_email}`),
+        text: "Email",
+      });
+    }
+
+    if (club.club_phone) {
+      contactOptions.push({
+        onPress: () => Linking.openURL(`tel:${club.club_phone}`),
+        text: "Telefono",
+      });
+    }
+
+    if (club.website_url) {
+      contactOptions.push({
+        onPress: () => Linking.openURL(normalizeExternalUrl(club.website_url!)),
+        text: "Sito web",
+      });
+    }
+
+    if (contactOptions.length === 0) {
+      Alert.alert(
+        "Contatti non disponibili",
+        "Questa società non ha ancora condiviso contatti pubblici.",
+      );
+      return;
+    }
+
+    const contactSummary = [
+      club.club_email ? `Email: ${club.club_email}` : null,
+      club.club_phone ? `Telefono: ${club.club_phone}` : null,
+      club.website_url ? `Sito: ${club.website_url}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    Alert.alert("Contatta la società", contactSummary, [
+      { style: "cancel", text: "Annulla" },
+      ...contactOptions,
+    ]);
   }
 
   function handleManageAgentMedia(itemId: string | null = null) {
@@ -313,7 +435,18 @@ export default function ProfileScreen() {
       <KeyboardAwareForm
         contentContainerStyle={styles.scrollContent}
       >
-        {completeProfile && role === "player" && playerHeaderDetails ? (
+        {completeProfile && role === "club_admin" && completeProfile.club ? (
+          <PublicClubHeader
+            club={toPublicClubProfile(completeProfile.club)}
+            isFollowed={isClubFollowed}
+            isFollowing={isClubFollowing}
+            onContactPress={handleClubContactPress}
+            onToggleFollow={handleToggleClubFollow}
+            stats={clubHeaderStats}
+            style={styles.clubPublicHeader}
+            teams={clubTeams}
+          />
+        ) : completeProfile && role === "player" && playerHeaderDetails ? (
           <PlayerProfileHeader
             ageLabel={playerHeaderDetails.ageLabel}
             availabilityBadges={playerHeaderDetails.availabilityBadges}
@@ -431,7 +564,7 @@ export default function ProfileScreen() {
             onEditMedia={(itemId) => handleManageAgentMedia(itemId)}
             onManageMedia={() => handleManageAgentMedia()}
           />
-        ) : completeProfile ? (
+        ) : completeProfile && role === "club_admin" ? null : completeProfile ? (
           <ProfileReadonlyView
             completeProfile={completeProfile}
             onEdit={handleEdit}
@@ -614,7 +747,46 @@ export default function ProfileScreen() {
   );
 }
 
+function toPublicClubProfile(
+  club: NonNullable<CompleteProfessionalProfile["club"]>,
+): PublicClubProfile {
+  return {
+    category: club.category,
+    city: club.city,
+    club_colors: club.club_colors,
+    club_email: club.club_email,
+    club_phone: club.club_phone,
+    country: club.country,
+    description: club.description,
+    field_address: club.field_address,
+    founding_year: club.founding_year,
+    headquarters_address: club.headquarters_address,
+    id: club.id,
+    league: club.league,
+    logo_url: club.logo_url,
+    name: club.name,
+    owner_full_name: null,
+    region: club.region,
+    stadium: club.stadium,
+    verification_status: club.verification_status,
+    website_url: club.website_url,
+  };
+}
+
+function normalizeExternalUrl(url: string) {
+  const trimmedUrl = url.trim();
+
+  if (/^https?:\/\//i.test(trimmedUrl)) {
+    return trimmedUrl;
+  }
+
+  return `https://${trimmedUrl}`;
+}
+
 const styles = StyleSheet.create({
+  clubPublicHeader: {
+    paddingTop: 64,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.surface,
