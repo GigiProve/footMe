@@ -589,6 +589,21 @@ export function buildHeaderDetails(data: CompleteProfessionalProfile) {
     };
   }
 
+  if (data.profile.role === "director") {
+    const primaryRole =
+      data.directorProfile?.primary_role?.trim() ||
+      data.directorProfile?.director_roles?.[0]?.trim() ||
+      "Dirigente";
+    const focus = data.directorProfile?.main_focus?.trim();
+
+    return {
+      badges: [roleBadge],
+      fullName,
+      primaryMeta,
+      secondaryMeta: focus ? `${primaryRole} - ${focus}` : primaryRole,
+    };
+  }
+
   if (data.profile.role === "club_admin") {
     const clubName = data.club?.name ?? "Società da completare";
     const clubCity = data.club?.city ?? "";

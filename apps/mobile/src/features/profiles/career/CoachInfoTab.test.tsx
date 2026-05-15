@@ -43,6 +43,7 @@ function buildCoachProfile(
       secondary_formations: [],
       technical_video_url: "https://example.com/video.mp4",
     },
+    directorProfile: null,
     playerCareerEntries: [],
     playerPalmares: [],
     playerProfile: null,

@@ -22,6 +22,7 @@ function buildStaffProfile(
     coachDirectorCareerEntries: [],
     coachPlayerCareerEntries: [],
     coachProfile: null,
+    directorProfile: null,
     playerCareerEntries: [],
     playerPalmares: [],
     playerProfile: null,

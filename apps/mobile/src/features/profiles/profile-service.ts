@@ -251,6 +251,22 @@ export type StaffProfileRecord = {
   staff_roles: string[];
 };
 
+export type DirectorProfileRecord = {
+  career_entries: unknown[];
+  club_types: string[];
+  director_roles: string[];
+  experience_categories: string[];
+  has_other_football_experience: boolean;
+  has_played_football: boolean;
+  main_focus: string | null;
+  market_involvement: string | null;
+  other_football_roles: string[];
+  player_career_entries: unknown[];
+  primary_role: string | null;
+  profile_id: string;
+  responsibilities: string[];
+};
+
 type ClubRecord = {
   category: string | null;
   city: string;
@@ -317,6 +333,7 @@ export type CompleteProfessionalProfile = {
   coachDirectorCareerEntries: CoachDirectorCareerEntryRecord[];
   coachPlayerCareerEntries: CoachPlayerCareerEntryRecord[];
   coachProfile: CoachProfileRecord | null;
+  directorProfile: DirectorProfileRecord | null;
   playerCareerEntries: PlayerCareerEntryRecord[];
   playerPalmares: PlayerPalmaresRecord[];
   playerProfile: PlayerProfileRecord | null;
@@ -886,6 +903,37 @@ function normalizeAgentManagedPlayerEntryRecord(
   } satisfies AgentManagedPlayerEntryRecord;
 }
 
+function normalizeDirectorProfileRecord(
+  profileId: string,
+  rawProfile: Partial<DirectorProfileRecord> | null | undefined,
+) {
+  if (!rawProfile) {
+    return null;
+  }
+
+  return {
+    career_entries: Array.isArray(rawProfile.career_entries)
+      ? rawProfile.career_entries
+      : [],
+    club_types: normalizeStringArray(rawProfile.club_types),
+    director_roles: normalizeStringArray(rawProfile.director_roles),
+    experience_categories: normalizeStringArray(rawProfile.experience_categories),
+    has_other_football_experience: normalizeBoolean(
+      rawProfile.has_other_football_experience,
+    ),
+    has_played_football: normalizeBoolean(rawProfile.has_played_football),
+    main_focus: normalizeOptionalText(rawProfile.main_focus),
+    market_involvement: normalizeOptionalText(rawProfile.market_involvement),
+    other_football_roles: normalizeStringArray(rawProfile.other_football_roles),
+    player_career_entries: Array.isArray(rawProfile.player_career_entries)
+      ? rawProfile.player_career_entries
+      : [],
+    primary_role: normalizeOptionalText(rawProfile.primary_role),
+    profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+    responsibilities: normalizeStringArray(rawProfile.responsibilities),
+  } satisfies DirectorProfileRecord;
+}
+
 function normalizeCoachCareerEntryRecord(
   profileId: string,
   rawEntry: Partial<CoachCareerEntryRecord>,
@@ -1132,6 +1180,7 @@ export function normalizeUserProfile(input: {
   coachDirectorCareerEntries?: Partial<CoachDirectorCareerEntryRecord>[] | null;
   coachPlayerCareerEntries?: Partial<CoachPlayerCareerEntryRecord>[] | null;
   coachProfile?: Partial<CoachProfileRecord> | null;
+  directorProfile?: Partial<DirectorProfileRecord> | null;
   playerCareerEntries?: Partial<PlayerCareerEntryRecord>[] | null;
   playerPalmares?: Partial<PlayerPalmaresRecord>[] | null;
   playerProfile?: Partial<PlayerProfileRecord> | null;
@@ -1179,6 +1228,10 @@ export function normalizeUserProfile(input: {
       normalizeCoachPlayerCareerEntryRecord(input.profileId, entry, index),
     ),
     coachProfile: normalizeCoachProfileRecord(input.profileId, input.coachProfile),
+    directorProfile: normalizeDirectorProfileRecord(
+      input.profileId,
+      input.directorProfile,
+    ),
     playerCareerEntries: (input.playerCareerEntries ?? []).map((entry, index) =>
       normalizePlayerCareerEntryRecord(input.profileId, entry, index),
     ),
@@ -1238,6 +1291,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     coachProfile,
     staffProfile,
     agentProfile,
+    directorProfile,
     club,
     profileContacts,
     privateContacts,
@@ -1279,6 +1333,15 @@ export async function getCompleteProfessionalProfile(profileId: string) {
           .eq("profile_id", profileId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    profile.role === "director"
+      ? supabase
+          .from("director_profiles")
+          .select(
+            "profile_id, director_roles, primary_role, responsibilities, experience_categories, main_focus, market_involvement, career_entries, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, club_types",
+          )
+          .eq("profile_id", profileId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
     profile.role === "club_admin"
       ? supabase
           .from("clubs")
@@ -1316,6 +1379,10 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 
   if (agentProfile.error) {
     throw agentProfile.error;
+  }
+
+  if (directorProfile.error) {
+    throw directorProfile.error;
   }
 
   if (club.error) {
@@ -1571,6 +1638,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     coachDirectorCareerEntries,
     coachPlayerCareerEntries,
     coachProfile: (coachProfile.data as Partial<CoachProfileRecord> | null) ?? null,
+    directorProfile: (directorProfile.data as Partial<DirectorProfileRecord> | null) ?? null,
     playerCareerEntries,
     playerPalmares,
     playerProfile: (playerProfile.data as Partial<PlayerProfileRecord> | null) ?? null,

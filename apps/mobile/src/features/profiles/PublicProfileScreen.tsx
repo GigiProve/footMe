@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -35,6 +36,11 @@ import { CoachProfileTabView } from "./career/CoachProfileTabView";
 import { ProfileTabView } from "./career/ProfileTabView";
 import { StaffProfileTabView } from "./career/StaffProfileTabView";
 import { AgentProfileTabView } from "./career/AgentProfileTabView";
+import { DirectorProfileTabView } from "./career/DirectorProfileTabView";
+import {
+  requestConnection,
+  startDirectConversation,
+} from "../networking/networking-service";
 import { colors, spacing } from "../../theme/tokens";
 import { AppText } from "../../ui";
 
@@ -46,6 +52,10 @@ export function PublicProfileScreen() {
   const { isLoading: isSessionLoading, needsOnboarding, session } = useSession();
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
+  const [profileAction, setProfileAction] = useState<{
+    profileId: string;
+    type: "connect" | "message";
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -106,6 +116,44 @@ export function PublicProfileScreen() {
     void loadProfile();
   }, [loadProfile]);
 
+  async function handleConnectToProfile(targetProfile: CompleteProfessionalProfile) {
+    try {
+      setProfileAction({ profileId: targetProfile.profile.id, type: "connect" });
+      await requestConnection(targetProfile.profile.id);
+      Alert.alert("Richiesta inviata", "La richiesta di collegamento e' stata inviata.");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore durante l'invio della richiesta.";
+      Alert.alert("Connessione non inviata", message);
+    } finally {
+      setProfileAction(null);
+    }
+  }
+
+  async function handleMessageProfile(targetProfile: CompleteProfessionalProfile) {
+    try {
+      setProfileAction({ profileId: targetProfile.profile.id, type: "message" });
+      const conversationId = await startDirectConversation(targetProfile.profile.id);
+      router.push({
+        pathname: "/messages/[conversationId]",
+        params: {
+          conversationId,
+          otherName: targetProfile.profile.full_name,
+        },
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore durante l'apertura della conversazione.";
+      Alert.alert("Chat non disponibile", message);
+    } finally {
+      setProfileAction(null);
+    }
+  }
+
   if (!isSessionLoading && !session?.user) {
     return <Redirect href="/(auth)/sign-in" />;
   }
@@ -118,9 +166,11 @@ export function PublicProfileScreen() {
     return <Redirect href="/(tabs)/profile" />;
   }
 
+  const isDirectorProfile = completeProfile?.profile.role === "director";
+
   return (
-    <SafeAreaView style={styles.screen}>
-      <View style={styles.topBar}>
+    <SafeAreaView style={[styles.screen, isDirectorProfile ? styles.directorScreen : null]}>
+      <View style={[styles.topBar, isDirectorProfile ? styles.directorTopBar : null]}>
         <Pressable
           accessibilityLabel="Torna indietro"
           accessibilityRole="button"
@@ -128,11 +178,17 @@ export function PublicProfileScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons color={colors.textPrimary} name="chevron-back" size={20} />
+          <Ionicons
+            color={isDirectorProfile ? "#061223" : colors.textPrimary}
+            name="chevron-back"
+            size={20}
+          />
         </Pressable>
-        <AppText variant="titleSm">
+        <AppText style={isDirectorProfile ? styles.directorTopBarTitle : null} variant="titleSm">
           {completeProfile
-            ? getProfileViewerTitle(completeProfile.profile.role as AppRole)
+            ? isDirectorProfile
+              ? completeProfile.profile.full_name
+              : getProfileViewerTitle(completeProfile.profile.role as AppRole)
             : "Profilo"}
         </AppText>
         <View style={styles.backButtonPlaceholder} />
@@ -163,7 +219,19 @@ export function PublicProfileScreen() {
               playerHeaderDetails={playerHeaderDetails}
               staffHeaderDetails={staffHeaderDetails}
             />
-            <ProfileContentBlock completeProfile={completeProfile} />
+            <ProfileContentBlock
+              completeProfile={completeProfile}
+              isConnecting={
+                profileAction?.profileId === completeProfile.profile.id &&
+                profileAction.type === "connect"
+              }
+              isMessaging={
+                profileAction?.profileId === completeProfile.profile.id &&
+                profileAction.type === "message"
+              }
+              onConnect={() => handleConnectToProfile(completeProfile)}
+              onMessage={() => handleMessageProfile(completeProfile)}
+            />
           </>
         ) : (
           <View style={styles.stateBlock}>
@@ -265,6 +333,10 @@ function ProfileHeaderBlock({
     );
   }
 
+  if (role === "director") {
+    return null;
+  }
+
   if (!headerDetails) {
     return null;
   }
@@ -284,8 +356,16 @@ function ProfileHeaderBlock({
 
 function ProfileContentBlock({
   completeProfile,
+  isConnecting = false,
+  isMessaging = false,
+  onConnect,
+  onMessage,
 }: {
   completeProfile: CompleteProfessionalProfile;
+  isConnecting?: boolean;
+  isMessaging?: boolean;
+  onConnect?: () => void;
+  onMessage?: () => void;
 }) {
   const role = completeProfile.profile.role as AppRole;
 
@@ -344,6 +424,19 @@ function ProfileContentBlock({
     );
   }
 
+  if (role === "director") {
+    return (
+      <DirectorProfileTabView
+        completeProfile={completeProfile}
+        isConnecting={isConnecting}
+        isMessaging={isMessaging}
+        isOwner={false}
+        onConnect={onConnect}
+        onMessage={onMessage}
+      />
+    );
+  }
+
   return (
     <ProfileReadonlyView
       completeProfile={completeProfile}
@@ -363,6 +456,8 @@ function getProfileViewerTitle(role: AppRole) {
       return "Profilo staff";
     case "club_admin":
       return "Profilo club";
+    case "director":
+      return "Profilo dirigente";
     case "player":
       return "Profilo giocatore";
     default:
@@ -379,6 +474,16 @@ const styles = StyleSheet.create({
   },
   backButtonPlaceholder: {
     width: 32,
+  },
+  directorScreen: {
+    backgroundColor: "#F7FAFD",
+  },
+  directorTopBar: {
+    backgroundColor: "#F7FAFD",
+    borderBottomColor: "#00000014",
+  },
+  directorTopBarTitle: {
+    color: "#061223",
   },
   screen: {
     backgroundColor: colors.background,

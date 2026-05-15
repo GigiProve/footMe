@@ -56,6 +56,7 @@ import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/Edit
 import { EditStaffMediaModal } from "../../src/features/profiles/edit-modals/EditStaffMediaModal";
 import { StaffProfileTabView } from "../../src/features/profiles/career/StaffProfileTabView";
 import { AgentProfileTabView } from "../../src/features/profiles/career/AgentProfileTabView";
+import { DirectorProfileTabView } from "../../src/features/profiles/career/DirectorProfileTabView";
 import type { StaffGroupedExperience } from "../../src/features/profiles/career/staff-career-grouping";
 import {
   buildFullUpdatePayload,
@@ -467,9 +468,12 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, role === "director" ? styles.directorScreen : null]}>
       <KeyboardAwareForm
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          role === "director" ? styles.directorScrollContent : null,
+        ]}
       >
         {completeProfile && role === "club_admin" && completeProfile.club ? (
           <PublicClubProfileView
@@ -558,7 +562,7 @@ export default function ProfileScreen() {
             primaryRole={agentHeaderDetails.primaryRole}
             statusBadge={agentHeaderDetails.statusBadge}
           />
-        ) : completeProfile && headerDetails ? (
+        ) : completeProfile && role === "director" ? null : completeProfile && headerDetails ? (
           <ProfileHeader
             avatarUrl={completeProfile.profile.avatar_url}
             badges={headerDetails.badges}
@@ -614,6 +618,8 @@ export default function ProfileScreen() {
             onEditMedia={(itemId) => handleManageAgentMedia(itemId)}
             onManageMedia={() => handleManageAgentMedia()}
           />
+        ) : completeProfile && role === "director" ? (
+          <DirectorProfileTabView completeProfile={completeProfile} isOwner />
         ) : completeProfile && role === "club_admin" ? null : completeProfile ? (
           <ProfileReadonlyView
             completeProfile={completeProfile}
@@ -864,6 +870,12 @@ function normalizeExternalUrl(url: string) {
 }
 
 const styles = StyleSheet.create({
+  directorScreen: {
+    backgroundColor: "#F7FAFD",
+  },
+  directorScrollContent: {
+    backgroundColor: "#F7FAFD",
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.background,

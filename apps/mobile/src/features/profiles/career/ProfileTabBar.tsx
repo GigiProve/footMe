@@ -8,6 +8,12 @@ export type ProfileTab = "career" | "media" | "info";
 type ProfileTabBarProps = {
   activeTab: ProfileTab;
   onTabChange: (tab: ProfileTab) => void;
+  activeColor?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  inactiveColor?: string;
+  indicatorColor?: string;
+  tabs?: { label: string; value: ProfileTab }[];
 };
 
 const TABS: { label: string; value: ProfileTab }[] = [
@@ -16,10 +22,19 @@ const TABS: { label: string; value: ProfileTab }[] = [
   { label: "Info", value: "info" },
 ];
 
-export function ProfileTabBar({ activeTab, onTabChange }: ProfileTabBarProps) {
+export function ProfileTabBar({
+  activeTab,
+  activeColor = colors.accent,
+  backgroundColor = colors.surface,
+  borderColor = colors.border,
+  inactiveColor = colors.textMuted,
+  indicatorColor = colors.accent,
+  onTabChange,
+  tabs = TABS,
+}: ProfileTabBarProps) {
   return (
-    <View style={styles.container}>
-      {TABS.map((tab) => {
+    <View style={[styles.container, { backgroundColor, borderBottomColor: borderColor }]}>
+      {tabs.map((tab) => {
         const isActive = tab.value === activeTab;
         return (
           <Pressable
@@ -28,11 +43,18 @@ export function ProfileTabBar({ activeTab, onTabChange }: ProfileTabBarProps) {
             accessibilityState={{ selected: isActive }}
             key={tab.value}
             onPress={() => onTabChange(tab.value)}
-            style={[styles.tab, isActive ? styles.tabActive : styles.tabInactive]}
+            style={[
+              styles.tab,
+              {
+                borderBottomColor: isActive ? indicatorColor : "transparent",
+              },
+            ]}
           >
             <AppText
-              color={isActive ? "accent" : "muted"}
-              style={styles.tabText}
+              style={[
+                styles.tabText,
+                { color: isActive ? activeColor : inactiveColor },
+              ]}
               variant="titleSm"
             >
               {tab.label}
@@ -46,8 +68,6 @@ export function ProfileTabBar({ activeTab, onTabChange }: ProfileTabBarProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
   },
@@ -56,13 +76,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 58,
     justifyContent: "center",
-  },
-  tabActive: {
-    borderBottomColor: colors.accent,
-    borderBottomWidth: 2,
-  },
-  tabInactive: {
-    borderBottomColor: "transparent",
     borderBottomWidth: 2,
   },
   tabText: {

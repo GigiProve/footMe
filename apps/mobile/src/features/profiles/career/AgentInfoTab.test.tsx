@@ -113,6 +113,7 @@ function buildAgentProfile(
     coachDirectorCareerEntries: [],
     coachPlayerCareerEntries: [],
     coachProfile: null,
+    directorProfile: null,
     playerCareerEntries: [],
     playerPalmares: [],
     playerProfile: null,

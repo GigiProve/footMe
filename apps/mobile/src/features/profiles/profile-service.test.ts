@@ -5,6 +5,7 @@ import { getCompleteProfessionalProfile, searchTeams } from "./profile-service";
 const mocks = vi.hoisted(() => {
   const clubMaybeSingleMock = vi.fn();
   const coachMaybeSingleMock = vi.fn();
+  const directorMaybeSingleMock = vi.fn();
   const playerCareerEqMock = vi.fn();
   const playerCareerFirstOrderMock = vi.fn();
   const playerCareerSecondOrderMock = vi.fn();
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => {
   return {
     clubMaybeSingleMock,
     coachMaybeSingleMock,
+    directorMaybeSingleMock,
     fromMock: vi.fn((table: string) => {
       if (table === "profiles_with_age") {
         return {
@@ -63,6 +65,16 @@ const mocks = vi.hoisted(() => {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               maybeSingle: staffMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "director_profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: directorMaybeSingleMock,
             })),
           })),
         };
@@ -175,6 +187,7 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.profileMaybeSingleMock.mockReset();
     mocks.playerMaybeSingleMock.mockReset();
     mocks.coachMaybeSingleMock.mockReset();
+    mocks.directorMaybeSingleMock.mockReset();
     mocks.staffMaybeSingleMock.mockReset();
     mocks.clubMaybeSingleMock.mockReset();
     mocks.rpcMock.mockReset();
@@ -220,6 +233,7 @@ describe("getCompleteProfessionalProfile", () => {
       error: null,
     });
     mocks.coachMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.directorMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.staffMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.clubMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.profileContactsMaybeSingleMock.mockResolvedValue({
@@ -372,6 +386,58 @@ describe("getCompleteProfessionalProfile", () => {
     expect(result.club).toEqual(club);
     expect(result.playerProfile).toBeNull();
     expect(result.playerCareerEntries).toEqual([]);
+    expect(
+      mocks.fromMock.mock.calls.some(([table]) => table === "player_career_entries"),
+    ).toBe(false);
+  });
+
+  it("loads director-specific profile data for director profiles", async () => {
+    mocks.profileMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        avatar_url: null,
+        bio: "Costruzione rosa e sviluppo progetto sportivo.",
+        birth_date: null,
+        age: null,
+        city: "Como",
+        full_name: "Marco Rossi",
+        id: "director-1",
+        is_open_to_transfer: false,
+        nationality: "IT",
+        region: "Lombardia",
+        role: "director",
+      },
+      error: null,
+    });
+    mocks.directorMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        career_entries: [],
+        club_types: ["Societa dilettantistica"],
+        director_roles: ["Direttore sportivo"],
+        experience_categories: ["Serie D", "Eccellenza"],
+        has_other_football_experience: true,
+        has_played_football: false,
+        main_focus: "Prima squadra",
+        market_involvement: "Solo supporto",
+        other_football_roles: ["Scout"],
+        player_career_entries: [],
+        primary_role: "Direttore sportivo",
+        profile_id: "director-1",
+        responsibilities: ["Gestione rose e contratti", "Settore giovanile"],
+      },
+      error: null,
+    });
+
+    const result = await getCompleteProfessionalProfile("director-1");
+
+    expect(result.profile.role).toBe("director");
+    expect(result.directorProfile).toMatchObject({
+      director_roles: ["Direttore sportivo"],
+      experience_categories: ["Serie D", "Eccellenza"],
+      main_focus: "Prima squadra",
+      primary_role: "Direttore sportivo",
+      responsibilities: ["Gestione rose e contratti", "Settore giovanile"],
+    });
+    expect(result.playerProfile).toBeNull();
     expect(
       mocks.fromMock.mock.calls.some(([table]) => table === "player_career_entries"),
     ).toBe(false);

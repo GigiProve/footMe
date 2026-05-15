@@ -26,6 +26,11 @@ vi.mock("./profile-service", () => ({
   getCompleteProfessionalProfile: vi.fn(),
 }));
 
+vi.mock("../networking/networking-service", () => ({
+  requestConnection: vi.fn(),
+  startDirectConversation: vi.fn(),
+}));
+
 vi.mock("./profile-edit-helpers", () => ({
   buildAgentProfileHeaderDetails: () => ({
     agencyLabel: "MB Football Management",
@@ -72,6 +77,11 @@ vi.mock("./career/CoachProfileTabView", () => ({
 vi.mock("./career/StaffProfileTabView", () => ({
   StaffProfileTabView: ({ isOwner }: { isOwner: boolean }) =>
     React.createElement("StaffProfileTabView", { isOwner }, isOwner ? "owner" : "visitor"),
+}));
+
+vi.mock("./career/DirectorProfileTabView", () => ({
+  DirectorProfileTabView: () =>
+    React.createElement("DirectorProfileTabView", { mode: "director" }, "director"),
 }));
 
 vi.mock("./ProfileReadonlyView", () => ({
@@ -137,6 +147,7 @@ function buildAgentProfile(): CompleteProfessionalProfile {
     coachDirectorCareerEntries: [],
     coachPlayerCareerEntries: [],
     coachProfile: null,
+    directorProfile: null,
     playerCareerEntries: [],
     playerPalmares: [],
     playerProfile: null,
@@ -173,6 +184,36 @@ function buildAgentProfile(): CompleteProfessionalProfile {
       showEmail: false,
       showFacebook: false,
       showInstagram: false,
+    },
+  };
+}
+
+function buildDirectorProfile(): CompleteProfessionalProfile {
+  const profile = buildAgentProfile();
+
+  return {
+    ...profile,
+    agentProfile: null,
+    directorProfile: {
+      career_entries: [],
+      club_types: ["Societa dilettantistica"],
+      director_roles: ["Direttore sportivo"],
+      experience_categories: ["Serie D"],
+      has_other_football_experience: false,
+      has_played_football: false,
+      main_focus: "Prima squadra",
+      market_involvement: null,
+      other_football_roles: [],
+      player_career_entries: [],
+      primary_role: "Direttore sportivo",
+      profile_id: "director-2",
+      responsibilities: ["Gestione rose e contratti"],
+    },
+    profile: {
+      ...profile.profile,
+      full_name: "Marco Rossi",
+      id: "director-2",
+      role: "director",
     },
   };
 }
@@ -243,5 +284,41 @@ describe("PublicProfileScreen", () => {
 
     expect(tree.root.findByProps({ mode: "visitor" })).toBeTruthy();
     expect(tree.root.findByProps({ isOwner: false })).toBeTruthy();
+  });
+
+  it("renders a remote director profile with the dedicated tab view", async () => {
+    localSearchParamsMock.mockReturnValue({ id: "director-2" });
+    vi.mocked(useSession).mockReturnValue({
+      isLoading: false,
+      needsOnboarding: false,
+      profile: {
+        avatar_url: null,
+        city: "Milano",
+        club_id: null,
+        club_name: null,
+        full_name: "Mario Rossi",
+        id: "user-1",
+        is_admin: false,
+        region: "Lombardia",
+        role: "player",
+      },
+      refreshProfile: vi.fn(),
+      session: {
+        user: {
+          id: "user-1",
+        },
+      } as never,
+    });
+    vi.mocked(getCompleteProfessionalProfile).mockResolvedValue(buildDirectorProfile());
+
+    let tree!: TestRenderer.ReactTestRenderer;
+
+    await act(async () => {
+      tree = TestRenderer.create(<PublicProfileScreen />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(tree.root.findByProps({ mode: "director" })).toBeTruthy();
   });
 });
