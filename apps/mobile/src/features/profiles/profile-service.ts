@@ -37,6 +37,11 @@ import {
   normalizeStaffMediaItems,
   type StaffMediaItemRecord,
 } from "./staff-media";
+import {
+  normalizeDirectorMediaItems,
+  type DirectorMediaItemRecord,
+  type DirectorMediaTargetCandidate,
+} from "./director-media";
 
 export type {
   AgentCareerEntryRecord,
@@ -261,6 +266,7 @@ export type DirectorProfileRecord = {
   has_played_football: boolean;
   main_focus: string | null;
   market_involvement: string | null;
+  media_items: DirectorMediaItemRecord[];
   other_football_roles: string[];
   player_career_entries: unknown[];
   primary_role: string | null;
@@ -402,6 +408,7 @@ export type CompleteProfessionalProfileUpdate = {
     has_played_football: boolean;
     main_focus: string | null;
     market_involvement: string | null;
+    media_items?: DirectorMediaItemRecord[];
     other_football_roles: string[];
     player_career_entries: unknown[];
     primary_role: string | null;
@@ -929,6 +936,7 @@ function normalizeDirectorProfileRecord(
     has_played_football: normalizeBoolean(rawProfile.has_played_football),
     main_focus: normalizeOptionalText(rawProfile.main_focus),
     market_involvement: normalizeOptionalText(rawProfile.market_involvement),
+    media_items: normalizeDirectorMediaItems(rawProfile.media_items),
     other_football_roles: normalizeStringArray(rawProfile.other_football_roles),
     player_career_entries: Array.isArray(rawProfile.player_career_entries)
       ? rawProfile.player_career_entries
@@ -1342,7 +1350,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("director_profiles")
           .select(
-            "profile_id, director_roles, primary_role, responsibilities, experience_categories, main_focus, market_involvement, career_entries, coach_career_entries, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, club_types",
+            "profile_id, director_roles, primary_role, responsibilities, experience_categories, main_focus, market_involvement, media_items, career_entries, coach_career_entries, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, club_types",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -1957,6 +1965,7 @@ export async function updateCompleteProfessionalProfile(
       has_played_football: input.directorProfile.has_played_football,
       main_focus: input.directorProfile.main_focus,
       market_involvement: input.directorProfile.market_involvement,
+      media_items: input.directorProfile.media_items ?? [],
       other_football_roles: input.directorProfile.other_football_roles,
       player_career_entries: input.directorProfile.player_career_entries,
       primary_role: input.directorProfile.primary_role,
@@ -2235,6 +2244,35 @@ export async function saveAgentProfileMedia(input: {
   }
 }
 
+export async function saveDirectorProfileMedia(input: {
+  directorProfile: NonNullable<CompleteProfessionalProfile["directorProfile"]>;
+  mediaItems: DirectorMediaItemRecord[];
+  profileId: string;
+}) {
+  const { error } = await supabase.from("director_profiles").upsert({
+    career_entries: input.directorProfile.career_entries,
+    coach_career_entries: input.directorProfile.coach_career_entries,
+    club_types: input.directorProfile.club_types,
+    director_roles: input.directorProfile.director_roles,
+    experience_categories: input.directorProfile.experience_categories,
+    has_other_football_experience:
+      input.directorProfile.has_other_football_experience,
+    has_played_football: input.directorProfile.has_played_football,
+    main_focus: input.directorProfile.main_focus,
+    market_involvement: input.directorProfile.market_involvement,
+    media_items: input.mediaItems,
+    other_football_roles: input.directorProfile.other_football_roles,
+    player_career_entries: input.directorProfile.player_career_entries,
+    primary_role: input.directorProfile.primary_role,
+    profile_id: input.profileId,
+    responsibilities: input.directorProfile.responsibilities,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function searchTeams(query: string, limit = 5) {
   const trimmedQuery = query.trim();
 
@@ -2303,6 +2341,88 @@ export async function searchAgentPlayerCandidates(query: string, limit = 8) {
     profile_id: row.profile_id,
     region: row.region,
   }));
+}
+
+export async function searchDirectorMediaTargets(query: string, limit = 8) {
+  const trimmedQuery = query.trim();
+
+  if (trimmedQuery.length < 2) {
+    return [] as DirectorMediaTargetCandidate[];
+  }
+
+  const [profilesResult, clubsResult] = await Promise.all([
+    supabase
+      .from("profiles_with_age")
+      .select("id, full_name, avatar_url, role, city, region")
+      .in("role", ["player", "coach", "staff"])
+      .ilike("full_name", `%${trimmedQuery}%`)
+      .limit(limit),
+    supabase
+      .from("clubs")
+      .select("id, name, city, region, category, logo_url")
+      .ilike("name", `%${trimmedQuery}%`)
+      .limit(limit),
+  ]);
+
+  if (profilesResult.error) {
+    throw profilesResult.error;
+  }
+
+  if (clubsResult.error) {
+    throw clubsResult.error;
+  }
+
+  const profileTargets = ((profilesResult.data ?? []) as {
+    avatar_url: string | null;
+    city: string | null;
+    full_name: string;
+    id: string;
+    region: string | null;
+    role: string | null;
+  }[]).map((row) => ({
+    avatar_url: row.avatar_url,
+    display_name: row.full_name,
+    role: row.role,
+    subtitle: formatDirectorMediaProfileSubtitle(row.role, row.city, row.region),
+    target_id: row.id,
+    target_type: "profile" as const,
+  }));
+
+  const clubTargets = ((clubsResult.data ?? []) as {
+    category: string | null;
+    city: string | null;
+    id: string;
+    logo_url: string | null;
+    name: string;
+    region: string | null;
+  }[]).map((row) => ({
+    avatar_url: row.logo_url,
+    display_name: row.name,
+    role: "club",
+    subtitle: [row.category, row.city ?? row.region].filter(Boolean).join(" - ") || null,
+    target_id: row.id,
+    target_type: "club" as const,
+  }));
+
+  return [...profileTargets, ...clubTargets].slice(0, limit);
+}
+
+function formatDirectorMediaProfileSubtitle(
+  role: string | null,
+  city: string | null,
+  region: string | null,
+) {
+  const roleLabel =
+    role === "player"
+      ? "Calciatore"
+      : role === "coach"
+        ? "Allenatore"
+        : role === "staff"
+          ? "Staff"
+          : "Profilo";
+  const location = city || region;
+
+  return location ? `${roleLabel} - ${location}` : roleLabel;
 }
 
 export async function upsertCoachAchievement(

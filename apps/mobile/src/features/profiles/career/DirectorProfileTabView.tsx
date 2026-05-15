@@ -4,8 +4,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { radius, spacing } from "../../../theme/tokens";
 import { AppText, EmptyState } from "../../../ui";
+import type { DirectorMediaLinkedTarget } from "../director-media";
 import { withDefaultProfileAvatar } from "../profile-avatar";
 import type { CompleteProfessionalProfile } from "../profile-service";
+import { DirectorMediaTabContent } from "./DirectorMediaTabContent";
 import { DirectorInfoTab } from "./DirectorInfoTab";
 import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
 
@@ -15,7 +17,12 @@ type DirectorProfileTabViewProps = {
   isMessaging?: boolean;
   isOwner?: boolean;
   onConnect?: () => void;
+  onDeleteMedia?: (itemId: string) => void;
+  onEditMedia?: (itemId: string) => void;
+  onManageMedia?: () => void;
   onMessage?: () => void;
+  onOpenLinkedTarget?: (target: DirectorMediaLinkedTarget) => void;
+  onToggleMediaFeatured?: (itemId: string) => void;
 };
 
 type DirectorCareerPreview = {
@@ -52,7 +59,12 @@ export function DirectorProfileTabView({
   isMessaging = false,
   isOwner = false,
   onConnect,
+  onDeleteMedia,
+  onEditMedia,
+  onManageMedia,
   onMessage,
+  onOpenLinkedTarget,
+  onToggleMediaFeatured,
 }: DirectorProfileTabViewProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("career");
 
@@ -73,7 +85,17 @@ export function DirectorProfileTabView({
       {activeTab === "career" ? (
         <DirectorCareerTabContent completeProfile={completeProfile} />
       ) : activeTab === "media" ? (
-        <DirectorMediaTabContent />
+        <DirectorMediaTabContent
+          authorAvatarUrl={completeProfile.profile.avatar_url}
+          authorName={completeProfile.profile.full_name}
+          initialItems={completeProfile.directorProfile?.media_items ?? []}
+          mode={isOwner ? "owner" : "visitor"}
+          onAddContentPress={isOwner ? onManageMedia : undefined}
+          onDeleteContentPress={isOwner ? onDeleteMedia : undefined}
+          onEditContentPress={isOwner ? onEditMedia : undefined}
+          onOpenLinkedTarget={onOpenLinkedTarget}
+          onToggleFeaturedPress={isOwner ? onToggleMediaFeatured : undefined}
+        />
       ) : (
         <DirectorInfoTab
           completeProfile={completeProfile}
@@ -309,17 +331,6 @@ function TeamLogo({
   return (
     <View style={[styles.logoFallback, { height: size, width: size }]}>
       <Ionicons color={bananiColors.primary} name="shield" size={18} />
-    </View>
-  );
-}
-
-function DirectorMediaTabContent() {
-  return (
-    <View style={styles.emptyContainer}>
-      <EmptyState
-        description="Questo profilo dirigente non ha ancora pubblicato contenuti."
-        title="Nessun contenuto"
-      />
     </View>
   );
 }

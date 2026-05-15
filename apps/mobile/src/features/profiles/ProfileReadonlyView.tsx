@@ -55,6 +55,7 @@ type EditSection =
   | "coachInfo"
   | "coachAchievements"
   | "coachExperiences"
+  | "directorMedia"
   | "staffInfo"
   | "staffExperiences"
   | "staffMedia"

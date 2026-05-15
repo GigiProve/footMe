@@ -44,6 +44,7 @@ import { EditCoachProfileModal } from "../../src/features/profiles/edit-modals/E
 import { EditCoachMediaModal } from "../../src/features/profiles/edit-modals/EditCoachMediaModal";
 import { EditCoachExperiencesModal } from "../../src/features/profiles/edit-modals/EditCoachExperiencesModal";
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
+import { EditDirectorMediaModal } from "../../src/features/profiles/edit-modals/EditDirectorMediaModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
 import { EditPlayerExperiencesModal } from "../../src/features/profiles/edit-modals/EditPlayerExperiencesModal";
 import { EditPlayerMediaModal } from "../../src/features/profiles/edit-modals/EditPlayerMediaModal";
@@ -82,10 +83,12 @@ import { AgentProfileHeader } from "../../src/features/profiles/AgentProfileHead
 import {
   getCompleteProfessionalProfile,
   saveAgentProfileMedia,
+  saveDirectorProfileMedia,
   updateCompleteProfessionalProfile,
   type CompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
 import { removeMediaFromStorage } from "../../src/features/profiles/media-upload-service";
+import type { DirectorMediaLinkedTarget } from "../../src/features/profiles/director-media";
 import type { GroupedExperience } from "../../src/features/profiles/career/career-grouping";
 import type { CoachGroupedExperience } from "../../src/features/profiles/career/coach-career-grouping";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
@@ -126,6 +129,7 @@ export default function ProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<EditSection | null>(null);
   const [agentMediaEditingItemId, setAgentMediaEditingItemId] = useState<string | null>(null);
+  const [directorMediaEditingItemId, setDirectorMediaEditingItemId] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
     if (!userId) {
@@ -224,11 +228,13 @@ export default function ProfileScreen() {
   function handleCloseModal() {
     setActiveModal(null);
     setAgentMediaEditingItemId(null);
+    setDirectorMediaEditingItemId(null);
   }
 
   async function handleSaved() {
     setActiveModal(null);
     setAgentMediaEditingItemId(null);
+    setDirectorMediaEditingItemId(null);
     await Promise.all([loadProfile(), refreshProfile()]);
     Alert.alert(
       "Profilo aggiornato",
@@ -292,6 +298,11 @@ export default function ProfileScreen() {
     setActiveModal("agentMedia");
   }
 
+  function handleManageDirectorMedia(itemId: string | null = null) {
+    setDirectorMediaEditingItemId(itemId);
+    setActiveModal("directorMedia");
+  }
+
   function handleOpenClubPositions() {
     if (!completeProfile?.club) {
       return;
@@ -310,6 +321,15 @@ export default function ProfileScreen() {
 
   function handleOpenProfile(profileId: string) {
     router.push(`/profile/${profileId}` as never);
+  }
+
+  function handleOpenDirectorLinkedTarget(target: DirectorMediaLinkedTarget) {
+    if (target.target_type === "club") {
+      router.push(`/club/${target.target_id}` as never);
+      return;
+    }
+
+    router.push(`/profile/${target.target_id}` as never);
   }
 
   async function handleDeleteExperience(group: GroupedExperience) {
@@ -467,6 +487,75 @@ export default function ProfileScreen() {
     );
   }
 
+  function handleDeleteDirectorMedia(itemId: string) {
+    if (!completeProfile?.directorProfile || !userId) {
+      return;
+    }
+
+    const itemToDelete =
+      completeProfile.directorProfile.media_items.find((item) => item.id === itemId) ?? null;
+
+    if (!itemToDelete) {
+      return;
+    }
+
+    Alert.alert(
+      "Elimina contenuto",
+      "Rimuovere questo contenuto dalla tab Media del dirigente?",
+      [
+        { style: "cancel", text: "Annulla" },
+        {
+          onPress: async () => {
+            try {
+              const nextItems = completeProfile.directorProfile?.media_items.filter(
+                (item) => item.id !== itemId,
+              ) ?? [];
+
+              await saveDirectorProfileMedia({
+                directorProfile: completeProfile.directorProfile!,
+                mediaItems: nextItems,
+                profileId: userId,
+              });
+
+              await Promise.allSettled([removeMediaFromStorage(itemToDelete.url)]);
+              await loadProfile();
+              Alert.alert("Contenuto eliminato", "La tab Media e' stata aggiornata.");
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "Impossibile eliminare il contenuto.";
+              Alert.alert("Errore", message);
+            }
+          },
+          style: "destructive",
+          text: "Elimina",
+        },
+      ],
+    );
+  }
+
+  async function handleToggleDirectorMediaFeatured(itemId: string) {
+    if (!completeProfile?.directorProfile || !userId) {
+      return;
+    }
+
+    const nextItems = completeProfile.directorProfile.media_items.map((item) =>
+      item.id === itemId ? { ...item, is_featured: !item.is_featured } : item,
+    );
+
+    try {
+      await saveDirectorProfileMedia({
+        directorProfile: completeProfile.directorProfile,
+        mediaItems: nextItems,
+        profileId: userId,
+      });
+      await loadProfile();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Impossibile aggiornare l'evidenza.";
+      Alert.alert("Errore", message);
+    }
+  }
+
   return (
     <SafeAreaView style={[styles.screen, role === "director" ? styles.directorScreen : null]}>
       <KeyboardAwareForm
@@ -619,7 +708,15 @@ export default function ProfileScreen() {
             onManageMedia={() => handleManageAgentMedia()}
           />
         ) : completeProfile && role === "director" ? (
-          <DirectorProfileTabView completeProfile={completeProfile} isOwner />
+          <DirectorProfileTabView
+            completeProfile={completeProfile}
+            isOwner
+            onDeleteMedia={handleDeleteDirectorMedia}
+            onEditMedia={(itemId) => handleManageDirectorMedia(itemId)}
+            onManageMedia={() => handleManageDirectorMedia()}
+            onOpenLinkedTarget={handleOpenDirectorLinkedTarget}
+            onToggleMediaFeatured={handleToggleDirectorMediaFeatured}
+          />
         ) : completeProfile && role === "club_admin" ? null : completeProfile ? (
           <ProfileReadonlyView
             completeProfile={completeProfile}
@@ -778,6 +875,16 @@ export default function ProfileScreen() {
                 visible={activeModal === "agentProfile"}
               />
             </>
+          ) : null}
+          {role === "director" ? (
+            <EditDirectorMediaModal
+              completeProfile={completeProfile}
+              editingItemId={directorMediaEditingItemId}
+              onClose={handleCloseModal}
+              onSaved={handleSaved}
+              userId={userId}
+              visible={activeModal === "directorMedia"}
+            />
           ) : null}
           {role === "club_admin" ? (
             <>

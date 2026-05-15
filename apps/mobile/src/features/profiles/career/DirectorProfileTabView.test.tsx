@@ -9,6 +9,11 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: (props: Record<string, unknown>) => React.createElement("Ionicon", props),
 }));
 
+vi.mock("../../../components/ui/video-player-modal", () => ({
+  VideoPlayerModal: (props: Record<string, unknown>) =>
+    React.createElement("mock-video-player-modal", props),
+}));
+
 function buildDirectorProfile(
   overrides: Partial<CompleteProfessionalProfile> = {},
 ): CompleteProfessionalProfile {
@@ -62,6 +67,7 @@ function buildDirectorProfile(
       has_played_football: true,
       main_focus: "Prima squadra",
       market_involvement: "Si, attivamente",
+      media_items: [],
       other_football_roles: ["Allenatore"],
       player_career_entries: [
         {
@@ -184,5 +190,86 @@ describe("DirectorProfileTabView", () => {
     expect(tree.root.findByProps({ children: "2019 - 2021 - Eccellenza" })).toBeTruthy();
     expect(tree.root.findAllByProps({ name: "shield" }).length).toBeGreaterThan(0);
     expect(tree.root.findAllByProps({ children: "Esperienze precedenti" })).toHaveLength(0);
+  });
+
+  it("renders director media with featured ordering, clean thumbnails and owner actions", () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(
+        <DirectorProfileTabView
+          completeProfile={buildDirectorProfile({
+            directorProfile: {
+              ...buildDirectorProfile().directorProfile!,
+              media_items: [
+                {
+                  created_at: "2026-05-01T10:00:00.000Z",
+                  description: "Foto istituzionale senza overlay tag.",
+                  id: "clean-item",
+                  is_featured: false,
+                  linked_targets: [],
+                  tag: null,
+                  thumbnail_url: "https://example.com/clean.jpg",
+                  type: "image",
+                  url: "https://example.com/clean.jpg",
+                },
+                {
+                  created_at: "2026-04-30T10:00:00.000Z",
+                  description: "Intervista sul progetto sportivo.",
+                  id: "featured-item",
+                  is_featured: true,
+                  linked_targets: [
+                    {
+                      avatar_url: null,
+                      display_name: "AC Como",
+                      role: "club",
+                      subtitle: "Serie D - Como",
+                      target_id: "club-1",
+                      target_type: "club",
+                    },
+                  ],
+                  tag: "interview",
+                  thumbnail_url: "https://example.com/interview.jpg",
+                  type: "video",
+                  url: "https://example.com/interview.mp4",
+                },
+              ],
+            },
+          })}
+          isOwner
+        />,
+      );
+    });
+
+    act(() => {
+      tree.root.findByProps({ accessibilityLabel: "Media" }).props.onPress();
+    });
+
+    const gridItemIds = tree.root
+      .findAll(
+        (node) =>
+          node.props.testID === "director-media-grid-item-featured-item" ||
+          node.props.testID === "director-media-grid-item-clean-item",
+      )
+      .map((node) => node.props.testID);
+
+    expect(gridItemIds[0]).toBe("director-media-grid-item-featured-item");
+    expect(tree.root.findAllByProps({ children: "Intervista" }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ children: "Mercato" })).toHaveLength(0);
+
+    act(() => {
+      tree.root
+        .findByProps({ testID: "director-media-grid-item-featured-item" })
+        .props.onPress();
+    });
+
+    expect(tree.root.findByProps({ children: "Profili collegati" })).toBeTruthy();
+    expect(tree.root.findAllByProps({ children: "AC Como" }).length).toBeGreaterThan(0);
+    expect(
+      tree.root.findByProps({ accessibilityLabel: "Modifica contenuto media dirigente" }),
+    ).toBeTruthy();
+    expect(
+      tree.root.findByProps({ accessibilityLabel: "Elimina contenuto media dirigente" }),
+    ).toBeTruthy();
   });
 });

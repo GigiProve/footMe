@@ -204,6 +204,7 @@ function buildDirectorProfile(): CompleteProfessionalProfile {
       has_played_football: false,
       main_focus: "Prima squadra",
       market_involvement: null,
+      media_items: [],
       other_football_roles: [],
       player_career_entries: [],
       primary_role: "Direttore sportivo",

@@ -37,6 +37,7 @@ import { ProfileTabView } from "./career/ProfileTabView";
 import { StaffProfileTabView } from "./career/StaffProfileTabView";
 import { AgentProfileTabView } from "./career/AgentProfileTabView";
 import { DirectorProfileTabView } from "./career/DirectorProfileTabView";
+import type { DirectorMediaLinkedTarget } from "./director-media";
 import {
   requestConnection,
   startDirectConversation,
@@ -154,6 +155,15 @@ export function PublicProfileScreen() {
     }
   }
 
+  function handleOpenDirectorLinkedTarget(target: DirectorMediaLinkedTarget) {
+    if (target.target_type === "club") {
+      router.push(`/club/${target.target_id}` as never);
+      return;
+    }
+
+    router.push(`/profile/${target.target_id}` as never);
+  }
+
   if (!isSessionLoading && !session?.user) {
     return <Redirect href="/(auth)/sign-in" />;
   }
@@ -231,6 +241,7 @@ export function PublicProfileScreen() {
               }
               onConnect={() => handleConnectToProfile(completeProfile)}
               onMessage={() => handleMessageProfile(completeProfile)}
+              onOpenDirectorLinkedTarget={handleOpenDirectorLinkedTarget}
             />
           </>
         ) : (
@@ -360,12 +371,14 @@ function ProfileContentBlock({
   isMessaging = false,
   onConnect,
   onMessage,
+  onOpenDirectorLinkedTarget,
 }: {
   completeProfile: CompleteProfessionalProfile;
   isConnecting?: boolean;
   isMessaging?: boolean;
   onConnect?: () => void;
   onMessage?: () => void;
+  onOpenDirectorLinkedTarget?: (target: DirectorMediaLinkedTarget) => void;
 }) {
   const role = completeProfile.profile.role as AppRole;
 
@@ -433,6 +446,7 @@ function ProfileContentBlock({
         isOwner={false}
         onConnect={onConnect}
         onMessage={onMessage}
+        onOpenLinkedTarget={onOpenDirectorLinkedTarget}
       />
     );
   }
