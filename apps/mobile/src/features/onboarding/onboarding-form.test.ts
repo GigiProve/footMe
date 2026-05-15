@@ -321,6 +321,52 @@ describe("onboarding-form", () => {
     expect(getPreviousOnboardingStep("complete", null, "agent")).toBe("agent_extra");
   });
 
+  it("maps the director coach career substep to the previous-experience progress group", () => {
+    expect(getOnboardingProgress("director_coach_career", "director")).toMatchObject({
+      stepIndex: 9,
+      totalSteps: 13,
+    });
+    expect(
+      getPreviousOnboardingStep(
+        "director_player_career_toggle",
+        "director_coach_career",
+        "director",
+      ),
+    ).toBe("director_coach_career");
+    expect(
+      getPreviousOnboardingStep(
+        "director_player_career_toggle",
+        "director_football_experience",
+        "director",
+      ),
+    ).toBe("director_football_experience");
+  });
+
+  it("normalizes director coach career draft entries with descriptions", () => {
+    const draft = normalizeOnboardingDraft({
+      directorCoachCareerEntries: [
+        {
+          category: "Under 17",
+          description: "Gestione gruppo e sviluppo tecnico.",
+          id: "director-coach-1",
+          period: null,
+          role: "Allenatore Under 17",
+          seasonDetails: undefined as never,
+          seasons: ["2018/2019"],
+          teamName: "Como Academy",
+          type: "SINGLE_SEASON",
+        },
+      ],
+    });
+
+    expect(draft.directorCoachCareerEntries).toEqual([
+      expect.objectContaining({
+        description: "Gestione gruppo e sviluppo tecnico.",
+        seasonDetails: {},
+      }),
+    ]);
+  });
+
   // ---------------------------------------------------------------------------
   // Nationality category classification
   // ---------------------------------------------------------------------------

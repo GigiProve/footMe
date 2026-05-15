@@ -891,6 +891,69 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     });
   });
 
+  it("persists director career and previous coach entries", async () => {
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      coachProfile: null,
+      directorProfile: {
+        career_entries: [
+          {
+            category: "Serie D",
+            description: "Gestione mercato e coordinamento sportivo.",
+            id: "director-career-1",
+            role: "Direttore sportivo",
+            seasons: ["2024/2025"],
+            teamName: "AC Como",
+          },
+        ],
+        coach_career_entries: [
+          {
+            category: "Under 17",
+            description: "Gestione del gruppo e sviluppo tecnico.",
+            id: "director-coach-1",
+            role: "Allenatore Under 17",
+            seasons: ["2018/2019"],
+            teamName: "Como Academy",
+          },
+        ],
+        club_types: ["Societa dilettantistica"],
+        director_roles: ["Direttore sportivo"],
+        experience_categories: ["Serie D"],
+        has_other_football_experience: true,
+        has_played_football: false,
+        main_focus: "Prima squadra",
+        market_involvement: "Solo supporto",
+        other_football_roles: ["Allenatore"],
+        player_career_entries: [],
+        primary_role: "Direttore sportivo",
+        responsibilities: ["Gestione rose e contratti"],
+      },
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "director",
+      staffProfile: null,
+    });
+
+    expect(mocks.directorProfilesUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        career_entries: [
+          expect.objectContaining({
+            description: "Gestione mercato e coordinamento sportivo.",
+            role: "Direttore sportivo",
+          }),
+        ],
+        coach_career_entries: [
+          expect.objectContaining({
+            description: "Gestione del gruppo e sviluppo tecnico.",
+            role: "Allenatore Under 17",
+          }),
+        ],
+        other_football_roles: ["Allenatore"],
+        profile_id: "profile-1",
+      }),
+    );
+  });
+
   it("persists fan interests in fan_profiles", async () => {
     await updateCompleteProfessionalProfile({
       ...buildUpdateInput(),

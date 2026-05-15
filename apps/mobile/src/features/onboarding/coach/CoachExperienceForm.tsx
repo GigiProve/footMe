@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 
 import { SelectField } from "../../../components/ui/select-field";
 import { colors, radius, spacing } from "../../../theme/tokens";
-import { AppText, Button } from "../../../ui";
+import { AppText, Button, Input } from "../../../ui";
 import {
   SENIOR_CATEGORY_OPTIONS,
   YOUTH_CATEGORY_OPTIONS,
@@ -42,9 +42,12 @@ type CoachExperienceFormProps = {
   roleOptions?: { label: string; value: string }[];
   rolePlaceholder?: string;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  showDescription?: boolean;
   teamLabel?: string;
   teamPlaceholder?: string;
   title?: string;
+  descriptionLabel?: string;
+  descriptionPlaceholder?: string;
 };
 
 const COACH_EXPERIENCE_CATEGORY_OPTIONS = [
@@ -398,9 +401,12 @@ export function CoachExperienceForm({
   roleOptions = COACH_ROLE_OPTIONS,
   rolePlaceholder = "Seleziona ruolo",
   searchTeams,
+  showDescription = false,
   teamLabel = "Squadra *",
   teamPlaceholder = "Es. ASD Pro Calcio",
   title,
+  descriptionLabel = "Attività svolte",
+  descriptionPlaceholder = "Riassumi in una o due righe attività, gestione del gruppo o coordinamento sportivo.",
 }: CoachExperienceFormProps) {
   const [form, setForm] = useState<CoachCareerEntry>(entry);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -737,6 +743,21 @@ export function CoachExperienceForm({
         </View>
       ) : null}
 
+      {showDescription ? (
+        <View style={formStyles.fieldGroup}>
+          <Input
+            label={descriptionLabel}
+            multiline
+            numberOfLines={3}
+            onChangeText={(value) => updateField("description", value)}
+            placeholder={descriptionPlaceholder}
+            style={formStyles.descriptionInput}
+            textAlignVertical="top"
+            value={form.description ?? ""}
+          />
+        </View>
+      ) : null}
+
       {/* Action buttons */}
       <Button
         label={isEditing ? "Salva modifiche" : "Salva esperienza"}
@@ -754,6 +775,9 @@ const formStyles = StyleSheet.create({
   },
   fieldGroup: {
     gap: spacing[8],
+  },
+  descriptionInput: {
+    minHeight: 96,
   },
   seasonDetailsSection: {
     gap: spacing[12],

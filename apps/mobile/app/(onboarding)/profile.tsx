@@ -270,7 +270,7 @@ function mapCoachCareerEntryToStaffRecord(
   return {
     category: entry.category || null,
     club_id: entry.clubId ?? null,
-    description: null,
+    description: entry.description?.trim() || null,
     experience_type: entry.type,
     head_coach_name: null,
     id: entry.id,
@@ -308,6 +308,14 @@ function mapPlayerExperienceFormToStaffRecord(
     staff_profile_id: profileId,
     team_logo_url: entry.teamLogoUrl || null,
     team_name: entry.clubName,
+  };
+}
+
+function normalizeCoachCareerEntryForJson(entry: CoachCareerEntry): CoachCareerEntry {
+  return {
+    ...entry,
+    description: entry.description?.trim() || null,
+    seasonDetails: entry.seasonDetails ?? {},
   };
 }
 
@@ -635,6 +643,7 @@ export default function OnboardingProfileScreen() {
     directorBio,
     directorCareerEntries,
     directorCategories,
+    directorCoachCareerEntries,
     directorClubTypes,
     directorHasOtherFootballExperience,
     directorHasPlayedFootball,
@@ -1930,6 +1939,18 @@ export default function OnboardingProfileScreen() {
 
     patchForm({ lastCompletedStep: "director_football_experience" });
     setValidationErrors({});
+    if (
+      directorHasOtherFootballExperience &&
+      directorOtherFootballRoles.includes("Allenatore")
+    ) {
+      navigateToStep("director_coach_career");
+      return;
+    }
+    navigateToStep("director_player_career_toggle");
+  }
+
+  function handleContinueFromDirectorCoachCareer() {
+    patchForm({ lastCompletedStep: "director_coach_career" });
     navigateToStep("director_player_career_toggle");
   }
 
@@ -1977,7 +1998,12 @@ export default function OnboardingProfileScreen() {
         clubSeasonEntries: [],
         coachProfile: null,
         directorProfile: {
-          career_entries: directorCareerEntries,
+          career_entries: directorCareerEntries.map(normalizeCoachCareerEntryForJson),
+          coach_career_entries:
+            directorHasOtherFootballExperience &&
+            directorOtherFootballRoles.includes("Allenatore")
+              ? directorCoachCareerEntries.map(normalizeCoachCareerEntryForJson)
+              : [],
           club_types: directorClubTypes,
           director_roles: directorRoles,
           experience_categories: directorCategories,
@@ -2266,7 +2292,7 @@ export default function OnboardingProfileScreen() {
           category: entry.category || null,
           club_id: entry.clubId ?? null,
           coach_profile_id: session.user.id,
-          description: null,
+          description: entry.description?.trim() || null,
           experience_type: entry.type,
           id: entry.id,
           period_end_month: entry.period?.endMonth || null,
@@ -4503,6 +4529,8 @@ export default function OnboardingProfileScreen() {
           <CoachCareerStep
             addButtonLabel="Aggiungi esperienza dirigenziale"
             defaultRole={directorPrimaryRole}
+            descriptionLabel="Attività svolte"
+            descriptionPlaceholder="Riassumi in una o due righe gestione rosa, mercato, scouting o coordinamento sportivo."
             emptyMessage="Aggiungi le tue esperienze dirigenziali. Puoi inserirle ora o completarle in seguito dal tuo profilo."
             entries={directorCareerEntries}
             isBusy={isBusy}
@@ -4516,6 +4544,7 @@ export default function OnboardingProfileScreen() {
             searchTeams={searchTeams}
             selectorSubtitle="Scegli come vuoi inserire questa esperienza."
             selectorTitle="Aggiungi esperienza dirigenziale"
+            showDescription
             subtitle="Aggiungi le tue esperienze come dirigente per completare il profilo."
             title="Carriera dirigenziale"
             typeOptions={staffExperienceTypeOptions}
@@ -4533,11 +4562,47 @@ export default function OnboardingProfileScreen() {
             errorMessage={validationErrors.directorOtherFootballRoles}
             onContinue={handleContinueFromDirectorFootballExperience}
             onToggleExperience={(value) =>
-              patchForm({ directorHasOtherFootballExperience: value })
+              patchForm({
+                directorCoachCareerEntries: value ? directorCoachCareerEntries : [],
+                directorHasOtherFootballExperience: value,
+                directorOtherFootballRoles: value ? directorOtherFootballRoles : [],
+              })
             }
-            onUpdateRoles={(roles) =>
-              patchForm({ directorOtherFootballRoles: roles })
+            onUpdateRoles={(roles) => {
+              patchForm({
+                directorCoachCareerEntries: roles.includes("Allenatore")
+                  ? directorCoachCareerEntries
+                  : [],
+                directorOtherFootballRoles: roles,
+              });
+            }}
+          />
+        ) : null}
+
+        {/* ============================================================= */}
+        {/* STEP: Director Coach Career                                    */}
+        {/* ============================================================= */}
+        {step === "director_coach_career" ? (
+          <CoachCareerStep
+            addButtonLabel="Aggiungi esperienza da allenatore"
+            defaultRole="Allenatore"
+            descriptionLabel="Attività svolte"
+            descriptionPlaceholder="Riassumi in una o due righe gestione del gruppo, sviluppo tecnico o coordinamento sportivo."
+            emptyMessage="Aggiungi eventuali esperienze da allenatore maturate prima del percorso dirigenziale."
+            entries={directorCoachCareerEntries}
+            isBusy={isBusy}
+            onContinue={handleContinueFromDirectorCoachCareer}
+            onRegisterBack={registerCoachCareerBack}
+            onSkip={handleContinueFromDirectorCoachCareer}
+            onUpdateEntries={(entries) =>
+              patchForm({ directorCoachCareerEntries: entries })
             }
+            searchTeams={searchTeams}
+            selectorSubtitle="Scegli come vuoi inserire questa esperienza precedente."
+            selectorTitle="Aggiungi esperienza da allenatore"
+            showDescription
+            subtitle="Mantieni separate le esperienze da allenatore dalla carriera dirigenziale."
+            title="Esperienze da allenatore"
           />
         ) : null}
 

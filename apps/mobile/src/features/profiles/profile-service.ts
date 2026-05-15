@@ -253,6 +253,7 @@ export type StaffProfileRecord = {
 
 export type DirectorProfileRecord = {
   career_entries: unknown[];
+  coach_career_entries: unknown[];
   club_types: string[];
   director_roles: string[];
   experience_categories: string[];
@@ -393,6 +394,7 @@ export type CompleteProfessionalProfileUpdate = {
   } | null;
   directorProfile?: {
     career_entries: unknown[];
+    coach_career_entries: unknown[];
     club_types: string[];
     director_roles: string[];
     experience_categories: string[];
@@ -915,6 +917,9 @@ function normalizeDirectorProfileRecord(
     career_entries: Array.isArray(rawProfile.career_entries)
       ? rawProfile.career_entries
       : [],
+    coach_career_entries: Array.isArray(rawProfile.coach_career_entries)
+      ? rawProfile.coach_career_entries
+      : [],
     club_types: normalizeStringArray(rawProfile.club_types),
     director_roles: normalizeStringArray(rawProfile.director_roles),
     experience_categories: normalizeStringArray(rawProfile.experience_categories),
@@ -1337,7 +1342,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("director_profiles")
           .select(
-            "profile_id, director_roles, primary_role, responsibilities, experience_categories, main_focus, market_involvement, career_entries, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, club_types",
+            "profile_id, director_roles, primary_role, responsibilities, experience_categories, main_focus, market_involvement, career_entries, coach_career_entries, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, club_types",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -1943,6 +1948,7 @@ export async function updateCompleteProfessionalProfile(
   if (input.role === "director" && input.directorProfile) {
     const { error } = await supabase.from("director_profiles").upsert({
       career_entries: input.directorProfile.career_entries,
+      coach_career_entries: input.directorProfile.coach_career_entries,
       club_types: input.directorProfile.club_types,
       director_roles: input.directorProfile.director_roles,
       experience_categories: input.directorProfile.experience_categories,

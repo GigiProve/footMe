@@ -68,6 +68,7 @@ export type OnboardingStep =
   | "director_market"
   | "director_career"
   | "director_football_experience"
+  | "director_coach_career"
   | "director_player_career_toggle"
   | "director_player_career"
   | "director_club_type"
@@ -222,6 +223,7 @@ export type OnboardingFormState = {
   directorMainFocus: string;
   directorMarketInvolvement: string;
   directorCareerEntries: CoachCareerEntry[];
+  directorCoachCareerEntries: CoachCareerEntry[];
   directorHasOtherFootballExperience: boolean;
   directorOtherFootballRoles: string[];
   directorHasPlayedFootball: boolean;
@@ -635,6 +637,7 @@ const directorStepOrder: OnboardingStep[] = [
   "director_market",
   "director_career",
   "director_football_experience",
+  "director_coach_career",
   "director_player_career_toggle",
   "director_player_career",
   "director_club_type",
@@ -888,6 +891,7 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   directorMainFocus: "",
   directorMarketInvolvement: "",
   directorCareerEntries: [],
+  directorCoachCareerEntries: [],
   directorHasOtherFootballExperience: false,
   directorOtherFootballRoles: [],
   directorHasPlayedFootball: false,
@@ -1170,6 +1174,12 @@ export function normalizeOnboardingDraft(
           seasonDetails: e.seasonDetails ?? {},
         }))
       : defaultOnboardingFormState.directorCareerEntries,
+    directorCoachCareerEntries: Array.isArray(value.directorCoachCareerEntries)
+      ? (value.directorCoachCareerEntries as CoachCareerEntry[]).map((e) => ({
+          ...e,
+          seasonDetails: e.seasonDetails ?? {},
+        }))
+      : defaultOnboardingFormState.directorCoachCareerEntries,
     directorHasOtherFootballExperience: value.directorHasOtherFootballExperience === true,
     directorOtherFootballRoles: Array.isArray(value.directorOtherFootballRoles)
       ? value.directorOtherFootballRoles.filter((v): v is string => typeof v === "string")
@@ -1266,7 +1276,7 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     "player_career_toggle", "player_career", "coach_extra",
     "director_roles", "director_responsibilities", "director_categories",
     "director_focus", "director_market", "director_career",
-    "director_football_experience", "director_player_career_toggle",
+    "director_football_experience", "director_coach_career", "director_player_career_toggle",
     "director_player_career", "director_club_type", "director_extra",
     "complete",
     // Legacy steps for draft migration
@@ -1304,6 +1314,10 @@ export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" 
 
   if (role === "director" && effectiveStep === "director_player_career") {
     comparableStep = "director_player_career_toggle";
+  }
+
+  if (role === "director" && effectiveStep === "director_coach_career") {
+    comparableStep = "director_football_experience";
   }
 
   const visibleIndex = visibleSteps.findIndex((entry) => entry.step === comparableStep);
@@ -1378,6 +1392,12 @@ export function getPreviousOnboardingStep(
     return _lastCompletedStep === "director_player_career"
       ? "director_player_career"
       : "director_player_career_toggle";
+  }
+
+  if (role === "director" && effectiveStep === "director_player_career_toggle") {
+    return _lastCompletedStep === "director_coach_career"
+      ? "director_coach_career"
+      : "director_football_experience";
   }
 
   const previousIndex = stepOrder.indexOf(effectiveStep) - 1;
@@ -1513,6 +1533,7 @@ export function validateOnboardingStep(
   // director career, toggle, player career, extra → no required validation
   if (
     step === "director_career" ||
+    step === "director_coach_career" ||
     step === "director_player_career_toggle" ||
     step === "director_player_career" ||
     step === "director_extra" ||

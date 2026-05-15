@@ -196,6 +196,7 @@ function buildDirectorProfile(): CompleteProfessionalProfile {
     agentProfile: null,
     directorProfile: {
       career_entries: [],
+      coach_career_entries: [],
       club_types: ["Societa dilettantistica"],
       director_roles: ["Direttore sportivo"],
       experience_categories: ["Serie D"],

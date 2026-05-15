@@ -32,6 +32,8 @@ type FlowScreen =
 type CoachCareerStepProps = {
   addButtonLabel?: string;
   defaultRole?: string;
+  descriptionLabel?: string;
+  descriptionPlaceholder?: string;
   emptyMessage?: string;
   entries: CoachCareerEntry[];
   subtitle?: string;
@@ -44,6 +46,7 @@ type CoachCareerStepProps = {
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
   selectorSubtitle?: string;
   selectorTitle?: string;
+  showDescription?: boolean;
   title?: string;
   typeOptions?: {
     icon: keyof typeof Ionicons.glyphMap;
@@ -60,6 +63,8 @@ type CoachCareerStepProps = {
 export function CoachCareerStep({
   addButtonLabel = "Aggiungi esperienza",
   defaultRole = "",
+  descriptionLabel,
+  descriptionPlaceholder,
   emptyMessage = "Puoi aggiungere le tue esperienze ora oppure farlo in seguito dal tuo profilo.",
   entries,
   subtitle = "Aggiungi le tue esperienze come allenatore per completare il tuo profilo.",
@@ -72,6 +77,7 @@ export function CoachCareerStep({
   searchTeams,
   selectorSubtitle,
   selectorTitle,
+  showDescription = false,
   title = "Carriera da allenatore",
   typeOptions,
 }: CoachCareerStepProps) {
@@ -97,6 +103,7 @@ export function CoachCareerStep({
         id: generateCoachEntryId(),
         teamName: "",
         category: "",
+        description: null,
         role: defaultRole,
         type,
         seasons: [],
@@ -188,6 +195,9 @@ export function CoachCareerStep({
             onSave={handleFormSave}
             roleOptions={roleOptions}
             searchTeams={searchTeams}
+            showDescription={showDescription}
+            descriptionLabel={descriptionLabel}
+            descriptionPlaceholder={descriptionPlaceholder}
           />
         </OnboardingSectionCard>
       </View>

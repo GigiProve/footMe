@@ -411,6 +411,13 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.directorMaybeSingleMock.mockResolvedValueOnce({
       data: {
         career_entries: [],
+        coach_career_entries: [
+          {
+            id: "director-coach-1",
+            teamName: "Como Academy",
+            role: "Allenatore Under 17",
+          },
+        ],
         club_types: ["Societa dilettantistica"],
         director_roles: ["Direttore sportivo"],
         experience_categories: ["Serie D", "Eccellenza"],
@@ -431,6 +438,12 @@ describe("getCompleteProfessionalProfile", () => {
 
     expect(result.profile.role).toBe("director");
     expect(result.directorProfile).toMatchObject({
+      coach_career_entries: [
+        expect.objectContaining({
+          role: "Allenatore Under 17",
+          teamName: "Como Academy",
+        }),
+      ],
       director_roles: ["Direttore sportivo"],
       experience_categories: ["Serie D", "Eccellenza"],
       main_focus: "Prima squadra",

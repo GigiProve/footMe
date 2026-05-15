@@ -24,6 +24,7 @@ function buildDirectorProfile(
     coachProfile: null,
     directorProfile: {
       career_entries: [],
+      coach_career_entries: [],
       club_types: ["Societa dilettantistica"],
       director_roles: ["Direttore sportivo"],
       experience_categories: ["Eccellenza", "Serie D", "Settore giovanile"],
@@ -121,6 +122,7 @@ describe("DirectorInfoTab", () => {
           completeProfile={buildDirectorProfile({
             directorProfile: {
               career_entries: [],
+              coach_career_entries: [],
               club_types: [],
               director_roles: ["Team manager"],
               experience_categories: [],

@@ -114,6 +114,12 @@ export function CoachCareerExperienceCard({
             </AppText>
           </View>
         ) : null}
+
+        {entry.description?.trim() ? (
+          <AppText color="secondary" numberOfLines={2} variant="bodySm">
+            {entry.description.trim()}
+          </AppText>
+        ) : null}
       </View>
     </View>
   );

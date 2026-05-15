@@ -12,6 +12,7 @@ export type CoachCareerEntry = {
   teamLogoUrl?: string | null;
   teamName: string;
   category: string; // used for single season; defaults for new seasons
+  description?: string | null;
   role: string; // used for single season; defaults for new seasons
   type: CoachExperienceType;
   seasons: string[]; // used for MULTI_SEASON and SINGLE_SEASON
