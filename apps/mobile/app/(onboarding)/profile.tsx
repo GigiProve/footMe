@@ -603,6 +603,8 @@ export default function OnboardingProfileScreen() {
     phoneCountryCode,
     phoneNumber,
     communityProfileType,
+    fanFavoriteClubId,
+    fanFavoriteTeamName,
     fanInterestCategories,
     fanInterestRegions,
     mediaAffiliationName,
@@ -2123,6 +2125,8 @@ export default function OnboardingProfileScreen() {
         coachProfile: null,
         directorProfile: null,
         fanProfile: {
+          favorite_club_id: fanFavoriteClubId,
+          favorite_team_name: fanFavoriteTeamName,
           interest_categories: fanInterestCategories,
           interest_regions: fanInterestRegions,
         },
@@ -3126,12 +3130,15 @@ export default function OnboardingProfileScreen() {
         {step === "fan_interests" ? (
           <View style={styles.stepContainer}>
             <FanInterestsStep
+              favoriteClubId={fanFavoriteClubId}
+              favoriteTeamName={fanFavoriteTeamName}
               interestCategories={fanInterestCategories}
               interestRegions={fanInterestRegions}
               onUpdate={(patch) => {
                 patchForm(patch);
                 clearValidationErrors(Object.keys(patch));
               }}
+              searchTeams={searchTeams}
               validationErrors={validationErrors}
             />
             <Button

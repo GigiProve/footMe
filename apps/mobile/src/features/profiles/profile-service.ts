@@ -274,6 +274,14 @@ export type DirectorProfileRecord = {
   responsibilities: string[];
 };
 
+export type FanProfileRecord = {
+  favorite_club_id: string | null;
+  favorite_team_name: string | null;
+  interest_categories: string[];
+  interest_regions: string[];
+  profile_id: string;
+};
+
 type ClubRecord = {
   category: string | null;
   city: string;
@@ -341,6 +349,7 @@ export type CompleteProfessionalProfile = {
   coachPlayerCareerEntries: CoachPlayerCareerEntryRecord[];
   coachProfile: CoachProfileRecord | null;
   directorProfile: DirectorProfileRecord | null;
+  fanProfile?: FanProfileRecord | null;
   playerCareerEntries: PlayerCareerEntryRecord[];
   playerPalmares: PlayerPalmaresRecord[];
   playerProfile: PlayerProfileRecord | null;
@@ -415,6 +424,8 @@ export type CompleteProfessionalProfileUpdate = {
     responsibilities: string[];
   } | null;
   fanProfile?: {
+    favorite_club_id?: string | null;
+    favorite_team_name?: string | null;
     interest_categories: string[];
     interest_regions: string[];
   } | null;
@@ -947,6 +958,27 @@ function normalizeDirectorProfileRecord(
   } satisfies DirectorProfileRecord;
 }
 
+function normalizeFanProfileRecord(
+  profileId: string,
+  rawProfile: Partial<FanProfileRecord> | null | undefined,
+) {
+  if (!rawProfile) {
+    return null;
+  }
+
+  return {
+    favorite_club_id:
+      typeof rawProfile.favorite_club_id === "string" &&
+      rawProfile.favorite_club_id.trim()
+        ? rawProfile.favorite_club_id
+        : null,
+    favorite_team_name: normalizeOptionalText(rawProfile.favorite_team_name),
+    interest_categories: normalizeStringArray(rawProfile.interest_categories),
+    interest_regions: normalizeStringArray(rawProfile.interest_regions),
+    profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+  } satisfies FanProfileRecord;
+}
+
 function normalizeCoachCareerEntryRecord(
   profileId: string,
   rawEntry: Partial<CoachCareerEntryRecord>,
@@ -1194,6 +1226,7 @@ export function normalizeUserProfile(input: {
   coachPlayerCareerEntries?: Partial<CoachPlayerCareerEntryRecord>[] | null;
   coachProfile?: Partial<CoachProfileRecord> | null;
   directorProfile?: Partial<DirectorProfileRecord> | null;
+  fanProfile?: Partial<FanProfileRecord> | null;
   playerCareerEntries?: Partial<PlayerCareerEntryRecord>[] | null;
   playerPalmares?: Partial<PlayerPalmaresRecord>[] | null;
   playerProfile?: Partial<PlayerProfileRecord> | null;
@@ -1245,6 +1278,7 @@ export function normalizeUserProfile(input: {
       input.profileId,
       input.directorProfile,
     ),
+    fanProfile: normalizeFanProfileRecord(input.profileId, input.fanProfile),
     playerCareerEntries: (input.playerCareerEntries ?? []).map((entry, index) =>
       normalizePlayerCareerEntryRecord(input.profileId, entry, index),
     ),
@@ -1305,6 +1339,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     staffProfile,
     agentProfile,
     directorProfile,
+    fanProfile,
     club,
     profileContacts,
     privateContacts,
@@ -1355,6 +1390,15 @@ export async function getCompleteProfessionalProfile(profileId: string) {
           .eq("profile_id", profileId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    profile.role === "fan"
+      ? supabase
+          .from("fan_profiles")
+          .select(
+            "profile_id, interest_categories, interest_regions, favorite_team_name, favorite_club_id",
+          )
+          .eq("profile_id", profileId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
     profile.role === "club_admin"
       ? supabase
           .from("clubs")
@@ -1396,6 +1440,10 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 
   if (directorProfile.error) {
     throw directorProfile.error;
+  }
+
+  if (fanProfile.error) {
+    throw fanProfile.error;
   }
 
   if (club.error) {
@@ -1652,6 +1700,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     coachPlayerCareerEntries,
     coachProfile: (coachProfile.data as Partial<CoachProfileRecord> | null) ?? null,
     directorProfile: (directorProfile.data as Partial<DirectorProfileRecord> | null) ?? null,
+    fanProfile: (fanProfile.data as Partial<FanProfileRecord> | null) ?? null,
     playerCareerEntries,
     playerPalmares,
     playerProfile: (playerProfile.data as Partial<PlayerProfileRecord> | null) ?? null,
@@ -1980,6 +2029,16 @@ export async function updateCompleteProfessionalProfile(
 
   if (input.role === "fan" && input.fanProfile) {
     const { error } = await supabase.from("fan_profiles").upsert({
+      favorite_club_id:
+        typeof input.fanProfile.favorite_club_id === "string" &&
+        input.fanProfile.favorite_club_id.trim()
+          ? input.fanProfile.favorite_club_id.trim()
+          : null,
+      favorite_team_name:
+        typeof input.fanProfile.favorite_team_name === "string" &&
+        input.fanProfile.favorite_team_name.trim()
+          ? input.fanProfile.favorite_team_name.trim()
+          : null,
       interest_categories: input.fanProfile.interest_categories,
       interest_regions: input.fanProfile.interest_regions,
       profile_id: input.profileId,
@@ -2120,6 +2179,30 @@ export async function updateCompleteProfessionalProfile(
         }
       }
     }
+  }
+}
+
+export async function updateFanFavoriteTeam(input: {
+  favoriteClubId?: string | null;
+  favoriteTeamName: string;
+  profileId: string;
+}) {
+  const trimmedFavoriteTeamName = input.favoriteTeamName.trim();
+  const favoriteTeamName =
+    trimmedFavoriteTeamName.length > 0 ? trimmedFavoriteTeamName : null;
+  const favoriteClubId =
+    typeof input.favoriteClubId === "string" && input.favoriteClubId.trim()
+      ? input.favoriteClubId.trim()
+      : null;
+
+  const { error } = await supabase.from("fan_profiles").upsert({
+    favorite_club_id: favoriteClubId,
+    favorite_team_name: favoriteTeamName,
+    profile_id: input.profileId,
+  });
+
+  if (error) {
+    throw error;
   }
 }
 

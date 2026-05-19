@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { updateCompleteProfessionalProfile } from "./profile-service";
+import {
+  updateCompleteProfessionalProfile,
+  updateFanFavoriteTeam,
+} from "./profile-service";
 
 const mocks = vi.hoisted(() => {
   const profileUpdateMock = vi.fn();
@@ -958,6 +961,8 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     await updateCompleteProfessionalProfile({
       ...buildUpdateInput(),
       fanProfile: {
+        favorite_club_id: "club-1",
+        favorite_team_name: "AC Como",
         interest_categories: ["dilettanti", "mercato"],
         interest_regions: ["Umbria", "Toscana"],
       },
@@ -968,8 +973,24 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     });
 
     expect(mocks.fanProfilesUpsertMock).toHaveBeenCalledWith({
+      favorite_club_id: "club-1",
+      favorite_team_name: "AC Como",
       interest_categories: ["dilettanti", "mercato"],
       interest_regions: ["Umbria", "Toscana"],
+      profile_id: "profile-1",
+    });
+  });
+
+  it("updates only the fan favorite team fields", async () => {
+    await updateFanFavoriteTeam({
+      favoriteClubId: "club-1",
+      favoriteTeamName: "  AC Como  ",
+      profileId: "profile-1",
+    });
+
+    expect(mocks.fanProfilesUpsertMock).toHaveBeenCalledWith({
+      favorite_club_id: "club-1",
+      favorite_team_name: "AC Como",
       profile_id: "profile-1",
     });
   });

@@ -177,6 +177,8 @@ export type OnboardingFormState = {
   phoneCountryCode: string;
   phoneNumber: string;
   communityProfileType: "fan" | "media" | "";
+  fanFavoriteClubId: string | null;
+  fanFavoriteTeamName: string;
   fanInterestCategories: string[];
   fanInterestRegions: string[];
   mediaAffiliationName: string;
@@ -846,6 +848,8 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   phoneCountryCode: "+39",
   phoneNumber: "",
   communityProfileType: "",
+  fanFavoriteClubId: null,
+  fanFavoriteTeamName: "",
   fanInterestCategories: [],
   fanInterestRegions: [],
   mediaAffiliationName: "",
@@ -951,6 +955,14 @@ export function normalizeOnboardingDraft(
       value.communityProfileType === "fan" || value.communityProfileType === "media"
         ? value.communityProfileType
         : defaultOnboardingFormState.communityProfileType,
+    fanFavoriteClubId:
+      typeof value.fanFavoriteClubId === "string" && value.fanFavoriteClubId.trim()
+        ? value.fanFavoriteClubId
+        : null,
+    fanFavoriteTeamName:
+      typeof value.fanFavoriteTeamName === "string"
+        ? value.fanFavoriteTeamName
+        : defaultOnboardingFormState.fanFavoriteTeamName,
     fanInterestCategories: Array.isArray(value.fanInterestCategories)
       ? value.fanInterestCategories.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.fanInterestCategories,

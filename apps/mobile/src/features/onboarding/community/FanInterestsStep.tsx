@@ -2,24 +2,33 @@ import { StyleSheet, View } from "react-native";
 
 import { InterestCategoriesSelector } from "../../../components/ui/interest-categories-selector";
 import { REGION_OPTIONS } from "../../profiles/profile-form-utils";
+import type { TeamAutocompleteOption } from "../../profiles/player-sports";
+import { TeamAutocompleteInput } from "../../profiles/player-sports-section";
 import { spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 import { OnboardingSectionCard } from "../onboarding-ui";
 import { CommunityChipGroup } from "./CommunityChipGroup";
 
 type FanInterestsStepProps = {
+  favoriteClubId: string | null;
+  favoriteTeamName: string;
   interestCategories: string[];
   interestRegions: string[];
   validationErrors: Partial<Record<string, string>>;
   onUpdate: (patch: {
+    fanFavoriteClubId?: string | null;
+    fanFavoriteTeamName?: string;
     fanInterestCategories?: string[];
     fanInterestRegions?: string[];
   }) => void;
+  searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
 };
 
 export function FanInterestsStep({
+  favoriteTeamName,
   interestCategories,
   interestRegions,
+  searchTeams,
   validationErrors,
   onUpdate,
 }: FanInterestsStepProps) {
@@ -29,6 +38,27 @@ export function FanInterestsStep({
         title="Cosa vuoi seguire?"
         subtitle="Seleziona velocemente gli interessi e le regioni che ti interessano di più."
       >
+        <View style={styles.fieldGroup}>
+          <TeamAutocompleteInput
+            label="Squadra tifata"
+            onChangeText={(value) =>
+              onUpdate({
+                fanFavoriteClubId: null,
+                fanFavoriteTeamName: value,
+              })
+            }
+            onSelectTeam={(team) =>
+              onUpdate({
+                fanFavoriteClubId: team.id ?? null,
+                fanFavoriteTeamName: team.name,
+              })
+            }
+            placeholder="Es. AC Como"
+            searchTeams={searchTeams}
+            value={favoriteTeamName}
+          />
+        </View>
+
         <View style={styles.fieldGroup}>
           <InterestCategoriesSelector
             onChange={(value) => onUpdate({ fanInterestCategories: value })}

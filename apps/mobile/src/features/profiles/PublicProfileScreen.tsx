@@ -38,6 +38,7 @@ import { StaffProfileTabView } from "./career/StaffProfileTabView";
 import { AgentProfileTabView } from "./career/AgentProfileTabView";
 import { DirectorProfileTabView } from "./career/DirectorProfileTabView";
 import type { DirectorMediaLinkedTarget } from "./director-media";
+import { FanProfileView } from "./FanProfileView";
 import {
   requestConnection,
   startDirectConversation,
@@ -164,6 +165,14 @@ export function PublicProfileScreen() {
     router.push(`/profile/${target.target_id}` as never);
   }
 
+  function handleOpenFavoriteClub(clubId: string) {
+    router.push(`/club/${clubId}` as never);
+  }
+
+  function handleOpenPlayerProfile(playerProfileId: string) {
+    router.push(`/profile/${playerProfileId}` as never);
+  }
+
   if (!isSessionLoading && !session?.user) {
     return <Redirect href="/(auth)/sign-in" />;
   }
@@ -242,6 +251,9 @@ export function PublicProfileScreen() {
               onConnect={() => handleConnectToProfile(completeProfile)}
               onMessage={() => handleMessageProfile(completeProfile)}
               onOpenDirectorLinkedTarget={handleOpenDirectorLinkedTarget}
+              onOpenFavoriteClub={handleOpenFavoriteClub}
+              onOpenPlayerProfile={handleOpenPlayerProfile}
+              viewerProfileId={currentUserId}
             />
           </>
         ) : (
@@ -348,6 +360,10 @@ function ProfileHeaderBlock({
     return null;
   }
 
+  if (role === "fan") {
+    return null;
+  }
+
   if (!headerDetails) {
     return null;
   }
@@ -372,6 +388,9 @@ function ProfileContentBlock({
   onConnect,
   onMessage,
   onOpenDirectorLinkedTarget,
+  onOpenFavoriteClub,
+  onOpenPlayerProfile,
+  viewerProfileId,
 }: {
   completeProfile: CompleteProfessionalProfile;
   isConnecting?: boolean;
@@ -379,6 +398,9 @@ function ProfileContentBlock({
   onConnect?: () => void;
   onMessage?: () => void;
   onOpenDirectorLinkedTarget?: (target: DirectorMediaLinkedTarget) => void;
+  onOpenFavoriteClub?: (clubId: string) => void;
+  onOpenPlayerProfile?: (profileId: string) => void;
+  viewerProfileId?: string | null;
 }) {
   const role = completeProfile.profile.role as AppRole;
 
@@ -451,6 +473,18 @@ function ProfileContentBlock({
     );
   }
 
+  if (role === "fan") {
+    return (
+      <FanProfileView
+        completeProfile={completeProfile}
+        mode="visitor"
+        onOpenFavoriteClub={onOpenFavoriteClub}
+        onOpenPlayerProfile={onOpenPlayerProfile}
+        viewerProfileId={viewerProfileId}
+      />
+    );
+  }
+
   return (
     <ProfileReadonlyView
       completeProfile={completeProfile}
@@ -472,6 +506,8 @@ function getProfileViewerTitle(role: AppRole) {
       return "Profilo club";
     case "director":
       return "Profilo dirigente";
+    case "fan":
+      return "Profilo appassionato";
     case "player":
       return "Profilo giocatore";
     default:

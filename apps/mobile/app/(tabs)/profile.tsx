@@ -80,6 +80,7 @@ import {
   StaffProfileHeader,
 } from "../../src/features/profiles/profile-screen-components";
 import { AgentProfileHeader } from "../../src/features/profiles/AgentProfileHeader";
+import { FanProfileView } from "../../src/features/profiles/FanProfileView";
 import {
   getCompleteProfessionalProfile,
   saveAgentProfileMedia,
@@ -651,7 +652,7 @@ export default function ProfileScreen() {
             primaryRole={agentHeaderDetails.primaryRole}
             statusBadge={agentHeaderDetails.statusBadge}
           />
-        ) : completeProfile && role === "director" ? null : completeProfile && headerDetails ? (
+        ) : completeProfile && (role === "director" || role === "fan") ? null : completeProfile && headerDetails ? (
           <ProfileHeader
             avatarUrl={completeProfile.profile.avatar_url}
             badges={headerDetails.badges}
@@ -716,6 +717,14 @@ export default function ProfileScreen() {
             onManageMedia={() => handleManageDirectorMedia()}
             onOpenLinkedTarget={handleOpenDirectorLinkedTarget}
             onToggleMediaFeatured={handleToggleDirectorMediaFeatured}
+          />
+        ) : completeProfile && role === "fan" ? (
+          <FanProfileView
+            completeProfile={completeProfile}
+            mode="owner"
+            onOpenFavoriteClub={handleOpenAffiliateClub}
+            onOpenPlayerProfile={handleOpenProfile}
+            viewerProfileId={userId}
           />
         ) : completeProfile && role === "club_admin" ? null : completeProfile ? (
           <ProfileReadonlyView
