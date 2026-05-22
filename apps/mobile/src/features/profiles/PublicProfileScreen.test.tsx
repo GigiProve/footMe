@@ -1,17 +1,19 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CompleteProfessionalProfile } from "./profile-service";
-import { PublicProfileScreen } from "./PublicProfileScreen";
-import { useSession } from "../auth/use-session";
-import { getCompleteProfessionalProfile } from "./profile-service";
+
+let PublicProfileScreen: typeof import("./PublicProfileScreen").PublicProfileScreen;
+let useSession: typeof import("../auth/use-session").useSession;
+let getCompleteProfessionalProfile: typeof import("./profile-service").getCompleteProfessionalProfile;
 
 const backMock = vi.fn();
 const localSearchParamsMock = vi.fn();
 
 vi.mock("expo-router", () => ({
-  Redirect: (props: Record<string, unknown>) => React.createElement("Redirect", props),
+  Redirect: (props: Record<string, unknown>) =>
+    React.createElement("Redirect", props),
   useLocalSearchParams: () => localSearchParamsMock(),
   useRouter: () => ({
     back: backMock,
@@ -61,32 +63,56 @@ vi.mock("./AgentProfileHeader", () => ({
 
 vi.mock("./career/AgentProfileTabView", () => ({
   AgentProfileTabView: ({ isOwner }: { isOwner: boolean }) =>
-    React.createElement("AgentProfileTabView", { isOwner }, isOwner ? "owner" : "visitor"),
+    React.createElement(
+      "AgentProfileTabView",
+      { isOwner },
+      isOwner ? "owner" : "visitor",
+    ),
 }));
 
 vi.mock("./career/ProfileTabView", () => ({
   ProfileTabView: ({ isOwner }: { isOwner: boolean }) =>
-    React.createElement("ProfileTabView", { isOwner }, isOwner ? "owner" : "visitor"),
+    React.createElement(
+      "ProfileTabView",
+      { isOwner },
+      isOwner ? "owner" : "visitor",
+    ),
 }));
 
 vi.mock("./career/CoachProfileTabView", () => ({
   CoachProfileTabView: ({ isOwner }: { isOwner: boolean }) =>
-    React.createElement("CoachProfileTabView", { isOwner }, isOwner ? "owner" : "visitor"),
+    React.createElement(
+      "CoachProfileTabView",
+      { isOwner },
+      isOwner ? "owner" : "visitor",
+    ),
 }));
 
 vi.mock("./career/StaffProfileTabView", () => ({
   StaffProfileTabView: ({ isOwner }: { isOwner: boolean }) =>
-    React.createElement("StaffProfileTabView", { isOwner }, isOwner ? "owner" : "visitor"),
+    React.createElement(
+      "StaffProfileTabView",
+      { isOwner },
+      isOwner ? "owner" : "visitor",
+    ),
 }));
 
 vi.mock("./career/DirectorProfileTabView", () => ({
   DirectorProfileTabView: () =>
-    React.createElement("DirectorProfileTabView", { mode: "director" }, "director"),
+    React.createElement(
+      "DirectorProfileTabView",
+      { mode: "director" },
+      "director",
+    ),
 }));
 
 vi.mock("./ProfileReadonlyView", () => ({
   ProfileReadonlyView: ({ editable }: { editable?: boolean }) =>
-    React.createElement("ProfileReadonlyView", { editable }, editable ? "editable" : "readonly"),
+    React.createElement(
+      "ProfileReadonlyView",
+      { editable },
+      editable ? "editable" : "readonly",
+    ),
 }));
 
 vi.mock("./profile-screen-components", () => ({
@@ -94,6 +120,58 @@ vi.mock("./profile-screen-components", () => ({
   PlayerProfileHeader: () => React.createElement("PlayerProfileHeader"),
   ProfileHeader: () => React.createElement("ProfileHeader"),
   StaffProfileHeader: () => React.createElement("StaffProfileHeader"),
+}));
+
+vi.mock("expo-modules-core", () => {
+  class EventEmitter {}
+
+  return {
+    EventEmitter,
+    NativeModulesProxy: {},
+    requireNativeModule: () => ({}),
+    requireOptionalNativeModule: () => undefined,
+    default: {
+      EventEmitter,
+      NativeModulesProxy: {},
+      requireNativeModule: () => ({}),
+      requireOptionalNativeModule: () => undefined,
+    },
+  };
+});
+
+vi.mock("expo-constants", () => ({
+  default: {},
+  AppOwnership: {},
+  ExecutionEnvironment: {},
+  UserInterfaceIdiom: {},
+  platform: {},
+  manifest: null,
+}));
+
+vi.mock("expo-asset", () => ({
+  Asset: {
+    fromURI: (uri: string) => ({ uri }),
+    loadAsync: async () => [],
+  },
+  default: {},
+}));
+
+vi.mock("expo-av", () => ({
+  ResizeMode: {
+    COVER: "cover",
+  },
+  Video: (props: Record<string, unknown>) =>
+    React.createElement("mock-video", props),
+}));
+
+vi.mock("./FanProfileView", () => ({
+  FanProfileView: (props: Record<string, unknown>) =>
+    React.createElement("FanProfileView", props),
+}));
+
+vi.mock("./MediaProfileView", () => ({
+  MediaProfileView: (props: Record<string, unknown>) =>
+    React.createElement("MediaProfileView", props),
 }));
 
 vi.mock("@expo/vector-icons/Ionicons", () => {
@@ -109,6 +187,20 @@ vi.mock("@expo/vector-icons/Ionicons", () => {
   return {
     default: MockIonicons,
   };
+});
+
+beforeAll(async () => {
+  (globalThis as any).__DEV__ = false;
+
+  const profileModule = await import("./PublicProfileScreen");
+  PublicProfileScreen = profileModule.PublicProfileScreen;
+
+  const authModule = await import("../auth/use-session");
+  useSession = authModule.useSession;
+
+  const profileServiceModule = await import("./profile-service");
+  getCompleteProfessionalProfile =
+    profileServiceModule.getCompleteProfessionalProfile;
 });
 
 function buildAgentProfile(): CompleteProfessionalProfile {
@@ -274,7 +366,9 @@ describe("PublicProfileScreen", () => {
         },
       } as never,
     });
-    vi.mocked(getCompleteProfessionalProfile).mockResolvedValue(buildAgentProfile());
+    vi.mocked(getCompleteProfessionalProfile).mockResolvedValue(
+      buildAgentProfile(),
+    );
 
     let tree!: TestRenderer.ReactTestRenderer;
 
@@ -311,7 +405,9 @@ describe("PublicProfileScreen", () => {
         },
       } as never,
     });
-    vi.mocked(getCompleteProfessionalProfile).mockResolvedValue(buildDirectorProfile());
+    vi.mocked(getCompleteProfessionalProfile).mockResolvedValue(
+      buildDirectorProfile(),
+    );
 
     let tree!: TestRenderer.ReactTestRenderer;
 
