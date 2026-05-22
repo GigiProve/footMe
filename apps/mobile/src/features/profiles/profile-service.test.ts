@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
   const clubMaybeSingleMock = vi.fn();
   const coachMaybeSingleMock = vi.fn();
   const directorMaybeSingleMock = vi.fn();
+  const mediaMaybeSingleMock = vi.fn();
   const playerCareerEqMock = vi.fn();
   const playerCareerFirstOrderMock = vi.fn();
   const playerCareerSecondOrderMock = vi.fn();
@@ -75,6 +76,16 @@ const mocks = vi.hoisted(() => {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               maybeSingle: directorMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "media_profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: mediaMaybeSingleMock,
             })),
           })),
         };
@@ -165,6 +176,7 @@ const mocks = vi.hoisted(() => {
     playerCareerSecondOrderMock,
     playerPalmaresEqMock,
     playerPalmaresOrderMock,
+    mediaMaybeSingleMock,
     playerMaybeSingleMock,
     privateContactsMaybeSingleMock,
     profileContactsMaybeSingleMock,
@@ -188,6 +200,7 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.playerMaybeSingleMock.mockReset();
     mocks.coachMaybeSingleMock.mockReset();
     mocks.directorMaybeSingleMock.mockReset();
+    mocks.mediaMaybeSingleMock.mockReset();
     mocks.staffMaybeSingleMock.mockReset();
     mocks.clubMaybeSingleMock.mockReset();
     mocks.rpcMock.mockReset();
@@ -234,6 +247,7 @@ describe("getCompleteProfessionalProfile", () => {
     });
     mocks.coachMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.directorMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.mediaMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.staffMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.clubMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.profileContactsMaybeSingleMock.mockResolvedValue({
@@ -451,6 +465,76 @@ describe("getCompleteProfessionalProfile", () => {
       responsibilities: ["Gestione rose e contratti", "Settore giovanile"],
     });
     expect(result.playerProfile).toBeNull();
+    expect(
+      mocks.fromMock.mock.calls.some(([table]) => table === "player_career_entries"),
+    ).toBe(false);
+  });
+
+  it("loads media-specific profile data for media profiles", async () => {
+    mocks.profileMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        avatar_url: "https://example.com/avatar.png",
+        bio: "Notizie e racconti sul calcio italiano.",
+        birth_date: null,
+        age: null,
+        city: "Milano",
+        current_location_country: "IT",
+        full_name: "Redazione FootMe",
+        id: "media-1",
+        is_open_to_transfer: false,
+        nationality: "IT",
+        region: "Lombardia",
+        role: "media",
+      },
+      error: null,
+    });
+    mocks.mediaMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        affiliation_name: "FootMe News",
+        affiliation_type: "Testata o sito",
+        content_types: ["Notizie", "Interviste"],
+        entity_name: "FootMe News",
+        focus_areas: ["Serie A", "Calciomercato"],
+        logo_url: "https://example.com/logo.png",
+        profile_id: "media-1",
+        short_description: "Aggiornamenti quotidiani sul calcio.",
+      },
+      error: null,
+    });
+    mocks.profileContactsMaybeSingleMock.mockResolvedValueOnce({
+      data: {
+        email: "",
+        facebook: "https://facebook.com/footmenews",
+        instagram: "https://instagram.com/footmenews",
+        show_email: false,
+        show_facebook: true,
+        show_instagram: true,
+        show_tiktok: false,
+        show_website: true,
+        show_youtube: true,
+        tiktok: "",
+        website: "https://footme.example/news",
+        youtube: "https://youtube.com/@footmenews",
+      },
+      error: null,
+    });
+
+    const result = await getCompleteProfessionalProfile("media-1");
+
+    expect(result.profile.role).toBe("media");
+    expect(result.mediaProfile).toEqual({
+      affiliation_name: "FootMe News",
+      affiliation_type: "Testata o sito",
+      content_types: ["Notizie", "Interviste"],
+      entity_name: "FootMe News",
+      focus_areas: ["Serie A", "Calciomercato"],
+      logo_url: "https://example.com/logo.png",
+      profile_id: "media-1",
+      short_description: "Aggiornamenti quotidiani sul calcio.",
+    });
+    expect(result.userContacts.website).toBe("https://footme.example/news");
+    expect(result.userContacts.youtube).toBe("https://youtube.com/@footmenews");
+    expect(mocks.mediaMaybeSingleMock).toHaveBeenCalledTimes(1);
     expect(
       mocks.fromMock.mock.calls.some(([table]) => table === "player_career_entries"),
     ).toBe(false);

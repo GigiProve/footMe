@@ -39,6 +39,7 @@ import { AgentProfileTabView } from "./career/AgentProfileTabView";
 import { DirectorProfileTabView } from "./career/DirectorProfileTabView";
 import type { DirectorMediaLinkedTarget } from "./director-media";
 import { FanProfileView } from "./FanProfileView";
+import { MediaProfileView } from "./MediaProfileView";
 import {
   requestConnection,
   startDirectConversation,
@@ -364,6 +365,10 @@ function ProfileHeaderBlock({
     return null;
   }
 
+  if (role === "media") {
+    return null;
+  }
+
   if (!headerDetails) {
     return null;
   }
@@ -485,6 +490,18 @@ function ProfileContentBlock({
     );
   }
 
+  if (role === "media") {
+    return (
+      <MediaProfileView
+        completeProfile={completeProfile}
+        mode="visitor"
+        onOpenClub={onOpenFavoriteClub}
+        onOpenProfile={onOpenPlayerProfile}
+        viewerProfileId={viewerProfileId}
+      />
+    );
+  }
+
   return (
     <ProfileReadonlyView
       completeProfile={completeProfile}
@@ -508,6 +525,8 @@ function getProfileViewerTitle(role: AppRole) {
       return "Profilo dirigente";
     case "fan":
       return "Profilo appassionato";
+    case "media":
+      return "Profilo media";
     case "player":
       return "Profilo giocatore";
     default:

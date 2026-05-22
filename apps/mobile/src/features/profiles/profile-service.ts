@@ -282,6 +282,17 @@ export type FanProfileRecord = {
   profile_id: string;
 };
 
+export type MediaProfileRecord = {
+  affiliation_name: string | null;
+  affiliation_type: string | null;
+  content_types: string[];
+  entity_name: string | null;
+  focus_areas: string[];
+  logo_url: string | null;
+  profile_id: string;
+  short_description: string | null;
+};
+
 type ClubRecord = {
   category: string | null;
   city: string;
@@ -350,6 +361,7 @@ export type CompleteProfessionalProfile = {
   coachProfile: CoachProfileRecord | null;
   directorProfile: DirectorProfileRecord | null;
   fanProfile?: FanProfileRecord | null;
+  mediaProfile?: MediaProfileRecord | null;
   playerCareerEntries: PlayerCareerEntryRecord[];
   playerPalmares: PlayerPalmaresRecord[];
   playerProfile: PlayerProfileRecord | null;
@@ -979,6 +991,26 @@ function normalizeFanProfileRecord(
   } satisfies FanProfileRecord;
 }
 
+function normalizeMediaProfileRecord(
+  profileId: string,
+  rawProfile: Partial<MediaProfileRecord> | null | undefined,
+) {
+  if (!rawProfile) {
+    return null;
+  }
+
+  return {
+    affiliation_name: normalizeOptionalText(rawProfile.affiliation_name),
+    affiliation_type: normalizeOptionalText(rawProfile.affiliation_type),
+    content_types: normalizeStringArray(rawProfile.content_types),
+    entity_name: normalizeOptionalText(rawProfile.entity_name),
+    focus_areas: normalizeStringArray(rawProfile.focus_areas),
+    logo_url: normalizeOptionalText(rawProfile.logo_url),
+    profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+    short_description: normalizeOptionalText(rawProfile.short_description),
+  } satisfies MediaProfileRecord;
+}
+
 function normalizeCoachCareerEntryRecord(
   profileId: string,
   rawEntry: Partial<CoachCareerEntryRecord>,
@@ -1227,6 +1259,7 @@ export function normalizeUserProfile(input: {
   coachProfile?: Partial<CoachProfileRecord> | null;
   directorProfile?: Partial<DirectorProfileRecord> | null;
   fanProfile?: Partial<FanProfileRecord> | null;
+  mediaProfile?: Partial<MediaProfileRecord> | null;
   playerCareerEntries?: Partial<PlayerCareerEntryRecord>[] | null;
   playerPalmares?: Partial<PlayerPalmaresRecord>[] | null;
   playerProfile?: Partial<PlayerProfileRecord> | null;
@@ -1279,6 +1312,7 @@ export function normalizeUserProfile(input: {
       input.directorProfile,
     ),
     fanProfile: normalizeFanProfileRecord(input.profileId, input.fanProfile),
+    mediaProfile: normalizeMediaProfileRecord(input.profileId, input.mediaProfile),
     playerCareerEntries: (input.playerCareerEntries ?? []).map((entry, index) =>
       normalizePlayerCareerEntryRecord(input.profileId, entry, index),
     ),
@@ -1340,6 +1374,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     agentProfile,
     directorProfile,
     fanProfile,
+    mediaProfile,
     club,
     profileContacts,
     privateContacts,
@@ -1399,6 +1434,15 @@ export async function getCompleteProfessionalProfile(profileId: string) {
           .eq("profile_id", profileId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    profile.role === "media"
+      ? supabase
+          .from("media_profiles")
+          .select(
+            "profile_id, entity_name, short_description, logo_url, content_types, focus_areas, affiliation_type, affiliation_name",
+          )
+          .eq("profile_id", profileId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
     profile.role === "club_admin"
       ? supabase
           .from("clubs")
@@ -1444,6 +1488,10 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 
   if (fanProfile.error) {
     throw fanProfile.error;
+  }
+
+  if (mediaProfile.error) {
+    throw mediaProfile.error;
   }
 
   if (club.error) {
@@ -1701,6 +1749,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     coachProfile: (coachProfile.data as Partial<CoachProfileRecord> | null) ?? null,
     directorProfile: (directorProfile.data as Partial<DirectorProfileRecord> | null) ?? null,
     fanProfile: (fanProfile.data as Partial<FanProfileRecord> | null) ?? null,
+    mediaProfile: (mediaProfile.data as Partial<MediaProfileRecord> | null) ?? null,
     playerCareerEntries,
     playerPalmares,
     playerProfile: (playerProfile.data as Partial<PlayerProfileRecord> | null) ?? null,
