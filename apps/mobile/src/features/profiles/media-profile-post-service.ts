@@ -24,6 +24,7 @@ export type MediaProfilePostComment = {
 };
 
 export type MediaProfilePost = {
+  author_id: string | null;
   author_name: string;
   body: string | null;
   category: string;
@@ -49,6 +50,7 @@ export type MediaProfilePost = {
 };
 
 export type CreateMediaProfilePostInput = {
+  authorId?: string | null;
   authorName: string;
   body?: string | null;
   category: string;
@@ -65,6 +67,7 @@ export type CreateMediaProfilePostInput = {
 };
 
 type MediaProfilePostRow = {
+  author_id: string | null;
   author_name: string;
   body: string | null;
   category: string;
@@ -103,7 +106,7 @@ type ClubTargetRow = {
 };
 
 const POST_SELECT =
-  "id, media_profile_id, created_by_profile_id, kind, category, title, subtitle, excerpt, body, cover_url, cover_type, external_url, author_name, status, published_at, created_at, updated_at";
+  "id, media_profile_id, created_by_profile_id, kind, category, title, subtitle, excerpt, body, cover_url, cover_type, external_url, author_id, author_name, status, published_at, created_at, updated_at";
 
 export async function fetchMediaProfilePostFeed(
   mediaProfileId: string,
@@ -352,6 +355,7 @@ async function enrichMediaProfilePosts(
     const body = row.body ?? null;
 
     return {
+      author_id: row.author_id ?? null,
       author_name: row.author_name,
       body,
       category: row.category,
@@ -606,6 +610,7 @@ function buildCreatePayload(input: CreateMediaProfilePostInput) {
 
   return {
     author_name: authorName,
+    author_id: normalizeText(input.authorId),
     body,
     category,
     cover_type: coverType,

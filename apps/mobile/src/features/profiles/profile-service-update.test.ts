@@ -1001,11 +1001,17 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       mediaProfile: {
         affiliation_name: "ASD Test",
         affiliation_type: "Società sportiva",
+        covered_competitions: ["Serie D"],
+        covered_teams: ["ASD Test"],
+        covered_territories: ["Italia"],
+        covered_topics: ["Mercato"],
         content_types: ["Notizie", "Video"],
+        editorial_type: "Testata giornalistica / Media sportivo",
         entity_name: "TuttoDilettanti",
         focus_areas: ["Calcio locale", "Mercato"],
         logo_url: "https://example.com/logo.png",
         short_description: "Pagina dedicata al calcio regionale.",
+        verification_status: "verified",
       },
       playerCareerEntries: [],
       playerProfile: null,
@@ -1029,12 +1035,18 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     expect(mocks.mediaProfilesUpsertMock).toHaveBeenCalledWith({
       affiliation_name: "ASD Test",
       affiliation_type: "Società sportiva",
+      covered_competitions: ["Serie D"],
+      covered_teams: ["ASD Test"],
+      covered_territories: ["Italia"],
+      covered_topics: ["Mercato"],
       content_types: ["Notizie", "Video"],
+      editorial_type: "Testata giornalistica / Media sportivo",
       entity_name: "TuttoDilettanti",
       focus_areas: ["Calcio locale", "Mercato"],
       logo_url: "https://example.com/logo.png",
       profile_id: "profile-1",
       short_description: "Pagina dedicata al calcio regionale.",
+      verification_status: "verified",
     });
 
     expect(mocks.profileContactsUpsertMock).toHaveBeenCalledWith(

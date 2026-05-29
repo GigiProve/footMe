@@ -112,6 +112,7 @@ vi.mock("../../lib/supabase", () => ({
 }));
 
 const basePost = {
+  author_id: "author-1",
   author_name: "Marco Bianchi",
   body: "Testo articolo",
   category: "Mercato",
@@ -266,6 +267,7 @@ describe("media-profile-post-service", () => {
 
     expect(news.kind).toBe("news");
     expect(mocks.operations[0].payload).toMatchObject({
+      author_id: null,
       author_name: "Luca Verdi",
       body: null,
       category: "Giovanili",
@@ -305,6 +307,7 @@ describe("media-profile-post-service", () => {
     );
 
     const post = await createMediaProfilePost({
+      authorId: "author-1",
       authorName: "Marco Bianchi",
       body: "Testo completo dell'articolo.",
       category: "Mercato",
@@ -333,6 +336,7 @@ describe("media-profile-post-service", () => {
       table: "media_profile_posts",
     });
     expect(mocks.operations[0].payload).toMatchObject({
+      author_id: "author-1",
       author_name: "Marco Bianchi",
       body: "Testo completo dell'articolo.",
       external_url: "https://gazzetta.example/articolo",

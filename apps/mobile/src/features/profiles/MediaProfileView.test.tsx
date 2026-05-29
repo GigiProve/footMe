@@ -44,6 +44,8 @@ vi.mock("@expo/vector-icons/Ionicons", () => {
         bookmark: 1,
         "bookmark-outline": 1,
         "bar-chart-outline": 1,
+        "briefcase-outline": 1,
+        "call-outline": 1,
         "chatbubble-outline": 1,
         "chatbubbles-outline": 1,
         "chatbox-outline": 1,
@@ -55,13 +57,22 @@ vi.mock("@expo/vector-icons/Ionicons", () => {
         close: 1,
         "document-text-outline": 1,
         "flash-outline": 1,
+        "globe-outline": 1,
         "help-circle-outline": 1,
         "link-outline": 1,
         "location-outline": 1,
+        "logo-facebook": 1,
+        "logo-instagram": 1,
+        "logo-tiktok": 1,
+        "logo-twitter": 1,
+        "logo-youtube": 1,
+        "mail-outline": 1,
         "newspaper-outline": 1,
         "open-outline": 1,
+        "people-outline": 1,
         play: 1,
         "share-outline": 1,
+        "shield-checkmark-outline": 1,
         "star-outline": 1,
       },
     },
@@ -218,13 +229,98 @@ function buildCompleteProfile(
     mediaProfile: {
       affiliation_name: "Gazzetta Network",
       affiliation_type: "Testata o sito",
+      covered_competitions: ["Serie A", "Serie B", "Nazionale"],
+      covered_teams: ["Como", "Milan"],
+      covered_territories: ["Italia"],
+      covered_topics: ["Calciomercato", "Interviste", "Giovanili", "Opinioni"],
       content_types: ["Calciomercato", "Nazionale"],
+      editorial_type: "Testata giornalistica / Media sportivo",
       entity_name: "Gazzetta dello Sport",
       focus_areas: ["Serie A", "Serie B"],
       logo_url: "https://example.com/gazzetta-logo.png",
       profile_id: "media-1",
       short_description: "Notizie, analisi e storie sul calcio italiano.",
+      verification_status: "verified",
     },
+    mediaProfileAuthors: [
+      {
+        avatar_url: "https://example.com/marco.jpg",
+        display_name: "Marco Bianchi",
+        id: "author-1",
+        is_public: true,
+        is_verified: true,
+        media_profile_id: "media-1",
+        profile_id: "profile-author-1",
+        role_label: "Giornalista",
+        sort_order: 0,
+      },
+      {
+        avatar_url: null,
+        display_name: "Sara Rossi",
+        id: "author-2",
+        is_public: true,
+        is_verified: false,
+        media_profile_id: "media-1",
+        profile_id: null,
+        role_label: "Settore giovanile",
+        sort_order: 1,
+      },
+    ],
+    mediaProfileChannels: [
+      {
+        channel_type: "x",
+        id: "channel-x",
+        is_public: true,
+        label: "X / Twitter",
+        media_profile_id: "media-1",
+        sort_order: 4,
+        url: "https://x.com/gazzetta",
+      },
+    ],
+    mediaProfileContacts: [
+      {
+        contact_type: "editorial",
+        href: null,
+        id: "contact-editorial",
+        is_public: true,
+        label: "Redazione",
+        media_profile_id: "media-1",
+        sort_order: 0,
+        value: "redazione@gazzetta.example",
+      },
+      {
+        contact_type: "press",
+        href: null,
+        id: "contact-press",
+        is_public: true,
+        label: "Comunicati stampa",
+        media_profile_id: "media-1",
+        sort_order: 1,
+        value: "comunicati@gazzetta.example",
+      },
+    ],
+    mediaProfileVerifications: [
+      {
+        id: "verification-publication",
+        is_public: true,
+        label: "Testata registrata",
+        media_profile_id: "media-1",
+        sort_order: 1,
+        status: "verified",
+        verification_type: "registered_publication",
+        verified_at: "2026-05-01T00:00:00Z",
+      },
+      {
+        id: "verification-authors",
+        is_public: true,
+        label: "Autori verificati",
+        media_profile_id: "media-1",
+        sort_order: 2,
+        status: "verified",
+        verification_type: "authors_verified",
+        verified_at: "2026-05-01T00:00:00Z",
+      },
+    ],
     playerCareerEntries: [],
     playerPalmares: [],
     playerProfile: null,
@@ -274,6 +370,7 @@ function buildCompleteProfile(
 
 function buildPost(overrides: Partial<MediaProfilePost> = {}): MediaProfilePost {
   return {
+    author_id: "author-1",
     author_name: "Marco Bianchi",
     body:
       "La societa valuta profili giovani per completare il reparto offensivo.\n> Un investimento mirato per il futuro.",
@@ -431,7 +528,7 @@ describe("MediaProfileView", () => {
 
     expect(hasText(tree.root, "Gazzetta dello Sport")).toBe(true);
     expect(hasText(tree.root, "Testata giornalistica / Media sportivo")).toBe(true);
-    expect(hasText(tree.root, "Serie A • Serie B • Calciomercato • Nazionale")).toBe(true);
+    expect(hasText(tree.root, "Serie A • Serie B • Nazionale")).toBe(true);
     expect(hasText(tree.root, "Italia")).toBe(true);
     expect(hasText(tree.root, "Sito web • Instagram • YouTube")).toBe(true);
     expect(hasText(tree.root, "Segui")).toBe(true);
@@ -567,9 +664,73 @@ describe("MediaProfileView", () => {
       findPressableByTestId(tree.root, "media-tab-info").props.onPress();
     });
 
-    expect(hasText(tree.root, "Affiliazione")).toBe(true);
-    expect(hasText(tree.root, "Gazzetta Network")).toBe(true);
+    expect(hasText(tree.root, "Identità editoriale")).toBe(true);
+    expect(hasText(tree.root, "Copertura")).toBe(true);
+    expect(hasText(tree.root, "Canali ufficiali")).toBe(true);
+    expect(hasText(tree.root, "Redazione")).toBe(true);
+    expect(hasText(tree.root, "Verifiche")).toBe(true);
+    expect(hasText(tree.root, "Contatti")).toBe(true);
     expect(findByTestId(tree.root, "media-tab-info")).toBeTruthy();
+  });
+
+  it("renders complete media info sections and links authors back to their articles", async () => {
+    articleMocks.fetchMediaProfilePostFeed.mockResolvedValue([
+      buildPost(),
+      buildPost({
+        author_id: "author-2",
+        author_name: "Sara Rossi",
+        category: "Giovanili",
+        id: "post-sara",
+        title: "Como U19, focus sui nuovi profili",
+      }),
+    ]);
+
+    const tree = await renderAsync(
+      <MediaProfileView
+        completeProfile={buildCompleteProfile()}
+        mode="visitor"
+        viewerProfileId="viewer-1"
+      />,
+    );
+
+    act(() => {
+      findPressableByTestId(tree.root, "media-tab-info").props.onPress();
+    });
+
+    expect(hasText(tree.root, "Testata giornalistica / Media sportivo")).toBe(true);
+    expect(hasText(tree.root, "Competizioni")).toBe(true);
+    expect(hasText(tree.root, "Squadre")).toBe(true);
+    expect(hasText(tree.root, "Territori")).toBe(true);
+    expect(hasText(tree.root, "Temi")).toBe(true);
+    expect(hasText(tree.root, "X / Twitter")).toBe(true);
+    expect(hasText(tree.root, "Marco Bianchi")).toBe(true);
+    expect(hasText(tree.root, "Sara Rossi")).toBe(true);
+    expect(hasText(tree.root, "Profilo verificato")).toBe(true);
+    expect(hasText(tree.root, "Testata registrata")).toBe(true);
+    expect(hasText(tree.root, "Autori verificati")).toBe(true);
+    expect(hasText(tree.root, "redazione@gazzetta.example")).toBe(true);
+
+    await act(async () => {
+      findPressableByTestId(tree.root, "media-info-channel-channel-x").props.onPress();
+      await Promise.resolve();
+    });
+    expect(Linking.openURL).toHaveBeenCalledWith("https://x.com/gazzetta");
+
+    await act(async () => {
+      findPressableByTestId(tree.root, "media-info-contact-contact-editorial").props.onPress();
+      await Promise.resolve();
+    });
+    expect(Linking.openURL).toHaveBeenCalledWith(
+      "mailto:redazione@gazzetta.example",
+    );
+
+    act(() => {
+      findPressableByTestId(tree.root, "media-info-author-author-2").props.onPress();
+    });
+
+    expect(hasText(tree.root, "Autore")).toBe(true);
+    expect(hasText(tree.root, "Como U19, focus sui nuovi profili")).toBe(true);
+    expect(hasText(tree.root, "Como, occhi su un attaccante Under 19")).toBe(false);
   });
 
   it("renders Media Tribuna formats and handles voting, save, comments, Q&A and player links", async () => {

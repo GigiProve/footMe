@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => {
   const coachMaybeSingleMock = vi.fn();
   const directorMaybeSingleMock = vi.fn();
   const mediaMaybeSingleMock = vi.fn();
+  const mediaAuthorsResultMock = vi.fn();
+  const mediaChannelsResultMock = vi.fn();
+  const mediaContactsResultMock = vi.fn();
+  const mediaVerificationsResultMock = vi.fn();
   const playerCareerEqMock = vi.fn();
   const playerCareerFirstOrderMock = vi.fn();
   const playerCareerSecondOrderMock = vi.fn();
@@ -25,6 +29,20 @@ const mocks = vi.hoisted(() => {
   const playerCareerFirstOrderChain = {
     order: playerCareerFirstOrderMock,
   };
+  function createMediaListBuilder(resultMock: () => unknown) {
+    const builder = {
+      eq: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      then: (
+        resolve: (value: unknown) => unknown,
+        reject: (reason: unknown) => unknown,
+      ) => Promise.resolve(resultMock()).then(resolve, reject),
+    };
+
+    return {
+      select: vi.fn(() => builder),
+    };
+  }
 
   return {
     clubMaybeSingleMock,
@@ -89,6 +107,22 @@ const mocks = vi.hoisted(() => {
             })),
           })),
         };
+      }
+
+      if (table === "media_profile_channels") {
+        return createMediaListBuilder(mediaChannelsResultMock);
+      }
+
+      if (table === "media_profile_authors") {
+        return createMediaListBuilder(mediaAuthorsResultMock);
+      }
+
+      if (table === "media_profile_contacts") {
+        return createMediaListBuilder(mediaContactsResultMock);
+      }
+
+      if (table === "media_profile_verifications") {
+        return createMediaListBuilder(mediaVerificationsResultMock);
       }
 
       if (table === "clubs") {
@@ -177,6 +211,10 @@ const mocks = vi.hoisted(() => {
     playerPalmaresEqMock,
     playerPalmaresOrderMock,
     mediaMaybeSingleMock,
+    mediaAuthorsResultMock,
+    mediaChannelsResultMock,
+    mediaContactsResultMock,
+    mediaVerificationsResultMock,
     playerMaybeSingleMock,
     privateContactsMaybeSingleMock,
     profileContactsMaybeSingleMock,
@@ -201,6 +239,10 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.coachMaybeSingleMock.mockReset();
     mocks.directorMaybeSingleMock.mockReset();
     mocks.mediaMaybeSingleMock.mockReset();
+    mocks.mediaAuthorsResultMock.mockReset();
+    mocks.mediaChannelsResultMock.mockReset();
+    mocks.mediaContactsResultMock.mockReset();
+    mocks.mediaVerificationsResultMock.mockReset();
     mocks.staffMaybeSingleMock.mockReset();
     mocks.clubMaybeSingleMock.mockReset();
     mocks.rpcMock.mockReset();
@@ -248,6 +290,10 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.coachMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.directorMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.mediaMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+    mocks.mediaAuthorsResultMock.mockReturnValue({ data: [], error: null });
+    mocks.mediaChannelsResultMock.mockReturnValue({ data: [], error: null });
+    mocks.mediaContactsResultMock.mockReturnValue({ data: [], error: null });
+    mocks.mediaVerificationsResultMock.mockReturnValue({ data: [], error: null });
     mocks.staffMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.clubMaybeSingleMock.mockResolvedValue({ data: null, error: null });
     mocks.profileContactsMaybeSingleMock.mockResolvedValue({
@@ -492,13 +538,79 @@ describe("getCompleteProfessionalProfile", () => {
       data: {
         affiliation_name: "FootMe News",
         affiliation_type: "Testata o sito",
+        covered_competitions: ["Serie A"],
+        covered_teams: ["Como"],
+        covered_territories: ["Italia"],
+        covered_topics: ["Calciomercato"],
         content_types: ["Notizie", "Interviste"],
+        editorial_type: "Testata giornalistica / Media sportivo",
         entity_name: "FootMe News",
         focus_areas: ["Serie A", "Calciomercato"],
         logo_url: "https://example.com/logo.png",
         profile_id: "media-1",
         short_description: "Aggiornamenti quotidiani sul calcio.",
+        verification_status: "verified",
       },
+      error: null,
+    });
+    mocks.mediaChannelsResultMock.mockReturnValueOnce({
+      data: [
+        {
+          channel_type: "x",
+          id: "channel-x",
+          is_public: true,
+          label: "X / Twitter",
+          media_profile_id: "media-1",
+          sort_order: 1,
+          url: "https://x.com/footmenews",
+        },
+      ],
+      error: null,
+    });
+    mocks.mediaAuthorsResultMock.mockReturnValueOnce({
+      data: [
+        {
+          avatar_url: "https://example.com/author.png",
+          display_name: "Marco Bianchi",
+          id: "author-1",
+          is_public: true,
+          is_verified: true,
+          media_profile_id: "media-1",
+          profile_id: "profile-author-1",
+          role_label: "Giornalista",
+          sort_order: 0,
+        },
+      ],
+      error: null,
+    });
+    mocks.mediaContactsResultMock.mockReturnValueOnce({
+      data: [
+        {
+          contact_type: "editorial",
+          href: null,
+          id: "contact-1",
+          is_public: true,
+          label: "Redazione",
+          media_profile_id: "media-1",
+          sort_order: 0,
+          value: "redazione@footme.example",
+        },
+      ],
+      error: null,
+    });
+    mocks.mediaVerificationsResultMock.mockReturnValueOnce({
+      data: [
+        {
+          id: "verification-1",
+          is_public: true,
+          label: "Testata registrata",
+          media_profile_id: "media-1",
+          sort_order: 0,
+          status: "verified",
+          verification_type: "registered_publication",
+          verified_at: "2026-05-01T00:00:00Z",
+        },
+      ],
       error: null,
     });
     mocks.profileContactsMaybeSingleMock.mockResolvedValueOnce({
@@ -525,12 +637,42 @@ describe("getCompleteProfessionalProfile", () => {
     expect(result.mediaProfile).toEqual({
       affiliation_name: "FootMe News",
       affiliation_type: "Testata o sito",
+      covered_competitions: ["Serie A"],
+      covered_teams: ["Como"],
+      covered_territories: ["Italia"],
+      covered_topics: ["Calciomercato"],
       content_types: ["Notizie", "Interviste"],
+      editorial_type: "Testata giornalistica / Media sportivo",
       entity_name: "FootMe News",
       focus_areas: ["Serie A", "Calciomercato"],
       logo_url: "https://example.com/logo.png",
       profile_id: "media-1",
       short_description: "Aggiornamenti quotidiani sul calcio.",
+      verification_status: "verified",
+    });
+    expect(result.mediaProfileChannels).toEqual([
+      {
+        channel_type: "x",
+        id: "channel-x",
+        is_public: true,
+        label: "X / Twitter",
+        media_profile_id: "media-1",
+        sort_order: 1,
+        url: "https://x.com/footmenews",
+      },
+    ]);
+    expect((result.mediaProfileAuthors ?? [])[0]).toMatchObject({
+      display_name: "Marco Bianchi",
+      id: "author-1",
+      is_verified: true,
+    });
+    expect((result.mediaProfileContacts ?? [])[0]).toMatchObject({
+      contact_type: "editorial",
+      value: "redazione@footme.example",
+    });
+    expect((result.mediaProfileVerifications ?? [])[0]).toMatchObject({
+      label: "Testata registrata",
+      status: "verified",
     });
     expect(result.userContacts.website).toBe("https://footme.example/news");
     expect(result.userContacts.youtube).toBe("https://youtube.com/@footmenews");

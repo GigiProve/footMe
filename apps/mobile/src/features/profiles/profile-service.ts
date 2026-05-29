@@ -285,12 +285,62 @@ export type FanProfileRecord = {
 export type MediaProfileRecord = {
   affiliation_name: string | null;
   affiliation_type: string | null;
+  covered_competitions: string[];
+  covered_teams: string[];
+  covered_territories: string[];
+  covered_topics: string[];
   content_types: string[];
+  editorial_type: string | null;
   entity_name: string | null;
   focus_areas: string[];
   logo_url: string | null;
   profile_id: string;
   short_description: string | null;
+  verification_status: string;
+};
+
+export type MediaProfileChannelRecord = {
+  channel_type: string;
+  id: string;
+  is_public: boolean;
+  label: string;
+  media_profile_id: string;
+  sort_order: number;
+  url: string;
+};
+
+export type MediaProfileAuthorRecord = {
+  avatar_url: string | null;
+  display_name: string;
+  id: string;
+  is_public: boolean;
+  is_verified: boolean;
+  media_profile_id: string;
+  profile_id: string | null;
+  role_label: string | null;
+  sort_order: number;
+};
+
+export type MediaProfileContactRecord = {
+  contact_type: string;
+  href: string | null;
+  id: string;
+  is_public: boolean;
+  label: string;
+  media_profile_id: string;
+  sort_order: number;
+  value: string;
+};
+
+export type MediaProfileVerificationRecord = {
+  id: string;
+  is_public: boolean;
+  label: string;
+  media_profile_id: string;
+  sort_order: number;
+  status: string;
+  verification_type: string;
+  verified_at: string | null;
 };
 
 type ClubRecord = {
@@ -362,6 +412,10 @@ export type CompleteProfessionalProfile = {
   directorProfile: DirectorProfileRecord | null;
   fanProfile?: FanProfileRecord | null;
   mediaProfile?: MediaProfileRecord | null;
+  mediaProfileAuthors?: MediaProfileAuthorRecord[];
+  mediaProfileChannels?: MediaProfileChannelRecord[];
+  mediaProfileContacts?: MediaProfileContactRecord[];
+  mediaProfileVerifications?: MediaProfileVerificationRecord[];
   playerCareerEntries: PlayerCareerEntryRecord[];
   playerPalmares: PlayerPalmaresRecord[];
   playerProfile: PlayerProfileRecord | null;
@@ -444,11 +498,17 @@ export type CompleteProfessionalProfileUpdate = {
   mediaProfile?: {
     affiliation_name: string | null;
     affiliation_type: string | null;
+    covered_competitions?: string[];
+    covered_teams?: string[];
+    covered_territories?: string[];
+    covered_topics?: string[];
     content_types: string[];
+    editorial_type?: string | null;
     entity_name: string | null;
     focus_areas: string[];
     logo_url: string | null;
     short_description: string | null;
+    verification_status?: string | null;
   } | null;
   club: {
     category: string | null;
@@ -1002,13 +1062,99 @@ function normalizeMediaProfileRecord(
   return {
     affiliation_name: normalizeOptionalText(rawProfile.affiliation_name),
     affiliation_type: normalizeOptionalText(rawProfile.affiliation_type),
+    covered_competitions: normalizeStringArray(rawProfile.covered_competitions),
+    covered_teams: normalizeStringArray(rawProfile.covered_teams),
+    covered_territories: normalizeStringArray(rawProfile.covered_territories),
+    covered_topics: normalizeStringArray(rawProfile.covered_topics),
     content_types: normalizeStringArray(rawProfile.content_types),
+    editorial_type: normalizeOptionalText(rawProfile.editorial_type),
     entity_name: normalizeOptionalText(rawProfile.entity_name),
     focus_areas: normalizeStringArray(rawProfile.focus_areas),
     logo_url: normalizeOptionalText(rawProfile.logo_url),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
     short_description: normalizeOptionalText(rawProfile.short_description),
+    verification_status: normalizeRequiredText(
+      rawProfile.verification_status,
+      "unverified",
+    ),
   } satisfies MediaProfileRecord;
+}
+
+function normalizeMediaProfileChannelRecord(
+  profileId: string,
+  rawChannel: Partial<MediaProfileChannelRecord>,
+  index: number,
+) {
+  return {
+    channel_type: normalizeRequiredText(rawChannel.channel_type, "other"),
+    id: normalizeRequiredText(rawChannel.id, `${profileId}-channel-${index}`),
+    is_public: normalizeBoolean(rawChannel.is_public ?? true),
+    label: normalizeRequiredText(rawChannel.label, ""),
+    media_profile_id: normalizeRequiredText(rawChannel.media_profile_id, profileId),
+    sort_order: normalizeNumber(rawChannel.sort_order) ?? index,
+    url: normalizeRequiredText(rawChannel.url, ""),
+  } satisfies MediaProfileChannelRecord;
+}
+
+function normalizeMediaProfileAuthorRecord(
+  profileId: string,
+  rawAuthor: Partial<MediaProfileAuthorRecord>,
+  index: number,
+) {
+  return {
+    avatar_url: normalizeOptionalText(rawAuthor.avatar_url),
+    display_name: normalizeRequiredText(rawAuthor.display_name, ""),
+    id: normalizeRequiredText(rawAuthor.id, `${profileId}-author-${index}`),
+    is_public: normalizeBoolean(rawAuthor.is_public ?? true),
+    is_verified: normalizeBoolean(rawAuthor.is_verified),
+    media_profile_id: normalizeRequiredText(rawAuthor.media_profile_id, profileId),
+    profile_id:
+      typeof rawAuthor.profile_id === "string" && rawAuthor.profile_id.trim()
+        ? rawAuthor.profile_id
+        : null,
+    role_label: normalizeOptionalText(rawAuthor.role_label),
+    sort_order: normalizeNumber(rawAuthor.sort_order) ?? index,
+  } satisfies MediaProfileAuthorRecord;
+}
+
+function normalizeMediaProfileContactRecord(
+  profileId: string,
+  rawContact: Partial<MediaProfileContactRecord>,
+  index: number,
+) {
+  return {
+    contact_type: normalizeRequiredText(rawContact.contact_type, "other"),
+    href: normalizeOptionalText(rawContact.href),
+    id: normalizeRequiredText(rawContact.id, `${profileId}-contact-${index}`),
+    is_public: normalizeBoolean(rawContact.is_public ?? true),
+    label: normalizeRequiredText(rawContact.label, ""),
+    media_profile_id: normalizeRequiredText(rawContact.media_profile_id, profileId),
+    sort_order: normalizeNumber(rawContact.sort_order) ?? index,
+    value: normalizeRequiredText(rawContact.value, ""),
+  } satisfies MediaProfileContactRecord;
+}
+
+function normalizeMediaProfileVerificationRecord(
+  profileId: string,
+  rawVerification: Partial<MediaProfileVerificationRecord>,
+  index: number,
+) {
+  return {
+    id: normalizeRequiredText(rawVerification.id, `${profileId}-verification-${index}`),
+    is_public: normalizeBoolean(rawVerification.is_public ?? true),
+    label: normalizeRequiredText(rawVerification.label, ""),
+    media_profile_id: normalizeRequiredText(
+      rawVerification.media_profile_id,
+      profileId,
+    ),
+    sort_order: normalizeNumber(rawVerification.sort_order) ?? index,
+    status: normalizeRequiredText(rawVerification.status, "verified"),
+    verification_type: normalizeRequiredText(
+      rawVerification.verification_type,
+      "other",
+    ),
+    verified_at: normalizeOptionalText(rawVerification.verified_at),
+  } satisfies MediaProfileVerificationRecord;
 }
 
 function normalizeCoachCareerEntryRecord(
@@ -1260,6 +1406,10 @@ export function normalizeUserProfile(input: {
   directorProfile?: Partial<DirectorProfileRecord> | null;
   fanProfile?: Partial<FanProfileRecord> | null;
   mediaProfile?: Partial<MediaProfileRecord> | null;
+  mediaProfileAuthors?: Partial<MediaProfileAuthorRecord>[] | null;
+  mediaProfileChannels?: Partial<MediaProfileChannelRecord>[] | null;
+  mediaProfileContacts?: Partial<MediaProfileContactRecord>[] | null;
+  mediaProfileVerifications?: Partial<MediaProfileVerificationRecord>[] | null;
   playerCareerEntries?: Partial<PlayerCareerEntryRecord>[] | null;
   playerPalmares?: Partial<PlayerPalmaresRecord>[] | null;
   playerProfile?: Partial<PlayerProfileRecord> | null;
@@ -1313,6 +1463,19 @@ export function normalizeUserProfile(input: {
     ),
     fanProfile: normalizeFanProfileRecord(input.profileId, input.fanProfile),
     mediaProfile: normalizeMediaProfileRecord(input.profileId, input.mediaProfile),
+    mediaProfileAuthors: (input.mediaProfileAuthors ?? []).map((author, index) =>
+      normalizeMediaProfileAuthorRecord(input.profileId, author, index),
+    ),
+    mediaProfileChannels: (input.mediaProfileChannels ?? []).map((channel, index) =>
+      normalizeMediaProfileChannelRecord(input.profileId, channel, index),
+    ),
+    mediaProfileContacts: (input.mediaProfileContacts ?? []).map((contact, index) =>
+      normalizeMediaProfileContactRecord(input.profileId, contact, index),
+    ),
+    mediaProfileVerifications: (input.mediaProfileVerifications ?? []).map(
+      (verification, index) =>
+        normalizeMediaProfileVerificationRecord(input.profileId, verification, index),
+    ),
     playerCareerEntries: (input.playerCareerEntries ?? []).map((entry, index) =>
       normalizePlayerCareerEntryRecord(input.profileId, entry, index),
     ),
@@ -1375,6 +1538,10 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     directorProfile,
     fanProfile,
     mediaProfile,
+    mediaProfileChannels,
+    mediaProfileAuthors,
+    mediaProfileContacts,
+    mediaProfileVerifications,
     club,
     profileContacts,
     privateContacts,
@@ -1438,11 +1605,52 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("media_profiles")
           .select(
-            "profile_id, entity_name, short_description, logo_url, content_types, focus_areas, affiliation_type, affiliation_name",
+            "profile_id, entity_name, short_description, logo_url, content_types, focus_areas, affiliation_type, affiliation_name, editorial_type, verification_status, covered_competitions, covered_teams, covered_territories, covered_topics",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    profile.role === "media"
+      ? supabase
+          .from("media_profile_channels")
+          .select("id, media_profile_id, channel_type, label, url, is_public, sort_order")
+          .eq("media_profile_id", profileId)
+          .eq("is_public", true)
+          .order("sort_order", { ascending: true })
+          .order("label", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    profile.role === "media"
+      ? supabase
+          .from("media_profile_authors")
+          .select(
+            "id, media_profile_id, profile_id, display_name, role_label, avatar_url, is_verified, is_public, sort_order",
+          )
+          .eq("media_profile_id", profileId)
+          .eq("is_public", true)
+          .order("sort_order", { ascending: true })
+          .order("display_name", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    profile.role === "media"
+      ? supabase
+          .from("media_profile_contacts")
+          .select("id, media_profile_id, contact_type, label, value, href, is_public, sort_order")
+          .eq("media_profile_id", profileId)
+          .eq("is_public", true)
+          .order("sort_order", { ascending: true })
+          .order("label", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    profile.role === "media"
+      ? supabase
+          .from("media_profile_verifications")
+          .select(
+            "id, media_profile_id, verification_type, label, status, is_public, sort_order, verified_at",
+          )
+          .eq("media_profile_id", profileId)
+          .eq("is_public", true)
+          .eq("status", "verified")
+          .order("sort_order", { ascending: true })
+          .order("label", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
     profile.role === "club_admin"
       ? supabase
           .from("clubs")
@@ -1492,6 +1700,22 @@ export async function getCompleteProfessionalProfile(profileId: string) {
 
   if (mediaProfile.error) {
     throw mediaProfile.error;
+  }
+
+  if (mediaProfileChannels.error) {
+    throw mediaProfileChannels.error;
+  }
+
+  if (mediaProfileAuthors.error) {
+    throw mediaProfileAuthors.error;
+  }
+
+  if (mediaProfileContacts.error) {
+    throw mediaProfileContacts.error;
+  }
+
+  if (mediaProfileVerifications.error) {
+    throw mediaProfileVerifications.error;
   }
 
   if (club.error) {
@@ -1750,6 +1974,16 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     directorProfile: (directorProfile.data as Partial<DirectorProfileRecord> | null) ?? null,
     fanProfile: (fanProfile.data as Partial<FanProfileRecord> | null) ?? null,
     mediaProfile: (mediaProfile.data as Partial<MediaProfileRecord> | null) ?? null,
+    mediaProfileAuthors:
+      (mediaProfileAuthors.data as Partial<MediaProfileAuthorRecord>[] | null) ?? [],
+    mediaProfileChannels:
+      (mediaProfileChannels.data as Partial<MediaProfileChannelRecord>[] | null) ?? [],
+    mediaProfileContacts:
+      (mediaProfileContacts.data as Partial<MediaProfileContactRecord>[] | null) ?? [],
+    mediaProfileVerifications:
+      (mediaProfileVerifications.data as
+        | Partial<MediaProfileVerificationRecord>[]
+        | null) ?? [],
     playerCareerEntries,
     playerPalmares,
     playerProfile: (playerProfile.data as Partial<PlayerProfileRecord> | null) ?? null,
@@ -2102,12 +2336,18 @@ export async function updateCompleteProfessionalProfile(
     const { error } = await supabase.from("media_profiles").upsert({
       affiliation_name: input.mediaProfile.affiliation_name,
       affiliation_type: input.mediaProfile.affiliation_type,
+      covered_competitions: input.mediaProfile.covered_competitions ?? [],
+      covered_teams: input.mediaProfile.covered_teams ?? [],
+      covered_territories: input.mediaProfile.covered_territories ?? [],
+      covered_topics: input.mediaProfile.covered_topics ?? [],
       content_types: input.mediaProfile.content_types,
+      editorial_type: input.mediaProfile.editorial_type ?? null,
       entity_name: input.mediaProfile.entity_name,
       focus_areas: input.mediaProfile.focus_areas,
       logo_url: input.mediaProfile.logo_url,
       profile_id: input.profileId,
       short_description: input.mediaProfile.short_description,
+      verification_status: input.mediaProfile.verification_status ?? "unverified",
     });
 
     if (error) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -60,7 +60,13 @@ import {
   normalizeFacebookInput,
   normalizeInstagramInput,
 } from "./profile-form-utils";
-import type { CompleteProfessionalProfile } from "./profile-service";
+import type {
+  CompleteProfessionalProfile,
+  MediaProfileAuthorRecord,
+  MediaProfileChannelRecord,
+  MediaProfileContactRecord,
+  MediaProfileVerificationRecord,
+} from "./profile-service";
 
 const DEFAULT_MEDIA_COVER_URI =
   "https://storage.googleapis.com/banani-generated-images/generated-images/b4de0b61-da83-47dc-b416-c759eaabd930.jpg";
@@ -77,9 +83,31 @@ type MediaProfileViewProps = {
 };
 
 type ChannelItem = {
+  channelType: string;
+  icon: keyof typeof Ionicons.glyphMap;
   key: string;
   label: string;
   url: string;
+};
+
+type MediaAuthorFilter = {
+  id: string;
+  name: string;
+};
+
+type ContactItem = {
+  contactType: string;
+  href: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  key: string;
+  label: string;
+  value: string;
+};
+
+type VerificationItem = {
+  icon: keyof typeof Ionicons.glyphMap;
+  key: string;
+  label: string;
 };
 
 type DraftState = {
@@ -161,6 +189,8 @@ export function MediaProfileView({
   const [isFollowed, setIsFollowed] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<ArticleFilter>("all");
+  const [activeAuthorFilter, setActiveAuthorFilter] =
+    useState<MediaAuthorFilter | null>(null);
   const [posts, setPosts] = useState<MediaProfilePost[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
   const [selectedPost, setSelectedPost] = useState<MediaProfilePost | null>(null);
@@ -185,24 +215,42 @@ export function MediaProfileView({
   const logoUrl = mediaProfile?.logo_url?.trim() || profile.avatar_url || null;
   const websiteUrl = normalizeWebsiteInput(completeProfile.userContacts.website);
   const channels = useMemo(
-    () => buildChannelItems(completeProfile.userContacts),
-    [completeProfile.userContacts],
+    () =>
+      buildChannelItems(
+        completeProfile.mediaProfileChannels ?? [],
+        completeProfile.userContacts,
+      ),
+    [completeProfile.mediaProfileChannels, completeProfile.userContacts],
   );
   const channelLabels = channels.map((channel) => channel.label).join(" • ");
   const coverageItems = useMemo(
     () =>
       normalizeUniqueValues([
+        ...(mediaProfile?.covered_competitions ?? []),
+        ...(mediaProfile?.covered_teams ?? []),
+        ...(mediaProfile?.covered_topics ?? []),
         ...(mediaProfile?.focus_areas ?? []),
         ...(mediaProfile?.content_types ?? []),
       ]),
-    [mediaProfile?.content_types, mediaProfile?.focus_areas],
+    [
+      mediaProfile?.content_types,
+      mediaProfile?.covered_competitions,
+      mediaProfile?.covered_teams,
+      mediaProfile?.covered_topics,
+      mediaProfile?.focus_areas,
+    ],
   );
   const coverageLabel =
     coverageItems.length > 0
       ? coverageItems.join(" • ")
       : "Copertura da completare";
-  const areaLabel = buildAreaLabel(completeProfile);
-  const profileTypeLabel = buildMediaProfileTypeLabel(mediaProfile?.affiliation_type);
+  const areaLabel =
+    (mediaProfile?.covered_territories ?? []).length > 0
+      ? mediaProfile!.covered_territories.join(" • ")
+      : buildAreaLabel(completeProfile);
+  const profileTypeLabel = buildMediaProfileTypeLabel(
+    mediaProfile?.editorial_type ?? mediaProfile?.affiliation_type,
+  );
   const verificationStatus = mediaProfile
     ? (mediaProfile as { verification_status?: string; is_verified?: boolean })
         .verification_status
@@ -215,14 +263,25 @@ export function MediaProfileView({
           .is_verified,
     );
   const filteredPosts = useMemo(() => {
-    if (activeFilter === "all") {
-      return posts;
+    let nextPosts = posts;
+
+    if (activeFilter !== "all") {
+      nextPosts = nextPosts.filter(
+        (post) => post.category.trim().toLowerCase() === activeFilter.toLowerCase(),
+      );
     }
 
-    return posts.filter(
-      (post) => post.category.trim().toLowerCase() === activeFilter.toLowerCase(),
-    );
-  }, [activeFilter, posts]);
+    if (activeAuthorFilter) {
+      const normalizedAuthorName = activeAuthorFilter.name.trim().toLowerCase();
+      nextPosts = nextPosts.filter(
+        (post) =>
+          post.author_id === activeAuthorFilter.id ||
+          post.author_name.trim().toLowerCase() === normalizedAuthorName,
+      );
+    }
+
+    return nextPosts;
+  }, [activeAuthorFilter, activeFilter, posts]);
 
   const loadPosts = useCallback(async () => {
     try {
@@ -647,11 +706,13 @@ export function MediaProfileView({
 
       {activeTab === "articles" ? (
         <ArticlesTab
+          activeAuthorFilter={activeAuthorFilter}
           activeFilter={activeFilter}
           displayName={displayName}
           isLoading={isLoadingPosts}
           mode={mode}
           onAddPress={() => setIsComposerOpen(true)}
+          onClearAuthorFilter={() => setActiveAuthorFilter(null)}
           onFilterChange={setActiveFilter}
           onOpenPost={(post) => {
             void handleOpenPost(post);
@@ -696,10 +757,31 @@ export function MediaProfileView({
       ) : (
         <MediaInfoPanel
           areaLabel={areaLabel}
-          channelLabels={channelLabels}
+          channels={channels}
+          contacts={buildContactItems(
+            completeProfile.mediaProfileContacts ?? [],
+            completeProfile.userContacts,
+          )}
           coverageLabel={coverageLabel}
+          displayName={displayName}
+          isVerified={isVerified}
           mediaProfile={mediaProfile}
+          mediaProfileAuthors={completeProfile.mediaProfileAuthors ?? []}
+          onAuthorPress={(author) => {
+            setActiveAuthorFilter({
+              id: author.id,
+              name: author.display_name,
+            });
+            setActiveTab("articles");
+          }}
+          onOpenExternal={(url) => {
+            void Linking.openURL(url);
+          }}
           profileTypeLabel={profileTypeLabel}
+          verifications={buildVerificationItems(
+            mediaProfile?.verification_status ?? null,
+            completeProfile.mediaProfileVerifications ?? [],
+          )}
         />
       )}
 
@@ -768,21 +850,25 @@ export function MediaProfileView({
 }
 
 function ArticlesTab({
+  activeAuthorFilter,
   activeFilter,
   displayName,
   isLoading,
   mode,
   onAddPress,
+  onClearAuthorFilter,
   onFilterChange,
   onOpenPost,
   onOpenTarget,
   posts,
 }: {
+  activeAuthorFilter: MediaAuthorFilter | null;
   activeFilter: ArticleFilter;
   displayName: string;
   isLoading: boolean;
   mode: "owner" | "visitor";
   onAddPress: () => void;
+  onClearAuthorFilter: () => void;
   onFilterChange: (filter: ArticleFilter) => void;
   onOpenPost: (post: MediaProfilePost) => void;
   onOpenTarget: (target: MediaProfilePostTaggedTarget) => void;
@@ -839,6 +925,34 @@ function ArticlesTab({
           </Pressable>
         ))}
       </ScrollView>
+
+      {activeAuthorFilter ? (
+        <View style={styles.authorFilterBar}>
+          <View style={styles.authorFilterText}>
+            <AppText color="secondary" variant="caption">
+              Autore
+            </AppText>
+            <AppText numberOfLines={1} style={styles.authorFilterName} variant="bodySm">
+              {activeAuthorFilter.name}
+            </AppText>
+          </View>
+          <Pressable
+            accessibilityLabel="Rimuovi filtro autore"
+            accessibilityRole="button"
+            onPress={onClearAuthorFilter}
+            style={({ pressed }) => [
+              styles.authorFilterClear,
+              pressed ? styles.pressedRow : null,
+            ]}
+            testID="media-author-filter-clear"
+          >
+            <Ionicons color={colors.accent} name="close" size={16} />
+            <AppText color="accent" variant="caption">
+              Rimuovi
+            </AppText>
+          </Pressable>
+        </View>
+      ) : null}
 
       {isLoading ? (
         <View style={styles.loadingState}>
@@ -2438,43 +2552,244 @@ function MediaEmptyState({
 
 function MediaInfoPanel({
   areaLabel,
-  channelLabels,
+  channels,
+  contacts,
   coverageLabel,
+  displayName,
+  isVerified,
   mediaProfile,
+  mediaProfileAuthors,
+  onAuthorPress,
+  onOpenExternal,
   profileTypeLabel,
+  verifications,
 }: {
   areaLabel: string;
-  channelLabels: string;
+  channels: ChannelItem[];
+  contacts: ContactItem[];
   coverageLabel: string;
+  displayName: string;
+  isVerified: boolean;
   mediaProfile: CompleteProfessionalProfile["mediaProfile"];
+  mediaProfileAuthors: MediaProfileAuthorRecord[];
+  onAuthorPress: (author: MediaProfileAuthorRecord) => void;
+  onOpenExternal: (url: string) => void;
   profileTypeLabel: string;
+  verifications: VerificationItem[];
 }) {
   const description = mediaProfile?.short_description?.trim();
-  const affiliation = normalizeUniqueValues([
-    mediaProfile?.affiliation_type,
-    mediaProfile?.affiliation_name,
-  ]).join(" • ");
+  const coverageGroups = buildCoverageGroups(mediaProfile, areaLabel);
+  const visibleAuthors = mediaProfileAuthors.slice(0, 5);
 
   return (
-    <View style={styles.infoPanel}>
-      <InfoRow label="Tipologia" value={profileTypeLabel} />
-      <InfoRow label="Copertura" value={coverageLabel} />
-      <InfoRow label="Area" value={areaLabel} />
-      <InfoRow label="Canali" value={channelLabels || "Da completare"} />
-      {affiliation ? <InfoRow label="Affiliazione" value={affiliation} /> : null}
-      {description ? <InfoRow label="Descrizione" value={description} /> : null}
+    <View style={styles.infoPanel} testID="media-info-tab">
+      <InfoSection title="Identità editoriale">
+        <View style={styles.editorialIdentity}>
+          <View style={styles.nameRow}>
+            <AppText style={styles.identityName} variant="titleSm">
+              {displayName}
+            </AppText>
+            {isVerified ? (
+              <Ionicons color="#007AFF" name="checkmark-circle" size={16} />
+            ) : null}
+          </View>
+          <AppText color="secondary" style={styles.identityRole} variant="bodySm">
+            {profileTypeLabel}
+          </AppText>
+          {description ? (
+            <AppText
+              numberOfLines={2}
+              style={styles.identityDescription}
+              variant="bodySm"
+            >
+              {description}
+            </AppText>
+          ) : null}
+        </View>
+      </InfoSection>
+
+      <InfoSection title="Copertura">
+        {coverageGroups.length > 0 ? (
+          <View style={styles.coverageGroups}>
+            {coverageGroups.map((group) => (
+              <View key={group.label} style={styles.coverageGroup}>
+                <AppText color="secondary" variant="caption">
+                  {group.label}
+                </AppText>
+                <View style={styles.infoTagsRow}>
+                  {group.values.map((value) => (
+                    <View key={`${group.label}-${value}`} style={styles.infoTag}>
+                      <AppText style={styles.infoTagText} variant="caption">
+                        {value}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <AppText color="secondary" variant="bodySm">
+            {coverageLabel}
+          </AppText>
+        )}
+      </InfoSection>
+
+      {channels.length > 0 ? (
+        <InfoSection title="Canali ufficiali">
+          <View style={styles.infoItemList}>
+            {channels.map((channel) => (
+              <InfoActionRow
+                icon={channel.icon}
+                key={channel.key}
+                label={channel.label}
+                onPress={() => onOpenExternal(channel.url)}
+                testID={`media-info-channel-${channel.key}`}
+              />
+            ))}
+          </View>
+        </InfoSection>
+      ) : null}
+
+      {visibleAuthors.length > 0 ? (
+        <InfoSection title="Redazione">
+          <View style={styles.authorsList}>
+            {visibleAuthors.map((author) => (
+              <Pressable
+                accessibilityLabel={`Mostra articoli di ${author.display_name}`}
+                accessibilityRole="button"
+                key={author.id}
+                onPress={() => onAuthorPress(author)}
+                style={({ pressed }) => [
+                  styles.authorRow,
+                  pressed ? styles.pressedRow : null,
+                ]}
+                testID={`media-info-author-${author.id}`}
+              >
+                <Avatar
+                  name={author.display_name}
+                  size="md"
+                  uri={author.avatar_url}
+                />
+                <View style={styles.authorInfo}>
+                  <View style={styles.authorNameRow}>
+                    <AppText
+                      numberOfLines={1}
+                      style={styles.authorName}
+                      variant="bodySm"
+                    >
+                      {author.display_name}
+                    </AppText>
+                    {author.is_verified ? (
+                      <Ionicons color="#007AFF" name="checkmark-circle" size={14} />
+                    ) : null}
+                  </View>
+                  {author.role_label ? (
+                    <AppText color="secondary" numberOfLines={1} variant="caption">
+                      {author.role_label}
+                    </AppText>
+                  ) : null}
+                </View>
+              </Pressable>
+            ))}
+            {mediaProfileAuthors.length > visibleAuthors.length ? (
+              <AppText color="secondary" variant="caption">
+                +{mediaProfileAuthors.length - visibleAuthors.length} altri autori
+              </AppText>
+            ) : null}
+          </View>
+        </InfoSection>
+      ) : null}
+
+      {verifications.length > 0 ? (
+        <InfoSection title="Verifiche">
+          <View style={styles.trustBadges}>
+            {verifications.map((verification) => (
+              <View key={verification.key} style={styles.trustBadge}>
+                <Ionicons color="#007AFF" name={verification.icon} size={20} />
+                <AppText style={styles.trustBadgeText} variant="bodySm">
+                  {verification.label}
+                </AppText>
+              </View>
+            ))}
+          </View>
+        </InfoSection>
+      ) : null}
+
+      {contacts.length > 0 ? (
+        <InfoSection title="Contatti">
+          <View style={styles.infoItemList}>
+            {contacts.map((contact) => (
+              <InfoActionRow
+                icon={contact.icon}
+                key={contact.key}
+                label={contact.label}
+                onPress={() => onOpenExternal(contact.href)}
+                supportingText={contact.value}
+                testID={`media-info-contact-${contact.key}`}
+              />
+            ))}
+          </View>
+        </InfoSection>
+      ) : null}
     </View>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoSection({
+  children,
+  title,
+}: {
+  children: ReactNode;
+  title: string;
+}) {
   return (
-    <View style={styles.infoRow}>
-      <AppText color="secondary" variant="overline">
-        {label}
+    <View style={styles.infoSection}>
+      <AppText style={styles.infoSectionTitle} variant="titleSm">
+        {title}
       </AppText>
-      <AppText variant="bodySm">{value}</AppText>
+      {children}
     </View>
+  );
+}
+
+function InfoActionRow({
+  icon,
+  label,
+  onPress,
+  supportingText,
+  testID,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  supportingText?: string;
+  testID: string;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={supportingText ? `${label}: ${supportingText}` : label}
+      accessibilityRole="link"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.infoActionRow,
+        pressed ? styles.pressedRow : null,
+      ]}
+      testID={testID}
+    >
+      <Ionicons color={colors.textMuted} name={icon} size={18} />
+      <View style={styles.infoActionText}>
+        <AppText numberOfLines={1} style={styles.infoActionLabel} variant="bodySm">
+          {label}
+        </AppText>
+        {supportingText ? (
+          <AppText color="secondary" numberOfLines={1} variant="caption">
+            {supportingText}
+          </AppText>
+        ) : null}
+      </View>
+      <Ionicons color={colors.textMuted} name="open-outline" size={16} />
+    </Pressable>
   );
 }
 
@@ -2820,7 +3135,11 @@ function buildMediaProfileTypeLabel(affiliationType: string | null | undefined) 
     return "Testata giornalistica / Media sportivo";
   }
 
-  if (normalized.includes("pagina") || normalized.includes("progetto")) {
+  if (
+    normalized.includes("creator") ||
+    normalized.includes("pagina") ||
+    normalized.includes("progetto")
+  ) {
     return "Creator sportivo / Pagina tifosi";
   }
 
@@ -2854,7 +3173,52 @@ function buildAreaLabel(completeProfile: CompleteProfessionalProfile) {
   );
 }
 
+function buildCoverageGroups(
+  mediaProfile: CompleteProfessionalProfile["mediaProfile"],
+  areaLabel: string,
+) {
+  if (!mediaProfile) {
+    return [];
+  }
+
+  return [
+    {
+      label: "Competizioni",
+      values: normalizeUniqueValues([
+        ...mediaProfile.covered_competitions,
+        ...(mediaProfile.covered_competitions.length === 0
+          ? mediaProfile.focus_areas
+          : []),
+      ]),
+    },
+    {
+      label: "Squadre",
+      values: normalizeUniqueValues(mediaProfile.covered_teams),
+    },
+    {
+      label: "Territori",
+      values: normalizeUniqueValues([
+        ...mediaProfile.covered_territories,
+        ...(mediaProfile.covered_territories.length === 0 &&
+        areaLabel !== "Area da completare"
+          ? [areaLabel]
+          : []),
+      ]),
+    },
+    {
+      label: "Temi",
+      values: normalizeUniqueValues([
+        ...mediaProfile.covered_topics,
+        ...(mediaProfile.covered_topics.length === 0
+          ? mediaProfile.content_types
+          : []),
+      ]),
+    },
+  ].filter((group) => group.values.length > 0);
+}
+
 function buildChannelItems(
+  mediaChannels: MediaProfileChannelRecord[],
   contacts: CompleteProfessionalProfile["userContacts"],
 ): ChannelItem[] {
   const website = normalizeWebsiteInput(contacts.website);
@@ -2863,23 +3227,297 @@ function buildChannelItems(
   const tiktok = normalizeExternalUrl(contacts.tiktok ?? "");
   const facebook = normalizeFacebookInput(contacts.facebook);
 
-  return [
+  const explicitChannels = mediaChannels
+    .map((channel) => {
+      const url = normalizeExternalUrl(channel.url);
+
+      if (!channel.is_public || !url) {
+        return null;
+      }
+
+      return {
+        channelType: channel.channel_type,
+        icon: getChannelIcon(channel.channel_type),
+        key: channel.id,
+        label: channel.label.trim() || formatChannelLabel(channel.channel_type),
+        url,
+      };
+    })
+    .filter(Boolean) as ChannelItem[];
+  const legacyChannels = [
     contacts.showWebsite && website
-      ? { key: "website", label: "Sito web", url: website }
+      ? {
+          channelType: "website",
+          icon: getChannelIcon("website"),
+          key: "legacy-website",
+          label: "Sito web",
+          url: website,
+        }
       : null,
     contacts.showInstagram && instagram
-      ? { key: "instagram", label: "Instagram", url: instagram }
+      ? {
+          channelType: "instagram",
+          icon: getChannelIcon("instagram"),
+          key: "legacy-instagram",
+          label: "Instagram",
+          url: instagram,
+        }
       : null,
     contacts.showYouTube && youtube
-      ? { key: "youtube", label: "YouTube", url: youtube }
+      ? {
+          channelType: "youtube",
+          icon: getChannelIcon("youtube"),
+          key: "legacy-youtube",
+          label: "YouTube",
+          url: youtube,
+        }
       : null,
     contacts.showTikTok && tiktok
-      ? { key: "tiktok", label: "TikTok", url: tiktok }
+      ? {
+          channelType: "tiktok",
+          icon: getChannelIcon("tiktok"),
+          key: "legacy-tiktok",
+          label: "TikTok",
+          url: tiktok,
+        }
       : null,
     contacts.showFacebook && facebook
-      ? { key: "facebook", label: "Facebook", url: facebook }
+      ? {
+          channelType: "facebook",
+          icon: getChannelIcon("facebook"),
+          key: "legacy-facebook",
+          label: "Facebook",
+          url: facebook,
+        }
       : null,
   ].filter(Boolean) as ChannelItem[];
+
+  return uniqueChannelItems([...explicitChannels, ...legacyChannels]);
+}
+
+function buildContactItems(
+  mediaContacts: MediaProfileContactRecord[],
+  contacts: CompleteProfessionalProfile["userContacts"],
+): ContactItem[] {
+  const explicitContacts = mediaContacts
+    .map((contact) => {
+      const href = normalizeContactHref(contact.href || contact.value, contact.contact_type);
+
+      if (!contact.is_public || !href) {
+        return null;
+      }
+
+      return {
+        contactType: contact.contact_type,
+        href,
+        icon: getContactIcon(contact.contact_type, contact.value),
+        key: contact.id,
+        label: contact.label.trim() || formatContactLabel(contact.contact_type),
+        value: contact.value.trim(),
+      };
+    })
+    .filter(Boolean) as ContactItem[];
+
+  const email = contacts.email.trim();
+  const fallbackEmail =
+    contacts.showEmail && email
+      ? [
+          {
+            contactType: "editorial",
+            href: `mailto:${email}`,
+            icon: getContactIcon("email", email),
+            key: "legacy-email",
+            label: "Redazione",
+            value: email,
+          },
+        ]
+      : [];
+
+  return uniqueContactItems([...explicitContacts, ...fallbackEmail]);
+}
+
+function buildVerificationItems(
+  verificationStatus: string | null,
+  verifications: MediaProfileVerificationRecord[],
+): VerificationItem[] {
+  const items = verifications
+    .filter((verification) => verification.is_public && verification.status === "verified")
+    .map((verification) => ({
+      icon: getVerificationIcon(verification.verification_type),
+      key: verification.id,
+      label:
+        verification.label.trim() ||
+        formatVerificationLabel(verification.verification_type),
+    }));
+
+  if (verificationStatus === "verified") {
+    items.unshift({
+      icon: getVerificationIcon("profile_verified"),
+      key: "profile-status-verified",
+      label: "Profilo verificato",
+    });
+  }
+
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.label.trim().toLowerCase();
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function uniqueChannelItems(items: ChannelItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.url.trim().toLowerCase();
+
+    if (!key || seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function uniqueContactItems(items: ContactItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.href.trim().toLowerCase();
+
+    if (!key || seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function formatChannelLabel(channelType: string) {
+  const normalized = channelType.trim().toLowerCase();
+
+  if (normalized === "website") {
+    return "Sito web";
+  }
+
+  if (normalized === "x" || normalized === "twitter") {
+    return "X / Twitter";
+  }
+
+  if (normalized === "youtube") {
+    return "YouTube";
+  }
+
+  if (normalized === "tiktok") {
+    return "TikTok";
+  }
+
+  return normalized ? normalized[0].toUpperCase() + normalized.slice(1) : "Canale";
+}
+
+function getChannelIcon(channelType: string): keyof typeof Ionicons.glyphMap {
+  const normalized = channelType.trim().toLowerCase();
+
+  if (normalized === "instagram") {
+    return "logo-instagram";
+  }
+
+  if (normalized === "youtube") {
+    return "logo-youtube";
+  }
+
+  if (normalized === "tiktok") {
+    return "logo-tiktok";
+  }
+
+  if (normalized === "x" || normalized === "twitter") {
+    return "logo-twitter";
+  }
+
+  if (normalized === "facebook") {
+    return "logo-facebook";
+  }
+
+  if (normalized === "website") {
+    return "globe-outline";
+  }
+
+  return "link-outline";
+}
+
+function formatContactLabel(contactType: string) {
+  const normalized = contactType.trim().toLowerCase();
+
+  if (normalized === "press") {
+    return "Comunicati stampa";
+  }
+
+  if (normalized === "commercial" || normalized === "sponsor") {
+    return "Commerciale / sponsor";
+  }
+
+  if (normalized === "phone") {
+    return "Telefono";
+  }
+
+  return "Redazione";
+}
+
+function getContactIcon(
+  contactType: string,
+  value: string,
+): keyof typeof Ionicons.glyphMap {
+  const normalized = contactType.trim().toLowerCase();
+
+  if (normalized === "phone" || /^tel:/i.test(value)) {
+    return "call-outline";
+  }
+
+  if (normalized === "commercial" || normalized === "sponsor") {
+    return "briefcase-outline";
+  }
+
+  return "mail-outline";
+}
+
+function formatVerificationLabel(verificationType: string) {
+  const normalized = verificationType.trim().toLowerCase();
+
+  if (normalized === "registered_publication") {
+    return "Testata registrata";
+  }
+
+  if (normalized === "authors_verified") {
+    return "Autori verificati";
+  }
+
+  if (normalized === "identity_checked") {
+    return "Identità verificata";
+  }
+
+  return "Profilo verificato";
+}
+
+function getVerificationIcon(
+  verificationType: string,
+): keyof typeof Ionicons.glyphMap {
+  const normalized = verificationType.trim().toLowerCase();
+
+  if (normalized === "registered_publication") {
+    return "document-text-outline";
+  }
+
+  if (normalized === "authors_verified") {
+    return "people-outline";
+  }
+
+  return "shield-checkmark-outline";
 }
 
 function normalizeUniqueValues(values: (string | null | undefined)[]) {
@@ -2908,6 +3546,31 @@ function normalizeUniqueValues(values: (string | null | undefined)[]) {
 function normalizeWebsiteInput(value: string | null | undefined) {
   const normalized = normalizeExternalUrl(value ?? "");
   return normalized && !normalized.includes("instagram.com") ? normalized : "";
+}
+
+function normalizeContactHref(value: string, contactType: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^(mailto|tel|https?):/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (trimmed.includes("@") && !trimmed.includes(" ")) {
+    return `mailto:${trimmed}`;
+  }
+
+  if (
+    contactType.trim().toLowerCase() === "phone" ||
+    /^\+?[0-9][0-9\s().-]{5,}$/.test(trimmed)
+  ) {
+    return `tel:${trimmed.replace(/[\s().-]/g, "")}`;
+  }
+
+  return normalizeExternalUrl(trimmed);
 }
 
 function normalizeExternalUrl(value: string) {
@@ -3022,6 +3685,56 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: spacing[18],
     paddingBottom: spacing[18],
+  },
+  authorFilterBar: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: spacing[12],
+    justifyContent: "space-between",
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[10],
+  },
+  authorFilterClear: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[4],
+    minHeight: 44,
+    paddingHorizontal: spacing[8],
+  },
+  authorFilterName: {
+    color: colors.textPrimary,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  authorFilterText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  authorInfo: {
+    flex: 1,
+    gap: spacing[4],
+    minWidth: 0,
+  },
+  authorName: {
+    color: colors.textPrimary,
+    flex: 1,
+    fontWeight: typography.fontWeight.medium,
+  },
+  authorNameRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[6],
+  },
+  authorRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[12],
+    minHeight: 44,
+  },
+  authorsList: {
+    gap: spacing[14],
   },
   bodyInput: {
     minHeight: 150,
@@ -3275,18 +3988,83 @@ const styles = StyleSheet.create({
     gap: spacing[4],
     marginBottom: spacing[18],
   },
+  identityDescription: {
+    color: colors.textPrimary,
+    lineHeight: 20,
+    marginTop: spacing[8],
+  },
+  identityName: {
+    color: "#061223",
+    flexShrink: 1,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  identityRole: {
+    marginTop: spacing[4],
+  },
   infoBlock: {
     gap: spacing[8],
     marginBottom: spacing[20],
   },
+  editorialIdentity: {
+    gap: spacing[4],
+  },
+  coverageGroup: {
+    gap: spacing[8],
+  },
+  coverageGroups: {
+    gap: spacing[16],
+  },
   infoPanel: {
     backgroundColor: colors.surface,
-    gap: spacing[14],
-    paddingHorizontal: spacing[20],
-    paddingVertical: spacing[20],
+    gap: spacing[32],
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[24],
   },
-  infoRow: {
+  infoActionLabel: {
+    color: colors.textPrimary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  infoActionRow: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius[8],
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: spacing[12],
+    minHeight: 48,
+    paddingHorizontal: spacing[14],
+    paddingVertical: spacing[12],
+  },
+  infoActionText: {
+    flex: 1,
     gap: spacing[4],
+    minWidth: 0,
+  },
+  infoItemList: {
+    gap: spacing[10],
+  },
+  infoSection: {
+    gap: spacing[14],
+  },
+  infoSectionTitle: {
+    color: "#061223",
+    fontWeight: typography.fontWeight.semibold,
+  },
+  infoTag: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 18,
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[6],
+  },
+  infoTagText: {
+    color: colors.textPrimary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  infoTagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
   },
   kindButton: {
     alignItems: "center",
@@ -3455,6 +4233,19 @@ const styles = StyleSheet.create({
   targetChipText: {
     color: colors.textPrimary,
     maxWidth: 150,
+  },
+  trustBadge: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[10],
+    minHeight: 32,
+  },
+  trustBadgeText: {
+    color: colors.textPrimary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  trustBadges: {
+    gap: spacing[14],
   },
   thumbVideoOverlay: {
     alignItems: "center",
