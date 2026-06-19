@@ -211,15 +211,23 @@ export function ClubDashboard() {
     }
   }
 
-  // Filter members
-  const activeMembers = members.filter((m) => m.status === "active");
+  // Build a team name lookup from loaded teams
+  const teamNameById = new Map<string, string>(
+    teams.map((t) => [t.id, t.name]),
+  );
+
+  // Show active + pending members; hide rejected/removed
+  const visibleMembers = members.filter(
+    (m) => m.status === "active" || m.status === "pending",
+  );
   const filteredMembers =
     rosterFilter === "all"
-      ? activeMembers
+      ? visibleMembers
       : rosterFilter === "player"
-        ? activeMembers.filter((m) => m.member_role === "player")
-        : activeMembers.filter((m) => m.member_role !== "player");
+        ? visibleMembers.filter((m) => m.member_role === "player")
+        : visibleMembers.filter((m) => m.member_role !== "player");
 
+  const activeMembers = members.filter((m) => m.status === "active");
   const playersCount = activeMembers.filter(
     (m) => m.member_role === "player",
   ).length;
@@ -351,6 +359,7 @@ export function ClubDashboard() {
                   member={item}
                   onReject={handleRejectMember}
                   onRemove={handleRemoveMember}
+                  teamName={item.team_id ? (teamNameById.get(item.team_id) ?? null) : null}
                 />
               )}
               scrollEnabled={false}

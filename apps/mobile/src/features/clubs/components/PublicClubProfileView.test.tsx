@@ -43,6 +43,12 @@ vi.mock("../../profiles/media-upload-service", () => ({
   ProfileMediaUploadError: class ProfileMediaUploadError extends Error {},
 }));
 
+vi.mock("../../content/content-tag-service", () => ({
+  hideTag: vi.fn().mockResolvedValue(undefined),
+  notifyTaggedProfiles: vi.fn().mockResolvedValue(undefined),
+  reportTag: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { PublicClubProfileView } from "./PublicClubProfileView";
 
 function render(element: React.ReactElement) {

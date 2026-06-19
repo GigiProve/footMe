@@ -1,4 +1,43 @@
+import { notifyTaggedProfiles } from "../content/content-tag-service";
 import { supabase } from "../../lib/supabase";
+
+/**
+ * Notify everyone following a media profile that it published new content.
+ * Best-effort: failures must not block content creation.
+ */
+async function notifyMediaFollowers(input: {
+  excludeProfileId: string;
+  mediaProfileId: string;
+  postId: string;
+  title: string;
+}) {
+  const { data, error } = await supabase
+    .from("profile_follows")
+    .select("follower_profile_id")
+    .eq("followed_profile_id", input.mediaProfileId);
+
+  if (error || !data || data.length === 0) {
+    return;
+  }
+
+  const recipients = data
+    .map((row) => row.follower_profile_id as string)
+    .filter((id) => id && id !== input.excludeProfileId);
+
+  if (recipients.length === 0) {
+    return;
+  }
+
+  await supabase.from("notifications").insert(
+    recipients.map((profileId) => ({
+      body: `Nuovo contenuto: "${input.title}"`,
+      data: { media_profile_id: input.mediaProfileId, post_id: input.postId },
+      recipient_profile_id: profileId,
+      title: "Un media che segui ha pubblicato un nuovo contenuto",
+      type: "followed_media_content",
+    })),
+  );
+}
 
 export type MediaProfilePostKind = "article" | "news";
 export type MediaProfilePostCoverType = "image" | "video";
@@ -193,6 +232,30 @@ export async function createMediaProfilePost(
     if (tagError) {
       throw tagError;
     }
+
+    await notifyTaggedProfiles({
+      contentType: "media_profile",
+      postId,
+      taggedProfileIds: taggedTargets
+        .filter((target) => target.target_type === "profile")
+        .map((target) => target.target_id),
+      taggerProfileId: input.createdByProfileId,
+    });
+  }
+
+  // Notify followers of the media profile that a new article was published.
+  const row = data as MediaProfilePostRow;
+  const isPublished =
+    (row as { status?: string }).status === "published" ||
+    row.published_at !== null;
+
+  if (isPublished) {
+    await notifyMediaFollowers({
+      excludeProfileId: input.createdByProfileId,
+      mediaProfileId: input.mediaProfileId,
+      postId,
+      title: input.title,
+    });
   }
 
   const [post] = await enrichMediaProfilePosts(

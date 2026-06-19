@@ -1,6 +1,6 @@
 export type MemberRole = "player" | "staff" | "coach" | "director";
 
-export type MemberStatus = "active" | "rejected" | "removed";
+export type MemberStatus = "pending" | "active" | "rejected" | "removed";
 
 export type AddedBy = "admin_manual" | "self_request" | "invite_link";
 
@@ -11,11 +11,14 @@ export type ClubMember = {
   created_at: string;
   full_name: string | null;
   id: string;
+  is_current: boolean;
   manual_name: string | null;
   member_role: MemberRole;
   profile_id: string | null;
+  season: string | null;
   staff_title: string | null;
   status: MemberStatus;
+  team_id: string | null;
 };
 
 export type ClubInviteLink = {

@@ -44,15 +44,22 @@ import {
   requestConnection,
   startDirectConversation,
 } from "../networking/networking-service";
+import {
+  fetchPlayerAgent,
+  fetchRepresentationState,
+  requestRepresentation,
+  respondRepresentation,
+  type AgentRepresentation,
+} from "../relationships/agent-representation-service";
 import { colors, spacing } from "../../theme/tokens";
-import { AppText } from "../../ui";
+import { AppText, Button } from "../../ui";
 
 const noop = () => undefined;
 
 export function PublicProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
-  const { isLoading: isSessionLoading, needsOnboarding, session } = useSession();
+  const { isLoading: isSessionLoading, needsOnboarding, profile: viewerProfile, session } = useSession();
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
   const [profileAction, setProfileAction] = useState<{
@@ -62,8 +69,18 @@ export function PublicProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Representation state (agent↔player)
+  const [representationState, setRepresentationState] =
+    useState<AgentRepresentation | null>(null);
+  const [playerAgent, setPlayerAgent] = useState<{
+    agent_full_name: string | null;
+    agent_profile_id: string;
+  } | null>(null);
+  const [isRepresentationLoading, setIsRepresentationLoading] = useState(false);
+
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
   const currentUserId = session?.user.id ?? null;
+  const viewerRole = (viewerProfile?.role ?? null) as AppRole | null;
 
   const headerDetails = useMemo(
     () => (completeProfile ? buildHeaderDetails(completeProfile) : null),
@@ -115,9 +132,69 @@ export function PublicProfileScreen() {
     }
   }, [profileId, session?.user]);
 
+  // Load representation state when viewer is agent viewing a player, or viewer
+  // is a player being viewed by an agent.
+  const loadRepresentationData = useCallback(async () => {
+    if (!completeProfile || !currentUserId) {
+      setRepresentationState(null);
+      setPlayerAgent(null);
+      return;
+    }
+
+    const viewedRole = completeProfile.profile.role as AppRole;
+    const viewedProfileId = completeProfile.profile.id;
+
+    // Agent viewing a player profile
+    if (viewerRole === "agent" && viewedRole === "player") {
+      try {
+        setIsRepresentationLoading(true);
+        const state = await fetchRepresentationState(currentUserId, viewedProfileId);
+        setRepresentationState(state);
+      } catch {
+        setRepresentationState(null);
+      } finally {
+        setIsRepresentationLoading(false);
+      }
+      return;
+    }
+
+    // Player viewing another profile — check if this viewer-player has any
+    // pending incoming request from the viewed agent
+    if (viewerRole === "player" && viewedRole === "agent") {
+      try {
+        setIsRepresentationLoading(true);
+        const state = await fetchRepresentationState(viewedProfileId, currentUserId);
+        setRepresentationState(state);
+      } catch {
+        setRepresentationState(null);
+      } finally {
+        setIsRepresentationLoading(false);
+      }
+      return;
+    }
+
+    // Any viewer looking at a player profile — surface accepted public agent
+    if (viewedRole === "player") {
+      try {
+        const agent = await fetchPlayerAgent(viewedProfileId);
+        setPlayerAgent(agent);
+      } catch {
+        setPlayerAgent(null);
+      }
+      return;
+    }
+
+    setRepresentationState(null);
+    setPlayerAgent(null);
+  }, [completeProfile, currentUserId, viewerRole]);
+
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    void loadRepresentationData();
+  }, [loadRepresentationData]);
 
   async function handleConnectToProfile(targetProfile: CompleteProfessionalProfile) {
     try {
@@ -154,6 +231,43 @@ export function PublicProfileScreen() {
       Alert.alert("Chat non disponibile", message);
     } finally {
       setProfileAction(null);
+    }
+  }
+
+  async function handleRequestRepresentation() {
+    if (!profileId) return;
+    try {
+      setIsRepresentationLoading(true);
+      await requestRepresentation(profileId);
+      // Reload state to reflect "pending"
+      await loadRepresentationData();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Impossibile inviare la richiesta.";
+      Alert.alert("Errore", message);
+    } finally {
+      setIsRepresentationLoading(false);
+    }
+  }
+
+  async function handleRespondRepresentation(accept: boolean) {
+    if (!representationState) return;
+    try {
+      setIsRepresentationLoading(true);
+      await respondRepresentation(representationState.id, accept);
+      await loadRepresentationData();
+      Alert.alert(
+        accept ? "Rappresentanza accettata" : "Richiesta rifiutata",
+        accept
+          ? "Hai accettato la rappresentanza dell'agente."
+          : "Hai rifiutato la richiesta di rappresentanza.",
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Impossibile rispondere alla richiesta.";
+      Alert.alert("Errore", message);
+    } finally {
+      setIsRepresentationLoading(false);
     }
   }
 
@@ -249,12 +363,18 @@ export function PublicProfileScreen() {
                 profileAction?.profileId === completeProfile.profile.id &&
                 profileAction.type === "message"
               }
+              isRepresentationLoading={isRepresentationLoading}
               onConnect={() => handleConnectToProfile(completeProfile)}
               onMessage={() => handleMessageProfile(completeProfile)}
               onOpenDirectorLinkedTarget={handleOpenDirectorLinkedTarget}
               onOpenFavoriteClub={handleOpenFavoriteClub}
               onOpenPlayerProfile={handleOpenPlayerProfile}
+              onRequestRepresentation={handleRequestRepresentation}
+              onRespondRepresentation={handleRespondRepresentation}
+              playerAgent={playerAgent}
+              representationState={representationState}
               viewerProfileId={currentUserId}
+              viewerRole={viewerRole}
             />
           </>
         ) : (
@@ -390,35 +510,138 @@ function ProfileContentBlock({
   completeProfile,
   isConnecting = false,
   isMessaging = false,
+  isRepresentationLoading = false,
   onConnect,
   onMessage,
   onOpenDirectorLinkedTarget,
   onOpenFavoriteClub,
   onOpenPlayerProfile,
+  onRequestRepresentation,
+  onRespondRepresentation,
+  playerAgent,
+  representationState,
   viewerProfileId,
+  viewerRole,
 }: {
   completeProfile: CompleteProfessionalProfile;
   isConnecting?: boolean;
   isMessaging?: boolean;
+  isRepresentationLoading?: boolean;
   onConnect?: () => void;
   onMessage?: () => void;
   onOpenDirectorLinkedTarget?: (target: DirectorMediaLinkedTarget) => void;
   onOpenFavoriteClub?: (clubId: string) => void;
   onOpenPlayerProfile?: (profileId: string) => void;
+  onRequestRepresentation?: () => void;
+  onRespondRepresentation?: (accept: boolean) => void;
+  playerAgent?: { agent_full_name: string | null; agent_profile_id: string } | null;
+  representationState?: AgentRepresentation | null;
   viewerProfileId?: string | null;
+  viewerRole?: AppRole | null;
 }) {
   const role = completeProfile.profile.role as AppRole;
 
   if (role === "player") {
+    // Determine whether viewer is an agent (can request representation) or
+    // the player themselves receiving an incoming request.
+    const isViewerAgent = viewerRole === "agent";
+    const isViewerThisPlayer = viewerRole === "player";
+
+    // A pending request where the agent is the initiator = incoming for the player
+    const hasIncomingRequest =
+      isViewerThisPlayer &&
+      representationState?.status === "pending" &&
+      representationState?.requested_by === representationState?.agent_profile_id;
+
     return (
-      <ProfileTabView
-        completeProfile={completeProfile}
-        isOwner={false}
-        onAddExperience={noop}
-        onDeleteExperience={noop}
-        onEdit={noop}
-        onManageMedia={noop}
-      />
+      <View>
+        {/* Agent → Player representation actions */}
+        {isViewerAgent ? (
+          <View style={styles.representationBar}>
+            {representationState?.status === "accepted" ? (
+              <View style={styles.representationStatus}>
+                <Ionicons color={colors.success} name="checkmark-circle" size={16} />
+                <AppText color="secondary" variant="bodySm">
+                  Rappresentanza attiva
+                </AppText>
+              </View>
+            ) : representationState?.status === "pending" ? (
+              <View style={styles.representationStatus}>
+                <Ionicons color={colors.textSecondary} name="time-outline" size={16} />
+                <AppText color="secondary" variant="bodySm">
+                  Richiesta inviata
+                </AppText>
+              </View>
+            ) : (
+              <Button
+                disabled={isRepresentationLoading}
+                label="Richiedi rappresentanza"
+                loading={isRepresentationLoading}
+                onPress={onRequestRepresentation}
+                size="sm"
+                variant="primary"
+              />
+            )}
+          </View>
+        ) : null}
+
+        {/* Player receiving incoming representation request */}
+        {hasIncomingRequest ? (
+          <View style={styles.representationBar}>
+            <AppText style={styles.representationIncomingLabel} variant="bodySm">
+              Un agente ha richiesto di rappresentarti
+            </AppText>
+            <View style={styles.representationActions}>
+              <Button
+                disabled={isRepresentationLoading}
+                label="Accetta"
+                loading={isRepresentationLoading}
+                onPress={() => onRespondRepresentation?.(true)}
+                size="sm"
+                variant="primary"
+              />
+              <Button
+                disabled={isRepresentationLoading}
+                label="Rifiuta"
+                onPress={() => onRespondRepresentation?.(false)}
+                size="sm"
+                variant="danger"
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {/* Accepted public agent row */}
+        {playerAgent ? (
+          <Pressable
+            accessibilityLabel={`Apri profilo agente ${playerAgent.agent_full_name ?? ""}`}
+            accessibilityRole="button"
+            onPress={() => onOpenPlayerProfile?.(playerAgent.agent_profile_id)}
+            style={({ pressed }) => [
+              styles.agentRow,
+              pressed ? styles.agentRowPressed : null,
+            ]}
+          >
+            <Ionicons color={colors.textSecondary} name="person-outline" size={15} />
+            <AppText color="secondary" variant="bodySm">
+              {"Agente: "}
+              <AppText color="accent" variant="bodySm">
+                {playerAgent.agent_full_name ?? "Agente"}
+              </AppText>
+            </AppText>
+            <Ionicons color={colors.textSecondary} name="chevron-forward" size={14} />
+          </Pressable>
+        ) : null}
+
+        <ProfileTabView
+          completeProfile={completeProfile}
+          isOwner={false}
+          onAddExperience={noop}
+          onDeleteExperience={noop}
+          onEdit={noop}
+          onManageMedia={noop}
+        />
+      </View>
     );
   }
 
@@ -535,6 +758,19 @@ function getProfileViewerTitle(role: AppRole) {
 }
 
 const styles = StyleSheet.create({
+  agentRow: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: spacing[8],
+    paddingHorizontal: spacing[20],
+    paddingVertical: spacing[12],
+  },
+  agentRowPressed: {
+    opacity: 0.75,
+  },
   backButton: {
     alignItems: "center",
     height: 32,
@@ -553,6 +789,26 @@ const styles = StyleSheet.create({
   },
   directorTopBarTitle: {
     color: "#061223",
+  },
+  representationActions: {
+    flexDirection: "row",
+    gap: spacing[10],
+    marginTop: spacing[10],
+  },
+  representationBar: {
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing[20],
+    paddingVertical: spacing[14],
+  },
+  representationIncomingLabel: {
+    marginBottom: spacing[4],
+  },
+  representationStatus: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[8],
   },
   screen: {
     backgroundColor: colors.background,

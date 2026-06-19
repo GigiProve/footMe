@@ -259,3 +259,43 @@ export async function fetchPendingReports(): Promise<ClubReportEntry[]> {
     club_name: clubMap.get(report.club_id) ?? "Sconosciuto",
   }));
 }
+
+export type ReportedContentType = "club_media" | "fan_tribuna" | "media_profile";
+
+export type ReportedTag = {
+  content_type: ReportedContentType;
+  created_at: string;
+  post_id: string;
+  tagged_name: string;
+  tagged_profile_id: string;
+};
+
+/** Admin: reported content tags awaiting moderation (across all content types). */
+export async function fetchReportedTags(): Promise<ReportedTag[]> {
+  const { data, error } = await supabase.rpc("fetch_reported_content_tags");
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as ReportedTag[];
+}
+
+/** Admin: dismiss a report (keep the tag) or remove the tag (hide it). */
+export async function moderateReportedTag(input: {
+  contentType: ReportedContentType;
+  dismiss: boolean;
+  postId: string;
+  taggedProfileId: string;
+}) {
+  const { error } = await supabase.rpc("moderate_content_tag", {
+    p_content_type: input.contentType,
+    p_dismiss: input.dismiss,
+    p_post_id: input.postId,
+    p_tagged_id: input.taggedProfileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}

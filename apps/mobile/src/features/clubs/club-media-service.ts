@@ -1,3 +1,4 @@
+import { notifyTaggedProfiles } from "../content/content-tag-service";
 import { supabase } from "../../lib/supabase";
 
 export type ClubMediaKind =
@@ -198,6 +199,13 @@ export async function createClubMediaPost(
     if (tagError) {
       throw tagError;
     }
+
+    await notifyTaggedProfiles({
+      contentType: "club_media",
+      postId,
+      taggedProfileIds: taggedProfileIds,
+      taggerProfileId: input.createdByProfileId,
+    });
   }
 
   const [post] = await enrichClubMediaPosts(

@@ -4,6 +4,7 @@ import {
   applyToRecruitingAd,
   getOwnedClub,
   toggleSavedAd,
+  updateApplicationStatus,
 } from "./recruiting-service";
 
 const mocks = vi.hoisted(() => {
@@ -12,7 +13,11 @@ const mocks = vi.hoisted(() => {
   const deleteFirstEqMock = vi.fn();
   const playerProfileMaybeSingleMock = vi.fn();
   const recruitingApplicationInsertMock = vi.fn();
+  const recruitingApplicationUpdateEqMock = vi.fn();
   const savedAdsUpsertMock = vi.fn();
+  const recruitingAdMaybeSingleMock = vi.fn();
+  const profileMaybeSingleMock = vi.fn();
+  const notificationsInsertMock = vi.fn();
 
   const deleteChain = {
     eq: deleteFinalEqMock,
@@ -56,13 +61,46 @@ const mocks = vi.hoisted(() => {
       if (table === "recruiting_applications") {
         return {
           insert: recruitingApplicationInsertMock,
+          update: vi.fn(() => ({
+            eq: recruitingApplicationUpdateEqMock,
+          })),
+        };
+      }
+
+      if (table === "recruiting_ads") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: recruitingAdMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: profileMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
+      if (table === "notifications") {
+        return {
+          insert: notificationsInsertMock,
         };
       }
 
       throw new Error(`Unexpected table: ${table}`);
     }),
+    notificationsInsertMock,
     playerProfileMaybeSingleMock,
+    profileMaybeSingleMock,
+    recruitingAdMaybeSingleMock,
     recruitingApplicationInsertMock,
+    recruitingApplicationUpdateEqMock,
     savedAdsUpsertMock,
   };
 });
@@ -91,6 +129,24 @@ describe("recruiting-service", () => {
     });
     mocks.recruitingApplicationInsertMock.mockReset();
     mocks.recruitingApplicationInsertMock.mockResolvedValue({ error: null });
+    mocks.recruitingAdMaybeSingleMock.mockReset();
+    mocks.recruitingAdMaybeSingleMock.mockResolvedValue({
+      data: {
+        club_id: "club-1",
+        clubs: { owner_profile_id: "club-owner-1" },
+        title: "Cercasi attaccante",
+      },
+      error: null,
+    });
+    mocks.profileMaybeSingleMock.mockReset();
+    mocks.profileMaybeSingleMock.mockResolvedValue({
+      data: { full_name: "Mario Rossi" },
+      error: null,
+    });
+    mocks.notificationsInsertMock.mockReset();
+    mocks.notificationsInsertMock.mockResolvedValue({ error: null });
+    mocks.recruitingApplicationUpdateEqMock.mockReset();
+    mocks.recruitingApplicationUpdateEqMock.mockResolvedValue({ error: null });
   });
 
   it("returns the owned club when present", async () => {
@@ -153,5 +209,36 @@ describe("recruiting-service", () => {
       player_profile_id: "profile-5",
       status: "submitted",
     });
+  });
+
+  it("notifies the club owner when a new application is submitted", async () => {
+    await applyToRecruitingAd("profile-5", "ad-9", "Pronto");
+
+    expect(mocks.notificationsInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipient_profile_id: "club-owner-1",
+        type: "application_received",
+      }),
+    );
+  });
+
+  it("updates an application status and notifies the applicant", async () => {
+    await updateApplicationStatus({
+      adTitle: "Cercasi attaccante",
+      applicantProfileId: "applicant-1",
+      applicationId: "app-1",
+      status: "accepted",
+    });
+
+    expect(mocks.recruitingApplicationUpdateEqMock).toHaveBeenCalledWith(
+      "id",
+      "app-1",
+    );
+    expect(mocks.notificationsInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipient_profile_id: "applicant-1",
+        type: "application_status",
+      }),
+    );
   });
 });

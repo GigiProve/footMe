@@ -4,6 +4,7 @@ import {
   Linking,
   SafeAreaView,
   StyleSheet,
+  View,
   type AlertButton,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -23,6 +24,11 @@ import {
   PublicClubProfileView,
 } from "../../src/features/clubs/components/PublicClubProfileView";
 import type { ClubHeaderTab } from "../../src/features/clubs/components/PublicClubHeader";
+import {
+  fetchPendingMemberships,
+  respondToMembership,
+  type PendingMembership,
+} from "../../src/features/clubs/membership-service";
 import {
   fetchClubTeamProfiles,
   fetchClubTeams,
@@ -95,8 +101,8 @@ import type { GroupedExperience } from "../../src/features/profiles/career/caree
 import type { CoachGroupedExperience } from "../../src/features/profiles/career/coach-career-grouping";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
 import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
-import { colors } from "../../src/theme/tokens";
-import { AppText } from "../../src/ui";
+import { colors, spacing } from "../../src/theme/tokens";
+import { AppText, Button, SectionCard } from "../../src/ui";
 
 const emptyClubHeaderStats: ClubHeaderStats = {
   activeTeamsCount: 0,
@@ -110,6 +116,13 @@ const emptyClubOverview: PublicClubSquadraOverview = {
   positionPreview: [],
   positionsTotal: 0,
   seasonSummaries: [],
+};
+
+const MEMBER_ROLE_LABELS: Record<string, string> = {
+  coach: "Allenatore",
+  director: "Dirigente",
+  player: "Giocatore",
+  staff: "Staff",
 };
 
 export default function ProfileScreen() {
@@ -130,8 +143,23 @@ export default function ProfileScreen() {
   const [activeClubTab, setActiveClubTab] = useState<ClubHeaderTab>("team");
   const [isLoading, setIsLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<EditSection | null>(null);
+  const [pendingMemberships, setPendingMemberships] = useState<PendingMembership[]>([]);
+  const [respondingMembershipId, setRespondingMembershipId] = useState<string | null>(null);
   const [agentMediaEditingItemId, setAgentMediaEditingItemId] = useState<string | null>(null);
   const [directorMediaEditingItemId, setDirectorMediaEditingItemId] = useState<string | null>(null);
+
+  const loadPendingMemberships = useCallback(async () => {
+    if (!userId) {
+      setPendingMemberships([]);
+      return;
+    }
+    try {
+      const data = await fetchPendingMemberships(userId);
+      setPendingMemberships(data);
+    } catch {
+      setPendingMemberships([]);
+    }
+  }, [userId]);
 
   const loadProfile = useCallback(async () => {
     if (!userId) {
@@ -190,7 +218,25 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     void loadProfile();
-  }, [loadProfile]);
+    void loadPendingMemberships();
+  }, [loadProfile, loadPendingMemberships]);
+
+  async function handleRespondMembership(memberId: string, accept: boolean) {
+    try {
+      setRespondingMembershipId(memberId);
+      await respondToMembership(memberId, accept);
+      await loadPendingMemberships();
+      await loadProfile();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Operazione non riuscita.";
+      Alert.alert("Operazione non riuscita", message);
+    } finally {
+      setRespondingMembershipId(null);
+    }
+  }
 
   const headerDetails = useMemo(
     () => (completeProfile ? buildHeaderDetails(completeProfile) : null),
@@ -566,6 +612,49 @@ export default function ProfileScreen() {
           role === "director" ? styles.directorScrollContent : null,
         ]}
       >
+        {pendingMemberships.length > 0 ? (
+          <SectionCard
+            description="Conferma se vuoi unirti a queste rose."
+            title="Richieste"
+            variant="flat"
+          >
+            <View style={styles.pendingList}>
+              {pendingMemberships.map((membership) => (
+                <View key={membership.id} style={styles.pendingItem}>
+                  <View style={styles.pendingInfo}>
+                    <AppText variant="bodySm">
+                      {membership.club_name ?? "Una societa'"}
+                      {membership.team_name ? ` · ${membership.team_name}` : ""}
+                    </AppText>
+                    <AppText color="secondary" variant="caption">
+                      {MEMBER_ROLE_LABELS[membership.member_role] ??
+                        membership.member_role}
+                    </AppText>
+                  </View>
+                  <View style={styles.pendingActions}>
+                    <Button
+                      disabled={respondingMembershipId === membership.id}
+                      label="Accetta"
+                      onPress={() =>
+                        handleRespondMembership(membership.id, true)
+                      }
+                      size="sm"
+                    />
+                    <Button
+                      disabled={respondingMembershipId === membership.id}
+                      label="Rifiuta"
+                      onPress={() =>
+                        handleRespondMembership(membership.id, false)
+                      }
+                      size="sm"
+                      variant="outline"
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </SectionCard>
+        ) : null}
         {completeProfile && role === "club_admin" && completeProfile.club ? (
           <PublicClubProfileView
             activeTab={activeClubTab}
@@ -1008,5 +1097,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     backgroundColor: colors.background,
     paddingBottom: 0,
+  },
+  pendingList: {
+    gap: spacing[12],
+  },
+  pendingItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing[12],
+  },
+  pendingInfo: {
+    flex: 1,
+    gap: spacing[4],
+  },
+  pendingActions: {
+    flexDirection: "row",
+    gap: spacing[8],
   },
 });

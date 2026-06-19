@@ -60,6 +60,7 @@ import {
   normalizeFacebookInput,
   normalizeInstagramInput,
 } from "./profile-form-utils";
+import { hideTag, reportTag } from "../../features/content/content-tag-service";
 import type {
   CompleteProfessionalProfile,
   MediaProfileAuthorRecord,
@@ -810,10 +811,15 @@ export function MediaProfileView({
         onShare={(post) => {
           void sharePost(post);
         }}
+        onTagActionDone={() => {
+          void loadPosts();
+          handleClosePost();
+        }}
         onToggleSave={(post) => {
           void handleToggleSave(post);
         }}
         post={selectedPost}
+        viewerProfileId={viewerProfileId}
       />
 
       <MediaPostComposerModal
@@ -1470,8 +1476,10 @@ function MediaPostDetailModal({
   onClose,
   onOpenTarget,
   onShare,
+  onTagActionDone,
   onToggleSave,
   post,
+  viewerProfileId,
 }: {
   displayName: string;
   isLoading: boolean;
@@ -1479,8 +1487,10 @@ function MediaPostDetailModal({
   onClose: () => void;
   onOpenTarget: (target: MediaProfilePostTaggedTarget) => void;
   onShare: (post: MediaProfilePost) => void;
+  onTagActionDone?: () => void;
   onToggleSave: (post: MediaProfilePost) => void;
   post: MediaProfilePost | null;
+  viewerProfileId?: string | null;
 }) {
   const [commentDraft, setCommentDraft] = useState("");
   const [isCommenting, setIsCommenting] = useState(false);
@@ -1603,7 +1613,10 @@ function MediaPostDetailModal({
                 </AppText>
                 <TaggedTargetsInline
                   onOpenTarget={onOpenTarget}
+                  onTagActionDone={onTagActionDone}
+                  postId={post.id}
                   targets={post.tagged_targets}
+                  viewerProfileId={viewerProfileId}
                 />
               </View>
             ) : null}
@@ -2843,40 +2856,86 @@ function getTribunaIcon(kind: MediaTribunaKind): keyof typeof Ionicons.glyphMap 
 function TaggedTargetsInline({
   compact = false,
   onOpenTarget,
+  onTagActionDone,
+  postId,
   removable = false,
   targets,
+  viewerProfileId,
 }: {
   compact?: boolean;
   onOpenTarget: (target: MediaProfilePostTaggedTarget) => void;
+  onTagActionDone?: () => void;
+  postId?: string;
   removable?: boolean;
   targets: MediaProfilePostTaggedTarget[];
+  viewerProfileId?: string | null;
 }) {
   const visibleTargets = compact ? targets.slice(0, 2) : targets;
 
+  async function applyTagAction(action: "hide" | "report") {
+    if (!postId || !viewerProfileId) {
+      return;
+    }
+    try {
+      if (action === "hide") {
+        await hideTag("media_profile", postId, viewerProfileId);
+      } else {
+        await reportTag("media_profile", postId, viewerProfileId);
+      }
+      onTagActionDone?.();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Operazione non riuscita.";
+      Alert.alert("Operazione non riuscita", message);
+    }
+  }
+
+  function openTagMenu() {
+    Alert.alert("Gestisci tag", "Cosa vuoi fare con questo tag?", [
+      { onPress: () => applyTagAction("hide"), text: "Nascondi tag" },
+      {
+        onPress: () => applyTagAction("report"),
+        style: "destructive",
+        text: "Segnala",
+      },
+      { style: "cancel", text: "Annulla" },
+    ]);
+  }
+
   return (
     <View style={[styles.taggedTargets, compact ? styles.taggedTargetsCompact : null]}>
-      {visibleTargets.map((target) => (
-        <Pressable
-          accessibilityLabel={`${removable ? "Rimuovi" : "Apri"} ${target.display_name}`}
-          accessibilityRole="button"
-          key={getTargetKey(target)}
-          onPress={(event) => {
-            event.stopPropagation();
-            onOpenTarget(target);
-          }}
-          style={[styles.targetChip, compact ? styles.targetChipCompact : null]}
-        >
+      {visibleTargets.map((target) => {
+        const isViewerTag =
+          !removable &&
+          !!postId &&
+          !!viewerProfileId &&
+          target.target_type === "profile" &&
+          target.target_id === viewerProfileId;
+
+        return (
+          <Pressable
+            accessibilityLabel={`${removable ? "Rimuovi" : "Apri"} ${target.display_name}`}
+            accessibilityRole="button"
+            key={getTargetKey(target)}
+            onLongPress={isViewerTag ? openTagMenu : undefined}
+            onPress={(event) => {
+              event.stopPropagation();
+              onOpenTarget(target);
+            }}
+            style={[styles.targetChip, compact ? styles.targetChipCompact : null]}
+          >
           {!compact ? (
             <Avatar name={target.display_name} size="sm" uri={target.avatar_url} />
           ) : null}
           <AppText numberOfLines={1} style={styles.targetChipText} variant="caption">
             {target.display_name}
           </AppText>
-          {removable ? (
-            <Ionicons color={colors.accent} name="close" size={14} />
-          ) : null}
-        </Pressable>
-      ))}
+            {removable ? (
+              <Ionicons color={colors.accent} name="close" size={14} />
+            ) : null}
+          </Pressable>
+        );
+      })}
       {compact && targets.length > visibleTargets.length ? (
         <View style={styles.targetChipCompact}>
           <AppText color="secondary" variant="caption">

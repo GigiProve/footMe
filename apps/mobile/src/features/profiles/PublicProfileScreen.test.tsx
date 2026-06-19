@@ -33,6 +33,14 @@ vi.mock("../networking/networking-service", () => ({
   startDirectConversation: vi.fn(),
 }));
 
+vi.mock("../relationships/agent-representation-service", () => ({
+  fetchPlayerAgent: vi.fn().mockResolvedValue(null),
+  fetchRepresentationState: vi.fn().mockResolvedValue(null),
+  fetchRepresentedPlayers: vi.fn().mockResolvedValue([]),
+  requestRepresentation: vi.fn(),
+  respondRepresentation: vi.fn(),
+}));
+
 vi.mock("./profile-edit-helpers", () => ({
   buildAgentProfileHeaderDetails: () => ({
     agencyLabel: "MB Football Management",

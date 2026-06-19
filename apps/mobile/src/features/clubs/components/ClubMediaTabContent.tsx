@@ -45,6 +45,7 @@ import {
   type ClubMediaTaggedProfile,
   type ClubMediaVisualType,
 } from "../club-media-service";
+import { hideTag, reportTag } from "../../content/content-tag-service";
 
 type ClubMediaTabContentProps = {
   club: PublicClubProfile;
@@ -457,6 +458,7 @@ export function ClubMediaTabContent({
         onClose={handleClosePost}
         onOpenProfile={onOpenProfile}
         onOpenVideo={() => setIsVideoOpen(true)}
+        onRefresh={() => { void loadPosts(); }}
         onShare={(post) => {
           void handleShare(post);
         }}
@@ -468,6 +470,7 @@ export function ClubMediaTabContent({
         }}
         onVideoClose={() => setIsVideoOpen(false)}
         post={selectedPost}
+        viewerProfileId={viewerProfileId}
       />
     </View>
   );
@@ -539,11 +542,13 @@ function ClubMediaDetailModal({
   onClose,
   onOpenProfile,
   onOpenVideo,
+  onRefresh,
   onShare,
   onToggleLike,
   onToggleSave,
   onVideoClose,
   post,
+  viewerProfileId,
 }: {
   isLoading: boolean;
   isVideoOpen: boolean;
@@ -551,11 +556,13 @@ function ClubMediaDetailModal({
   onClose: () => void;
   onOpenProfile: (profileId: string) => void;
   onOpenVideo: () => void;
+  onRefresh: () => void;
   onShare: (post: ClubMediaPost) => void;
   onToggleLike: (post: ClubMediaPost) => void;
   onToggleSave: (post: ClubMediaPost) => void;
   onVideoClose: () => void;
   post: ClubMediaPost | null;
+  viewerProfileId?: string | null;
 }) {
   const [commentBody, setCommentBody] = useState("");
 
@@ -678,8 +685,11 @@ function ClubMediaDetailModal({
             {post.tagged_profiles.length > 0 ? (
               <TaggedProfiles
                 onOpenProfile={onOpenProfile}
+                onTagActionDone={onRefresh}
+                postId={post.id}
                 profiles={post.tagged_profiles}
                 title={post.kind === "market" ? "Profilo giocatore taggato" : "Taggati"}
+                viewerProfileId={viewerProfileId}
               />
             ) : null}
 
@@ -821,45 +831,107 @@ function MarketSummary({ post }: { post: ClubMediaPost }) {
 
 function TaggedProfiles({
   onOpenProfile,
+  onTagActionDone,
+  postId,
   profiles,
   title,
+  viewerProfileId,
 }: {
   onOpenProfile: (profileId: string) => void;
+  onTagActionDone?: () => void;
+  postId: string;
   profiles: ClubMediaTaggedProfile[];
   title: string;
+  viewerProfileId?: string | null;
 }) {
+  async function applyTagAction(
+    taggedProfileId: string,
+    action: "hide" | "report",
+  ) {
+    try {
+      if (action === "hide") {
+        await hideTag("club_media", postId, taggedProfileId);
+      } else {
+        await reportTag("club_media", postId, taggedProfileId);
+      }
+      onTagActionDone?.();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Operazione non riuscita.";
+      Alert.alert("Operazione non riuscita", message);
+    }
+  }
+
+  function openTagMenu(taggedProfileId: string) {
+    Alert.alert("Gestisci tag", "Cosa vuoi fare con questo tag?", [
+      {
+        onPress: () => applyTagAction(taggedProfileId, "hide"),
+        text: "Nascondi tag",
+      },
+      {
+        onPress: () => applyTagAction(taggedProfileId, "report"),
+        style: "destructive",
+        text: "Segnala",
+      },
+      { style: "cancel", text: "Annulla" },
+    ]);
+  }
+
   return (
     <View style={styles.taggedSection}>
       <AppText color="secondary" style={styles.taggedTitle} variant="caption">
         {title}
       </AppText>
       <View style={styles.taggedList}>
-        {profiles.map((profile) => (
-          <Pressable
-            accessibilityLabel={`Apri profilo ${profile.display_name}`}
-            accessibilityRole="button"
-            key={profile.profile_id}
-            onPress={() => onOpenProfile(profile.profile_id)}
-            style={styles.taggedProfileCard}
-          >
-            <Avatar
-              name={profile.display_name}
-              size="md"
-              uri={profile.avatar_url}
-            />
-            <View style={styles.taggedInfo}>
-              <AppText numberOfLines={1} style={styles.taggedName} variant="bodySm">
-                {profile.display_name}
-              </AppText>
-              <AppText color="secondary" numberOfLines={1} variant="caption">
-                {formatRole(profile.role)}
-              </AppText>
-            </View>
-            <AppText color="accent" style={styles.taggedCta} variant="caption">
-              Apri
-            </AppText>
-          </Pressable>
-        ))}
+        {profiles.map((profile) => {
+          const isViewerTag =
+            !!viewerProfileId && profile.profile_id === viewerProfileId;
+
+          return (
+            <Pressable
+              accessibilityLabel={`Apri profilo ${profile.display_name}`}
+              accessibilityRole="button"
+              key={profile.profile_id}
+              onLongPress={
+                isViewerTag ? () => openTagMenu(profile.profile_id) : undefined
+              }
+              onPress={() => onOpenProfile(profile.profile_id)}
+              style={styles.taggedProfileCard}
+            >
+              <Avatar
+                name={profile.display_name}
+                size="md"
+                uri={profile.avatar_url}
+              />
+              <View style={styles.taggedInfo}>
+                <AppText numberOfLines={1} style={styles.taggedName} variant="bodySm">
+                  {profile.display_name}
+                </AppText>
+                <AppText color="secondary" numberOfLines={1} variant="caption">
+                  {formatRole(profile.role)}
+                </AppText>
+              </View>
+              {isViewerTag ? (
+                <Pressable
+                  accessibilityLabel="Gestisci tag"
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => openTagMenu(profile.profile_id)}
+                >
+                  <Ionicons
+                    color={colors.textSecondary}
+                    name="ellipsis-horizontal"
+                    size={18}
+                  />
+                </Pressable>
+              ) : (
+                <AppText color="accent" style={styles.taggedCta} variant="caption">
+                  Apri
+                </AppText>
+              )}
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );

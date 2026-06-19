@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import { EditModalShell } from "../../profiles/edit-modals/EditModalShell";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Avatar, Input } from "../../../ui";
 import { addLinkedMember, addManualMember, suggestProfiles } from "../membership-service";
+import { fetchClubTeams, type ClubTeam } from "../team-service";
 import type { MemberRole, ProfileSuggestion } from "../membership-types";
 
 type AddMemberModalProps = {
@@ -31,14 +32,28 @@ export function AddMemberModal({
 }: AddMemberModalProps) {
   const [name, setName] = useState("");
   const [staffTitle, setStaffTitle] = useState("");
+  const [season, setSeason] = useState("");
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [teams, setTeams] = useState<ClubTeam[]>([]);
   const [suggestions, setSuggestions] = useState<ProfileSuggestion[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<ProfileSuggestion | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    if (!visible || !clubId) return;
+    fetchClubTeams(clubId)
+      .then(setTeams)
+      .catch(() => {
+        // Non-blocking — team picker is optional
+      });
+  }, [visible, clubId]);
+
   function resetState() {
     setName("");
     setStaffTitle("");
+    setSeason("");
+    setSelectedTeamId(null);
     setSuggestions([]);
     setSelectedProfile(null);
     setIsSaving(false);
@@ -93,7 +108,9 @@ export function AddMemberModal({
           clubId,
           memberRole,
           profileId: selectedProfile.profile_id,
+          season: season.trim() || undefined,
           staffTitle: staffTitle || undefined,
+          teamId: selectedTeamId ?? undefined,
         });
       } else {
         await addManualMember({
@@ -116,6 +133,7 @@ export function AddMemberModal({
   }
 
   const showStaffTitle = memberRole === "staff" || memberRole === "coach" || memberRole === "director";
+  const isLinkedPath = selectedProfile !== null;
 
   return (
     <EditModalShell
@@ -197,11 +215,74 @@ export function AddMemberModal({
           value={staffTitle}
         />
       ) : null}
+
+      {isLinkedPath ? (
+        <>
+          {teams.length > 0 ? (
+            <View style={styles.teamSection}>
+              <AppText variant="bodySm" color="secondary">
+                Squadra (opzionale)
+              </AppText>
+              <View style={styles.teamChips}>
+                <Pressable
+                  onPress={() => setSelectedTeamId(null)}
+                  style={[
+                    styles.teamChip,
+                    selectedTeamId === null ? styles.teamChipActive : null,
+                  ]}
+                >
+                  <AppText
+                    variant="bodySm"
+                    color={selectedTeamId === null ? "inverse" : "secondary"}
+                  >
+                    Tutta la società
+                  </AppText>
+                </Pressable>
+                {teams.map((team) => (
+                  <Pressable
+                    key={team.id}
+                    onPress={() => setSelectedTeamId(team.id)}
+                    style={[
+                      styles.teamChip,
+                      selectedTeamId === team.id ? styles.teamChipActive : null,
+                    ]}
+                  >
+                    <AppText
+                      variant="bodySm"
+                      color={selectedTeamId === team.id ? "inverse" : "secondary"}
+                    >
+                      {team.name}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          <Input
+            label="Stagione (opzionale)"
+            onChangeText={setSeason}
+            placeholder="Es. 2025/2026"
+            value={season}
+          />
+
+          <View style={styles.confirmNote}>
+            <AppText variant="caption" color="secondary">
+              La persona dovrà confermare l'assegnazione.
+            </AppText>
+          </View>
+        </>
+      ) : null}
     </EditModalShell>
   );
 }
 
 const styles = StyleSheet.create({
+  confirmNote: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius[8],
+    padding: spacing[10],
+  },
   inputContainer: {
     gap: spacing[8],
   },
@@ -237,5 +318,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: spacing[8],
     padding: spacing[12],
+  },
+  teamChip: {
+    borderColor: colors.border,
+    borderRadius: radius[16],
+    borderWidth: 1,
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[6],
+  },
+  teamChipActive: {
+    backgroundColor: colors.surfaceInverse,
+    borderColor: colors.surfaceInverse,
+  },
+  teamChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
+  },
+  teamSection: {
+    gap: spacing[8],
   },
 });
