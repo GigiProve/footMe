@@ -7,6 +7,7 @@ import type { CompleteProfessionalProfile } from "../profile-service";
 import type { EditSection } from "../ProfileReadonlyView";
 import { CoachCareerTabContent } from "./CoachCareerTabContent";
 import { CoachInfoTab } from "./CoachInfoTab";
+import { useTaggedMediaItems } from "../../content/use-tagged-content";
 import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
 import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
 import type { CoachGroupedExperience } from "./coach-career-grouping";
@@ -31,6 +32,9 @@ export function CoachProfileTabView({
   onManageMedia,
 }: CoachProfileTabViewProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("career");
+  const { onOpenTaggedItem, taggedItems } = useTaggedMediaItems(
+    completeProfile.profile.id,
+  );
 
   const mediaItems = useMemo<MediaContentItem[]>(() => {
     const profileMediaItems = completeProfile.coachProfile?.media_items ?? [];
@@ -102,9 +106,10 @@ export function CoachProfileTabView({
       ) : activeTab === "media" ? (
         <MediaTabContent
           authorName={completeProfile.profile.full_name}
-          initialItems={mediaItems}
+          initialItems={[...mediaItems, ...taggedItems]}
           mode={isOwner ? "owner" : "visitor"}
           onAddContentPress={isOwner ? onManageMedia : undefined}
+          onOpenTaggedItem={onOpenTaggedItem}
         />
       ) : (
         <CoachInfoTab

@@ -2,57 +2,116 @@ import { supabase } from "../../lib/supabase";
 
 /**
  * Content surfaces where a profile can be tagged. Each maps to an existing
- * per-content tag table with a `status` column (active | hidden | reported).
+ * per-content tag table with a `status` column.
  */
 export type TaggedContentType = "club_media" | "fan_tribuna" | "media_profile";
 
-export type TagStatus = "active" | "hidden" | "reported";
+export type TagStatus =
+  | "active"
+  | "hidden"
+  | "reported"
+  | "in_review"
+  | "removed";
 
-type TagTableConfig = {
-  /** The column holding the tagged profile id. */
-  profileColumn: string;
-  table: string;
+export const TAG_STATUS_LABELS: Record<TagStatus, string> = {
+  active: "Attivo",
+  hidden: "Nascosto dal profilo",
+  in_review: "In revisione",
+  removed: "Rimosso",
+  reported: "Segnalato",
 };
 
-const TAG_TABLES: Record<TaggedContentType, TagTableConfig> = {
-  club_media: {
-    profileColumn: "profile_id",
-    table: "club_media_tagged_profiles",
-  },
-  fan_tribuna: {
-    profileColumn: "player_profile_id",
-    table: "fan_tribuna_tagged_players",
-  },
-  media_profile: {
-    // media_profile_post_tagged_targets uses (target_type='profile', target_id)
-    profileColumn: "target_id",
-    table: "media_profile_post_tagged_targets",
-  },
+export type ReportReason =
+  | "info_non_corrette"
+  | "uso_improprio"
+  | "contenuto_offensivo"
+  | "spam"
+  | "altro";
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  altro: "Altro",
+  contenuto_offensivo: "Contenuto offensivo",
+  info_non_corrette: "Informazioni non corrette",
+  spam: "Spam o non pertinente",
+  uso_improprio: "Uso improprio del profilo",
+};
+
+export type TargetType = "profile" | "club" | "team";
+
+export type TaggedContentItem = {
+  content_type: TaggedContentType;
+  kind: string;
+  post_id: string;
+  published_at: string | null;
+  publisher_id: string;
+  publisher_name: string;
+  thumbnail_url: string | null;
+  title: string;
+};
+
+export type TagSearchResult = {
+  avatar_url: string | null;
+  display_name: string;
+  role_label: string;
+  subtitle: string;
+  target_id: string;
+  target_type: TargetType;
 };
 
 /**
- * The tagged profile sets the moderation status of their own tag row. RLS only
- * permits updating rows where the caller is the tagged party.
+ * The tagged party sets the moderation status of their own tag row. RLS only
+ * permits updating rows where the caller is the tagged party (or club owner for
+ * club/team targets on club_media).
+ *
+ * For club_media, matching now uses target_type + coalesce(target_id, profile_id)
+ * because the table was migrated to a surrogate PK with non-account target support.
  */
 async function setTagStatus(
   contentType: TaggedContentType,
   postId: string,
-  taggedProfileId: string,
+  taggedId: string,
   status: TagStatus,
+  targetType: TargetType = "profile",
 ) {
-  const config = TAG_TABLES[contentType];
+  if (contentType === "club_media") {
+    // club_media_tagged_profiles has target_type/target_id after the migration.
+    // The RLS policy gates this update to: profile_id=auth.uid() for profile targets,
+    // or owns_club(post.club_id) for club/team targets.
+    const { error } = await supabase
+      .from("club_media_tagged_profiles")
+      .update({ status })
+      .eq("post_id", postId)
+      .eq("target_type", targetType)
+      .eq("target_id", taggedId);
 
-  let query = supabase
-    .from(config.table)
-    .update({ status })
-    .eq("post_id", postId)
-    .eq(config.profileColumn, taggedProfileId);
+    if (error) {
+      throw error;
+    }
 
-  if (contentType === "media_profile") {
-    query = query.eq("target_type", "profile");
+    return;
   }
 
-  const { error } = await query;
+  if (contentType === "fan_tribuna") {
+    const { error } = await supabase
+      .from("fan_tribuna_tagged_players")
+      .update({ status })
+      .eq("post_id", postId)
+      .eq("player_profile_id", taggedId);
+
+    if (error) {
+      throw error;
+    }
+
+    return;
+  }
+
+  // media_profile: uses (target_type, target_id)
+  const { error } = await supabase
+    .from("media_profile_post_tagged_targets")
+    .update({ status })
+    .eq("post_id", postId)
+    .eq("target_type", targetType)
+    .eq("target_id", taggedId);
 
   if (error) {
     throw error;
@@ -66,6 +125,8 @@ async function setTagStatus(
 export async function notifyTaggedProfiles(input: {
   contentType: TaggedContentType;
   postId: string;
+  publisherId?: string;
+  publisherName?: string;
   taggedProfileIds: string[];
   taggerProfileId: string;
 }) {
@@ -77,12 +138,18 @@ export async function notifyTaggedProfiles(input: {
     return;
   }
 
+  const body = input.publisherName
+    ? `${input.publisherName} ti ha taggato in un contenuto`
+    : "Sei stato taggato in un contenuto";
+
   await supabase.from("notifications").insert(
     recipients.map((profileId) => ({
-      body: "Sei stato taggato in un contenuto",
+      body,
       data: {
         content_type: input.contentType,
         post_id: input.postId,
+        publisher_id: input.publisherId ?? null,
+        target_type: "profile",
       },
       recipient_profile_id: profileId,
       title: "Nuovo tag",
@@ -91,20 +158,94 @@ export async function notifyTaggedProfiles(input: {
   );
 }
 
-/** Hide a tag from the tagged profile's own profile view. */
+/** Hide a tag from the tagged party's own profile view. */
 export function hideTag(
   contentType: TaggedContentType,
   postId: string,
-  taggedProfileId: string,
+  taggedId: string,
+  targetType: TargetType = "profile",
 ) {
-  return setTagStatus(contentType, postId, taggedProfileId, "hidden");
+  return setTagStatus(contentType, postId, taggedId, "hidden", targetType);
 }
 
-/** Report a tag as inappropriate (flags for later moderation). */
-export function reportTag(
+/** Remove a tag entirely (disappears from all surfaces except the publisher's own view). */
+export function removeTag(
   contentType: TaggedContentType,
   postId: string,
-  taggedProfileId: string,
+  taggedId: string,
+  targetType: TargetType = "profile",
 ) {
-  return setTagStatus(contentType, postId, taggedProfileId, "reported");
+  return setTagStatus(contentType, postId, taggedId, "removed", targetType);
+}
+
+/**
+ * Report a tag via the report_content_tag RPC which:
+ *   1. Inserts a row in content_tag_reports.
+ *   2. Sets the tag status to 'reported'.
+ */
+export async function reportTag(
+  contentType: TaggedContentType,
+  postId: string,
+  taggedId: string,
+  reason: ReportReason,
+  note?: string | null,
+  targetType: TargetType = "profile",
+) {
+  const { error } = await supabase.rpc("report_content_tag", {
+    p_content_type: contentType,
+    p_note: note ?? null,
+    p_post_id: postId,
+    p_reason: reason,
+    p_tagged_id: taggedId,
+    p_target_type: targetType,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+/**
+ * Fetch content where the given profile is tagged (active only).
+ * Uses the fetch_tagged_content_for_owner RPC; omit profileId to default to auth.uid().
+ */
+export async function fetchTaggedContentForProfile(
+  profileId?: string,
+): Promise<TaggedContentItem[]> {
+  const params = profileId ? { p_profile_id: profileId } : {};
+  const { data, error } = await supabase.rpc(
+    "fetch_tagged_content_for_owner",
+    params,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as TaggedContentItem[];
+}
+
+/**
+ * Search taggable targets across profiles, clubs, and internal teams.
+ * Returns an empty array for queries shorter than 2 characters (client-side guard
+ * mirrors the RPC server-side guard to avoid a round-trip).
+ */
+export async function searchTagTargets(
+  query: string,
+  limit = 20,
+): Promise<TagSearchResult[]> {
+  if (query.trim().length < 2) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc("search_tag_targets", {
+    p_limit: limit,
+    p_query: query,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as TagSearchResult[];
 }

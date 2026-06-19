@@ -266,6 +266,8 @@ export type ReportedTag = {
   content_type: ReportedContentType;
   created_at: string;
   post_id: string;
+  report_note?: string | null;
+  report_reason?: string | null;
   tagged_name: string;
   tagged_profile_id: string;
 };

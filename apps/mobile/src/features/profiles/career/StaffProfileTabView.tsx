@@ -5,6 +5,7 @@ import { getStaffMediaTagMeta } from "../staff-media";
 import { withDefaultProfileAvatar } from "../profile-avatar";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import type { EditSection } from "../ProfileReadonlyView";
+import { useTaggedMediaItems } from "../../content/use-tagged-content";
 import type { GroupedExperience } from "./career-grouping";
 import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
 import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
@@ -34,6 +35,9 @@ export function StaffProfileTabView({
   onManageMedia,
 }: StaffProfileTabViewProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("career");
+  const { onOpenTaggedItem, taggedItems } = useTaggedMediaItems(
+    completeProfile.profile.id,
+  );
 
   const mediaItems = useMemo<MediaContentItem[]>(() => {
     const profileMediaItems = completeProfile.staffProfile?.media_items ?? [];
@@ -89,9 +93,10 @@ export function StaffProfileTabView({
       ) : activeTab === "media" ? (
         <MediaTabContent
           authorName={completeProfile.profile.full_name}
-          initialItems={mediaItems}
+          initialItems={[...mediaItems, ...taggedItems]}
           mode={isOwner ? "owner" : "visitor"}
           onAddContentPress={isOwner ? onManageMedia : undefined}
+          onOpenTaggedItem={onOpenTaggedItem}
         />
       ) : (
         <StaffInfoTab

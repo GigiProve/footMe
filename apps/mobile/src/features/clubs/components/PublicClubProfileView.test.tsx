@@ -20,6 +20,10 @@ const mediaMocks = vi.hoisted(() => ({
   toggleSavedClubMedia: vi.fn(),
 }));
 
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 vi.mock("../../../components/ui/video-player-modal", () => ({
   VideoPlayerModal: (props: Record<string, unknown>) =>
     React.createElement("mock-video-player-modal", props),
@@ -440,6 +444,8 @@ const mediaPosts: ClubMediaPost[] = [
         display_name: "Marco Rossi",
         profile_id: "profile-player-2",
         role: "player",
+        target_id: "profile-player-2",
+        target_type: "profile" as const,
       },
     ],
     thumbnail_url: "https://cdn.test/market.jpg",

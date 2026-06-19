@@ -14,8 +14,10 @@ export type ClubMediaVisualType = "image" | "video";
 export type ClubMediaTaggedProfile = {
   avatar_url: string | null;
   display_name: string;
-  profile_id: string;
+  profile_id: string | null;
   role: string | null;
+  target_id: string;
+  target_type: "profile" | "club" | "team";
 };
 
 export type ClubMediaComment = {
@@ -60,6 +62,11 @@ export type ClubMediaPost = {
   visual_url: string | null;
 };
 
+export type TaggedTarget = {
+  target_id: string;
+  target_type: "profile" | "club" | "team";
+};
+
 export type CreateClubMediaPostInput = {
   attachmentLabel?: string | null;
   body?: string | null;
@@ -74,7 +81,16 @@ export type CreateClubMediaPostInput = {
   playerName?: string | null;
   playerPreviousClub?: string | null;
   playerRole?: string | null;
+  /**
+   * Backward-compat alias: profile-only tags. Merged into taggedTargets with
+   * target_type 'profile'. If both are provided, taggedTargets takes precedence
+   * for deduplication.
+   */
   taggedProfileIds?: string[];
+  /**
+   * Multi-type targets (profile | club | team). Preferred over taggedProfileIds.
+   */
+  taggedTargets?: TaggedTarget[];
   thumbnailUrl?: string | null;
   title: string;
   videoDurationSeconds?: string | number | null;
@@ -113,6 +129,20 @@ type ProfileRow = {
   full_name: string | null;
   id: string;
   role: string | null;
+};
+
+type ClubRow = {
+  id: string;
+  logo_url: string | null;
+  name: string;
+  owner_profile_id: string;
+};
+
+type ClubTeamRow = {
+  club_id: string;
+  id: string;
+  logo_url: string | null;
+  name: string;
 };
 
 const POST_SELECT =
@@ -184,15 +214,22 @@ export async function createClubMediaPost(
   }
 
   const postId = (data as ClubMediaPostRow).id;
-  const taggedProfileIds = uniqueIds(input.taggedProfileIds ?? []);
 
-  if (taggedProfileIds.length > 0) {
+  // Merge taggedProfileIds (backward-compat) and taggedTargets into one list.
+  const allTargets = mergeTaggedTargets(input);
+
+  if (allTargets.length > 0) {
+    // Fetch the club name for notification body.
+    const clubName = await fetchClubName(input.clubId);
+
     const { error: tagError } = await supabase
       .from("club_media_tagged_profiles")
       .insert(
-        taggedProfileIds.map((profileId) => ({
+        allTargets.map((target) => ({
           post_id: postId,
-          profile_id: profileId,
+          profile_id: target.target_type === "profile" ? target.target_id : null,
+          target_id: target.target_id,
+          target_type: target.target_type,
         })),
       );
 
@@ -200,10 +237,12 @@ export async function createClubMediaPost(
       throw tagError;
     }
 
-    await notifyTaggedProfiles({
-      contentType: "club_media",
+    // Notify recipients — best-effort, never throws.
+    await notifyClubMediaTagged({
+      allTargets,
+      clubId: input.clubId,
+      clubName,
       postId,
-      taggedProfileIds: taggedProfileIds,
       taggerProfileId: input.createdByProfileId,
     });
   }
@@ -451,6 +490,12 @@ async function loadViewerPostIds(
   return ids;
 }
 
+/**
+ * Load tagged profiles/clubs/teams for a set of posts.
+ * Excludes status='removed'. Publisher surfaces (club's own feed) see everything
+ * except removed — the RLS select policy (status=published on the parent post) is
+ * the gate; we additionally filter removed so the tagged list stays clean.
+ */
 async function loadTaggedProfiles(postIds: string[]) {
   const taggedByPost = new Map<string, ClubMediaTaggedProfile[]>();
 
@@ -460,26 +505,73 @@ async function loadTaggedProfiles(postIds: string[]) {
 
   const { data, error } = await supabase
     .from("club_media_tagged_profiles")
-    .select("post_id, profile_id")
-    .in("post_id", postIds);
+    .select("post_id, profile_id, target_type, target_id, status")
+    .in("post_id", postIds)
+    .neq("status", "removed");
 
   if (error) {
     throw error;
   }
 
-  const rows = (data ?? []) as { post_id: string; profile_id: string }[];
-  const profiles = await loadProfilesById(rows.map((row) => row.profile_id));
+  const rows = (data ?? []) as {
+    post_id: string;
+    profile_id: string | null;
+    status: string;
+    target_id: string;
+    target_type: string;
+  }[];
+
+  const profileIds = rows
+    .filter((row) => row.target_type === "profile" && row.target_id)
+    .map((row) => row.target_id);
+  const clubIds = rows
+    .filter((row) => row.target_type === "club")
+    .map((row) => row.target_id);
+  const teamIds = rows
+    .filter((row) => row.target_type === "team")
+    .map((row) => row.target_id);
+
+  const [profiles, clubs, teams] = await Promise.all([
+    loadProfilesById(profileIds),
+    loadClubsById(clubIds),
+    loadTeamsById(teamIds),
+  ]);
 
   for (const row of rows) {
-    const profile = profiles.get(row.profile_id);
     const list = taggedByPost.get(row.post_id) ?? [];
 
-    list.push({
-      avatar_url: profile?.avatar_url ?? null,
-      display_name: profile?.full_name?.trim() || "Profilo FootMe",
-      profile_id: row.profile_id,
-      role: profile?.role ?? null,
-    });
+    if (row.target_type === "club") {
+      const club = clubs.get(row.target_id);
+      list.push({
+        avatar_url: club?.logo_url ?? null,
+        display_name: club?.name?.trim() || "Società FootMe",
+        profile_id: null,
+        role: "club",
+        target_id: row.target_id,
+        target_type: "club",
+      });
+    } else if (row.target_type === "team") {
+      const team = teams.get(row.target_id);
+      list.push({
+        avatar_url: team?.logo_url ?? null,
+        display_name: team?.name?.trim() || "Squadra FootMe",
+        profile_id: null,
+        role: "team",
+        target_id: row.target_id,
+        target_type: "team",
+      });
+    } else {
+      const profile = profiles.get(row.target_id);
+      list.push({
+        avatar_url: profile?.avatar_url ?? null,
+        display_name: profile?.full_name?.trim() || "Profilo FootMe",
+        profile_id: row.profile_id ?? row.target_id,
+        role: profile?.role ?? null,
+        target_id: row.target_id,
+        target_type: "profile",
+      });
+    }
+
     taggedByPost.set(row.post_id, list);
   }
 
@@ -552,6 +644,222 @@ async function loadProfilesById(profileIds: string[]) {
   }
 
   return profiles;
+}
+
+async function loadClubsById(clubIds: string[]) {
+  const clubs = new Map<string, ClubRow>();
+  const ids = uniqueIds(clubIds);
+
+  if (ids.length === 0) {
+    return clubs;
+  }
+
+  const { data, error } = await supabase
+    .from("clubs")
+    .select("id, name, logo_url, owner_profile_id")
+    .in("id", ids);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const club of (data ?? []) as ClubRow[]) {
+    clubs.set(club.id, club);
+  }
+
+  return clubs;
+}
+
+async function loadTeamsById(teamIds: string[]) {
+  const teams = new Map<string, ClubTeamRow>();
+  const ids = uniqueIds(teamIds);
+
+  if (ids.length === 0) {
+    return teams;
+  }
+
+  const { data, error } = await supabase
+    .from("club_teams")
+    .select("id, name, logo_url, club_id")
+    .in("id", ids);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const team of (data ?? []) as ClubTeamRow[]) {
+    teams.set(team.id, team);
+  }
+
+  return teams;
+}
+
+async function fetchClubName(clubId: string): Promise<string> {
+  const { data } = await supabase
+    .from("clubs")
+    .select("name")
+    .eq("id", clubId)
+    .maybeSingle();
+
+  return (data as { name?: string } | null)?.name ?? "Società";
+}
+
+/**
+ * Resolve notification recipients for club/team targets (owner of the club).
+ * Returns { recipientProfileId, body } entries for each non-profile target.
+ */
+async function resolveNonProfileRecipients(
+  targets: TaggedTarget[],
+  clubName: string,
+): Promise<{ body: string; recipientProfileId: string }[]> {
+  const clubTargets = targets.filter((t) => t.target_type === "club");
+  const teamTargets = targets.filter((t) => t.target_type === "team");
+  const results: { body: string; recipientProfileId: string }[] = [];
+
+  if (clubTargets.length > 0) {
+    const { data } = await supabase
+      .from("clubs")
+      .select("id, owner_profile_id")
+      .in(
+        "id",
+        clubTargets.map((t) => t.target_id),
+      );
+
+    for (const row of (data ?? []) as { id: string; owner_profile_id: string }[]) {
+      results.push({
+        body: `${clubName} ha taggato la tua società in un contenuto`,
+        recipientProfileId: row.owner_profile_id,
+      });
+    }
+  }
+
+  if (teamTargets.length > 0) {
+    const { data } = await supabase
+      .from("club_teams")
+      .select("id, club_id")
+      .in(
+        "id",
+        teamTargets.map((t) => t.target_id),
+      );
+
+    if ((data ?? []).length > 0) {
+      const teamClubIds = (data ?? []).map(
+        (row: { club_id: string }) => row.club_id,
+      );
+      const { data: ownerData } = await supabase
+        .from("clubs")
+        .select("id, owner_profile_id")
+        .in("id", teamClubIds);
+
+      for (const row of (ownerData ?? []) as {
+        id: string;
+        owner_profile_id: string;
+      }[]) {
+        results.push({
+          body: `${clubName} ha taggato la tua squadra in un contenuto`,
+          recipientProfileId: row.owner_profile_id,
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Send notifications for all tagged targets after a club media post is created.
+ * Best-effort: failures must not block content creation.
+ */
+async function notifyClubMediaTagged(input: {
+  allTargets: TaggedTarget[];
+  clubId: string;
+  clubName: string;
+  postId: string;
+  taggerProfileId: string;
+}) {
+  const profileTargetIds = input.allTargets
+    .filter((t) => t.target_type === "profile")
+    .map((t) => t.target_id);
+
+  // Profile notifications via shared helper.
+  if (profileTargetIds.length > 0) {
+    await notifyTaggedProfiles({
+      contentType: "club_media",
+      postId: input.postId,
+      publisherId: input.clubId,
+      publisherName: input.clubName,
+      taggedProfileIds: profileTargetIds,
+      taggerProfileId: input.taggerProfileId,
+    });
+  }
+
+  // Club/team owner notifications.
+  const nonProfileTargets = input.allTargets.filter(
+    (t) => t.target_type !== "profile",
+  );
+
+  if (nonProfileTargets.length === 0) {
+    return;
+  }
+
+  const recipients = await resolveNonProfileRecipients(
+    nonProfileTargets,
+    input.clubName,
+  );
+
+  if (recipients.length === 0) {
+    return;
+  }
+
+  await supabase.from("notifications").insert(
+    recipients.map(({ body, recipientProfileId }) => ({
+      body,
+      data: {
+        content_type: "club_media",
+        post_id: input.postId,
+        publisher_id: input.clubId,
+        target_type: "club",
+      },
+      recipient_profile_id: recipientProfileId,
+      title: "Nuovo tag",
+      type: "content_tag",
+    })),
+  );
+}
+
+/**
+ * Merge taggedProfileIds (backward-compat) and taggedTargets into a single
+ * deduplicated list of TaggedTarget, with taggedTargets taking precedence.
+ */
+function mergeTaggedTargets(input: CreateClubMediaPostInput): TaggedTarget[] {
+  const seen = new Set<string>();
+  const result: TaggedTarget[] = [];
+
+  // taggedTargets is the authoritative source; process it first.
+  for (const target of input.taggedTargets ?? []) {
+    const key = `${target.target_type}:${target.target_id.trim()}`;
+
+    if (!target.target_id.trim() || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push({ target_id: target.target_id.trim(), target_type: target.target_type });
+  }
+
+  // taggedProfileIds: backward-compat alias for profile targets.
+  for (const id of uniqueIds(input.taggedProfileIds ?? [])) {
+    const key = `profile:${id}`;
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push({ target_id: id, target_type: "profile" });
+  }
+
+  return result;
 }
 
 function buildCreatePayload(input: CreateClubMediaPostInput) {

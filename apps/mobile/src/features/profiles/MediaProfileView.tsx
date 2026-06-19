@@ -60,7 +60,7 @@ import {
   normalizeFacebookInput,
   normalizeInstagramInput,
 } from "./profile-form-utils";
-import { hideTag, reportTag } from "../../features/content/content-tag-service";
+import { TagManageSheet } from "../../features/content/components/TagManageSheet";
 import type {
   CompleteProfessionalProfile,
   MediaProfileAuthorRecord,
@@ -2871,36 +2871,7 @@ function TaggedTargetsInline({
   viewerProfileId?: string | null;
 }) {
   const visibleTargets = compact ? targets.slice(0, 2) : targets;
-
-  async function applyTagAction(action: "hide" | "report") {
-    if (!postId || !viewerProfileId) {
-      return;
-    }
-    try {
-      if (action === "hide") {
-        await hideTag("media_profile", postId, viewerProfileId);
-      } else {
-        await reportTag("media_profile", postId, viewerProfileId);
-      }
-      onTagActionDone?.();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Operazione non riuscita.";
-      Alert.alert("Operazione non riuscita", message);
-    }
-  }
-
-  function openTagMenu() {
-    Alert.alert("Gestisci tag", "Cosa vuoi fare con questo tag?", [
-      { onPress: () => applyTagAction("hide"), text: "Nascondi tag" },
-      {
-        onPress: () => applyTagAction("report"),
-        style: "destructive",
-        text: "Segnala",
-      },
-      { style: "cancel", text: "Annulla" },
-    ]);
-  }
+  const [manageOpen, setManageOpen] = useState(false);
 
   return (
     <View style={[styles.taggedTargets, compact ? styles.taggedTargetsCompact : null]}>
@@ -2917,7 +2888,7 @@ function TaggedTargetsInline({
             accessibilityLabel={`${removable ? "Rimuovi" : "Apri"} ${target.display_name}`}
             accessibilityRole="button"
             key={getTargetKey(target)}
-            onLongPress={isViewerTag ? openTagMenu : undefined}
+            onLongPress={isViewerTag ? () => setManageOpen(true) : undefined}
             onPress={(event) => {
               event.stopPropagation();
               onOpenTarget(target);
@@ -2942,6 +2913,17 @@ function TaggedTargetsInline({
             +{targets.length - visibleTargets.length}
           </AppText>
         </View>
+      ) : null}
+      {manageOpen && postId && viewerProfileId ? (
+        <TagManageSheet
+          contentType="media_profile"
+          onActionDone={onTagActionDone}
+          onClose={() => setManageOpen(false)}
+          postId={postId}
+          taggedId={viewerProfileId}
+          targetType="profile"
+          visible
+        />
       ) : null}
     </View>
   );

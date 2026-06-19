@@ -25,8 +25,6 @@ import { SelectField } from "../../../components/ui/select-field";
 import { VideoPlayerModal } from "../../../components/ui/video-player-modal";
 import { colors, radius, spacing, typography } from "../../../theme/tokens";
 import { AppText, Avatar, Button, Input } from "../../../ui";
-import { searchAgentPlayerCandidates } from "../../profiles/profile-service";
-import type { AgentPlayerCandidate } from "../../profiles/agent-profile";
 import {
   pickAndUploadMedia,
   ProfileMediaUploadError,
@@ -45,7 +43,11 @@ import {
   type ClubMediaTaggedProfile,
   type ClubMediaVisualType,
 } from "../club-media-service";
-import { hideTag, reportTag } from "../../content/content-tag-service";
+import { useRouter } from "expo-router";
+
+import { TaggableTargetPicker } from "../../content/components/TaggableTargetPicker";
+import { TagManageSheet } from "../../content/components/TagManageSheet";
+import type { TaggableTarget } from "../../content/tag-types";
 
 type ClubMediaTabContentProps = {
   club: PublicClubProfile;
@@ -67,7 +69,7 @@ type DraftState = {
   playerName: string;
   playerPreviousClub: string;
   playerRole: string;
-  taggedProfiles: ClubMediaTaggedProfile[];
+  taggedProfiles: TaggableTarget[];
   title: string;
   videoDurationSeconds: string;
   visualType: ClubMediaVisualType | null;
@@ -684,6 +686,11 @@ function ClubMediaDetailModal({
 
             {post.tagged_profiles.length > 0 ? (
               <TaggedProfiles
+                content={{
+                  thumbnailUrl: post.thumbnail_url ?? post.visual_url,
+                  title: post.title,
+                  typeLabel: clubMediaKindLabel(post.kind),
+                }}
                 onOpenProfile={onOpenProfile}
                 onTagActionDone={onRefresh}
                 postId={post.id}
@@ -830,6 +837,7 @@ function MarketSummary({ post }: { post: ClubMediaPost }) {
 }
 
 function TaggedProfiles({
+  content,
   onOpenProfile,
   onTagActionDone,
   postId,
@@ -837,6 +845,7 @@ function TaggedProfiles({
   title,
   viewerProfileId,
 }: {
+  content?: { thumbnailUrl?: string | null; title: string; typeLabel: string };
   onOpenProfile: (profileId: string) => void;
   onTagActionDone?: () => void;
   postId: string;
@@ -844,37 +853,31 @@ function TaggedProfiles({
   title: string;
   viewerProfileId?: string | null;
 }) {
-  async function applyTagAction(
-    taggedProfileId: string,
-    action: "hide" | "report",
-  ) {
-    try {
-      if (action === "hide") {
-        await hideTag("club_media", postId, taggedProfileId);
-      } else {
-        await reportTag("club_media", postId, taggedProfileId);
-      }
-      onTagActionDone?.();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Operazione non riuscita.";
-      Alert.alert("Operazione non riuscita", message);
+  const router = useRouter();
+  const [manageTarget, setManageTarget] =
+    useState<ClubMediaTaggedProfile | null>(null);
+
+  function openTarget(target: ClubMediaTaggedProfile) {
+    if (target.target_type === "club") {
+      router.push({ params: { id: target.target_id }, pathname: "/club/[id]" });
+    } else if (target.target_type === "team") {
+      router.push({
+        params: { id: target.target_id },
+        pathname: "/club/team/[id]",
+      });
+    } else {
+      onOpenProfile(target.profile_id ?? target.target_id);
     }
   }
 
-  function openTagMenu(taggedProfileId: string) {
-    Alert.alert("Gestisci tag", "Cosa vuoi fare con questo tag?", [
-      {
-        onPress: () => applyTagAction(taggedProfileId, "hide"),
-        text: "Nascondi tag",
-      },
-      {
-        onPress: () => applyTagAction(taggedProfileId, "report"),
-        style: "destructive",
-        text: "Segnala",
-      },
-      { style: "cancel", text: "Annulla" },
-    ]);
+  function targetRoleLabel(target: ClubMediaTaggedProfile) {
+    if (target.target_type === "club") {
+      return "Società";
+    }
+    if (target.target_type === "team") {
+      return "Squadra interna";
+    }
+    return formatRole(target.role);
   }
 
   return (
@@ -885,22 +888,25 @@ function TaggedProfiles({
       <View style={styles.taggedList}>
         {profiles.map((profile) => {
           const isViewerTag =
-            !!viewerProfileId && profile.profile_id === viewerProfileId;
+            !!viewerProfileId &&
+            profile.target_type === "profile" &&
+            (profile.profile_id ?? profile.target_id) === viewerProfileId;
 
           return (
             <Pressable
-              accessibilityLabel={`Apri profilo ${profile.display_name}`}
+              accessibilityLabel={`Apri ${profile.display_name}`}
               accessibilityRole="button"
-              key={profile.profile_id}
+              key={profile.target_id}
               onLongPress={
-                isViewerTag ? () => openTagMenu(profile.profile_id) : undefined
+                isViewerTag ? () => setManageTarget(profile) : undefined
               }
-              onPress={() => onOpenProfile(profile.profile_id)}
+              onPress={() => openTarget(profile)}
               style={styles.taggedProfileCard}
             >
               <Avatar
                 name={profile.display_name}
                 size="md"
+                square={profile.target_type !== "profile"}
                 uri={profile.avatar_url}
               />
               <View style={styles.taggedInfo}>
@@ -908,7 +914,7 @@ function TaggedProfiles({
                   {profile.display_name}
                 </AppText>
                 <AppText color="secondary" numberOfLines={1} variant="caption">
-                  {formatRole(profile.role)}
+                  {targetRoleLabel(profile)}
                 </AppText>
               </View>
               {isViewerTag ? (
@@ -916,7 +922,7 @@ function TaggedProfiles({
                   accessibilityLabel="Gestisci tag"
                   accessibilityRole="button"
                   hitSlop={8}
-                  onPress={() => openTagMenu(profile.profile_id)}
+                  onPress={() => setManageTarget(profile)}
                 >
                   <Ionicons
                     color={colors.textSecondary}
@@ -933,6 +939,19 @@ function TaggedProfiles({
           );
         })}
       </View>
+
+      {manageTarget ? (
+        <TagManageSheet
+          content={content}
+          contentType="club_media"
+          onActionDone={onTagActionDone}
+          onClose={() => setManageTarget(null)}
+          postId={postId}
+          taggedId={manageTarget.profile_id ?? manageTarget.target_id}
+          targetType={manageTarget.target_type}
+          visible
+        />
+      ) : null}
     </View>
   );
 }
@@ -1110,7 +1129,13 @@ function ClubMediaPostFormModal({
         playerName: draft.playerName,
         playerPreviousClub: draft.playerPreviousClub,
         playerRole: draft.playerRole,
-        taggedProfileIds: draft.taggedProfiles.map((profile) => profile.profile_id),
+        taggedTargets: draft.taggedProfiles.map((target) => ({
+          target_id: target.target_id,
+          target_type: target.target_type,
+        })),
+        taggedProfileIds: draft.taggedProfiles
+          .filter((target) => target.target_type === "profile")
+          .map((target) => target.target_id),
         title: draft.title,
         videoDurationSeconds: draft.videoDurationSeconds,
         visualType: draft.visualType,
@@ -1267,8 +1292,14 @@ function ClubMediaPostFormModal({
           ) : null}
 
           {currentKind === "market" || currentKind === "interview" || currentKind === "highlights" ? (
-            <TaggedProfilePicker
-              onChange={(profiles) => patchDraft("taggedProfiles", profiles)}
+            <TaggableTargetPicker
+              allowedTypes={currentKind === "market" ? ["profile"] : undefined}
+              onChange={(targets) => patchDraft("taggedProfiles", targets)}
+              placeholder={
+                currentKind === "market"
+                  ? "Cerca il profilo del giocatore"
+                  : "Cerca profili, società o squadre"
+              }
               required={currentKind === "market"}
               value={draft.taggedProfiles}
             />
@@ -1286,136 +1317,6 @@ function ClubMediaPostFormModal({
         </View>
       </SafeAreaView>
     </Modal>
-  );
-}
-
-function TaggedProfilePicker({
-  onChange,
-  required,
-  value,
-}: {
-  onChange: (profiles: ClubMediaTaggedProfile[]) => void;
-  required: boolean;
-  value: ClubMediaTaggedProfile[];
-}) {
-  const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<AgentPlayerCandidate[]>([]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const timeout = setTimeout(() => {
-      async function loadSuggestions() {
-        if (query.trim().length < 2) {
-          setSuggestions([]);
-          return;
-        }
-
-        try {
-          const results = await searchAgentPlayerCandidates(query.trim());
-          if (isMounted) {
-            setSuggestions(results);
-          }
-        } catch {
-          if (isMounted) {
-            setSuggestions([]);
-          }
-        }
-      }
-
-      void loadSuggestions();
-    }, 250);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeout);
-    };
-  }, [query]);
-
-  const selectedIds = useMemo(
-    () => new Set(value.map((profile) => profile.profile_id)),
-    [value],
-  );
-
-  function handleSelect(candidate: AgentPlayerCandidate) {
-    if (selectedIds.has(candidate.profile_id)) {
-      return;
-    }
-
-    onChange([
-      ...value,
-      {
-        avatar_url: candidate.avatar_url,
-        display_name: candidate.full_name,
-        profile_id: candidate.profile_id,
-        role: "player",
-      },
-    ]);
-    setQuery("");
-    setSuggestions([]);
-  }
-
-  return (
-    <View style={styles.tagPicker}>
-      <Input
-        label={required ? "Profilo giocatore taggato" : "Profili taggati"}
-        onChangeText={setQuery}
-        placeholder="Cerca giocatore da taggare"
-        value={query}
-      />
-
-      {value.length > 0 ? (
-        <View style={styles.selectedTags}>
-          {value.map((profile) => (
-            <View key={profile.profile_id} style={styles.selectedTagChip}>
-              <Avatar name={profile.display_name} size="sm" uri={profile.avatar_url} />
-              <AppText numberOfLines={1} style={styles.selectedTagText} variant="bodySm">
-                {profile.display_name}
-              </AppText>
-              <Pressable
-                accessibilityLabel={`Rimuovi ${profile.display_name}`}
-                hitSlop={8}
-                onPress={() =>
-                  onChange(value.filter((item) => item.profile_id !== profile.profile_id))
-                }
-              >
-                <Ionicons color={colors.accent} name="close" size={16} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      {suggestions.length > 0 ? (
-        <View style={styles.suggestions}>
-          {suggestions.map((candidate) => (
-            <Pressable
-              accessibilityRole="button"
-              disabled={selectedIds.has(candidate.profile_id)}
-              key={candidate.profile_id}
-              onPress={() => handleSelect(candidate)}
-              style={styles.suggestionRow}
-            >
-              <Avatar
-                name={candidate.full_name}
-                size="sm"
-                uri={candidate.avatar_url}
-              />
-              <View style={styles.suggestionText}>
-                <AppText numberOfLines={1} style={styles.suggestionName} variant="bodySm">
-                  {candidate.full_name}
-                </AppText>
-                <AppText color="secondary" numberOfLines={1} variant="caption">
-                  {formatCandidateLine(candidate)}
-                </AppText>
-              </View>
-              {selectedIds.has(candidate.profile_id) ? (
-                <Ionicons color={colors.success} name="checkmark" size={18} />
-              ) : null}
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-    </View>
   );
 }
 
@@ -1500,19 +1401,19 @@ function formatRole(role: string | null) {
   return role ? labels[role] ?? role : "Profilo FootMe";
 }
 
-function formatCandidateLine(candidate: AgentPlayerCandidate) {
-  return [
-    candidate.primary_position,
-    candidate.birth_year ? `classe ${candidate.birth_year}` : null,
-    candidate.region,
-  ]
-    .filter(Boolean)
-    .join(" • ");
-}
-
 function normalizeExternalUrl(url: string) {
   const trimmedUrl = url.trim();
   return /^https?:\/\//i.test(trimmedUrl) ? trimmedUrl : `https://${trimmedUrl}`;
+}
+
+function clubMediaKindLabel(kind: ClubMediaKind) {
+  if (kind === "highlights") return "Highlights";
+  if (kind === "interview") return "Intervista";
+  if (kind === "market") return "Mercato";
+  if (kind === "statement") return "Comunicato";
+  if (kind === "training") return "Allenamento";
+  if (kind === "event") return "Evento";
+  return "Contenuto";
 }
 
 function getTitleLabel(kind: ClubMediaKind) {

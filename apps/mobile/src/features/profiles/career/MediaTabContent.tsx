@@ -28,6 +28,7 @@ type MediaTabContentProps = {
   initialItems?: MediaContentItem[];
   mode: MediaViewerMode;
   onAddContentPress?: () => void;
+  onOpenTaggedItem?: (ref: { contentType: string; postId: string }) => void;
 };
 
 type MediaContentTag = {
@@ -51,6 +52,7 @@ export type MediaContentItem = {
   isSaved: boolean;
   likeCount: number;
   tag?: MediaContentTag;
+  taggedRef?: { contentType: "club_media" | "fan_tribuna" | "media_profile"; postId: string };
   thumbnailUrl: string;
   type: "image" | "video";
   videoUrl?: string;
@@ -61,6 +63,7 @@ export function MediaTabContent({
   initialItems = [],
   mode,
   onAddContentPress,
+  onOpenTaggedItem,
 }: MediaTabContentProps) {
   const [items, setItems] = useState(initialItems);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -116,11 +119,17 @@ export function MediaTabContent({
       return;
     }
 
-    const itemIndex = orderedItems.findIndex((item) => item.id === itemId);
-    if (itemIndex < 0) {
+    const item = orderedItems.find((orderedItem) => orderedItem.id === itemId);
+    if (!item) {
       return;
     }
 
+    if (item.taggedRef && onOpenTaggedItem) {
+      onOpenTaggedItem(item.taggedRef);
+      return;
+    }
+
+    const itemIndex = orderedItems.indexOf(item);
     setActiveViewerIndex(itemIndex);
     setSelectedItemId(itemId);
   }

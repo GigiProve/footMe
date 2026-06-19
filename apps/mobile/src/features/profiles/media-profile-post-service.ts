@@ -1,4 +1,4 @@
-import { notifyTaggedProfiles } from "../content/content-tag-service";
+import { notifyTaggedProfiles, searchTagTargets } from "../content/content-tag-service";
 import { supabase } from "../../lib/supabase";
 
 /**
@@ -42,7 +42,7 @@ async function notifyMediaFollowers(input: {
 export type MediaProfilePostKind = "article" | "news";
 export type MediaProfilePostCoverType = "image" | "video";
 export type MediaProfilePostStatus = "draft" | "published" | "archived";
-export type MediaProfilePostTargetType = "profile" | "club";
+export type MediaProfilePostTargetType = "profile" | "club" | "team";
 
 export type MediaProfilePostTaggedTarget = {
   avatar_url: string | null;
@@ -142,6 +142,14 @@ type ClubTargetRow = {
   logo_url: string | null;
   name: string;
   region: string | null;
+};
+
+type TeamTargetRow = {
+  category: string | null;
+  city: string | null;
+  id: string;
+  logo_url: string | null;
+  name: string;
 };
 
 const POST_SELECT =
@@ -341,55 +349,20 @@ export async function toggleSavedMediaProfilePost(
   }
 }
 
-export async function searchMediaProfilePostTargets(query: string, limit = 8) {
-  const trimmedQuery = query.trim();
+export async function searchMediaProfilePostTargets(
+  query: string,
+  limit = 8,
+): Promise<MediaProfilePostTaggedTarget[]> {
+  const results = await searchTagTargets(query, limit);
 
-  if (trimmedQuery.length < 2) {
-    return [] as MediaProfilePostTaggedTarget[];
-  }
-
-  const [profilesResult, clubsResult] = await Promise.all([
-    supabase
-      .from("profiles_with_age")
-      .select("id, full_name, avatar_url, role, city, region")
-      .in("role", ["player", "coach", "staff"])
-      .ilike("full_name", `%${trimmedQuery}%`)
-      .limit(limit),
-    supabase
-      .from("clubs")
-      .select("id, name, city, region, category, logo_url")
-      .ilike("name", `%${trimmedQuery}%`)
-      .limit(limit),
-  ]);
-
-  if (profilesResult.error) {
-    throw profilesResult.error;
-  }
-
-  if (clubsResult.error) {
-    throw clubsResult.error;
-  }
-
-  const profileTargets = ((profilesResult.data ?? []) as ProfileTargetRow[]).map(
-    (row) => ({
-      avatar_url: row.avatar_url,
-      display_name: row.full_name?.trim() || "Profilo FootMe",
-      role: row.role,
-      subtitle: formatProfileSubtitle(row.role, row.city ?? null, row.region ?? null),
-      target_id: row.id,
-      target_type: "profile" as const,
-    }),
-  );
-  const clubTargets = ((clubsResult.data ?? []) as ClubTargetRow[]).map((row) => ({
-    avatar_url: row.logo_url,
-    display_name: row.name,
-    role: "club",
-    subtitle: [row.category, row.city ?? row.region].filter(Boolean).join(" - ") || null,
-    target_id: row.id,
-    target_type: "club" as const,
+  return results.map((item) => ({
+    avatar_url: item.avatar_url,
+    display_name: item.display_name,
+    role: item.role_label,
+    subtitle: item.subtitle || null,
+    target_id: item.target_id,
+    target_type: item.target_type as MediaProfilePostTargetType,
   }));
-
-  return [...profileTargets, ...clubTargets].slice(0, limit);
 }
 
 async function enrichMediaProfilePosts(
@@ -519,9 +492,13 @@ async function loadTaggedTargets(postIds: string[]) {
   const clubIds = rows
     .filter((row) => row.target_type === "club")
     .map((row) => row.target_id);
-  const [profiles, clubs] = await Promise.all([
+  const teamIds = rows
+    .filter((row) => row.target_type === "team")
+    .map((row) => row.target_id);
+  const [profiles, clubs, teams] = await Promise.all([
     loadProfilesById(profileIds),
     loadClubsById(clubIds),
+    loadTeamsById(teamIds),
   ]);
 
   for (const row of rows) {
@@ -538,6 +515,18 @@ async function loadTaggedTargets(postIds: string[]) {
           : null,
         target_id: row.target_id,
         target_type: "club",
+      });
+    } else if (row.target_type === "team") {
+      const team = teams.get(row.target_id);
+      list.push({
+        avatar_url: team?.logo_url ?? null,
+        display_name: team?.name?.trim() || "Squadra FootMe",
+        role: "team",
+        subtitle: team
+          ? [team.category, team.city].filter(Boolean).join(" - ") || null
+          : null,
+        target_id: row.target_id,
+        target_type: "team",
       });
     } else {
       const profile = profiles.get(row.target_id);
@@ -649,6 +638,30 @@ async function loadClubsById(clubIds: string[]) {
   }
 
   return clubs;
+}
+
+async function loadTeamsById(teamIds: string[]) {
+  const teams = new Map<string, TeamTargetRow>();
+  const ids = uniqueIds(teamIds);
+
+  if (ids.length === 0) {
+    return teams;
+  }
+
+  const { data, error } = await supabase
+    .from("club_teams")
+    .select("id, name, category, city, logo_url")
+    .in("id", ids);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const team of (data ?? []) as TeamTargetRow[]) {
+    teams.set(team.id, team);
+  }
+
+  return teams;
 }
 
 function buildCreatePayload(input: CreateMediaProfilePostInput) {
@@ -823,7 +836,9 @@ function formatProfileSubtitle(
         ? "Allenatore"
         : role === "staff"
           ? "Staff"
-          : "Profilo";
+          : role === "director"
+            ? "Dirigente"
+            : "Profilo";
   const location = city || region;
 
   return location ? `${roleLabel} - ${location}` : roleLabel;

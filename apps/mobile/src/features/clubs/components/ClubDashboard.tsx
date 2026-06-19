@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useRouter } from "expo-router";
 
 import { Screen } from "../../../components/ui/screen";
 import { KeyboardAwareForm } from "../../../components/ui/keyboard-aware-form";
