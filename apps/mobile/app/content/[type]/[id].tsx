@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -14,26 +21,27 @@ import {
   type MediaProfilePost,
 } from "../../../src/features/profiles/media-profile-post-service";
 import { CompactContentModule } from "../../../src/features/content/components/CompactContentModule";
+import { ContentTaggedHeader } from "../../../src/features/content/components/ContentTaggedHeader";
 import { TagManageSheet } from "../../../src/features/content/components/TagManageSheet";
-import type {
-  TaggedContentType,
-  TargetType,
-} from "../../../src/features/content/content-tag-service";
+import type { ContentTaggedTarget } from "../../../src/features/content/components/TaggedProfilesSheet";
+import type { TaggedContentType } from "../../../src/features/content/content-tag-service";
 import { colors, radius, spacing } from "../../../src/theme/tokens";
-import { AppText, Avatar, Button } from "../../../src/ui";
+import { AppText, Button } from "../../../src/ui";
 
-type TaggedEntry = {
-  avatar_url: string | null;
-  display_name: string;
-  target_id: string;
-  target_type: TargetType;
-};
+type TaggedEntry = ContentTaggedTarget;
 
 type ContentView = {
+  authorName: string | null;
   body: string | null;
+  displayMode: "full" | "preview";
+  excerpt: string | null;
+  externalUrl: string | null;
+  publishedAt: string | null;
   publisherId: string;
   publisherKind: "club" | "profile";
   publisherName: string;
+  readingLabel: string | null;
+  sourceName: string | null;
   tagged: TaggedEntry[];
   thumbnailUrl: string | null;
   title: string;
@@ -55,13 +63,21 @@ function clubMediaTypeLabel(kind: ClubMediaPost["kind"]): string {
 
 function mapClubMedia(post: ClubMediaPost, viewerId: string | null): ContentView {
   return {
+    authorName: null,
     body: post.body ?? post.excerpt ?? null,
+    displayMode: "full",
+    excerpt: post.excerpt ?? null,
+    externalUrl: null,
+    publishedAt: null,
     publisherId: post.club_id,
     publisherKind: "club",
     publisherName: "Società",
+    readingLabel: null,
+    sourceName: null,
     tagged: post.tagged_profiles.map((tag) => ({
       avatar_url: tag.avatar_url,
       display_name: tag.display_name,
+      subtitle: tag.role,
       target_id: tag.target_id,
       target_type: tag.target_type,
     })),
@@ -83,13 +99,21 @@ function mapMediaProfile(
   viewerId: string | null,
 ): ContentView {
   return {
+    authorName: post.author_name,
     body: post.body ?? post.excerpt ?? null,
+    displayMode: post.display_mode,
+    excerpt: post.excerpt ?? null,
+    externalUrl: post.external_url,
+    publishedAt: post.published_at ?? post.created_at,
     publisherId: post.media_profile_id,
     publisherKind: "profile",
-    publisherName: post.author_name,
+    publisherName: post.publisher_name,
+    readingLabel: post.kind === "news" ? null : `${post.reading_time_minutes} min`,
+    sourceName: post.source_name,
     tagged: post.tagged_targets.map((tag) => ({
       avatar_url: tag.avatar_url,
       display_name: tag.display_name,
+      subtitle: tag.subtitle,
       target_id: tag.target_id,
       target_type: tag.target_type,
     })),
@@ -207,53 +231,47 @@ export default function ContentDetailScreen() {
             typeLabel={content.typeLabel}
           />
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={openPublisher}
-            style={styles.publisherRow}
-          >
-            <Ionicons color={colors.textSecondary} name="megaphone-outline" size={16} />
-            <AppText style={styles.publisherText} variant="bodySm">
-              Pubblicato da{" "}
-              <AppText color="accent" variant="bodySm">
-                {content.publisherName}
-              </AppText>
-            </AppText>
-          </Pressable>
+          <ContentTaggedHeader
+            authorName={content.authorName}
+            onOpenTarget={openTarget}
+            onPressPublisher={openPublisher}
+            publishedAt={content.publishedAt}
+            publisherName={content.publisherName}
+            readingLabel={content.readingLabel}
+            tagged={content.tagged}
+          />
 
-          {content.body ? (
-            <AppText color="secondary" variant="bodyLg">
-              {content.body}
-            </AppText>
-          ) : null}
-
-          {content.tagged.length > 0 ? (
-            <View style={styles.taggedSection}>
-              <AppText color="secondary" variant="caption">
-                Profili taggati
-              </AppText>
-              <View style={styles.taggedList}>
-                {content.tagged.map((target) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    key={`${target.target_type}:${target.target_id}`}
-                    onPress={() => openTarget(target)}
-                    style={styles.taggedChip}
-                  >
-                    <Avatar
-                      name={target.display_name}
-                      size="sm"
-                      square={target.target_type !== "profile"}
-                      uri={target.avatar_url}
-                    />
-                    <AppText numberOfLines={1} style={styles.taggedName} variant="bodySm">
-                      {target.display_name}
-                    </AppText>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : null}
+          {content.displayMode === "preview" ? (
+            <>
+              {content.excerpt ? (
+                <AppText color="secondary" variant="bodyLg">
+                  {content.excerpt}
+                </AppText>
+              ) : null}
+              {content.externalUrl ? (
+                <SourceLinkCard
+                  sourceName={content.sourceName}
+                  title="Leggi l'articolo completo sul sito"
+                  url={content.externalUrl}
+                />
+              ) : null}
+            </>
+          ) : (
+            <>
+              {content.body ? (
+                <AppText color="secondary" variant="bodyLg">
+                  {content.body}
+                </AppText>
+              ) : null}
+              {content.externalUrl ? (
+                <SourceLinkCard
+                  sourceName={content.sourceName}
+                  title="Leggi anche sul sito"
+                  url={content.externalUrl}
+                />
+              ) : null}
+            </>
+          )}
 
           {content.viewerTagged ? (
             <Button
@@ -288,6 +306,36 @@ export default function ContentDetailScreen() {
   );
 }
 
+function SourceLinkCard({
+  sourceName,
+  title,
+  url,
+}: {
+  sourceName: string | null;
+  title: string;
+  url: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={() => {
+        void Linking.openURL(url);
+      }}
+      style={styles.sourceCard}
+    >
+      <View style={styles.sourceCardText}>
+        <AppText color="accent" variant="bodySm">
+          {title}
+        </AppText>
+        <AppText color="secondary" numberOfLines={1} variant="caption">
+          {sourceName ? `Fonte: ${sourceName}` : "Fonte originale"}
+        </AppText>
+      </View>
+      <Ionicons color={colors.accent} name="open-outline" size={19} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   centered: {
     alignItems: "center",
@@ -295,41 +343,26 @@ const styles = StyleSheet.create({
     gap: spacing[16],
     justifyContent: "center",
   },
-  publisherRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[6],
-  },
-  publisherText: {
-    flex: 1,
-  },
   scroll: {
     gap: spacing[16],
     paddingBottom: spacing[28],
     paddingHorizontal: spacing[4],
     paddingTop: spacing[8],
   },
-  taggedChip: {
+  sourceCard: {
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius.full,
+    borderRadius: radius[12],
     borderWidth: 1,
     flexDirection: "row",
-    gap: spacing[6],
-    paddingHorizontal: spacing[8],
-    paddingVertical: spacing[6],
+    gap: spacing[12],
+    paddingHorizontal: spacing[14],
+    paddingVertical: spacing[12],
   },
-  taggedList: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[8],
-  },
-  taggedName: {
-    maxWidth: 150,
-  },
-  taggedSection: {
-    gap: spacing[8],
+  sourceCardText: {
+    flex: 1,
+    gap: spacing[4],
   },
   topBar: {
     alignItems: "center",

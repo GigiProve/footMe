@@ -38,6 +38,28 @@ export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
 
 export type TargetType = "profile" | "club" | "team";
 
+const PROFILE_ROLE_LABELS: Record<string, string> = {
+  coach: "Allenatore",
+  director: "Dirigente",
+  player: "Calciatore",
+  staff: "Staff",
+};
+
+/**
+ * Localized role label for a tag suggestion. Only profiles carry a role; clubs
+ * and teams return null so their meta line shows just the subtitle.
+ */
+export function formatTargetRoleLabel(
+  roleLabel: string | null | undefined,
+  targetType: TargetType,
+): string | null {
+  if (targetType !== "profile" || !roleLabel) {
+    return null;
+  }
+
+  return PROFILE_ROLE_LABELS[roleLabel] ?? "Profilo";
+}
+
 export type TaggedContentItem = {
   content_type: TaggedContentType;
   kind: string;
@@ -123,6 +145,8 @@ async function setTagStatus(
  * the tagger is never the recipient, and failures do not block content creation.
  */
 export async function notifyTaggedProfiles(input: {
+  /** Lowercase content noun used in the notification body, e.g. "un articolo". */
+  contentLabel?: string;
   contentType: TaggedContentType;
   postId: string;
   publisherId?: string;
@@ -138,9 +162,10 @@ export async function notifyTaggedProfiles(input: {
     return;
   }
 
+  const label = input.contentLabel ?? "un contenuto";
   const body = input.publisherName
-    ? `${input.publisherName} ti ha taggato in un contenuto`
-    : "Sei stato taggato in un contenuto";
+    ? `${input.publisherName} ti ha taggato in ${label}`
+    : `Sei stato taggato in ${label}`;
 
   await supabase.from("notifications").insert(
     recipients.map((profileId) => ({

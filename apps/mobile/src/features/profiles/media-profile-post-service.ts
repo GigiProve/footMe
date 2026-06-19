@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase";
  * Best-effort: failures must not block content creation.
  */
 async function notifyMediaFollowers(input: {
-  excludeProfileId: string;
+  excludeProfileIds: string[];
   mediaProfileId: string;
   postId: string;
   title: string;
@@ -20,9 +20,11 @@ async function notifyMediaFollowers(input: {
     return;
   }
 
+  // Skip the author and anyone already notified as a tagged profile.
+  const excluded = new Set(input.excludeProfileIds);
   const recipients = data
     .map((row) => row.follower_profile_id as string)
-    .filter((id) => id && id !== input.excludeProfileId);
+    .filter((id) => id && !excluded.has(id));
 
   if (recipients.length === 0) {
     return;
@@ -43,6 +45,10 @@ export type MediaProfilePostKind = "article" | "news";
 export type MediaProfilePostCoverType = "image" | "video";
 export type MediaProfilePostStatus = "draft" | "published" | "archived";
 export type MediaProfilePostTargetType = "profile" | "club" | "team";
+/** How the post was produced: written on-platform, imported from a link, or pasted. */
+export type MediaProfilePostSourceType = "platform" | "link" | "pasted";
+/** For link-imported posts: show only a preview + link, or the full body in-app. */
+export type MediaProfilePostDisplayMode = "preview" | "full";
 
 export type MediaProfilePostTaggedTarget = {
   avatar_url: string | null;
@@ -73,6 +79,7 @@ export type MediaProfilePost = {
   cover_url: string | null;
   created_at: string;
   created_by_profile_id: string;
+  display_mode: MediaProfilePostDisplayMode;
   excerpt: string | null;
   external_url: string | null;
   id: string;
@@ -80,7 +87,11 @@ export type MediaProfilePost = {
   kind: MediaProfilePostKind;
   media_profile_id: string;
   published_at: string | null;
+  /** Display name of the publishing media outlet (entity_name, fallback full_name). */
+  publisher_name: string;
   reading_time_minutes: number;
+  source_name: string | null;
+  source_type: MediaProfilePostSourceType;
   status: MediaProfilePostStatus;
   subtitle: string | null;
   tagged_targets: MediaProfilePostTaggedTarget[];
@@ -96,10 +107,15 @@ export type CreateMediaProfilePostInput = {
   coverType?: MediaProfilePostCoverType | null;
   coverUrl?: string | null;
   createdByProfileId: string;
+  displayMode?: MediaProfilePostDisplayMode | null;
   excerpt?: string | null;
   externalUrl?: string | null;
   kind: MediaProfilePostKind;
   mediaProfileId: string;
+  /** Display name of the publishing media profile, used in the tag notification. */
+  publisherName?: string | null;
+  sourceName?: string | null;
+  sourceType?: MediaProfilePostSourceType | null;
   subtitle?: string | null;
   taggedTargets?: MediaProfilePostTaggedTarget[];
   title: string;
@@ -114,12 +130,15 @@ type MediaProfilePostRow = {
   cover_url: string | null;
   created_at: string;
   created_by_profile_id: string;
+  display_mode: string | null;
   excerpt: string | null;
   external_url: string | null;
   id: string;
   kind: string;
   media_profile_id: string;
   published_at: string | null;
+  source_name: string | null;
+  source_type: string | null;
   status: string;
   subtitle: string | null;
   title: string;
@@ -153,7 +172,7 @@ type TeamTargetRow = {
 };
 
 const POST_SELECT =
-  "id, media_profile_id, created_by_profile_id, kind, category, title, subtitle, excerpt, body, cover_url, cover_type, external_url, author_id, author_name, status, published_at, created_at, updated_at";
+  "id, media_profile_id, created_by_profile_id, kind, category, title, subtitle, excerpt, body, cover_url, cover_type, external_url, author_id, author_name, source_type, display_mode, source_name, status, published_at, created_at, updated_at";
 
 export async function fetchMediaProfilePostFeed(
   mediaProfileId: string,
@@ -225,6 +244,9 @@ export async function createMediaProfilePost(
 
   const postId = (data as MediaProfilePostRow).id;
   const taggedTargets = uniqueTargets(input.taggedTargets ?? []);
+  const taggedProfileIds = taggedTargets
+    .filter((target) => target.target_type === "profile")
+    .map((target) => target.target_id);
 
   if (taggedTargets.length > 0) {
     const { error: tagError } = await supabase
@@ -241,14 +263,20 @@ export async function createMediaProfilePost(
       throw tagError;
     }
 
-    await notifyTaggedProfiles({
-      contentType: "media_profile",
-      postId,
-      taggedProfileIds: taggedTargets
-        .filter((target) => target.target_type === "profile")
-        .map((target) => target.target_id),
-      taggerProfileId: input.createdByProfileId,
-    });
+    // Notifications are best-effort: a delivery failure must not fail the post.
+    try {
+      await notifyTaggedProfiles({
+        contentLabel: input.kind === "news" ? "una news" : "un articolo",
+        contentType: "media_profile",
+        postId,
+        publisherId: input.mediaProfileId,
+        publisherName: normalizeText(input.publisherName) ?? undefined,
+        taggedProfileIds,
+        taggerProfileId: input.createdByProfileId,
+      });
+    } catch {
+      // Swallow: the post is already created.
+    }
   }
 
   // Notify followers of the media profile that a new article was published.
@@ -258,12 +286,17 @@ export async function createMediaProfilePost(
     row.published_at !== null;
 
   if (isPublished) {
-    await notifyMediaFollowers({
-      excludeProfileId: input.createdByProfileId,
-      mediaProfileId: input.mediaProfileId,
-      postId,
-      title: input.title,
-    });
+    try {
+      await notifyMediaFollowers({
+        // Skip the author and the already-notified tagged profiles.
+        excludeProfileIds: [input.createdByProfileId, ...taggedProfileIds],
+        mediaProfileId: input.mediaProfileId,
+        postId,
+        title: input.title,
+      });
+    } catch {
+      // Swallow: the post is already created.
+    }
   }
 
   const [post] = await enrichMediaProfilePosts(
@@ -375,7 +408,7 @@ async function enrichMediaProfilePosts(
   }
 
   const postIds = rows.map((row) => row.id);
-  const [commentCounts, savedIds, taggedTargets, commentsByPost] =
+  const [commentCounts, savedIds, taggedTargets, commentsByPost, publisherNames] =
     await Promise.all([
       loadPostCountMap("media_profile_post_comments", postIds),
       viewerProfileId
@@ -385,6 +418,7 @@ async function enrichMediaProfilePosts(
       includeComments
         ? loadCommentsByPost(postIds)
         : Promise.resolve(new Map<string, MediaProfilePostComment[]>()),
+      loadPublisherNames(rows.map((row) => row.media_profile_id)),
     ]);
 
   return rows.map((row) => {
@@ -401,6 +435,7 @@ async function enrichMediaProfilePosts(
       cover_url: row.cover_url ?? null,
       created_at: row.created_at,
       created_by_profile_id: row.created_by_profile_id,
+      display_mode: normalizeDisplayMode(row.display_mode),
       excerpt: row.excerpt ?? buildExcerpt(body),
       external_url: row.external_url ?? null,
       id: row.id,
@@ -408,7 +443,11 @@ async function enrichMediaProfilePosts(
       kind: normalizeKind(row.kind),
       media_profile_id: row.media_profile_id,
       published_at: row.published_at ?? null,
+      publisher_name:
+        publisherNames.get(row.media_profile_id) ?? row.author_name,
       reading_time_minutes: calculateReadingTime(body),
+      source_name: row.source_name ?? null,
+      source_type: normalizeSourceType(row.source_type),
       status: normalizeStatus(row.status),
       subtitle: row.subtitle ?? null,
       tagged_targets: taggedTargets.get(row.id) ?? [],
@@ -474,8 +513,11 @@ async function loadTaggedTargets(postIds: string[]) {
 
   const { data, error } = await supabase
     .from("media_profile_post_tagged_targets")
-    .select("post_id, target_id, target_type")
-    .in("post_id", postIds);
+    .select("post_id, target_id, target_type, status")
+    .in("post_id", postIds)
+    // A removed tag is unlinked from the article: it must not appear in the
+    // detail header ("con …"). Hidden/reported/in_review tags stay on the post.
+    .neq("status", "removed");
 
   if (error) {
     throw error;
@@ -592,6 +634,48 @@ async function loadCommentsByPost(postIds: string[]) {
   return commentsByPost;
 }
 
+async function loadPublisherNames(mediaProfileIds: string[]) {
+  const names = new Map<string, string>();
+  const ids = uniqueIds(mediaProfileIds);
+
+  if (ids.length === 0) {
+    return names;
+  }
+
+  const { data, error } = await supabase
+    .from("media_profiles")
+    .select("profile_id, entity_name")
+    .in("profile_id", ids);
+
+  if (error) {
+    return names;
+  }
+
+  for (const row of (data ?? []) as {
+    entity_name: string | null;
+    profile_id: string;
+  }[]) {
+    const name = row.entity_name?.trim();
+
+    if (name) {
+      names.set(row.profile_id, name);
+    }
+  }
+
+  // Fall back to the owner profile's full name where entity_name is missing.
+  const missing = ids.filter((id) => !names.has(id));
+
+  if (missing.length > 0) {
+    const profiles = await loadProfilesById(missing);
+
+    for (const id of missing) {
+      names.set(id, profiles.get(id)?.full_name?.trim() || "Media FootMe");
+    }
+  }
+
+  return names;
+}
+
 async function loadProfilesById(profileIds: string[]) {
   const profiles = new Map<string, ProfileTargetRow>();
   const ids = uniqueIds(profileIds);
@@ -674,13 +758,19 @@ function buildCreatePayload(input: CreateMediaProfilePostInput) {
   const coverUrl = normalizeText(input.coverUrl);
   const coverType = input.coverType ?? inferCoverType(coverUrl);
   const externalUrl = normalizeExternalUrl(input.externalUrl);
+  const sourceType = normalizeSourceType(input.sourceType);
+  // Only link-imported posts may be preview-only; everything else shows in full.
+  const displayMode =
+    sourceType === "link" ? normalizeDisplayMode(input.displayMode) : "full";
 
   validateCreateInput({
     authorName,
     body,
     category,
+    displayMode,
     excerpt,
     kind: input.kind,
+    sourceType,
     title,
   });
 
@@ -692,10 +782,13 @@ function buildCreatePayload(input: CreateMediaProfilePostInput) {
     cover_type: coverType,
     cover_url: coverUrl,
     created_by_profile_id: input.createdByProfileId,
+    display_mode: displayMode,
     excerpt,
     external_url: externalUrl,
     kind: input.kind,
     media_profile_id: input.mediaProfileId,
+    source_name: normalizeText(input.sourceName),
+    source_type: sourceType,
     status: "published",
     subtitle,
     title,
@@ -706,8 +799,10 @@ function validateCreateInput(input: {
   authorName: string;
   body: string | null;
   category: string;
+  displayMode: MediaProfilePostDisplayMode;
   excerpt: string | null;
   kind: MediaProfilePostKind;
+  sourceType: MediaProfilePostSourceType;
   title: string;
 }) {
   if (!input.title) {
@@ -722,6 +817,16 @@ function validateCreateInput(input: {
     throw new Error("Inserisci l'autore del contenuto.");
   }
 
+  // Link imported as preview-only: the body is intentionally not brought in-app,
+  // so only a description/excerpt (shown next to the source link) is required.
+  if (input.sourceType === "link" && input.displayMode === "preview") {
+    if (!input.excerpt && !input.body) {
+      throw new Error("Aggiungi una descrizione per l'anteprima del link.");
+    }
+
+    return;
+  }
+
   if (input.kind === "article" && !input.body) {
     throw new Error("Inserisci il testo dell'articolo.");
   }
@@ -731,12 +836,26 @@ function validateCreateInput(input: {
   }
 }
 
-function calculateReadingTime(body: string | null) {
+/** Count words in a body, ignoring markdown markers used by the editor toolbar. */
+export function countWords(body: string | null | undefined): number {
   if (!body) {
+    return 0;
+  }
+
+  return body
+    .replace(/[*_>#-]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+/** Estimate reading time in minutes (~220 words/min), minimum 1. */
+export function calculateReadingTime(body: string | null): number {
+  const words = countWords(body);
+
+  if (words === 0) {
     return 1;
   }
 
-  const words = body.split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 220));
 }
 
@@ -754,6 +873,18 @@ function normalizeKind(value: string): MediaProfilePostKind {
 
 function normalizeStatus(value: string): MediaProfilePostStatus {
   return value === "draft" || value === "archived" ? value : "published";
+}
+
+function normalizeSourceType(
+  value: string | null | undefined,
+): MediaProfilePostSourceType {
+  return value === "link" || value === "pasted" ? value : "platform";
+}
+
+function normalizeDisplayMode(
+  value: string | null | undefined,
+): MediaProfilePostDisplayMode {
+  return value === "preview" ? "preview" : "full";
 }
 
 function normalizeCoverType(value: string | null): MediaProfilePostCoverType | null {

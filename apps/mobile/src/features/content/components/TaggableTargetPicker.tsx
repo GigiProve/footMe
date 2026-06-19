@@ -5,6 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors, radius, spacing } from "../../../styles";
 import { AppText, Avatar, Input } from "../../../ui";
 import {
+  formatTargetRoleLabel,
   searchTagTargets,
   type TargetType,
 } from "../content-tag-service";
@@ -133,9 +134,13 @@ export function TaggableTargetPicker({
         <View style={styles.suggestions}>
           {suggestions.map((suggestion) => {
             const disabled = selectedKeys.has(targetKey(suggestion));
-            const meta = suggestion.subtitle
-              ? `${suggestion.role_label ?? ""} · ${suggestion.subtitle}`
-              : suggestion.role_label ?? "";
+            const roleText = formatTargetRoleLabel(
+              suggestion.role_label,
+              suggestion.target_type,
+            );
+            const meta = [roleText, suggestion.subtitle]
+              .filter(Boolean)
+              .join(" · ");
 
             return (
               <Pressable
