@@ -46,6 +46,7 @@ import {
 import { useRouter } from "expo-router";
 
 import { TaggableTargetPicker } from "../../content/components/TaggableTargetPicker";
+import { TaggedContentGrid } from "../../content/components/TaggedContentGrid";
 import { TagManageSheet } from "../../content/components/TagManageSheet";
 import type { TaggableTarget } from "../../content/tag-types";
 
@@ -433,6 +434,8 @@ export function ClubMediaTabContent({
           </View>
         </View>
       )}
+
+      <TaggedContentGrid targetId={club.id} targetType="club" />
 
       <CreateMenuSheet
         onClose={() => setIsCreateMenuOpen(false)}

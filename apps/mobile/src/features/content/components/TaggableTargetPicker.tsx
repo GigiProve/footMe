@@ -16,6 +16,9 @@ const SEARCH_DEBOUNCE_MS = 250;
 type TaggableTargetPickerProps = {
   allowedTypes?: TargetType[];
   label?: string;
+  /** Maximum number of targets selectable. When the cap is reached a neutral
+   *  hint is shown in place of the search input. Default: unlimited. */
+  max?: number;
   onChange: (next: TaggableTarget[]) => void;
   placeholder?: string;
   required?: boolean;
@@ -29,6 +32,7 @@ function isSquare(type: TargetType) {
 export function TaggableTargetPicker({
   allowedTypes,
   label,
+  max,
   onChange,
   placeholder = "Cerca un profilo, una società o una squadra",
   required = false,
@@ -37,7 +41,14 @@ export function TaggableTargetPicker({
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<TaggableTarget[]>([]);
 
+  const atMax = max !== undefined && value.length >= max;
+
   useEffect(() => {
+    if (atMax) {
+      setSuggestions([]);
+      return;
+    }
+
     let isMounted = true;
     const timeout = setTimeout(() => {
       async function loadSuggestions() {
@@ -72,7 +83,7 @@ export function TaggableTargetPicker({
       isMounted = false;
       clearTimeout(timeout);
     };
-  }, [query, allowedTypes]);
+  }, [query, allowedTypes, atMax]);
 
   const selectedKeys = useMemo(
     () => new Set(value.map((target) => targetKey(target))),
@@ -81,6 +92,9 @@ export function TaggableTargetPicker({
 
   function handleSelect(target: TaggableTarget) {
     if (selectedKeys.has(targetKey(target))) {
+      return;
+    }
+    if (max !== undefined && value.length >= max) {
       return;
     }
     onChange([...value, target]);
@@ -94,12 +108,18 @@ export function TaggableTargetPicker({
 
   return (
     <View style={styles.container}>
-      <Input
-        label={label ?? (required ? "Profili taggati (obbligatorio)" : "Profili taggati")}
-        onChangeText={setQuery}
-        placeholder={placeholder}
-        value={query}
-      />
+      {atMax ? (
+        <AppText color="secondary" variant="bodySm">
+          Puoi taggare fino a {max} profili.
+        </AppText>
+      ) : (
+        <Input
+          label={label ?? (required ? "Profili taggati (obbligatorio)" : "Profili taggati")}
+          onChangeText={setQuery}
+          placeholder={placeholder}
+          value={query}
+        />
+      )}
 
       {value.length > 0 ? (
         <View style={styles.selectedTags}>
@@ -130,7 +150,7 @@ export function TaggableTargetPicker({
         </View>
       ) : null}
 
-      {suggestions.length > 0 ? (
+      {suggestions.length > 0 && !atMax ? (
         <View style={styles.suggestions}>
           {suggestions.map((suggestion) => {
             const disabled = selectedKeys.has(targetKey(suggestion));

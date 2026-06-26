@@ -41,6 +41,7 @@ export type TargetType = "profile" | "club" | "team";
 const PROFILE_ROLE_LABELS: Record<string, string> = {
   coach: "Allenatore",
   director: "Dirigente",
+  media: "Media",
   player: "Calciatore",
   staff: "Staff",
 };
@@ -69,6 +70,15 @@ export type TaggedContentItem = {
   publisher_name: string;
   thumbnail_url: string | null;
   title: string;
+};
+
+/** Default page size for the paginated tagged-content RPCs (mirrors the SQL default). */
+export const TAGGED_CONTENT_PAGE_SIZE = 30;
+
+/** Paging options for the tagged-content list loaders. */
+export type TaggedContentPageOptions = {
+  limit?: number;
+  offset?: number;
 };
 
 export type TagSearchResult = {
@@ -114,11 +124,14 @@ async function setTagStatus(
   }
 
   if (contentType === "fan_tribuna") {
+    // After 20260620100000 the table has target_type + target_id.
+    // Match on all three so club/team tags are moderated correctly too.
     const { error } = await supabase
       .from("fan_tribuna_tagged_players")
       .update({ status })
       .eq("post_id", postId)
-      .eq("player_profile_id", taggedId);
+      .eq("target_type", targetType)
+      .eq("target_id", taggedId);
 
     if (error) {
       throw error;
@@ -231,13 +244,23 @@ export async function reportTag(
 }
 
 /**
- * Fetch content where the given profile is tagged (active only).
+ * Fetch one page of content where the given profile is tagged (active only).
  * Uses the fetch_tagged_content_for_owner RPC; omit profileId to default to auth.uid().
+ * Returns at most `limit` items ordered by published_at desc; callers detect
+ * "has more" when the returned length equals the requested limit.
  */
 export async function fetchTaggedContentForProfile(
   profileId?: string,
+  options: TaggedContentPageOptions = {},
 ): Promise<TaggedContentItem[]> {
-  const params = profileId ? { p_profile_id: profileId } : {};
+  const params: Record<string, unknown> = {
+    p_limit: options.limit ?? TAGGED_CONTENT_PAGE_SIZE,
+    p_offset: options.offset ?? 0,
+  };
+  if (profileId) {
+    params.p_profile_id = profileId;
+  }
+
   const { data, error } = await supabase.rpc(
     "fetch_tagged_content_for_owner",
     params,
@@ -273,4 +296,28 @@ export async function searchTagTargets(
   }
 
   return (data ?? []) as TagSearchResult[];
+}
+
+/**
+ * Fetch one page of content that tags a specific club or team (active tags only).
+ * Uses the fetch_tagged_content_for_target RPC. Intended for the public
+ * club/team Media tabs. Returns at most `limit` items ordered by published_at desc.
+ */
+export async function fetchTaggedContentForTarget(
+  targetType: "club" | "team",
+  targetId: string,
+  options: TaggedContentPageOptions = {},
+): Promise<TaggedContentItem[]> {
+  const { data, error } = await supabase.rpc("fetch_tagged_content_for_target", {
+    p_limit: options.limit ?? TAGGED_CONTENT_PAGE_SIZE,
+    p_offset: options.offset ?? 0,
+    p_target_id: targetId,
+    p_target_type: targetType,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as TaggedContentItem[];
 }

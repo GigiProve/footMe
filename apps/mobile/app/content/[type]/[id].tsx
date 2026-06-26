@@ -20,6 +20,11 @@ import {
   fetchMediaProfilePostDetail,
   type MediaProfilePost,
 } from "../../../src/features/profiles/media-profile-post-service";
+import {
+  fetchFanTribunaPostDetail,
+  type FanTribunaPostDetail,
+} from "../../../src/features/profiles/fan-tribuna-service";
+import { FanContentBody } from "../../../src/features/profiles/FanContentBody";
 import { CompactContentModule } from "../../../src/features/content/components/CompactContentModule";
 import { ContentTaggedHeader } from "../../../src/features/content/components/ContentTaggedHeader";
 import { TagManageSheet } from "../../../src/features/content/components/TagManageSheet";
@@ -49,7 +54,11 @@ type ContentView = {
   viewerTagged: boolean;
 };
 
-const SUPPORTED: TaggedContentType[] = ["club_media", "media_profile"];
+const SUPPORTED: TaggedContentType[] = [
+  "club_media",
+  "media_profile",
+  "fan_tribuna",
+];
 
 function clubMediaTypeLabel(kind: ClubMediaPost["kind"]): string {
   if (kind === "highlights") return "Highlights";
@@ -128,6 +137,48 @@ function mapMediaProfile(
   };
 }
 
+function fanTribunaTypeLabel(kind: FanTribunaPostDetail["kind"]): string {
+  if (kind === "poll") return "Sondaggio";
+  if (kind === "formation") return "Formazione";
+  if (kind === "photo") return "Foto / Video";
+  if (kind === "opinion") return "Opinione";
+  return "Proposta";
+}
+
+function mapFanTribuna(
+  post: FanTribunaPostDetail,
+  viewerId: string | null,
+): ContentView {
+  return {
+    authorName: null,
+    body: post.body ?? null,
+    displayMode: "full",
+    excerpt: null,
+    externalUrl: null,
+    publishedAt: post.published_at ?? post.created_at,
+    publisherId: post.profile_id,
+    publisherKind: "profile",
+    publisherName: post.publisher_name,
+    readingLabel: null,
+    sourceName: null,
+    tagged: post.tagged_targets.map((tag) => ({
+      avatar_url: tag.avatar_url,
+      display_name: tag.display_name,
+      subtitle: null,
+      target_id: tag.target_id,
+      target_type: tag.target_type,
+    })),
+    thumbnailUrl: post.thumbnail_url ?? null,
+    title: post.title,
+    typeLabel: fanTribunaTypeLabel(post.kind),
+    viewerTagged:
+      !!viewerId &&
+      post.tagged_targets.some(
+        (tag) => tag.target_type === "profile" && tag.target_id === viewerId,
+      ),
+  };
+}
+
 export default function ContentDetailScreen() {
   const { id, type } = useLocalSearchParams<{ id: string; type: string }>();
   const { profile } = useSession();
@@ -135,6 +186,7 @@ export default function ContentDetailScreen() {
   const viewerId = profile?.id ?? null;
 
   const [content, setContent] = useState<ContentView | null>(null);
+  const [fanPost, setFanPost] = useState<FanTribunaPostDetail | null>(null);
   const [isLoading, setLoading] = useState(true);
   const [isManageOpen, setManageOpen] = useState(false);
 
@@ -151,13 +203,20 @@ export default function ContentDetailScreen() {
     try {
       if (contentType === "club_media") {
         const post = await fetchClubMediaPostDetail(id, viewerId);
+        setFanPost(null);
         setContent(post ? mapClubMedia(post, viewerId) : null);
+      } else if (contentType === "fan_tribuna") {
+        const post = await fetchFanTribunaPostDetail(id, viewerId);
+        setFanPost(post);
+        setContent(post ? mapFanTribuna(post, viewerId) : null);
       } else {
         const post = await fetchMediaProfilePostDetail(id, viewerId);
+        setFanPost(null);
         setContent(post ? mapMediaProfile(post, viewerId) : null);
       }
     } catch {
       setContent(null);
+      setFanPost(null);
     } finally {
       setLoading(false);
     }
@@ -241,7 +300,9 @@ export default function ContentDetailScreen() {
             tagged={content.tagged}
           />
 
-          {content.displayMode === "preview" ? (
+          {contentType === "fan_tribuna" && fanPost ? (
+            <FanContentBody post={fanPost} viewerProfileId={viewerId} />
+          ) : content.displayMode === "preview" ? (
             <>
               {content.excerpt ? (
                 <AppText color="secondary" variant="bodyLg">

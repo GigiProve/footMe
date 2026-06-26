@@ -53,6 +53,12 @@ vi.mock("../../content/content-tag-service", () => ({
   reportTag: vi.fn().mockResolvedValue(undefined),
 }));
 
+// TaggedContentGrid fetches via TanStack Query; this test renders without a
+// QueryClientProvider and is not exercising tagged content, so stub it out.
+vi.mock("../../content/components/TaggedContentGrid", () => ({
+  TaggedContentGrid: () => null,
+}));
+
 import { PublicClubProfileView } from "./PublicClubProfileView";
 
 function render(element: React.ReactElement) {

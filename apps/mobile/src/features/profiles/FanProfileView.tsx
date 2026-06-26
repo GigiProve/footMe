@@ -43,9 +43,12 @@ import { TeamAutocompleteInput } from "./player-sports-section";
 import {
   addFanTribunaComment,
   createFanTribunaFormation,
+  createFanTribunaOpinion,
+  createFanTribunaPhoto,
   createFanTribunaPoll,
   createFanTribunaProposal,
   FAN_TRIBUNA_FORMATIONS,
+  FAN_TRIBUNA_PAGE_SIZE,
   fetchFanTribunaFeed,
   toggleFanTribunaSupport,
   toggleSavedFanTribuna,
@@ -54,9 +57,13 @@ import {
   type FanTribunaKind,
   type FanTribunaComment,
   type FanTribunaLineupPlayer,
+  type FanTribunaMediaType,
   type FanTribunaPost,
   type FanTribunaTaggedPlayer,
 } from "./fan-tribuna-service";
+import { TaggableTargetPicker } from "../content/components/TaggableTargetPicker";
+import { searchTagTargets } from "../content/content-tag-service";
+import { targetKey, type TaggableTarget } from "../content/tag-types";
 import {
   addFanMediaComment,
   createFanMediaPost,
@@ -142,6 +149,54 @@ const emptyFormationDraft: DraftFormationState = {
   title: "",
 };
 
+type DraftOpinionState = {
+  body: string;
+  targets: TaggableTarget[];
+};
+
+const emptyOpinionDraft: DraftOpinionState = {
+  body: "",
+  targets: [],
+};
+
+type DraftPhotoState = {
+  caption: string;
+  isUploading: boolean;
+  mediaType: FanTribunaMediaType | null;
+  mediaUrl: string;
+  targets: TaggableTarget[];
+  thumbnailUrl: string | null;
+};
+
+const emptyPhotoDraft: DraftPhotoState = {
+  caption: "",
+  isUploading: false,
+  mediaType: null,
+  mediaUrl: "",
+  targets: [],
+  thumbnailUrl: null,
+};
+
+type DraftPollOption = {
+  label: string;
+  target: TaggableTarget | null;
+};
+
+const emptyPollOptions: DraftPollOption[] = [
+  { label: "", target: null },
+  { label: "", target: null },
+];
+
+const MAX_FAN_CONTENT_TAGS = 5;
+
+const TRIBUNA_MODAL_TITLES: Record<FanTribunaKind, string> = {
+  formation: "Nuova formazione",
+  opinion: "Nuova opinione",
+  photo: "Nuovo contenuto",
+  poll: "Nuovo sondaggio",
+  proposal: "Nuova proposta",
+};
+
 export function FanProfileView({
   completeProfile,
   mode,
@@ -154,6 +209,8 @@ export function FanProfileView({
   const [tribunaPosts, setTribunaPosts] = useState<FanTribunaPost[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isLoadingTribuna, setIsLoadingTribuna] = useState(true);
+  const [isLoadingMoreTribuna, setIsLoadingMoreTribuna] = useState(false);
+  const [hasMoreTribuna, setHasMoreTribuna] = useState(false);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [tribunaComposerKind, setTribunaComposerKind] =
@@ -220,14 +277,45 @@ export function FanProfileView({
     setIsLoadingTribuna(true);
 
     try {
-      const data = await fetchFanTribunaFeed(profile.id, viewerProfileId);
+      const data = await fetchFanTribunaFeed(profile.id, viewerProfileId, {
+        limit: FAN_TRIBUNA_PAGE_SIZE,
+        offset: 0,
+      });
       setTribunaPosts(data);
+      setHasMoreTribuna(data.length === FAN_TRIBUNA_PAGE_SIZE);
     } catch {
       Alert.alert("Errore", "Impossibile caricare la tribuna.");
     } finally {
       setIsLoadingTribuna(false);
     }
   }, [profile.id, viewerProfileId]);
+
+  const loadMoreTribunaPosts = useCallback(async () => {
+    if (isLoadingMoreTribuna || !hasMoreTribuna) {
+      return;
+    }
+
+    setIsLoadingMoreTribuna(true);
+
+    try {
+      const data = await fetchFanTribunaFeed(profile.id, viewerProfileId, {
+        limit: FAN_TRIBUNA_PAGE_SIZE,
+        offset: tribunaPosts.length,
+      });
+      setTribunaPosts((current) => [...current, ...data]);
+      setHasMoreTribuna(data.length === FAN_TRIBUNA_PAGE_SIZE);
+    } catch {
+      Alert.alert("Errore", "Impossibile caricare altri contenuti.");
+    } finally {
+      setIsLoadingMoreTribuna(false);
+    }
+  }, [
+    hasMoreTribuna,
+    isLoadingMoreTribuna,
+    profile.id,
+    tribunaPosts.length,
+    viewerProfileId,
+  ]);
 
   useEffect(() => {
     void loadPosts();
@@ -743,6 +831,17 @@ export function FanProfileView({
               post={post}
             />
           ))}
+          {hasMoreTribuna ? (
+            <Button
+              accessibilityLabel="Mostra altri contenuti della tribuna"
+              disabled={isLoadingMoreTribuna}
+              label={isLoadingMoreTribuna ? "Caricamento…" : "Mostra altri"}
+              onPress={() => {
+                void loadMoreTribunaPosts();
+              }}
+              variant="secondary"
+            />
+          ) : null}
         </View>
       ) : (
         <View style={styles.emptyState}>
@@ -955,6 +1054,8 @@ export function FanProfileView({
         onClose={() => setTribunaComposerKind(null)}
         onCreated={handleCreatedTribuna}
         profileId={profile.id}
+        publisherName={profile.full_name}
+        userId={viewerProfileId ?? profile.id}
         visible={tribunaComposerKind !== null}
       />
       <FanFavoriteTeamModal
@@ -1254,6 +1355,21 @@ function FanTribunaPostCard({
         />
       ) : null}
 
+      {post.kind === "photo" && post.media_url ? (
+        post.media_type === "video" ? (
+          <Video
+            isMuted
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={false}
+            source={{ uri: post.media_url }}
+            style={styles.tribunaMedia}
+            useNativeControls
+          />
+        ) : (
+          <Image source={{ uri: post.media_url }} style={styles.tribunaMedia} />
+        )
+      ) : null}
+
       <View style={styles.tribunaActions}>
         {hasSupportAction ? (
           <Pressable
@@ -1396,7 +1512,7 @@ function TaggedPlayersRow({
   );
 }
 
-function FootballPitchPreview({
+export function FootballPitchPreview({
   formation,
   players,
 }: {
@@ -1469,9 +1585,18 @@ function FanCreateMenuModal({
     activeTab === "bacheca"
       ? [{ icon: "image-outline" as const, kind: "post" as const, label: "Post" }]
       : [
+          {
+            icon: "chatbubble-ellipses-outline" as const,
+            kind: "opinion" as const,
+            label: "Post opinione",
+          },
           { icon: "stats-chart-outline" as const, kind: "poll" as const, label: "Sondaggio" },
-          { icon: "bulb-outline" as const, kind: "proposal" as const, label: "Proposta" },
           { icon: "football-outline" as const, kind: "formation" as const, label: "Formazione" },
+          {
+            icon: "videocam-outline" as const,
+            kind: "photo" as const,
+            label: "Foto / Video",
+          },
         ];
 
   return (
@@ -1512,16 +1637,22 @@ function FanCreateTribunaModal({
   onClose,
   onCreated,
   profileId,
+  publisherName,
+  userId,
   visible,
 }: {
   kind: FanTribunaKind | null;
   onClose: () => void;
   onCreated: (post: FanTribunaPost) => void;
   profileId: string;
+  publisherName: string | null;
+  userId: string;
   visible: boolean;
 }) {
   const [question, setQuestion] = useState("");
-  const [options, setOptions] = useState(["", ""]);
+  const [pollOptions, setPollOptions] = useState<DraftPollOption[]>(emptyPollOptions);
+  const [opinionDraft, setOpinionDraft] = useState<DraftOpinionState>(emptyOpinionDraft);
+  const [photoDraft, setPhotoDraft] = useState<DraftPhotoState>(emptyPhotoDraft);
   const [proposalDraft, setProposalDraft] = useState<DraftProposalState>(
     emptyProposalDraft,
   );
@@ -1533,12 +1664,48 @@ function FanCreateTribunaModal({
   useEffect(() => {
     if (visible) {
       setQuestion("");
-      setOptions(["", ""]);
+      setPollOptions(emptyPollOptions);
+      setOpinionDraft(emptyOpinionDraft);
+      setPhotoDraft(emptyPhotoDraft);
       setProposalDraft(emptyProposalDraft);
       setFormationDraft(emptyFormationDraft);
       setIsSaving(false);
     }
   }, [visible]);
+
+  async function handlePickPhotoMedia() {
+    setPhotoDraft((current) => ({ ...current, isUploading: true }));
+
+    try {
+      const uploads: UploadedMediaItem[] = await pickAndUploadMedia({
+        folder: "fan-tribuna",
+        mediaTypes: ["images", "videos"],
+        userId,
+      });
+      const upload = uploads[0];
+
+      if (!upload) {
+        setPhotoDraft((current) => ({ ...current, isUploading: false }));
+        return;
+      }
+
+      const mediaType: FanTribunaMediaType = upload.type === "video" ? "video" : "image";
+      setPhotoDraft((current) => ({
+        ...current,
+        isUploading: false,
+        mediaType,
+        mediaUrl: upload.url,
+        thumbnailUrl: mediaType === "image" ? upload.url : null,
+      }));
+    } catch (error) {
+      const message =
+        error instanceof ProfileMediaUploadError
+          ? error.message
+          : "Caricamento media non riuscito.";
+      setPhotoDraft((current) => ({ ...current, isUploading: false }));
+      Alert.alert("Errore", message);
+    }
+  }
 
   async function handleSave() {
     if (!kind) {
@@ -1548,33 +1715,58 @@ function FanCreateTribunaModal({
     setIsSaving(true);
 
     try {
-      const post =
-        kind === "poll"
-          ? await createFanTribunaPoll({
-              options,
-              profileId,
-              question,
-            })
-          : kind === "proposal"
-            ? await createFanTribunaProposal({
-                body: proposalDraft.body,
-                profileId,
-                referenceCategory: proposalDraft.referenceCategory,
-                referenceClubId: proposalDraft.referenceClubId,
-                referenceTeamName: proposalDraft.referenceTeamName,
-                taggedPlayers: proposalDraft.taggedPlayers,
-                title: proposalDraft.title,
-              })
-            : await createFanTribunaFormation({
-                body: formationDraft.body,
-                formation: formationDraft.formation,
-                lineupPlayers: formationDraft.lineupPlayers,
-                profileId,
-                referenceCategory: formationDraft.referenceCategory,
-                referenceClubId: formationDraft.referenceClubId,
-                referenceTeamName: formationDraft.referenceTeamName,
-                title: formationDraft.title,
-              });
+      let post: FanTribunaPost;
+
+      if (kind === "poll") {
+        post = await createFanTribunaPoll({
+          options: pollOptions.map((option) => ({
+            label: option.label,
+            target: option.target,
+          })),
+          profileId,
+          publisherName,
+          question,
+        });
+      } else if (kind === "opinion") {
+        post = await createFanTribunaOpinion({
+          body: opinionDraft.body,
+          profileId,
+          publisherName,
+          targets: opinionDraft.targets,
+        });
+      } else if (kind === "photo") {
+        post = await createFanTribunaPhoto({
+          caption: photoDraft.caption,
+          mediaType: photoDraft.mediaType ?? "image",
+          mediaUrl: photoDraft.mediaUrl,
+          profileId,
+          publisherName,
+          targets: photoDraft.targets,
+          thumbnailUrl: photoDraft.thumbnailUrl,
+        });
+      } else if (kind === "proposal") {
+        post = await createFanTribunaProposal({
+          body: proposalDraft.body,
+          profileId,
+          publisherName,
+          referenceCategory: proposalDraft.referenceCategory,
+          referenceClubId: proposalDraft.referenceClubId,
+          referenceTeamName: proposalDraft.referenceTeamName,
+          taggedPlayers: proposalDraft.taggedPlayers,
+          title: proposalDraft.title,
+        });
+      } else {
+        post = await createFanTribunaFormation({
+          body: formationDraft.body,
+          formation: formationDraft.formation,
+          lineupPlayers: formationDraft.lineupPlayers,
+          profileId,
+          referenceCategory: formationDraft.referenceCategory,
+          referenceClubId: formationDraft.referenceClubId,
+          referenceTeamName: formationDraft.referenceTeamName,
+          title: formationDraft.title,
+        });
+      }
 
       onCreated(post);
     } catch (error) {
@@ -1586,15 +1778,20 @@ function FanCreateTribunaModal({
     }
   }
 
-  const title = kind ? `Nuov${kind === "proposal" ? "a" : "o"} ${getTribunaLabel(kind)}` : "";
+  const title = kind ? TRIBUNA_MODAL_TITLES[kind] : "";
   const canPublish =
     kind === "poll"
-      ? question.trim().length > 0 && options.filter((option) => option.trim()).length >= 2
-      : kind === "proposal"
-        ? proposalDraft.title.trim().length > 0 && proposalDraft.body.trim().length > 0
-        : kind === "formation"
-          ? formationDraft.referenceTeamName.trim().length > 0
-          : false;
+      ? question.trim().length > 0 &&
+        pollOptions.filter((option) => option.label.trim()).length >= 2
+      : kind === "opinion"
+        ? opinionDraft.body.trim().length > 0
+        : kind === "photo"
+          ? photoDraft.mediaUrl.trim().length > 0 && !photoDraft.isUploading
+          : kind === "proposal"
+            ? proposalDraft.title.trim().length > 0 && proposalDraft.body.trim().length > 0
+            : kind === "formation"
+              ? formationDraft.referenceTeamName.trim().length > 0
+              : false;
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
@@ -1639,28 +1836,135 @@ function FanCreateTribunaModal({
                 placeholder="Confermeresti l'allenatore?"
                 value={question}
               />
-              {options.map((option, index) => (
-                <Input
-                  key={`poll-option-${index}`}
-                  label={`Opzione ${index + 1}`}
-                  onChangeText={(value) =>
-                    setOptions((current) =>
-                      current.map((entry, entryIndex) =>
-                        entryIndex === index ? value : entry,
-                      ),
-                    )
-                  }
-                  placeholder={index === 0 ? "Si" : index === 1 ? "No" : "Altra opzione"}
-                  value={option}
-                />
+              {pollOptions.map((option, index) => (
+                <View key={`poll-option-${index}`} style={styles.pollOptionEditor}>
+                  <Input
+                    label={`Opzione ${index + 1}`}
+                    onChangeText={(value) =>
+                      setPollOptions((current) =>
+                        current.map((entry, entryIndex) =>
+                          entryIndex === index ? { ...entry, label: value } : entry,
+                        ),
+                      )
+                    }
+                    placeholder={index === 0 ? "Si" : index === 1 ? "No" : "Altra opzione"}
+                    value={option.label}
+                  />
+                  <PollOptionProfileLink
+                    onChange={(target) =>
+                      setPollOptions((current) =>
+                        current.map((entry, entryIndex) =>
+                          entryIndex === index ? { ...entry, target } : entry,
+                        ),
+                      )
+                    }
+                    value={option.target}
+                  />
+                </View>
               ))}
-              {options.length < 6 ? (
+              {pollOptions.length < 6 ? (
                 <Button
                   label="Aggiungi opzione"
-                  onPress={() => setOptions((current) => [...current, ""])}
+                  onPress={() =>
+                    setPollOptions((current) => [...current, { label: "", target: null }])
+                  }
                   variant="outline"
                 />
               ) : null}
+              <AppText color="secondary" variant="caption">
+                I profili collegati alle opzioni vengono taggati nel contenuto.
+              </AppText>
+            </>
+          ) : kind === "opinion" ? (
+            <>
+              <Input
+                helperText={`${opinionDraft.body.length}/${TRIBUNA_TEXT_LIMIT}`}
+                label="La tua opinione"
+                maxLength={TRIBUNA_TEXT_LIMIT}
+                multiline
+                onChangeText={(value) =>
+                  setOpinionDraft((current) => ({ ...current, body: value }))
+                }
+                placeholder="Secondo me servirebbe un attaccante rapido per completare la rosa..."
+                value={opinionDraft.body}
+              />
+              <TaggableTargetPicker
+                label="Tagga profili (opzionale)"
+                max={MAX_FAN_CONTENT_TAGS}
+                onChange={(targets) =>
+                  setOpinionDraft((current) => ({ ...current, targets }))
+                }
+                value={opinionDraft.targets}
+              />
+            </>
+          ) : kind === "photo" ? (
+            <>
+              <Pressable
+                accessibilityLabel="Scegli foto o video"
+                accessibilityRole="button"
+                disabled={photoDraft.isUploading}
+                onPress={() => {
+                  void handlePickPhotoMedia();
+                }}
+                style={({ pressed }) => [
+                  styles.createMedia,
+                  pressed ? styles.pressed : null,
+                ]}
+              >
+                {photoDraft.mediaUrl && photoDraft.mediaType === "image" ? (
+                  <Image source={{ uri: photoDraft.mediaUrl }} style={styles.createMediaImage} />
+                ) : photoDraft.mediaUrl ? (
+                  <View style={styles.createVideoPreview}>
+                    <Video
+                      isMuted
+                      resizeMode={ResizeMode.COVER}
+                      shouldPlay={false}
+                      source={{ uri: photoDraft.mediaUrl }}
+                      style={styles.createMediaImage}
+                      useNativeControls={false}
+                    />
+                    <View style={styles.createVideoOverlay}>
+                      <Ionicons color={colors.inkInvert} name="play" size={26} />
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.createPlaceholder}>
+                    {photoDraft.isUploading ? (
+                      <ActivityIndicator color={colors.accent} />
+                    ) : (
+                      <>
+                        <Ionicons color={colors.accent} name="image-outline" size={32} />
+                        <AppText
+                          color="accent"
+                          style={styles.createPlaceholderText}
+                          variant="bodySm"
+                        >
+                          Scegli foto o video
+                        </AppText>
+                      </>
+                    )}
+                  </View>
+                )}
+              </Pressable>
+              <Input
+                helperText={`${photoDraft.caption.length}/${TRIBUNA_TEXT_LIMIT}`}
+                label="Didascalia (opzionale)"
+                maxLength={TRIBUNA_TEXT_LIMIT}
+                multiline
+                onChangeText={(value) =>
+                  setPhotoDraft((current) => ({ ...current, caption: value }))
+                }
+                placeholder="Aggiungi una didascalia..."
+                value={photoDraft.caption}
+              />
+              <TaggableTargetPicker
+                label="Tagga profili (opzionale)"
+                max={MAX_FAN_CONTENT_TAGS}
+                onChange={(targets) =>
+                  setPhotoDraft((current) => ({ ...current, targets }))
+                }
+                value={photoDraft.targets}
+              />
             </>
           ) : kind === "proposal" ? (
             <>
@@ -1798,6 +2102,127 @@ function FanCreateTribunaModal({
         </ScrollView>
       </SafeAreaView>
     </Modal>
+  );
+}
+
+function PollOptionProfileLink({
+  onChange,
+  value,
+}: {
+  onChange: (target: TaggableTarget | null) => void;
+  value: TaggableTarget | null;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<TaggableTarget[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    let isMounted = true;
+    const timeout = setTimeout(() => {
+      async function loadSuggestions() {
+        if (query.trim().length < 2) {
+          setSuggestions([]);
+          return;
+        }
+
+        try {
+          const results = await searchTagTargets(query.trim());
+          if (isMounted) {
+            setSuggestions(results);
+          }
+        } catch {
+          if (isMounted) {
+            setSuggestions([]);
+          }
+        }
+      }
+
+      void loadSuggestions();
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, [isOpen, query]);
+
+  if (value) {
+    return (
+      <View style={styles.pollOptionLinkChip}>
+        <Avatar
+          name={value.display_name}
+          size="sm"
+          square={value.target_type !== "profile"}
+          uri={value.avatar_url}
+        />
+        <AppText numberOfLines={1} style={styles.pollOptionLinkName} variant="caption">
+          {value.display_name}
+        </AppText>
+        <Pressable
+          accessibilityLabel={`Rimuovi collegamento ${value.display_name}`}
+          hitSlop={8}
+          onPress={() => onChange(null)}
+        >
+          <Ionicons color={colors.accent} name="close" size={16} />
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!isOpen) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => setIsOpen(true)}
+        style={styles.pollOptionLinkButton}
+      >
+        <Ionicons color={colors.accent} name="link-outline" size={14} />
+        <AppText color="accent" variant="caption">
+          Collega profilo
+        </AppText>
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={styles.pollOptionLinkSearch}>
+      <Input
+        onChangeText={setQuery}
+        placeholder="Cerca un profilo da collegare"
+        value={query}
+      />
+      {suggestions.length > 0 ? (
+        <View style={styles.pollOptionSuggestions}>
+          {suggestions.map((suggestion) => (
+            <Pressable
+              accessibilityRole="button"
+              key={targetKey(suggestion)}
+              onPress={() => {
+                onChange(suggestion);
+                setIsOpen(false);
+                setQuery("");
+                setSuggestions([]);
+              }}
+              style={styles.pollOptionSuggestionRow}
+            >
+              <Avatar
+                name={suggestion.display_name}
+                size="sm"
+                square={suggestion.target_type !== "profile"}
+                uri={suggestion.avatar_url}
+              />
+              <AppText numberOfLines={1} variant="bodySm">
+                {suggestion.display_name}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -2189,6 +2614,10 @@ function getTribunaLabel(kind: FanTribunaKind) {
       return "Formazione";
     case "proposal":
       return "Proposta";
+    case "opinion":
+      return "Opinione";
+    case "photo":
+      return "Foto / Video";
     case "poll":
     default:
       return "Sondaggio";
@@ -2201,6 +2630,10 @@ function getTribunaIcon(kind: FanTribunaKind): keyof typeof Ionicons.glyphMap {
       return "football-outline";
     case "proposal":
       return "bulb-outline";
+    case "opinion":
+      return "chatbubble-ellipses-outline";
+    case "photo":
+      return "videocam-outline";
     case "poll":
     default:
       return "stats-chart-outline";
@@ -2710,6 +3143,54 @@ const styles = StyleSheet.create({
   createForm: {
     gap: spacing[20],
     padding: spacing[16],
+  },
+  pollOptionEditor: {
+    gap: spacing[8],
+  },
+  pollOptionLinkButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    gap: spacing[6],
+    paddingVertical: spacing[4],
+  },
+  pollOptionLinkChip: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.full,
+    flexDirection: "row",
+    gap: spacing[6],
+    paddingHorizontal: spacing[8],
+    paddingVertical: spacing[6],
+  },
+  pollOptionLinkName: {
+    maxWidth: 160,
+  },
+  pollOptionLinkSearch: {
+    gap: spacing[8],
+  },
+  pollOptionSuggestionRow: {
+    alignItems: "center",
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: spacing[12],
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[10],
+  },
+  pollOptionSuggestions: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius[12],
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  tribunaMedia: {
+    aspectRatio: 1,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius[12],
+    width: "100%",
   },
   createMedia: {
     aspectRatio: 1,

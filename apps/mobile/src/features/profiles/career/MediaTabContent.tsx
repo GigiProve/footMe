@@ -45,6 +45,9 @@ type MediaComment = {
 export type MediaContentItem = {
   commentCount: number;
   comments: MediaComment[];
+  /** Icon shown on a generated cover when the item has no thumbnail image
+   *  (e.g. a tagged poll/formation/opinion). */
+  coverIcon?: ComponentProps<typeof Ionicons>["name"];
   description: string;
   id: string;
   isFeatured: boolean;
@@ -278,7 +281,17 @@ export function MediaTabContent({
                 ]}
                 testID={`media-grid-item-${item.id}`}
               >
-                <Image source={{ uri: item.thumbnailUrl }} style={styles.gridImage} />
+                {item.thumbnailUrl ? (
+                  <Image source={{ uri: item.thumbnailUrl }} style={styles.gridImage} />
+                ) : (
+                  <View style={styles.gridPlaceholder}>
+                    <Ionicons
+                      color={colors.accent}
+                      name={item.coverIcon ?? "pricetag-outline"}
+                      size={26}
+                    />
+                  </View>
+                )}
                 <View style={styles.gridShade} />
                 {item.tag ? (
                   <View style={styles.tagBadge}>
@@ -603,6 +616,12 @@ const styles = StyleSheet.create({
   },
   gridItemDisabled: {
     opacity: 0.72,
+  },
+  gridPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    justifyContent: "center",
   },
   gridShade: {
     ...StyleSheet.absoluteFillObject,
