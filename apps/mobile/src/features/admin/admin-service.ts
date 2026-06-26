@@ -283,6 +283,54 @@ export async function fetchReportedTags(): Promise<ReportedTag[]> {
   return (data ?? []) as ReportedTag[];
 }
 
+/** Admin: reported representation rows awaiting moderation. */
+export type ReportedRepresentation = {
+  agent_avatar_url: string | null;
+  agent_name: string;
+  agent_profile_id: string;
+  created_at: string;
+  id: string;
+  player_avatar_url: string | null;
+  player_name: string;
+  player_profile_id: string;
+  relationship_type: string;
+  reported_at: string | null;
+  reported_reason: string | null;
+};
+
+/** Admin: fetch all representation rows with status='reported'. */
+export async function fetchReportedRepresentations(): Promise<
+  ReportedRepresentation[]
+> {
+  const { data, error } = await supabase.rpc(
+    "fetch_reported_representations",
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as ReportedRepresentation[];
+}
+
+/**
+ * Admin: dismiss a reported representation (remove=false → restore to accepted)
+ * or remove it (remove=true → status='terminated').
+ */
+export async function moderateReportedRepresentation(input: {
+  id: string;
+  remove: boolean;
+}): Promise<void> {
+  const { error } = await supabase.rpc("moderate_representation", {
+    p_id: input.id,
+    p_remove: input.remove,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 /** Admin: dismiss a report (keep the tag) or remove the tag (hide it). */
 export async function moderateReportedTag(input: {
   contentType: ReportedContentType;

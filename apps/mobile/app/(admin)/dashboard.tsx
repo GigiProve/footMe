@@ -4,9 +4,12 @@ import { Stack, useFocusEffect, useRouter } from "expo-router";
 
 import {
   fetchPendingClubs,
+  fetchReportedRepresentations,
   fetchReportedTags,
+  moderateReportedRepresentation,
   moderateReportedTag,
   type AdminClubEntry,
+  type ReportedRepresentation,
   type ReportedTag,
 } from "../../src/features/admin/admin-service";
 import { logout } from "../../src/features/auth/logout";
@@ -26,7 +29,9 @@ export default function AdminDashboardScreen() {
   const { profile, session } = useSession();
   const [clubs, setClubs] = useState<AdminClubEntry[]>([]);
   const [reportedTags, setReportedTags] = useState<ReportedTag[]>([]);
+  const [reportedRepresentations, setReportedRepresentations] = useState<ReportedRepresentation[]>([]);
   const [moderatingKey, setModeratingKey] = useState<string | null>(null);
+  const [moderatingRepKey, setModeratingRepKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -34,12 +39,14 @@ export default function AdminDashboardScreen() {
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [clubsData, tagsData] = await Promise.all([
+      const [clubsData, tagsData, repsData] = await Promise.all([
         fetchPendingClubs(),
         fetchReportedTags().catch(() => [] as ReportedTag[]),
+        fetchReportedRepresentations().catch(() => [] as ReportedRepresentation[]),
       ]);
       setClubs(clubsData);
       setReportedTags(tagsData);
+      setReportedRepresentations(repsData);
     } catch {
       setError("Impossibile caricare le richieste di iscrizione.");
     } finally {
@@ -67,6 +74,25 @@ export default function AdminDashboardScreen() {
       Alert.alert("Operazione non riuscita", message);
     } finally {
       setModeratingKey(null);
+    }
+  }
+
+  async function handleModerateRepresentation(
+    rep: ReportedRepresentation,
+    remove: boolean,
+  ) {
+    try {
+      setModeratingRepKey(rep.id);
+      await moderateReportedRepresentation({ id: rep.id, remove });
+      await loadData();
+    } catch (moderationError) {
+      const message =
+        moderationError instanceof Error
+          ? moderationError.message
+          : "Operazione non riuscita.";
+      Alert.alert("Operazione non riuscita", message);
+    } finally {
+      setModeratingRepKey(null);
     }
   }
 
@@ -148,6 +174,47 @@ export default function AdminDashboardScreen() {
               </View>
             );
           })}
+        </View>
+      ) : null}
+
+      {reportedRepresentations.length > 0 ? (
+        <View style={styles.moderationSection}>
+          <View style={styles.moderationHeader}>
+            <AppText variant="titleSm">Rapporti segnalati</AppText>
+            <Badge
+              label={reportedRepresentations.length.toString()}
+              variant="error"
+            />
+          </View>
+          {reportedRepresentations.map((rep) => (
+            <View key={rep.id} style={styles.moderationRow}>
+              <View style={styles.moderationInfo}>
+                <AppText variant="bodySm">
+                  {rep.agent_name} → {rep.player_name}
+                </AppText>
+                <AppText color="secondary" variant="caption">
+                  {rep.relationship_type}
+                  {rep.reported_reason ? ` • ${rep.reported_reason}` : ""}
+                </AppText>
+              </View>
+              <View style={styles.moderationActions}>
+                <Button
+                  disabled={moderatingRepKey === rep.id}
+                  label="Mantieni"
+                  onPress={() => handleModerateRepresentation(rep, false)}
+                  size="sm"
+                  variant="outline"
+                />
+                <Button
+                  disabled={moderatingRepKey === rep.id}
+                  label="Rimuovi"
+                  onPress={() => handleModerateRepresentation(rep, true)}
+                  size="sm"
+                  variant="danger"
+                />
+              </View>
+            </View>
+          ))}
         </View>
       ) : null}
 

@@ -24,6 +24,10 @@ function iconForType(
   type: string,
 ): keyof typeof Ionicons.glyphMap {
   if (type === "content_tag") return "pricetag-outline";
+  if (type === "agent_representation_request") return "person-add-outline";
+  if (type === "agent_representation_responded") return "people-outline";
+  if (type === "agent_representation_visibility_proposed") return "eye-outline";
+  if (type === "agent_representation_removed") return "person-remove-outline";
   return "notifications-outline";
 }
 
@@ -95,7 +99,23 @@ export function NotificationCenterScreen() {
           params: { type: contentType, id: postId },
         });
       }
+    } else if (item.type === "agent_representation_request") {
+      const representationId = item.data?.representation_id;
+      if (representationId) {
+        router.push(`/representation/${representationId}` as never);
+      }
+    } else if (item.type === "agent_representation_responded") {
+      const representationId = item.data?.representation_id;
+      if (representationId) {
+        router.push(`/representation/assistito/${representationId}` as never);
+      }
+    } else if (item.type === "agent_representation_visibility_proposed") {
+      const representationId = item.data?.representation_id;
+      if (representationId) {
+        router.push(`/representation/manage/${representationId}` as never);
+      }
     }
+    // agent_representation_removed: mark read only, no navigation
   }
 
   if (isLoading) {

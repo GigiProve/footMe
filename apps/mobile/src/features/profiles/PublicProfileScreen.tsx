@@ -46,11 +46,12 @@ import {
 } from "../networking/networking-service";
 import {
   fetchPlayerAgent,
+  fetchPlayerRepresentations,
   fetchRepresentationState,
-  requestRepresentation,
   respondRepresentation,
   type AgentRepresentation,
 } from "../relationships/agent-representation-service";
+import { RepresentationSection } from "../relationships/RepresentationSection";
 import { colors, spacing } from "../../theme/tokens";
 import { AppText, Button } from "../../ui";
 
@@ -76,6 +77,9 @@ export function PublicProfileScreen() {
     agent_full_name: string | null;
     agent_profile_id: string;
   } | null>(null);
+  const [playerRepresentations, setPlayerRepresentations] = useState<
+    Awaited<ReturnType<typeof fetchPlayerRepresentations>>
+  >([]);
   const [isRepresentationLoading, setIsRepresentationLoading] = useState(false);
 
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -138,6 +142,7 @@ export function PublicProfileScreen() {
     if (!completeProfile || !currentUserId) {
       setRepresentationState(null);
       setPlayerAgent(null);
+      setPlayerRepresentations([]);
       return;
     }
 
@@ -173,19 +178,28 @@ export function PublicProfileScreen() {
       return;
     }
 
-    // Any viewer looking at a player profile — surface accepted public agent
+    // Any viewer looking at a player profile — surface accepted representations
     if (viewedRole === "player") {
       try {
-        const agent = await fetchPlayerAgent(viewedProfileId);
+        setIsRepresentationLoading(true);
+        const [agent, reps] = await Promise.all([
+          fetchPlayerAgent(viewedProfileId),
+          fetchPlayerRepresentations(viewedProfileId),
+        ]);
         setPlayerAgent(agent);
+        setPlayerRepresentations(reps);
       } catch {
         setPlayerAgent(null);
+        setPlayerRepresentations([]);
+      } finally {
+        setIsRepresentationLoading(false);
       }
       return;
     }
 
     setRepresentationState(null);
     setPlayerAgent(null);
+    setPlayerRepresentations([]);
   }, [completeProfile, currentUserId, viewerRole]);
 
   useEffect(() => {
@@ -234,20 +248,16 @@ export function PublicProfileScreen() {
     }
   }
 
-  async function handleRequestRepresentation() {
-    if (!profileId) return;
-    try {
-      setIsRepresentationLoading(true);
-      await requestRepresentation(profileId);
-      // Reload state to reflect "pending"
-      await loadRepresentationData();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Impossibile inviare la richiesta.";
-      Alert.alert("Errore", message);
-    } finally {
-      setIsRepresentationLoading(false);
-    }
+  function handleRequestRepresentation() {
+    if (!profileId || !completeProfile) return;
+    const p = completeProfile.profile;
+    router.push({
+      pathname: "/representation/request",
+      params: {
+        playerId: profileId,
+        name: p.full_name ?? "",
+      },
+    });
   }
 
   async function handleRespondRepresentation(accept: boolean) {
@@ -372,6 +382,7 @@ export function PublicProfileScreen() {
               onRequestRepresentation={handleRequestRepresentation}
               onRespondRepresentation={handleRespondRepresentation}
               playerAgent={playerAgent}
+              playerRepresentations={playerRepresentations}
               representationState={representationState}
               viewerProfileId={currentUserId}
               viewerRole={viewerRole}
@@ -519,6 +530,7 @@ function ProfileContentBlock({
   onRequestRepresentation,
   onRespondRepresentation,
   playerAgent,
+  playerRepresentations,
   representationState,
   viewerProfileId,
   viewerRole,
@@ -535,6 +547,7 @@ function ProfileContentBlock({
   onRequestRepresentation?: () => void;
   onRespondRepresentation?: (accept: boolean) => void;
   playerAgent?: { agent_full_name: string | null; agent_profile_id: string } | null;
+  playerRepresentations?: Awaited<ReturnType<typeof fetchPlayerRepresentations>>;
   representationState?: AgentRepresentation | null;
   viewerProfileId?: string | null;
   viewerRole?: AppRole | null;
@@ -611,8 +624,15 @@ function ProfileContentBlock({
           </View>
         ) : null}
 
-        {/* Accepted public agent row */}
-        {playerAgent ? (
+        {/* Rappresentanza section */}
+        {(playerRepresentations?.length ?? 0) > 0 ? (
+          <View style={styles.representationSection}>
+            <RepresentationSection
+              isOwner={false}
+              representations={playerRepresentations ?? []}
+            />
+          </View>
+        ) : playerAgent ? (
           <Pressable
             accessibilityLabel={`Apri profilo agente ${playerAgent.agent_full_name ?? ""}`}
             accessibilityRole="button"
@@ -758,6 +778,10 @@ function getProfileViewerTitle(role: AppRole) {
 }
 
 const styles = StyleSheet.create({
+  representationSection: {
+    paddingHorizontal: spacing[20],
+    paddingVertical: spacing[12],
+  },
   agentRow: {
     alignItems: "center",
     backgroundColor: colors.surface,
