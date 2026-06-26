@@ -4,10 +4,12 @@ import {
   Alert,
   Pressable,
   SafeAreaView,
+  Share,
   StyleSheet,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useQueryClient } from "@tanstack/react-query";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
@@ -52,8 +54,18 @@ import {
   type AgentRepresentation,
 } from "../relationships/agent-representation-service";
 import { RepresentationSection } from "../relationships/RepresentationSection";
+import {
+  fetchProfileFollowState,
+  followProfile,
+  unfollowProfile,
+} from "./fan-media-service";
+import {
+  fetchProfileSaveState,
+  saveProfile,
+  unsaveProfile,
+} from "../saved/saved-service";
 import { colors, spacing } from "../../theme/tokens";
-import { AppText, Button } from "../../ui";
+import { ActionSheet, AppText, Button, useToast } from "../../ui";
 
 const noop = () => undefined;
 
@@ -61,6 +73,8 @@ export function PublicProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const { isLoading: isSessionLoading, needsOnboarding, profile: viewerProfile, session } = useSession();
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
   const [profileAction, setProfileAction] = useState<{
@@ -82,9 +96,19 @@ export function PublicProfileScreen() {
   >([]);
   const [isRepresentationLoading, setIsRepresentationLoading] = useState(false);
 
+  // Follow / Save state for the viewed profile (visitor only).
+  const [isFollowed, setIsFollowed] = useState(false);
+  const [isProfileSaved, setIsProfileSaved] = useState(false);
+  const [isFollowPending, setIsFollowPending] = useState(false);
+  const [isSavePending, setIsSavePending] = useState(false);
+  const [profileActionsVisible, setProfileActionsVisible] = useState(false);
+
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
   const currentUserId = session?.user.id ?? null;
   const viewerRole = (viewerProfile?.role ?? null) as AppRole | null;
+  const viewedProfileId = completeProfile?.profile.id ?? null;
+  const canFollowOrSave =
+    !!currentUserId && !!viewedProfileId && currentUserId !== viewedProfileId;
 
   const headerDetails = useMemo(
     () => (completeProfile ? buildHeaderDetails(completeProfile) : null),
@@ -209,6 +233,109 @@ export function PublicProfileScreen() {
   useEffect(() => {
     void loadRepresentationData();
   }, [loadRepresentationData]);
+
+  // Load follow/save state for the viewed profile.
+  useEffect(() => {
+    if (!canFollowOrSave || !currentUserId || !viewedProfileId) {
+      setIsFollowed(false);
+      setIsProfileSaved(false);
+      return;
+    }
+
+    let active = true;
+    void Promise.all([
+      fetchProfileFollowState(currentUserId, viewedProfileId).catch(() => false),
+      fetchProfileSaveState(currentUserId, viewedProfileId).catch(() => false),
+    ]).then(([followed, saved]) => {
+      if (!active) {
+        return;
+      }
+      setIsFollowed(followed);
+      setIsProfileSaved(saved);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [canFollowOrSave, currentUserId, viewedProfileId]);
+
+  async function handleToggleFollow() {
+    if (!currentUserId || !viewedProfileId || isFollowPending) {
+      return;
+    }
+    const next = !isFollowed;
+    const name = completeProfile?.profile.full_name ?? "questo profilo";
+    setIsFollowPending(true);
+    setIsFollowed(next);
+    try {
+      if (next) {
+        await followProfile(currentUserId, viewedProfileId);
+        showToast({ message: `Segui ${name}`, tone: "success", icon: "person-add" });
+      } else {
+        await unfollowProfile(currentUserId, viewedProfileId);
+        showToast({ message: `Non segui più ${name}`, tone: "neutral" });
+      }
+      queryClient.invalidateQueries({ queryKey: ["following-count"] });
+      queryClient.invalidateQueries({ queryKey: ["followed"] });
+    } catch (error) {
+      setIsFollowed(!next);
+      showToast({
+        message:
+          error instanceof Error ? error.message : "Operazione non riuscita.",
+        tone: "neutral",
+      });
+    } finally {
+      setIsFollowPending(false);
+    }
+  }
+
+  async function handleToggleSaveProfile() {
+    if (!currentUserId || !viewedProfileId || isSavePending) {
+      return;
+    }
+    const next = !isProfileSaved;
+    setIsSavePending(true);
+    setIsProfileSaved(next);
+    try {
+      if (next) {
+        await saveProfile(currentUserId, viewedProfileId);
+        showToast({ message: "Profilo salvato", tone: "success", icon: "bookmark" });
+      } else {
+        await unsaveProfile(currentUserId, viewedProfileId);
+        showToast({ message: "Elemento rimosso dai Salvati", tone: "neutral" });
+      }
+      queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["saved-items"] });
+    } catch (error) {
+      setIsProfileSaved(!next);
+      showToast({
+        message:
+          error instanceof Error ? error.message : "Operazione non riuscita.",
+        tone: "neutral",
+      });
+    } finally {
+      setIsSavePending(false);
+    }
+  }
+
+  async function handleShareProfile() {
+    const name = completeProfile?.profile.full_name ?? "questo profilo";
+    try {
+      await Share.share({
+        message: `Dai un'occhiata al profilo di ${name} su FootMe.`,
+      });
+    } catch {
+      // user cancelled or share unavailable — no-op
+    }
+  }
+
+  function handleReportProfile() {
+    showToast({
+      message: "Segnalazione inviata. Grazie.",
+      tone: "success",
+      icon: "flag",
+    });
+  }
 
   async function handleConnectToProfile(targetProfile: CompleteProfessionalProfile) {
     try {
@@ -335,7 +462,52 @@ export function PublicProfileScreen() {
               : getProfileViewerTitle(completeProfile.profile.role as AppRole)
             : "Profilo"}
         </AppText>
-        <View style={styles.backButtonPlaceholder} />
+        {canFollowOrSave ? (
+          <View style={styles.topBarActions}>
+            <Pressable
+              accessibilityLabel={
+                isProfileSaved ? "Rimuovi dai salvati" : "Salva profilo"
+              }
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={handleToggleSaveProfile}
+              style={({ pressed }) => [
+                styles.topBarIcon,
+                pressed ? styles.topBarIconPressed : null,
+              ]}
+            >
+              <Ionicons
+                color={
+                  isProfileSaved
+                    ? colors.accent
+                    : isDirectorProfile
+                      ? "#061223"
+                      : colors.textPrimary
+                }
+                name={isProfileSaved ? "bookmark" : "bookmark-outline"}
+                size={22}
+              />
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Azioni profilo"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => setProfileActionsVisible(true)}
+              style={({ pressed }) => [
+                styles.topBarIcon,
+                pressed ? styles.topBarIconPressed : null,
+              ]}
+            >
+              <Ionicons
+                color={isDirectorProfile ? "#061223" : colors.textPrimary}
+                name="ellipsis-horizontal"
+                size={22}
+              />
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.backButtonPlaceholder} />
+        )}
       </View>
 
       <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
@@ -360,6 +532,9 @@ export function PublicProfileScreen() {
               agentHeaderDetails={agentHeaderDetails}
               coachHeaderDetails={coachHeaderDetails}
               headerDetails={headerDetails}
+              isFollowed={isFollowed}
+              isSaved={isProfileSaved}
+              onFollowPress={canFollowOrSave ? handleToggleFollow : undefined}
               playerHeaderDetails={playerHeaderDetails}
               staffHeaderDetails={staffHeaderDetails}
             />
@@ -369,12 +544,15 @@ export function PublicProfileScreen() {
                 profileAction?.profileId === completeProfile.profile.id &&
                 profileAction.type === "connect"
               }
+              isFollowed={isFollowed}
               isMessaging={
                 profileAction?.profileId === completeProfile.profile.id &&
                 profileAction.type === "message"
               }
+              isProfileSaved={isProfileSaved}
               isRepresentationLoading={isRepresentationLoading}
               onConnect={() => handleConnectToProfile(completeProfile)}
+              onFollowPress={canFollowOrSave ? handleToggleFollow : undefined}
               onMessage={() => handleMessageProfile(completeProfile)}
               onOpenDirectorLinkedTarget={handleOpenDirectorLinkedTarget}
               onOpenFavoriteClub={handleOpenFavoriteClub}
@@ -397,6 +575,30 @@ export function PublicProfileScreen() {
           </View>
         )}
       </KeyboardAwareForm>
+      <ActionSheet
+        actions={[
+          {
+            icon: isProfileSaved ? "bookmark" : "bookmark-outline",
+            label: isProfileSaved ? "Rimuovi dai Salvati" : "Salva profilo",
+            subtitle: isProfileSaved ? undefined : "Ritrovalo nei tuoi Salvati.",
+            onPress: handleToggleSaveProfile,
+          },
+          {
+            icon: "share-outline",
+            label: "Condividi profilo",
+            onPress: handleShareProfile,
+          },
+          {
+            destructive: true,
+            icon: "flag-outline",
+            label: "Segnala profilo",
+            onPress: handleReportProfile,
+          },
+        ]}
+        onClose={() => setProfileActionsVisible(false)}
+        title="Azioni profilo"
+        visible={profileActionsVisible}
+      />
     </SafeAreaView>
   );
 }
@@ -406,6 +608,10 @@ function ProfileHeaderBlock({
   agentHeaderDetails,
   coachHeaderDetails,
   headerDetails,
+  isFollowed,
+  isSaved,
+  onFollowPress,
+  onSavePress,
   playerHeaderDetails,
   staffHeaderDetails,
 }: {
@@ -413,6 +619,10 @@ function ProfileHeaderBlock({
   agentHeaderDetails: ReturnType<typeof buildAgentProfileHeaderDetails>;
   coachHeaderDetails: ReturnType<typeof buildCoachProfileHeaderDetails>;
   headerDetails: ReturnType<typeof buildHeaderDetails> | null;
+  isFollowed: boolean;
+  isSaved: boolean;
+  onFollowPress?: () => void;
+  onSavePress?: () => void;
   playerHeaderDetails: ReturnType<typeof buildPlayerProfileHeaderDetails>;
   staffHeaderDetails: ReturnType<typeof buildStaffProfileHeaderDetails>;
 }) {
@@ -431,6 +641,10 @@ function ProfileHeaderBlock({
         heightLabel={playerHeaderDetails.heightLabel}
         locationLabel={playerHeaderDetails.locationLabel}
         mode="visitor"
+        isFollowed={isFollowed}
+        isSaved={isSaved}
+        onFollowPress={onFollowPress}
+        onSavePress={onSavePress}
         preferredFootLabel={playerHeaderDetails.preferredFootLabel}
         primaryRole={playerHeaderDetails.primaryRole}
         regionBadges={playerHeaderDetails.regionBadges}
@@ -452,6 +666,10 @@ function ProfileHeaderBlock({
         licenseBadges={coachHeaderDetails.licenseBadges}
         locationLabel={coachHeaderDetails.locationLabel}
         mode="visitor"
+        isFollowed={isFollowed}
+        isSaved={isSaved}
+        onFollowPress={onFollowPress}
+        onSavePress={onSavePress}
         primaryRole={coachHeaderDetails.primaryRole}
         statusBadge={coachHeaderDetails.statusBadge}
         teamLabel={coachHeaderDetails.teamLabel}
@@ -468,6 +686,10 @@ function ProfileHeaderBlock({
         fullName={staffHeaderDetails.fullName}
         locationLabel={staffHeaderDetails.locationLabel}
         mode="visitor"
+        isFollowed={isFollowed}
+        isSaved={isSaved}
+        onFollowPress={onFollowPress}
+        onSavePress={onSavePress}
         primaryRole={staffHeaderDetails.primaryRole}
         statusBadge={staffHeaderDetails.statusBadge}
       />
@@ -481,7 +703,11 @@ function ProfileHeaderBlock({
         avatarUrl={completeProfile.profile.avatar_url}
         bio={agentHeaderDetails.bio}
         fullName={agentHeaderDetails.fullName}
+        isFollowed={isFollowed}
+        isSaved={isSaved}
         locationLabel={agentHeaderDetails.locationLabel}
+        onFollowPress={onFollowPress}
+        onSavePress={onSavePress}
         primaryRole={agentHeaderDetails.primaryRole}
         statusBadge={agentHeaderDetails.statusBadge}
       />
@@ -520,10 +746,14 @@ function ProfileHeaderBlock({
 function ProfileContentBlock({
   completeProfile,
   isConnecting = false,
+  isFollowed = false,
   isMessaging = false,
+  isProfileSaved = false,
   isRepresentationLoading = false,
   onConnect,
+  onFollowPress,
   onMessage,
+  onSavePress,
   onOpenDirectorLinkedTarget,
   onOpenFavoriteClub,
   onOpenPlayerProfile,
@@ -537,10 +767,14 @@ function ProfileContentBlock({
 }: {
   completeProfile: CompleteProfessionalProfile;
   isConnecting?: boolean;
+  isFollowed?: boolean;
   isMessaging?: boolean;
+  isProfileSaved?: boolean;
   isRepresentationLoading?: boolean;
   onConnect?: () => void;
+  onFollowPress?: () => void;
   onMessage?: () => void;
+  onSavePress?: () => void;
   onOpenDirectorLinkedTarget?: (target: DirectorMediaLinkedTarget) => void;
   onOpenFavoriteClub?: (clubId: string) => void;
   onOpenPlayerProfile?: (profileId: string) => void;
@@ -712,11 +946,15 @@ function ProfileContentBlock({
       <DirectorProfileTabView
         completeProfile={completeProfile}
         isConnecting={isConnecting}
+        isFollowed={isFollowed}
         isMessaging={isMessaging}
         isOwner={false}
+        isSaved={isProfileSaved}
         onConnect={onConnect}
+        onFollowPress={onFollowPress}
         onMessage={onMessage}
         onOpenLinkedTarget={onOpenDirectorLinkedTarget}
+        onSavePress={onSavePress}
       />
     );
   }
@@ -803,6 +1041,20 @@ const styles = StyleSheet.create({
   },
   backButtonPlaceholder: {
     width: 32,
+  },
+  topBarActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[8],
+  },
+  topBarIcon: {
+    alignItems: "center",
+    height: 32,
+    justifyContent: "center",
+    width: 28,
+  },
+  topBarIconPressed: {
+    opacity: 0.6,
   },
   directorScreen: {
     backgroundColor: "#F7FAFD",

@@ -28,6 +28,7 @@ type PublicClubProfileViewProps = {
   isFollowed: boolean;
   isFollowing: boolean;
   isOwner?: boolean;
+  isSaved?: boolean;
   members: PublicClubMember[];
   onContactPress: () => void;
   onEditAffiliations?: () => void;
@@ -40,6 +41,7 @@ type PublicClubProfileViewProps = {
   onOpenTeam: (teamId: string) => void;
   onTabChange: (tab: ClubHeaderTab) => void;
   onToggleFollow: () => void;
+  onToggleSave?: () => void;
   overview: PublicClubSquadraOverview;
   stats: ClubHeaderStats;
   teamProfiles?: Record<string, ClubTeamProfileDetails>;
@@ -99,6 +101,7 @@ export function PublicClubProfileView({
   isFollowed,
   isFollowing,
   isOwner = false,
+  isSaved,
   members,
   onContactPress,
   onEditAffiliations,
@@ -111,6 +114,7 @@ export function PublicClubProfileView({
   onOpenTeam,
   onTabChange,
   onToggleFollow,
+  onToggleSave,
   overview,
   stats,
   teamProfiles = {},
@@ -129,10 +133,12 @@ export function PublicClubProfileView({
         club={club}
         isFollowed={isFollowed}
         isFollowing={isFollowing}
+        isSaved={isSaved}
         mode={isOwner ? "owner" : "visitor"}
         onContactPress={onContactPress}
         onTabChange={onTabChange}
         onToggleFollow={onToggleFollow}
+        onToggleSave={onToggleSave}
         stats={stats}
         teams={teams}
       />

@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Linking,
+  Pressable,
   SafeAreaView,
   StyleSheet,
   View,
   type AlertButton,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
@@ -101,8 +103,10 @@ import type { GroupedExperience } from "../../src/features/profiles/career/caree
 import type { CoachGroupedExperience } from "../../src/features/profiles/career/coach-career-grouping";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
 import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
-import { colors, spacing } from "../../src/theme/tokens";
-import { AppText, Button, SectionCard } from "../../src/ui";
+import { SavedSection } from "../../src/features/saved/SavedSection";
+import { FollowingSection } from "../../src/features/following/FollowingSection";
+import { colors, radius, spacing } from "../../src/theme/tokens";
+import { ActionSheet, AppText, Button, SectionCard } from "../../src/ui";
 
 const emptyClubHeaderStats: ClubHeaderStats = {
   activeTeamsCount: 0,
@@ -144,6 +148,7 @@ export default function ProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<EditSection | null>(null);
   const [pendingMemberships, setPendingMemberships] = useState<PendingMembership[]>([]);
+  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [respondingMembershipId, setRespondingMembershipId] = useState<string | null>(null);
   const [agentMediaEditingItemId, setAgentMediaEditingItemId] = useState<string | null>(null);
   const [directorMediaEditingItemId, setDirectorMediaEditingItemId] = useState<string | null>(null);
@@ -612,6 +617,43 @@ export default function ProfileScreen() {
           role === "director" ? styles.directorScrollContent : null,
         ]}
       >
+        <View style={styles.profileTopBar}>
+          <Pressable
+            accessibilityLabel="Le tue raccolte: Salvati e Seguiti"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => setMoreMenuVisible(true)}
+            style={({ pressed }) => [
+              styles.moreButton,
+              pressed ? styles.moreButtonPressed : null,
+            ]}
+          >
+            <Ionicons
+              color={colors.textPrimary}
+              name="ellipsis-horizontal"
+              size={22}
+            />
+          </Pressable>
+        </View>
+        <ActionSheet
+          actions={[
+            {
+              icon: "bookmark-outline",
+              label: "Salvati",
+              subtitle: "Solo tu puoi vedere ciò che salvi.",
+              onPress: () => router.push("/saved" as never),
+            },
+            {
+              icon: "people-outline",
+              label: "Seguiti",
+              subtitle: "I profili che segui.",
+              onPress: () => router.push("/following" as never),
+            },
+          ]}
+          onClose={() => setMoreMenuVisible(false)}
+          title="Le tue raccolte"
+          visible={moreMenuVisible}
+        />
         {pendingMemberships.length > 0 ? (
           <SectionCard
             description="Conferma se vuoi unirti a queste rose."
@@ -830,6 +872,12 @@ export default function ProfileScreen() {
             onEdit={handleEdit}
             role={role}
           />
+        ) : null}
+        {completeProfile ? (
+          <>
+            <SavedSection />
+            <FollowingSection />
+          </>
         ) : null}
       </KeyboardAwareForm>
 
@@ -1084,6 +1132,25 @@ function normalizeExternalUrl(url: string) {
 }
 
 const styles = StyleSheet.create({
+  profileTopBar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[8],
+  },
+  moreButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  moreButtonPressed: {
+    opacity: 0.7,
+  },
   directorScreen: {
     backgroundColor: "#F7FAFD",
   },

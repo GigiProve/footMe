@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
 import { VideoPlayerModal } from "../../components/ui/video-player-modal";
@@ -167,6 +168,7 @@ export function MediaProfileView({
   const [activeTab, setActiveTab] = useState<MediaProfileTab>("articles");
   const [isFollowed, setIsFollowed] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState<ArticleFilter>("all");
   const [activeAuthorFilter, setActiveAuthorFilter] =
     useState<MediaAuthorFilter | null>(null);
@@ -342,8 +344,10 @@ export function MediaProfileView({
       Alert.alert("Errore", "Impossibile aggiornare il follow.");
     } finally {
       setIsFollowing(false);
+      queryClient.invalidateQueries({ queryKey: ["following-count"] });
+      queryClient.invalidateQueries({ queryKey: ["followed"] });
     }
-  }, [isFollowed, profile.id, viewerProfileId]);
+  }, [isFollowed, profile.id, queryClient, viewerProfileId]);
 
   const handleVisitWebsite = useCallback(() => {
     if (!websiteUrl) {
@@ -655,7 +659,7 @@ export function MediaProfileView({
                 size="md"
                 style={styles.followButton}
                 testID="media-follow-button"
-                variant="primary"
+                variant={isFollowed ? "secondary" : "primary"}
               />
             ) : null}
             <Button

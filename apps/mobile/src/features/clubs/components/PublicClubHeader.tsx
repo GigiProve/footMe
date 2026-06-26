@@ -31,10 +31,12 @@ type PublicClubHeaderProps = {
   club: PublicClubProfile;
   isFollowed: boolean;
   isFollowing: boolean;
+  isSaved?: boolean;
   mode?: "owner" | "visitor";
   onContactPress: () => void;
   onTabChange?: (tab: ClubHeaderTab) => void;
   onToggleFollow: () => void;
+  onToggleSave?: () => void;
   stats: ClubHeaderStats;
   style?: StyleProp<ViewStyle>;
   teams: ClubTeam[];
@@ -52,10 +54,12 @@ export function PublicClubHeader({
   club,
   isFollowed,
   isFollowing,
+  isSaved,
   mode = "visitor",
   onContactPress,
   onTabChange,
   onToggleFollow,
+  onToggleSave,
   stats,
   style,
   teams,
@@ -188,6 +192,24 @@ export function PublicClubHeader({
             style={styles.actionButton}
             variant="outline"
           />
+          {mode !== "owner" && onToggleSave ? (
+            <Pressable
+              accessibilityLabel={isSaved ? "Rimuovi dai salvati" : "Salva società"}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onToggleSave}
+              style={({ pressed }) => [
+                styles.saveButton,
+                pressed ? styles.savePressed : null,
+              ]}
+            >
+              <Ionicons
+                color={isSaved ? colors.accent : colors.textMuted}
+                name={isSaved ? "bookmark" : "bookmark-outline"}
+                size={20}
+              />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -304,9 +326,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionsRow: {
+    alignItems: "center",
     flexDirection: "row",
     gap: spacing[12],
     width: "100%",
+  },
+  saveButton: {
+    alignItems: "center",
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  savePressed: {
+    opacity: 0.75,
   },
   affiliationBadge: {
     alignItems: "center",

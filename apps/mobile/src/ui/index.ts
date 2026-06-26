@@ -5,6 +5,10 @@ export {
 } from "./AppText/AppText";
 export { Avatar, type AvatarProps, type AvatarSize } from "./Avatar/Avatar";
 export {
+  ActionSheet,
+  type ActionSheetAction,
+} from "./ActionSheet/ActionSheet";
+export {
   ConfirmModal,
   type ConfirmModalProps,
 } from "./ConfirmModal/ConfirmModal";

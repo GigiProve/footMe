@@ -55,6 +55,9 @@ type PlayerProfileHeaderProps = {
   onContactPress?: () => void;
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
+  isFollowed?: boolean;
+  isSaved?: boolean;
+  onSavePress?: () => void;
   preferredFootLabel: string;
   primaryRole: string;
   regionBadges?: string[];
@@ -76,6 +79,9 @@ type CoachProfileHeaderProps = {
   onContactPress?: () => void;
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
+  isFollowed?: boolean;
+  isSaved?: boolean;
+  onSavePress?: () => void;
   primaryRole: string;
   statusBadge?: string;
   teamLabel?: string;
@@ -100,6 +106,9 @@ export function PlayerProfileHeader({
   onContactPress,
   onEditProfilePress,
   onFollowPress,
+  isFollowed,
+  isSaved,
+  onSavePress,
   preferredFootLabel,
   primaryRole,
   regionBadges = [],
@@ -203,26 +212,15 @@ export function PlayerProfileHeader({
                 onPress={onEditProfilePress}
                 variant="primary"
               />
-            ) : onFollowPress || onContactPress ? (
-              <>
-                {onFollowPress ? (
-                  <HeaderActionButton
-                    icon="person-add-outline"
-                    label="Segui"
-                    onPress={onFollowPress}
-                    variant="primary"
-                  />
-                ) : null}
-                {onContactPress ? (
-                  <HeaderActionButton
-                    icon="chatbubble-ellipses-outline"
-                    label="Contatta"
-                    onPress={onContactPress}
-                    variant="secondary"
-                  />
-                ) : null}
-              </>
-            ) : null}
+            ) : (
+              <VisitorHeaderActions
+                isFollowed={isFollowed}
+                isSaved={isSaved}
+                onContactPress={onContactPress}
+                onFollowPress={onFollowPress}
+                onSavePress={onSavePress}
+              />
+            )}
           </View>
         </View>
       </View>
@@ -289,6 +287,9 @@ export function CoachProfileHeader({
   onContactPress,
   onEditProfilePress,
   onFollowPress,
+  isFollowed,
+  isSaved,
+  onSavePress,
   primaryRole,
   statusBadge,
   teamLabel,
@@ -370,26 +371,15 @@ export function CoachProfileHeader({
                 onPress={onEditProfilePress}
                 variant="primary"
               />
-            ) : onFollowPress || onContactPress ? (
-              <>
-                {onFollowPress ? (
-                  <HeaderActionButton
-                    icon="person-add-outline"
-                    label="Segui"
-                    onPress={onFollowPress}
-                    variant="primary"
-                  />
-                ) : null}
-                {onContactPress ? (
-                  <HeaderActionButton
-                    icon="chatbubble-ellipses-outline"
-                    label="Contatta"
-                    onPress={onContactPress}
-                    variant="secondary"
-                  />
-                ) : null}
-              </>
-            ) : null}
+            ) : (
+              <VisitorHeaderActions
+                isFollowed={isFollowed}
+                isSaved={isSaved}
+                onContactPress={onContactPress}
+                onFollowPress={onFollowPress}
+                onSavePress={onSavePress}
+              />
+            )}
           </View>
         </View>
       </View>
@@ -445,6 +435,9 @@ type StaffProfileHeaderProps = {
   onContactPress?: () => void;
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
+  isFollowed?: boolean;
+  isSaved?: boolean;
+  onSavePress?: () => void;
   primaryRole: string;
   statusBadge?: string;
 };
@@ -460,6 +453,9 @@ export function StaffProfileHeader({
   onContactPress,
   onEditProfilePress,
   onFollowPress,
+  isFollowed,
+  isSaved,
+  onSavePress,
   primaryRole,
   statusBadge,
 }: StaffProfileHeaderProps) {
@@ -512,26 +508,15 @@ export function StaffProfileHeader({
                 onPress={onEditProfilePress}
                 variant="primary"
               />
-            ) : onFollowPress || onContactPress ? (
-              <>
-                {onFollowPress ? (
-                  <HeaderActionButton
-                    icon="person-add-outline"
-                    label="Segui"
-                    onPress={onFollowPress}
-                    variant="primary"
-                  />
-                ) : null}
-                {onContactPress ? (
-                  <HeaderActionButton
-                    icon="chatbubble-ellipses-outline"
-                    label="Contatta"
-                    onPress={onContactPress}
-                    variant="secondary"
-                  />
-                ) : null}
-              </>
-            ) : null}
+            ) : (
+              <VisitorHeaderActions
+                isFollowed={isFollowed}
+                isSaved={isSaved}
+                onContactPress={onContactPress}
+                onFollowPress={onFollowPress}
+                onSavePress={onSavePress}
+              />
+            )}
           </View>
         </View>
       </View>
@@ -745,6 +730,63 @@ export function ProfileField({
   );
 }
 
+function VisitorHeaderActions({
+  isFollowed,
+  isSaved,
+  onContactPress,
+  onFollowPress,
+  onSavePress,
+}: {
+  isFollowed?: boolean;
+  isSaved?: boolean;
+  onContactPress?: () => void;
+  onFollowPress?: () => void;
+  onSavePress?: () => void;
+}) {
+  if (!onFollowPress && !onContactPress && !onSavePress) {
+    return null;
+  }
+
+  return (
+    <>
+      {onFollowPress ? (
+        <HeaderActionButton
+          icon={isFollowed ? "checkmark" : "person-add-outline"}
+          label={isFollowed ? "Seguito" : "Segui"}
+          onPress={onFollowPress}
+          variant={isFollowed ? "secondary" : "primary"}
+        />
+      ) : null}
+      {onContactPress ? (
+        <HeaderActionButton
+          icon="chatbubble-ellipses-outline"
+          label="Contatta"
+          onPress={onContactPress}
+          variant="secondary"
+        />
+      ) : null}
+      {onSavePress ? (
+        <Pressable
+          accessibilityLabel={isSaved ? "Rimuovi dai salvati" : "Salva profilo"}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onSavePress}
+          style={({ pressed }) => [
+            styles.headerSaveButton,
+            pressed ? styles.headerSavePressed : null,
+          ]}
+        >
+          <Ionicons
+            color={isSaved ? colors.accent : colors.textMuted}
+            name={isSaved ? "bookmark" : "bookmark-outline"}
+            size={20}
+          />
+        </Pressable>
+      ) : null}
+    </>
+  );
+}
+
 function HeaderActionButton({
   icon,
   label,
@@ -875,7 +917,18 @@ const styles = StyleSheet.create({
   },
   playerActionsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
     gap: spacing[10],
+  },
+  headerSaveButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerSavePressed: {
+    opacity: 0.75,
   },
   playerAvatarShell: {
     width: 112,

@@ -21,6 +21,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useQueryClient } from "@tanstack/react-query";
 import { ResizeMode, Video } from "expo-av";
 
 import { VideoPlayerModal } from "../../components/ui/video-player-modal";
@@ -231,6 +232,7 @@ export function FanProfileView({
   );
   const [isFollowed, setIsFollowed] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const queryClient = useQueryClient();
   const viewerScrollRef = useRef<ScrollView | null>(null);
   const viewportHeight = Dimensions.get("window").height;
 
@@ -426,6 +428,8 @@ export function FanProfileView({
       Alert.alert("Errore", "Non siamo riusciti ad aggiornare il follow.");
     } finally {
       setIsFollowing(false);
+      queryClient.invalidateQueries({ queryKey: ["following-count"] });
+      queryClient.invalidateQueries({ queryKey: ["followed"] });
     }
   }
 

@@ -102,6 +102,25 @@ vi.mock("./fan-media-service", () => ({
   unfollowProfile: followMocks.unfollowProfile,
 }));
 
+vi.mock("../saved/saved-service", () => ({
+  fetchProfileSaveState: vi.fn().mockResolvedValue(false),
+  saveProfile: vi.fn().mockResolvedValue(undefined),
+  unsaveProfile: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../ui/Toast/ToastProvider", () => ({
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+  useToast: () => ({ showToast: vi.fn() }),
+}));
+
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  };
+});
+
 vi.mock("./media-profile-post-service", () => ({
   addMediaProfilePostComment: articleMocks.addMediaProfilePostComment,
   createMediaProfilePost: articleMocks.createMediaProfilePost,
