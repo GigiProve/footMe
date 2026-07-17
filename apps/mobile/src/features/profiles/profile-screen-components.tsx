@@ -56,6 +56,7 @@ type PlayerProfileHeaderProps = {
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
   isFollowed?: boolean;
+  isMessaging?: boolean;
   isSaved?: boolean;
   onSavePress?: () => void;
   isShortlisted?: boolean;
@@ -82,6 +83,7 @@ type CoachProfileHeaderProps = {
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
   isFollowed?: boolean;
+  isMessaging?: boolean;
   isSaved?: boolean;
   onSavePress?: () => void;
   isShortlisted?: boolean;
@@ -111,6 +113,7 @@ export function PlayerProfileHeader({
   onEditProfilePress,
   onFollowPress,
   isFollowed,
+  isMessaging,
   isSaved,
   onSavePress,
   isShortlisted,
@@ -220,6 +223,7 @@ export function PlayerProfileHeader({
               />
             ) : (
               <VisitorHeaderActions
+                isContactPending={isMessaging}
                 isFollowed={isFollowed}
                 isSaved={isSaved}
                 isShortlisted={isShortlisted}
@@ -296,6 +300,7 @@ export function CoachProfileHeader({
   onEditProfilePress,
   onFollowPress,
   isFollowed,
+  isMessaging,
   isSaved,
   onSavePress,
   isShortlisted,
@@ -383,6 +388,7 @@ export function CoachProfileHeader({
               />
             ) : (
               <VisitorHeaderActions
+                isContactPending={isMessaging}
                 isFollowed={isFollowed}
                 isSaved={isSaved}
                 isShortlisted={isShortlisted}
@@ -448,6 +454,7 @@ type StaffProfileHeaderProps = {
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
   isFollowed?: boolean;
+  isMessaging?: boolean;
   isSaved?: boolean;
   onSavePress?: () => void;
   isShortlisted?: boolean;
@@ -468,6 +475,7 @@ export function StaffProfileHeader({
   onEditProfilePress,
   onFollowPress,
   isFollowed,
+  isMessaging,
   isSaved,
   onSavePress,
   isShortlisted,
@@ -526,6 +534,7 @@ export function StaffProfileHeader({
               />
             ) : (
               <VisitorHeaderActions
+                isContactPending={isMessaging}
                 isFollowed={isFollowed}
                 isSaved={isSaved}
                 isShortlisted={isShortlisted}
@@ -749,6 +758,7 @@ export function ProfileField({
 }
 
 function VisitorHeaderActions({
+  isContactPending,
   isFollowed,
   isSaved,
   isShortlisted,
@@ -757,6 +767,7 @@ function VisitorHeaderActions({
   onSavePress,
   onShortlistPress,
 }: {
+  isContactPending?: boolean;
   isFollowed?: boolean;
   isSaved?: boolean;
   isShortlisted?: boolean;
@@ -783,6 +794,7 @@ function VisitorHeaderActions({
         <HeaderActionButton
           icon="chatbubble-ellipses-outline"
           label="Contatta"
+          loading={isContactPending}
           onPress={onContactPress}
           variant="secondary"
         />
@@ -830,19 +842,26 @@ function VisitorHeaderActions({
 function HeaderActionButton({
   icon,
   label,
+  loading,
   onPress,
   variant,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  loading?: boolean;
   onPress?: () => void;
   variant: "primary" | "secondary";
 }) {
   return (
     <Button
-      disabled={!onPress}
+      disabled={!onPress || loading}
       label={label}
-      leftIcon={<Ionicons color={variant === "primary" ? colors.inkInvert : colors.accent} name={icon} size={18} />}
+      leftIcon={
+        loading ? undefined : (
+          <Ionicons color={variant === "primary" ? colors.inkInvert : colors.accent} name={icon} size={18} />
+        )
+      }
+      loading={loading}
       onPress={onPress}
       size="sm"
       style={styles.headerActionButton}

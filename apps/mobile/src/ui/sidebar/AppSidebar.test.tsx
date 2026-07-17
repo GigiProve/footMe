@@ -37,6 +37,7 @@ vi.mock("@expo/vector-icons/Ionicons", () => {
         "grid-outline": 1,
         "log-out-outline": 1,
         "megaphone-outline": 1,
+        "people-outline": 1,
         "person-outline": 1,
         "settings-outline": 1,
       },
@@ -141,6 +142,46 @@ describe("AppSidebar", () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(pushMock).toHaveBeenCalledWith("/(tabs)/profile");
+  });
+
+  it("closes the drawer and routes to the network destination", () => {
+    const onClose = vi.fn();
+    vi.mocked(useSession).mockReturnValue({
+      isLoading: false,
+      needsOnboarding: false,
+      profile: {
+        avatar_url: null,
+        city: null,
+        club_id: null,
+        club_name: null,
+        full_name: "Mario Rossi",
+        id: "user-1",
+        is_admin: false,
+        region: null,
+        role: "player",
+      },
+      refreshProfile: vi.fn(),
+      session: {
+        user: {
+          app_metadata: {},
+          aud: "authenticated",
+          created_at: "2026-03-12T00:00:00.000Z",
+          email: "mario@example.com",
+          id: "user-1",
+          user_metadata: {},
+        },
+      } as never,
+    });
+
+    const tree = renderSidebar({ isOpen: true, onClose });
+    const networkAction = tree.root.findByProps({ accessibilityLabel: "Apri Rete" });
+
+    act(() => {
+      networkAction.props.onPress();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(pushMock).toHaveBeenCalledWith("/(tabs)/network");
   });
 
   it("runs logout and redirects to login from the footer action", async () => {

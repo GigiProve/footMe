@@ -59,11 +59,11 @@ function mapUploadError(error: unknown) {
   return new ProfileMediaUploadError("upload_failed", message, { cause: error });
 }
 
-function normalizeFileName(fileName: string | null | undefined, fallback: string) {
+export function normalizeFileName(fileName: string | null | undefined, fallback: string) {
   return (fileName ?? fallback).replace(/[^a-zA-Z0-9._-]+/g, "-");
 }
 
-function createUploadSuffix() {
+export function createUploadSuffix() {
   if (globalThis.crypto?.randomUUID) {
     return globalThis.crypto.randomUUID();
   }

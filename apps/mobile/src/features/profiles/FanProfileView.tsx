@@ -88,7 +88,9 @@ type CreateContentKind = "post" | FanTribunaKind;
 
 type FanProfileViewProps = {
   completeProfile: CompleteProfessionalProfile;
+  isMessaging?: boolean;
   mode: "owner" | "visitor";
+  onContactPress?: () => void;
   onOpenFavoriteClub?: (clubId: string) => void;
   onOpenPlayerProfile?: (profileId: string) => void;
   viewerProfileId?: string | null;
@@ -200,7 +202,9 @@ const TRIBUNA_MODAL_TITLES: Record<FanTribunaKind, string> = {
 
 export function FanProfileView({
   completeProfile,
+  isMessaging = false,
   mode,
+  onContactPress,
   onOpenFavoriteClub,
   onOpenPlayerProfile,
   viewerProfileId,
@@ -715,14 +719,26 @@ export function FanProfileView({
         </View>
 
         {mode === "visitor" ? (
-          <Button
-            fullWidth
-            label={isFollowed ? "Seguito" : "Segui"}
-            loading={isFollowing}
-            onPress={handleToggleFollow}
-            testID="fan-follow-button"
-            variant={isFollowed ? "secondary" : "primary"}
-          />
+          <View style={styles.followActionsRow}>
+            <Button
+              label={isFollowed ? "Seguito" : "Segui"}
+              loading={isFollowing}
+              onPress={handleToggleFollow}
+              style={styles.followButtonFlex}
+              testID="fan-follow-button"
+              variant={isFollowed ? "secondary" : "primary"}
+            />
+            {onContactPress ? (
+              <Button
+                label="Contatta"
+                loading={isMessaging}
+                onPress={onContactPress}
+                style={styles.followButtonFlex}
+                testID="fan-contact-button"
+                variant="secondary"
+              />
+            ) : null}
+          </View>
         ) : null}
       </View>
 
@@ -3283,6 +3299,14 @@ const styles = StyleSheet.create({
   },
   favoriteTeamContent: {
     padding: spacing[16],
+  },
+  followActionsRow: {
+    flexDirection: "row",
+    gap: spacing[10],
+    width: "100%",
+  },
+  followButtonFlex: {
+    flex: 1,
   },
   feedActions: {
     alignItems: "center",

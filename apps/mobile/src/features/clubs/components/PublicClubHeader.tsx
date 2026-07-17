@@ -29,6 +29,7 @@ type PublicClubHeaderProps = {
   activeTab?: ClubHeaderTab;
   affiliationLabel?: string | null;
   club: PublicClubProfile;
+  isContacting?: boolean;
   isFollowed: boolean;
   isFollowing: boolean;
   isSaved?: boolean;
@@ -52,6 +53,7 @@ export function PublicClubHeader({
   activeTab: controlledActiveTab,
   affiliationLabel,
   club,
+  isContacting,
   isFollowed,
   isFollowing,
   isSaved,
@@ -187,6 +189,7 @@ export function PublicClubHeader({
           />
           <Button
             label="Contatta"
+            loading={isContacting}
             onPress={onContactPress}
             size="sm"
             style={styles.actionButton}

@@ -10,7 +10,9 @@ type AgentProfileHeaderProps = {
   avatarUrl: string | null | undefined;
   bio?: string | null;
   fullName: string;
+  isMessaging?: boolean;
   locationLabel?: string;
+  onContactPress?: () => void;
   onEditAvatarPress?: () => void;
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
@@ -28,7 +30,9 @@ export function AgentProfileHeader({
   avatarUrl,
   bio,
   fullName,
+  isMessaging,
   locationLabel,
+  onContactPress,
   onEditAvatarPress,
   onEditProfilePress,
   onFollowPress,
@@ -110,7 +114,7 @@ export function AgentProfileHeader({
           size="sm"
           variant="primary"
         />
-      ) : onFollowPress || onSavePress || onShortlistPress ? (
+      ) : onFollowPress || onContactPress || onSavePress || onShortlistPress ? (
         <View style={styles.actionsRow}>
           {onFollowPress ? (
             <Button
@@ -125,6 +129,20 @@ export function AgentProfileHeader({
               onPress={onFollowPress}
               size="sm"
               variant={isFollowed ? "secondary" : "primary"}
+            />
+          ) : null}
+          {onContactPress ? (
+            <Button
+              label="Contatta"
+              leftIcon={
+                isMessaging ? undefined : (
+                  <Ionicons color={colors.accent} name="chatbubble-ellipses-outline" size={18} />
+                )
+              }
+              loading={isMessaging}
+              onPress={onContactPress}
+              size="sm"
+              variant="secondary"
             />
           ) : null}
           {onSavePress ? (

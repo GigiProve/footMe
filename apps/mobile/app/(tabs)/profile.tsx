@@ -1112,6 +1112,7 @@ function toPublicClubProfile(
     logo_url: club.logo_url,
     name: club.name,
     owner_full_name: null,
+    owner_profile_id: null,
     region: club.region,
     sports_focus: club.sports_focus,
     stadium: club.stadium,

@@ -128,6 +128,7 @@ const club: PublicClubProfile = {
   logo_url: null,
   name: "AC Como",
   owner_full_name: null,
+  owner_profile_id: null,
   region: "Lombardia",
   sports_focus: "Valorizzazione giovani e continuità tra vivaio e prima squadra.",
   stadium: "Sinigaglia",

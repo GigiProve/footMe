@@ -32,6 +32,7 @@ export { Checkbox } from "./Checkbox/Checkbox";
 export { ChipGroup } from "./ChipGroup/ChipGroup";
 export { Divider, type DividerProps } from "./Divider/Divider";
 export { EmptyState } from "./EmptyState/EmptyState";
+export { HeaderBell } from "./HeaderBell/HeaderBell";
 export { Input } from "./Input/Input";
 export { ListItem } from "./ListItem/ListItem";
 export { ModalHeader } from "./ModalHeader/ModalHeader";

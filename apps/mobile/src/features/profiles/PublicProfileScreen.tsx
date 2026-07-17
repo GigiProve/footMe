@@ -42,10 +42,8 @@ import { DirectorProfileTabView } from "./career/DirectorProfileTabView";
 import type { DirectorMediaLinkedTarget } from "./director-media";
 import { FanProfileView } from "./FanProfileView";
 import { MediaProfileView } from "./MediaProfileView";
-import {
-  requestConnection,
-  startDirectConversation,
-} from "../networking/networking-service";
+import { requestConnection } from "../networking/networking-service";
+import { openDirectConversation } from "../messaging/messaging-service";
 import {
   fetchPlayerAgent,
   fetchPlayerRepresentations,
@@ -397,7 +395,7 @@ export function PublicProfileScreen() {
   async function handleMessageProfile(targetProfile: CompleteProfessionalProfile) {
     try {
       setProfileAction({ profileId: targetProfile.profile.id, type: "message" });
-      const conversationId = await startDirectConversation(targetProfile.profile.id);
+      const conversationId = await openDirectConversation(targetProfile.profile.id);
       router.push({
         pathname: "/messages/[conversationId]",
         params: {
@@ -574,8 +572,15 @@ export function PublicProfileScreen() {
               coachHeaderDetails={coachHeaderDetails}
               headerDetails={headerDetails}
               isFollowed={isFollowed}
+              isMessaging={
+                profileAction?.profileId === completeProfile.profile.id &&
+                profileAction.type === "message"
+              }
               isSaved={isProfileSaved}
               isShortlisted={canUseShortlistStar ? isShortlisted : undefined}
+              onContactPress={
+                canFollowOrSave ? () => handleMessageProfile(completeProfile) : undefined
+              }
               onFollowPress={canFollowOrSave ? handleToggleFollow : undefined}
               onShortlistPress={canUseShortlistStar ? handleShortlistPress : undefined}
               playerHeaderDetails={playerHeaderDetails}
@@ -667,8 +672,10 @@ function ProfileHeaderBlock({
   coachHeaderDetails,
   headerDetails,
   isFollowed,
+  isMessaging,
   isSaved,
   isShortlisted,
+  onContactPress,
   onFollowPress,
   onSavePress,
   onShortlistPress,
@@ -680,8 +687,10 @@ function ProfileHeaderBlock({
   coachHeaderDetails: ReturnType<typeof buildCoachProfileHeaderDetails>;
   headerDetails: ReturnType<typeof buildHeaderDetails> | null;
   isFollowed: boolean;
+  isMessaging?: boolean;
   isSaved: boolean;
   isShortlisted?: boolean;
+  onContactPress?: () => void;
   onFollowPress?: () => void;
   onSavePress?: () => void;
   onShortlistPress?: () => void;
@@ -704,8 +713,10 @@ function ProfileHeaderBlock({
         locationLabel={playerHeaderDetails.locationLabel}
         mode="visitor"
         isFollowed={isFollowed}
+        isMessaging={isMessaging}
         isSaved={isSaved}
         isShortlisted={isShortlisted}
+        onContactPress={onContactPress}
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
         onShortlistPress={onShortlistPress}
@@ -731,8 +742,10 @@ function ProfileHeaderBlock({
         locationLabel={coachHeaderDetails.locationLabel}
         mode="visitor"
         isFollowed={isFollowed}
+        isMessaging={isMessaging}
         isSaved={isSaved}
         isShortlisted={isShortlisted}
+        onContactPress={onContactPress}
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
         onShortlistPress={onShortlistPress}
@@ -753,8 +766,10 @@ function ProfileHeaderBlock({
         locationLabel={staffHeaderDetails.locationLabel}
         mode="visitor"
         isFollowed={isFollowed}
+        isMessaging={isMessaging}
         isSaved={isSaved}
         isShortlisted={isShortlisted}
+        onContactPress={onContactPress}
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
         onShortlistPress={onShortlistPress}
@@ -772,9 +787,11 @@ function ProfileHeaderBlock({
         bio={agentHeaderDetails.bio}
         fullName={agentHeaderDetails.fullName}
         isFollowed={isFollowed}
+        isMessaging={isMessaging}
         isSaved={isSaved}
         isShortlisted={isShortlisted}
         locationLabel={agentHeaderDetails.locationLabel}
+        onContactPress={onContactPress}
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
         onShortlistPress={onShortlistPress}
@@ -1033,7 +1050,9 @@ function ProfileContentBlock({
     return (
       <FanProfileView
         completeProfile={completeProfile}
+        isMessaging={isMessaging}
         mode="visitor"
+        onContactPress={onMessage}
         onOpenFavoriteClub={onOpenFavoriteClub}
         onOpenPlayerProfile={onOpenPlayerProfile}
         viewerProfileId={viewerProfileId}
@@ -1045,7 +1064,9 @@ function ProfileContentBlock({
     return (
       <MediaProfileView
         completeProfile={completeProfile}
+        isMessaging={isMessaging}
         mode="visitor"
+        onContactPress={onMessage}
         onOpenClub={onOpenFavoriteClub}
         onOpenProfile={onOpenPlayerProfile}
         viewerProfileId={viewerProfileId}

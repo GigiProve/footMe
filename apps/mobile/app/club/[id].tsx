@@ -38,6 +38,7 @@ import {
   saveClub,
   unsaveClub,
 } from "../../src/features/saved/saved-service";
+import { openDirectConversation } from "../../src/features/messaging/messaging-service";
 import type { ClubHeaderTab } from "../../src/features/clubs/components/PublicClubHeader";
 import {
   fetchClubTeamProfiles,
@@ -83,6 +84,7 @@ export default function ClubProfileScreen() {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [clubActionsVisible, setClubActionsVisible] = useState(false);
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ClubHeaderTab>("team");
 
@@ -230,7 +232,35 @@ export default function ClubProfileScreen() {
     });
   }
 
-  function handleContactPress() {
+  async function handleContactPress() {
+    if (!club) {
+      return;
+    }
+
+    if (club.owner_profile_id && club.owner_profile_id !== profile?.id) {
+      try {
+        setIsOpeningChat(true);
+        const conversationId = await openDirectConversation(club.owner_profile_id);
+        router.push({
+          pathname: "/messages/[conversationId]",
+          params: { conversationId, otherName: club.name },
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Errore durante l'apertura della conversazione.";
+        Alert.alert("Chat non disponibile", message);
+      } finally {
+        setIsOpeningChat(false);
+      }
+      return;
+    }
+
+    handleShowPublicContacts();
+  }
+
+  function handleShowPublicContacts() {
     if (!club) {
       return;
     }
@@ -391,6 +421,7 @@ export default function ClubProfileScreen() {
           <PublicClubProfileView
             activeTab={activeTab}
             club={club}
+            isContacting={isOpeningChat}
             isFollowed={isFollowed}
             isFollowing={isFollowing}
             isSaved={isSaved}
@@ -417,6 +448,11 @@ export default function ClubProfileScreen() {
             label: isSaved ? "Rimuovi dai Salvati" : "Salva società",
             subtitle: isSaved ? undefined : "Ritrovala nei tuoi Salvati.",
             onPress: handleToggleSave,
+          },
+          {
+            icon: "call-outline",
+            label: "Contatti pubblici",
+            onPress: handleShowPublicContacts,
           },
           {
             icon: "share-outline",

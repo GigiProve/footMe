@@ -73,7 +73,9 @@ type ArticleFilter = "all" | "Mercato" | "Interviste" | "Giovanili" | "Opinioni"
 
 type MediaProfileViewProps = {
   completeProfile: CompleteProfessionalProfile;
+  isMessaging?: boolean;
   mode: "owner" | "visitor";
+  onContactPress?: () => void;
   onOpenClub?: (clubId: string) => void;
   onOpenProfile?: (profileId: string) => void;
   viewerProfileId?: string | null;
@@ -160,7 +162,9 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 export function MediaProfileView({
   completeProfile,
+  isMessaging = false,
   mode,
+  onContactPress,
   onOpenClub,
   onOpenProfile,
   viewerProfileId,
@@ -660,6 +664,17 @@ export function MediaProfileView({
                 style={styles.followButton}
                 testID="media-follow-button"
                 variant={isFollowed ? "secondary" : "primary"}
+              />
+            ) : null}
+            {mode === "visitor" && onContactPress ? (
+              <Button
+                label="Contatta"
+                loading={isMessaging}
+                onPress={onContactPress}
+                size="md"
+                style={styles.followButton}
+                testID="media-contact-button"
+                variant="secondary"
               />
             ) : null}
             <Button
@@ -3301,6 +3316,7 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing[12],
     marginBottom: spacing[24],
   },

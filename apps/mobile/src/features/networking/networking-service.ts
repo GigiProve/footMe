@@ -51,15 +51,3 @@ export async function updateConnectionStatus(
     throw error;
   }
 }
-
-export async function startDirectConversation(targetProfileId: string) {
-  const { data, error } = await supabase.rpc("start_direct_conversation", {
-    target_profile_id: targetProfileId,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return data as string;
-}

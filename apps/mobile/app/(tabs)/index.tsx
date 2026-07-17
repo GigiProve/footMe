@@ -10,7 +10,6 @@ import {
 } from "../../src/features/home/home-dashboard-service";
 import { logout } from "../../src/features/auth/logout";
 import { useSession } from "../../src/features/auth/use-session";
-import { ClubDashboard } from "../../src/features/clubs/components/ClubDashboard";
 import { getUnreadCount } from "../../src/features/clubs/notification-service";
 import { hasSupabaseEnv } from "../../src/lib/supabase";
 import { spacing } from "../../src/theme/tokens";
@@ -67,10 +66,6 @@ export default function HomeScreen() {
 
     loadDashboard();
   }, [loadDashboard, profile?.id, userId]);
-
-  if (profile?.role === "club_admin") {
-    return <ClubDashboard />;
-  }
 
   async function handleSignOut() {
     await logout({

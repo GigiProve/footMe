@@ -25,6 +25,7 @@ import { ClubMediaTabContent } from "./ClubMediaTabContent";
 type PublicClubProfileViewProps = {
   activeTab: ClubHeaderTab;
   club: PublicClubProfile;
+  isContacting?: boolean;
   isFollowed: boolean;
   isFollowing: boolean;
   isOwner?: boolean;
@@ -98,6 +99,7 @@ const playerDepartmentOrder: PlayerDepartment[] = [
 export function PublicClubProfileView({
   activeTab,
   club,
+  isContacting,
   isFollowed,
   isFollowing,
   isOwner = false,
@@ -131,6 +133,7 @@ export function PublicClubProfileView({
         activeTab={activeTab}
         affiliationLabel={affiliationLabel}
         club={club}
+        isContacting={isContacting}
         isFollowed={isFollowed}
         isFollowing={isFollowing}
         isSaved={isSaved}

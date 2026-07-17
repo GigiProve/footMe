@@ -30,7 +30,10 @@ vi.mock("./profile-service", () => ({
 
 vi.mock("../networking/networking-service", () => ({
   requestConnection: vi.fn(),
-  startDirectConversation: vi.fn(),
+}));
+
+vi.mock("../messaging/messaging-service", () => ({
+  openDirectConversation: vi.fn(),
 }));
 
 vi.mock("./fan-media-service", () => ({

@@ -10,7 +10,7 @@ import { colors, radius, shadows, sizes, spacing, typography, zIndex } from "../
 import { Icon, type IconName } from "../../src/ui";
 
 export default function TabsLayout() {
-  const { isLoading, needsOnboarding, profile, session } = useSession();
+  const { isLoading, needsOnboarding, session } = useSession();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   if (isLoading) {
@@ -48,27 +48,26 @@ export default function TabsLayout() {
       >
         <Tabs.Screen
           name="index"
-          options={buildTabOptions(
-            profile?.role === "club_admin" ? "Dashboard" : "Home",
-            "home",
-          )}
+          options={buildTabOptions("Home", "home")}
         />
         <Tabs.Screen
-          name="profile"
-          options={buildTabOptions("Profilo", "profile")}
+          name="cerca"
+          options={buildTabOptions("Cerca", "search")}
         />
         <Tabs.Screen
-          name="network"
-          options={buildTabOptions("Rete", "network")}
+          name="dashboard"
+          options={buildTabOptions("Dashboard", "dashboard")}
         />
         <Tabs.Screen
           name="messages"
           options={buildTabOptions("Messaggi", "messages")}
         />
         <Tabs.Screen
-          name="announcements"
-          options={buildTabOptions("Annunci", "announcements")}
+          name="profile"
+          options={buildTabOptions("Profilo", "profile")}
         />
+        <Tabs.Screen name="network" options={{ href: null }} />
+        <Tabs.Screen name="announcements" options={{ href: null }} />
       </Tabs>
 
       <SafeAreaView pointerEvents="box-none" style={styles.menuArea}>

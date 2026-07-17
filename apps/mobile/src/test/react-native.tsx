@@ -34,6 +34,32 @@ export const TouchableWithoutFeedback = createComponent(
   "TouchableWithoutFeedback",
 );
 export const View = createComponent("View");
+export const KeyboardAvoidingView = createComponent("KeyboardAvoidingView");
+
+type MockFlatListProps = {
+  data?: readonly unknown[];
+  keyExtractor?: (item: unknown, index: number) => string;
+  renderItem?: (info: { index: number; item: unknown }) => unknown;
+} & Record<string, unknown>;
+
+export function FlatList({
+  data = [],
+  keyExtractor,
+  renderItem,
+  ...props
+}: MockFlatListProps) {
+  return createElement(
+    "FlatList",
+    props,
+    data.map((item, index) =>
+      createElement(
+        "View",
+        { key: keyExtractor ? keyExtractor(item, index) : String(index) },
+        renderItem ? (renderItem({ index, item }) as never) : null,
+      ),
+    ),
+  );
+}
 export const Alert = {
   alert: () => undefined,
 };

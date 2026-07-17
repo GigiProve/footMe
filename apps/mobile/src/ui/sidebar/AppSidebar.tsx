@@ -27,6 +27,7 @@ type SidebarRoute =
   | "/(tabs)"
   | "/(tabs)/announcements"
   | "/(tabs)/messages"
+  | "/(tabs)/network"
   | "/(tabs)/profile"
   | "/settings"
   | "/shortlist";
@@ -77,6 +78,11 @@ const navigationItems: {
     icon: "megaphone-outline",
     label: "Annunci",
     route: "/(tabs)/announcements",
+  },
+  {
+    icon: "people-outline",
+    label: "Rete",
+    route: "/(tabs)/network",
   },
   {
     icon: "chatbubble-ellipses-outline",

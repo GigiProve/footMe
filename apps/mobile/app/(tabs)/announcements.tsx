@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
 import { useSession } from "../../src/features/auth/use-session";
+import { openDirectConversation } from "../../src/features/messaging/messaging-service";
 import {
   applyToRecruitingAd,
   createRecruitingAd,
@@ -70,6 +72,7 @@ function formatApplicationStatus(status: string) {
 }
 
 export default function AnnouncementsScreen() {
+  const router = useRouter();
   const { profile, session } = useSession();
   const userId = session?.user?.id;
   const [ads, setAds] = useState<RecruitingAdSummary[]>([]);
@@ -82,6 +85,9 @@ export default function AnnouncementsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
+  const [contactingApplicationId, setContactingApplicationId] = useState<
+    string | null
+  >(null);
   const [selectedAdId, setSelectedAdId] = useState<string | null>(null);
   const [coverMessage, setCoverMessage] = useState("");
   const [form, setForm] = useState<RecruitingAdForm>({
@@ -184,6 +190,35 @@ export default function AnnouncementsScreen() {
       Alert.alert("Aggiornamento non riuscito", message);
     } finally {
       setIsActionLoading(null);
+    }
+  }
+
+  async function handleContactApplicant(application: ClubApplicationSummary) {
+    if (!application.applicant?.id) {
+      return;
+    }
+
+    try {
+      setContactingApplicationId(application.id);
+      const conversationId = await openDirectConversation(
+        application.applicant.id,
+        application.id,
+      );
+      router.push({
+        pathname: "/messages/[conversationId]",
+        params: {
+          conversationId,
+          otherName: application.applicant.full_name,
+        },
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore durante l'apertura della conversazione.";
+      Alert.alert("Chat non disponibile", message);
+    } finally {
+      setContactingApplicationId(null);
     }
   }
 
@@ -532,6 +567,19 @@ export default function AnnouncementsScreen() {
                 </AppText>
               )}
               <View style={styles.candidateActions}>
+                {application.applicant ? (
+                  <Button
+                    disabled={contactingApplicationId === application.id}
+                    label={
+                      contactingApplicationId === application.id
+                        ? "Apertura chat..."
+                        : "Contatta"
+                    }
+                    onPress={() => handleContactApplicant(application)}
+                    size="sm"
+                    variant="secondary"
+                  />
+                ) : null}
                 <Button
                   disabled={
                     isActionLoading === application.id ||
