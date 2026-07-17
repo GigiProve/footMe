@@ -17,6 +17,8 @@ type AgentProfileHeaderProps = {
   isFollowed?: boolean;
   onSavePress?: () => void;
   isSaved?: boolean;
+  onShortlistPress?: () => void;
+  isShortlisted?: boolean;
   primaryRole: string;
   statusBadge?: string;
 };
@@ -33,6 +35,8 @@ export function AgentProfileHeader({
   isFollowed,
   onSavePress,
   isSaved,
+  onShortlistPress,
+  isShortlisted,
   primaryRole,
   statusBadge,
 }: AgentProfileHeaderProps) {
@@ -106,7 +110,7 @@ export function AgentProfileHeader({
           size="sm"
           variant="primary"
         />
-      ) : onFollowPress || onSavePress ? (
+      ) : onFollowPress || onSavePress || onShortlistPress ? (
         <View style={styles.actionsRow}>
           {onFollowPress ? (
             <Button
@@ -137,6 +141,24 @@ export function AgentProfileHeader({
               <Ionicons
                 color={isSaved ? colors.accent : colors.textMuted}
                 name={isSaved ? "bookmark" : "bookmark-outline"}
+                size={20}
+              />
+            </Pressable>
+          ) : null}
+          {onShortlistPress ? (
+            <Pressable
+              accessibilityLabel={isShortlisted ? "Gestisci shortlist" : "Aggiungi a shortlist"}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onShortlistPress}
+              style={({ pressed }) => [
+                styles.saveButton,
+                pressed ? styles.savePressed : null,
+              ]}
+            >
+              <Ionicons
+                color={isShortlisted ? colors.accent : colors.textMuted}
+                name={isShortlisted ? "star" : "star-outline"}
                 size={20}
               />
             </Pressable>

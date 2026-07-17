@@ -45,6 +45,18 @@ vi.mock("../saved/saved-service", () => ({
   unsaveProfile: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("../shortlist/use-shortlist-permissions", () => ({
+  useShortlistPermissions: () => ({ data: undefined }),
+}));
+
+vi.mock("../shortlist/shortlist-service", () => ({
+  fetchProfileShortlistMemberships: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("../shortlist/components/AddToShortlistFlow", () => ({
+  AddToShortlistFlow: () => null,
+}));
+
 vi.mock("../../ui/Toast/ToastProvider", () => ({
   ToastProvider: ({ children }: { children: React.ReactNode }) => children,
   useToast: () => ({ showToast: vi.fn() }),
@@ -54,6 +66,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
+    useQuery: () => ({ data: undefined }),
     useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   };
 });

@@ -24,6 +24,10 @@ vi.mock("../../features/auth/logout", () => ({
   logout: vi.fn(),
 }));
 
+vi.mock("../../features/shortlist/use-shortlist-permissions", () => ({
+  useShortlistPermissions: () => ({ data: undefined }),
+}));
+
 vi.mock("@expo/vector-icons/Ionicons", () => {
   const MockIonicons = Object.assign(
     (props: Record<string, unknown>) => React.createElement("Ionicon", props),

@@ -20,9 +20,16 @@ import { useRouter } from "expo-router";
 import { logout } from "../../features/auth/logout";
 import { useSession } from "../../features/auth/use-session";
 import { withDefaultProfileAvatar } from "../../features/profiles/profile-avatar";
+import { useShortlistPermissions } from "../../features/shortlist/use-shortlist-permissions";
 import { colors, radius, shadows, sizes, spacing, typography, zIndex } from "../../theme/tokens";
 
-type SidebarRoute = "/(tabs)" | "/(tabs)/announcements" | "/(tabs)/messages" | "/(tabs)/profile" | "/settings";
+type SidebarRoute =
+  | "/(tabs)"
+  | "/(tabs)/announcements"
+  | "/(tabs)/messages"
+  | "/(tabs)/profile"
+  | "/settings"
+  | "/shortlist";
 
 type AppSidebarProps = {
   isOpen: boolean;
@@ -78,9 +85,20 @@ const navigationItems: {
   },
 ];
 
+const shortlistNavItem: {
+  icon: SidebarItemProps["icon"];
+  label: string;
+  route: SidebarRoute;
+} = {
+  icon: "clipboard-outline",
+  label: "Shortlist",
+  route: "/shortlist",
+};
+
 export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
   const router = useRouter();
   const { profile, session } = useSession();
+  const { data: shortlistPermissions } = useShortlistPermissions();
   const [isMounted, setIsMounted] = useState(isOpen);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const translateX = useRef(new Animated.Value(-sidebarWidth)).current;
@@ -138,6 +156,10 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
   if (!isMounted) {
     return null;
   }
+
+  const visibleNavigationItems = shortlistPermissions?.can_view
+    ? [...navigationItems, shortlistNavItem]
+    : navigationItems;
 
   const displayName =
     profile?.full_name?.trim() || session?.user.email?.trim() || "Utente footMe";
@@ -207,7 +229,7 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
                 />
                 <View style={styles.sectionDivider} />
                 <View style={styles.sectionGroup}>
-                  {navigationItems.map((item) => (
+                  {visibleNavigationItems.map((item) => (
                     <SidebarItem
                       key={item.label}
                       accessibilityLabel={`Apri ${item.label}`}

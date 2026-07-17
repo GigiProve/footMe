@@ -8,6 +8,7 @@ export {
   ActionSheet,
   type ActionSheetAction,
 } from "./ActionSheet/ActionSheet";
+export { BottomSheet, type BottomSheetProps } from "./BottomSheet/BottomSheet";
 export {
   ConfirmModal,
   type ConfirmModalProps,

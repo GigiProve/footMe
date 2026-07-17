@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
@@ -64,6 +64,9 @@ import {
   saveProfile,
   unsaveProfile,
 } from "../saved/saved-service";
+import { AddToShortlistFlow } from "../shortlist/components/AddToShortlistFlow";
+import { useShortlistPermissions } from "../shortlist/use-shortlist-permissions";
+import { fetchProfileShortlistMemberships } from "../shortlist/shortlist-service";
 import { colors, spacing } from "../../theme/tokens";
 import { ActionSheet, AppText, Button, useToast } from "../../ui";
 
@@ -102,6 +105,10 @@ export function PublicProfileScreen() {
   const [isFollowPending, setIsFollowPending] = useState(false);
   const [isSavePending, setIsSavePending] = useState(false);
   const [profileActionsVisible, setProfileActionsVisible] = useState(false);
+  const [shortlistFlow, setShortlistFlow] = useState<{
+    initialMode: "picker" | "manage";
+    open: boolean;
+  }>({ initialMode: "picker", open: false });
 
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
   const currentUserId = session?.user.id ?? null;
@@ -109,6 +116,33 @@ export function PublicProfileScreen() {
   const viewedProfileId = completeProfile?.profile.id ?? null;
   const canFollowOrSave =
     !!currentUserId && !!viewedProfileId && currentUserId !== viewedProfileId;
+
+  const { data: shortlistPermissions } = useShortlistPermissions();
+  const canViewShortlist = !!shortlistPermissions?.can_view && canFollowOrSave;
+
+  const { data: shortlistMemberships } = useQuery({
+    enabled: canViewShortlist && !!viewedProfileId,
+    queryFn: () =>
+      fetchProfileShortlistMemberships(
+        viewedProfileId as string,
+        shortlistPermissions?.club_id as string,
+      ),
+    queryKey: ["shortlist-memberships", viewedProfileId],
+  });
+  const isShortlisted = (shortlistMemberships?.length ?? 0) > 0;
+  // Con il solo permesso di visualizzazione la stella comparirebbe ma il
+  // flusso di aggiunta fallirebbe alla RLS: la mostriamo solo a chi può
+  // aggiungere profili o gestire una presenza già esistente.
+  const canUseShortlistStar =
+    canViewShortlist &&
+    (!!shortlistPermissions?.can_add_profiles || isShortlisted);
+
+  function handleShortlistPress() {
+    setShortlistFlow({
+      initialMode: isShortlisted ? "manage" : "picker",
+      open: true,
+    });
+  }
 
   const headerDetails = useMemo(
     () => (completeProfile ? buildHeaderDetails(completeProfile) : null),
@@ -134,6 +168,13 @@ export function PublicProfileScreen() {
       completeProfile ? buildStaffProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
+
+  const shortlistProfileSubtitle =
+    playerHeaderDetails?.primaryRole ??
+    coachHeaderDetails?.primaryRole ??
+    staffHeaderDetails?.primaryRole ??
+    agentHeaderDetails?.primaryRole ??
+    "";
 
   const loadProfile = useCallback(async () => {
     if (!profileId || !session?.user) {
@@ -534,7 +575,9 @@ export function PublicProfileScreen() {
               headerDetails={headerDetails}
               isFollowed={isFollowed}
               isSaved={isProfileSaved}
+              isShortlisted={canUseShortlistStar ? isShortlisted : undefined}
               onFollowPress={canFollowOrSave ? handleToggleFollow : undefined}
+              onShortlistPress={canUseShortlistStar ? handleShortlistPress : undefined}
               playerHeaderDetails={playerHeaderDetails}
               staffHeaderDetails={staffHeaderDetails}
             />
@@ -599,6 +642,21 @@ export function PublicProfileScreen() {
         title="Azioni profilo"
         visible={profileActionsVisible}
       />
+      {shortlistPermissions && viewedProfileId ? (
+        <AddToShortlistFlow
+          clubId={shortlistPermissions.club_id}
+          initialMode={shortlistFlow.initialMode}
+          onClose={() => setShortlistFlow((prev) => ({ ...prev, open: false }))}
+          open={shortlistFlow.open}
+          permissions={shortlistPermissions}
+          profile={{
+            avatarUrl: completeProfile?.profile.avatar_url,
+            fullName: completeProfile?.profile.full_name ?? "Profilo",
+            id: viewedProfileId,
+            subtitle: shortlistProfileSubtitle,
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -610,8 +668,10 @@ function ProfileHeaderBlock({
   headerDetails,
   isFollowed,
   isSaved,
+  isShortlisted,
   onFollowPress,
   onSavePress,
+  onShortlistPress,
   playerHeaderDetails,
   staffHeaderDetails,
 }: {
@@ -621,8 +681,10 @@ function ProfileHeaderBlock({
   headerDetails: ReturnType<typeof buildHeaderDetails> | null;
   isFollowed: boolean;
   isSaved: boolean;
+  isShortlisted?: boolean;
   onFollowPress?: () => void;
   onSavePress?: () => void;
+  onShortlistPress?: () => void;
   playerHeaderDetails: ReturnType<typeof buildPlayerProfileHeaderDetails>;
   staffHeaderDetails: ReturnType<typeof buildStaffProfileHeaderDetails>;
 }) {
@@ -643,8 +705,10 @@ function ProfileHeaderBlock({
         mode="visitor"
         isFollowed={isFollowed}
         isSaved={isSaved}
+        isShortlisted={isShortlisted}
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
+        onShortlistPress={onShortlistPress}
         preferredFootLabel={playerHeaderDetails.preferredFootLabel}
         primaryRole={playerHeaderDetails.primaryRole}
         regionBadges={playerHeaderDetails.regionBadges}
@@ -668,8 +732,10 @@ function ProfileHeaderBlock({
         mode="visitor"
         isFollowed={isFollowed}
         isSaved={isSaved}
+        isShortlisted={isShortlisted}
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
+        onShortlistPress={onShortlistPress}
         primaryRole={coachHeaderDetails.primaryRole}
         statusBadge={coachHeaderDetails.statusBadge}
         teamLabel={coachHeaderDetails.teamLabel}
@@ -688,8 +754,10 @@ function ProfileHeaderBlock({
         mode="visitor"
         isFollowed={isFollowed}
         isSaved={isSaved}
+        isShortlisted={isShortlisted}
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
+        onShortlistPress={onShortlistPress}
         primaryRole={staffHeaderDetails.primaryRole}
         statusBadge={staffHeaderDetails.statusBadge}
       />
@@ -705,9 +773,11 @@ function ProfileHeaderBlock({
         fullName={agentHeaderDetails.fullName}
         isFollowed={isFollowed}
         isSaved={isSaved}
+        isShortlisted={isShortlisted}
         locationLabel={agentHeaderDetails.locationLabel}
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
+        onShortlistPress={onShortlistPress}
         primaryRole={agentHeaderDetails.primaryRole}
         statusBadge={agentHeaderDetails.statusBadge}
       />

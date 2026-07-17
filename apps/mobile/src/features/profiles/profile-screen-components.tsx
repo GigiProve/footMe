@@ -58,6 +58,8 @@ type PlayerProfileHeaderProps = {
   isFollowed?: boolean;
   isSaved?: boolean;
   onSavePress?: () => void;
+  isShortlisted?: boolean;
+  onShortlistPress?: () => void;
   preferredFootLabel: string;
   primaryRole: string;
   regionBadges?: string[];
@@ -82,6 +84,8 @@ type CoachProfileHeaderProps = {
   isFollowed?: boolean;
   isSaved?: boolean;
   onSavePress?: () => void;
+  isShortlisted?: boolean;
+  onShortlistPress?: () => void;
   primaryRole: string;
   statusBadge?: string;
   teamLabel?: string;
@@ -109,6 +113,8 @@ export function PlayerProfileHeader({
   isFollowed,
   isSaved,
   onSavePress,
+  isShortlisted,
+  onShortlistPress,
   preferredFootLabel,
   primaryRole,
   regionBadges = [],
@@ -216,9 +222,11 @@ export function PlayerProfileHeader({
               <VisitorHeaderActions
                 isFollowed={isFollowed}
                 isSaved={isSaved}
+                isShortlisted={isShortlisted}
                 onContactPress={onContactPress}
                 onFollowPress={onFollowPress}
                 onSavePress={onSavePress}
+                onShortlistPress={onShortlistPress}
               />
             )}
           </View>
@@ -290,6 +298,8 @@ export function CoachProfileHeader({
   isFollowed,
   isSaved,
   onSavePress,
+  isShortlisted,
+  onShortlistPress,
   primaryRole,
   statusBadge,
   teamLabel,
@@ -375,9 +385,11 @@ export function CoachProfileHeader({
               <VisitorHeaderActions
                 isFollowed={isFollowed}
                 isSaved={isSaved}
+                isShortlisted={isShortlisted}
                 onContactPress={onContactPress}
                 onFollowPress={onFollowPress}
                 onSavePress={onSavePress}
+                onShortlistPress={onShortlistPress}
               />
             )}
           </View>
@@ -438,6 +450,8 @@ type StaffProfileHeaderProps = {
   isFollowed?: boolean;
   isSaved?: boolean;
   onSavePress?: () => void;
+  isShortlisted?: boolean;
+  onShortlistPress?: () => void;
   primaryRole: string;
   statusBadge?: string;
 };
@@ -456,6 +470,8 @@ export function StaffProfileHeader({
   isFollowed,
   isSaved,
   onSavePress,
+  isShortlisted,
+  onShortlistPress,
   primaryRole,
   statusBadge,
 }: StaffProfileHeaderProps) {
@@ -512,9 +528,11 @@ export function StaffProfileHeader({
               <VisitorHeaderActions
                 isFollowed={isFollowed}
                 isSaved={isSaved}
+                isShortlisted={isShortlisted}
                 onContactPress={onContactPress}
                 onFollowPress={onFollowPress}
                 onSavePress={onSavePress}
+                onShortlistPress={onShortlistPress}
               />
             )}
           </View>
@@ -733,17 +751,21 @@ export function ProfileField({
 function VisitorHeaderActions({
   isFollowed,
   isSaved,
+  isShortlisted,
   onContactPress,
   onFollowPress,
   onSavePress,
+  onShortlistPress,
 }: {
   isFollowed?: boolean;
   isSaved?: boolean;
+  isShortlisted?: boolean;
   onContactPress?: () => void;
   onFollowPress?: () => void;
   onSavePress?: () => void;
+  onShortlistPress?: () => void;
 }) {
-  if (!onFollowPress && !onContactPress && !onSavePress) {
+  if (!onFollowPress && !onContactPress && !onSavePress && !onShortlistPress) {
     return null;
   }
 
@@ -779,6 +801,24 @@ function VisitorHeaderActions({
           <Ionicons
             color={isSaved ? colors.accent : colors.textMuted}
             name={isSaved ? "bookmark" : "bookmark-outline"}
+            size={20}
+          />
+        </Pressable>
+      ) : null}
+      {onShortlistPress ? (
+        <Pressable
+          accessibilityLabel={isShortlisted ? "Gestisci shortlist" : "Aggiungi a shortlist"}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onShortlistPress}
+          style={({ pressed }) => [
+            styles.headerSaveButton,
+            pressed ? styles.headerSavePressed : null,
+          ]}
+        >
+          <Ionicons
+            color={isShortlisted ? colors.accent : colors.textMuted}
+            name={isShortlisted ? "star" : "star-outline"}
             size={20}
           />
         </Pressable>
