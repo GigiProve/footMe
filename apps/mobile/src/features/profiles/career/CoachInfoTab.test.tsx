@@ -9,6 +9,17 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: (props: Record<string, unknown>) => React.createElement("Ionicon", props),
 }));
 
+vi.mock("../media-upload-service", () => ({
+  captureAndUploadPhoto: vi.fn(),
+  pickAndUploadMedia: vi.fn(),
+  removeMediaFromStorage: vi.fn(),
+}));
+
+vi.mock("../profile-social-service", () => ({
+  updateProfileAvatarUrl: vi.fn(),
+  updateProfileCoverUrl: vi.fn(),
+}));
+
 function buildCoachProfile(
   overrides: Partial<CompleteProfessionalProfile> = {},
 ): CompleteProfessionalProfile {

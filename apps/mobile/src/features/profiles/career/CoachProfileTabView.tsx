@@ -12,6 +12,12 @@ import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
 import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
 import type { CoachGroupedExperience } from "./coach-career-grouping";
 
+const COACH_PROFILE_TABS: { label: string; value: ProfileTab }[] = [
+  { label: "Profilo", value: "info" },
+  { label: "Carriera", value: "career" },
+  { label: "Media", value: "media" },
+];
+
 type CoachProfileTabViewProps = {
   completeProfile: CompleteProfessionalProfile;
   isOwner: boolean;
@@ -31,7 +37,7 @@ export function CoachProfileTabView({
   onEdit,
   onManageMedia,
 }: CoachProfileTabViewProps) {
-  const [activeTab, setActiveTab] = useState<ProfileTab>("career");
+  const [activeTab, setActiveTab] = useState<ProfileTab>("info");
   const { onOpenTaggedItem, taggedItems } = useTaggedMediaItems(
     completeProfile.profile.id,
   );
@@ -91,7 +97,11 @@ export function CoachProfileTabView({
 
   return (
     <View style={styles.container}>
-      <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <ProfileTabBar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        tabs={COACH_PROFILE_TABS}
+      />
 
       {activeTab === "career" ? (
         <CoachCareerTabContent
@@ -116,6 +126,7 @@ export function CoachProfileTabView({
           completeProfile={completeProfile}
           isOwner={isOwner}
           onEdit={onEdit}
+          onViewAllExperiences={() => setActiveTab("career")}
         />
       )}
     </View>

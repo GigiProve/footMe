@@ -56,6 +56,10 @@ type BaseProfileRecord = {
   bio: string | null;
   birth_date: string | null;
   city: string | null;
+  // Optional: keeps existing BaseProfileRecord literals (test fixtures across
+  // other profile-* modules) source-compatible without needing every one of
+  // them updated. Always populated (string | null) by normalizeBaseProfileRecord.
+  cover_url?: string | null;
   current_location_city: string | null;
   current_location_country: string | null;
   domicile: string | null;
@@ -782,6 +786,7 @@ function normalizeBaseProfileRecord(
     bio: normalizeOptionalText(rawProfile?.bio),
     birth_date: normalizeOptionalText(rawProfile?.birth_date),
     city: normalizeOptionalText(rawProfile?.city),
+    cover_url: normalizeOptionalText(rawProfile?.cover_url),
     current_location_city: normalizeOptionalText(rawProfile?.current_location_city),
     current_location_country: normalizeOptionalText(rawProfile?.current_location_country),
     domicile: normalizeOptionalText(rawProfile?.domicile),
@@ -1516,7 +1521,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
   const { data: profileData, error: profileError } = await supabase
     .from("profiles_with_age")
     .select(
-      "id, full_name, role, birth_date, age, nationality, bio, avatar_url, region, city, gender, residence, domicile, residence_country, current_location_country, current_location_city, legal_status, is_open_to_transfer, languages",
+      "id, full_name, role, birth_date, age, nationality, bio, avatar_url, cover_url, region, city, gender, residence, domicile, residence_country, current_location_country, current_location_city, legal_status, is_open_to_transfer, languages",
     )
     .eq("id", profileId)
     .maybeSingle();

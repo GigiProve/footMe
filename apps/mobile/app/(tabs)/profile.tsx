@@ -100,6 +100,7 @@ import {
   type CompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
 import { removeMediaFromStorage } from "../../src/features/profiles/media-upload-service";
+import { fetchProfileSocialSummary } from "../../src/features/profiles/profile-social-service";
 import type { DirectorMediaLinkedTarget } from "../../src/features/profiles/director-media";
 import type { GroupedExperience } from "../../src/features/profiles/career/career-grouping";
 import type { CoachGroupedExperience } from "../../src/features/profiles/career/coach-career-grouping";
@@ -159,6 +160,11 @@ export default function ProfileScreen() {
     enabled: !!profileId,
     queryFn: () => getUnreadCount(profileId),
     queryKey: ["notifications-unread", profileId],
+  });
+  const { data: coachSocialSummary } = useQuery({
+    enabled: !!profileId && profile?.role === "coach",
+    queryFn: () => fetchProfileSocialSummary(profileId),
+    queryKey: ["profile-social-summary", profileId],
   });
 
   const loadPendingMemberships = useCallback(async () => {
@@ -765,18 +771,44 @@ export default function ProfileScreen() {
           />
         ) : completeProfile && role === "coach" && coachHeaderDetails ? (
           <CoachProfileHeader
+            assignmentLabel={coachHeaderDetails.assignmentLabel}
             availabilityBadges={coachHeaderDetails.availabilityBadges}
             avatarUrl={completeProfile.profile.avatar_url}
             bio={coachHeaderDetails.bio}
-            categoryLabel={coachHeaderDetails.categoryLabel}
+            categoryLocationLabel={coachHeaderDetails.categoryLocationLabel}
+            coverImageUrl={completeProfile.profile.cover_url}
             fullName={coachHeaderDetails.fullName}
             licenseBadges={coachHeaderDetails.licenseBadges}
-            locationLabel={coachHeaderDetails.locationLabel}
+            licenseYearsLabel={coachHeaderDetails.licenseYearsLabel}
             mode="owner"
+            onAddContentPress={() => handleEdit("coachMedia")}
             onEditProfilePress={() => handleEdit("editCoachProfile")}
+            onFollowersPress={() =>
+              router.push(
+                `/profile/connections?profileId=${userId}&mode=followers` as never,
+              )
+            }
+            onFollowingPress={() => router.push("/following" as never)}
+            onImagesChanged={() => void loadProfile()}
+            onMutualPress={() =>
+              router.push(
+                `/profile/connections?profileId=${userId}&mode=mutual` as never,
+              )
+            }
             primaryRole={coachHeaderDetails.primaryRole}
+            profileId={userId}
+            roleTypeLabel={coachHeaderDetails.roleTypeLabel}
+            socialSummary={
+              coachSocialSummary
+                ? {
+                    followerCount: coachSocialSummary.followerCount,
+                    followingCount: coachSocialSummary.followingCount,
+                    mutualPreview: coachSocialSummary.mutualPreview,
+                    mutualTotal: coachSocialSummary.mutualTotal,
+                  }
+                : undefined
+            }
             statusBadge={coachHeaderDetails.statusBadge}
-            teamLabel={coachHeaderDetails.teamLabel}
           />
         ) : completeProfile && role === "staff" && staffHeaderDetails ? (
           <StaffProfileHeader

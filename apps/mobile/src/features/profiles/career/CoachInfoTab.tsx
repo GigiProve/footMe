@@ -1,18 +1,21 @@
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing } from "../../../theme/tokens";
-import { AppText } from "../../../ui";
+import { AppText, Avatar } from "../../../ui";
 import { ContactSection } from "../contact-section";
+import { PublicBioBlock } from "../bio-section";
 import { getOptionLabel, REGION_OPTIONS } from "../profile-form-utils";
 import { computePlayerBackground } from "../profile-display-helpers";
 import type { CoachAchievementRecord, CompleteProfessionalProfile } from "../profile-service";
 import type { EditSection } from "../ProfileReadonlyView";
+import { groupCoachCareerEntries } from "./coach-career-grouping";
 
 type CoachInfoTabProps = {
   completeProfile: CompleteProfessionalProfile;
   isOwner: boolean;
   onEdit: (section: EditSection) => void;
+  onViewAllExperiences?: () => void;
 };
 
 const ACHIEVEMENT_ICONS: Record<CoachAchievementRecord["achievement_type"], string> = {
@@ -43,6 +46,7 @@ export function CoachInfoTab({
   completeProfile,
   isOwner,
   onEdit,
+  onViewAllExperiences,
 }: CoachInfoTabProps) {
   const coachProfile = completeProfile.coachProfile;
   const playerCareerEntries = completeProfile.coachPlayerCareerEntries ?? [];
@@ -53,12 +57,73 @@ export function CoachInfoTab({
   );
 
   const achievements = coachProfile?.achievements ?? [];
+  const bio = completeProfile.profile.bio?.trim() || "";
+  const recentExperiences = groupCoachCareerEntries(
+    completeProfile.coachCareerEntries ?? [],
+  ).slice(0, 3);
 
   return (
     <ScrollView
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
+      {/* 0. INFORMAZIONI */}
+      {bio ? (
+        <View style={styles.section}>
+          <SectionLabel>Informazioni</SectionLabel>
+          <PublicBioBlock bio={bio} variant="plain" />
+        </View>
+      ) : null}
+
+      {/* 0.1 ESPERIENZE RECENTI */}
+      {recentExperiences.length > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <SectionLabel>Esperienze recenti</SectionLabel>
+            {onViewAllExperiences ? (
+              <Pressable
+                accessibilityLabel="Vedi tutte le esperienze"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={onViewAllExperiences}
+              >
+                <AppText color="accent" variant="bodySm">
+                  Vedi tutte
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={styles.recentExperienceList}>
+            {recentExperiences.map((experience) => (
+              <View key={experience.entryId} style={styles.recentExperienceItem}>
+                {experience.teamLogoUrl ? (
+                  <Image
+                    source={{ uri: experience.teamLogoUrl }}
+                    style={styles.recentExperienceLogo}
+                  />
+                ) : (
+                  <Avatar name={experience.teamName} size="md" square />
+                )}
+                <View style={styles.recentExperienceContent}>
+                  <AppText numberOfLines={1} style={styles.recentExperienceRole} variant="bodySm">
+                    {experience.roleLabel}
+                  </AppText>
+                  <AppText color="secondary" numberOfLines={1} variant="caption">
+                    {experience.teamName}
+                    {experience.seasons[0]?.assignments[0]?.category
+                      ? ` · ${experience.seasons[0].assignments[0].category}`
+                      : ""}
+                  </AppText>
+                  <AppText color="secondary" variant="caption">
+                    {experience.durationLabel}
+                  </AppText>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       {/* 1. STATUS & DISPONIBILITÀ */}
       <View style={styles.section}>
         {(coachProfile?.current_club || completeProfile.profile.role) ? (
@@ -288,6 +353,26 @@ const styles = StyleSheet.create({
   },
   section: {
     position: "relative",
+  },
+  recentExperienceList: {
+    gap: spacing[14],
+  },
+  recentExperienceItem: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[12],
+  },
+  recentExperienceLogo: {
+    borderRadius: radius[8],
+    height: 44,
+    width: 44,
+  },
+  recentExperienceContent: {
+    flex: 1,
+    gap: spacing[4],
+  },
+  recentExperienceRole: {
+    fontWeight: "600",
   },
   sectionLabel: {
     color: colors.textSecondary,

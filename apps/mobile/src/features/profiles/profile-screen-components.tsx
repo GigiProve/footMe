@@ -1,10 +1,20 @@
-import { type ReactNode } from "react";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { type ReactNode, useState } from "react";
+import { Alert, Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { withDefaultProfileAvatar } from "./profile-avatar";
+import {
+  captureAndUploadPhoto,
+  pickAndUploadMedia,
+  removeMediaFromStorage,
+} from "./media-upload-service";
+import {
+  updateProfileAvatarUrl,
+  updateProfileCoverUrl,
+  type ProfileConnectionPreview,
+} from "./profile-social-service";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
-import { AppText, Avatar, Badge, Button, Divider, Input } from "../../ui";
+import { AppText, ActionSheet, Avatar, Badge, Button, Divider, Input } from "../../ui";
 
 type ProfileHeaderProps = {
   avatarUrl: string | null | undefined;
@@ -69,19 +79,32 @@ type PlayerProfileHeaderProps = {
   weightLabel: string;
 };
 
+export type CoachProfileSocialSummary = {
+  followerCount: number;
+  followingCount: number;
+  mutualPreview: ProfileConnectionPreview[];
+  mutualTotal: number;
+};
+
 type CoachProfileHeaderProps = {
+  assignmentLabel?: string;
   availabilityBadges?: string[];
   avatarUrl: string | null | undefined;
   bio?: string | null;
-  categoryLabel?: string;
+  categoryLocationLabel?: string;
   coverImageUrl?: string | null;
   fullName: string;
   licenseBadges?: string[];
-  locationLabel?: string;
+  licenseYearsLabel?: string;
   mode: PlayerProfileHeaderMode;
+  onAddContentPress?: () => void;
   onContactPress?: () => void;
   onEditProfilePress?: () => void;
+  onFollowersPress?: () => void;
+  onFollowingPress?: () => void;
   onFollowPress?: () => void;
+  onImagesChanged?: () => void;
+  onMutualPress?: () => void;
   isFollowed?: boolean;
   isMessaging?: boolean;
   isSaved?: boolean;
@@ -89,8 +112,11 @@ type CoachProfileHeaderProps = {
   isShortlisted?: boolean;
   onShortlistPress?: () => void;
   primaryRole: string;
+  profileId?: string;
+  // Profile-type line under the name (e.g. "Allenatore"); falls back to primaryRole.
+  roleTypeLabel?: string;
+  socialSummary?: CoachProfileSocialSummary;
   statusBadge?: string;
-  teamLabel?: string;
 };
 
 const DEFAULT_PLAYER_COVER_URI =
@@ -287,18 +313,24 @@ export function PlayerProfileHeader({
 }
 
 export function CoachProfileHeader({
+  assignmentLabel,
   availabilityBadges = [],
   avatarUrl,
   bio,
-  categoryLabel,
+  categoryLocationLabel,
   coverImageUrl,
   fullName,
   licenseBadges = [],
-  locationLabel,
+  licenseYearsLabel,
   mode,
+  onAddContentPress,
   onContactPress,
   onEditProfilePress,
+  onFollowersPress,
+  onFollowingPress,
   onFollowPress,
+  onImagesChanged,
+  onMutualPress,
   isFollowed,
   isMessaging,
   isSaved,
@@ -306,9 +338,12 @@ export function CoachProfileHeader({
   isShortlisted,
   onShortlistPress,
   primaryRole,
+  profileId,
+  roleTypeLabel,
+  socialSummary,
   statusBadge,
-  teamLabel,
 }: CoachProfileHeaderProps) {
+  const isOwner = mode === "owner";
   const resolvedAvatarUrl = withDefaultProfileAvatar(avatarUrl);
   const infoGroups = [
     {
@@ -332,60 +367,103 @@ export function CoachProfileHeader({
           style={styles.playerCoverImage}
         />
         <View pointerEvents="none" style={styles.playerCoverOverlay} />
+        {isOwner && profileId ? (
+          <ProfileImageEditButton
+            currentUrl={coverImageUrl ?? null}
+            kind="cover"
+            onChanged={onImagesChanged}
+            profileId={profileId}
+            style={styles.coverEditButton}
+          />
+        ) : null}
         <View style={styles.playerAvatarShell}>
           <Avatar name={fullName} size="xl" uri={resolvedAvatarUrl} />
+          {isOwner && profileId ? (
+            <ProfileImageEditButton
+              currentUrl={avatarUrl ?? null}
+              kind="avatar"
+              onChanged={onImagesChanged}
+              profileId={profileId}
+              style={styles.avatarEditButton}
+            />
+          ) : null}
         </View>
         <View style={styles.playerHeroContent}>
           <View style={styles.playerIdentityStack}>
             <AppText variant="headingLg">{fullName}</AppText>
             <View style={styles.playerRoleRow}>
               <AppText color="accent" style={styles.playerPrimaryRole} variant="titleSm">
-                {primaryRole}
+                {roleTypeLabel ?? primaryRole}
               </AppText>
             </View>
-            {teamLabel ? (
+            {assignmentLabel ? (
               <View style={styles.playerMetaRow}>
                 <Ionicons color={colors.textSecondary} name="shield-outline" size={15} />
                 <AppText color="secondary" variant="bodySm">
-                  {teamLabel}
+                  {assignmentLabel}
                 </AppText>
               </View>
             ) : null}
-            {categoryLabel ? (
+            {categoryLocationLabel ? (
               <View style={styles.playerMetaRow}>
-                <Ionicons color={colors.textSecondary} name="layers-outline" size={15} />
+                <Ionicons color={colors.textSecondary} name="trophy-outline" size={15} />
                 <AppText color="secondary" variant="bodySm">
-                  {categoryLabel}
+                  {categoryLocationLabel}
                 </AppText>
               </View>
             ) : null}
-            {locationLabel ? (
+            {licenseYearsLabel ? (
               <View style={styles.playerMetaRow}>
-                <Ionicons color={colors.textSecondary} name="location-outline" size={15} />
+                <Ionicons color={colors.textSecondary} name="school-outline" size={15} />
                 <AppText color="secondary" variant="bodySm">
-                  {locationLabel}
+                  {licenseYearsLabel}
                 </AppText>
               </View>
             ) : null}
           </View>
 
           {statusBadge ? (
-            <View style={styles.playerStatusBadge}>
-              <Ionicons color={colors.successForeground} name="checkmark-circle" size={16} />
+            <View style={styles.coachAvailabilityPill}>
+              <View style={styles.coachAvailabilityDot} />
               <AppText color="success" variant="caption">
                 {statusBadge}
               </AppText>
             </View>
           ) : null}
 
+          {socialSummary ? (
+            <CoachSocialRow
+              onFollowersPress={onFollowersPress}
+              onFollowingPress={onFollowingPress}
+              summary={socialSummary}
+            />
+          ) : null}
+
+          {socialSummary && socialSummary.mutualTotal > 0 ? (
+            <CoachMutualConnectionsRow
+              onPress={onMutualPress}
+              summary={socialSummary}
+            />
+          ) : null}
+
           <View style={styles.playerActionsRow}>
             {mode === "owner" ? (
-              <HeaderActionButton
-                icon="create-outline"
-                label="Modifica profilo"
-                onPress={onEditProfilePress}
-                variant="primary"
-              />
+              <>
+                <HeaderActionButton
+                  icon="create-outline"
+                  label="Modifica profilo"
+                  onPress={onEditProfilePress}
+                  variant="primary"
+                />
+                {onAddContentPress ? (
+                  <HeaderActionButton
+                    icon="add-circle-outline"
+                    label="Aggiungi contenuto"
+                    onPress={onAddContentPress}
+                    variant="secondary"
+                  />
+                ) : null}
+              </>
             ) : (
               <VisitorHeaderActions
                 isContactPending={isMessaging}
@@ -439,6 +517,247 @@ export function CoachProfileHeader({
         </>
       ) : null}
     </View>
+  );
+}
+
+function CoachSocialRow({
+  onFollowersPress,
+  onFollowingPress,
+  summary,
+}: {
+  onFollowersPress?: () => void;
+  onFollowingPress?: () => void;
+  summary: CoachProfileSocialSummary;
+}) {
+  return (
+    <View style={styles.socialRow}>
+      <Ionicons color={colors.textSecondary} name="people-outline" size={15} />
+      <Pressable
+        accessibilityLabel={`${summary.followerCount} follower`}
+        accessibilityRole="button"
+        disabled={!onFollowersPress}
+        hitSlop={6}
+        onPress={onFollowersPress}
+      >
+        <AppText color="secondary" variant="bodySm">
+          {summary.followerCount} follower
+        </AppText>
+      </Pressable>
+      <AppText color="secondary" variant="bodySm">
+        {" "}
+        ·{" "}
+      </AppText>
+      <Pressable
+        accessibilityLabel={`${summary.followingCount} seguiti`}
+        accessibilityRole="button"
+        disabled={!onFollowingPress}
+        hitSlop={6}
+        onPress={onFollowingPress}
+      >
+        <AppText color="secondary" variant="bodySm">
+          {summary.followingCount} seguiti
+        </AppText>
+      </Pressable>
+    </View>
+  );
+}
+
+function CoachMutualConnectionsRow({
+  onPress,
+  summary,
+}: {
+  onPress?: () => void;
+  summary: CoachProfileSocialSummary;
+}) {
+  const shown = summary.mutualPreview.slice(0, 3);
+  const namedShown = summary.mutualPreview.slice(0, 2);
+  const remaining = summary.mutualTotal - namedShown.length;
+  const namesText =
+    namedShown.length === 1
+      ? namedShown[0].displayName
+      : namedShown.length === 2
+        ? `${namedShown[0].displayName} e ${namedShown[1].displayName}`
+        : "";
+  const remainderText =
+    remaining <= 0
+      ? ""
+      : remaining === 1
+        ? " e un'altra persona"
+        : ` e altre ${remaining} persone`;
+
+  return (
+    <Pressable
+      accessibilityLabel="Vedi connessioni in comune"
+      accessibilityRole="button"
+      disabled={!onPress}
+      onPress={onPress}
+      style={styles.mutualRow}
+    >
+      <View style={styles.mutualAvatarStack}>
+        {shown.map((connection, index) => (
+          <View
+            key={connection.profileId}
+            style={[styles.mutualAvatarWrap, index > 0 ? styles.mutualAvatarOverlap : null]}
+          >
+            <Avatar name={connection.displayName} size="sm" uri={connection.avatarUrl} />
+          </View>
+        ))}
+        {summary.mutualTotal > shown.length ? (
+          <View style={[styles.mutualAvatarWrap, styles.mutualAvatarOverlap, styles.mutualAvatarMore]}>
+            <AppText color="inverse" variant="caption">
+              +{summary.mutualTotal - shown.length}
+            </AppText>
+          </View>
+        ) : null}
+      </View>
+      <AppText color="secondary" numberOfLines={2} style={styles.mutualText} variant="bodySm">
+        Seguito da{" "}
+        <AppText color="accent" variant="bodySm">
+          {namesText}
+        </AppText>
+        {remainderText}
+      </AppText>
+    </Pressable>
+  );
+}
+
+type ProfileImageEditKind = "cover" | "avatar";
+
+function ProfileImageEditButton({
+  currentUrl,
+  kind,
+  onChanged,
+  profileId,
+  style,
+}: {
+  currentUrl: string | null;
+  kind: ProfileImageEditKind;
+  onChanged?: () => void;
+  profileId: string;
+  style?: object;
+}) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const isCover = kind === "cover";
+  const accessibilityLabel = isCover ? "Modifica copertina" : "Modifica foto profilo";
+  const folder = isCover ? "cover" : "avatar";
+
+  async function runGuarded(task: () => Promise<void>) {
+    if (isBusy) {
+      return;
+    }
+
+    setIsBusy(true);
+    try {
+      await task();
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handlePicked(uploaded: { url: string }[]) {
+    const uploadedUrl = uploaded[0]?.url;
+    if (!uploadedUrl) {
+      return;
+    }
+
+    try {
+      if (isCover) {
+        await updateProfileCoverUrl(profileId, uploadedUrl);
+      } else {
+        await updateProfileAvatarUrl(profileId, uploadedUrl);
+      }
+      onChanged?.();
+    } catch {
+      Alert.alert("Errore", "Impossibile aggiornare l'immagine. Riprova.");
+    }
+  }
+
+  async function handlePickFromLibrary() {
+    try {
+      const uploaded = await pickAndUploadMedia({
+        folder,
+        mediaTypes: ["images"],
+        userId: profileId,
+      });
+      await handlePicked(uploaded);
+    } catch {
+      Alert.alert("Errore", "Impossibile selezionare l'immagine. Riprova.");
+    }
+  }
+
+  async function handleCapturePhoto() {
+    try {
+      const uploaded = await captureAndUploadPhoto({
+        folder,
+        userId: profileId,
+      });
+      await handlePicked(uploaded);
+    } catch {
+      Alert.alert("Errore", "Impossibile scattare la foto. Riprova.");
+    }
+  }
+
+  async function handleRemove() {
+    if (!currentUrl) {
+      return;
+    }
+
+    try {
+      await removeMediaFromStorage(currentUrl);
+      if (isCover) {
+        await updateProfileCoverUrl(profileId, null);
+      } else {
+        await updateProfileAvatarUrl(profileId, null);
+      }
+      onChanged?.();
+    } catch {
+      Alert.alert("Errore", "Impossibile rimuovere l'immagine. Riprova.");
+    }
+  }
+
+  const actions = [
+    {
+      icon: "images-outline" as const,
+      label: "Scegli dalla galleria",
+      onPress: () => void runGuarded(handlePickFromLibrary),
+    },
+    {
+      icon: "camera-outline" as const,
+      label: "Scatta una foto",
+      onPress: () => void runGuarded(handleCapturePhoto),
+    },
+    ...(currentUrl
+      ? [
+          {
+            destructive: true,
+            icon: "trash-outline" as const,
+            label: isCover ? "Rimuovi copertina" : "Rimuovi foto",
+            onPress: () => void runGuarded(handleRemove),
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <>
+      <Pressable
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="button"
+        disabled={isBusy}
+        hitSlop={8}
+        onPress={() => setIsVisible(true)}
+        style={[styles.imageEditButton, style]}
+      >
+        <Ionicons color={colors.textPrimary} name="pencil" size={14} />
+      </Pressable>
+      <ActionSheet
+        actions={actions}
+        onClose={() => setIsVisible(false)}
+        title={isCover ? "Copertina profilo" : "Foto profilo"}
+        visible={isVisible}
+      />
+    </>
   );
 }
 
@@ -895,6 +1214,74 @@ const styles = StyleSheet.create({
   },
   clubLogoAvatar: {
     borderRadius: radius[12],
+  },
+  coverEditButton: {
+    position: "absolute",
+    right: spacing[12],
+    top: spacing[12],
+  },
+  avatarEditButton: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+  },
+  imageEditButton: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.full,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  coachAvailabilityPill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[6],
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[10],
+    paddingVertical: spacing[4],
+    backgroundColor: colors.successSoft,
+  },
+  coachAvailabilityDot: {
+    width: 6,
+    height: 6,
+    borderRadius: radius.full,
+    backgroundColor: colors.success,
+  },
+  socialRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[4],
+  },
+  mutualRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[10],
+  },
+  mutualAvatarStack: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  mutualAvatarWrap: {
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  mutualAvatarOverlap: {
+    marginLeft: -10,
+  },
+  mutualAvatarMore: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.textSecondary,
+  },
+  mutualText: {
+    flex: 1,
   },
   clubLogoPlaceholder: {
     alignItems: "center",

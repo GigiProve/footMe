@@ -42,6 +42,19 @@ vi.mock("./fan-media-service", () => ({
   unfollowProfile: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("./profile-social-service", () => ({
+  fetchProfileFollowers: vi.fn().mockResolvedValue([]),
+  fetchProfileMutualConnections: vi.fn().mockResolvedValue([]),
+  fetchProfileSocialSummary: vi.fn().mockResolvedValue({
+    followerCount: 0,
+    followingCount: 0,
+    mutualPreview: [],
+    mutualTotal: 0,
+  }),
+  updateProfileAvatarUrl: vi.fn().mockResolvedValue(undefined),
+  updateProfileCoverUrl: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("../saved/saved-service", () => ({
   fetchProfileSaveState: vi.fn().mockResolvedValue(false),
   saveProfile: vi.fn().mockResolvedValue(undefined),

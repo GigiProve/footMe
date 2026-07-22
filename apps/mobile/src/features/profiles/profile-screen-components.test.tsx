@@ -14,6 +14,17 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: (props: Record<string, unknown>) => React.createElement("Ionicon", props),
 }));
 
+vi.mock("./media-upload-service", () => ({
+  captureAndUploadPhoto: vi.fn(),
+  pickAndUploadMedia: vi.fn(),
+  removeMediaFromStorage: vi.fn(),
+}));
+
+vi.mock("./profile-social-service", () => ({
+  updateProfileAvatarUrl: vi.fn(),
+  updateProfileCoverUrl: vi.fn(),
+}));
+
 describe("profile-screen-components", () => {
   it("renders readonly profile fields with a fallback value", () => {
     let tree: TestRenderer.ReactTestRenderer;
@@ -163,27 +174,103 @@ describe("profile-screen-components", () => {
     act(() => {
       tree = TestRenderer.create(
         <CoachProfileHeader
+          assignmentLabel="Allenatore Prima Squadra · AC Como"
           availabilityBadges={["Lombardia", "Piemonte"]}
           avatarUrl=""
           bio="Allenatore focalizzato su intensità e organizzazione."
-          categoryLabel="Promozione"
-          fullName="Luca Bianchi"
-          licenseBadges={["UEFA B"]}
-          locationLabel="Milano, Lombardia"
+          categoryLocationLabel="Serie D · Milano, Lombardia"
+          fullName="Marco Rossi"
+          licenseBadges={["UEFA A"]}
+          licenseYearsLabel="UEFA A · 8 anni di esperienza"
           mode="owner"
+          onAddContentPress={() => undefined}
           onEditProfilePress={() => undefined}
-          primaryRole="Allenatore"
-          statusBadge="Disponibile per nuove panchine"
-          teamLabel="USD Virtus"
+          onFollowersPress={() => undefined}
+          onFollowingPress={() => undefined}
+          onMutualPress={() => undefined}
+          primaryRole="Allenatore Prima Squadra"
+          profileId="coach-1"
+          roleTypeLabel="Allenatore"
+          socialSummary={{
+            followerCount: 428,
+            followingCount: 186,
+            mutualPreview: [
+              { profileId: "p1", displayName: "Luca Bianchi", avatarUrl: null },
+              { profileId: "p2", displayName: "Varese Calcio", avatarUrl: null },
+            ],
+            mutualTotal: 14,
+          }}
+          statusBadge="Disponibile"
         />,
       );
     });
 
-    expect(tree!.root.findByProps({ children: "Luca Bianchi" })).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "Marco Rossi" })).toBeTruthy();
     expect(tree!.root.findByProps({ children: "Allenatore" })).toBeTruthy();
-    expect(tree!.root.findByProps({ children: "USD Virtus" })).toBeTruthy();
-    expect(tree!.root.findByProps({ children: "Promozione" })).toBeTruthy();
+    expect(
+      tree!.root.findByProps({ children: "Allenatore Prima Squadra · AC Como" }),
+    ).toBeTruthy();
+    expect(
+      tree!.root.findByProps({ children: "Serie D · Milano, Lombardia" }),
+    ).toBeTruthy();
+    expect(
+      tree!.root.findByProps({ children: "UEFA A · 8 anni di esperienza" }),
+    ).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "Disponibile" })).toBeTruthy();
     expect(tree!.root.findByProps({ accessibilityLabel: "Modifica profilo" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "Aggiungi contenuto" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "Modifica copertina" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "Modifica foto profilo" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "428 follower" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "186 seguiti" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "Vedi connessioni in comune" })).toBeTruthy();
     expect(tree!.root.findByProps({ children: "Licenze" })).toBeTruthy();
+  });
+
+  it("renders the shared coach header in visitor mode without owner-only controls", () => {
+    let tree: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(
+        <CoachProfileHeader
+          avatarUrl=""
+          fullName="Marco Rossi"
+          mode="visitor"
+          onContactPress={() => undefined}
+          onFollowPress={() => undefined}
+          primaryRole="Allenatore"
+        />,
+      );
+    });
+
+    expect(tree!.root.findByProps({ accessibilityLabel: "Segui" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "Contatta" })).toBeTruthy();
+    expect(() => tree!.root.findByProps({ accessibilityLabel: "Modifica profilo" })).toThrow();
+    expect(() => tree!.root.findByProps({ accessibilityLabel: "Aggiungi contenuto" })).toThrow();
+    expect(() => tree!.root.findByProps({ accessibilityLabel: "Modifica copertina" })).toThrow();
+    expect(() => tree!.root.findByProps({ accessibilityLabel: "Modifica foto profilo" })).toThrow();
+  });
+
+  it("hides coach header rows that have no reliable data instead of showing empty placeholders", () => {
+    let tree: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(
+        <CoachProfileHeader
+          avatarUrl=""
+          fullName="Marco Rossi"
+          mode="owner"
+          onEditProfilePress={() => undefined}
+          primaryRole="Allenatore"
+          profileId="coach-1"
+        />,
+      );
+    });
+
+    expect(tree!.root.findByProps({ children: "Marco Rossi" })).toBeTruthy();
+    expect(() =>
+      tree!.root.findByProps({ accessibilityLabel: "Vedi connessioni in comune" }),
+    ).toThrow();
+    expect(() => tree!.root.findByProps({ children: "Licenze" })).toThrow();
   });
 });

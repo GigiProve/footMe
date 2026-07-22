@@ -62,6 +62,7 @@ import {
   saveProfile,
   unsaveProfile,
 } from "../saved/saved-service";
+import { fetchProfileSocialSummary } from "./profile-social-service";
 import { AddToShortlistFlow } from "../shortlist/components/AddToShortlistFlow";
 import { useShortlistPermissions } from "../shortlist/use-shortlist-permissions";
 import { fetchProfileShortlistMemberships } from "../shortlist/shortlist-service";
@@ -166,6 +167,12 @@ export function PublicProfileScreen() {
       completeProfile ? buildStaffProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
+
+  const { data: coachSocialSummary } = useQuery({
+    enabled: !!viewedProfileId && completeProfile?.profile.role === "coach",
+    queryFn: () => fetchProfileSocialSummary(viewedProfileId as string),
+    queryKey: ["profile-social-summary", viewedProfileId],
+  });
 
   const shortlistProfileSubtitle =
     playerHeaderDetails?.primaryRole ??
@@ -570,6 +577,7 @@ export function PublicProfileScreen() {
               completeProfile={completeProfile}
               agentHeaderDetails={agentHeaderDetails}
               coachHeaderDetails={coachHeaderDetails}
+              coachSocialSummary={coachSocialSummary}
               headerDetails={headerDetails}
               isFollowed={isFollowed}
               isMessaging={
@@ -581,7 +589,17 @@ export function PublicProfileScreen() {
               onContactPress={
                 canFollowOrSave ? () => handleMessageProfile(completeProfile) : undefined
               }
+              onFollowersPress={() =>
+                router.push(
+                  `/profile/connections?profileId=${completeProfile.profile.id}&mode=followers` as never,
+                )
+              }
               onFollowPress={canFollowOrSave ? handleToggleFollow : undefined}
+              onMutualPress={() =>
+                router.push(
+                  `/profile/connections?profileId=${completeProfile.profile.id}&mode=mutual` as never,
+                )
+              }
               onShortlistPress={canUseShortlistStar ? handleShortlistPress : undefined}
               playerHeaderDetails={playerHeaderDetails}
               staffHeaderDetails={staffHeaderDetails}
@@ -670,13 +688,16 @@ function ProfileHeaderBlock({
   completeProfile,
   agentHeaderDetails,
   coachHeaderDetails,
+  coachSocialSummary,
   headerDetails,
   isFollowed,
   isMessaging,
   isSaved,
   isShortlisted,
   onContactPress,
+  onFollowersPress,
   onFollowPress,
+  onMutualPress,
   onSavePress,
   onShortlistPress,
   playerHeaderDetails,
@@ -685,13 +706,16 @@ function ProfileHeaderBlock({
   completeProfile: CompleteProfessionalProfile;
   agentHeaderDetails: ReturnType<typeof buildAgentProfileHeaderDetails>;
   coachHeaderDetails: ReturnType<typeof buildCoachProfileHeaderDetails>;
+  coachSocialSummary?: Awaited<ReturnType<typeof fetchProfileSocialSummary>>;
   headerDetails: ReturnType<typeof buildHeaderDetails> | null;
   isFollowed: boolean;
   isMessaging?: boolean;
   isSaved: boolean;
   isShortlisted?: boolean;
   onContactPress?: () => void;
+  onFollowersPress?: () => void;
   onFollowPress?: () => void;
+  onMutualPress?: () => void;
   onSavePress?: () => void;
   onShortlistPress?: () => void;
   playerHeaderDetails: ReturnType<typeof buildPlayerProfileHeaderDetails>;
@@ -733,25 +757,30 @@ function ProfileHeaderBlock({
   if (role === "coach" && coachHeaderDetails) {
     return (
       <CoachProfileHeader
+        assignmentLabel={coachHeaderDetails.assignmentLabel}
         availabilityBadges={coachHeaderDetails.availabilityBadges}
         avatarUrl={completeProfile.profile.avatar_url}
         bio={coachHeaderDetails.bio}
-        categoryLabel={coachHeaderDetails.categoryLabel}
+        categoryLocationLabel={coachHeaderDetails.categoryLocationLabel}
+        coverImageUrl={completeProfile.profile.cover_url}
         fullName={coachHeaderDetails.fullName}
         licenseBadges={coachHeaderDetails.licenseBadges}
-        locationLabel={coachHeaderDetails.locationLabel}
+        licenseYearsLabel={coachHeaderDetails.licenseYearsLabel}
         mode="visitor"
         isFollowed={isFollowed}
         isMessaging={isMessaging}
         isSaved={isSaved}
         isShortlisted={isShortlisted}
         onContactPress={onContactPress}
+        onFollowersPress={onFollowersPress}
         onFollowPress={onFollowPress}
+        onMutualPress={onMutualPress}
         onSavePress={onSavePress}
         onShortlistPress={onShortlistPress}
         primaryRole={coachHeaderDetails.primaryRole}
+        roleTypeLabel={coachHeaderDetails.roleTypeLabel}
+        socialSummary={coachSocialSummary}
         statusBadge={coachHeaderDetails.statusBadge}
-        teamLabel={coachHeaderDetails.teamLabel}
       />
     );
   }
