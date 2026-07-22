@@ -1,13 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
@@ -17,20 +8,8 @@ import { Screen } from "../../../components/ui/screen";
 import { KeyboardAwareForm } from "../../../components/ui/keyboard-aware-form";
 import { useSession } from "../../auth/use-session";
 import { colors, radius, spacing } from "../../../theme/tokens";
-import {
-  AppText,
-  Avatar,
-  Badge,
-  EmptyState,
-  ListItem,
-  ModalHeader,
-} from "../../../ui";
-import {
-  fetchNotifications,
-  getUnreadCount,
-  markNotificationRead,
-} from "../notification-service";
-import type { AppNotification } from "../membership-types";
+import { AppText, Avatar, HeaderBell, ListItem } from "../../../ui";
+import { getUnreadCount } from "../notification-service";
 import { fetchPublicClubProfile } from "../club-service";
 
 type ClubMenuItem = {
@@ -85,8 +64,8 @@ const MENU_ITEMS_AFTER: ClubMenuItem[] = [
 
 export function ClubDashboard() {
   const router = useRouter();
-  const { profile, session } = useSession();
-  const userId = session?.user?.id;
+  const { profile } = useSession();
+  const profileId = profile?.id ?? null;
   const clubId = profile?.club_id ?? null;
 
   const { data: clubProfile } = useQuery({
@@ -95,49 +74,11 @@ export function ClubDashboard() {
     queryKey: ["club-public-profile", clubId],
   });
 
-  // Notifications
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isNotificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-
-  const loadUnreadCount = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const count = await getUnreadCount(userId);
-      setUnreadCount(count);
-    } catch {
-      // Ignore
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    loadUnreadCount();
-  }, [loadUnreadCount]);
-
-  async function handleOpenNotifications() {
-    if (!userId) return;
-    try {
-      const data = await fetchNotifications(userId);
-      setNotifications(data);
-      setNotificationsOpen(true);
-    } catch {
-      Alert.alert("Errore", "Impossibile caricare le notifiche");
-    }
-  }
-
-  async function handleMarkRead(notificationId: string) {
-    try {
-      await markNotificationRead(notificationId);
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notificationId ? { ...n, is_read: true } : n,
-        ),
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {
-      // Ignore
-    }
-  }
+  const { data: unreadCount = 0 } = useQuery({
+    enabled: !!profileId,
+    queryFn: () => getUnreadCount(profileId as string),
+    queryKey: ["notifications-unread", profileId],
+  });
 
   function handleMenuPress(route: string) {
     router.push(route as never);
@@ -150,29 +91,10 @@ export function ClubDashboard() {
       <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
         <View style={styles.topBar}>
           <AppText variant="headingMd">Dashboard società</AppText>
-          <Pressable
-            accessibilityLabel="Notifiche"
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={handleOpenNotifications}
-            style={({ pressed }) => [
-              styles.bellButton,
-              pressed ? styles.pressed : null,
-            ]}
-          >
-            <Ionicons
-              color={colors.textPrimary}
-              name={unreadCount > 0 ? "notifications" : "notifications-outline"}
-              size={20}
-            />
-            {unreadCount > 0 ? (
-              <View style={styles.bellBadge}>
-                <AppText color="inverse" variant="caption">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </AppText>
-              </View>
-            ) : null}
-          </Pressable>
+          <HeaderBell
+            count={unreadCount}
+            onPress={() => router.push("/notifications")}
+          />
         </View>
 
         <View style={styles.clubHeader}>
@@ -291,80 +213,11 @@ export function ClubDashboard() {
           />
         </View>
       </KeyboardAwareForm>
-
-      {/* Notifications Modal */}
-      <Modal
-        animationType="slide"
-        onRequestClose={() => setNotificationsOpen(false)}
-        visible={isNotificationsOpen}
-      >
-        <SafeAreaView style={styles.notificationsRoot}>
-          <ModalHeader
-            onClose={() => setNotificationsOpen(false)}
-            title="Notifiche"
-          />
-          {notifications.length === 0 ? (
-            <View style={styles.notificationsEmpty}>
-              <EmptyState
-                icon="notifications-outline"
-                title="Nessuna notifica"
-                description="Le notifiche sui membri della tua rosa appariranno qui"
-              />
-            </View>
-          ) : (
-            <FlatList
-              contentContainerStyle={styles.notificationsList}
-              data={notifications}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <ListItem
-                  left={
-                    <Ionicons
-                      color={item.is_read ? colors.textMuted : colors.accent}
-                      name={
-                        item.is_read ? "notifications-outline" : "notifications"
-                      }
-                      size={22}
-                    />
-                  }
-                  onPress={() => handleMarkRead(item.id)}
-                  right={
-                    !item.is_read ? (
-                      <Badge label="Nuova" variant="accent" />
-                    ) : undefined
-                  }
-                  subtitle={item.body ?? ""}
-                  title={item.title}
-                />
-              )}
-            />
-          )}
-        </SafeAreaView>
-      </Modal>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  bellBadge: {
-    alignItems: "center",
-    backgroundColor: colors.danger,
-    borderRadius: radius.full,
-    justifyContent: "center",
-    minWidth: 16,
-    paddingHorizontal: spacing[4],
-    position: "absolute",
-    right: -4,
-    top: -4,
-  },
-  bellButton: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.full,
-    height: 40,
-    justifyContent: "center",
-    width: 40,
-  },
   clubDescription: {
     marginTop: spacing[4],
   },
@@ -417,18 +270,6 @@ const styles = StyleSheet.create({
   },
   menuRow: {
     paddingHorizontal: 0,
-  },
-  notificationsEmpty: {
-    flex: 1,
-    justifyContent: "center",
-    padding: spacing[20],
-  },
-  notificationsList: {
-    padding: spacing[12],
-  },
-  notificationsRoot: {
-    backgroundColor: colors.background,
-    flex: 1,
   },
   pressed: {
     opacity: 0.82,

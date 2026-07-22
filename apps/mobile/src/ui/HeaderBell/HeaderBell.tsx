@@ -20,7 +20,7 @@ export function HeaderBell({ count, onPress }: HeaderBellProps) {
       <Ionicons color={colors.textMuted} name="notifications-outline" size={22} />
       {count > 0 ? (
         <View style={styles.badgePosition}>
-          <NotificationBadge count={count} />
+          <NotificationBadge count={count} tone="accent" />
         </View>
       ) : null}
     </Pressable>

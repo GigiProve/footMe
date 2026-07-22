@@ -9,6 +9,8 @@ export type InboxTab = "chat" | "comunicazioni";
 type InboxTabBarProps = {
   activeTab: InboxTab;
   onTabChange: (tab: InboxTab) => void;
+  chatCount?: number;
+  comunicazioniCount?: number;
 };
 
 const TABS: { icon: keyof typeof Ionicons.glyphMap; label: string; value: InboxTab }[] = [
@@ -16,15 +18,22 @@ const TABS: { icon: keyof typeof Ionicons.glyphMap; label: string; value: InboxT
   { icon: "megaphone-outline", label: "Comunicazioni", value: "comunicazioni" },
 ];
 
-export function InboxTabBar({ activeTab, onTabChange }: InboxTabBarProps) {
+export function InboxTabBar({
+  activeTab,
+  onTabChange,
+  chatCount = 0,
+  comunicazioniCount = 0,
+}: InboxTabBarProps) {
   return (
     <View style={styles.container}>
       {TABS.map((tab) => {
         const isActive = tab.value === activeTab;
+        const count = tab.value === "chat" ? chatCount : comunicazioniCount;
+        const label = count > 0 ? `${tab.label} · ${count}` : tab.label;
 
         return (
           <Pressable
-            accessibilityLabel={tab.label}
+            accessibilityLabel={label}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
             key={tab.value}
@@ -41,7 +50,7 @@ export function InboxTabBar({ activeTab, onTabChange }: InboxTabBarProps) {
               style={styles.label}
               variant="overline"
             >
-              {tab.label}
+              {label}
             </AppText>
           </Pressable>
         );

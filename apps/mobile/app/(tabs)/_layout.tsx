@@ -3,15 +3,36 @@ import { Pressable, SafeAreaView, StyleSheet, View } from "react-native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Redirect, Tabs } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 
 import { useSession } from "../../src/features/auth/use-session";
+import { fetchCommunications } from "../../src/features/messaging/communications-service";
+import { fetchInboxConversations } from "../../src/features/messaging/messaging-service";
 import { AppSidebar } from "../../src/ui/sidebar";
 import { colors, radius, shadows, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
 import { Icon, type IconName } from "../../src/ui";
 
 export default function TabsLayout() {
-  const { isLoading, needsOnboarding, session } = useSession();
+  const { isLoading, needsOnboarding, profile, session } = useSession();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const profileId = profile?.id ?? "";
+
+  const conversationsQuery = useQuery({
+    enabled: !!profileId,
+    queryFn: () => fetchInboxConversations(),
+    queryKey: ["inbox-conversations", profileId],
+  });
+
+  const communicationsQuery = useQuery({
+    enabled: !!profileId,
+    queryFn: () => fetchCommunications(),
+    queryKey: ["communications", profileId],
+  });
+
+  const unreadThreadsCount = profileId
+    ? (conversationsQuery.data ?? []).filter((item) => item.unread_count > 0).length +
+      (communicationsQuery.data ?? []).filter((item) => !item.is_read).length
+    : 0;
 
   if (isLoading) {
     return null;
@@ -60,7 +81,11 @@ export default function TabsLayout() {
         />
         <Tabs.Screen
           name="messages"
-          options={buildTabOptions("Messaggi", "messages")}
+          options={{
+            ...buildTabOptions("Messaggi", "messages"),
+            tabBarBadge: unreadThreadsCount > 0 ? unreadThreadsCount : undefined,
+            tabBarBadgeStyle: styles.messagesBadge,
+          }}
         />
         <Tabs.Screen
           name="profile"
@@ -125,5 +150,10 @@ const styles = StyleSheet.create({
   },
   menuButtonPressed: {
     backgroundColor: colors.surfaceMuted,
+  },
+  messagesBadge: {
+    backgroundColor: colors.accent,
+    fontSize: typography.fontSize[11],
+    color: colors.inkInvert,
   },
 });

@@ -33,6 +33,7 @@ export type ClubInviteLink = {
 
 export type AppNotification = {
   body: string | null;
+  category?: string;
   created_at: string;
   data: Record<string, string>;
   id: string;

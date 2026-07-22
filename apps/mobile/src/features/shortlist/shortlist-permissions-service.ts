@@ -17,6 +17,31 @@ export const SHORTLIST_PERMISSION_LABELS: Record<ShortlistPermissionKey, string>
   shortlist_view: "Vedere shortlist",
 };
 
+export type ClubNotifPermissionKey =
+  | "notif_new_applications"
+  | "notif_shortlist_updates"
+  | "notif_connection_requests"
+  | "notif_store_orders"
+  | "notif_content_tags"
+  | "notif_affiliations"
+  | "notif_profile_verifications";
+
+export const CLUB_NOTIF_PERMISSION_LABELS: Record<
+  ClubNotifPermissionKey,
+  string
+> = {
+  notif_affiliations: "Affiliazioni",
+  notif_connection_requests: "Richieste collegamenti",
+  notif_content_tags: "Tag contenuti",
+  notif_new_applications: "Nuove candidature",
+  notif_profile_verifications: "Verifiche profilo",
+  notif_shortlist_updates: "Aggiornamenti Shortlist",
+  notif_store_orders: "Nuovi ordini Store",
+};
+
+// Any grantable permission key stored in club_member_permissions.
+export type ClubPermissionKey = ShortlistPermissionKey | ClubNotifPermissionKey;
+
 export type MyShortlistPermissions = {
   club_id: string;
   club_name: string;
@@ -35,7 +60,7 @@ export type ClubPermissionMember = {
   full_name: string | null;
   avatar_url: string | null;
   member_role: string;
-  permissions: ShortlistPermissionKey[];
+  permissions: ClubPermissionKey[];
 };
 
 export async function fetchMyShortlistPermissions(): Promise<MyShortlistPermissions | null> {
@@ -75,11 +100,11 @@ export async function fetchClubPermissionMembers(
     throw grantsError;
   }
 
-  const permissionsByProfile = new Map<string, ShortlistPermissionKey[]>();
+  const permissionsByProfile = new Map<string, ClubPermissionKey[]>();
 
   for (const grant of grants ?? []) {
     const list = permissionsByProfile.get(grant.profile_id) ?? [];
-    list.push(grant.permission_key as ShortlistPermissionKey);
+    list.push(grant.permission_key as ClubPermissionKey);
     permissionsByProfile.set(grant.profile_id, list);
   }
 
@@ -102,7 +127,7 @@ export async function fetchClubPermissionMembers(
 export async function grantClubPermission(
   clubId: string,
   profileId: string,
-  permissionKey: ShortlistPermissionKey,
+  permissionKey: ClubPermissionKey,
   grantedByProfileId: string,
 ): Promise<void> {
   const { error } = await supabase.from("club_member_permissions").upsert(
@@ -126,7 +151,7 @@ export async function grantClubPermission(
 export async function revokeClubPermission(
   clubId: string,
   profileId: string,
-  permissionKey: ShortlistPermissionKey,
+  permissionKey: ClubPermissionKey,
 ): Promise<void> {
   const { error } = await supabase
     .from("club_member_permissions")

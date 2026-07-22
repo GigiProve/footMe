@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../src/features/auth/use-session";
@@ -22,6 +23,7 @@ import {
   type PublicClubProfile,
   type PublicClubSquadraOverview,
 } from "../../src/features/clubs/club-service";
+import { getUnreadCount } from "../../src/features/clubs/notification-service";
 import {
   PublicClubProfileView,
 } from "../../src/features/clubs/components/PublicClubProfileView";
@@ -106,7 +108,7 @@ import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabVie
 import { SavedSection } from "../../src/features/saved/SavedSection";
 import { FollowingSection } from "../../src/features/following/FollowingSection";
 import { colors, radius, spacing } from "../../src/theme/tokens";
-import { ActionSheet, AppText, Button, SectionCard } from "../../src/ui";
+import { ActionSheet, AppText, Button, HeaderBell, SectionCard } from "../../src/ui";
 
 const emptyClubHeaderStats: ClubHeaderStats = {
   activeTeamsCount: 0,
@@ -152,6 +154,12 @@ export default function ProfileScreen() {
   const [respondingMembershipId, setRespondingMembershipId] = useState<string | null>(null);
   const [agentMediaEditingItemId, setAgentMediaEditingItemId] = useState<string | null>(null);
   const [directorMediaEditingItemId, setDirectorMediaEditingItemId] = useState<string | null>(null);
+  const profileId = profile?.id ?? "";
+  const { data: unreadCount = 0 } = useQuery({
+    enabled: !!profileId,
+    queryFn: () => getUnreadCount(profileId),
+    queryKey: ["notifications-unread", profileId],
+  });
 
   const loadPendingMemberships = useCallback(async () => {
     if (!userId) {
@@ -618,6 +626,10 @@ export default function ProfileScreen() {
         ]}
       >
         <View style={styles.profileTopBar}>
+          <HeaderBell
+            count={unreadCount}
+            onPress={() => router.push("/notifications" as never)}
+          />
           <Pressable
             accessibilityLabel="Le tue raccolte: Salvati e Seguiti"
             accessibilityRole="button"
@@ -648,6 +660,12 @@ export default function ProfileScreen() {
               label: "Seguiti",
               subtitle: "I profili che segui.",
               onPress: () => router.push("/following" as never),
+            },
+            {
+              icon: "settings-outline",
+              label: "Impostazioni",
+              subtitle: "Preferenze e account",
+              onPress: () => router.push("/settings" as never),
             },
           ]}
           onClose={() => setMoreMenuVisible(false)}
@@ -1135,7 +1153,8 @@ function normalizeExternalUrl(url: string) {
 const styles = StyleSheet.create({
   profileTopBar: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing[4],
     paddingBottom: spacing[8],
   },

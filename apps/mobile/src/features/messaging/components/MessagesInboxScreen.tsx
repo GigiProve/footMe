@@ -99,6 +99,8 @@ export function MessagesInboxScreen() {
 
   const conversations = conversationsQuery.data ?? [];
   const communications = communicationsQuery.data ?? [];
+  const chatCount = conversations.filter((item) => item.unread_count > 0).length;
+  const comunicazioniCount = communications.filter((item) => !item.is_read).length;
   const isLoading = conversationsQuery.isLoading || communicationsQuery.isLoading;
   const trimmedQuery = searchQuery.trim();
   const isSearching = trimmedQuery.length >= 2;
@@ -147,7 +149,12 @@ export function MessagesInboxScreen() {
           title="Messaggi"
         />
 
-        <InboxTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        <InboxTabBar
+          activeTab={activeTab}
+          chatCount={chatCount}
+          comunicazioniCount={comunicazioniCount}
+          onTabChange={setActiveTab}
+        />
 
         <View style={styles.searchWrapper}>
           <InboxSearchBar onQueryChange={setSearchQuery} placeholder={searchPlaceholder} />
