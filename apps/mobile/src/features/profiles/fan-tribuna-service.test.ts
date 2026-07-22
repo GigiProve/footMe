@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => {
     orders: { column: string; options: unknown }[];
     options: unknown;
     payload: unknown;
+    range: { from: number; to: number } | null;
     selectArgs: unknown[];
     table: string;
   };
@@ -43,6 +44,7 @@ const mocks = vi.hoisted(() => {
       orders: [],
       options: null,
       payload: null,
+      range: null,
       selectArgs: [],
       table,
     };
@@ -69,6 +71,10 @@ const mocks = vi.hoisted(() => {
       maybeSingle: vi.fn(async () => nextResponse()),
       order: vi.fn((column: string, options: unknown) => {
         operation.orders.push({ column, options });
+        return builder;
+      }),
+      range: vi.fn((from: number, to: number) => {
+        operation.range = { from, to };
         return builder;
       }),
       select: vi.fn((...args: unknown[]) => {
@@ -108,6 +114,12 @@ vi.mock("../../lib/supabase", () => ({
   supabase: {
     from: mocks.fromMock,
   },
+}));
+
+// notifyTaggedProfiles is a best-effort side effect tested elsewhere; stub it so
+// it does not consume queued supabase responses and shift operation alignment.
+vi.mock("../content/content-tag-service", () => ({
+  notifyTaggedProfiles: vi.fn(() => Promise.resolve()),
 }));
 
 const basePost = {
@@ -198,6 +210,9 @@ describe("fan-tribuna-service", () => {
             player_profile_id: "player-1",
             post_id: "proposal-1",
             sort_order: 0,
+            status: "active",
+            target_id: "player-1",
+            target_type: "profile",
           },
         ],
         error: null,
@@ -232,6 +247,11 @@ describe("fan-tribuna-service", () => {
     const feed = await fetchFanTribunaFeed("fan-1", "viewer-1");
 
     expect(feed).toHaveLength(3);
+    // The feed query is paginated to the default page size (range is inclusive).
+    expect(mocks.operations[0]).toMatchObject({
+      range: { from: 0, to: 29 },
+      table: "fan_tribuna_posts",
+    });
     expect(feed[0].poll_options).toMatchObject([
       { id: "option-yes", is_voted: true, percentage: 67, vote_count: 2 },
       { id: "option-no", is_voted: false, percentage: 33, vote_count: 1 },
@@ -267,7 +287,7 @@ describe("fan-tribuna-service", () => {
   it("creates polls with two to six options and rejects incomplete drafts", async () => {
     await expect(
       createFanTribunaPoll({
-        options: ["Si"],
+        options: [{ label: "Si" }],
         profileId: "fan-1",
         question: "Confermeresti l'allenatore?",
       }),
@@ -295,7 +315,7 @@ describe("fan-tribuna-service", () => {
     );
 
     const post = await createFanTribunaPoll({
-      options: [" Si ", " No "],
+      options: [{ label: " Si " }, { label: " No " }],
       profileId: "fan-1",
       question: " Confermeresti l'allenatore? ",
     });
@@ -354,6 +374,9 @@ describe("fan-tribuna-service", () => {
             player_profile_id: "player-1",
             post_id: "proposal-1",
             sort_order: 0,
+            status: "active",
+            target_id: "player-1",
+            target_type: "profile",
           },
         ],
         error: null,

@@ -16,6 +16,7 @@ export type RecruitingAdForm = {
   description: string;
   region: string;
   roleRequired: "goalkeeper" | "defender" | "midfielder" | "forward";
+  teamId?: string | null;
   title: string;
 };
 
@@ -244,7 +245,88 @@ export async function applyToRecruitingAd(
   if (error) {
     throw error;
   }
+
+  // Notify the club owner of the new application.
+  const { data: ad } = await supabase
+    .from("recruiting_ads")
+    .select("title, club_id, clubs(owner_profile_id)")
+    .eq("id", adId)
+    .maybeSingle();
+
+  const club = ad
+    ? ((Array.isArray(ad.clubs) ? ad.clubs[0] : ad.clubs) as {
+        owner_profile_id: string;
+      } | null)
+    : null;
+
+  if (club?.owner_profile_id) {
+    const { data: applicant } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", profileId)
+      .maybeSingle();
+
+    await supabase.from("notifications").insert({
+      body: `${applicant?.full_name ?? "Un candidato"} si e' candidato per "${ad?.title ?? "un annuncio"}"`,
+      data: { ad_id: adId, applicant_profile_id: profileId },
+      recipient_profile_id: club.owner_profile_id,
+      title: "Hai ricevuto una nuova candidatura",
+      type: "application_received",
+    });
+  }
 }
+
+export type ApplicationStatus =
+  | "submitted"
+  | "reviewing"
+  | "shortlisted"
+  | "rejected"
+  | "accepted"
+  | "withdrawn";
+
+/**
+ * Club updates an application's status and notifies the applicant.
+ * RLS already permits the club owner (and applicant) to update the row.
+ */
+export async function updateApplicationStatus(input: {
+  adTitle: string;
+  applicantProfileId: string;
+  applicationId: string;
+  status: ApplicationStatus;
+}) {
+  const { error } = await supabase
+    .from("recruiting_applications")
+    .update({ status: input.status, updated_at: new Date().toISOString() })
+    .eq("id", input.applicationId);
+
+  if (error) {
+    throw error;
+  }
+
+  const isRead = input.status === "reviewing";
+  const statusBody = isRead
+    ? `La tua candidatura per "${input.adTitle}" e' stata letta`
+    : `La tua candidatura per "${input.adTitle}" e' ora: ${APPLICATION_STATUS_LABELS[input.status]}`;
+
+  await supabase.from("notifications").insert({
+    body: statusBody,
+    data: { application_id: input.applicationId, status: input.status },
+    recipient_profile_id: input.applicantProfileId,
+    title: isRead
+      ? "La tua candidatura e' stata letta"
+      : "La tua candidatura ha cambiato stato",
+    type: "application_status",
+  });
+}
+
+export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
+  accepted: "Accettata",
+  rejected: "Rifiutata",
+  reviewing: "In lettura",
+  shortlisted: "Shortlist",
+  submitted: "Inviata",
+  withdrawn: "Ritirata",
+};
 
 export async function getClubApplications(profileId: string) {
   const club = await getOwnedClub(profileId);
@@ -375,6 +457,7 @@ export async function createRecruitingAd(
     region: input.region.trim() || club.region,
     role_required: input.roleRequired,
     status: "published",
+    team_id: input.teamId ?? null,
     title: input.title.trim(),
   });
 

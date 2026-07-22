@@ -54,7 +54,7 @@ export function TopBar({
         />
         {notificationCount > 0 ? (
           <View style={styles.badgePosition}>
-            <NotificationBadge count={notificationCount} />
+            <NotificationBadge count={notificationCount} tone="accent" />
           </View>
         ) : null}
       </Pressable>

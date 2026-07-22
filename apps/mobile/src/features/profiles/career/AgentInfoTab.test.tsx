@@ -6,11 +6,23 @@ import type { CompleteProfessionalProfile } from "../profile-service";
 import { AgentInfoTab } from "./AgentInfoTab";
 
 const pushMock = vi.fn();
+const fetchAgentAssistitiMock = vi.fn();
 
 vi.mock("expo-router", () => ({
   useRouter: () => ({
     push: pushMock,
   }),
+}));
+
+vi.mock("../../relationships/agent-representation-service", () => ({
+  cancelRequest: vi.fn(),
+  fetchAgentAssistiti: (...args: unknown[]) => fetchAgentAssistitiMock(...args),
+  getRelationshipTypeLabel: (t: string) =>
+    t === "procuratore"
+      ? "Procuratore"
+      : t === "intermediario"
+        ? "Intermediario"
+        : "Referente sportivo",
 }));
 
 vi.mock("@expo/vector-icons/Ionicons", () => {
@@ -19,7 +31,7 @@ vi.mock("@expo/vector-icons/Ionicons", () => {
     {
       glyphMap: {
         "business-outline": 1,
-        "checkmark": 1,
+        checkmark: 1,
         "chevron-down": 1,
         "chevron-forward": 1,
         "chevron-up": 1,
@@ -28,6 +40,7 @@ vi.mock("@expo/vector-icons/Ionicons", () => {
         "logo-instagram": 1,
         "mail-outline": 1,
         pencil: 1,
+        "people-outline": 1,
         "shield-checkmark-outline": 1,
       },
     },
@@ -43,44 +56,7 @@ function buildAgentProfile(
 ): CompleteProfessionalProfile {
   return {
     agentCareerEntries: [],
-    agentManagedPlayerEntries: [
-      {
-        agent_profile_id: "profile-1",
-        avatar_url: null,
-        birth_year: 2004,
-        category_label: "Serie D",
-        display_name: "Luca Bianchi",
-        id: "managed-1",
-        is_free_agent: false,
-        linked_profile_id: "player-1",
-        primary_position: "midfielder",
-        sort_order: 0,
-      },
-      {
-        agent_profile_id: "profile-1",
-        avatar_url: null,
-        birth_year: 2007,
-        category_label: "Juniores",
-        display_name: "Marco Rossi",
-        id: "managed-2",
-        is_free_agent: false,
-        linked_profile_id: "player-2",
-        primary_position: "forward",
-        sort_order: 1,
-      },
-      {
-        agent_profile_id: "profile-1",
-        avatar_url: null,
-        birth_year: 1999,
-        category_label: "Eccellenza",
-        display_name: "Andrea Verdi",
-        id: "managed-3",
-        is_free_agent: true,
-        linked_profile_id: null,
-        primary_position: "defender",
-        sort_order: 2,
-      },
-    ],
+    agentManagedPlayerEntries: [],
     agentProfile: {
       agency_logo_url: null,
       agency_name: "MB Football Management",
@@ -158,12 +134,14 @@ function buildAgentProfile(
 describe("AgentInfoTab", () => {
   beforeEach(() => {
     pushMock.mockReset();
+    fetchAgentAssistitiMock.mockReset();
+    fetchAgentAssistitiMock.mockResolvedValue([]);
   });
 
-  it("renders the portfolio focus and filters the managed players list", () => {
+  it("renders the positioning copy and the Assistiti section", async () => {
     let tree!: TestRenderer.ReactTestRenderer;
 
-    act(() => {
+    await act(async () => {
       tree = TestRenderer.create(
         <AgentInfoTab
           completeProfile={buildAgentProfile()}
@@ -174,64 +152,33 @@ describe("AgentInfoTab", () => {
     });
 
     expect(
-      tree.root.findByProps({ children: "Giocatori rappresentati (3)" }),
-    ).toBeTruthy();
-    expect(tree.root.findByProps({ children: "Svincolati" })).toBeTruthy();
-    expect(() => tree.root.findByProps({ children: "MB Football Management" })).toThrow();
-    expect(() => tree.root.findByProps({ children: "FIGC" })).toThrow();
-
-    const categoryTrigger = tree.root.findByProps({
-      accessibilityLabel: "Apri filtro Categoria",
-    });
-
-    act(() => {
-      categoryTrigger.props.onPress();
-    });
-
-    const selectSerieD = tree.root.findByProps({
-      accessibilityLabel: "Seleziona Categoria Serie D",
-    });
-
-    act(() => {
-      selectSerieD.props.onPress();
-    });
-
-    expect(
-      tree.root.findByProps({ accessibilityLabel: "Rimuovi filtro Serie D" }),
-    ).toBeTruthy();
-    expect(
-      tree.root.findByProps({ accessibilityLabel: "Apri profilo di Luca Bianchi" }),
-    ).toBeTruthy();
-    expect(() =>
-      tree.root.findByProps({ accessibilityLabel: "Andrea Verdi, profilo non collegato" }),
-    ).toThrow();
+      tree.root.findAllByProps({ children: "Valorizzazione giovani" }).length,
+    ).toBeGreaterThan(0);
+    expect(tree.root.findByProps({ children: "Assistiti" })).toBeTruthy();
+    expect(fetchAgentAssistitiMock).toHaveBeenCalledWith("profile-1");
   });
 
-  it("navigates only for linked players", () => {
+  it("lets the owner open the add-assistito flow", async () => {
     let tree!: TestRenderer.ReactTestRenderer;
 
-    act(() => {
+    await act(async () => {
       tree = TestRenderer.create(
         <AgentInfoTab
           completeProfile={buildAgentProfile()}
-          isOwner={false}
+          isOwner
           onEdit={() => undefined}
         />,
       );
     });
 
-    const linkedRow = tree.root.findByProps({
-      accessibilityLabel: "Apri profilo di Luca Bianchi",
-    });
-    const manualRow = tree.root.findByProps({
-      accessibilityLabel: "Andrea Verdi, profilo non collegato",
+    const addButton = tree.root.findByProps({
+      label: "+ Aggiungi assistito",
     });
 
     act(() => {
-      linkedRow.props.onPress();
+      addButton.props.onPress();
     });
 
-    expect(pushMock).toHaveBeenCalledWith("/profile/player-1");
-    expect(manualRow.props.onPress).toBeUndefined();
+    expect(pushMock).toHaveBeenCalledWith("/representation/add");
   });
 });

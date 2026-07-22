@@ -12,9 +12,9 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
-import { MediaPickerField } from "../../components/ui/media-picker-field";
 import { VideoPlayerModal } from "../../components/ui/video-player-modal";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
 import { AppText, Avatar, Button, Input } from "../../ui";
@@ -25,7 +25,6 @@ import {
 } from "./fan-media-service";
 import {
   addMediaProfilePostComment,
-  createMediaProfilePost,
   fetchMediaProfilePostDetail,
   fetchMediaProfilePostFeed,
   searchMediaProfilePostTargets,
@@ -52,14 +51,12 @@ import {
   type MediaTribunaPlayerOptionInput,
 } from "./media-tribuna-service";
 import {
-  pickAndUploadMedia,
-  ProfileMediaUploadError,
-  type UploadedMediaItem,
-} from "./media-upload-service";
-import {
   normalizeFacebookInput,
   normalizeInstagramInput,
 } from "./profile-form-utils";
+import { ContentTaggedHeader } from "../../features/content/components/ContentTaggedHeader";
+import { TagManageSheet } from "../../features/content/components/TagManageSheet";
+import { MediaPostComposer } from "./media-posts/MediaPostComposer";
 import type {
   CompleteProfessionalProfile,
   MediaProfileAuthorRecord,
@@ -76,7 +73,9 @@ type ArticleFilter = "all" | "Mercato" | "Interviste" | "Giovanili" | "Opinioni"
 
 type MediaProfileViewProps = {
   completeProfile: CompleteProfessionalProfile;
+  isMessaging?: boolean;
   mode: "owner" | "visitor";
+  onContactPress?: () => void;
   onOpenClub?: (clubId: string) => void;
   onOpenProfile?: (profileId: string) => void;
   viewerProfileId?: string | null;
@@ -110,20 +109,6 @@ type VerificationItem = {
   label: string;
 };
 
-type DraftState = {
-  authorName: string;
-  body: string;
-  category: Exclude<ArticleFilter, "all">;
-  coverType: "image" | "video" | null;
-  coverUrl: string;
-  excerpt: string;
-  externalUrl: string;
-  kind: MediaProfilePostKind;
-  subtitle: string;
-  taggedTargets: MediaProfilePostTaggedTarget[];
-  title: string;
-};
-
 type TribunaDraftKind = MediaTribunaKind | null;
 
 const MEDIA_TABS: { label: string; value: MediaProfileTab }[] = [
@@ -140,9 +125,6 @@ const ARTICLE_FILTERS: { label: string; value: ArticleFilter }[] = [
   { label: "Opinioni", value: "Opinioni" },
 ];
 
-const CATEGORY_VALUES = ARTICLE_FILTERS.filter((filter) => filter.value !== "all").map(
-  (filter) => filter.value,
-) as Exclude<ArticleFilter, "all">[];
 
 const TRIBUNA_CREATE_OPTIONS: {
   description: string;
@@ -180,7 +162,9 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 export function MediaProfileView({
   completeProfile,
+  isMessaging = false,
   mode,
+  onContactPress,
   onOpenClub,
   onOpenProfile,
   viewerProfileId,
@@ -188,6 +172,7 @@ export function MediaProfileView({
   const [activeTab, setActiveTab] = useState<MediaProfileTab>("articles");
   const [isFollowed, setIsFollowed] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState<ArticleFilter>("all");
   const [activeAuthorFilter, setActiveAuthorFilter] =
     useState<MediaAuthorFilter | null>(null);
@@ -363,8 +348,10 @@ export function MediaProfileView({
       Alert.alert("Errore", "Impossibile aggiornare il follow.");
     } finally {
       setIsFollowing(false);
+      queryClient.invalidateQueries({ queryKey: ["following-count"] });
+      queryClient.invalidateQueries({ queryKey: ["followed"] });
     }
-  }, [isFollowed, profile.id, viewerProfileId]);
+  }, [isFollowed, profile.id, queryClient, viewerProfileId]);
 
   const handleVisitWebsite = useCallback(() => {
     if (!websiteUrl) {
@@ -676,7 +663,18 @@ export function MediaProfileView({
                 size="md"
                 style={styles.followButton}
                 testID="media-follow-button"
-                variant="primary"
+                variant={isFollowed ? "secondary" : "primary"}
+              />
+            ) : null}
+            {mode === "visitor" && onContactPress ? (
+              <Button
+                label="Contatta"
+                loading={isMessaging}
+                onPress={onContactPress}
+                size="md"
+                style={styles.followButton}
+                testID="media-contact-button"
+                variant="secondary"
               />
             ) : null}
             <Button
@@ -810,19 +808,25 @@ export function MediaProfileView({
         onShare={(post) => {
           void sharePost(post);
         }}
+        onTagActionDone={() => {
+          void loadPosts();
+          handleClosePost();
+        }}
         onToggleSave={(post) => {
           void handleToggleSave(post);
         }}
         post={selectedPost}
+        viewerProfileId={viewerProfileId}
       />
 
-      <MediaPostComposerModal
+      <MediaPostComposer
         defaultAuthorName={profile.full_name}
         mediaProfileId={mediaProfileId}
         onClose={() => setIsComposerOpen(false)}
         onCreated={(post) => {
           void handleCreated(post);
         }}
+        publisherName={displayName}
         userId={viewerProfileId ?? null}
         visible={isComposerOpen}
       />
@@ -1470,8 +1474,10 @@ function MediaPostDetailModal({
   onClose,
   onOpenTarget,
   onShare,
+  onTagActionDone,
   onToggleSave,
   post,
+  viewerProfileId,
 }: {
   displayName: string;
   isLoading: boolean;
@@ -1479,12 +1485,15 @@ function MediaPostDetailModal({
   onClose: () => void;
   onOpenTarget: (target: MediaProfilePostTaggedTarget) => void;
   onShare: (post: MediaProfilePost) => void;
+  onTagActionDone?: () => void;
   onToggleSave: (post: MediaProfilePost) => void;
   post: MediaProfilePost | null;
+  viewerProfileId?: string | null;
 }) {
   const [commentDraft, setCommentDraft] = useState("");
   const [isCommenting, setIsCommenting] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const [isManageOpen, setManageOpen] = useState(false);
   const postId = post?.id ?? null;
 
   useEffect(() => {
@@ -1492,6 +1501,7 @@ function MediaPostDetailModal({
       setCommentDraft("");
       setIsCommenting(false);
       setIsVideoOpen(false);
+      setManageOpen(false);
     }
   }, [postId]);
 
@@ -1501,6 +1511,13 @@ function MediaPostDetailModal({
 
   const showHero = post.kind === "article" || Boolean(post.cover_url);
   const heroUrl = post.cover_url || DEFAULT_MEDIA_COVER_URI;
+  const viewerTagged =
+    !!viewerProfileId &&
+    post.tagged_targets.some(
+      (target) =>
+        target.target_type === "profile" &&
+        target.target_id === viewerProfileId,
+    );
 
   async function handleComment() {
     if (!commentDraft.trim()) {
@@ -1590,22 +1607,34 @@ function MediaPostDetailModal({
                 {post.subtitle ?? post.excerpt}
               </AppText>
             ) : null}
-            <AppText color="secondary" style={styles.authorLine} variant="bodySm">
-              {buildDetailAuthorLine(post, displayName)}
-            </AppText>
+            <ContentTaggedHeader
+              authorName={post.author_name}
+              onOpenTarget={(target) =>
+                onOpenTarget({
+                  avatar_url: target.avatar_url,
+                  display_name: target.display_name,
+                  role: null,
+                  subtitle: target.subtitle ?? null,
+                  target_id: target.target_id,
+                  target_type: target.target_type,
+                })
+              }
+              publishedAt={post.published_at ?? post.created_at}
+              publisherName={displayName}
+              readingLabel={
+                post.kind === "news" ? null : `${post.reading_time_minutes} min`
+              }
+              tagged={post.tagged_targets.map((target) => ({
+                avatar_url: target.avatar_url,
+                display_name: target.display_name,
+                subtitle: target.subtitle,
+                target_id: target.target_id,
+                target_type: target.target_type,
+              }))}
+            />
 
-            {post.body ? <ArticleBodyText body={post.body} /> : null}
-
-            {post.tagged_targets.length > 0 ? (
-              <View style={styles.detailSection}>
-                <AppText style={styles.detailSectionTitle} variant="titleSm">
-                  Profili taggati
-                </AppText>
-                <TaggedTargetsInline
-                  onOpenTarget={onOpenTarget}
-                  targets={post.tagged_targets}
-                />
-              </View>
+            {post.display_mode !== "preview" && post.body ? (
+              <ArticleBodyText body={post.body} />
             ) : null}
 
             <View style={styles.detailActions}>
@@ -1635,16 +1664,33 @@ function MediaPostDetailModal({
                 style={styles.externalLinkCard}
                 testID="media-article-external-link"
               >
-                <View>
+                <View style={styles.externalLinkText}>
                   <AppText color="accent" style={styles.externalLinkTitle} variant="bodySm">
-                    Leggi anche sul sito
+                    {post.display_mode === "preview"
+                      ? "Leggi l'articolo completo sul sito"
+                      : "Leggi anche sul sito"}
                   </AppText>
                   <AppText color="secondary" numberOfLines={1} variant="caption">
-                    Link esterno opzionale
+                    {post.source_name ? `Fonte: ${post.source_name}` : "Fonte originale"}
                   </AppText>
                 </View>
                 <Ionicons color={colors.accent} name="open-outline" size={19} />
               </Pressable>
+            ) : null}
+
+            {viewerTagged ? (
+              <Button
+                label="Gestisci tag"
+                leftIcon={
+                  <Ionicons
+                    color={colors.textPrimary}
+                    name="pricetag-outline"
+                    size={18}
+                  />
+                }
+                onPress={() => setManageOpen(true)}
+                variant="secondary"
+              />
             ) : null}
 
             <View style={styles.commentBox}>
@@ -1702,356 +1748,26 @@ function MediaPostDetailModal({
             visible={isVideoOpen}
           />
         ) : null}
-      </SafeAreaView>
-    </Modal>
-  );
-}
 
-function MediaPostComposerModal({
-  defaultAuthorName,
-  mediaProfileId,
-  onClose,
-  onCreated,
-  userId,
-  visible,
-}: {
-  defaultAuthorName: string;
-  mediaProfileId: string;
-  onClose: () => void;
-  onCreated: (post: MediaProfilePost) => void;
-  userId: string | null;
-  visible: boolean;
-}) {
-  const [draft, setDraft] = useState<DraftState>(() =>
-    createEmptyDraft(defaultAuthorName),
-  );
-  const [isUploading, setIsUploading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [targetQuery, setTargetQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<MediaProfilePostTaggedTarget[]>([]);
-
-  useEffect(() => {
-    if (visible) {
-      setDraft(createEmptyDraft(defaultAuthorName));
-      setTargetQuery("");
-      setSuggestions([]);
-      setIsUploading(false);
-      setIsSaving(false);
-    }
-  }, [defaultAuthorName, visible]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const timeout = setTimeout(() => {
-      async function loadSuggestions() {
-        if (targetQuery.trim().length < 2) {
-          if (isMounted) {
-            setSuggestions([]);
-          }
-          return;
-        }
-
-        try {
-          const results = await searchMediaProfilePostTargets(targetQuery.trim());
-          if (isMounted) {
-            setSuggestions(results);
-          }
-        } catch {
-          if (isMounted) {
-            setSuggestions([]);
-          }
-        }
-      }
-
-      void loadSuggestions();
-    }, SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeout);
-    };
-  }, [targetQuery]);
-
-  if (!visible) {
-    return null;
-  }
-
-  const selectedTargetKeys = new Set(
-    draft.taggedTargets.map((target) => getTargetKey(target)),
-  );
-
-  function patchDraft<Key extends keyof DraftState>(key: Key, value: DraftState[Key]) {
-    setDraft((current) => ({ ...current, [key]: value }));
-  }
-
-  async function handlePickCover() {
-    if (!userId) {
-      Alert.alert("Accesso richiesto", "Accedi per caricare una copertina.");
-      return;
-    }
-
-    setIsUploading(true);
-
-    try {
-      const uploads: UploadedMediaItem[] = await pickAndUploadMedia({
-        folder: "media-profile-posts",
-        mediaTypes: ["images", "videos"],
-        userId,
-      });
-
-      const upload = uploads[0];
-      if (!upload) {
-        return;
-      }
-
-      patchDraft("coverUrl", upload.url);
-      patchDraft("coverType", upload.type === "video" ? "video" : "image");
-    } catch (error) {
-      const message =
-        error instanceof ProfileMediaUploadError
-          ? error.message
-          : "Caricamento copertina non riuscito.";
-      Alert.alert("Errore", message);
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  function handleAddTarget(target: MediaProfilePostTaggedTarget) {
-    if (selectedTargetKeys.has(getTargetKey(target))) {
-      return;
-    }
-
-    patchDraft("taggedTargets", [...draft.taggedTargets, target]);
-    setTargetQuery("");
-    setSuggestions([]);
-  }
-
-  async function handleSave() {
-    if (!userId) {
-      Alert.alert("Accesso richiesto", "Accedi per pubblicare articoli.");
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      const post = await createMediaProfilePost({
-        authorName: draft.authorName,
-        body: draft.body,
-        category: draft.category,
-        coverType: draft.coverType,
-        coverUrl: draft.coverUrl,
-        createdByProfileId: userId,
-        excerpt: draft.excerpt,
-        externalUrl: draft.externalUrl,
-        kind: draft.kind,
-        mediaProfileId,
-        subtitle: draft.subtitle,
-        taggedTargets: draft.taggedTargets,
-        title: draft.title,
-      });
-
-      onCreated(post);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Pubblicazione non riuscita.";
-      Alert.alert("Errore", message);
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  return (
-    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
-      <SafeAreaView style={styles.formRoot}>
-        <View style={styles.formHeader}>
-          <Pressable
-            accessibilityLabel="Chiudi creazione articolo"
-            accessibilityRole="button"
-            onPress={onClose}
-            style={styles.detailIconButton}
-          >
-            <Ionicons color={colors.textPrimary} name="close" size={22} />
-          </Pressable>
-          <AppText variant="titleSm">Crea contenuto</AppText>
-          <View style={styles.detailIconButton} />
-        </View>
-
-        <KeyboardAwareForm contentContainerStyle={styles.formContent}>
-          <View style={styles.kindSwitch}>
-            {(["article", "news"] as const).map((kind) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: draft.kind === kind }}
-                key={kind}
-                onPress={() => patchDraft("kind", kind)}
-                style={[
-                  styles.kindButton,
-                  draft.kind === kind ? styles.kindButtonActive : null,
-                ]}
-                testID={`media-composer-kind-${kind}`}
-              >
-                <Ionicons
-                  color={draft.kind === kind ? colors.inkInvert : colors.textSecondary}
-                  name={kind === "article" ? "document-text-outline" : "flash-outline"}
-                  size={16}
-                />
-                <AppText
-                  color={draft.kind === kind ? "inverse" : "secondary"}
-                  style={styles.kindButtonText}
-                  variant="bodySm"
-                >
-                  {kind === "article" ? "Articolo" : "News"}
-                </AppText>
-              </Pressable>
-            ))}
-          </View>
-
-          <Input
-            label="Titolo"
-            onChangeText={(value) => patchDraft("title", value)}
-            placeholder="Inserisci il titolo..."
-            value={draft.title}
-          />
-
-          <MediaPickerField
-            buttonLabel={draft.coverUrl ? "Sostituisci copertina" : "Carica copertina"}
-            helperText={
-              draft.kind === "article"
-                ? "Immagine o video di apertura dell'articolo."
-                : "Opzionale per una news breve."
-            }
-            isUploading={isUploading}
-            label="Immagine o video di copertina"
-            mediaType={draft.coverType ?? "image"}
-            onPick={handlePickCover}
-            previewUrl={draft.coverUrl || null}
-          />
-
-          <View style={styles.categoryPicker}>
-            <AppText color="secondary" style={styles.formLabel} variant="caption">
-              Categoria
-            </AppText>
-            <View style={styles.categoryOptions}>
-              {CATEGORY_VALUES.map((category) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: draft.category === category }}
-                  key={category}
-                  onPress={() => patchDraft("category", category)}
-                  style={[
-                    styles.categoryOption,
-                    draft.category === category ? styles.categoryOptionActive : null,
-                  ]}
-                >
-                  <AppText
-                    color={draft.category === category ? "inverse" : "secondary"}
-                    variant="caption"
-                  >
-                    {category}
-                  </AppText>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          <Input
-            label={draft.kind === "article" ? "Sottotitolo" : "Anteprima"}
-            multiline
-            onChangeText={(value) =>
-              draft.kind === "article"
-                ? patchDraft("subtitle", value)
-                : patchDraft("excerpt", value)
-            }
-            placeholder="Scrivi una breve introduzione..."
-            value={draft.kind === "article" ? draft.subtitle : draft.excerpt}
-          />
-
-          <Input
-            label={draft.kind === "article" ? "Testo articolo" : "Testo news"}
-            multiline
-            onChangeText={(value) => patchDraft("body", value)}
-            placeholder="Scrivi il contenuto..."
-            style={styles.bodyInput}
-            value={draft.body}
-          />
-
-          <Input
-            label="Autore"
-            onChangeText={(value) => patchDraft("authorName", value)}
-            placeholder="Nome autore..."
-            value={draft.authorName}
-          />
-
-          <View style={styles.tagPicker}>
-            <Input
-              label="Profili taggati"
-              onChangeText={setTargetQuery}
-              placeholder="Cerca societa, giocatori o allenatori..."
-              value={targetQuery}
-            />
-            {draft.taggedTargets.length > 0 ? (
-              <TaggedTargetsInline
-                onOpenTarget={(target) =>
-                  patchDraft(
-                    "taggedTargets",
-                    draft.taggedTargets.filter(
-                      (entry) => getTargetKey(entry) !== getTargetKey(target),
-                    ),
-                  )
-                }
-                removable
-                targets={draft.taggedTargets}
-              />
-            ) : null}
-            {suggestions.length > 0 ? (
-              <View style={styles.suggestions}>
-                {suggestions.map((target) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={selectedTargetKeys.has(getTargetKey(target))}
-                    key={getTargetKey(target)}
-                    onPress={() => handleAddTarget(target)}
-                    style={styles.suggestionRow}
-                  >
-                    <Avatar name={target.display_name} size="sm" uri={target.avatar_url} />
-                    <View style={styles.suggestionText}>
-                      <AppText numberOfLines={1} variant="bodySm">
-                        {target.display_name}
-                      </AppText>
-                      <AppText color="secondary" numberOfLines={1} variant="caption">
-                        {target.subtitle ?? formatTargetRole(target.role)}
-                      </AppText>
-                    </View>
-                    {selectedTargetKeys.has(getTargetKey(target)) ? (
-                      <Ionicons color={colors.success} name="checkmark" size={18} />
-                    ) : null}
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-          </View>
-
-          <Input
-            autoCapitalize="none"
-            label="Link esterno (opzionale)"
-            onChangeText={(value) => patchDraft("externalUrl", value)}
-            placeholder="https://..."
-            value={draft.externalUrl}
-          />
-        </KeyboardAwareForm>
-
-        <View style={styles.formFooter}>
-          <Button
-            disabled={isUploading || isSaving}
-            label={isSaving ? "Pubblicazione..." : "Pubblica"}
-            onPress={() => {
-              void handleSave();
+        {isManageOpen && viewerProfileId ? (
+          <TagManageSheet
+            content={{
+              thumbnailUrl: post.cover_url,
+              title: post.title,
+              typeLabel: post.kind === "news" ? "News" : "Articolo",
             }}
-            testID="media-composer-publish-button"
+            contentType="media_profile"
+            onActionDone={() => {
+              setManageOpen(false);
+              onTagActionDone?.();
+            }}
+            onClose={() => setManageOpen(false)}
+            postId={post.id}
+            taggedId={viewerProfileId}
+            targetType="profile"
+            visible
           />
-        </View>
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -2843,46 +2559,74 @@ function getTribunaIcon(kind: MediaTribunaKind): keyof typeof Ionicons.glyphMap 
 function TaggedTargetsInline({
   compact = false,
   onOpenTarget,
+  onTagActionDone,
+  postId,
   removable = false,
   targets,
+  viewerProfileId,
 }: {
   compact?: boolean;
   onOpenTarget: (target: MediaProfilePostTaggedTarget) => void;
+  onTagActionDone?: () => void;
+  postId?: string;
   removable?: boolean;
   targets: MediaProfilePostTaggedTarget[];
+  viewerProfileId?: string | null;
 }) {
   const visibleTargets = compact ? targets.slice(0, 2) : targets;
+  const [manageOpen, setManageOpen] = useState(false);
 
   return (
     <View style={[styles.taggedTargets, compact ? styles.taggedTargetsCompact : null]}>
-      {visibleTargets.map((target) => (
-        <Pressable
-          accessibilityLabel={`${removable ? "Rimuovi" : "Apri"} ${target.display_name}`}
-          accessibilityRole="button"
-          key={getTargetKey(target)}
-          onPress={(event) => {
-            event.stopPropagation();
-            onOpenTarget(target);
-          }}
-          style={[styles.targetChip, compact ? styles.targetChipCompact : null]}
-        >
+      {visibleTargets.map((target) => {
+        const isViewerTag =
+          !removable &&
+          !!postId &&
+          !!viewerProfileId &&
+          target.target_type === "profile" &&
+          target.target_id === viewerProfileId;
+
+        return (
+          <Pressable
+            accessibilityLabel={`${removable ? "Rimuovi" : "Apri"} ${target.display_name}`}
+            accessibilityRole="button"
+            key={getTargetKey(target)}
+            onLongPress={isViewerTag ? () => setManageOpen(true) : undefined}
+            onPress={(event) => {
+              event.stopPropagation();
+              onOpenTarget(target);
+            }}
+            style={[styles.targetChip, compact ? styles.targetChipCompact : null]}
+          >
           {!compact ? (
             <Avatar name={target.display_name} size="sm" uri={target.avatar_url} />
           ) : null}
           <AppText numberOfLines={1} style={styles.targetChipText} variant="caption">
             {target.display_name}
           </AppText>
-          {removable ? (
-            <Ionicons color={colors.accent} name="close" size={14} />
-          ) : null}
-        </Pressable>
-      ))}
+            {removable ? (
+              <Ionicons color={colors.accent} name="close" size={14} />
+            ) : null}
+          </Pressable>
+        );
+      })}
       {compact && targets.length > visibleTargets.length ? (
         <View style={styles.targetChipCompact}>
           <AppText color="secondary" variant="caption">
             +{targets.length - visibleTargets.length}
           </AppText>
         </View>
+      ) : null}
+      {manageOpen && postId && viewerProfileId ? (
+        <TagManageSheet
+          contentType="media_profile"
+          onActionDone={onTagActionDone}
+          onClose={() => setManageOpen(false)}
+          postId={postId}
+          taggedId={viewerProfileId}
+          targetType="profile"
+          visible
+        />
       ) : null}
     </View>
   );
@@ -3022,38 +2766,12 @@ function getTribunaBodyPlaceholder(kind: MediaTribunaKind) {
   return "Le domande piu votate saranno usate nella prossima intervista.";
 }
 
-function createEmptyDraft(authorName: string): DraftState {
-  return {
-    authorName,
-    body: "",
-    category: "Mercato",
-    coverType: null,
-    coverUrl: "",
-    excerpt: "",
-    externalUrl: "",
-    kind: "article",
-    subtitle: "",
-    taggedTargets: [],
-    title: "",
-  };
-}
-
 function buildFeedMeta(post: MediaProfilePost) {
   return [
     `di ${post.author_name}`,
     formatPostDate(post.published_at ?? post.created_at),
     post.kind === "article" ? `${post.reading_time_minutes} min` : null,
     formatCommentCount(post.comment_count),
-  ]
-    .filter(Boolean)
-    .join(" • ");
-}
-
-function buildDetailAuthorLine(post: MediaProfilePost, displayName: string) {
-  return [
-    `di ${post.author_name} - ${displayName}`,
-    formatPostDate(post.published_at ?? post.created_at),
-    post.kind === "article" ? `${post.reading_time_minutes} min` : null,
   ]
     .filter(Boolean)
     .join(" • ");
@@ -3106,26 +2824,6 @@ function formatPostDate(value: string | null) {
 
 function getTargetKey(target: MediaProfilePostTaggedTarget) {
   return `${target.target_type}:${target.target_id}`;
-}
-
-function formatTargetRole(role: string | null) {
-  if (role === "club") {
-    return "Societa";
-  }
-
-  if (role === "player") {
-    return "Calciatore";
-  }
-
-  if (role === "coach") {
-    return "Allenatore";
-  }
-
-  if (role === "staff") {
-    return "Staff";
-  }
-
-  return "Profilo";
 }
 
 function buildMediaProfileTypeLabel(affiliationType: string | null | undefined) {
@@ -3618,6 +3316,7 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing[12],
     marginBottom: spacing[24],
   },
@@ -3897,9 +3596,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius[8],
     flexDirection: "row",
+    gap: spacing[12],
     justifyContent: "space-between",
     marginTop: spacing[22],
     padding: spacing[14],
+  },
+  externalLinkText: {
+    flex: 1,
   },
   externalLinkTitle: {
     fontWeight: typography.fontWeight.semibold,

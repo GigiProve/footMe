@@ -23,6 +23,7 @@ export type PublicClubProfile = {
   logo_url: string | null;
   name: string;
   owner_full_name: string | null;
+  owner_profile_id: string | null;
   region: string;
   sports_focus: string | null;
   stadium: string | null;
@@ -159,6 +160,7 @@ export async function fetchPublicClubProfile(clubId: string): Promise<PublicClub
     logo_url: data.logo_url ?? null,
     name: data.name ?? "",
     owner_full_name: owner?.full_name ?? null,
+    owner_profile_id: data.owner_profile_id ?? null,
     region: data.region ?? "",
     sports_focus: data.sports_focus ?? null,
     stadium: data.stadium ?? null,

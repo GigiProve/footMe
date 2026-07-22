@@ -10,6 +10,8 @@ type ClubMemberRowProps = {
   member: ClubMember;
   onRemove: (memberId: string) => void;
   onReject: (memberId: string) => void;
+  /** Resolved team name for members that have a team_id. */
+  teamName?: string | null;
 };
 
 const roleLabelMap: Record<string, string> = {
@@ -23,6 +25,7 @@ export function ClubMemberRow({
   member,
   onRemove,
   onReject,
+  teamName,
 }: ClubMemberRowProps) {
   const router = useRouter();
   const isLinked = member.profile_id !== null;
@@ -30,9 +33,17 @@ export function ClubMemberRow({
     ? (member.full_name ?? "Profilo collegato")
     : (member.manual_name ?? "Senza nome");
   const roleLabel = roleLabelMap[member.member_role] ?? member.member_role;
-  const subtitle = member.staff_title
-    ? `${roleLabel} · ${member.staff_title}`
-    : roleLabel;
+
+  const subtitleParts: string[] = [];
+  if (member.staff_title) {
+    subtitleParts.push(`${roleLabel} · ${member.staff_title}`);
+  } else {
+    subtitleParts.push(roleLabel);
+  }
+  if (teamName) {
+    subtitleParts.push(`Squadra: ${teamName}`);
+  }
+  const subtitle = subtitleParts.join(" · ");
 
   function handlePress() {
     if (isLinked && member.profile_id) {
@@ -68,6 +79,9 @@ export function ClubMemberRow({
       onPress={isLinked ? handlePress : undefined}
       right={
         <View style={styles.rightSlot}>
+          {member.status === "pending" ? (
+            <Badge label="In attesa" variant="warning" />
+          ) : null}
           {!isLinked ? <Badge label="Non collegato" variant="default" /> : null}
           {member.added_by === "self_request" ? (
             <Badge label="Auto" variant="accent" />

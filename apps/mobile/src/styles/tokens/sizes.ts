@@ -6,4 +6,7 @@ export const sizes = {
   recruitingDescriptionMinHeight: 120,
   orbHero: 220,
   orbAccent: 260,
+  chatHeaderHeight: 56,
+  chatComposerButton: 36,
+  chatAvatar: 36,
 } as const;

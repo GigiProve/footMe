@@ -19,6 +19,14 @@ const iconNames = {
     active: "person-circle",
     inactive: "person-circle-outline",
   },
+  search: {
+    active: "search",
+    inactive: "search-outline",
+  },
+  dashboard: {
+    active: "grid",
+    inactive: "grid-outline",
+  },
 } as const;
 
 export type IconName = keyof typeof iconNames;

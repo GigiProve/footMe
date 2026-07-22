@@ -28,6 +28,7 @@ type MediaTabContentProps = {
   initialItems?: MediaContentItem[];
   mode: MediaViewerMode;
   onAddContentPress?: () => void;
+  onOpenTaggedItem?: (ref: { contentType: string; postId: string }) => void;
 };
 
 type MediaContentTag = {
@@ -44,6 +45,9 @@ type MediaComment = {
 export type MediaContentItem = {
   commentCount: number;
   comments: MediaComment[];
+  /** Icon shown on a generated cover when the item has no thumbnail image
+   *  (e.g. a tagged poll/formation/opinion). */
+  coverIcon?: ComponentProps<typeof Ionicons>["name"];
   description: string;
   id: string;
   isFeatured: boolean;
@@ -51,6 +55,7 @@ export type MediaContentItem = {
   isSaved: boolean;
   likeCount: number;
   tag?: MediaContentTag;
+  taggedRef?: { contentType: "club_media" | "fan_tribuna" | "media_profile"; postId: string };
   thumbnailUrl: string;
   type: "image" | "video";
   videoUrl?: string;
@@ -61,6 +66,7 @@ export function MediaTabContent({
   initialItems = [],
   mode,
   onAddContentPress,
+  onOpenTaggedItem,
 }: MediaTabContentProps) {
   const [items, setItems] = useState(initialItems);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -116,11 +122,17 @@ export function MediaTabContent({
       return;
     }
 
-    const itemIndex = orderedItems.findIndex((item) => item.id === itemId);
-    if (itemIndex < 0) {
+    const item = orderedItems.find((orderedItem) => orderedItem.id === itemId);
+    if (!item) {
       return;
     }
 
+    if (item.taggedRef && onOpenTaggedItem) {
+      onOpenTaggedItem(item.taggedRef);
+      return;
+    }
+
+    const itemIndex = orderedItems.indexOf(item);
     setActiveViewerIndex(itemIndex);
     setSelectedItemId(itemId);
   }
@@ -269,7 +281,17 @@ export function MediaTabContent({
                 ]}
                 testID={`media-grid-item-${item.id}`}
               >
-                <Image source={{ uri: item.thumbnailUrl }} style={styles.gridImage} />
+                {item.thumbnailUrl ? (
+                  <Image source={{ uri: item.thumbnailUrl }} style={styles.gridImage} />
+                ) : (
+                  <View style={styles.gridPlaceholder}>
+                    <Ionicons
+                      color={colors.accent}
+                      name={item.coverIcon ?? "pricetag-outline"}
+                      size={26}
+                    />
+                  </View>
+                )}
                 <View style={styles.gridShade} />
                 {item.tag ? (
                   <View style={styles.tagBadge}>
@@ -594,6 +616,12 @@ const styles = StyleSheet.create({
   },
   gridItemDisabled: {
     opacity: 0.72,
+  },
+  gridPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    justifyContent: "center",
   },
   gridShade: {
     ...StyleSheet.absoluteFillObject,

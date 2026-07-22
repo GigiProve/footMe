@@ -102,6 +102,25 @@ vi.mock("./fan-media-service", () => ({
   unfollowProfile: followMocks.unfollowProfile,
 }));
 
+vi.mock("../saved/saved-service", () => ({
+  fetchProfileSaveState: vi.fn().mockResolvedValue(false),
+  saveProfile: vi.fn().mockResolvedValue(undefined),
+  unsaveProfile: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../ui/Toast/ToastProvider", () => ({
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+  useToast: () => ({ showToast: vi.fn() }),
+}));
+
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  };
+});
+
 vi.mock("./media-profile-post-service", () => ({
   addMediaProfilePostComment: articleMocks.addMediaProfilePostComment,
   createMediaProfilePost: articleMocks.createMediaProfilePost,
@@ -127,6 +146,12 @@ vi.mock("./media-tribuna-service", () => ({
 vi.mock("./media-upload-service", () => ({
   pickAndUploadMedia: vi.fn(),
   ProfileMediaUploadError: class ProfileMediaUploadError extends Error {},
+}));
+
+vi.mock("../content/content-tag-service", () => ({
+  hideTag: vi.fn().mockResolvedValue(undefined),
+  notifyTaggedProfiles: vi.fn().mockResolvedValue(undefined),
+  reportTag: vi.fn().mockResolvedValue(undefined),
 }));
 
 function render(element: React.ReactElement) {
@@ -381,6 +406,7 @@ function buildPost(overrides: Partial<MediaProfilePost> = {}): MediaProfilePost 
     cover_url: "https://example.com/cover.jpg",
     created_at: "2026-05-19T08:00:00Z",
     created_by_profile_id: "media-1",
+    display_mode: "full",
     excerpt: "La societa valuta profili giovani per completare il reparto offensivo.",
     external_url: null,
     id: "post-1",
@@ -388,7 +414,10 @@ function buildPost(overrides: Partial<MediaProfilePost> = {}): MediaProfilePost 
     kind: "article",
     media_profile_id: "media-1",
     published_at: "2026-05-19T08:00:00Z",
+    publisher_name: "Gazzetta dello Sport",
     reading_time_minutes: 3,
+    source_name: null,
+    source_type: "platform",
     status: "published",
     subtitle: "La redazione segue un profilo Under 19 per il mercato estivo.",
     tagged_targets: [
@@ -604,8 +633,9 @@ describe("MediaProfileView", () => {
       await Promise.resolve();
     });
 
-    expect(hasText(tree.root, "di Marco Bianchi - Gazzetta dello Sport")).toBe(true);
-    expect(hasText(tree.root, "Profili taggati")).toBe(true);
+    expect(hasText(tree.root, "Gazzetta dello Sport")).toBe(true);
+    expect(hasText(tree.root, "di Marco Bianchi")).toBe(true);
+    expect(hasText(tree.root, "con AC Como")).toBe(true);
     expect(hasText(tree.root, "Leggi anche sul sito")).toBe(true);
     expect(hasText(tree.root, "Commenta")).toBe(true);
     expect(hasText(tree.root, "Salva")).toBe(true);

@@ -6,6 +6,7 @@ import { withDefaultProfileAvatar } from "../profile-avatar";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import type { EditSection } from "../ProfileReadonlyView";
 import type { GroupedExperience } from "./career-grouping";
+import { useTaggedMediaItems } from "../../content/use-tagged-content";
 import { CareerTabContent } from "./CareerTabContent";
 import { InfoTab } from "./InfoTab";
 import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
@@ -83,6 +84,10 @@ function MediaTab({
   isOwner: boolean;
   onManageMedia: () => void;
 }) {
+  const { onOpenTaggedItem, taggedItems } = useTaggedMediaItems(
+    completeProfile.profile.id,
+  );
+
   const mediaItems = useMemo<MediaContentItem[]>(() => {
     const profileMediaItems = completeProfile.playerProfile?.media_items ?? [];
 
@@ -138,9 +143,10 @@ function MediaTab({
   return (
     <MediaTabContent
       authorName={completeProfile.profile.full_name}
-      initialItems={mediaItems}
+      initialItems={[...mediaItems, ...taggedItems]}
       mode={isOwner ? "owner" : "visitor"}
       onAddContentPress={isOwner ? onManageMedia : undefined}
+      onOpenTaggedItem={onOpenTaggedItem}
     />
   );
 }

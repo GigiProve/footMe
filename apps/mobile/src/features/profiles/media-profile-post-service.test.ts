@@ -68,6 +68,10 @@ const mocks = vi.hoisted(() => {
       }),
       limit: vi.fn(() => builder),
       maybeSingle: vi.fn(async () => nextResponse()),
+      neq: vi.fn((column: string, value: unknown) => {
+        operation.filters.push({ column, value });
+        return builder;
+      }),
       order: vi.fn((column: string, options: unknown) => {
         operation.orders.push({ column, options });
         return builder;
@@ -157,9 +161,23 @@ describe("media-profile-post-service", () => {
       { data: [{ post_id: "post-1" }], error: null },
       {
         data: [
-          { post_id: "post-1", target_id: "player-1", target_type: "profile" },
-          { post_id: "post-1", target_id: "club-1", target_type: "club" },
+          {
+            post_id: "post-1",
+            status: "active",
+            target_id: "player-1",
+            target_type: "profile",
+          },
+          {
+            post_id: "post-1",
+            status: "active",
+            target_id: "club-1",
+            target_type: "club",
+          },
         ],
+        error: null,
+      },
+      {
+        data: [{ entity_name: "Gazzetta dello Sport", profile_id: "media-1" }],
         error: null,
       },
       {
@@ -195,9 +213,12 @@ describe("media-profile-post-service", () => {
     expect(feed.map((post) => post.id)).toEqual(["post-1", "post-2"]);
     expect(feed[0]).toMatchObject({
       comment_count: 2,
+      display_mode: "full",
       is_saved: true,
       kind: "article",
+      publisher_name: "Gazzetta dello Sport",
       reading_time_minutes: 1,
+      source_type: "platform",
     });
     expect(feed[0].tagged_targets).toEqual([
       {

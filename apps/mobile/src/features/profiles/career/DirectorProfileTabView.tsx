@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { radius, spacing } from "../../../theme/tokens";
-import { AppText, EmptyState } from "../../../ui";
+import { AppText, Button, EmptyState } from "../../../ui";
 import type { DirectorMediaLinkedTarget } from "../director-media";
 import { withDefaultProfileAvatar } from "../profile-avatar";
 import type { CompleteProfessionalProfile } from "../profile-service";
@@ -14,9 +14,13 @@ import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
 type DirectorProfileTabViewProps = {
   completeProfile: CompleteProfessionalProfile;
   isConnecting?: boolean;
+  isFollowed?: boolean;
   isMessaging?: boolean;
   isOwner?: boolean;
+  isSaved?: boolean;
   onConnect?: () => void;
+  onFollowPress?: () => void;
+  onSavePress?: () => void;
   onDeleteMedia?: (itemId: string) => void;
   onEditMedia?: (itemId: string) => void;
   onManageMedia?: () => void;
@@ -56,9 +60,13 @@ const bananiColors = {
 export function DirectorProfileTabView({
   completeProfile,
   isConnecting = false,
+  isFollowed = false,
   isMessaging = false,
   isOwner = false,
+  isSaved = false,
   onConnect,
+  onFollowPress,
+  onSavePress,
   onDeleteMedia,
   onEditMedia,
   onManageMedia,
@@ -70,7 +78,13 @@ export function DirectorProfileTabView({
 
   return (
     <View style={styles.container}>
-      <DirectorProfileHeader completeProfile={completeProfile} />
+      <DirectorProfileHeader
+        completeProfile={completeProfile}
+        isFollowed={isFollowed}
+        isSaved={isSaved}
+        onFollowPress={onFollowPress}
+        onSavePress={onSavePress}
+      />
       <ProfileTabBar
         activeColor={bananiColors.foreground}
         activeTab={activeTab}
@@ -112,8 +126,16 @@ export function DirectorProfileTabView({
 
 function DirectorProfileHeader({
   completeProfile,
+  isFollowed,
+  isSaved,
+  onFollowPress,
+  onSavePress,
 }: {
   completeProfile: CompleteProfessionalProfile;
+  isFollowed?: boolean;
+  isSaved?: boolean;
+  onFollowPress?: () => void;
+  onSavePress?: () => void;
 }) {
   const directorProfile = completeProfile.directorProfile;
   const primaryRole =
@@ -152,6 +174,43 @@ function DirectorProfileHeader({
               </AppText>
             </View>
           ))}
+        </View>
+      ) : null}
+      {onFollowPress || onSavePress ? (
+        <View style={styles.directorActionsRow}>
+          {onFollowPress ? (
+            <Button
+              label={isFollowed ? "Seguito" : "Segui"}
+              leftIcon={
+                <Ionicons
+                  color={isFollowed ? bananiColors.primary : "#FFFFFF"}
+                  name={isFollowed ? "checkmark" : "person-add-outline"}
+                  size={18}
+                />
+              }
+              onPress={onFollowPress}
+              size="sm"
+              variant={isFollowed ? "secondary" : "primary"}
+            />
+          ) : null}
+          {onSavePress ? (
+            <Pressable
+              accessibilityLabel={isSaved ? "Rimuovi dai salvati" : "Salva profilo"}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onSavePress}
+              style={({ pressed }) => [
+                styles.directorSaveButton,
+                pressed ? styles.directorSavePressed : null,
+              ]}
+            >
+              <Ionicons
+                color={isSaved ? bananiColors.primary : bananiColors.mutedForeground}
+                name={isSaved ? "bookmark" : "bookmark-outline"}
+                size={20}
+              />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -702,6 +761,23 @@ const styles = StyleSheet.create({
   },
   previousSection: {
     gap: spacing[28],
+  },
+  directorActionsRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[10],
+    justifyContent: "center",
+    paddingTop: spacing[16],
+  },
+  directorSaveButton: {
+    alignItems: "center",
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  directorSavePressed: {
+    opacity: 0.75,
   },
   profileHeader: {
     alignItems: "center",

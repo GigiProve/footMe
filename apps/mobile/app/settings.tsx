@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Redirect, useRouter } from "expo-router";
 
 import { Screen } from "../src/components/ui/screen";
 import { KeyboardAwareForm } from "../src/components/ui/keyboard-aware-form";
 import { useSession } from "../src/features/auth/use-session";
 import { supabase } from "../src/lib/supabase";
-import { spacing } from "../src/theme/tokens";
-import { AppText, Badge, Button, Card, SectionCard } from "../src/ui";
+import { colors, spacing } from "../src/theme/tokens";
+import { AppText, Badge, Button, Card, ListItem, SectionCard } from "../src/ui";
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -105,6 +106,25 @@ export default function SettingsScreen() {
             )}
           </SectionCard>
         ) : null}
+
+        <SectionCard
+          description="Scegli quali aggiornamenti vuoi ricevere dalla campanella"
+          title="Notifiche"
+        >
+          <ListItem
+            onPress={() => router.push("/notification-preferences")}
+            right={
+              <Ionicons
+                color={colors.textMuted}
+                name="chevron-forward"
+                size={20}
+              />
+            }
+            showDivider={false}
+            subtitle="Richieste, candidature, attività, Store e altro"
+            title="Preferenze notifiche"
+          />
+        </SectionCard>
 
         <Card style={styles.card}>
           <Badge label="Generali" variant="accent" />

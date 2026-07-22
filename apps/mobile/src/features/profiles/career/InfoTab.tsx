@@ -12,6 +12,7 @@ import { InfoRow } from "../components/InfoRow";
 import { InfoTagsRow } from "../components/InfoTagsRow";
 import { PalmaresItem } from "../components/PalmaresItem";
 import { ReadonlyPositionPitch } from "../components/ReadonlyPositionPitch";
+import { PlayerRepresentationsCard } from "../../relationships/PlayerRepresentationsCard";
 
 type InfoTabProps = {
   completeProfile: CompleteProfessionalProfile;
@@ -225,7 +226,12 @@ export function InfoTab({ completeProfile, isOwner, onEdit }: InfoTabProps) {
         />
       </SectionCard>
 
-      {/* 8. Contatti */}
+      {/* 8. Rappresentanza (only the owner manages their links here) */}
+      {isOwner ? (
+        <PlayerRepresentationsCard playerProfileId={profile.id} />
+      ) : null}
+
+      {/* 9. Contatti */}
       <View>
         <ContactSection contacts={userContacts} variant="flat" />
         {isOwner ? (

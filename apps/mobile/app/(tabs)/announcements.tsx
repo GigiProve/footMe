@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
 import { useSession } from "../../src/features/auth/use-session";
+import { openDirectConversation } from "../../src/features/messaging/messaging-service";
 import {
   applyToRecruitingAd,
   createRecruitingAd,
@@ -11,12 +13,18 @@ import {
   getClubAds,
   getPublishedAds,
   toggleSavedAd,
+  updateApplicationStatus,
+  type ApplicationStatus,
   type ClubApplicationSummary,
   type DiscoverableRecruitingAd,
   type RecruitingAdForm,
   type RecruitingAdSummary,
 } from "../../src/features/recruiting/recruiting-service";
 import { JobCard } from "../../src/features/recruiting/components/JobCard";
+import {
+  fetchClubTeams,
+  type ClubTeam,
+} from "../../src/features/clubs/team-service";
 import { sizes, spacing } from "../../src/theme/tokens";
 import {
   AppText,
@@ -47,8 +55,9 @@ const roleLabels: Record<string, string> = {
 };
 
 const applicationStatusLabels: Record<string, string> = {
+  accepted: "Accettata",
   rejected: "Rifiutata",
-  reviewing: "In revisione",
+  reviewing: "In lettura",
   shortlisted: "Shortlist",
   submitted: "Inviata",
   withdrawn: "Ritirata",
@@ -63,6 +72,7 @@ function formatApplicationStatus(status: string) {
 }
 
 export default function AnnouncementsScreen() {
+  const router = useRouter();
   const { profile, session } = useSession();
   const userId = session?.user?.id;
   const [ads, setAds] = useState<RecruitingAdSummary[]>([]);
@@ -71,9 +81,13 @@ export default function AnnouncementsScreen() {
     [],
   );
   const [clubName, setClubName] = useState<string | null>(null);
+  const [clubTeams, setClubTeams] = useState<ClubTeam[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
+  const [contactingApplicationId, setContactingApplicationId] = useState<
+    string | null
+  >(null);
   const [selectedAdId, setSelectedAdId] = useState<string | null>(null);
   const [coverMessage, setCoverMessage] = useState("");
   const [form, setForm] = useState<RecruitingAdForm>({
@@ -84,6 +98,7 @@ export default function AnnouncementsScreen() {
     description: "",
     region: "",
     roleRequired: "forward",
+    teamId: null,
     title: "",
   });
 
@@ -101,6 +116,11 @@ export default function AnnouncementsScreen() {
       setAds(result.ads);
       setClubName(result.club?.name ?? null);
       setApplications(nextApplications);
+      if (result.club?.id) {
+        setClubTeams(await fetchClubTeams(result.club.id));
+      } else {
+        setClubTeams([]);
+      }
     } catch (error) {
       const message =
         error instanceof Error
@@ -145,6 +165,62 @@ export default function AnnouncementsScreen() {
 
     loadPublicAnnouncements();
   }, [loadClubDashboard, loadPublicAnnouncements, profile?.role, userId]);
+
+  async function handleUpdateApplicationStatus(
+    application: ClubApplicationSummary,
+    status: ApplicationStatus,
+  ) {
+    if (!application.applicant?.id) {
+      return;
+    }
+    try {
+      setIsActionLoading(application.id);
+      await updateApplicationStatus({
+        adTitle: application.ad.title,
+        applicantProfileId: application.applicant.id,
+        applicationId: application.id,
+        status,
+      });
+      await loadClubDashboard();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore durante l'aggiornamento della candidatura.";
+      Alert.alert("Aggiornamento non riuscito", message);
+    } finally {
+      setIsActionLoading(null);
+    }
+  }
+
+  async function handleContactApplicant(application: ClubApplicationSummary) {
+    if (!application.applicant?.id) {
+      return;
+    }
+
+    try {
+      setContactingApplicationId(application.id);
+      const conversationId = await openDirectConversation(
+        application.applicant.id,
+        application.id,
+      );
+      router.push({
+        pathname: "/messages/[conversationId]",
+        params: {
+          conversationId,
+          otherName: application.applicant.full_name,
+        },
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore durante l'apertura della conversazione.";
+      Alert.alert("Chat non disponibile", message);
+    } finally {
+      setContactingApplicationId(null);
+    }
+  }
 
   function patchForm<Key extends keyof RecruitingAdForm>(
     key: Key,
@@ -374,6 +450,26 @@ export default function AnnouncementsScreen() {
             options={positions}
             value={form.roleRequired}
           />
+          {clubTeams.length > 0 ? (
+            <View style={styles.teamPicker}>
+              <AppText color="secondary" variant="caption">
+                Squadra
+              </AppText>
+              <ChipGroup
+                onChange={(value) =>
+                  patchForm("teamId", value === "all" ? null : value)
+                }
+                options={[
+                  { label: "Tutta la societa'", value: "all" },
+                  ...clubTeams.map((team) => ({
+                    label: team.name,
+                    value: team.id,
+                  })),
+                ]}
+                value={form.teamId ?? "all"}
+              />
+            </View>
+          ) : null}
           <View style={styles.ageRow}>
             <Input
               keyboardType="number-pad"
@@ -470,6 +566,68 @@ export default function AnnouncementsScreen() {
                   Nessun messaggio allegato.
                 </AppText>
               )}
+              <View style={styles.candidateActions}>
+                {application.applicant ? (
+                  <Button
+                    disabled={contactingApplicationId === application.id}
+                    label={
+                      contactingApplicationId === application.id
+                        ? "Apertura chat..."
+                        : "Contatta"
+                    }
+                    onPress={() => handleContactApplicant(application)}
+                    size="sm"
+                    variant="secondary"
+                  />
+                ) : null}
+                <Button
+                  disabled={
+                    isActionLoading === application.id ||
+                    application.status === "reviewing"
+                  }
+                  label="Letta"
+                  onPress={() =>
+                    handleUpdateApplicationStatus(application, "reviewing")
+                  }
+                  size="sm"
+                  variant="outline"
+                />
+                <Button
+                  disabled={
+                    isActionLoading === application.id ||
+                    application.status === "shortlisted"
+                  }
+                  label="Shortlist"
+                  onPress={() =>
+                    handleUpdateApplicationStatus(application, "shortlisted")
+                  }
+                  size="sm"
+                  variant="outline"
+                />
+                <Button
+                  disabled={
+                    isActionLoading === application.id ||
+                    application.status === "accepted"
+                  }
+                  label="Accetta"
+                  onPress={() =>
+                    handleUpdateApplicationStatus(application, "accepted")
+                  }
+                  size="sm"
+                />
+                <Button
+                  disabled={
+                    isActionLoading === application.id ||
+                    application.status === "rejected"
+                  }
+                  label="Rifiuta"
+                  onPress={() =>
+                    handleUpdateApplicationStatus(application, "rejected")
+                  }
+                  size="sm"
+                  variant="danger"
+                />
+              </View>
             </Card>
           ))}
         </View>
@@ -499,5 +657,13 @@ const styles = StyleSheet.create({
   },
   sectionGap: {
     gap: spacing[12],
+  },
+  teamPicker: {
+    gap: spacing[8],
+  },
+  candidateActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
   },
 });

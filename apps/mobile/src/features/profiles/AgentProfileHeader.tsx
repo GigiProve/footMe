@@ -10,9 +10,17 @@ type AgentProfileHeaderProps = {
   avatarUrl: string | null | undefined;
   bio?: string | null;
   fullName: string;
+  isMessaging?: boolean;
   locationLabel?: string;
+  onContactPress?: () => void;
   onEditAvatarPress?: () => void;
   onEditProfilePress?: () => void;
+  onFollowPress?: () => void;
+  isFollowed?: boolean;
+  onSavePress?: () => void;
+  isSaved?: boolean;
+  onShortlistPress?: () => void;
+  isShortlisted?: boolean;
   primaryRole: string;
   statusBadge?: string;
 };
@@ -22,9 +30,17 @@ export function AgentProfileHeader({
   avatarUrl,
   bio,
   fullName,
+  isMessaging,
   locationLabel,
+  onContactPress,
   onEditAvatarPress,
   onEditProfilePress,
+  onFollowPress,
+  isFollowed,
+  onSavePress,
+  isSaved,
+  onShortlistPress,
+  isShortlisted,
   primaryRole,
   statusBadge,
 }: AgentProfileHeaderProps) {
@@ -98,12 +114,95 @@ export function AgentProfileHeader({
           size="sm"
           variant="primary"
         />
+      ) : onFollowPress || onContactPress || onSavePress || onShortlistPress ? (
+        <View style={styles.actionsRow}>
+          {onFollowPress ? (
+            <Button
+              label={isFollowed ? "Seguito" : "Segui"}
+              leftIcon={
+                <Ionicons
+                  color={isFollowed ? colors.accent : colors.inkInvert}
+                  name={isFollowed ? "checkmark" : "person-add-outline"}
+                  size={18}
+                />
+              }
+              onPress={onFollowPress}
+              size="sm"
+              variant={isFollowed ? "secondary" : "primary"}
+            />
+          ) : null}
+          {onContactPress ? (
+            <Button
+              label="Contatta"
+              leftIcon={
+                isMessaging ? undefined : (
+                  <Ionicons color={colors.accent} name="chatbubble-ellipses-outline" size={18} />
+                )
+              }
+              loading={isMessaging}
+              onPress={onContactPress}
+              size="sm"
+              variant="secondary"
+            />
+          ) : null}
+          {onSavePress ? (
+            <Pressable
+              accessibilityLabel={isSaved ? "Rimuovi dai salvati" : "Salva profilo"}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onSavePress}
+              style={({ pressed }) => [
+                styles.saveButton,
+                pressed ? styles.savePressed : null,
+              ]}
+            >
+              <Ionicons
+                color={isSaved ? colors.accent : colors.textMuted}
+                name={isSaved ? "bookmark" : "bookmark-outline"}
+                size={20}
+              />
+            </Pressable>
+          ) : null}
+          {onShortlistPress ? (
+            <Pressable
+              accessibilityLabel={isShortlisted ? "Gestisci shortlist" : "Aggiungi a shortlist"}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onShortlistPress}
+              style={({ pressed }) => [
+                styles.saveButton,
+                pressed ? styles.savePressed : null,
+              ]}
+            >
+              <Ionicons
+                color={isShortlisted ? colors.accent : colors.textMuted}
+                name={isShortlisted ? "star" : "star-outline"}
+                size={20}
+              />
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  actionsRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[10],
+  },
+  saveButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  savePressed: {
+    opacity: 0.75,
+  },
   avatarEditBadge: {
     alignItems: "center",
     backgroundColor: colors.accent,

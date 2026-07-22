@@ -2,17 +2,36 @@ import { useCallback, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 
-import { fetchPendingClubs, type AdminClubEntry } from "../../src/features/admin/admin-service";
+import {
+  fetchPendingClubs,
+  fetchReportedRepresentations,
+  fetchReportedTags,
+  moderateReportedRepresentation,
+  moderateReportedTag,
+  type AdminClubEntry,
+  type ReportedRepresentation,
+  type ReportedTag,
+} from "../../src/features/admin/admin-service";
 import { logout } from "../../src/features/auth/logout";
 import { useSession } from "../../src/features/auth/use-session";
 import { ClubRegistrationRequestList } from "../../src/features/admin/components/club-registration-request-list";
 import { colors, spacing } from "../../src/theme/tokens";
 import { AppText, Badge, Button } from "../../src/ui";
 
+const REPORTED_CONTENT_LABELS: Record<string, string> = {
+  club_media: "Post societa'",
+  fan_tribuna: "Tribuna tifosi",
+  media_profile: "Articolo media",
+};
+
 export default function AdminDashboardScreen() {
   const router = useRouter();
   const { profile, session } = useSession();
   const [clubs, setClubs] = useState<AdminClubEntry[]>([]);
+  const [reportedTags, setReportedTags] = useState<ReportedTag[]>([]);
+  const [reportedRepresentations, setReportedRepresentations] = useState<ReportedRepresentation[]>([]);
+  const [moderatingKey, setModeratingKey] = useState<string | null>(null);
+  const [moderatingRepKey, setModeratingRepKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -20,8 +39,14 @@ export default function AdminDashboardScreen() {
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const data = await fetchPendingClubs();
-      setClubs(data);
+      const [clubsData, tagsData, repsData] = await Promise.all([
+        fetchPendingClubs(),
+        fetchReportedTags().catch(() => [] as ReportedTag[]),
+        fetchReportedRepresentations().catch(() => [] as ReportedRepresentation[]),
+      ]);
+      setClubs(clubsData);
+      setReportedTags(tagsData);
+      setReportedRepresentations(repsData);
     } catch {
       setError("Impossibile caricare le richieste di iscrizione.");
     } finally {
@@ -29,6 +54,47 @@ export default function AdminDashboardScreen() {
       setIsRefreshing(false);
     }
   }, []);
+
+  async function handleModerateTag(tag: ReportedTag, dismiss: boolean) {
+    const key = `${tag.content_type}:${tag.post_id}:${tag.tagged_profile_id}`;
+    try {
+      setModeratingKey(key);
+      await moderateReportedTag({
+        contentType: tag.content_type,
+        dismiss,
+        postId: tag.post_id,
+        taggedProfileId: tag.tagged_profile_id,
+      });
+      await loadData();
+    } catch (moderationError) {
+      const message =
+        moderationError instanceof Error
+          ? moderationError.message
+          : "Operazione non riuscita.";
+      Alert.alert("Operazione non riuscita", message);
+    } finally {
+      setModeratingKey(null);
+    }
+  }
+
+  async function handleModerateRepresentation(
+    rep: ReportedRepresentation,
+    remove: boolean,
+  ) {
+    try {
+      setModeratingRepKey(rep.id);
+      await moderateReportedRepresentation({ id: rep.id, remove });
+      await loadData();
+    } catch (moderationError) {
+      const message =
+        moderationError instanceof Error
+          ? moderationError.message
+          : "Operazione non riuscita.";
+      Alert.alert("Operazione non riuscita", message);
+    } finally {
+      setModeratingRepKey(null);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -72,6 +138,86 @@ export default function AdminDashboardScreen() {
         <Button label="Esci" onPress={handleSignOut} size="sm" variant="secondary" />
       </View>
 
+      {reportedTags.length > 0 ? (
+        <View style={styles.moderationSection}>
+          <View style={styles.moderationHeader}>
+            <AppText variant="titleSm">Tag segnalati</AppText>
+            <Badge label={reportedTags.length.toString()} variant="error" />
+          </View>
+          {reportedTags.map((tag) => {
+            const key = `${tag.content_type}:${tag.post_id}:${tag.tagged_profile_id}`;
+            return (
+              <View key={key} style={styles.moderationRow}>
+                <View style={styles.moderationInfo}>
+                  <AppText variant="bodySm">{tag.tagged_name}</AppText>
+                  <AppText color="secondary" variant="caption">
+                    {REPORTED_CONTENT_LABELS[tag.content_type] ??
+                      tag.content_type}
+                  </AppText>
+                </View>
+                <View style={styles.moderationActions}>
+                  <Button
+                    disabled={moderatingKey === key}
+                    label="Mantieni"
+                    onPress={() => handleModerateTag(tag, true)}
+                    size="sm"
+                    variant="outline"
+                  />
+                  <Button
+                    disabled={moderatingKey === key}
+                    label="Rimuovi"
+                    onPress={() => handleModerateTag(tag, false)}
+                    size="sm"
+                    variant="danger"
+                  />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {reportedRepresentations.length > 0 ? (
+        <View style={styles.moderationSection}>
+          <View style={styles.moderationHeader}>
+            <AppText variant="titleSm">Rapporti segnalati</AppText>
+            <Badge
+              label={reportedRepresentations.length.toString()}
+              variant="error"
+            />
+          </View>
+          {reportedRepresentations.map((rep) => (
+            <View key={rep.id} style={styles.moderationRow}>
+              <View style={styles.moderationInfo}>
+                <AppText variant="bodySm">
+                  {rep.agent_name} → {rep.player_name}
+                </AppText>
+                <AppText color="secondary" variant="caption">
+                  {rep.relationship_type}
+                  {rep.reported_reason ? ` • ${rep.reported_reason}` : ""}
+                </AppText>
+              </View>
+              <View style={styles.moderationActions}>
+                <Button
+                  disabled={moderatingRepKey === rep.id}
+                  label="Mantieni"
+                  onPress={() => handleModerateRepresentation(rep, false)}
+                  size="sm"
+                  variant="outline"
+                />
+                <Button
+                  disabled={moderatingRepKey === rep.id}
+                  label="Rimuovi"
+                  onPress={() => handleModerateRepresentation(rep, true)}
+                  size="sm"
+                  variant="danger"
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.sectionHeader}>
         <AppText variant="titleSm">Richieste di iscrizione</AppText>
         {clubs.length > 0 ? (
@@ -112,5 +258,31 @@ const styles = StyleSheet.create({
     gap: spacing[8],
     paddingBottom: spacing[12],
     paddingHorizontal: spacing[20],
+  },
+  moderationSection: {
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    gap: spacing[12],
+    paddingBottom: spacing[16],
+    paddingHorizontal: spacing[20],
+  },
+  moderationHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[8],
+  },
+  moderationRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[12],
+    justifyContent: "space-between",
+  },
+  moderationInfo: {
+    flex: 1,
+    gap: spacing[4],
+  },
+  moderationActions: {
+    flexDirection: "row",
+    gap: spacing[8],
   },
 });

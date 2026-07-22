@@ -34,6 +34,7 @@ const baseClub: PublicClubProfile = {
   logo_url: "https://example.com/logo.png",
   name: "AC Como",
   owner_full_name: null,
+  owner_profile_id: null,
   region: "Lombardia",
   sports_focus: null,
   stadium: "Stadio Giuseppe Sinigaglia",

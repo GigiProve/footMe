@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 
 import { Screen } from "../../src/components/ui/screen";
 import {
@@ -9,7 +10,7 @@ import {
 } from "../../src/features/home/home-dashboard-service";
 import { logout } from "../../src/features/auth/logout";
 import { useSession } from "../../src/features/auth/use-session";
-import { ClubDashboard } from "../../src/features/clubs/components/ClubDashboard";
+import { getUnreadCount } from "../../src/features/clubs/notification-service";
 import { hasSupabaseEnv } from "../../src/lib/supabase";
 import { spacing } from "../../src/theme/tokens";
 import { AppText, Badge, Button, Card, StatCard, TopBar } from "../../src/ui";
@@ -25,9 +26,16 @@ export default function HomeScreen() {
   const router = useRouter();
   const { profile, session } = useSession();
   const userId = session?.user?.id;
+  const profileId = profile?.id ?? "";
   const userEmail = session?.user?.email ?? null;
   const [dashboard, setDashboard] = useState<HomeDashboardData | null>(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
+
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["notifications-unread", profileId],
+    queryFn: () => getUnreadCount(profileId),
+    enabled: !!profileId,
+  });
 
   const loadDashboard = useCallback(async () => {
     if (!userId) {
@@ -59,10 +67,6 @@ export default function HomeScreen() {
     loadDashboard();
   }, [loadDashboard, profile?.id, userId]);
 
-  if (profile?.role === "club_admin") {
-    return <ClubDashboard />;
-  }
-
   async function handleSignOut() {
     await logout({
       avatarUrl: profile?.avatar_url,
@@ -79,7 +83,11 @@ export default function HomeScreen() {
   return (
     <Screen>
       <View style={styles.container}>
-        <TopBar searchPlaceholder="Cerca giocatori, squadre..." />
+        <TopBar
+          notificationCount={unreadCount}
+          onNotificationsPress={() => router.push("/notifications")}
+          searchPlaceholder="Cerca giocatori, squadre..."
+        />
 
         <View style={styles.feedContent}>
           <Card>

@@ -2,11 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Linking,
+  Pressable,
   SafeAreaView,
   StyleSheet,
+  View,
   type AlertButton,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../src/features/auth/use-session";
@@ -19,10 +23,16 @@ import {
   type PublicClubProfile,
   type PublicClubSquadraOverview,
 } from "../../src/features/clubs/club-service";
+import { getUnreadCount } from "../../src/features/clubs/notification-service";
 import {
   PublicClubProfileView,
 } from "../../src/features/clubs/components/PublicClubProfileView";
 import type { ClubHeaderTab } from "../../src/features/clubs/components/PublicClubHeader";
+import {
+  fetchPendingMemberships,
+  respondToMembership,
+  type PendingMembership,
+} from "../../src/features/clubs/membership-service";
 import {
   fetchClubTeamProfiles,
   fetchClubTeams,
@@ -95,8 +105,10 @@ import type { GroupedExperience } from "../../src/features/profiles/career/caree
 import type { CoachGroupedExperience } from "../../src/features/profiles/career/coach-career-grouping";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
 import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
-import { colors } from "../../src/theme/tokens";
-import { AppText } from "../../src/ui";
+import { SavedSection } from "../../src/features/saved/SavedSection";
+import { FollowingSection } from "../../src/features/following/FollowingSection";
+import { colors, radius, spacing } from "../../src/theme/tokens";
+import { ActionSheet, AppText, Button, HeaderBell, SectionCard } from "../../src/ui";
 
 const emptyClubHeaderStats: ClubHeaderStats = {
   activeTeamsCount: 0,
@@ -110,6 +122,13 @@ const emptyClubOverview: PublicClubSquadraOverview = {
   positionPreview: [],
   positionsTotal: 0,
   seasonSummaries: [],
+};
+
+const MEMBER_ROLE_LABELS: Record<string, string> = {
+  coach: "Allenatore",
+  director: "Dirigente",
+  player: "Giocatore",
+  staff: "Staff",
 };
 
 export default function ProfileScreen() {
@@ -130,8 +149,30 @@ export default function ProfileScreen() {
   const [activeClubTab, setActiveClubTab] = useState<ClubHeaderTab>("team");
   const [isLoading, setIsLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<EditSection | null>(null);
+  const [pendingMemberships, setPendingMemberships] = useState<PendingMembership[]>([]);
+  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [respondingMembershipId, setRespondingMembershipId] = useState<string | null>(null);
   const [agentMediaEditingItemId, setAgentMediaEditingItemId] = useState<string | null>(null);
   const [directorMediaEditingItemId, setDirectorMediaEditingItemId] = useState<string | null>(null);
+  const profileId = profile?.id ?? "";
+  const { data: unreadCount = 0 } = useQuery({
+    enabled: !!profileId,
+    queryFn: () => getUnreadCount(profileId),
+    queryKey: ["notifications-unread", profileId],
+  });
+
+  const loadPendingMemberships = useCallback(async () => {
+    if (!userId) {
+      setPendingMemberships([]);
+      return;
+    }
+    try {
+      const data = await fetchPendingMemberships(userId);
+      setPendingMemberships(data);
+    } catch {
+      setPendingMemberships([]);
+    }
+  }, [userId]);
 
   const loadProfile = useCallback(async () => {
     if (!userId) {
@@ -190,7 +231,25 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     void loadProfile();
-  }, [loadProfile]);
+    void loadPendingMemberships();
+  }, [loadProfile, loadPendingMemberships]);
+
+  async function handleRespondMembership(memberId: string, accept: boolean) {
+    try {
+      setRespondingMembershipId(memberId);
+      await respondToMembership(memberId, accept);
+      await loadPendingMemberships();
+      await loadProfile();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Operazione non riuscita.";
+      Alert.alert("Operazione non riuscita", message);
+    } finally {
+      setRespondingMembershipId(null);
+    }
+  }
 
   const headerDetails = useMemo(
     () => (completeProfile ? buildHeaderDetails(completeProfile) : null),
@@ -566,6 +625,96 @@ export default function ProfileScreen() {
           role === "director" ? styles.directorScrollContent : null,
         ]}
       >
+        <View style={styles.profileTopBar}>
+          <HeaderBell
+            count={unreadCount}
+            onPress={() => router.push("/notifications" as never)}
+          />
+          <Pressable
+            accessibilityLabel="Le tue raccolte: Salvati e Seguiti"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => setMoreMenuVisible(true)}
+            style={({ pressed }) => [
+              styles.moreButton,
+              pressed ? styles.moreButtonPressed : null,
+            ]}
+          >
+            <Ionicons
+              color={colors.textPrimary}
+              name="ellipsis-horizontal"
+              size={22}
+            />
+          </Pressable>
+        </View>
+        <ActionSheet
+          actions={[
+            {
+              icon: "bookmark-outline",
+              label: "Salvati",
+              subtitle: "Solo tu puoi vedere ciò che salvi.",
+              onPress: () => router.push("/saved" as never),
+            },
+            {
+              icon: "people-outline",
+              label: "Seguiti",
+              subtitle: "I profili che segui.",
+              onPress: () => router.push("/following" as never),
+            },
+            {
+              icon: "settings-outline",
+              label: "Impostazioni",
+              subtitle: "Preferenze e account",
+              onPress: () => router.push("/settings" as never),
+            },
+          ]}
+          onClose={() => setMoreMenuVisible(false)}
+          title="Le tue raccolte"
+          visible={moreMenuVisible}
+        />
+        {pendingMemberships.length > 0 ? (
+          <SectionCard
+            description="Conferma se vuoi unirti a queste rose."
+            title="Richieste"
+            variant="flat"
+          >
+            <View style={styles.pendingList}>
+              {pendingMemberships.map((membership) => (
+                <View key={membership.id} style={styles.pendingItem}>
+                  <View style={styles.pendingInfo}>
+                    <AppText variant="bodySm">
+                      {membership.club_name ?? "Una societa'"}
+                      {membership.team_name ? ` · ${membership.team_name}` : ""}
+                    </AppText>
+                    <AppText color="secondary" variant="caption">
+                      {MEMBER_ROLE_LABELS[membership.member_role] ??
+                        membership.member_role}
+                    </AppText>
+                  </View>
+                  <View style={styles.pendingActions}>
+                    <Button
+                      disabled={respondingMembershipId === membership.id}
+                      label="Accetta"
+                      onPress={() =>
+                        handleRespondMembership(membership.id, true)
+                      }
+                      size="sm"
+                    />
+                    <Button
+                      disabled={respondingMembershipId === membership.id}
+                      label="Rifiuta"
+                      onPress={() =>
+                        handleRespondMembership(membership.id, false)
+                      }
+                      size="sm"
+                      variant="outline"
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </SectionCard>
+        ) : null}
         {completeProfile && role === "club_admin" && completeProfile.club ? (
           <PublicClubProfileView
             activeTab={activeClubTab}
@@ -741,6 +890,12 @@ export default function ProfileScreen() {
             onEdit={handleEdit}
             role={role}
           />
+        ) : null}
+        {completeProfile ? (
+          <>
+            <SavedSection />
+            <FollowingSection />
+          </>
         ) : null}
       </KeyboardAwareForm>
 
@@ -975,6 +1130,7 @@ function toPublicClubProfile(
     logo_url: club.logo_url,
     name: club.name,
     owner_full_name: null,
+    owner_profile_id: null,
     region: club.region,
     sports_focus: club.sports_focus,
     stadium: club.stadium,
@@ -995,6 +1151,26 @@ function normalizeExternalUrl(url: string) {
 }
 
 const styles = StyleSheet.create({
+  profileTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[8],
+  },
+  moreButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  moreButtonPressed: {
+    opacity: 0.7,
+  },
   directorScreen: {
     backgroundColor: "#F7FAFD",
   },
@@ -1008,5 +1184,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     backgroundColor: colors.background,
     paddingBottom: 0,
+  },
+  pendingList: {
+    gap: spacing[12],
+  },
+  pendingItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing[12],
+  },
+  pendingInfo: {
+    flex: 1,
+    gap: spacing[4],
+  },
+  pendingActions: {
+    flexDirection: "row",
+    gap: spacing[8],
   },
 });

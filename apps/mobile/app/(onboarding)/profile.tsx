@@ -2474,7 +2474,7 @@ export default function OnboardingProfileScreen() {
     await resetForm();
 
     if (destination === "network") {
-      router.replace("/(tabs)/network");
+      router.replace("/(tabs)/cerca");
       return;
     }
 

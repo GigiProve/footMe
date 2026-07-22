@@ -20,6 +20,10 @@ const mediaMocks = vi.hoisted(() => ({
   toggleSavedClubMedia: vi.fn(),
 }));
 
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 vi.mock("../../../components/ui/video-player-modal", () => ({
   VideoPlayerModal: (props: Record<string, unknown>) =>
     React.createElement("mock-video-player-modal", props),
@@ -41,6 +45,18 @@ vi.mock("../../profiles/profile-service", () => ({
 vi.mock("../../profiles/media-upload-service", () => ({
   pickAndUploadMedia: vi.fn(async () => []),
   ProfileMediaUploadError: class ProfileMediaUploadError extends Error {},
+}));
+
+vi.mock("../../content/content-tag-service", () => ({
+  hideTag: vi.fn().mockResolvedValue(undefined),
+  notifyTaggedProfiles: vi.fn().mockResolvedValue(undefined),
+  reportTag: vi.fn().mockResolvedValue(undefined),
+}));
+
+// TaggedContentGrid fetches via TanStack Query; this test renders without a
+// QueryClientProvider and is not exercising tagged content, so stub it out.
+vi.mock("../../content/components/TaggedContentGrid", () => ({
+  TaggedContentGrid: () => null,
 }));
 
 import { PublicClubProfileView } from "./PublicClubProfileView";
@@ -112,6 +128,7 @@ const club: PublicClubProfile = {
   logo_url: null,
   name: "AC Como",
   owner_full_name: null,
+  owner_profile_id: null,
   region: "Lombardia",
   sports_focus: "Valorizzazione giovani e continuità tra vivaio e prima squadra.",
   stadium: "Sinigaglia",
@@ -434,6 +451,8 @@ const mediaPosts: ClubMediaPost[] = [
         display_name: "Marco Rossi",
         profile_id: "profile-player-2",
         role: "player",
+        target_id: "profile-player-2",
+        target_type: "profile" as const,
       },
     ],
     thumbnail_url: "https://cdn.test/market.jpg",

@@ -17,6 +17,12 @@ type AgentProfileTabViewProps = {
   onManageMedia: () => void;
 };
 
+const AGENT_TABS: { label: string; value: ProfileTab }[] = [
+  { label: "Info", value: "info" },
+  { label: "Opportunità", value: "career" },
+  { label: "Media", value: "media" },
+];
+
 export function AgentProfileTabView({
   completeProfile,
   isOwner,
@@ -25,11 +31,15 @@ export function AgentProfileTabView({
   onEditMedia,
   onManageMedia,
 }: AgentProfileTabViewProps) {
-  const [activeTab, setActiveTab] = useState<ProfileTab>("career");
+  const [activeTab, setActiveTab] = useState<ProfileTab>("info");
 
   return (
     <View style={styles.container}>
-      <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <ProfileTabBar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        tabs={AGENT_TABS}
+      />
 
       {activeTab === "career" ? (
         <AgentCareerTabContent

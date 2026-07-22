@@ -259,3 +259,93 @@ export async function fetchPendingReports(): Promise<ClubReportEntry[]> {
     club_name: clubMap.get(report.club_id) ?? "Sconosciuto",
   }));
 }
+
+export type ReportedContentType = "club_media" | "fan_tribuna" | "media_profile";
+
+export type ReportedTag = {
+  content_type: ReportedContentType;
+  created_at: string;
+  post_id: string;
+  report_note?: string | null;
+  report_reason?: string | null;
+  tagged_name: string;
+  tagged_profile_id: string;
+};
+
+/** Admin: reported content tags awaiting moderation (across all content types). */
+export async function fetchReportedTags(): Promise<ReportedTag[]> {
+  const { data, error } = await supabase.rpc("fetch_reported_content_tags");
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as ReportedTag[];
+}
+
+/** Admin: reported representation rows awaiting moderation. */
+export type ReportedRepresentation = {
+  agent_avatar_url: string | null;
+  agent_name: string;
+  agent_profile_id: string;
+  created_at: string;
+  id: string;
+  player_avatar_url: string | null;
+  player_name: string;
+  player_profile_id: string;
+  relationship_type: string;
+  reported_at: string | null;
+  reported_reason: string | null;
+};
+
+/** Admin: fetch all representation rows with status='reported'. */
+export async function fetchReportedRepresentations(): Promise<
+  ReportedRepresentation[]
+> {
+  const { data, error } = await supabase.rpc(
+    "fetch_reported_representations",
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as ReportedRepresentation[];
+}
+
+/**
+ * Admin: dismiss a reported representation (remove=false → restore to accepted)
+ * or remove it (remove=true → status='terminated').
+ */
+export async function moderateReportedRepresentation(input: {
+  id: string;
+  remove: boolean;
+}): Promise<void> {
+  const { error } = await supabase.rpc("moderate_representation", {
+    p_id: input.id,
+    p_remove: input.remove,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+/** Admin: dismiss a report (keep the tag) or remove the tag (hide it). */
+export async function moderateReportedTag(input: {
+  contentType: ReportedContentType;
+  dismiss: boolean;
+  postId: string;
+  taggedProfileId: string;
+}) {
+  const { error } = await supabase.rpc("moderate_content_tag", {
+    p_content_type: input.contentType,
+    p_dismiss: input.dismiss,
+    p_post_id: input.postId,
+    p_tagged_id: input.taggedProfileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}

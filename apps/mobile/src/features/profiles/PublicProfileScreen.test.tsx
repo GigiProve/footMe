@@ -30,7 +30,56 @@ vi.mock("./profile-service", () => ({
 
 vi.mock("../networking/networking-service", () => ({
   requestConnection: vi.fn(),
-  startDirectConversation: vi.fn(),
+}));
+
+vi.mock("../messaging/messaging-service", () => ({
+  openDirectConversation: vi.fn(),
+}));
+
+vi.mock("./fan-media-service", () => ({
+  fetchProfileFollowState: vi.fn().mockResolvedValue(false),
+  followProfile: vi.fn().mockResolvedValue(undefined),
+  unfollowProfile: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../saved/saved-service", () => ({
+  fetchProfileSaveState: vi.fn().mockResolvedValue(false),
+  saveProfile: vi.fn().mockResolvedValue(undefined),
+  unsaveProfile: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../shortlist/use-shortlist-permissions", () => ({
+  useShortlistPermissions: () => ({ data: undefined }),
+}));
+
+vi.mock("../shortlist/shortlist-service", () => ({
+  fetchProfileShortlistMemberships: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("../shortlist/components/AddToShortlistFlow", () => ({
+  AddToShortlistFlow: () => null,
+}));
+
+vi.mock("../../ui/Toast/ToastProvider", () => ({
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+  useToast: () => ({ showToast: vi.fn() }),
+}));
+
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    useQuery: () => ({ data: undefined }),
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  };
+});
+
+vi.mock("../relationships/agent-representation-service", () => ({
+  fetchPlayerAgent: vi.fn().mockResolvedValue(null),
+  fetchRepresentationState: vi.fn().mockResolvedValue(null),
+  fetchRepresentedPlayers: vi.fn().mockResolvedValue([]),
+  requestRepresentation: vi.fn(),
+  respondRepresentation: vi.fn(),
 }));
 
 vi.mock("./profile-edit-helpers", () => ({

@@ -9,6 +9,8 @@ describe("Icon", () => {
     expect(resolveIconName("messages", true)).toBe("chatbubble-ellipses");
     expect(resolveIconName("announcements", true)).toBe("megaphone");
     expect(resolveIconName("profile", true)).toBe("person-circle");
+    expect(resolveIconName("search", true)).toBe("search");
+    expect(resolveIconName("dashboard", true)).toBe("grid");
   });
 
   it("returns outline icons for inactive tabs", () => {
@@ -17,5 +19,7 @@ describe("Icon", () => {
     expect(resolveIconName("messages")).toBe("chatbubble-ellipses-outline");
     expect(resolveIconName("announcements")).toBe("megaphone-outline");
     expect(resolveIconName("profile")).toBe("person-circle-outline");
+    expect(resolveIconName("search")).toBe("search-outline");
+    expect(resolveIconName("dashboard")).toBe("grid-outline");
   });
 });

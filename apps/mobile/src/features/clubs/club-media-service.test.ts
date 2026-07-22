@@ -64,6 +64,7 @@ const mocks = vi.hoisted(() => {
         return builder;
       }),
       maybeSingle: vi.fn(async () => nextResponse()),
+      neq: vi.fn((_column: string, _value: unknown) => builder),
       order: vi.fn((column: string, options: unknown) => {
         operation.orders.push({ column, options });
         return builder;
@@ -138,6 +139,7 @@ describe("club-media-service", () => {
 
   it("fetches feed items with social state, counts and tagged profiles", async () => {
     mocks.queueResponses(
+      // posts
       {
         data: [
           {
@@ -160,14 +162,28 @@ describe("club-media-service", () => {
         ],
         error: null,
       },
+      // like counts
       { data: [{ post_id: "post-new" }, { post_id: "post-new" }], error: null },
+      // comment counts
       { data: [{ post_id: "post-new" }], error: null },
+      // liked by viewer
       { data: [{ post_id: "post-new" }], error: null },
+      // saved by viewer
       { data: [{ post_id: "post-old" }], error: null },
+      // tagged profiles (now includes target_type, target_id, status)
       {
-        data: [{ post_id: "post-new", profile_id: "player-1" }],
+        data: [
+          {
+            post_id: "post-new",
+            profile_id: "player-1",
+            status: "active",
+            target_id: "player-1",
+            target_type: "profile",
+          },
+        ],
         error: null,
       },
+      // profiles lookup
       {
         data: [
           {
@@ -179,6 +195,10 @@ describe("club-media-service", () => {
         ],
         error: null,
       },
+      // clubs lookup (empty — no club targets)
+      { data: [], error: null },
+      // teams lookup (empty — no team targets)
+      { data: [], error: null },
     );
 
     const feed = await fetchClubMediaFeed("club-1", "viewer-1");
@@ -198,6 +218,8 @@ describe("club-media-service", () => {
         display_name: "Marco Rossi",
         profile_id: "player-1",
         role: "player",
+        target_id: "player-1",
+        target_type: "profile",
       },
     ]);
     expect(feed[1]).toMatchObject({ is_saved: true, saved_count: 1 });
@@ -227,6 +249,7 @@ describe("club-media-service", () => {
 
   it("creates a post and stores tagged profiles", async () => {
     mocks.queueResponses(
+      // insert club_media_posts → maybeSingle
       {
         data: {
           ...basePost,
@@ -241,16 +264,32 @@ describe("club-media-service", () => {
         },
         error: null,
       },
+      // fetchClubName → clubs maybeSingle
+      { data: { name: "AC Como" }, error: null },
+      // insert club_media_tagged_profiles
       { data: null, error: null },
+      // notifyTaggedProfiles → notifications insert
+      { data: null, error: null },
+      // enrichClubMediaPosts: like counts
       { data: [], error: null },
+      // comment counts
       { data: [], error: null },
-      { data: [], error: null },
-      { data: [], error: null },
+      // liked by viewer (no viewer)
+      // saved by viewer (no viewer)
+      // tagged profiles select
       {
-        data: [{ post_id: "post-1", profile_id: "player-1" }],
+        data: [
+          {
+            post_id: "post-1",
+            profile_id: "player-1",
+            status: "active",
+            target_id: "player-1",
+            target_type: "profile",
+          },
+        ],
         error: null,
       },
-      { data: [], error: null },
+      // profiles lookup
       {
         data: [
           {
@@ -262,6 +301,10 @@ describe("club-media-service", () => {
         ],
         error: null,
       },
+      // clubs lookup (empty)
+      { data: [], error: null },
+      // teams lookup (empty)
+      { data: [], error: null },
     );
 
     const post = await createClubMediaPost({
@@ -291,9 +334,22 @@ describe("club-media-service", () => {
       player_birth_year: 2006,
       status: "published",
     });
+    // clubs name fetch
     expect(mocks.operations[1]).toMatchObject({
+      action: "select",
+      table: "clubs",
+    });
+    // tag insert now includes target_type and target_id
+    expect(mocks.operations[2]).toMatchObject({
       action: "insert",
-      payload: [{ post_id: "post-1", profile_id: "player-1" }],
+      payload: [
+        {
+          post_id: "post-1",
+          profile_id: "player-1",
+          target_id: "player-1",
+          target_type: "profile",
+        },
+      ],
       table: "club_media_tagged_profiles",
     });
   });

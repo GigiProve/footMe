@@ -11,6 +11,7 @@ type ListItemProps = {
   showDivider?: boolean;
   style?: StyleProp<ViewStyle>;
   subtitle?: string;
+  subtitleNumberOfLines?: number;
   title: string;
 };
 
@@ -21,6 +22,7 @@ export function ListItem({
   showDivider = true,
   style,
   subtitle,
+  subtitleNumberOfLines = 1,
   title,
 }: ListItemProps) {
   const content = (
@@ -31,7 +33,12 @@ export function ListItem({
           {title}
         </AppText>
         {subtitle ? (
-          <AppText variant="bodySm" color="muted" numberOfLines={1} style={styles.subtitle}>
+          <AppText
+            variant="bodySm"
+            color="muted"
+            numberOfLines={subtitleNumberOfLines}
+            style={styles.subtitle}
+          >
             {subtitle}
           </AppText>
         ) : null}
@@ -80,8 +87,8 @@ const styles = StyleSheet.create({
   },
   right: {
     flexShrink: 0,
-    width: 32,
-    height: 32,
+    minWidth: 32,
+    minHeight: 32,
     alignItems: "center",
     justifyContent: "center",
   },

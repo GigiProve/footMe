@@ -16,10 +16,13 @@ export type ConversationSummary = {
   unread_count: number;
 };
 
+export type MessageKind = "text" | "contact_card" | "image" | "video" | "document";
+
 export type ConversationMessage = {
   message_id: string;
   body: string;
-  message_kind: "contact_card" | "text";
+  message_kind: MessageKind;
+  media_url: string | null;
   sent_at: string;
   read_at: string | null;
   shared_contact_name: string | null;
@@ -156,4 +159,178 @@ export function subscribeToConversation(
 
 export async function unsubscribeFromConversation(channel: RealtimeChannel) {
   await supabase.removeChannel(channel);
+}
+
+export type InboxConversation = {
+  conversation_id: string;
+  conversation_type: "direct" | "group";
+  display_title: string;
+  avatar_url: string | null;
+  other_profile_id: string | null;
+  participant_count: number;
+  last_message_body: string | null;
+  last_message_kind: string | null;
+  last_message_sent_at: string | null;
+  last_message_sender_profile_id: string | null;
+  last_message_sender_name: string | null;
+  unread_count: number;
+  archived: boolean;
+  blocked_by_me: boolean;
+};
+
+export async function fetchInboxConversations(
+  limit = 50,
+  offset = 0,
+  includeArchived = false,
+): Promise<InboxConversation[]> {
+  const { data, error } = await supabase.rpc("fetch_inbox_conversations", {
+    p_limit: limit,
+    p_offset: offset,
+    p_include_archived: includeArchived,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as InboxConversation[];
+}
+
+export type DirectConversationMeta = {
+  other_profile_id: string;
+  other_full_name: string;
+  other_avatar_url: string | null;
+  other_role: string;
+  other_primary_position: string | null;
+  club_id: string | null;
+  club_name: string | null;
+  club_category: string | null;
+  mutual_follow: boolean;
+  representation_active: boolean;
+  representation_type: string | null;
+  roster_linked: boolean;
+  shortlisted: boolean;
+  i_have_sent: boolean;
+  other_has_sent: boolean;
+  blocked_by_me: boolean;
+  archived: boolean;
+  application_id: string | null;
+  application_status: string | null;
+  ad_id: string | null;
+  ad_title: string | null;
+  applicant_full_name: string | null;
+};
+
+export async function openDirectConversation(
+  targetProfileId: string,
+  applicationId?: string,
+): Promise<string> {
+  const { data, error } = await supabase.rpc("open_direct_conversation", {
+    target_profile_id: targetProfileId,
+    p_application_id: applicationId ?? null,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data as string;
+}
+
+export async function fetchDirectConversationMeta(
+  conversationId: string,
+): Promise<DirectConversationMeta | null> {
+  const { data, error } = await supabase.rpc("fetch_direct_conversation_meta", {
+    target_conversation_id: conversationId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data?.[0] ?? null) as DirectConversationMeta | null;
+}
+
+export async function blockUser(targetProfileId: string) {
+  const { error } = await supabase.rpc("block_user", {
+    target_profile_id: targetProfileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function unblockUser(targetProfileId: string) {
+  const { error } = await supabase.rpc("unblock_user", {
+    target_profile_id: targetProfileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export type ConversationReportReason =
+  | "spam"
+  | "messaggio_inappropriato"
+  | "profilo_falso"
+  | "molestie"
+  | "altro";
+
+export async function reportConversation(input: {
+  conversationId: string;
+  reason: ConversationReportReason;
+  details?: string;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc("report_conversation", {
+    target_conversation_id: input.conversationId,
+    p_reason: input.reason,
+    p_details: input.details ?? null,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data as string;
+}
+
+export async function setConversationArchived(
+  conversationId: string,
+  archived: boolean,
+) {
+  const { error } = await supabase.rpc("set_conversation_archived", {
+    target_conversation_id: conversationId,
+    p_archived: archived,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function getChatMediaSignedUrl(
+  path: string,
+  expiresIn = 3600,
+): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from("chat-media")
+    .createSignedUrl(path, expiresIn);
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.signedUrl ?? null;
+}
+
+export async function markInboxAllRead(): Promise<number> {
+  const { data, error } = await supabase.rpc("mark_inbox_all_read");
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? 0) as number;
 }

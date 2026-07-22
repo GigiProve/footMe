@@ -16,6 +16,7 @@ import {
   type PublicClubTeamProfile,
 } from "../../../src/features/clubs/club-service";
 import type { ClubHeaderTab } from "../../../src/features/clubs/components/PublicClubHeader";
+import { TaggedContentGrid } from "../../../src/features/content/components/TaggedContentGrid";
 import { colors, radius, spacing, typography } from "../../../src/theme/tokens";
 import { AppText, EmptyState } from "../../../src/ui";
 
@@ -228,21 +229,24 @@ function TeamMediaTab({ data }: { data: PublicClubTeamProfile }) {
   const mediaUrls = data.profile?.media_urls ?? [];
 
   return (
-    <View style={styles.section}>
-      {mediaUrls.length === 0 ? (
-        <EmptyState
-          description="La squadra non ha ancora media pubblicati."
-          icon="images-outline"
-          title="Media da completare"
-        />
-      ) : (
-        <View style={styles.mediaGrid}>
-          {mediaUrls.slice(0, 6).map((url) => (
-            <Image key={url} source={{ uri: url }} style={styles.mediaItem} />
-          ))}
-        </View>
-      )}
-    </View>
+    <>
+      <View style={styles.section}>
+        {mediaUrls.length === 0 ? (
+          <EmptyState
+            description="La squadra non ha ancora media pubblicati."
+            icon="images-outline"
+            title="Media da completare"
+          />
+        ) : (
+          <View style={styles.mediaGrid}>
+            {mediaUrls.slice(0, 6).map((url) => (
+              <Image key={url} source={{ uri: url }} style={styles.mediaItem} />
+            ))}
+          </View>
+        )}
+      </View>
+      <TaggedContentGrid targetId={data.team.id} targetType="team" />
+    </>
   );
 }
 

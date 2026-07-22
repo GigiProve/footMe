@@ -20,6 +20,8 @@ const fanMediaMocks = vi.hoisted(() => ({
 const fanTribunaMocks = vi.hoisted(() => ({
   addFanTribunaComment: vi.fn(),
   createFanTribunaFormation: vi.fn(),
+  createFanTribunaOpinion: vi.fn(),
+  createFanTribunaPhoto: vi.fn(),
   createFanTribunaPoll: vi.fn(),
   createFanTribunaProposal: vi.fn(),
   fetchFanTribunaFeed: vi.fn(),
@@ -124,16 +126,43 @@ vi.mock("./fan-media-service", () => ({
   unfollowProfile: fanMediaMocks.unfollowProfile,
 }));
 
+vi.mock("../saved/saved-service", () => ({
+  fetchProfileSaveState: vi.fn().mockResolvedValue(false),
+  saveProfile: vi.fn().mockResolvedValue(undefined),
+  unsaveProfile: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../ui/Toast/ToastProvider", () => ({
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+  useToast: () => ({ showToast: vi.fn() }),
+}));
+
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  };
+});
+
 vi.mock("./fan-tribuna-service", () => ({
   addFanTribunaComment: fanTribunaMocks.addFanTribunaComment,
   createFanTribunaFormation: fanTribunaMocks.createFanTribunaFormation,
+  createFanTribunaOpinion: fanTribunaMocks.createFanTribunaOpinion,
+  createFanTribunaPhoto: fanTribunaMocks.createFanTribunaPhoto,
   createFanTribunaPoll: fanTribunaMocks.createFanTribunaPoll,
   createFanTribunaProposal: fanTribunaMocks.createFanTribunaProposal,
   FAN_TRIBUNA_FORMATIONS: ["4-3-3", "4-4-2", "3-5-2", "4-2-3-1"],
+  FAN_TRIBUNA_PAGE_SIZE: 30,
   fetchFanTribunaFeed: fanTribunaMocks.fetchFanTribunaFeed,
   toggleFanTribunaSupport: fanTribunaMocks.toggleFanTribunaSupport,
   toggleSavedFanTribuna: fanTribunaMocks.toggleSavedFanTribuna,
   voteFanTribunaPoll: fanTribunaMocks.voteFanTribunaPoll,
+}));
+
+vi.mock("../content/content-tag-service", () => ({
+  formatTargetRoleLabel: () => null,
+  searchTagTargets: vi.fn(() => Promise.resolve([])),
 }));
 
 import { FanProfileView } from "./FanProfileView";
@@ -268,6 +297,8 @@ const tribunaPosts: FanTribunaPost[] = [
     is_supported: false,
     kind: "poll",
     lineup_players: [],
+    media_type: null,
+    media_url: null,
     poll_options: [
       {
         id: "option-yes",
@@ -275,6 +306,8 @@ const tribunaPosts: FanTribunaPost[] = [
         label: "Si",
         percentage: 67,
         sort_order: 0,
+        target_id: null,
+        target_type: null,
         vote_count: 2,
       },
       {
@@ -283,6 +316,8 @@ const tribunaPosts: FanTribunaPost[] = [
         label: "No",
         percentage: 33,
         sort_order: 1,
+        target_id: null,
+        target_type: null,
         vote_count: 1,
       },
     ],
@@ -295,6 +330,8 @@ const tribunaPosts: FanTribunaPost[] = [
     status: "published",
     support_count: 0,
     tagged_players: [],
+    tagged_targets: [],
+    thumbnail_url: null,
     title: "Confermeresti l'allenatore?",
     total_vote_count: 3,
     updated_at: "2026-05-15T08:00:00Z",
@@ -310,6 +347,8 @@ const tribunaPosts: FanTribunaPost[] = [
     is_supported: false,
     kind: "proposal",
     lineup_players: [],
+    media_type: null,
+    media_url: null,
     poll_options: [],
     profile_id: "fan-1",
     published_at: "2026-05-15T07:00:00Z",
@@ -327,6 +366,15 @@ const tribunaPosts: FanTribunaPost[] = [
         sort_order: 0,
       },
     ],
+    tagged_targets: [
+      {
+        avatar_url: null,
+        display_name: "Marco Verdi",
+        target_id: "player-1",
+        target_type: "profile",
+      },
+    ],
+    thumbnail_url: null,
     title: "Due Under 19 in prima squadra",
     total_vote_count: 0,
     updated_at: "2026-05-15T07:00:00Z",
@@ -352,6 +400,8 @@ const tribunaPosts: FanTribunaPost[] = [
         y_percent: 88,
       },
     ],
+    media_type: null,
+    media_url: null,
     poll_options: [],
     profile_id: "fan-1",
     published_at: "2026-05-15T06:00:00Z",
@@ -362,6 +412,8 @@ const tribunaPosts: FanTribunaPost[] = [
     status: "published",
     support_count: 2,
     tagged_players: [],
+    tagged_targets: [],
+    thumbnail_url: null,
     title: "Il mio 4-3-3",
     total_vote_count: 0,
     updated_at: "2026-05-15T06:00:00Z",
@@ -537,12 +589,16 @@ describe("FanProfileView", () => {
       findPressableByTestId(secondTree.root, "fan-create-button").props.onPress();
     });
 
-    expect(secondTree.root.findByProps({ testID: "fan-create-option-poll" }))
+    expect(secondTree.root.findByProps({ testID: "fan-create-option-opinion" }))
       .toBeTruthy();
-    expect(secondTree.root.findByProps({ testID: "fan-create-option-proposal" }))
+    expect(secondTree.root.findByProps({ testID: "fan-create-option-poll" }))
       .toBeTruthy();
     expect(secondTree.root.findByProps({ testID: "fan-create-option-formation" }))
       .toBeTruthy();
+    expect(secondTree.root.findByProps({ testID: "fan-create-option-photo" }))
+      .toBeTruthy();
+    expect(secondTree.root.findAllByProps({ testID: "fan-create-option-proposal" }))
+      .toHaveLength(0);
     expect(secondTree.root.findAllByProps({ testID: "fan-create-option-post" }))
       .toHaveLength(0);
   });
@@ -834,8 +890,12 @@ describe("FanProfileView", () => {
     });
 
     expect(fanTribunaMocks.createFanTribunaPoll).toHaveBeenCalledWith({
-      options: ["4-3-3", "4-4-2"],
+      options: [
+        { label: "4-3-3", target: null },
+        { label: "4-4-2", target: null },
+      ],
       profileId: "fan-1",
+      publisherName: "Luigi Bianchi",
       question: "Con quale modulo giocheresti domenica?",
     });
     expect(tree.root.findAllByProps({ testID: "fan-tribuna-card-poll" }).length)
