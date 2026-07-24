@@ -1,12 +1,11 @@
 import { useRouter } from "expo-router";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 
-import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
 import { useSession } from "../../src/features/auth/use-session";
 import { getUnreadCount } from "../../src/features/clubs/notification-service";
-import { ProfileSearchScreen } from "../../src/features/discovery/components/ProfileSearchScreen";
+import { SearchHomeScreen } from "../../src/features/search/components/SearchHomeScreen";
 import { spacing } from "../../src/theme/tokens";
 import { HeaderBell, ScreenHeader } from "../../src/ui";
 
@@ -23,10 +22,9 @@ export default function CercaScreen() {
 
   return (
     <Screen>
-      <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
+      <View style={styles.headerBlock}>
         <ScreenHeader
           title="Cerca"
-          subtitle="Trova giocatori, allenatori e opportunita'"
           action={
             <HeaderBell
               count={unreadCount}
@@ -34,16 +32,15 @@ export default function CercaScreen() {
             />
           }
         />
+      </View>
 
-        <ProfileSearchScreen hideHeader />
-      </KeyboardAwareForm>
+      <SearchHomeScreen />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContent: {
-    gap: spacing[16],
-    paddingBottom: spacing[24],
+  headerBlock: {
+    marginBottom: spacing[16],
   },
 });
