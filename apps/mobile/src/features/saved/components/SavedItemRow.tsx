@@ -17,6 +17,8 @@ function kindLabel(kind: SavedKind): string {
       return "Profilo";
     case "club":
       return "Società";
+    case "team":
+      return "Squadra";
     case "position":
       return "Posizione";
     case "content":

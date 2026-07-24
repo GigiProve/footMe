@@ -255,6 +255,31 @@ export async function unfollowClub(profileId: string, clubId: string) {
   }
 }
 
+/**
+ * Batch follow-state lookup for a page of club rows (e.g. Cerca > Società
+ * results). Returns the subset of `clubIds` the profile follows.
+ */
+export async function fetchFollowedClubIds(
+  profileId: string,
+  clubIds: string[],
+): Promise<Set<string>> {
+  if (clubIds.length === 0) {
+    return new Set();
+  }
+
+  const { data, error } = await supabase
+    .from("club_follows")
+    .select("club_id")
+    .eq("profile_id", profileId)
+    .in("club_id", clubIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Set((data ?? []).map((row) => row.club_id as string));
+}
+
 export async function submitClubClaim(input: {
   clubId: string;
   claimantEmail: string;

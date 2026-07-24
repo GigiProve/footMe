@@ -222,15 +222,73 @@ describe("ageRangeToClasse", () => {
 });
 
 describe("searchClubsPage", () => {
-  it("forwards the kind filter", async () => {
-    await searchClubsPage("como", "team", 1, 10);
+  it("forwards the kind/filters/sort and computes the offset", async () => {
+    await searchClubsPage({
+      filters: { region: "Lombardia" },
+      kind: "team",
+      page: 1,
+      pageSize: 10,
+      query: "como",
+      sort: "recent",
+    });
 
     expect(mocks.rpc).toHaveBeenCalledWith("search_clubs_page", {
+      p_filters: { region: "Lombardia" },
       p_kind: "team",
       p_limit: 10,
       p_offset: 10,
       p_query: "como",
+      p_sort: "recent",
     });
+  });
+
+  it("passes null query/kind/filters in browse mode, defaulting sort to relevance", async () => {
+    await searchClubsPage({ kind: null, page: 0, query: "   " });
+
+    expect(mocks.rpc).toHaveBeenCalledWith("search_clubs_page", {
+      p_filters: null,
+      p_kind: null,
+      p_limit: 20,
+      p_offset: 0,
+      p_query: null,
+      p_sort: "relevance",
+    });
+  });
+
+  it("collapses an empty filters object to null", async () => {
+    await searchClubsPage({
+      filters: { target_roles: [] },
+      kind: null,
+      page: 0,
+      query: null,
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "search_clubs_page",
+      expect.objectContaining({ p_filters: null }),
+    );
+  });
+
+  it("returns rows and coerces total_count, defaulting to 0 on an empty page", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [
+        { entity_id: "c1", kind: "club", total_count: "2" },
+        { entity_id: "c2", kind: "club", total_count: "2" },
+      ],
+      error: null,
+    });
+
+    const page = await searchClubsPage({ kind: null, page: 0, query: null });
+
+    expect(page.rows).toHaveLength(2);
+    expect(page.totalCount).toBe(2);
+
+    mocks.rpc.mockResolvedValue({ data: [], error: null });
+
+    const emptyPage = await searchClubsPage({ kind: null, page: 1, query: null });
+
+    expect(emptyPage.rows).toEqual([]);
+    expect(emptyPage.totalCount).toBe(0);
   });
 });
 

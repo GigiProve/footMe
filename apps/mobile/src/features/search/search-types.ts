@@ -130,6 +130,29 @@ export type ProfileSearchFilters = {
 /** Chip filter on Cerca > Società ("affiliate" filters clubs flagged as affiliated). */
 export type SearchClubKind = "club" | "team" | "affiliate";
 
+/** Sort modes accepted by `search_clubs_page` (p_sort). */
+export type ClubSearchSort = "relevance" | "vicini" | "recent" | "positions" | "name";
+
+/**
+ * Advanced filters payload for `search_clubs_page` (p_filters). Keys mirror
+ * the jsonb schema 1:1 (snake_case) — no client-side mapping layer. Only
+ * present keys constrain the result; `search-service.ts` drops the whole
+ * payload to `null` when empty (see `isClubFiltersEmpty`).
+ */
+export type ClubSearchFilters = {
+  categories?: string[];
+  region?: string;
+  city?: string;
+  has_senior?: boolean;
+  has_youth?: boolean;
+  has_teams?: boolean;
+  has_affiliates?: boolean;
+  open_positions?: boolean;
+  target_roles?: ("player" | "coach" | "staff")[];
+  followed?: boolean;
+  saved?: boolean;
+};
+
 export type ClubSearchRow = {
   kind: "club" | "team";
   entity_id: string;
@@ -138,8 +161,14 @@ export type ClubSearchRow = {
   city: string | null;
   region: string | null;
   category: string | null;
+  parent_club_id: string | null;
   parent_club_name: string | null;
   is_affiliate: boolean;
+  has_senior: boolean | null;
+  has_youth: boolean | null;
+  affiliate_count: number | null;
+  open_positions_count: number | null;
+  total_count: number;
 };
 
 /** Chip filter on Cerca > Posizioni aperte. */

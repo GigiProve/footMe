@@ -3,17 +3,22 @@ import { StyleSheet, View } from "react-native";
 
 import { spacing } from "../../../theme/tokens";
 import { BottomSheet, Button, Radio } from "../../../ui";
-import type { ProfileSearchSort } from "../search-types";
 
-type SortSheetProps = {
-  onApply: (value: ProfileSearchSort) => void;
+type SortSheetProps<T extends string> = {
+  onApply: (value: T) => void;
   onClose: () => void;
-  options: { label: string; value: ProfileSearchSort }[];
-  value: ProfileSearchSort;
+  options: { label: string; value: T }[];
+  value: T;
   visible: boolean;
 };
 
-export function SortSheet({ onApply, onClose, options, value, visible }: SortSheetProps) {
+export function SortSheet<T extends string>({
+  onApply,
+  onClose,
+  options,
+  value,
+  visible,
+}: SortSheetProps<T>) {
   const [draft, setDraft] = useState(value);
 
   useEffect(() => {

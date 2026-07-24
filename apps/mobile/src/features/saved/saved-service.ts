@@ -4,11 +4,12 @@ import { toggleSavedMediaTribuna } from "../profiles/media-tribuna-service";
 import { toggleSavedClubMedia } from "../clubs/club-media-service";
 import { toggleSavedFanTribuna } from "../profiles/fan-tribuna-service";
 
-export type SavedKind = "profile" | "club" | "position" | "content";
+export type SavedKind = "profile" | "club" | "team" | "position" | "content";
 
 export type SavedSourceTable =
   | "saved_profiles"
   | "saved_clubs"
+  | "saved_teams"
   | "saved_ads"
   | "saved_media_tribuna"
   | "saved_club_media"
@@ -177,6 +178,56 @@ export async function fetchClubSaveState(
   return data !== null;
 }
 
+export async function saveTeam(ownerId: string, teamId: string): Promise<void> {
+  const { error } = await supabase.from("saved_teams").upsert(
+    {
+      owner_profile_id: ownerId,
+      team_id: teamId,
+    },
+    {
+      ignoreDuplicates: true,
+      onConflict: "owner_profile_id,team_id",
+    },
+  );
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function unsaveTeam(
+  ownerId: string,
+  teamId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("saved_teams")
+    .delete()
+    .eq("owner_profile_id", ownerId)
+    .eq("team_id", teamId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function fetchTeamSaveState(
+  ownerId: string,
+  teamId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("saved_teams")
+    .select("owner_profile_id")
+    .eq("owner_profile_id", ownerId)
+    .eq("team_id", teamId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data !== null;
+}
+
 /**
  * Batch save-state lookup for a page of profile rows (e.g. Cerca > Profili
  * results). Returns the subset of `targetIds` the owner has saved.
@@ -202,6 +253,57 @@ export async function fetchSavedProfileIds(
   return new Set((data ?? []).map((row) => row.target_profile_id as string));
 }
 
+/**
+ * Batch save-state lookup for a page of club rows (e.g. Cerca > Società
+ * results). Returns the subset of `clubIds` the owner has saved.
+ */
+export async function fetchSavedClubIds(
+  ownerId: string,
+  clubIds: string[],
+): Promise<Set<string>> {
+  if (clubIds.length === 0) {
+    return new Set();
+  }
+
+  const { data, error } = await supabase
+    .from("saved_clubs")
+    .select("club_id")
+    .eq("owner_profile_id", ownerId)
+    .in("club_id", clubIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Set((data ?? []).map((row) => row.club_id as string));
+}
+
+/**
+ * Batch save-state lookup for a page of team rows (e.g. Cerca > Società
+ * results filtered to squadre interne). Returns the subset of `teamIds` the
+ * owner has saved.
+ */
+export async function fetchSavedTeamIds(
+  ownerId: string,
+  teamIds: string[],
+): Promise<Set<string>> {
+  if (teamIds.length === 0) {
+    return new Set();
+  }
+
+  const { data, error } = await supabase
+    .from("saved_teams")
+    .select("team_id")
+    .eq("owner_profile_id", ownerId)
+    .in("team_id", teamIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Set((data ?? []).map((row) => row.team_id as string));
+}
+
 // Content route `/content/[type]/[id]` only supports these types.
 // `saved_media_tribuna` items (content_type "media_tribuna") have no standalone
 // detail route, and saved positions (`saved_ads`) have no per-ad route either —
@@ -214,6 +316,8 @@ export function resolveSavedItemHref(item: SavedItem): string | null {
       return `/profile/${item.entity_id}`;
     case "club":
       return `/club/${item.entity_id}`;
+    case "team":
+      return `/club/team/${item.entity_id}`;
     case "content":
       return item.content_type && ROUTABLE_CONTENT_TYPES.has(item.content_type)
         ? `/content/${item.content_type}/${item.entity_id}`
@@ -234,6 +338,9 @@ export async function removeSavedItem(
       break;
     case "saved_clubs":
       await unsaveClub(ownerId, item.entity_id);
+      break;
+    case "saved_teams":
+      await unsaveTeam(ownerId, item.entity_id);
       break;
     case "saved_ads":
       await toggleSavedAd(ownerId, item.entity_id, false);

@@ -39,6 +39,11 @@ export function formatClubKindLabel(isAffiliate: boolean): string {
   return isAffiliate ? "Affiliata" : "Società";
 }
 
+/** "82 risultati" for Cerca > Società's ResultsCountBar. */
+export function formatClubResultsCount(count: number): string {
+  return `${count} risultati`;
+}
+
 const COACH_CONTEXT_LABELS: Record<string, string> = {
   prima_squadra: "Prima squadra",
   settore_giovanile: "Settore giovanile",

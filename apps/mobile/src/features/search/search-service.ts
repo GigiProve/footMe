@@ -1,7 +1,9 @@
 import { supabase } from "../../lib/supabase";
 import { isProfileFiltersEmpty } from "./search-filters";
 import type {
+  ClubSearchFilters,
   ClubSearchRow,
+  ClubSearchSort,
   GlobalSearchRow,
   PositionSearchRow,
   ProfileSearchFilters,
@@ -26,7 +28,40 @@ export type ProfileSearchPage = {
   totalCount: number;
 };
 
+export type ClubSearchPage = {
+  rows: ClubSearchRow[];
+  totalCount: number;
+};
+
 export { ageRangeToClasse, isProfileFiltersEmpty } from "./search-filters";
+
+/**
+ * True when a filters object carries no actual constraints (every key
+ * absent/empty). Mirrors `isProfileFiltersEmpty` — used to collapse the
+ * payload to `null` before it reaches `search_clubs_page`.
+ */
+export function isClubFiltersEmpty(
+  filters: ClubSearchFilters | null | undefined,
+): boolean {
+  if (!filters) {
+    return true;
+  }
+
+  return Object.values(filters).every((value) => {
+    // Boolean filters here are toggles that only constrain when `true`
+    // (see search_clubs_page); an explicit `false` behaves exactly like
+    // absent, so treat it as empty too.
+    if (value === undefined || value === false) {
+      return true;
+    }
+
+    if (Array.isArray(value)) {
+      return value.length === 0;
+    }
+
+    return false;
+  });
+}
 
 export async function searchGlobal(
   query: string,
@@ -82,24 +117,40 @@ export async function searchProfilesPage({
   };
 }
 
-export async function searchClubsPage(
-  query: string | null,
-  kind: SearchClubKind | null,
-  page: number,
+export async function searchClubsPage({
+  query,
+  kind,
+  filters,
+  sort,
+  page,
   pageSize = SEARCH_PAGE_SIZE,
-): Promise<ClubSearchRow[]> {
+}: {
+  query: string | null;
+  kind: SearchClubKind | null;
+  filters?: ClubSearchFilters | null;
+  sort?: ClubSearchSort;
+  page: number;
+  pageSize?: number;
+}): Promise<ClubSearchPage> {
   const { data, error } = await supabase.rpc("search_clubs_page", {
+    p_filters: isClubFiltersEmpty(filters) ? null : filters,
     p_kind: kind,
     p_limit: pageSize,
     p_offset: page * pageSize,
     p_query: normalizeQuery(query),
+    p_sort: sort ?? "relevance",
   });
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []) as ClubSearchRow[];
+  const rows = (data ?? []) as ClubSearchRow[];
+
+  return {
+    rows,
+    totalCount: Number(rows[0]?.total_count ?? 0),
+  };
 }
 
 export async function searchPositionsPage(
