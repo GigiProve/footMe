@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchSavedCounts,
   fetchSavedItems,
+  fetchSavedProfileIds,
   removeSavedItem,
   resolveSavedItemHref,
   saveProfile,
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => {
   builder.delete = vi.fn(() => builder);
   builder.select = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
+  builder.in = vi.fn(() => Promise.resolve({ data: [], error: null }));
   builder.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
   builder.then = (resolve: (value: unknown) => unknown) =>
     resolve({ error: null });
@@ -169,5 +171,41 @@ describe("rpc readers", () => {
       positions_count: 2,
       contents_count: 5,
     });
+  });
+});
+
+describe("fetchSavedProfileIds", () => {
+  it("short-circuits on an empty input without querying supabase", async () => {
+    const result = await fetchSavedProfileIds("owner-1", []);
+
+    expect(result).toEqual(new Set());
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it("returns the saved subset as a Set", async () => {
+    (mocks.builder.in as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: [{ target_profile_id: "p1" }, { target_profile_id: "p3" }],
+      error: null,
+    });
+
+    const result = await fetchSavedProfileIds("owner-1", ["p1", "p2", "p3"]);
+
+    expect(mocks.from).toHaveBeenCalledWith("saved_profiles");
+    expect(mocks.builder.eq).toHaveBeenCalledWith("owner_profile_id", "owner-1");
+    expect(mocks.builder.in).toHaveBeenCalledWith("target_profile_id", [
+      "p1",
+      "p2",
+      "p3",
+    ]);
+    expect(result).toEqual(new Set(["p1", "p3"]));
+  });
+
+  it("propagates errors", async () => {
+    (mocks.builder.in as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: null,
+      error: new Error("boom"),
+    });
+
+    await expect(fetchSavedProfileIds("owner-1", ["p1"])).rejects.toThrow("boom");
   });
 });

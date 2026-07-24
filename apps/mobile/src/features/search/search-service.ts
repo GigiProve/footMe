@@ -1,9 +1,12 @@
 import { supabase } from "../../lib/supabase";
+import { isProfileFiltersEmpty } from "./search-filters";
 import type {
   ClubSearchRow,
   GlobalSearchRow,
   PositionSearchRow,
+  ProfileSearchFilters,
   ProfileSearchRow,
+  ProfileSearchSort,
   SearchClubKind,
   SearchPositionTarget,
   SearchProfileRole,
@@ -17,6 +20,13 @@ function normalizeQuery(query: string | null | undefined): string | null {
   const trimmed = query?.trim() ?? "";
   return trimmed.length > 0 ? trimmed : null;
 }
+
+export type ProfileSearchPage = {
+  rows: ProfileSearchRow[];
+  totalCount: number;
+};
+
+export { ageRangeToClasse, isProfileFiltersEmpty } from "./search-filters";
 
 export async function searchGlobal(
   query: string,
@@ -36,24 +46,40 @@ export async function searchGlobal(
   return (data ?? []) as GlobalSearchRow[];
 }
 
-export async function searchProfilesPage(
-  query: string | null,
-  role: SearchProfileRole | null,
-  page: number,
+export async function searchProfilesPage({
+  query,
+  role,
+  filters,
+  sort,
+  page,
   pageSize = SEARCH_PAGE_SIZE,
-): Promise<ProfileSearchRow[]> {
+}: {
+  query: string | null;
+  role: SearchProfileRole | null;
+  filters?: ProfileSearchFilters | null;
+  sort?: ProfileSearchSort;
+  page: number;
+  pageSize?: number;
+}): Promise<ProfileSearchPage> {
   const { data, error } = await supabase.rpc("search_profiles_page", {
+    p_filters: isProfileFiltersEmpty(filters) ? null : filters,
     p_limit: pageSize,
     p_offset: page * pageSize,
     p_query: normalizeQuery(query),
     p_role: role,
+    p_sort: sort ?? "relevance",
   });
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []) as ProfileSearchRow[];
+  const rows = (data ?? []) as ProfileSearchRow[];
+
+  return {
+    rows,
+    totalCount: Number(rows[0]?.total_count ?? 0),
+  };
 }
 
 export async function searchClubsPage(

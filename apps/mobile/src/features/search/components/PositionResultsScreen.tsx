@@ -159,17 +159,22 @@ export function PositionResultsScreen() {
         showsHorizontalScrollIndicator={false}
         style={styles.chipsScroll}
       >
-        {TARGET_OPTIONS.map((option) => (
-          <Button
-            key={option.label}
-            label={option.label}
-            onPress={() => setTargetChip(option.value)}
-            selected={targetChip === option.value}
-            size="sm"
-            style={styles.chip}
-            variant="chipAction"
-          />
-        ))}
+        {TARGET_OPTIONS.map((option) => {
+          const selected = targetChip === option.value;
+
+          return (
+            <Button
+              key={option.label}
+              label={option.label}
+              onPress={() => setTargetChip(option.value)}
+              selected={selected}
+              size="sm"
+              style={[styles.chip, selected ? styles.chipSelected : null]}
+              textStyle={selected ? styles.chipSelectedLabel : undefined}
+              variant="chipAction"
+            />
+          );
+        })}
         <Button
           label="Salvate"
           onPress={() => setSavedOnly((prev) => !prev)}
@@ -248,14 +253,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 36,
   },
+  // Compact pills per the Banani spec (34px, 12px sides).
   chip: {
     marginRight: spacing[8],
+    minHeight: 34,
+    paddingHorizontal: spacing[12],
+  },
+  chipSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  chipSelectedLabel: {
+    color: colors.inkInvert,
   },
   chipsRow: {
+    alignItems: "center",
+    // Bleed to the screen edge (Screen pads by spacing[20]) so scrolled-out
+    // chips are clipped by the display, not mid-content.
+    paddingHorizontal: spacing[20],
     paddingVertical: spacing[4],
   },
   chipsScroll: {
+    flexGrow: 0,
     marginBottom: spacing[8],
+    marginHorizontal: -spacing[20],
   },
   footerLoader: {
     alignItems: "center",

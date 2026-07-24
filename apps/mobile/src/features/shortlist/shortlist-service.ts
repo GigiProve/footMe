@@ -273,6 +273,33 @@ export async function fetchProfileShortlistMemberships(
   });
 }
 
+/**
+ * Batch shortlist-membership lookup for a page of player rows (e.g. Cerca >
+ * Profili results). Returns the subset of `profileIds` already present in
+ * at least one shortlist of `clubId`. Mirrors the join used by
+ * `fetchProfileShortlistMemberships`, RLS-validated the same way.
+ */
+export async function fetchShortlistedProfileIds(
+  clubId: string,
+  profileIds: string[],
+): Promise<Set<string>> {
+  if (profileIds.length === 0) {
+    return new Set();
+  }
+
+  const { data, error } = await supabase
+    .from("club_shortlist_entries")
+    .select("player_profile_id, club_shortlists!inner(club_id)")
+    .eq("club_shortlists.club_id", clubId)
+    .in("player_profile_id", profileIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Set((data ?? []).map((row) => row.player_profile_id as string));
+}
+
 const SCOPE_LABELS: Record<ShortlistScope, string> = {
   juniores: "Juniores",
   prima_squadra: "Prima squadra",

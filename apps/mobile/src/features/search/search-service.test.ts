@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ageRangeToClasse,
+  isProfileFiltersEmpty,
   resolveGlobalSearchHref,
   searchClubsPage,
   searchGlobal,
   searchPositionsPage,
   searchProfilesPage,
 } from "./search-service";
-import type { GlobalSearchRow } from "./search-types";
+import type { GlobalSearchRow, ProfileSearchRow } from "./search-types";
 
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
@@ -27,6 +29,45 @@ function makeGlobalRow(overrides: Partial<GlobalSearchRow>): GlobalSearchRow {
     image_url: null,
     ...overrides,
   };
+}
+
+// supabase-js returns bigint columns (total_count) as strings, so the test
+// factory allows overriding it with either a string or a number.
+function makeProfileRow(
+  overrides: Partial<Omit<ProfileSearchRow, "total_count">> & {
+    total_count?: number | string;
+  },
+): ProfileSearchRow {
+  return {
+    profile_id: "p1",
+    full_name: "Marco Rossi",
+    avatar_url: null,
+    role: "player",
+    region: null,
+    city: null,
+    primary_position: null,
+    current_club_name: null,
+    current_team_name: null,
+    age: null,
+    is_available: null,
+    birth_year: null,
+    is_open_to_transfer: null,
+    current_category: null,
+    coach_primary_role: null,
+    coach_top_license: null,
+    coach_context: null,
+    open_to_new_role: null,
+    staff_primary_role: null,
+    experience_summary: null,
+    open_to_work: null,
+    agency_name: null,
+    managed_players_count: null,
+    agent_operating_areas: null,
+    open_to_players: null,
+    years_experience: null,
+    total_count: 0,
+    ...overrides,
+  } as ProfileSearchRow;
 }
 
 beforeEach(() => {
@@ -63,26 +104,120 @@ describe("searchGlobal", () => {
 });
 
 describe("searchProfilesPage", () => {
-  it("forwards filters and computes the offset", async () => {
-    await searchProfilesPage("rossi", "player", 2, 20);
+  it("forwards role/sort/filters and computes the offset", async () => {
+    await searchProfilesPage({
+      filters: { player: { situation: "svincolato" } },
+      page: 2,
+      pageSize: 20,
+      query: "rossi",
+      role: "player",
+      sort: "recent",
+    });
 
     expect(mocks.rpc).toHaveBeenCalledWith("search_profiles_page", {
+      p_filters: { player: { situation: "svincolato" } },
       p_limit: 20,
       p_offset: 40,
       p_query: "rossi",
       p_role: "player",
+      p_sort: "recent",
     });
   });
 
-  it("passes null query and role in browse mode", async () => {
-    await searchProfilesPage("   ", null, 0);
+  it("passes null query, role and filters in browse mode, defaulting sort to relevance", async () => {
+    await searchProfilesPage({ page: 0, query: "   ", role: null });
 
     expect(mocks.rpc).toHaveBeenCalledWith("search_profiles_page", {
+      p_filters: null,
       p_limit: 20,
       p_offset: 0,
       p_query: null,
       p_role: null,
+      p_sort: "relevance",
     });
+  });
+
+  it("collapses an empty filters object to null", async () => {
+    await searchProfilesPage({
+      filters: { player: {} },
+      page: 0,
+      query: null,
+      role: "player",
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "search_profiles_page",
+      expect.objectContaining({ p_filters: null }),
+    );
+  });
+
+  it("returns rows and coerces total_count, defaulting to 0 on an empty page", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [
+        makeProfileRow({ profile_id: "p1", total_count: "3" }),
+        makeProfileRow({ profile_id: "p2", total_count: "3" }),
+      ],
+      error: null,
+    });
+
+    const page = await searchProfilesPage({ page: 0, query: null, role: null });
+
+    expect(page.rows).toHaveLength(2);
+    expect(page.totalCount).toBe(3);
+
+    mocks.rpc.mockResolvedValue({ data: [], error: null });
+
+    const emptyPage = await searchProfilesPage({ page: 1, query: null, role: null });
+
+    expect(emptyPage.rows).toEqual([]);
+    expect(emptyPage.totalCount).toBe(0);
+  });
+
+  it("propagates rpc errors", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: new Error("boom") });
+
+    await expect(
+      searchProfilesPage({ page: 0, query: null, role: null }),
+    ).rejects.toThrow("boom");
+  });
+});
+
+describe("isProfileFiltersEmpty", () => {
+  it("treats null/undefined and fully-empty payloads as empty", () => {
+    expect(isProfileFiltersEmpty(null)).toBe(true);
+    expect(isProfileFiltersEmpty(undefined)).toBe(true);
+    expect(isProfileFiltersEmpty({})).toBe(true);
+    expect(isProfileFiltersEmpty({ player: {}, coach: {} })).toBe(true);
+  });
+
+  it("is false as soon as a shared key or a role group has content", () => {
+    expect(isProfileFiltersEmpty({ region: "Lombardia" })).toBe(false);
+    expect(isProfileFiltersEmpty({ is_available: true })).toBe(false);
+    expect(isProfileFiltersEmpty({ player: { situation: "svincolato" } })).toBe(
+      false,
+    );
+    expect(isProfileFiltersEmpty({ agent: { min_years: 3 } })).toBe(false);
+  });
+});
+
+describe("ageRangeToClasse", () => {
+  it("derives classe_min from ageMax and classe_max from ageMin", () => {
+    expect(ageRangeToClasse(19, 21, 2026)).toEqual({
+      classeMax: 2007,
+      classeMin: 2005,
+    });
+  });
+
+  it("supports an open-ended range (Under 21 style: only ageMax set)", () => {
+    expect(ageRangeToClasse(null, 21, 2026)).toEqual({ classeMin: 2005 });
+  });
+
+  it("supports an open-ended range (Over 23 style: only ageMin set)", () => {
+    expect(ageRangeToClasse(23, undefined, 2026)).toEqual({ classeMax: 2003 });
+  });
+
+  it("returns an empty object when both bounds are missing", () => {
+    expect(ageRangeToClasse(null, null, 2026)).toEqual({});
   });
 });
 

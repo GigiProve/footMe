@@ -8,6 +8,7 @@ import {
   fetchProfileShortlistMemberships,
   fetchShortlistEntries,
   fetchShortlistOverviewCounts,
+  fetchShortlistedProfileIds,
   getEvaluationStatusLabel,
   getPriorityLabel,
   getScopeLabel,
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => {
   builder.select = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
   builder.not = vi.fn(() => builder);
+  builder.in = vi.fn(() => builder);
   builder.single = vi.fn(() => Promise.resolve({ data: null, error: null }));
   builder.then = vi.fn((resolve: (value: unknown) => unknown) =>
     resolve({ data: null, error: null }),
@@ -51,6 +53,7 @@ beforeEach(() => {
   (mocks.builder.select as ReturnType<typeof vi.fn>).mockImplementation(() => mocks.builder);
   (mocks.builder.eq as ReturnType<typeof vi.fn>).mockImplementation(() => mocks.builder);
   (mocks.builder.not as ReturnType<typeof vi.fn>).mockImplementation(() => mocks.builder);
+  (mocks.builder.in as ReturnType<typeof vi.fn>).mockImplementation(() => mocks.builder);
   (mocks.builder.single as ReturnType<typeof vi.fn>).mockImplementation(() =>
     Promise.resolve({ data: null, error: null }),
   );
@@ -332,6 +335,53 @@ describe("fetchProfileShortlistMemberships", () => {
 
     const result = await fetchProfileShortlistMemberships("player-1", "club-1");
     expect(result).toEqual([]);
+  });
+});
+
+describe("fetchShortlistedProfileIds", () => {
+  it("short-circuits on an empty input without querying supabase", async () => {
+    const result = await fetchShortlistedProfileIds("club-1", []);
+
+    expect(result).toEqual(new Set());
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it("returns the shortlisted subset as a Set, scoped to the club", async () => {
+    (mocks.builder.then as ReturnType<typeof vi.fn>).mockImplementation(
+      (resolve: (value: unknown) => unknown) =>
+        resolve({
+          data: [
+            { player_profile_id: "p1", club_shortlists: { club_id: "club-1" } },
+            { player_profile_id: "p3", club_shortlists: { club_id: "club-1" } },
+          ],
+          error: null,
+        }),
+    );
+
+    const result = await fetchShortlistedProfileIds("club-1", ["p1", "p2", "p3"]);
+
+    expect(mocks.from).toHaveBeenCalledWith("club_shortlist_entries");
+    expect(mocks.builder.eq).toHaveBeenCalledWith(
+      "club_shortlists.club_id",
+      "club-1",
+    );
+    expect(mocks.builder.in).toHaveBeenCalledWith("player_profile_id", [
+      "p1",
+      "p2",
+      "p3",
+    ]);
+    expect(result).toEqual(new Set(["p1", "p3"]));
+  });
+
+  it("propagates errors", async () => {
+    (mocks.builder.then as ReturnType<typeof vi.fn>).mockImplementation(
+      (resolve: (value: unknown) => unknown) =>
+        resolve({ data: null, error: new Error("boom") }),
+    );
+
+    await expect(
+      fetchShortlistedProfileIds("club-1", ["p1"]),
+    ).rejects.toThrow("boom");
   });
 });
 

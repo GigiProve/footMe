@@ -27,18 +27,24 @@ export function SearchFilterChips<T extends string>({
       contentContainerStyle={styles.row}
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.scroll}
     >
-      {options.map((option) => (
-        <Button
-          key={option.label}
-          label={option.label}
-          onPress={() => onChange(option.value)}
-          selected={value === option.value}
-          size="sm"
-          style={styles.chip}
-          variant="chipAction"
-        />
-      ))}
+      {options.map((option) => {
+        const selected = value === option.value;
+
+        return (
+          <Button
+            key={option.label}
+            label={option.label}
+            onPress={() => onChange(option.value)}
+            selected={selected}
+            size="sm"
+            style={[styles.chip, selected ? styles.chipSelected : null]}
+            textStyle={selected ? styles.chipSelectedLabel : undefined}
+            variant="chipAction"
+          />
+        );
+      })}
       {onFiltersPress ? (
         <Button
           label="Filtri"
@@ -56,10 +62,34 @@ export function SearchFilterChips<T extends string>({
 }
 
 const styles = StyleSheet.create({
+  // Compact pills per the Banani spec (34px, 12px sides) instead of the
+  // 44px touch-target default of Button sm.
   chip: {
     marginRight: spacing[8],
+    minHeight: 34,
+    paddingHorizontal: spacing[12],
+  },
+  // Primary (category) row: the active tab gets a solid accent fill so it
+  // reads stronger than the soft-accent quick-filter chips below it.
+  chipSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  chipSelectedLabel: {
+    color: colors.inkInvert,
   },
   row: {
+    alignItems: "center",
+    // Let the row bleed to the screen edge (Screen pads by spacing[20]) so
+    // scrolled-out chips are clipped by the display, not mid-content.
+    paddingHorizontal: spacing[20],
     paddingVertical: spacing[4],
+  },
+  // A ScrollView in a flex column grabs the leftover vertical space by
+  // default, stretching the pills with it (giant chips on sparse screens).
+  scroll: {
+    flexGrow: 0,
+    marginBottom: spacing[4],
+    marginHorizontal: -spacing[20],
   },
 });

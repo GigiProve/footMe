@@ -177,6 +177,31 @@ export async function fetchClubSaveState(
   return data !== null;
 }
 
+/**
+ * Batch save-state lookup for a page of profile rows (e.g. Cerca > Profili
+ * results). Returns the subset of `targetIds` the owner has saved.
+ */
+export async function fetchSavedProfileIds(
+  ownerId: string,
+  targetIds: string[],
+): Promise<Set<string>> {
+  if (targetIds.length === 0) {
+    return new Set();
+  }
+
+  const { data, error } = await supabase
+    .from("saved_profiles")
+    .select("target_profile_id")
+    .eq("owner_profile_id", ownerId)
+    .in("target_profile_id", targetIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Set((data ?? []).map((row) => row.target_profile_id as string));
+}
+
 // Content route `/content/[type]/[id]` only supports these types.
 // `saved_media_tribuna` items (content_type "media_tribuna") have no standalone
 // detail route, and saved positions (`saved_ads`) have no per-ad route either —
