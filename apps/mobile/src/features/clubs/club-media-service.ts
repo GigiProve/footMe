@@ -354,7 +354,7 @@ export async function addClubMediaComment(input: {
 
   return {
     author_avatar_url: author?.avatar_url ?? null,
-    author_name: author?.full_name?.trim() || "Utente FootMe",
+    author_name: author?.full_name?.trim() || "Utente ProLink",
     body: String((data as { body: string }).body),
     created_at: String((data as { created_at: string }).created_at),
     id: String((data as { id: string }).id),
@@ -544,7 +544,7 @@ async function loadTaggedProfiles(postIds: string[]) {
       const club = clubs.get(row.target_id);
       list.push({
         avatar_url: club?.logo_url ?? null,
-        display_name: club?.name?.trim() || "Società FootMe",
+        display_name: club?.name?.trim() || "Società ProLink",
         profile_id: null,
         role: "club",
         target_id: row.target_id,
@@ -554,7 +554,7 @@ async function loadTaggedProfiles(postIds: string[]) {
       const team = teams.get(row.target_id);
       list.push({
         avatar_url: team?.logo_url ?? null,
-        display_name: team?.name?.trim() || "Squadra FootMe",
+        display_name: team?.name?.trim() || "Squadra ProLink",
         profile_id: null,
         role: "team",
         target_id: row.target_id,
@@ -564,7 +564,7 @@ async function loadTaggedProfiles(postIds: string[]) {
       const profile = profiles.get(row.target_id);
       list.push({
         avatar_url: profile?.avatar_url ?? null,
-        display_name: profile?.full_name?.trim() || "Profilo FootMe",
+        display_name: profile?.full_name?.trim() || "Profilo ProLink",
         profile_id: row.profile_id ?? row.target_id,
         role: profile?.role ?? null,
         target_id: row.target_id,
@@ -610,7 +610,7 @@ async function loadCommentsByPost(postIds: string[]) {
 
     list.push({
       author_avatar_url: profile?.avatar_url ?? null,
-      author_name: profile?.full_name?.trim() || "Utente FootMe",
+      author_name: profile?.full_name?.trim() || "Utente ProLink",
       body: row.body,
       created_at: row.created_at,
       id: row.id,

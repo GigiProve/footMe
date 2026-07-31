@@ -176,7 +176,7 @@ async function fetchProfilesForScouts(
   return (data ?? []).map((profile) => ({
     avatar_url: (profile.avatar_url as string | null) ?? null,
     city: (profile.city as string | null) ?? null,
-    full_name: (profile.full_name as string | null) ?? "Profilo footMe",
+    full_name: (profile.full_name as string | null) ?? "Profilo ProLink",
     profile_id: profile.id as string,
     region: (profile.region as string | null) ?? null,
     role: profile.role as string,

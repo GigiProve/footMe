@@ -154,7 +154,7 @@ describe("recruiting-service", () => {
       category: "Juniores",
       city: "Perugia",
       id: "club-1",
-      name: "AC FootMe",
+      name: "AC ProLink",
       region: "Umbria",
     };
     mocks.clubMaybeSingleMock.mockResolvedValueOnce({ data: club, error: null });

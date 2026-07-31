@@ -359,7 +359,7 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     try {
       setIsSharingContact(true);
       await sendContactCardMessage({
-        contactName: profile?.full_name?.trim() || "Utente footMe",
+        contactName: profile?.full_name?.trim() || "Utente ProLink",
         conversationId,
         phone: shareablePhone,
         senderProfileId: myProfileId,

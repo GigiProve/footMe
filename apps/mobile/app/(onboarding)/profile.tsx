@@ -4712,7 +4712,7 @@ export default function OnboardingProfileScreen() {
                     color="secondary"
                     style={styles.clubSuccessDesc}
                   >
-                    Benvenuto su FootMe. Inizia subito a cercare giocatori,
+                    Benvenuto su ProLink. Inizia subito a cercare giocatori,
                     allenatori e staff per la tua squadra.
                   </AppText>
                 </View>
@@ -4751,7 +4751,7 @@ export default function OnboardingProfileScreen() {
                     style={styles.textCenter}
                   >
                     {role === "media"
-                      ? "Il tuo profilo e' pronto per raccontare il mondo del calcio e farsi trovare dalla community di FootMe."
+                      ? "Il tuo profilo e' pronto per raccontare il mondo del calcio e farsi trovare dalla community di ProLink."
                       : role === "fan"
                         ? "Ora puoi esplorare il network, seguire le aree che ti interessano e partecipare alla community."
                         : "Ora puoi iniziare a connetterti con squadre, allenatori e giocatori. Se vuoi, potrai aggiungere altri dettagli in qualsiasi momento."}

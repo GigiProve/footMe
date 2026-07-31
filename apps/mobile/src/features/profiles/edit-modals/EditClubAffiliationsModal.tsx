@@ -126,7 +126,7 @@ export function EditClubAffiliationsModal({
       visible={visible}
     >
       <SectionCard
-        description="Collega academy, scuole calcio o centri tecnici già presenti su footMe."
+        description="Collega academy, scuole calcio o centri tecnici già presenti su ProLink."
         title="Cerca società"
       >
         <Input

@@ -324,7 +324,7 @@ describe("getCompleteProfessionalProfile", () => {
           assists: 8,
           awards: null,
           club_id: "club-1",
-          club_name: "AC FootMe",
+          club_name: "AC ProLink",
           competition_name: "Promozione",
           goals: 12,
           id: "career-1",
@@ -525,7 +525,7 @@ describe("getCompleteProfessionalProfile", () => {
         age: null,
         city: "Milano",
         current_location_country: "IT",
-        full_name: "Redazione FootMe",
+        full_name: "Redazione ProLink",
         id: "media-1",
         is_open_to_transfer: false,
         nationality: "IT",
@@ -536,7 +536,7 @@ describe("getCompleteProfessionalProfile", () => {
     });
     mocks.mediaMaybeSingleMock.mockResolvedValueOnce({
       data: {
-        affiliation_name: "FootMe News",
+        affiliation_name: "ProLink News",
         affiliation_type: "Testata o sito",
         covered_competitions: ["Serie A"],
         covered_teams: ["Como"],
@@ -544,7 +544,7 @@ describe("getCompleteProfessionalProfile", () => {
         covered_topics: ["Calciomercato"],
         content_types: ["Notizie", "Interviste"],
         editorial_type: "Testata giornalistica / Media sportivo",
-        entity_name: "FootMe News",
+        entity_name: "ProLink News",
         focus_areas: ["Serie A", "Calciomercato"],
         logo_url: "https://example.com/logo.png",
         profile_id: "media-1",
@@ -562,7 +562,7 @@ describe("getCompleteProfessionalProfile", () => {
           label: "X / Twitter",
           media_profile_id: "media-1",
           sort_order: 1,
-          url: "https://x.com/footmenews",
+          url: "https://x.com/prolinknews",
         },
       ],
       error: null,
@@ -593,7 +593,7 @@ describe("getCompleteProfessionalProfile", () => {
           label: "Redazione",
           media_profile_id: "media-1",
           sort_order: 0,
-          value: "redazione@footme.example",
+          value: "redazione@prolink.example",
         },
       ],
       error: null,
@@ -616,8 +616,8 @@ describe("getCompleteProfessionalProfile", () => {
     mocks.profileContactsMaybeSingleMock.mockResolvedValueOnce({
       data: {
         email: "",
-        facebook: "https://facebook.com/footmenews",
-        instagram: "https://instagram.com/footmenews",
+        facebook: "https://facebook.com/prolinknews",
+        instagram: "https://instagram.com/prolinknews",
         show_email: false,
         show_facebook: true,
         show_instagram: true,
@@ -625,8 +625,8 @@ describe("getCompleteProfessionalProfile", () => {
         show_website: true,
         show_youtube: true,
         tiktok: "",
-        website: "https://footme.example/news",
-        youtube: "https://youtube.com/@footmenews",
+        website: "https://prolink.example/news",
+        youtube: "https://youtube.com/@prolinknews",
       },
       error: null,
     });
@@ -635,7 +635,7 @@ describe("getCompleteProfessionalProfile", () => {
 
     expect(result.profile.role).toBe("media");
     expect(result.mediaProfile).toEqual({
-      affiliation_name: "FootMe News",
+      affiliation_name: "ProLink News",
       affiliation_type: "Testata o sito",
       covered_competitions: ["Serie A"],
       covered_teams: ["Como"],
@@ -643,7 +643,7 @@ describe("getCompleteProfessionalProfile", () => {
       covered_topics: ["Calciomercato"],
       content_types: ["Notizie", "Interviste"],
       editorial_type: "Testata giornalistica / Media sportivo",
-      entity_name: "FootMe News",
+      entity_name: "ProLink News",
       focus_areas: ["Serie A", "Calciomercato"],
       logo_url: "https://example.com/logo.png",
       profile_id: "media-1",
@@ -658,7 +658,7 @@ describe("getCompleteProfessionalProfile", () => {
         label: "X / Twitter",
         media_profile_id: "media-1",
         sort_order: 1,
-        url: "https://x.com/footmenews",
+        url: "https://x.com/prolinknews",
       },
     ]);
     expect((result.mediaProfileAuthors ?? [])[0]).toMatchObject({
@@ -668,14 +668,14 @@ describe("getCompleteProfessionalProfile", () => {
     });
     expect((result.mediaProfileContacts ?? [])[0]).toMatchObject({
       contact_type: "editorial",
-      value: "redazione@footme.example",
+      value: "redazione@prolink.example",
     });
     expect((result.mediaProfileVerifications ?? [])[0]).toMatchObject({
       label: "Testata registrata",
       status: "verified",
     });
-    expect(result.userContacts.website).toBe("https://footme.example/news");
-    expect(result.userContacts.youtube).toBe("https://youtube.com/@footmenews");
+    expect(result.userContacts.website).toBe("https://prolink.example/news");
+    expect(result.userContacts.youtube).toBe("https://youtube.com/@prolinknews");
     expect(mocks.mediaMaybeSingleMock).toHaveBeenCalledTimes(1);
     expect(
       mocks.fromMock.mock.calls.some(([table]) => table === "player_career_entries"),

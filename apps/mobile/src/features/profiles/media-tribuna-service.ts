@@ -416,7 +416,7 @@ export async function submitMediaTribunaQuestion(input: {
 
   return {
     author_avatar_url: author?.avatar_url ?? null,
-    author_name: author?.full_name?.trim() || "Utente FootMe",
+    author_name: author?.full_name?.trim() || "Utente ProLink",
     body: String((data as MediaTribunaQuestionRow).body),
     created_at: String((data as MediaTribunaQuestionRow).created_at),
     id: String((data as MediaTribunaQuestionRow).id),
@@ -703,7 +703,7 @@ async function loadQuestionsByPost(
 
     list.push({
       author_avatar_url: profile?.avatar_url ?? null,
-      author_name: profile?.full_name?.trim() || "Utente FootMe",
+      author_name: profile?.full_name?.trim() || "Utente ProLink",
       body: row.body,
       created_at: row.created_at,
       id: row.id,
@@ -777,7 +777,7 @@ async function loadCommentsByPost(postIds: string[]) {
 
     list.push({
       author_avatar_url: profile?.avatar_url ?? null,
-      author_name: profile?.full_name?.trim() || "Utente FootMe",
+      author_name: profile?.full_name?.trim() || "Utente ProLink",
       body: row.body,
       created_at: row.created_at,
       id: row.id,
@@ -872,7 +872,7 @@ async function enrichComment(row: MediaTribunaCommentRow) {
 
   return {
     author_avatar_url: author?.avatar_url ?? null,
-    author_name: author?.full_name?.trim() || "Utente FootMe",
+    author_name: author?.full_name?.trim() || "Utente ProLink",
     body: row.body,
     created_at: row.created_at,
     id: row.id,

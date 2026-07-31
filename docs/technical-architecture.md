@@ -1,4 +1,4 @@
-# footMe Technical Architecture
+# ProLink Technical Architecture
 
 ## Stack scelto
 

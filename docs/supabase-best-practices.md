@@ -1,8 +1,8 @@
-# Supabase / Postgres Best Practices per footMe
+# Supabase / Postgres Best Practices per ProLink
 
 ## Obiettivo
 
-Questo documento adatta a footMe le linee guida pubblicate da Supabase in **Postgres best practices for AI agents**.
+Questo documento adatta a ProLink le linee guida pubblicate da Supabase in **Postgres best practices for AI agents**.
 
 Serve come riferimento quando modifichi:
 
@@ -45,7 +45,7 @@ Da evitare:
 
 ### 2. Le migration sono append-only e focalizzate
 
-In footMe le migration devono restare:
+In ProLink le migration devono restare:
 
 - incrementali
 - ordinate temporalmente
@@ -67,7 +67,7 @@ Quando aggiungi o modifichi schema:
 - aggiungi `not null`, `check`, `unique` e default dove servono davvero
 - indicizza colonne usate spesso in join, filtri, ownership e ordinamenti
 
-Esempi tipici per footMe:
+Esempi tipici per ProLink:
 
 - foreign key verso `profiles`, `clubs`, `recruiting_ads`, `conversations`
 - lookup per `profile_id`, `club_id`, `created_at`, `status`
@@ -162,7 +162,7 @@ Se cambi il backend Supabase:
 - aggiorna `docs/supabase-setup.md` se cambia la procedura di bootstrap
 - documenta nuove funzioni helper, bucket o vincoli rilevanti
 
-## Come applicarle in footMe
+## Come applicarle in ProLink
 
 Quando lavori su Supabase o Postgres:
 

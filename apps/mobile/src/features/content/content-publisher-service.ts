@@ -45,7 +45,7 @@ export async function fetchContentPublisher(
     : (mediaResult.data as { entity_name: string | null; logo_url: string | null } | null);
 
   const name =
-    media?.entity_name?.trim() || profile?.full_name?.trim() || "Profilo FootMe";
+    media?.entity_name?.trim() || profile?.full_name?.trim() || "Profilo ProLink";
 
   return { avatarUrl: media?.logo_url ?? profile?.avatar_url ?? null, name };
 }

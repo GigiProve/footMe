@@ -368,7 +368,7 @@ export function PublicProfileScreen() {
     const name = completeProfile?.profile.full_name ?? "questo profilo";
     try {
       await Share.share({
-        message: `Dai un'occhiata al profilo di ${name} su FootMe.`,
+        message: `Dai un'occhiata al profilo di ${name} su ProLink.`,
       });
     } catch {
       // user cancelled or share unavailable — no-op

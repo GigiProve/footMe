@@ -1,8 +1,8 @@
-# React Best Practices per footMe
+# React Best Practices per ProLink
 
 ## Obiettivo
 
-Questo documento adatta al progetto footMe le linee guida pubblicate da Vercel in **Introducing React Best Practices**, concentrandosi su quello che e' davvero applicabile oggi a un'app **Expo + React Native + React 19**.
+Questo documento adatta al progetto ProLink le linee guida pubblicate da Vercel in **Introducing React Best Practices**, concentrandosi su quello che e' davvero applicabile oggi a un'app **Expo + React Native + React 19**.
 
 Usalo come riferimento quando implementi o modifichi schermate, componenti, hook e servizi React nel repository.
 
@@ -32,7 +32,7 @@ Quando due operazioni non dipendono una dall'altra, devono partire in parallelo.
 
 ### 2. Le dipendenze degli hook sono obbligatorie
 
-In footMe la regola `react-hooks/exhaustive-deps` va trattata come vincolante.
+In ProLink la regola `react-hooks/exhaustive-deps` va trattata come vincolante.
 
 Quindi:
 
@@ -98,7 +98,7 @@ Con React 19 e React Native:
 - introduci `Suspense` solo dove porta un beneficio reale e leggibile
 - non aggiungere complessita' architetturale senza un vantaggio misurabile
 
-## Come applicarle in footMe
+## Come applicarle in ProLink
 
 Quando lavori su codice React/React Native:
 

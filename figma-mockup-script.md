@@ -1,6 +1,6 @@
-# FootMe — Script completo per mockup Figma
+# ProLink — Script completo per mockup Figma
 
-> Questo documento contiene tutte le specifiche necessarie per ricreare fedelmente ogni schermata dell'app FootMe in Figma. L'app e' un network professionale per il calcio dilettantistico italiano, costruita con React Native (Expo). Lo stile visivo e' ispirato a LinkedIn: pulito, professionale, card-based, con gerarchia tipografica chiara.
+> Questo documento contiene tutte le specifiche necessarie per ricreare fedelmente ogni schermata dell'app ProLink in Figma. L'app e' un network professionale per il calcio dilettantistico italiano, costruita con React Native (Expo). Lo stile visivo e' ispirato a LinkedIn: pulito, professionale, card-based, con gerarchia tipografica chiara.
 
 ---
 
@@ -71,7 +71,7 @@ Tutte le ombre usano `rgba(15, 23, 42, 0.08)` come colore.
 
 | Variante | Font Size | Font Weight | Line Height | Uso |
 |----------|-----------|-------------|-------------|-----|
-| displayLg | 34px | 800 (Extra Bold) | 38px | Nome app "footMe" nel hero |
+| displayLg | 34px | 800 (Extra Bold) | 38px | Nome app "ProLink" nel hero |
 | displaySm | 28px | 800 | 32px | Titoli schermata, valori grandi |
 | headingLg | 24px | 800 | 28px | Intestazioni pagina |
 | headingMd | 20px | 800 | 28px | Titoli sezione (SectionCard) |
@@ -420,7 +420,7 @@ Route aggiuntive:
 
 1. **Header testo** (gap 10px):
    - Overline colore hero: `"Welcome Back"`
-   - displayLg: `"Accedi a footMe"`
+   - displayLg: `"Accedi a ProLink"`
    - bodyLg secondary: `"Entra nel network del calcio dilettantistico con un accesso pulito, rapido e orientato alla tua identita' sportiva."`
 
 2. **Card** (gap 14px):
@@ -526,7 +526,7 @@ L'onboarding ha 6+ step in base al ruolo scelto. Ogni step ha:
 1. **Hero Banner** (card inverse, radius 28, padding 24):
    - Badge piccola in alto a sinistra: sfondo rgba(255,255,255,0.16), testo #FFFFFF
      - overline inverseSoft: `"Amateur Football Network"`
-   - displayLg inverse: `"footMe"`
+   - displayLg inverse: `"ProLink"`
    - bodyLg inverseSoft: `"Il tuo profilo sportivo, la tua rete di contatti e le opportunita' giuste nello stesso posto."`
 
 2. **Riga stat (2 card affiancate, gap 12):**
@@ -821,7 +821,7 @@ Ogni sezione si modifica tramite una modale full-screen. Pattern comune:
 1. **Header scuro** (sfondo #1D2226, radius 24, padding interno):
    - Button link sm: `"← Torna ai messaggi"`
    - displaySm inverse: `"Marco Bianchi"` (nome interlocutore)
-   - bodySm inverseMuted: `"Conversazione privata 1:1 del network footMe."`
+   - bodySm inverseMuted: `"Conversazione privata 1:1 del network ProLink."`
 
 2. **Se in caricamento:**
    - Card: bodySm secondary `"Caricamento conversazione in corso..."`

@@ -1401,7 +1401,7 @@ function formatRole(role: string | null) {
     staff: "Staff",
   };
 
-  return role ? labels[role] ?? role : "Profilo FootMe";
+  return role ? labels[role] ?? role : "Profilo ProLink";
 }
 
 function normalizeExternalUrl(url: string) {

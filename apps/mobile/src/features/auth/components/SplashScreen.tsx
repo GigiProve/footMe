@@ -12,7 +12,7 @@ export function SplashScreen() {
           <Ionicons name="football" size={40} color={colors.inkInvert} />
         </View>
         <AppText variant="displayLg" style={styles.title}>
-          FootMe
+          ProLink
         </AppText>
       </View>
     </View>

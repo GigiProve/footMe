@@ -79,7 +79,7 @@ export function InviteLinkModal({
     const url = buildInviteUrl(token);
     try {
       await Share.share({
-        message: `Unisciti alla mia societa' su footMe: ${url}`,
+        message: `Unisciti alla mia societa' su ProLink: ${url}`,
         url,
       });
     } catch {

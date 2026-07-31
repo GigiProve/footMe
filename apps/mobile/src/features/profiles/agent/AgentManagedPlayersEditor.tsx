@@ -120,7 +120,7 @@ export function AgentManagedPlayersEditor({
   return (
     <View style={styles.container}>
       <Input
-        label="Cerca un calciatore su FootMe"
+        label="Cerca un calciatore su ProLink"
         onChangeText={setQuery}
         placeholder="Digita nome e cognome"
         value={query}
@@ -169,7 +169,7 @@ export function AgentManagedPlayersEditor({
       ) : query.trim().length >= 2 ? (
         <View style={styles.emptyState}>
           <AppText color="secondary" variant="bodySm">
-            Nessun profilo FootMe trovato con questo nome.
+            Nessun profilo ProLink trovato con questo nome.
           </AppText>
         </View>
       ) : null}

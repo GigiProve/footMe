@@ -546,7 +546,7 @@ export function StaffInfoTab({
           </View>
         ) : (
           <AppText color="secondary" variant="bodySm">
-            Nessun contatto pubblico condiviso. Usa la chat interna footMe per iniziare
+            Nessun contatto pubblico condiviso. Usa la chat interna ProLink per iniziare
             la conversazione.
           </AppText>
         )}

@@ -64,7 +64,7 @@ export async function fetchLinkPreview(rawUrl: string): Promise<LinkPreview> {
     const response = await fetch(url, {
       headers: {
         Accept: "text/html,application/xhtml+xml",
-        "User-Agent": "Mozilla/5.0 (compatible; FootMeLinkPreview/1.0)",
+        "User-Agent": "Mozilla/5.0 (compatible; ProLinkPreview/1.0)",
       },
       signal: controller.signal,
     });

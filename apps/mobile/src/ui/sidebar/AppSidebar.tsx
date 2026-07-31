@@ -168,7 +168,7 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
     : navigationItems;
 
   const displayName =
-    profile?.full_name?.trim() || session?.user.email?.trim() || "Utente footMe";
+    profile?.full_name?.trim() || session?.user.email?.trim() || "Utente ProLink";
   const headline = formatHeadline(profile?.role);
   const locationLabel = formatSupportingMeta(profile?.club_name, profile?.city, profile?.region);
 
@@ -368,7 +368,7 @@ function formatHeadline(role: string | null | undefined) {
     case "club_admin":
       return "Societa'";
     default:
-      return "Profilo footMe";
+      return "Profilo ProLink";
   }
 }
 

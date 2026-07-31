@@ -1,16 +1,16 @@
-# footMe Mobile UX/UI Guidelines
+# ProLink Mobile UX/UI Guidelines
 
 ## Obiettivo del documento
 
-Definire l'interfaccia, i pattern, le icone e le interazioni principali di footMe per iOS e Android.
+Definire l'interfaccia, i pattern, le icone e le interazioni principali di ProLink per iOS e Android.
 
-Il riferimento UX esplicito e' LinkedIn mobile: footMe deve comunicare professionalita', densita' informativa, fiducia e networking, adattando questi principi al contesto del calcio dilettantistico.
+Il riferimento UX esplicito e' LinkedIn mobile: ProLink deve comunicare professionalita', densita' informativa, fiducia e networking, adattando questi principi al contesto del calcio dilettantistico.
 
 ## Design direction
 
 ### Posizionamento UX
 
-footMe deve apparire come:
+ProLink deve apparire come:
 
 - il luogo professionale dove costruire identita' sportiva
 - il punto di incontro tra talenti, allenatori, staff e societa'
@@ -47,7 +47,7 @@ footMe deve apparire come:
 
 Il repository ha gia' una base colori in `apps/mobile/src/theme/tokens.ts`.
 
-- `accent #0D7A43`: colore identitario footMe per CTA primarie e stati positivi
+- `accent #0D7A43`: colore identitario ProLink per CTA primarie e stati positivi
 - `background #F5F2E9` e `surface #FFFDFC`: superfici calde e premium
 - `textPrimary #14261D`: testo principale
 - `border #D9D0C0`: separatori e outline
@@ -202,7 +202,7 @@ Pattern chiave:
 
 ### 1. Search pattern
 
-footMe deve usare una search bar molto prominente, ispirata a LinkedIn.
+ProLink deve usare una search bar molto prominente, ispirata a LinkedIn.
 
 Regole:
 
@@ -551,7 +551,7 @@ Ordine raccomandato:
 
 ## LinkedIn-inspired patterns da adottare esplicitamente
 
-Per soddisfare l'indicazione di rendere l'app piu' simile possibile a LinkedIn, footMe deve adottare i seguenti pattern strutturali:
+Per soddisfare l'indicazione di rendere l'app piu' simile possibile a LinkedIn, ProLink deve adottare i seguenti pattern strutturali:
 
 1. **Feed come punto di ingresso principale**
 2. **Top search sempre molto visibile**
@@ -562,7 +562,7 @@ Per soddisfare l'indicazione di rendere l'app piu' simile possibile a LinkedIn, 
 7. **Gerarchia dei contenuti densa ma pulita**
 8. **Card con meta-informazioni, badge e CTA discrete**
 
-Le differenze distintive footMe devono stare nei contenuti:
+Le differenze distintive ProLink devono stare nei contenuti:
 
 - carriera sportiva invece di esperienza lavorativa generica
 - statistiche e highlights invece di soli post professionali
@@ -621,7 +621,7 @@ Questo documento deve guidare la produzione dei prossimi artefatti:
 
 ## Decisione finale di design
 
-La UI di footMe deve essere progettata come **"LinkedIn per il calcio dilettantistico"**:
+La UI di ProLink deve essere progettata come **"LinkedIn per il calcio dilettantistico"**:
 
 - stessa chiarezza strutturale
 - stessa logica di networking professionale

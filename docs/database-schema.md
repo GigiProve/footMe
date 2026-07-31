@@ -1,4 +1,4 @@
-# footMe Initial Database Model
+# ProLink Initial Database Model
 
 ## Obiettivo
 

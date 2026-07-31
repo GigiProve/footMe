@@ -55,7 +55,7 @@ const societaCommunication: CommunicationSummary = {
   title: "Assemblea soci",
   preview: "Convocazione assemblea annuale",
   sender_club_id: "club-1",
-  sender_name: "ASD Footme",
+  sender_name: "ASD ProLink",
   sender_logo_url: null,
   cta_label: null,
   cta_url: null,
@@ -69,7 +69,7 @@ const eventiCommunication: CommunicationSummary = {
   title: "Torneo estivo",
   preview: "Iscrizioni aperte al torneo",
   sender_club_id: "club-1",
-  sender_name: "ASD Footme",
+  sender_name: "ASD ProLink",
   sender_logo_url: null,
   cta_label: "Iscriviti",
   cta_url: "https://example.com",
@@ -148,7 +148,7 @@ describe("matchesConversationQuery", () => {
 
 describe("matchesCommunicationQuery", () => {
   it("matches sender name, title, and preview case-insensitively", () => {
-    expect(matchesCommunicationQuery(societaCommunication, "footme")).toBe(
+    expect(matchesCommunicationQuery(societaCommunication, "prolink")).toBe(
       true,
     );
     expect(matchesCommunicationQuery(societaCommunication, "ASSEMBLEA")).toBe(
@@ -181,7 +181,7 @@ describe("buildSearchSections", () => {
   });
 
   it("returns matching chat and communication results for a valid query", () => {
-    const result = buildSearchSections(conversations, communications, "footme");
+    const result = buildSearchSections(conversations, communications, "prolink");
 
     expect(result.chatResults).toEqual([]);
     expect(result.communicationResults).toEqual(communications);

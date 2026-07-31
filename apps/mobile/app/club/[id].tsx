@@ -217,7 +217,7 @@ export default function ClubProfileScreen() {
     }
     try {
       await Share.share({
-        message: `Dai un'occhiata a ${club.name} su FootMe.`,
+        message: `Dai un'occhiata a ${club.name} su ProLink.`,
       });
     } catch {
       // user cancelled or share unavailable — no-op

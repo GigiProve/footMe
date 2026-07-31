@@ -89,9 +89,9 @@ Il repository non puo' collegarsi automaticamente a un progetto Supabase reale s
 
 La migration `20260310_dev_seed.sql` inserisce dati demo solo se nel progetto esistono gia' utenti auth con queste email:
 
-- `club.demo@footme.dev`
-- `player.demo@footme.dev`
-- `coach.demo@footme.dev`
-- `staff.demo@footme.dev`
+- `club.demo@prolink.dev`
+- `player.demo@prolink.dev`
+- `coach.demo@prolink.dev`
+- `staff.demo@prolink.dev`
 
 Se questi utenti non esistono, la migration non fallisce: semplicemente non inserisce i record dipendenti.

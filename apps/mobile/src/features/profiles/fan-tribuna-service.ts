@@ -622,7 +622,7 @@ export async function addFanTribunaComment(input: {
 
   return {
     author_avatar_url: author?.avatar_url ?? null,
-    author_name: author?.full_name?.trim() || "Utente FootMe",
+    author_name: author?.full_name?.trim() || "Utente ProLink",
     body: String((data as { body: string }).body),
     created_at: String((data as { created_at: string }).created_at),
     id: String((data as { id: string }).id),
@@ -1136,7 +1136,7 @@ async function loadCommentsByPost(postIds: string[]) {
 
     list.push({
       author_avatar_url: profile?.avatar_url ?? null,
-      author_name: profile?.full_name?.trim() || "Utente FootMe",
+      author_name: profile?.full_name?.trim() || "Utente ProLink",
       body: row.body,
       created_at: row.created_at,
       id: row.id,

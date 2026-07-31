@@ -342,7 +342,7 @@ export async function addMediaProfilePostComment(input: {
 
   return {
     author_avatar_url: author?.avatar_url ?? null,
-    author_name: author?.full_name?.trim() || "Utente FootMe",
+    author_name: author?.full_name?.trim() || "Utente ProLink",
     body: String((data as { body: string }).body),
     created_at: String((data as { created_at: string }).created_at),
     id: String((data as { id: string }).id),
@@ -550,7 +550,7 @@ async function loadTaggedTargets(postIds: string[]) {
       const club = clubs.get(row.target_id);
       list.push({
         avatar_url: club?.logo_url ?? null,
-        display_name: club?.name?.trim() || "Societa FootMe",
+        display_name: club?.name?.trim() || "Societa ProLink",
         role: "club",
         subtitle: club
           ? [club.category, club.city ?? club.region].filter(Boolean).join(" - ") || null
@@ -562,7 +562,7 @@ async function loadTaggedTargets(postIds: string[]) {
       const team = teams.get(row.target_id);
       list.push({
         avatar_url: team?.logo_url ?? null,
-        display_name: team?.name?.trim() || "Squadra FootMe",
+        display_name: team?.name?.trim() || "Squadra ProLink",
         role: "team",
         subtitle: team
           ? [team.category, team.city].filter(Boolean).join(" - ") || null
@@ -574,7 +574,7 @@ async function loadTaggedTargets(postIds: string[]) {
       const profile = profiles.get(row.target_id);
       list.push({
         avatar_url: profile?.avatar_url ?? null,
-        display_name: profile?.full_name?.trim() || "Profilo FootMe",
+        display_name: profile?.full_name?.trim() || "Profilo ProLink",
         role: profile?.role ?? null,
         subtitle: profile
           ? formatProfileSubtitle(profile.role, profile.city ?? null, profile.region ?? null)
@@ -622,7 +622,7 @@ async function loadCommentsByPost(postIds: string[]) {
 
     list.push({
       author_avatar_url: profile?.avatar_url ?? null,
-      author_name: profile?.full_name?.trim() || "Utente FootMe",
+      author_name: profile?.full_name?.trim() || "Utente ProLink",
       body: row.body,
       created_at: row.created_at,
       id: row.id,
@@ -669,7 +669,7 @@ async function loadPublisherNames(mediaProfileIds: string[]) {
     const profiles = await loadProfilesById(missing);
 
     for (const id of missing) {
-      names.set(id, profiles.get(id)?.full_name?.trim() || "Media FootMe");
+      names.set(id, profiles.get(id)?.full_name?.trim() || "Media ProLink");
     }
   }
 

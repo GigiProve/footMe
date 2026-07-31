@@ -19,7 +19,7 @@ export function CommunityProfileTypeStep({
   return (
     <OnboardingSectionCard
       title="Media e appassionati"
-      subtitle="Scegli il tipo di profilo che descrive meglio il tuo utilizzo di FootMe."
+      subtitle="Scegli il tipo di profilo che descrive meglio il tuo utilizzo di ProLink."
     >
       <View style={styles.options}>
         <ProfileTypeCard

@@ -980,7 +980,7 @@ function ArticlesTab({
           icon="newspaper-outline"
           text={
             mode === "owner"
-              ? "Pubblica articoli e news per rendere il profilo una testata viva dentro FootMe."
+              ? "Pubblica articoli e news per rendere il profilo una testata viva dentro ProLink."
               : "Questo profilo media non ha ancora pubblicato articoli."
           }
           title="Nessun articolo"

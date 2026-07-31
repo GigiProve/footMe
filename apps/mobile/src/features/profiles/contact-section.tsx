@@ -264,7 +264,7 @@ export function ContactSection({
         <View style={styles.emptyState}>
           <Ionicons color={colors.textSecondary} name="chatbubble-ellipses-outline" size={20} />
           <AppText variant="bodySm" color="secondary" style={styles.emptyStateText}>
-            Nessun contatto pubblico condiviso. Usa la chat interna footMe per iniziare la conversazione.
+            Nessun contatto pubblico condiviso. Usa la chat interna ProLink per iniziare la conversazione.
           </AppText>
         </View>
       )}

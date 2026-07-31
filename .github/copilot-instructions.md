@@ -12,7 +12,7 @@
 
 ## Working Rules
 
-- footMe is a mobile-first product for iOS and Android in the current scope.
+- ProLink is a mobile-first product for iOS and Android in the current scope.
 - Do not assume a web version is part of the current delivery unless the user explicitly asks for it.
 - Do not invent undocumented features, roles, constraints, or business rules.
 - If requirements are incomplete, ask focused questions and convert uncertainty into explicit decisions.

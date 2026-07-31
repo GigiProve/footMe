@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "footMe",
+    "name": "ProLink",
     "slug": "footme",
     "scheme": "footme",
     "version": "1.0.0",
@@ -12,7 +12,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "footMe usa la tua posizione per mostrarti le posizioni aperte vicino a te."
+          "locationWhenInUsePermission": "ProLink usa la tua posizione per mostrarti le posizioni aperte vicino a te."
         }
       ]
     ],
@@ -28,7 +28,7 @@
       "package": "com.footme.mobile"
     },
     "extra": {
-      "projectName": "footMe"
+      "projectName": "ProLink"
     }
   }
 }

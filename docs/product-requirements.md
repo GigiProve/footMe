@@ -1,8 +1,8 @@
-# footMe Product Requirements
+# ProLink Product Requirements
 
 ## Visione del prodotto
 
-footMe e' una piattaforma digitale dedicata al calcio dilettantistico che mette in collegamento calciatori, allenatori, membri dello staff e societa' sportive.
+ProLink e' una piattaforma digitale dedicata al calcio dilettantistico che mette in collegamento calciatori, allenatori, membri dello staff e societa' sportive.
 
 L'obiettivo e' offrire un'esperienza di networking professionale simile a LinkedIn, ma progettata per il settore calcistico, per facilitare:
 

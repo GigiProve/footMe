@@ -790,7 +790,7 @@ function normalizeBaseProfileRecord(
     current_location_city: normalizeOptionalText(rawProfile?.current_location_city),
     current_location_country: normalizeOptionalText(rawProfile?.current_location_country),
     domicile: normalizeOptionalText(rawProfile?.domicile),
-    full_name: normalizeRequiredText(rawProfile?.full_name, "Profilo FootMe"),
+    full_name: normalizeRequiredText(rawProfile?.full_name, "Profilo ProLink"),
     gender: normalizeProfileGender(rawProfile?.gender),
     id: normalizeRequiredText(rawProfile?.id, profileId),
     is_open_to_transfer: normalizeBoolean(rawProfile?.is_open_to_transfer),

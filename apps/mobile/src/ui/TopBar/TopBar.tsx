@@ -27,7 +27,7 @@ export function TopBar({
           </AppText>
         </View>
         <AppText variant="headingSm" color="accent">
-          FootMe
+          ProLink
         </AppText>
       </View>
       <Pressable

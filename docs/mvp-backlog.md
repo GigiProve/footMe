@@ -1,8 +1,8 @@
-# footMe MVP Backlog
+# ProLink MVP Backlog
 
 ## Scopo del backlog
 
-Questo backlog traduce il piano di alto livello in lavoro operativo per la prima release MVP mobile di footMe.
+Questo backlog traduce il piano di alto livello in lavoro operativo per la prima release MVP mobile di ProLink.
 
 Principi di priorita':
 

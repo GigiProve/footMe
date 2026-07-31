@@ -28,7 +28,7 @@ export function AgentPlayersStep({
       <View style={styles.header}>
         <AppText variant="displaySm">Portfolio calciatori</AppText>
         <AppText variant="bodySm" color="secondary">
-          Collega i giocatori già presenti su FootMe oppure inserisci manualmente le
+          Collega i giocatori già presenti su ProLink oppure inserisci manualmente le
           voci che rappresentano il tuo portfolio attuale.
         </AppText>
       </View>

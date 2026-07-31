@@ -316,7 +316,7 @@ export function EditAgentMediaModal({
           <Card style={styles.sectionCard}>
             <AppText variant="titleSm">Tag giocatori</AppText>
             <Input
-              label="Cerca un calciatore su FootMe"
+              label="Cerca un calciatore su ProLink"
               onChangeText={setSearchQuery}
               placeholder="Digita nome e cognome"
               value={searchQuery}
@@ -386,7 +386,7 @@ export function EditAgentMediaModal({
             ) : searchQuery.trim().length >= 2 ? (
               <View style={styles.inlineEmptyState}>
                 <AppText color="secondary" variant="bodySm">
-                  Nessun calciatore FootMe trovato con questo nome.
+                  Nessun calciatore ProLink trovato con questo nome.
                 </AppText>
               </View>
             ) : null}
@@ -436,7 +436,7 @@ function buildPlayerSummaryLine(candidate: AgentPlayerCandidate) {
     candidate.is_free_agent ? "Svincolato" : null,
   ].filter(Boolean);
 
-  return parts.length > 0 ? parts.join(" · ") : "Profilo calciatore FootMe";
+  return parts.length > 0 ? parts.join(" · ") : "Profilo calciatore ProLink";
 }
 
 function getPlayerPositionLabel(position: AgentPlayerCandidate["primary_position"]) {
