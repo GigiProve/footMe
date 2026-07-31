@@ -93,6 +93,11 @@ type FanProfileViewProps = {
   onContactPress?: () => void;
   onOpenFavoriteClub?: (clubId: string) => void;
   onOpenPlayerProfile?: (profileId: string) => void;
+  /**
+   * Apre una volta il menu di creazione già esistente. Serve al pulsante "+"
+   * della Home, che è solo un punto di accesso e non ha un composer proprio.
+   */
+  shouldOpenComposer?: boolean;
   viewerProfileId?: string | null;
 };
 
@@ -207,6 +212,7 @@ export function FanProfileView({
   onContactPress,
   onOpenFavoriteClub,
   onOpenPlayerProfile,
+  shouldOpenComposer = false,
   viewerProfileId,
 }: FanProfileViewProps) {
   const [activeTab, setActiveTab] = useState<FanProfileTab>("bacheca");
@@ -218,6 +224,7 @@ export function FanProfileView({
   const [hasMoreTribuna, setHasMoreTribuna] = useState(false);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const hasHandledComposeIntent = useRef(false);
   const [tribunaComposerKind, setTribunaComposerKind] =
     useState<FanTribunaKind | null>(null);
   const [isFavoriteTeamModalOpen, setIsFavoriteTeamModalOpen] = useState(false);
@@ -330,6 +337,17 @@ export function FanProfileView({
   useEffect(() => {
     void loadTribunaPosts();
   }, [loadTribunaPosts]);
+
+  // Il "+" della Home apre il menu di creazione già esistente. Il ref evita che
+  // il menu si riapra a ogni render finché il parametro resta nell'URL.
+  useEffect(() => {
+    if (!shouldOpenComposer || mode !== "owner" || hasHandledComposeIntent.current) {
+      return;
+    }
+
+    hasHandledComposeIntent.current = true;
+    setIsCreateMenuOpen(true);
+  }, [mode, shouldOpenComposer]);
 
   useEffect(() => {
     setFavoriteTeamName(completeProfile.fanProfile?.favorite_team_name ?? "");

@@ -9,7 +9,7 @@ import {
   type AlertButton,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
@@ -135,6 +135,14 @@ const MEMBER_ROLE_LABELS: Record<string, string> = {
 export default function ProfileScreen() {
   const { profile, refreshProfile, session } = useSession();
   const router = useRouter();
+  /**
+   * `?compose=` è il punto d'ingresso del pulsante "+" della Home: la Home non
+   * ospita un composer proprio, apre quello che già esiste in questa vista
+   * (§2 della Home: implementare solo il punto di accesso).
+   */
+  const { compose } = useLocalSearchParams<{ compose?: string }>();
+  const composeIntent =
+    compose === "fan" || compose === "media" || compose === "club" ? compose : null;
   const userId = session?.user.id ?? null;
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
@@ -147,7 +155,11 @@ export default function ProfileScreen() {
   const [clubOverview, setClubOverview] =
     useState<PublicClubSquadraOverview>(emptyClubOverview);
   const [clubMembers, setClubMembers] = useState<PublicClubMember[]>([]);
-  const [activeClubTab, setActiveClubTab] = useState<ClubHeaderTab>("team");
+  const [activeClubTab, setActiveClubTab] = useState<ClubHeaderTab>(
+    // Arrivando dal "+" della Home la scheda contenuti è quella che ospita il
+    // composer già esistente, quindi si apre direttamente su quella.
+    compose === "club" ? "media" : "team",
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<EditSection | null>(null);
   const [pendingMemberships, setPendingMemberships] = useState<PendingMembership[]>([]);
@@ -741,6 +753,7 @@ export default function ProfileScreen() {
             onTabChange={setActiveClubTab}
             onToggleFollow={() => handleEdit("clubInfo")}
             overview={clubOverview}
+            shouldOpenMediaComposer={composeIntent === "club"}
             stats={clubHeaderStats}
             teamProfiles={clubTeamProfiles}
             teams={clubTeams}
@@ -906,6 +919,7 @@ export default function ProfileScreen() {
             mode="owner"
             onOpenFavoriteClub={handleOpenAffiliateClub}
             onOpenPlayerProfile={handleOpenProfile}
+            shouldOpenComposer={composeIntent === "fan"}
             viewerProfileId={userId}
           />
         ) : completeProfile && role === "media" ? (
@@ -914,6 +928,7 @@ export default function ProfileScreen() {
             mode="owner"
             onOpenClub={handleOpenAffiliateClub}
             onOpenProfile={handleOpenProfile}
+            shouldOpenComposer={composeIntent === "media"}
             viewerProfileId={userId}
           />
         ) : completeProfile && role === "club_admin" ? null : completeProfile ? (

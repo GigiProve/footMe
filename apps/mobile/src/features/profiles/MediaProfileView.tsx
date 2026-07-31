@@ -1,4 +1,11 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Image,
@@ -78,6 +85,11 @@ type MediaProfileViewProps = {
   onContactPress?: () => void;
   onOpenClub?: (clubId: string) => void;
   onOpenProfile?: (profileId: string) => void;
+  /**
+   * Apre una volta il composer editoriale già esistente. Serve al pulsante "+"
+   * della Home, che è solo un punto di accesso e non ha un composer proprio.
+   */
+  shouldOpenComposer?: boolean;
   viewerProfileId?: string | null;
 };
 
@@ -167,6 +179,7 @@ export function MediaProfileView({
   onContactPress,
   onOpenClub,
   onOpenProfile,
+  shouldOpenComposer = false,
   viewerProfileId,
 }: MediaProfileViewProps) {
   const [activeTab, setActiveTab] = useState<MediaProfileTab>("articles");
@@ -181,6 +194,7 @@ export function MediaProfileView({
   const [selectedPost, setSelectedPost] = useState<MediaProfilePost | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const hasHandledComposeIntent = useRef(false);
   const [tribunaPosts, setTribunaPosts] = useState<MediaTribunaPost[]>([]);
   const [isLoadingTribuna, setIsLoadingTribuna] = useState(false);
   const [isTribunaCreateMenuOpen, setIsTribunaCreateMenuOpen] = useState(false);
@@ -301,6 +315,18 @@ export function MediaProfileView({
   useEffect(() => {
     void loadTribunaPosts();
   }, [loadTribunaPosts]);
+
+  // Il "+" della Home apre il composer editoriale già esistente, sulla scheda
+  // che lo ospita. Il ref evita che si riapra finché il parametro resta nell'URL.
+  useEffect(() => {
+    if (!shouldOpenComposer || mode !== "owner" || hasHandledComposeIntent.current) {
+      return;
+    }
+
+    hasHandledComposeIntent.current = true;
+    setActiveTab("articles");
+    setIsComposerOpen(true);
+  }, [mode, shouldOpenComposer]);
 
   useEffect(() => {
     if (mode !== "visitor" || !viewerProfileId) {

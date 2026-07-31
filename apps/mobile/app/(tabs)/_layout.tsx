@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, SafeAreaView, StyleSheet, View } from "react-native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Redirect, Tabs } from "expo-router";
+import { Redirect, Tabs, usePathname } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { useSession } from "../../src/features/auth/use-session";
@@ -15,7 +15,13 @@ import { Icon, type IconName } from "../../src/ui";
 export default function TabsLayout() {
   const { isLoading, needsOnboarding, profile, session } = useSession();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
   const profileId = profile?.id ?? "";
+
+  // La Home ha un header proprio con "PROLINK" in alto a sinistra e integra il
+  // menu come primo elemento della barra: il pulsante flottante si
+  // sovrapporrebbe esattamente al nome. Sulle altre tab resta com'era.
+  const showFloatingMenu = pathname !== "/";
 
   const conversationsQuery = useQuery({
     enabled: !!profileId,
@@ -95,19 +101,21 @@ export default function TabsLayout() {
         <Tabs.Screen name="announcements" options={{ href: null }} />
       </Tabs>
 
-      <SafeAreaView pointerEvents="box-none" style={styles.menuArea}>
-        <Pressable
-          accessibilityLabel="Apri menu laterale"
-          accessibilityRole="button"
-          onPress={() => setSidebarOpen(true)}
-          style={({ pressed }) => [
-            styles.menuButton,
-            pressed ? styles.menuButtonPressed : null,
-          ]}
-        >
-          <Ionicons color={colors.textPrimary} name="menu-outline" size={22} />
-        </Pressable>
-      </SafeAreaView>
+      {showFloatingMenu ? (
+        <SafeAreaView pointerEvents="box-none" style={styles.menuArea}>
+          <Pressable
+            accessibilityLabel="Apri menu laterale"
+            accessibilityRole="button"
+            onPress={() => setSidebarOpen(true)}
+            style={({ pressed }) => [
+              styles.menuButton,
+              pressed ? styles.menuButtonPressed : null,
+            ]}
+          >
+            <Ionicons color={colors.textPrimary} name="menu-outline" size={22} />
+          </Pressable>
+        </SafeAreaView>
+      ) : null}
 
       <AppSidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
     </View>

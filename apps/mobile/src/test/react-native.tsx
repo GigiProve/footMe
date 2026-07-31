@@ -191,6 +191,18 @@ export const Animated = {
       callback?.({ finished: true });
     },
   }),
+  // Serve a ToastProvider, che compone opacità e traslazione: senza questo
+  // qualunque test che faccia comparire un toast solleva.
+  parallel: (
+    animations: {
+      start: (callback?: (result: { finished: boolean }) => void) => void;
+    }[],
+  ) => ({
+    start: (callback?: (result: { finished: boolean }) => void) => {
+      animations.forEach((animation) => animation.start());
+      callback?.({ finished: true });
+    },
+  }),
 };
 export const PanResponder = {
   create: () => ({

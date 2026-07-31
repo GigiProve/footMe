@@ -44,6 +44,11 @@ type PublicClubProfileViewProps = {
   onToggleFollow: () => void;
   onToggleSave?: () => void;
   overview: PublicClubSquadraOverview;
+  /**
+   * Apre una volta il menu di pubblicazione già esistente nell'area contenuti.
+   * Serve al pulsante "+" della Home, che è solo un punto di accesso.
+   */
+  shouldOpenMediaComposer?: boolean;
   stats: ClubHeaderStats;
   teamProfiles?: Record<string, ClubTeamProfileDetails>;
   teams: ClubTeam[];
@@ -118,6 +123,7 @@ export function PublicClubProfileView({
   onToggleFollow,
   onToggleSave,
   overview,
+  shouldOpenMediaComposer = false,
   stats,
   teamProfiles = {},
   teams,
@@ -174,6 +180,7 @@ export function PublicClubProfileView({
           club={club}
           isOwner={isOwner}
           onOpenProfile={onOpenProfile}
+          shouldOpenComposer={shouldOpenMediaComposer}
           viewerProfileId={viewerProfileId}
         />
       )}

@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
 } from "react";
@@ -54,6 +55,11 @@ type ClubMediaTabContentProps = {
   club: PublicClubProfile;
   isOwner: boolean;
   onOpenProfile: (profileId: string) => void;
+  /**
+   * Apre una volta il menu di pubblicazione già esistente. Serve al pulsante
+   * "+" della Home, che è solo un punto di accesso.
+   */
+  shouldOpenComposer?: boolean;
   viewerProfileId?: string | null;
 };
 
@@ -198,6 +204,7 @@ export function ClubMediaTabContent({
   club,
   isOwner,
   onOpenProfile,
+  shouldOpenComposer = false,
   viewerProfileId,
 }: ClubMediaTabContentProps) {
   const [activeFilter, setActiveFilter] = useState<MediaFilter>("all");
@@ -208,6 +215,18 @@ export function ClubMediaTabContent({
   const [isVideoOpen, setIsVideoOpen] = useState(false);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [createKind, setCreateKind] = useState<ClubMediaKind | null>(null);
+  const hasHandledComposeIntent = useRef(false);
+
+  // Il "+" della Home apre il menu di pubblicazione già esistente. Il ref evita
+  // che si riapra finché il parametro resta nell'URL.
+  useEffect(() => {
+    if (!shouldOpenComposer || !isOwner || hasHandledComposeIntent.current) {
+      return;
+    }
+
+    hasHandledComposeIntent.current = true;
+    setIsCreateMenuOpen(true);
+  }, [isOwner, shouldOpenComposer]);
 
   const loadPosts = useCallback(async () => {
     setIsLoading(true);
