@@ -6,6 +6,7 @@ import {
   resolveGlobalSearchHref,
   searchClubsPage,
   searchGlobal,
+  searchPositionsForYou,
   searchPositionsPage,
   searchProfilesPage,
 } from "./search-service";
@@ -293,28 +294,111 @@ describe("searchClubsPage", () => {
 });
 
 describe("searchPositionsPage", () => {
-  it("forwards target and saved-only filters", async () => {
-    await searchPositionsPage("attaccante", "player", true, 3, 20);
+  it("forwards target, saved-only and geographic filters", async () => {
+    await searchPositionsPage({
+      query: "attaccante",
+      target: "player",
+      savedOnly: true,
+      positions: ["striker", "right_winger"],
+      primaryPositions: ["striker"],
+      regions: ["Lombardia"],
+      provinces: [],
+      lat: 45.81,
+      lng: 9.08,
+      radiusKm: 50,
+      sort: "vicinanza",
+      page: 3,
+      pageSize: 20,
+    });
 
     expect(mocks.rpc).toHaveBeenCalledWith("search_positions_page", {
+      p_categories: null,
+      p_club_id: null,
+      p_lat: 45.81,
       p_limit: 20,
+      p_lng: 9.08,
       p_offset: 60,
+      p_positions: ["striker", "right_winger"],
+      p_primary_positions: ["striker"],
+      p_provinces: null,
       p_query: "attaccante",
+      p_radius_km: 50,
+      p_regions: ["Lombardia"],
       p_saved_only: true,
+      p_sort: "vicinanza",
       p_target: "player",
+      p_team_type: null,
     });
   });
 
   it("browses all published positions with empty filters", async () => {
-    await searchPositionsPage(null, null, false, 0);
+    await searchPositionsPage({ page: 0 });
 
     expect(mocks.rpc).toHaveBeenCalledWith("search_positions_page", {
+      p_categories: null,
+      p_club_id: null,
+      p_lat: null,
       p_limit: 20,
+      p_lng: null,
       p_offset: 0,
+      p_positions: null,
+      p_primary_positions: null,
+      p_provinces: null,
       p_query: null,
+      p_radius_km: null,
+      p_regions: null,
       p_saved_only: false,
+      p_sort: null,
       p_target: null,
+      p_team_type: null,
     });
+  });
+});
+
+describe("searchPositionsForYou", () => {
+  it("dedupes out-of-area suggestions against the in-area list", async () => {
+    mocks.rpc
+      .mockResolvedValueOnce({
+        data: [
+          { ad_id: "a1", total_count: 2 },
+          { ad_id: "a2", total_count: 2 },
+        ],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: [
+          { ad_id: "a2", total_count: 2 },
+          { ad_id: "a3", total_count: 2 },
+        ],
+        error: null,
+      });
+
+    const result = await searchPositionsForYou({
+      compatiblePositions: ["right_winger"],
+      primaryPositions: ["striker"],
+      regions: ["Lombardia"],
+      target: "player",
+    });
+
+    expect(result.primary.map((row) => row.ad_id)).toEqual(["a1", "a2"]);
+    expect(result.suggestions.map((row) => row.ad_id)).toEqual(["a3"]);
+  });
+
+  it("skips the out-of-area query when the profile has no regions", async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: [{ ad_id: "a1", total_count: 1 }],
+      error: null,
+    });
+
+    const result = await searchPositionsForYou({
+      compatiblePositions: [],
+      primaryPositions: ["striker"],
+      regions: [],
+      target: "player",
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(result.suggestions).toEqual([]);
   });
 });
 

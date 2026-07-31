@@ -174,16 +174,59 @@ export type ClubSearchRow = {
 /** Chip filter on Cerca > Posizioni aperte. */
 export type SearchPositionTarget = "player" | "coach" | "staff";
 
+/** Sort modes accepted by `search_positions_page` (p_sort). */
+export type PositionSort =
+  | "pertinenza"
+  | "recenti"
+  | "vicinanza"
+  | "categoria"
+  | "localita";
+
 export type PositionSearchRow = {
   ad_id: string;
   title: string;
   club_name: string;
   club_logo_url: string | null;
   team_name: string | null;
+  team_type: "senior" | "youth" | null;
+  /** recruiting_ads.role_required (player positions); null for coach/staff. */
+  role_required: string | null;
   category: string | null;
+  city: string | null;
+  province: string | null;
   region: string | null;
   target_role: SearchPositionTarget;
   deadline: string | null;
   published_at: string | null;
+  /** Populated only in "Vicino a me" mode (haversine km); otherwise null. */
+  distance_km: number | null;
+  /** True when the ad matched via a compatible (non-primary) role. */
+  is_secondary_match: boolean;
   is_saved: boolean;
+  total_count: number;
+};
+
+/**
+ * Parameters forwarded to `search_positions_page`. Empty arrays collapse to
+ * null in `searchPositionsPage` so the RPC treats them as "no constraint".
+ */
+export type PositionSearchParams = {
+  query?: string | null;
+  target?: SearchPositionTarget | null;
+  savedOnly?: boolean;
+  /** Player positions to match against role_required. */
+  positions?: string[] | null;
+  /** Subset of `positions` considered primary (drives is_secondary_match). */
+  primaryPositions?: string[] | null;
+  regions?: string[] | null;
+  provinces?: string[] | null;
+  categories?: string[] | null;
+  teamType?: "senior" | "youth" | null;
+  clubId?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  radiusKm?: number | null;
+  sort?: PositionSort | null;
+  page: number;
+  pageSize?: number;
 };

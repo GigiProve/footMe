@@ -8,7 +8,13 @@
     "plugins": [
       "expo-router",
       "@react-native-community/datetimepicker",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "footMe usa la tua posizione per mostrarti le posizioni aperte vicino a te."
+        }
+      ]
     ],
     "newArchEnabled": false,
     "experiments": {

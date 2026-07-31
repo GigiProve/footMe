@@ -5,6 +5,7 @@ import type {
   ClubSearchRow,
   ClubSearchSort,
   GlobalSearchRow,
+  PositionSearchParams,
   PositionSearchRow,
   ProfileSearchFilters,
   ProfileSearchRow,
@@ -153,26 +154,121 @@ export async function searchClubsPage({
   };
 }
 
-export async function searchPositionsPage(
-  query: string | null,
-  target: SearchPositionTarget | null,
-  savedOnly: boolean,
-  page: number,
+export type PositionSearchPage = {
+  rows: PositionSearchRow[];
+  totalCount: number;
+};
+
+/** Arrays are only constraining when non-empty; collapse empties to null. */
+function arrayParam(values: string[] | null | undefined): string[] | null {
+  return values && values.length > 0 ? values : null;
+}
+
+export async function searchPositionsPage({
+  query = null,
+  target = null,
+  savedOnly = false,
+  positions = null,
+  primaryPositions = null,
+  regions = null,
+  provinces = null,
+  categories = null,
+  teamType = null,
+  clubId = null,
+  lat = null,
+  lng = null,
+  radiusKm = null,
+  sort = null,
+  page,
   pageSize = SEARCH_PAGE_SIZE,
-): Promise<PositionSearchRow[]> {
+}: PositionSearchParams): Promise<PositionSearchPage> {
   const { data, error } = await supabase.rpc("search_positions_page", {
+    p_categories: arrayParam(categories),
+    p_club_id: clubId,
+    p_lat: lat,
     p_limit: pageSize,
+    p_lng: lng,
     p_offset: page * pageSize,
+    p_positions: arrayParam(positions),
+    p_primary_positions: arrayParam(primaryPositions),
+    p_provinces: arrayParam(provinces),
     p_query: normalizeQuery(query),
+    p_radius_km: radiusKm,
+    p_regions: arrayParam(regions),
     p_saved_only: savedOnly,
+    p_sort: sort,
     p_target: target,
+    p_team_type: teamType,
   });
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []) as PositionSearchRow[];
+  const rows = (data ?? []) as PositionSearchRow[];
+
+  return {
+    rows,
+    totalCount: Number(rows[0]?.total_count ?? 0),
+  };
+}
+
+export type ForYouPositions = {
+  /** In-area, role-matched positions (primary role first). */
+  primary: PositionSearchRow[];
+  /** Same roles, out of the preferred area ("Potrebbero interessarti anche"). */
+  suggestions: PositionSearchRow[];
+};
+
+/**
+ * Profile-seeded "Per te" positions. Runs two queries in parallel: the main
+ * in-area list (region-filtered, primary role ranked first) and a lighter
+ * out-of-area list, deduped against the main one.
+ */
+export async function searchPositionsForYou({
+  target,
+  primaryPositions,
+  compatiblePositions,
+  regions,
+  pageSize = 10,
+}: {
+  target: SearchPositionTarget;
+  primaryPositions: string[];
+  compatiblePositions: string[];
+  regions: string[];
+  pageSize?: number;
+}): Promise<ForYouPositions> {
+  const allPositions =
+    target === "player"
+      ? [...primaryPositions, ...compatiblePositions]
+      : [];
+
+  const [inArea, anyArea] = await Promise.all([
+    searchPositionsPage({
+      target,
+      positions: allPositions,
+      primaryPositions,
+      regions,
+      sort: "pertinenza",
+      page: 0,
+      pageSize,
+    }),
+    regions.length > 0
+      ? searchPositionsPage({
+          target,
+          positions: allPositions,
+          primaryPositions,
+          sort: "recenti",
+          page: 0,
+          pageSize,
+        })
+      : Promise.resolve<PositionSearchPage>({ rows: [], totalCount: 0 }),
+  ]);
+
+  const primaryIds = new Set(inArea.rows.map((row) => row.ad_id));
+  const suggestions = anyArea.rows.filter((row) => !primaryIds.has(row.ad_id));
+
+  return { primary: inArea.rows, suggestions };
 }
 
 export function resolveGlobalSearchHref(row: GlobalSearchRow): string {
