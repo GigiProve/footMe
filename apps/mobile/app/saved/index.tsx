@@ -11,7 +11,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { Screen } from "../../src/components/ui/screen";
@@ -44,13 +44,26 @@ const SAVED_FILTERS: { label: string; value: SavedFilter }[] = [
   { label: "Società", value: "club" },
 ];
 
+/**
+ * `?filter=` permette di aprire Salvati già sulla scheda giusta — usato dalla
+ * CTA "Vedi salvati" di Cerca > Media e contenuti, che punta a Contenuti.
+ */
+function resolveInitialFilter(value: string | undefined): SavedFilter {
+  return SAVED_FILTERS.some((entry) => entry.value === value)
+    ? (value as SavedFilter)
+    : "all";
+}
+
 export default function SavedItemsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { session } = useSession();
   const ownerId = session?.user.id ?? null;
-  const [filter, setFilter] = useState<SavedFilter>("all");
+  const params = useLocalSearchParams<{ filter?: string }>();
+  const [filter, setFilter] = useState<SavedFilter>(
+    resolveInitialFilter(typeof params.filter === "string" ? params.filter : undefined),
+  );
   const [itemToRemove, setItemToRemove] = useState<SavedItem | null>(null);
 
   const {

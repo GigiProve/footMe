@@ -47,6 +47,8 @@ const SECTIONS: {
     label: "Posizioni aperte",
   },
   {
+    actionHref: "/search/media",
+    actionLabel: "Vedi tutti i contenuti",
     groupKey: "contenuto",
     icon: "newspaper-outline",
     label: "Contenuti",

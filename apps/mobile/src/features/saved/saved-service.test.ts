@@ -28,7 +28,9 @@ const mocks = vi.hoisted(() => {
     toggleSavedAd: vi.fn(() => Promise.resolve()),
     toggleSavedMediaTribuna: vi.fn(() => Promise.resolve()),
     toggleSavedClubMedia: vi.fn(() => Promise.resolve()),
+    toggleSavedFanMedia: vi.fn(() => Promise.resolve()),
     toggleSavedFanTribuna: vi.fn(() => Promise.resolve()),
+    toggleSavedMediaProfilePost: vi.fn(() => Promise.resolve()),
   };
 });
 
@@ -46,6 +48,12 @@ vi.mock("../clubs/club-media-service", () => ({
 }));
 vi.mock("../profiles/fan-tribuna-service", () => ({
   toggleSavedFanTribuna: mocks.toggleSavedFanTribuna,
+}));
+vi.mock("../profiles/fan-media-service", () => ({
+  toggleSavedFanMedia: mocks.toggleSavedFanMedia,
+}));
+vi.mock("../profiles/media-profile-post-service", () => ({
+  toggleSavedMediaProfilePost: mocks.toggleSavedMediaProfilePost,
 }));
 
 function makeItem(overrides: Partial<SavedItem>): SavedItem {
@@ -76,7 +84,9 @@ describe("resolveSavedItemHref", () => {
     ).toBe("/club/c1");
   });
 
-  it("routes routable content types and returns null for the rest", () => {
+  // CER-05 esteso `/content/[type]/[id]` a tutte e cinque le superfici
+  // contenuto, quindi ogni content_type è ora apribile.
+  it("routes every content type to the content detail route", () => {
     expect(
       resolveSavedItemHref(
         makeItem({ kind: "content", content_type: "club_media", entity_id: "x" }),
@@ -87,11 +97,26 @@ describe("resolveSavedItemHref", () => {
         makeItem({ kind: "content", content_type: "fan_tribuna", entity_id: "y" }),
       ),
     ).toBe("/content/fan_tribuna/y");
-    // media_tribuna has no standalone detail route
     expect(
       resolveSavedItemHref(
         makeItem({ kind: "content", content_type: "media_tribuna", entity_id: "z" }),
       ),
+    ).toBe("/content/media_tribuna/z");
+    expect(
+      resolveSavedItemHref(
+        makeItem({ kind: "content", content_type: "media_profile", entity_id: "w" }),
+      ),
+    ).toBe("/content/media_profile/w");
+    expect(
+      resolveSavedItemHref(
+        makeItem({ kind: "content", content_type: "fan_media", entity_id: "v" }),
+      ),
+    ).toBe("/content/fan_media/v");
+  });
+
+  it("returns null for content without a type and for saved positions", () => {
+    expect(
+      resolveSavedItemHref(makeItem({ kind: "content", content_type: null })),
     ).toBeNull();
     expect(resolveSavedItemHref(makeItem({ kind: "position" }))).toBeNull();
   });
@@ -119,6 +144,18 @@ describe("removeSavedItem", () => {
       makeItem({ source_table: "saved_fan_tribuna", entity_id: "f1" }),
     );
     expect(mocks.toggleSavedFanTribuna).toHaveBeenCalledWith("owner", "f1", false);
+
+    await removeSavedItem(
+      "owner",
+      makeItem({ source_table: "saved_media_profile_posts", entity_id: "mp1" }),
+    );
+    expect(mocks.toggleSavedMediaProfilePost).toHaveBeenCalledWith("owner", "mp1", false);
+
+    await removeSavedItem(
+      "owner",
+      makeItem({ source_table: "saved_fan_media", entity_id: "fm1" }),
+    );
+    expect(mocks.toggleSavedFanMedia).toHaveBeenCalledWith("owner", "fm1", false);
 
     await removeSavedItem(
       "owner",

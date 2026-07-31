@@ -1,6 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type RecentSearchScope = "global" | "profiles" | "clubs" | "positions";
+export type RecentSearchScope =
+  | "global"
+  | "profiles"
+  | "clubs"
+  | "positions"
+  | "media";
 
 export type RecentSearch = {
   query: string;
@@ -26,7 +31,8 @@ function isRecentSearch(value: unknown): value is RecentSearch {
     (entry.scope === "global" ||
       entry.scope === "profiles" ||
       entry.scope === "clubs" ||
-      entry.scope === "positions")
+      entry.scope === "positions" ||
+      entry.scope === "media")
   );
 }
 

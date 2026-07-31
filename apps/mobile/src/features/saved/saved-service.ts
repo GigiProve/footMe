@@ -2,7 +2,9 @@ import { supabase } from "../../lib/supabase";
 import { toggleSavedAd } from "../recruiting/recruiting-service";
 import { toggleSavedMediaTribuna } from "../profiles/media-tribuna-service";
 import { toggleSavedClubMedia } from "../clubs/club-media-service";
+import { toggleSavedFanMedia } from "../profiles/fan-media-service";
 import { toggleSavedFanTribuna } from "../profiles/fan-tribuna-service";
+import { toggleSavedMediaProfilePost } from "../profiles/media-profile-post-service";
 
 export type SavedKind = "profile" | "club" | "team" | "position" | "content";
 
@@ -13,13 +15,27 @@ export type SavedSourceTable =
   | "saved_ads"
   | "saved_media_tribuna"
   | "saved_club_media"
-  | "saved_fan_tribuna";
+  | "saved_fan_tribuna"
+  | "saved_media_profile_posts"
+  | "saved_fan_media";
+
+/**
+ * `content_type` copre tutte e cinque le superfici contenuto indicizzate da
+ * Cerca > Media e contenuti: i bookmark fatti da lì confluiscono qui, senza
+ * un secondo sistema di salvataggio (CER-05 §14).
+ */
+export type SavedContentType =
+  | "media_tribuna"
+  | "club_media"
+  | "fan_tribuna"
+  | "media_profile"
+  | "fan_media";
 
 export type SavedItem = {
   kind: SavedKind;
   source_table: SavedSourceTable;
   entity_id: string;
-  content_type: "media_tribuna" | "club_media" | "fan_tribuna" | null;
+  content_type: SavedContentType | null;
   title: string;
   subtitle: string | null;
   thumbnail_url: string | null;
@@ -304,11 +320,16 @@ export async function fetchSavedTeamIds(
   return new Set((data ?? []).map((row) => row.team_id as string));
 }
 
-// Content route `/content/[type]/[id]` only supports these types.
-// `saved_media_tribuna` items (content_type "media_tribuna") have no standalone
-// detail route, and saved positions (`saved_ads`) have no per-ad route either —
-// both resolve to null and render as non-navigating rows.
-const ROUTABLE_CONTENT_TYPES = new Set(["club_media", "fan_tribuna"]);
+// Content route `/content/[type]/[id]` supports all five content surfaces
+// since CER-05 extended it. Saved positions (`saved_ads`) still have no per-ad
+// route and resolve to null, rendering as non-navigating rows.
+const ROUTABLE_CONTENT_TYPES = new Set<SavedContentType>([
+  "club_media",
+  "fan_media",
+  "fan_tribuna",
+  "media_profile",
+  "media_tribuna",
+]);
 
 export function resolveSavedItemHref(item: SavedItem): string | null {
   switch (item.kind) {
@@ -353,6 +374,12 @@ export async function removeSavedItem(
       break;
     case "saved_fan_tribuna":
       await toggleSavedFanTribuna(ownerId, item.entity_id, false);
+      break;
+    case "saved_media_profile_posts":
+      await toggleSavedMediaProfilePost(ownerId, item.entity_id, false);
+      break;
+    case "saved_fan_media":
+      await toggleSavedFanMedia(ownerId, item.entity_id, false);
       break;
     default: {
       const _exhaustive: never = item.source_table;

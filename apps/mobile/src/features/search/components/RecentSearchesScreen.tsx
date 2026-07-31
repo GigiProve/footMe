@@ -24,6 +24,8 @@ function resolveHref(entry: RecentSearch): string {
       return `/search/clubs?q=${q}`;
     case "positions":
       return `/search/positions?q=${q}`;
+    case "media":
+      return `/search/media?q=${q}`;
     default:
       return `/search/results?q=${q}`;
   }

@@ -24,7 +24,19 @@ import {
   fetchFanTribunaPostDetail,
   type FanTribunaPostDetail,
 } from "../../../src/features/profiles/fan-tribuna-service";
+import {
+  fetchMediaTribunaDetail,
+  type MediaTribunaPost,
+} from "../../../src/features/profiles/media-tribuna-service";
+import {
+  fetchFanMediaPostDetail,
+  type FanMediaPost,
+} from "../../../src/features/profiles/fan-media-service";
 import { FanContentBody } from "../../../src/features/profiles/FanContentBody";
+import {
+  fetchContentPublisher,
+  type ContentPublisher,
+} from "../../../src/features/content/content-publisher-service";
 import { CompactContentModule } from "../../../src/features/content/components/CompactContentModule";
 import { ContentTaggedHeader } from "../../../src/features/content/components/ContentTaggedHeader";
 import { TagManageSheet } from "../../../src/features/content/components/TagManageSheet";
@@ -54,11 +66,32 @@ type ContentView = {
   viewerTagged: boolean;
 };
 
-const SUPPORTED: TaggedContentType[] = [
+/**
+ * Tutte le superfici contenuto apribili in dettaglio. `media_tribuna` e
+ * `fan_media` sono state aggiunte da CER-05 perché Cerca > Media e contenuti
+ * le indicizza e ogni risultato deve essere apribile.
+ */
+type ContentDetailType = TaggedContentType | "media_tribuna" | "fan_media";
+
+const SUPPORTED: ContentDetailType[] = [
   "club_media",
   "media_profile",
   "fan_tribuna",
+  "media_tribuna",
+  "fan_media",
 ];
+
+/**
+ * Solo tre superfici hanno una tag table: `media_tribuna_posts` e
+ * `fan_media_posts` non sono taggabili, quindi non passano da TagManageSheet.
+ */
+const TAGGABLE: TaggedContentType[] = ["club_media", "media_profile", "fan_tribuna"];
+
+function asTaggedContentType(value: ContentDetailType): TaggedContentType | null {
+  return TAGGABLE.includes(value as TaggedContentType)
+    ? (value as TaggedContentType)
+    : null;
+}
 
 function clubMediaTypeLabel(kind: ClubMediaPost["kind"]): string {
   if (kind === "highlights") return "Highlights";
@@ -179,6 +212,58 @@ function mapFanTribuna(
   };
 }
 
+function mediaTribunaTypeLabel(kind: MediaTribunaPost["kind"]): string {
+  if (kind === "editorial_poll") return "Sondaggio editoriale";
+  if (kind === "article_debate") return "Dibattito";
+  if (kind === "player_vote") return "Votazione";
+  return "Domande e risposte";
+}
+
+function mapMediaTribuna(
+  post: MediaTribunaPost,
+  publisher: ContentPublisher,
+): ContentView {
+  return {
+    authorName: null,
+    body: post.body ?? null,
+    displayMode: "full",
+    excerpt: null,
+    externalUrl: null,
+    publishedAt: post.published_at ?? post.created_at,
+    publisherId: post.media_profile_id,
+    publisherKind: "profile",
+    publisherName: publisher.name,
+    readingLabel: null,
+    sourceName: null,
+    tagged: [],
+    thumbnailUrl: null,
+    title: post.title,
+    typeLabel: mediaTribunaTypeLabel(post.kind),
+    viewerTagged: false,
+  };
+}
+
+function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentView {
+  return {
+    authorName: null,
+    body: null,
+    displayMode: "full",
+    excerpt: post.description,
+    externalUrl: null,
+    publishedAt: post.published_at ?? post.created_at,
+    publisherId: post.profile_id,
+    publisherKind: "profile",
+    publisherName: publisher.name,
+    readingLabel: null,
+    sourceName: post.tag,
+    tagged: [],
+    thumbnailUrl: post.thumbnail_url ?? post.visual_url,
+    title: post.description,
+    typeLabel: post.visual_type === "video" ? "Video" : "Foto",
+    viewerTagged: false,
+  };
+}
+
 export default function ContentDetailScreen() {
   const { id, type } = useLocalSearchParams<{ id: string; type: string }>();
   const { profile } = useSession();
@@ -190,7 +275,8 @@ export default function ContentDetailScreen() {
   const [isLoading, setLoading] = useState(true);
   const [isManageOpen, setManageOpen] = useState(false);
 
-  const contentType = type as TaggedContentType;
+  const contentType = type as ContentDetailType;
+  const taggableType = asTaggedContentType(contentType);
 
   const load = useCallback(async () => {
     if (!id || !SUPPORTED.includes(contentType)) {
@@ -209,6 +295,16 @@ export default function ContentDetailScreen() {
         const post = await fetchFanTribunaPostDetail(id, viewerId);
         setFanPost(post);
         setContent(post ? mapFanTribuna(post, viewerId) : null);
+      } else if (contentType === "media_tribuna") {
+        const post = await fetchMediaTribunaDetail(id, viewerId);
+        setFanPost(null);
+        const publisher = post ? await fetchContentPublisher(post.media_profile_id) : null;
+        setContent(post && publisher ? mapMediaTribuna(post, publisher) : null);
+      } else if (contentType === "fan_media") {
+        const post = await fetchFanMediaPostDetail(id, viewerId);
+        setFanPost(null);
+        const publisher = post ? await fetchContentPublisher(post.profile_id) : null;
+        setContent(post && publisher ? mapFanMedia(post, publisher) : null);
       } else {
         const post = await fetchMediaProfilePostDetail(id, viewerId);
         setFanPost(null);
@@ -347,14 +443,14 @@ export default function ContentDetailScreen() {
         </ScrollView>
       )}
 
-      {isManageOpen && content && viewerId ? (
+      {isManageOpen && content && viewerId && taggableType ? (
         <TagManageSheet
           content={{
             thumbnailUrl: content.thumbnailUrl,
             title: content.title,
             typeLabel: content.typeLabel,
           }}
-          contentType={contentType}
+          contentType={taggableType}
           onActionDone={load}
           onClose={() => setManageOpen(false)}
           postId={id}

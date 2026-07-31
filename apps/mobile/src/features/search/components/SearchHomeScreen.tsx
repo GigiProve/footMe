@@ -66,14 +66,20 @@ const EXPLORE_ITEMS: {
   {
     href: "/search/clubs",
     icon: "shield-outline",
-    subtitle: "Club, squadre interne e realtà affiliate",
+    subtitle: "Club, squadre e realtà affiliate",
     title: "Società",
   },
   {
     href: "/search/positions",
     icon: "briefcase-outline",
-    subtitle: "Opportunità pubblicate dalle società",
+    subtitle: "Trova opportunità adatte al tuo profilo",
     title: "Posizioni aperte",
+  },
+  {
+    href: "/search/media",
+    icon: "newspaper-outline",
+    subtitle: "Articoli, video, testate e creator",
+    title: "Media e contenuti",
   },
 ];
 
