@@ -17,6 +17,10 @@ const colorMap = {
   inverse: colors.inkInvert,
   inverseMuted: colors.textInverseMuted,
   inverseSoft: colors.textInverseSoft,
+  // Su superficie ink il blu e il verde della palette non reggono il contrasto:
+  // il design usa due varianti schiarite (§1c).
+  inverseAccent: colors.accentOnInverse,
+  inverseSuccess: colors.successOnInverse,
 } as const;
 
 type AppTextProps = TextProps & {

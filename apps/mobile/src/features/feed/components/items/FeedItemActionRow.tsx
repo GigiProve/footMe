@@ -20,7 +20,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, spacing } from "../../../../theme/tokens";
+import { colors, sizes, spacing } from "../../../../theme/tokens";
 import { AppText, useToast } from "../../../../ui";
 import {
   FEED_ACTION_COMMENT,
@@ -90,8 +90,8 @@ function Action({
       onPress={onPress}
       style={({ pressed }) => [styles.action, pressed ? styles.pressed : null]}
     >
-      <Ionicons color={colors.textSecondary} name={icon} size={16} />
-      <AppText color="secondary" variant="caption">
+      <Ionicons color={colors.textSecondary} name={icon} size={15} />
+      <AppText color="secondary" style={styles.actionLabel} variant="meta">
         {label}
       </AppText>
     </Pressable>
@@ -103,24 +103,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: spacing[6],
-    paddingVertical: spacing[6],
+    height: "100%",
+  },
+  actionLabel: {
+    fontWeight: "600",
   },
   bookmark: {
     alignItems: "center",
+    height: "100%",
     justifyContent: "center",
     marginLeft: "auto",
-    paddingVertical: spacing[6],
   },
   pressed: {
     opacity: 0.6,
   },
+  /**
+   * Il rail del design (§1a): 44px fissi, hairline sopra, azioni a sinistra e
+   * salva a destra. Stessa altezza e stessa posizione in ogni pagina.
+   */
   row: {
     alignItems: "center",
     borderTopColor: colors.border,
     borderTopWidth: 1,
     flexDirection: "row",
-    gap: spacing[18],
-    marginTop: spacing[10],
-    paddingTop: spacing[6],
+    gap: spacing[22],
+    height: sizes.actionRail,
+    paddingHorizontal: spacing[16],
   },
 });

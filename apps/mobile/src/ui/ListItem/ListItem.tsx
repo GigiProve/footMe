@@ -29,15 +29,14 @@ export function ListItem({
     <View style={[styles.container, showDivider ? styles.withDivider : null, style]}>
       {left ? <View style={styles.left}>{left}</View> : null}
       <View style={styles.body}>
-        <AppText variant="titleSm" numberOfLines={1} style={styles.title}>
+        <AppText variant="titleSm" numberOfLines={1}>
           {title}
         </AppText>
         {subtitle ? (
           <AppText
-            variant="bodySm"
-            color="muted"
+            variant="meta"
+            color="secondary"
             numberOfLines={subtitleNumberOfLines}
-            style={styles.subtitle}
           >
             {subtitle}
           </AppText>
@@ -65,11 +64,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing[12],
-    paddingVertical: spacing[12],
+    paddingVertical: spacing[14],
   },
   withDivider: {
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    // Hairline interna al modulo: più chiara del bordo che lo racchiude (§1d).
+    borderBottomColor: colors.divider,
   },
   left: {
     flexShrink: 0,
@@ -77,13 +77,6 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: spacing[4],
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  subtitle: {
-    fontSize: 13,
   },
   right: {
     flexShrink: 0,

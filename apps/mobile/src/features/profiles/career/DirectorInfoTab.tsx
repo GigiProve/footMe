@@ -10,7 +10,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   DIRECTOR_CATEGORY_OPTIONS,
 } from "../../onboarding/onboarding-types";
-import { radius, spacing } from "../../../theme/tokens";
+import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 import type { CompleteProfessionalProfile } from "../profile-service";
 
@@ -32,14 +32,18 @@ type ActivityMeta = {
 
 const MAX_VISIBLE_ACTIVITIES = 4;
 
+/**
+ * Alias locale sui token: la palette originale di questa schermata (#0A66CC,
+ * #EAF6FF…) non fa più parte del design system. I nomi restano, i valori no.
+ */
 const bananiColors = {
-  background: "#F7FAFD",
-  border: "#00000014",
-  foreground: "#061223",
-  mutedForeground: "#2F3B45",
-  primary: "#0A66CC",
-  primaryForeground: "#FFFFFF",
-  secondary: "#EAF6FF",
+  background: colors.background,
+  border: colors.border,
+  foreground: colors.textPrimary,
+  mutedForeground: colors.textSecondary,
+  primary: colors.accent,
+  primaryForeground: colors.inkInvert,
+  secondary: colors.accentSoft,
 } as const;
 
 const RESPONSIBILITY_META: Record<string, ActivityMeta> = {

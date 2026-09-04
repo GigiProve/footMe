@@ -55,6 +55,7 @@ describe("Avatar", () => {
       (s: Record<string, unknown>) => s && typeof s === "object" && "borderRadius" in s,
     );
 
-    expect(radiusStyle.borderRadius).toBe(12);
+    // Il quadrato ha un raggio che cresce con la misura (44px → 11).
+    expect(radiusStyle.borderRadius).toBe(11);
   });
 });

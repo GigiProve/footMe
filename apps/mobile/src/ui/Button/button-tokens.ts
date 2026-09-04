@@ -1,43 +1,61 @@
-import { colors, radius, sizes, spacing, typography } from "../../styles";
+import { colors, radius, spacing, typography } from "../../styles";
 
+/**
+ * Controlli del design "ProLink UI Upgrade" (§1a, riquadro "Controlli").
+ *
+ * Tutti i bottoni sono pill. Il primario è pieno #1B4FD8, il secondario è
+ * bianco con bordo blu 1,5px, le chip sono pill basse (30px) bianche che
+ * diventano azzurro tenue quando selezionate. Nessuna ombra.
+ */
 export const buttonHeights = {
-  sm: sizes.touchTarget,
-  md: 48,
-  lg: 52,
+  sm: 32,
+  md: 40,
+  lg: 44,
 } as const;
+
+/** Le chip hanno un'altezza propria, più bassa di qualunque bottone. */
+export const chipHeight = 30;
 
 export const buttonHorizontalPadding = {
   sm: spacing[14],
-  md: spacing[20],
+  md: spacing[18],
   lg: spacing[20],
 } as const;
 
+export const chipHorizontalPadding = spacing[12];
+
 export const buttonIconSizes = {
-  sm: 16,
-  md: 18,
-  lg: 20,
+  sm: 15,
+  md: 17,
+  lg: 18,
 } as const;
 
 export const buttonTypography = {
   sm: {
-    fontSize: typography.fontSize[14],
-    fontWeight: typography.fontWeight.semibold,
-    lineHeight: typography.lineHeight[22],
+    fontSize: typography.fontSize[13],
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: typography.lineHeight[18],
   },
   md: {
-    fontSize: typography.fontSize[15],
-    fontWeight: typography.fontWeight.semibold,
-    lineHeight: typography.lineHeight[22],
+    fontSize: typography.fontSize[13.5],
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: typography.lineHeight[18],
   },
   lg: {
-    fontSize: typography.fontSize[15],
-    fontWeight: typography.fontWeight.semibold,
-    lineHeight: typography.lineHeight[22],
+    fontSize: typography.fontSize[14],
+    fontWeight: typography.fontWeight.bold,
+    lineHeight: typography.lineHeight[20],
   },
 } as const;
 
+export const chipTypography = {
+  fontSize: typography.fontSize[12],
+  fontWeight: typography.fontWeight.semibold,
+  lineHeight: typography.lineHeight[16],
+} as const;
+
 export const buttonRadius = {
-  default: radius[12],
+  default: radius.full,
   chip: radius.full,
   icon: radius.full,
 } as const;
@@ -52,10 +70,10 @@ export const buttonStateOpacity = {
 
 export const buttonVariants = {
   chipAction: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: "transparent",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderWidth: 1,
-    textColor: colors.textPrimary,
+    textColor: colors.textSecondary,
   },
   danger: {
     backgroundColor: colors.surface,
@@ -67,13 +85,13 @@ export const buttonVariants = {
     backgroundColor: colors.accentSoft,
     borderColor: "transparent",
     borderWidth: 0,
-    textColor: colors.textPrimary,
+    textColor: colors.accent,
   },
   icon: {
     backgroundColor: colors.accentSoft,
     borderColor: "transparent",
     borderWidth: 0,
-    textColor: colors.textPrimary,
+    textColor: colors.accent,
   },
   link: {
     backgroundColor: "transparent",
@@ -82,10 +100,10 @@ export const buttonVariants = {
     textColor: colors.accent,
   },
   outline: {
-    backgroundColor: "transparent",
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    textColor: colors.textPrimary,
+    textColor: colors.textSecondary,
   },
   primary: {
     backgroundColor: colors.accent,
@@ -103,7 +121,7 @@ export const buttonVariants = {
     backgroundColor: colors.accentSoft,
     borderColor: "transparent",
     borderWidth: 0,
-    textColor: colors.textPrimary,
+    textColor: colors.accent,
   },
 } as const;
 
@@ -158,8 +176,12 @@ export const destructiveOverrides = {
   },
 } as const;
 
+/**
+ * Chip selezionata: azzurro tenue con bordo, non blu pieno. Un filtro attivo
+ * non deve pesare come una CTA (§1a).
+ */
 export const chipSelectedPalette = {
   backgroundColor: colors.accentSoft,
-  borderColor: "rgba(10, 102, 194, 0.2)",
+  borderColor: colors.accentSoftBorder,
   textColor: colors.accent,
 } as const;

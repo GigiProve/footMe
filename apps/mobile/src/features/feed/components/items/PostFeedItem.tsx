@@ -35,42 +35,48 @@ export function PostFeedItem({
 
   return (
     <View style={styles.card} testID="feed-post">
-      <FeedItemHeader
-        item={item}
-        onPressAuthor={onPressAuthor}
-        right={
-          <FeedItemMenu
-            authorName={item.author?.name}
-            canSave
-            isSaved={item.isSaved}
-            itemType={item.type}
-            onToggleSaved={onToggleSaved}
-          />
-        }
-      />
+      <View style={styles.content}>
+        <FeedItemHeader
+          item={item}
+          onPressAuthor={onPressAuthor}
+          right={
+            <FeedItemMenu
+              authorName={item.author?.name}
+              canSave
+              isSaved={item.isSaved}
+              itemType={item.type}
+              onToggleSaved={onToggleSaved}
+            />
+          }
+        />
 
-      <Pressable accessibilityRole="button" onPress={onPress} style={styles.body}>
-        {item.title ? (
-          <AppText numberOfLines={2} variant="titleSm">
-            {item.title}
-          </AppText>
-        ) : null}
+        <Pressable accessibilityRole="button" onPress={onPress} style={styles.body}>
+          {item.title ? (
+            <AppText numberOfLines={2} variant="titleMd">
+              {item.title}
+            </AppText>
+          ) : null}
 
-        {text ? (
-          <AppText color="secondary" numberOfLines={4} variant="bodySm">
-            {text}
-          </AppText>
-        ) : null}
+          {text ? (
+            <AppText color="primary" numberOfLines={4} variant="bodyLg">
+              {text}
+            </AppText>
+          ) : null}
+        </Pressable>
+      </View>
 
-        {imageUrl ? (
+      {/* Il media esce dal padding: nel design occupa tutta la larghezza del
+          modulo, fra il corpo e il rail azioni (§1b). */}
+      {imageUrl ? (
+        <Pressable accessibilityRole="button" onPress={onPress}>
           <Image
             accessibilityIgnoresInvertColors
             resizeMode="cover"
             source={{ uri: imageUrl }}
             style={styles.media}
           />
-        ) : null}
-      </Pressable>
+        </Pressable>
+      ) : null}
 
       <FeedItemActionRow isSaved={item.isSaved} onToggleSaved={onToggleSaved} />
     </View>
@@ -85,15 +91,18 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius[12],
+    borderRadius: radius[16],
     borderWidth: 1,
-    padding: spacing[14],
+    overflow: "hidden",
+  },
+  content: {
+    paddingHorizontal: spacing[16],
+    paddingTop: spacing[14],
+    paddingBottom: spacing[12],
   },
   media: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    height: 200,
-    marginTop: spacing[4],
+    backgroundColor: colors.surfacePlaceholder,
+    height: 186,
     width: "100%",
   },
 });

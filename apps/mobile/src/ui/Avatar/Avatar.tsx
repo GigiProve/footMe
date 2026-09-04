@@ -4,6 +4,12 @@ import { colors, radius, typography } from "../../styles";
 
 type AvatarSize = "sm" | "md" | "lg" | "xl";
 
+/**
+ * Tono del fallback a iniziali. `ink` è il fondo scuro che il design usa per
+ * le società (§1b, §1c); `accent` è l'azzurro tenue usato per le persone.
+ */
+type AvatarTone = "accent" | "ink" | "muted";
+
 const sizeMap: Record<AvatarSize, number> = {
   sm: 32,
   md: 44,
@@ -11,11 +17,19 @@ const sizeMap: Record<AvatarSize, number> = {
   xl: 104,
 };
 
+/** Raggio della variante quadrata: cresce con la misura, non è mai una pill. */
+const squareRadiusMap: Record<AvatarSize, number> = {
+  sm: radius[8],
+  md: radius[11],
+  lg: radius[16],
+  xl: radius[26],
+};
+
 const fontSizeMap: Record<AvatarSize, number> = {
   sm: typography.fontSize[12],
-  md: typography.fontSize[14],
+  md: typography.fontSize[15],
   lg: typography.fontSize[20],
-  xl: typography.fontSize[34],
+  xl: typography.fontSize[28],
 };
 
 function getInitials(name: string): string {
@@ -33,6 +47,7 @@ type AvatarProps = {
   name?: string;
   size?: AvatarSize;
   square?: boolean;
+  tone?: AvatarTone;
 };
 
 export function Avatar({
@@ -40,9 +55,10 @@ export function Avatar({
   name,
   size = "md",
   square = false,
+  tone = "accent",
 }: AvatarProps) {
   const dimension = sizeMap[size];
-  const borderRadius = square ? radius[12] : dimension / 2;
+  const borderRadius = square ? squareRadiusMap[size] : dimension / 2;
 
   const containerStyle = {
     width: dimension,
@@ -64,11 +80,17 @@ export function Avatar({
 
   return (
     <View
-      style={[styles.fallback, containerStyle]}
+      style={[styles.fallback, toneStyles[tone], containerStyle]}
       accessibilityLabel={name ?? "Avatar"}
     >
       {initials ? (
-        <Text style={[styles.initials, { fontSize: fontSizeMap[size] }]}>
+        <Text
+          style={[
+            styles.initials,
+            toneTextStyles[tone],
+            { fontSize: fontSizeMap[size] },
+          ]}
+        >
           {initials}
         </Text>
       ) : null}
@@ -78,17 +100,28 @@ export function Avatar({
 
 const styles = StyleSheet.create({
   image: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surfacePlaceholder,
   },
   fallback: {
-    backgroundColor: colors.accentSoft,
     alignItems: "center",
     justifyContent: "center",
   },
   initials: {
-    color: colors.accent,
-    fontWeight: typography.fontWeight.bold,
+    // Le iniziali sono un "numero" come le statistiche: stessa famiglia (§1a).
+    fontFamily: typography.fontFamily.display,
   },
 });
 
-export type { AvatarProps, AvatarSize };
+const toneStyles = StyleSheet.create({
+  accent: { backgroundColor: colors.accentSoft },
+  ink: { backgroundColor: colors.hero },
+  muted: { backgroundColor: colors.divider },
+});
+
+const toneTextStyles = StyleSheet.create({
+  accent: { color: colors.accent },
+  ink: { color: colors.inkInvert },
+  muted: { color: colors.textMuted },
+});
+
+export type { AvatarProps, AvatarSize, AvatarTone };

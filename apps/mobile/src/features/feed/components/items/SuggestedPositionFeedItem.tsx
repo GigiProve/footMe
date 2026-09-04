@@ -1,10 +1,13 @@
 /**
- * Contenitore base "Posizione per te" (§9).
+ * Contenitore base "Posizione per te" (§9), nella forma del modulo standard
+ * (§1a del design "ProLink UI Upgrade").
  *
- * Mostra: intestazione "Per te" con helper "In base al tuo profilo", logo
- * società, ruolo cercato, squadra, categoria, località e la CTA "Apri
- * posizione". Il tap sull'intero componente o sulla CTA apre il dettaglio
- * posizione già esistente.
+ * Mostra: eyebrow "Per te" con nota "In base al tuo profilo", logo società,
+ * ruolo cercato, squadra, località e l'azione "Apri posizione" nel rail. Il tap
+ * sull'intero componente o sull'azione apre il dettaglio posizione esistente.
+ *
+ * Porta la barra blu di personalizzazione: è contenuto scelto per l'utente, il
+ * solo caso in cui quel segno è ammesso.
  *
  * NON mostra, per esplicito divieto del §9: candidatura diretta, requisiti
  * completi, descrizioni lunghe, scadenza, percentuali di compatibilità. Il tipo
@@ -12,10 +15,10 @@
  * mostrarli per distrazione.
  */
 
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
-import { colors, radius, spacing } from "../../../../theme/tokens";
-import { AppText, Avatar, Button } from "../../../../ui";
+import { spacing } from "../../../../theme/tokens";
+import { AppText, Avatar, Badge, ContentModule } from "../../../../ui";
 import {
   FEED_POSITION_CTA,
   FEED_POSITION_HELPER,
@@ -40,53 +43,40 @@ export function SuggestedPositionFeedItem({
   const location = positionLocationLine(payload);
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <ContentModule
+      actions={[{ label: FEED_POSITION_CTA, onPress }]}
+      eyebrow={FEED_POSITION_OVERLINE}
+      eyebrowNote={FEED_POSITION_HELPER}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
+      personalized
       testID="feed-suggested-position"
     >
-      <View style={styles.heading}>
-        <AppText color="muted" variant="overline">
-          {FEED_POSITION_OVERLINE}
-        </AppText>
-        <AppText color="muted" variant="caption">
-          {FEED_POSITION_HELPER}
-        </AppText>
-      </View>
-
       <View style={styles.row}>
         <Avatar
           name={payload.clubName ?? ""}
           size="md"
           square
+          tone="ink"
           uri={payload.clubLogoUrl ?? undefined}
         />
         <View style={styles.body}>
-          <AppText numberOfLines={1} variant="titleSm">
+          <AppText numberOfLines={1} variant="titleMd">
             {positionHeadline(payload, null)}
           </AppText>
           {team ? (
-            <AppText color="secondary" numberOfLines={1} variant="bodySm">
+            <AppText color="secondary" numberOfLines={1} variant="meta">
               {team}
-            </AppText>
-          ) : null}
-          {location ? (
-            <AppText color="muted" numberOfLines={1} variant="bodySm">
-              {location}
             </AppText>
           ) : null}
         </View>
       </View>
 
-      <Button
-        fullWidth
-        label={FEED_POSITION_CTA}
-        onPress={onPress}
-        size="sm"
-        variant="secondary"
-      />
-    </Pressable>
+      {location ? (
+        <View style={styles.chips}>
+          <Badge label={location} />
+        </View>
+      ) : null}
+    </ContentModule>
   );
 }
 
@@ -95,21 +85,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing[4],
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[12],
-    borderWidth: 1,
-    gap: spacing[10],
-    padding: spacing[14],
-  },
-  heading: {
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
-    paddingBottom: spacing[8],
-  },
-  pressed: {
-    backgroundColor: colors.surfaceMuted,
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[6],
+    marginTop: spacing[10],
   },
   row: {
     alignItems: "center",

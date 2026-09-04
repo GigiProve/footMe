@@ -9,8 +9,8 @@ import { useSession } from "../../src/features/auth/use-session";
 import { fetchCommunications } from "../../src/features/messaging/communications-service";
 import { fetchInboxConversations } from "../../src/features/messaging/messaging-service";
 import { AppSidebar } from "../../src/ui/sidebar";
-import { colors, radius, shadows, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
-import { Icon, type IconName } from "../../src/ui";
+import { colors, radius, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
+import { AppText, Icon, type IconName } from "../../src/ui";
 
 export default function TabsLayout() {
   const { isLoading, needsOnboarding, profile, session } = useSession();
@@ -59,16 +59,11 @@ export default function TabsLayout() {
           headerShown: false,
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.textMuted,
-          tabBarLabelStyle: {
-            fontSize: typography.fontSize[12],
-            fontWeight: typography.fontWeight.bold,
-            marginBottom: spacing[4],
-          },
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            paddingTop: spacing[8],
-            paddingBottom: spacing[8],
+            paddingTop: spacing[10],
+            paddingBottom: spacing[6],
             height: sizes.tabBarHeight,
           },
         }}
@@ -122,11 +117,24 @@ export default function TabsLayout() {
   );
 }
 
+/**
+ * Bottom nav del design (§1b): icona 23px, etichetta 10,5/700 e — solo sulla
+ * tab attiva — un indicatore 16×3 sotto l'etichetta. È lo stesso segno usato
+ * dalle tab interne (testo + barra), così la navigazione ha un solo linguaggio.
+ */
 function buildTabOptions(title: string, iconName: IconName) {
   return {
     title,
     tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-      <Icon active={focused} color={color} name={iconName} size="lg" />
+      <Icon active={focused} color={color} name={iconName} size="nav" />
+    ),
+    tabBarLabel: ({ color, focused }: { color: string; focused: boolean }) => (
+      <View style={styles.tabLabelBlock}>
+        <AppText style={[styles.tabLabel, { color }]} variant="navLabel">
+          {title}
+        </AppText>
+        {focused ? <View style={styles.tabIndicator} /> : null}
+      </View>
     ),
   };
 }
@@ -154,14 +162,26 @@ const styles = StyleSheet.create({
     height: sizes.touchTarget,
     justifyContent: "center",
     width: sizes.touchTarget,
-    ...shadows.card,
   },
   menuButtonPressed: {
     backgroundColor: colors.surfaceMuted,
   },
   messagesBadge: {
     backgroundColor: colors.accent,
-    fontSize: typography.fontSize[11],
+    fontSize: typography.fontSize[10.5],
     color: colors.inkInvert,
+  },
+  tabLabelBlock: {
+    alignItems: "center",
+    gap: spacing[4],
+  },
+  tabLabel: {
+    textAlign: "center",
+  },
+  tabIndicator: {
+    backgroundColor: colors.accent,
+    borderRadius: 2,
+    height: sizes.navIndicatorHeight,
+    width: sizes.navIndicatorWidth,
   },
 });

@@ -56,7 +56,7 @@ describe("Button", () => {
       expect.arrayContaining([
         expect.objectContaining({
           backgroundColor: colors.accentSoft,
-          borderColor: "rgba(10, 102, 194, 0.2)",
+          borderColor: colors.accentSoftBorder,
         }),
       ]),
     );

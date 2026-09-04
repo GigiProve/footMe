@@ -17,7 +17,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, sizes, spacing } from "../../../theme/tokens";
+import { colors, radius, sizes, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 import { FEED_BRAND } from "../feed-labels";
 
@@ -46,7 +46,7 @@ export function FeedHeader({
         <Ionicons color={colors.textPrimary} name="menu-outline" size={22} />
       </Pressable>
 
-      <AppText color="accent" style={styles.brand} variant="headingSm">
+      <AppText style={styles.brand} variant="heroName">
         {FEED_BRAND}
       </AppText>
 
@@ -63,14 +63,16 @@ export function FeedHeader({
         ) : null}
       </Pressable>
 
+      {/* Unica azione piena della testata: creare contenuto è la CTA della
+          Home, e nel design è un cerchio blu (§1b). */}
       <Pressable
         accessibilityLabel="Crea contenuto"
         accessibilityRole="button"
         hitSlop={8}
         onPress={onOpenComposer}
-        style={styles.iconButton}
+        style={styles.composerButton}
       >
-        <Ionicons color={colors.textPrimary} name="add" size={24} />
+        <Ionicons color={colors.inkInvert} name="add" size={20} />
       </Pressable>
     </View>
   );
@@ -89,17 +91,28 @@ const styles = StyleSheet.create({
   },
   brand: {
     flex: 1,
-    letterSpacing: 0.5,
+    fontSize: 19,
     paddingLeft: spacing[4],
+  },
+  composerButton: {
+    alignItems: "center",
+    backgroundColor: colors.accent,
+    borderRadius: radius.full,
+    height: 36,
+    justifyContent: "center",
+    marginLeft: spacing[4],
+    width: 36,
   },
   dot: {
     backgroundColor: colors.accent,
-    borderRadius: 4,
-    height: 8,
+    borderColor: colors.surface,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    height: 10,
     position: "absolute",
-    right: spacing[6],
-    top: spacing[6],
-    width: 8,
+    right: spacing[8],
+    top: spacing[8],
+    width: 10,
   },
   iconButton: {
     alignItems: "center",

@@ -1,11 +1,15 @@
 import { PropsWithChildren } from "react";
 import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 
-import { colors, radius, shadows, spacing } from "../../styles";
+import { colors, radius, spacing } from "../../styles";
 
 type CardVariant = "default" | "muted" | "inverse";
 
 type CardProps = PropsWithChildren<{
+  /**
+   * Ignorato: il design ProLink è piatto e l'elevazione è la hairline del
+   * bordo. La prop resta per non toccare i punti che la passano già.
+   */
   elevated?: boolean;
   style?: StyleProp<ViewStyle>;
   variant?: CardVariant;
@@ -16,33 +20,20 @@ const variantStyles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    ...shadows.card,
   },
   inverse: {
     backgroundColor: colors.surfaceInverse,
   },
   muted: {
     backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderWidth: 1,
   },
 });
 
-export function Card({
-  children,
-  elevated = false,
-  style,
-  variant = "default",
-}: CardProps) {
+export function Card({ children, style, variant = "default" }: CardProps) {
   return (
-    <View
-      style={[
-        styles.base,
-        variantStyles[variant],
-        elevated ? shadows.card : null,
-        style,
-      ]}
-    >
-      {children}
-    </View>
+    <View style={[styles.base, variantStyles[variant], style]}>{children}</View>
   );
 }
 
@@ -50,6 +41,6 @@ const styles = StyleSheet.create({
   base: {
     gap: spacing[12],
     padding: spacing[16],
-    borderRadius: radius[8],
+    borderRadius: radius[16],
   },
 });

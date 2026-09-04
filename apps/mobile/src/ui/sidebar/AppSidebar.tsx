@@ -403,13 +403,15 @@ const styles = StyleSheet.create({
   },
   drawer: {
     backgroundColor: colors.surface,
-    borderBottomRightRadius: radius[12],
-    borderTopRightRadius: radius[12],
+    borderBottomRightRadius: radius[16],
+    borderTopRightRadius: radius[16],
     bottom: 0,
     left: 0,
     position: "absolute",
     top: 0,
-    ...shadows.card,
+    // Il drawer galleggia davvero sopra la pagina: è uno dei pochi casi in cui
+    // il design ammette un'ombra.
+    ...shadows.overlay,
   },
   footerArea: {
     gap: spacing[14],

@@ -14,8 +14,16 @@ function render(element: React.ReactElement) {
 }
 
 describe("Divider", () => {
-  it("renders a thin line with border color", () => {
+  it("renders a thin line with the in-module hairline color", () => {
     const tree = render(<Divider />);
+    const view = tree.root.findByType("View" as never);
+    const flatStyle = Object.assign({}, ...view.props.style.filter(Boolean));
+
+    expect(flatStyle.backgroundColor).toBe(colors.divider);
+  });
+
+  it("uses the module border color for the strong tone", () => {
+    const tree = render(<Divider tone="strong" />);
     const view = tree.root.findByType("View" as never);
     const flatStyle = Object.assign({}, ...view.props.style.filter(Boolean));
 

@@ -20,7 +20,10 @@ import {
   buttonStateOpacity,
   buttonTypography,
   buttonVariants,
+  chipHeight,
+  chipHorizontalPadding,
   chipSelectedPalette,
+  chipTypography,
   destructiveOverrides,
 } from "./button-tokens";
 
@@ -102,8 +105,19 @@ function resolveContainerSize(
   size: ButtonSize,
   variant: ButtonVariant,
 ): ViewStyle {
-  const height = buttonHeights[size];
   const borderRadius = resolveBorderRadius(variant);
+
+  // Una chip è più bassa di qualunque bottone: 30px fissi, indipendenti da
+  // `size`, così un filtro non compete mai con una CTA (§1a).
+  if (variant === "chipAction") {
+    return {
+      borderRadius,
+      minHeight: chipHeight,
+      paddingHorizontal: chipHorizontalPadding,
+    };
+  }
+
+  const height = buttonHeights[size];
 
   return {
     borderRadius,
@@ -168,7 +182,6 @@ export function Button({
         fullWidth ? styles.fullWidth : null,
         variant === "link" ? styles.linkButton : null,
         variant === "icon" ? styles.iconButton : null,
-        variant === "primary" ? styles.primaryShadow : null,
         "focused" in state && state.focused ? styles.focused : null,
         state.pressed && !isDisabled ? styles.pressed : null,
         isDisabled ? styles.disabled : null,
@@ -218,9 +231,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
   },
-  chipLabel: {
-    fontWeight: buttonTypography.sm.fontWeight,
-  },
+  chipLabel: chipTypography,
   content: {
     alignItems: "center",
     flexDirection: "row",
@@ -240,13 +251,6 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     paddingHorizontal: 0,
-  },
-  primaryShadow: {
-    shadowColor: "#0A66C2",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
   },
   label: {
     textAlign: "center",

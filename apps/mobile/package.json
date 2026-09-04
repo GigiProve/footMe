@@ -16,6 +16,7 @@
     "test:watch": "../../scripts/run-node20.sh ../../node_modules/vitest/vitest.mjs"
   },
   "dependencies": {
+    "@expo-google-fonts/mulish": "^0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.4.4",
     "@supabase/supabase-js": "^2.49.1",
@@ -25,6 +26,7 @@
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-document-picker": "~14.0.8",
+    "expo-font": "~14.0.11",
     "expo-image-picker": "~17.0.10",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.8",

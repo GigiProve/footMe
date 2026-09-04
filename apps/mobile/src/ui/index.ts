@@ -3,7 +3,12 @@ export {
   type AppTextProps,
   type AppTextColor,
 } from "./AppText/AppText";
-export { Avatar, type AvatarProps, type AvatarSize } from "./Avatar/Avatar";
+export {
+  Avatar,
+  type AvatarProps,
+  type AvatarSize,
+  type AvatarTone,
+} from "./Avatar/Avatar";
 export {
   ActionSheet,
   type ActionSheetAction,
@@ -19,7 +24,7 @@ export {
   type ToastOptions,
   type ToastTone,
 } from "./Toast/ToastProvider";
-export { Badge } from "./Badge/Badge";
+export { Badge, type BadgeSize, type BadgeVariant } from "./Badge/Badge";
 export {
   Button,
   type ButtonProps,
@@ -30,7 +35,15 @@ export { IconButton } from "./Button/IconButton";
 export { Card } from "./Card/Card";
 export { Checkbox } from "./Checkbox/Checkbox";
 export { ChipGroup } from "./ChipGroup/ChipGroup";
-export { Divider, type DividerProps } from "./Divider/Divider";
+export {
+  ContentModule,
+  type ContentModuleAction,
+} from "./ContentModule/ContentModule";
+export {
+  Divider,
+  type DividerProps,
+  type DividerTone,
+} from "./Divider/Divider";
 export { EmptyState } from "./EmptyState/EmptyState";
 export { HeaderBell } from "./HeaderBell/HeaderBell";
 export { Input } from "./Input/Input";
@@ -39,9 +52,14 @@ export { ModalHeader } from "./ModalHeader/ModalHeader";
 export { NotificationBadge } from "./NotificationBadge/NotificationBadge";
 export { Radio } from "./Radio/Radio";
 export { ScreenHeader } from "./ScreenHeader/ScreenHeader";
+export {
+  SearchField,
+  type SearchFieldProps,
+} from "./SearchField/SearchField";
 export { SectionCard } from "./SectionCard/SectionCard";
 export { Skeleton } from "./Skeleton/Skeleton";
 export { StatCard } from "./StatCard/StatCard";
+export { TabBar, type TabBarItem } from "./TabBar/TabBar";
 export { Toggle } from "./Toggle/Toggle";
 export { TopBar } from "./TopBar/TopBar";
 export { Icon, type IconName } from "./icons";

@@ -1,11 +1,13 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors } from "../../styles";
+import { colors, sizes } from "../../styles";
 import { resolveIconName, type IconName } from "./icon-config";
 
 const iconSizes = {
   md: 20,
   lg: 24,
+  /** Misura della bottom nav nel design (§1b). */
+  nav: sizes.navIcon,
 } as const;
 
 type IconProps = {

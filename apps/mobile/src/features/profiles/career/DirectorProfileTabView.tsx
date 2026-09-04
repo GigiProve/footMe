@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { radius, spacing } from "../../../theme/tokens";
+import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button, EmptyState } from "../../../ui";
 import type { DirectorMediaLinkedTarget } from "../director-media";
 import { withDefaultProfileAvatar } from "../profile-avatar";
@@ -48,13 +48,18 @@ const DIRECTOR_TABS: { label: string; value: ProfileTab }[] = [
   { label: "Media", value: "media" },
 ];
 
+/**
+ * Alias locale sui token: questa schermata era nata con una palette propria
+ * (#0A66CC, #F7FAFD…) che non esiste più nel design system. I nomi restano per
+ * non riscrivere gli stili, i valori arrivano dai token.
+ */
 const bananiColors = {
-  background: "#F7FAFD",
-  border: "#00000014",
-  foreground: "#061223",
-  muted: "#F3F6F9",
-  mutedForeground: "#2F3B45",
-  primary: "#0A66CC",
+  background: colors.background,
+  border: colors.border,
+  foreground: colors.textPrimary,
+  muted: colors.surfaceMuted,
+  mutedForeground: colors.textSecondary,
+  primary: colors.accent,
 } as const;
 
 export function DirectorProfileTabView({
@@ -86,12 +91,7 @@ export function DirectorProfileTabView({
         onSavePress={onSavePress}
       />
       <ProfileTabBar
-        activeColor={bananiColors.foreground}
         activeTab={activeTab}
-        backgroundColor={bananiColors.background}
-        borderColor={bananiColors.border}
-        inactiveColor={bananiColors.mutedForeground}
-        indicatorColor={bananiColors.foreground}
         onTabChange={setActiveTab}
         tabs={DIRECTOR_TABS}
       />

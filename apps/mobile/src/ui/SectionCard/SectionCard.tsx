@@ -10,8 +10,13 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing } from "../../styles";
 import { AppText } from "../AppText/AppText";
-import { Divider } from "../Divider/Divider";
 
+/**
+ * Sezione di contenuto dentro un modulo. Il titolo è un eyebrow (§1a): dice
+ * perché il blocco è lì, non compete con il contenuto e sta sempre nella
+ * stessa posizione. Nessuna riga di separazione sotto l'intestazione: a
+ * separare basta lo spazio.
+ */
 type SectionCardProps = PropsWithChildren<{
   description?: string;
   onEdit?: () => void;
@@ -29,12 +34,16 @@ export function SectionCard({
   variant = "card",
 }: SectionCardProps) {
   return (
-    <View style={[styles.base, variant === "flat" ? styles.flat : styles.card, style]}>
+    <View
+      style={[styles.base, variant === "flat" ? styles.flat : styles.card, style]}
+    >
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <AppText variant="titleSm">{title}</AppText>
+          <AppText color="muted" variant="eyebrow">
+            {title}
+          </AppText>
           {description ? (
-            <AppText variant="bodySm" color="secondary">
+            <AppText color="secondary" variant="meta">
               {description}
             </AppText>
           ) : null}
@@ -43,22 +52,14 @@ export function SectionCard({
           <Pressable
             accessibilityLabel={`Modifica ${title}`}
             accessibilityRole="button"
-            hitSlop={8}
+            hitSlop={12}
             onPress={onEdit}
-            style={({ pressed }) => [
-              styles.editButton,
-              pressed ? styles.pressed : null,
-            ]}
+            style={({ pressed }) => (pressed ? styles.pressed : null)}
           >
-            <Ionicons
-              color={colors.textSecondary}
-              name="create-outline"
-              size={18}
-            />
+            <Ionicons color={colors.textMuted} name="create-outline" size={19} />
           </Pressable>
         ) : null}
       </View>
-      <Divider />
       <View style={styles.content}>{children}</View>
     </View>
   );
@@ -69,43 +70,32 @@ const styles = StyleSheet.create({
     gap: spacing[12],
   },
   card: {
-    padding: spacing[16],
-    borderRadius: radius[8],
     backgroundColor: colors.surface,
-    borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: "#000000",
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
+    borderRadius: radius[16],
+    borderWidth: 1,
+    paddingBottom: spacing[16],
+    paddingHorizontal: spacing[16],
+    paddingTop: spacing[14],
   },
   flat: {
+    backgroundColor: colors.surface,
+    paddingBottom: spacing[18],
     paddingHorizontal: spacing[16],
     paddingTop: spacing[20],
-    paddingBottom: spacing[18],
-    backgroundColor: colors.surface,
   },
   header: {
-    flexDirection: "row",
     alignItems: "flex-start",
-    justifyContent: "space-between",
+    flexDirection: "row",
     gap: spacing[12],
+    justifyContent: "space-between",
   },
   headerText: {
     flex: 1,
     gap: spacing[4],
   },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceMuted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   pressed: {
-    opacity: 0.82,
+    opacity: 0.6,
   },
   content: {
     gap: spacing[14],
