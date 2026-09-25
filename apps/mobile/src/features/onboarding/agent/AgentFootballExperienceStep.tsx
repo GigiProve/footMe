@@ -36,7 +36,7 @@ export function AgentFootballExperienceStep({
       <View style={styles.header}>
         <AppText variant="displaySm">Esperienze nel calcio</AppText>
         <AppText variant="bodySm" color="secondary">
-          Aggiungi eventuali ruoli gia' ricoperti per rendere il profilo piu'
+          Aggiungi eventuali ruoli già ricoperti per rendere il profilo più
           credibile e completo.
         </AppText>
       </View>

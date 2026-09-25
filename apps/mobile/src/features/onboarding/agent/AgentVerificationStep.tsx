@@ -31,7 +31,7 @@ export function AgentVerificationStep({
       <View style={styles.header}>
         <AppText variant="displaySm">Verifica</AppText>
         <AppText variant="bodySm" color="secondary">
-          Inserisci i dati di licenza per mostrare un profilo piu' autorevole.
+          Inserisci i dati di licenza per mostrare un profilo più autorevole.
         </AppText>
       </View>
 

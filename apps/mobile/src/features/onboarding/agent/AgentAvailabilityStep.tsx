@@ -27,9 +27,9 @@ export function AgentAvailabilityStep({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <AppText variant="displaySm">Disponibilita'</AppText>
+        <AppText variant="displaySm">Disponibilità</AppText>
         <AppText variant="bodySm" color="secondary">
-          Scegli chi puo' contattarti da subito tramite il tuo profilo.
+          Scegli chi può contattarti da subito tramite il tuo profilo.
         </AppText>
       </View>
 

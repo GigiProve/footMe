@@ -5,10 +5,10 @@ import {
   Image,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -42,12 +42,21 @@ import {
 import {
   OnboardingCheckboxRow,
   OnboardingEyebrow,
-  OnboardingInfoCard,
-  OnboardingProgressBar,
-  OnboardingScreenHeader,
   OnboardingSectionCard,
   OnboardingToggleRow,
 } from "../../src/features/onboarding/onboarding-ui";
+import {
+  getOnboardingCounter,
+  InlineError,
+  OnboardingCompletion,
+  OnboardingHeader,
+  PhotoPicker,
+  PhotoTips,
+  RoleCard,
+  SegmentedSelector,
+  onboardingLayout,
+} from "../../src/features/onboarding/ui";
+import { ONBOARDING_ROLE_OPTIONS } from "../../src/features/onboarding/onboarding-roles";
 import { WhereToPlaySection } from "../../src/features/onboarding/where-to-play-section";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
 import { CareerExperienceStep } from "../../src/features/onboarding/career/CareerExperienceStep";
@@ -144,47 +153,6 @@ import { AppText, Button, Input, Toggle } from "../../src/ui";
 
 type CompletionDestination = "feed" | "network" | "profile";
 
-const roleOptions: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: AppRole | "community";
-}[] = [
-  {
-    icon: "person-outline",
-    label: "Calciatore",
-    value: "player",
-  },
-  {
-    icon: "clipboard-outline",
-    label: "Allenatore",
-    value: "coach",
-  },
-  {
-    icon: "briefcase-outline",
-    label: "Staff Tecnico",
-    value: "staff",
-  },
-  {
-    icon: "shield-outline",
-    label: "Societa'",
-    value: "club_admin",
-  },
-  {
-    icon: "people-outline",
-    label: "Agente",
-    value: "agent",
-  },
-  {
-    icon: "people-outline",
-    label: "Dirigente",
-    value: "director",
-  },
-  {
-    icon: "newspaper-outline",
-    label: "Media e appassionati",
-    value: "community",
-  },
-];
 
 const genderOptions: { label: string; value: ProfileGender }[] = [
   { label: "Uomo", value: "male" },
@@ -323,96 +291,43 @@ function normalizeCoachCareerEntryForJson(entry: CoachCareerEntry): CoachCareerE
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function RoleSelectionCard({
-  active,
-  icon,
-  label,
-  onPress,
-  testID,
-}: {
-  active: boolean;
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  testID?: string;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={[styles.roleCard, active ? styles.roleCardActive : null]}
-      testID={testID}
-    >
-      <View
-        style={[
-          styles.roleIconCircle,
-          active ? styles.roleIconCircleActive : null,
-        ]}
-      >
-        <Ionicons
-          name={icon}
-          size={24}
-          color={active ? colors.inkInvert : colors.accentStrong}
-        />
-      </View>
-      <AppText
-        variant="bodySm"
-        style={[
-          styles.roleCardTitle,
-          active ? styles.roleCardActiveText : undefined,
-        ]}
-      >
-        {label}
-      </AppText>
-    </Pressable>
-  );
-}
-
-function GenderCard({
-  active,
-  label,
-  onPress,
-  testID,
-}: {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-  testID?: string;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={[styles.genderCard, active ? styles.genderCardActive : null]}
-      testID={testID}
-    >
-      <AppText
-        variant="titleSm"
-        style={active ? styles.genderCardActiveText : undefined}
-      >
-        {label}
-      </AppText>
-    </Pressable>
-  );
-}
-
 function ValidationMessage({
   children,
   tone = "danger",
 }: {
-  children: string;
+  children?: string;
   tone?: "danger" | "muted";
 }) {
-  return (
-    <AppText
-      variant="bodySm"
-      color={tone === "danger" ? "danger" : "secondary"}
-    >
-      {children}
-    </AppText>
-  );
+  if (!children) {
+    return null;
+  }
+
+  if (tone === "muted") {
+    return (
+      <AppText color="secondary" variant="meta">
+        {children}
+      </AppText>
+    );
+  }
+
+  return <InlineError message={children} />;
+}
+
+/** Copy di chiusura contestuale al ruolo (§AI). Il titolo resta uno solo. */
+function getCompletionDescription(role: string) {
+  if (role === "club_admin") {
+    return "Inizia subito a cercare giocatori, allenatori e staff per la tua squadra.";
+  }
+
+  if (role === "media") {
+    return "Ora puoi raccontare il calcio e farti trovare dalla community.";
+  }
+
+  if (role === "fan") {
+    return "Ora puoi esplorare il network e seguire le aree che ti interessano.";
+  }
+
+  return "Ora puoi connetterti con squadre, allenatori e giocatori.";
 }
 
 // ---------------------------------------------------------------------------
@@ -483,6 +398,7 @@ function logMediaUploadFailure(payload: {
 // ---------------------------------------------------------------------------
 
 export default function OnboardingProfileScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
@@ -670,6 +586,7 @@ export default function OnboardingProfileScreen() {
   const nationalityCategory = getNationalityCategory(nationality);
   const visibleSteps = getOnboardingVisibleSteps(role as AppRole | "");
   const progress = getOnboardingProgress(step, role as AppRole | "");
+  const counter = getOnboardingCounter(visibleSteps, progress.stepIndex);
   const canGoBack = step !== "role";
   const isBusy = isSubmitting || uploadingField !== null;
   const authEmail = session?.user?.email ?? "";
@@ -2499,8 +2416,29 @@ export default function OnboardingProfileScreen() {
     return null;
   }
 
+  if (step === "complete") {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            fullScreenGestureEnabled: false,
+            gestureEnabled: false,
+            headerShown: false,
+          }}
+        />
+        <OnboardingCompletion
+          description={getCompletionDescription(role)}
+          onPrimaryPress={() => finishOnboarding("feed")}
+          onSecondaryPress={() => finishOnboarding("profile")}
+          primaryLabel="Entra in ProLink"
+          secondaryLabel="Completa ulteriormente il profilo"
+        />
+      </>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <Stack.Screen
         options={{
           fullScreenGestureEnabled: false,
@@ -2509,18 +2447,12 @@ export default function OnboardingProfileScreen() {
         }}
       />
 
-      {step !== "complete" ? (
-        <OnboardingScreenHeader
-          onBack={canGoBack ? handleBackNavigation : undefined}
-        />
-      ) : null}
-
-      {step !== "complete" && step !== "role" ? (
-        <OnboardingProgressBar
-          currentIndex={progress.stepIndex}
-          steps={visibleSteps}
-        />
-      ) : null}
+      <OnboardingHeader
+        currentStep={step === "role" ? undefined : counter.current}
+        onBack={canGoBack ? handleBackNavigation : undefined}
+        stepLabel={step === "role" ? undefined : counter.label}
+        totalSteps={step === "role" ? undefined : counter.total}
+      />
 
       <KeyboardAwareForm contentContainerStyle={styles.formContent}>
         {/* ============================================================= */}
@@ -2528,78 +2460,49 @@ export default function OnboardingProfileScreen() {
         {/* ============================================================= */}
         {step === "role" ? (
           <View style={styles.stepContainer}>
-            <OnboardingSectionCard
-              title="Scegli il tuo ruolo"
-              subtitle="Seleziona il profilo che ti rappresenta meglio. Ti mostreremo solo i campi utili per iniziare."
+            <View style={styles.pageTitleGroup}>
+              <AppText variant="screenTitle">Scegli il tuo profilo</AppText>
+              <AppText color="secondary" variant="bodyLg">
+                Seleziona il ruolo che ti rappresenta per un&apos;esperienza su
+                misura.
+              </AppText>
+            </View>
+
+            <ValidationMessage>{validationErrors.role}</ValidationMessage>
+
+            <View
+              accessibilityRole="radiogroup"
+              style={styles.roleList}
             >
-              {validationErrors.role ? (
-                <ValidationMessage>{validationErrors.role}</ValidationMessage>
-              ) : null}
-
-              <View style={styles.roleGrid}>
-                {Array.from(
-                  { length: Math.ceil(roleOptions.length / 2) },
-                  (_, rowIndex) => {
-                    const pair = roleOptions.slice(
-                      rowIndex * 2,
-                      rowIndex * 2 + 2,
-                    );
-                    return (
-                      <View key={rowIndex} style={styles.roleGridRow}>
-                        {pair.map((entry) => (
-                          <RoleSelectionCard
-                            key={entry.value}
-                            active={
-                              entry.value === "community"
-                                ? role === "fan" || role === "media"
-                                : role === entry.value
-                            }
-                            icon={entry.icon}
-                            label={entry.label}
-                            onPress={() => {
-                              if (entry.value === "community") {
-                                patchForm({
-                                  communityProfileType: "",
-                                  role: "fan",
-                                });
-                                clearValidationErrors([
-                                  "role",
-                                  "communityProfileType",
-                                ]);
-                                return;
-                              }
-
-                              patchForm({
-                                communityProfileType: "",
-                                role: entry.value,
-                              });
-                              clearValidationErrors([
-                                "role",
-                                "communityProfileType",
-                              ]);
-                            }}
-                            testID={`role-card-${entry.value}`}
-                          />
-                        ))}
-                      </View>
-                    );
-                  },
-                )}
-              </View>
-            </OnboardingSectionCard>
+              {ONBOARDING_ROLE_OPTIONS.map((entry) => (
+                <RoleCard
+                  description={entry.description}
+                  icon={entry.icon}
+                  key={entry.value}
+                  label={entry.label}
+                  onPress={() => {
+                    patchForm({
+                      communityProfileType: "",
+                      role: entry.value === "community" ? "fan" : entry.value,
+                    });
+                    clearValidationErrors(["role", "communityProfileType"]);
+                  }}
+                  selected={
+                    entry.value === "community"
+                      ? role === "fan" || role === "media"
+                      : role === entry.value
+                  }
+                  testID={`role-card-${entry.value}`}
+                />
+              ))}
+            </View>
 
             <Button
               disabled={!role}
-              label={
-                role
-                  ? `Continua come ${
-                      role === "fan" || role === "media"
-                        ? "Media e appassionati"
-                        : roleOptions.find((r) => r.value === role)?.label
-                    }`
-                  : "Seleziona un ruolo"
-              }
+              label="Continua"
               onPress={handleContinueFromRole}
+              size="lg"
+              style={styles.primaryCta}
               variant="primary"
             />
           </View>
@@ -2731,27 +2634,16 @@ export default function OnboardingProfileScreen() {
                   ) : null}
                 </View>
 
-                <View style={styles.sectionHeaderGap}>
-                  <AppText variant="titleSm">Sesso *</AppText>
-                  <View style={styles.genderRow}>
-                    {genderOptions.map((entry) => (
-                      <GenderCard
-                        key={entry.value}
-                        active={gender === entry.value}
-                        label={entry.label}
-                        onPress={() =>
-                          updateValue("gender", entry.value, ["gender"])
-                        }
-                        testID={`gender-card-${entry.value}`}
-                      />
-                    ))}
-                  </View>
-                  {validationErrors.gender ? (
-                    <ValidationMessage>
-                      {validationErrors.gender}
-                    </ValidationMessage>
-                  ) : null}
-                </View>
+                <SegmentedSelector
+                  errorMessage={validationErrors.gender}
+                  label="Sesso"
+                  onChange={(value) =>
+                    updateValue("gender", value, ["gender"])
+                  }
+                  options={genderOptions}
+                  testID="gender-selector"
+                  value={gender}
+                />
 
                 <DatePickerField
                   label="Data di nascita *"
@@ -3032,55 +2924,17 @@ export default function OnboardingProfileScreen() {
         {/* ============================================================= */}
         {step === "photo" || step === "fan_photo" || step === "media_photo" ? (
           <View style={styles.stepContainer}>
-            <OnboardingSectionCard
-              title="Aggiungi una foto"
-              subtitle={
-                step === "fan_photo"
-                  ? "Aggiungi una foto per farti riconoscere dagli altri utenti della community. Puoi saltare questo passaggio."
-                  : step === "media_photo"
-                    ? "Carica una foto personale per il tuo profilo account. Puoi saltare questo passaggio."
-                    : "Una foto profilo aiuta gli altri a riconoscerti. Puoi saltare questo passaggio e aggiungerla in seguito."
-              }
-            >
-              <View style={styles.photoPreviewContainer}>
-                <View style={styles.photoWrapper}>
-                  <View style={styles.photoCircle}>
-                    {avatarUrl ? (
-                      <Image
-                        source={{ uri: withDefaultProfileAvatar(avatarUrl) }}
-                        style={styles.photoImage}
-                      />
-                    ) : (
-                      <Ionicons
-                        name="person-outline"
-                        size={48}
-                        color={colors.textMuted}
-                      />
-                    )}
-                  </View>
-                </View>
-              </View>
+            <View style={styles.pageTitleGroup}>
+              <AppText variant="screenTitle">Aggiungi la tua foto</AppText>
+              <AppText color="secondary" variant="bodyLg">
+                {step === "media_photo"
+                  ? "Una foto personale rende riconoscibile il tuo account."
+                  : "Una foto chiara aiuta gli altri a riconoscerti."}
+              </AppText>
+            </View>
 
-              {!avatarUrl ? (
-                <OnboardingInfoCard message="Se non carichi una foto ora, useremo un'immagine di default." />
-              ) : null}
-            </OnboardingSectionCard>
-
-            <Button
-              disabled={uploadingField === "avatar"}
-              label={
-                uploadingField === "avatar"
-                  ? "Caricamento..."
-                  : "Carica da galleria"
-              }
-              leftIcon={
-                <Ionicons
-                  name="images-outline"
-                  size={18}
-                  color={colors.inkInvert}
-                />
-              }
-              onPress={() =>
+            <PhotoPicker
+              onPickFromLibrary={() =>
                 handleMediaUpload({
                   field: "avatar",
                   folder: "avatars",
@@ -3089,19 +2943,8 @@ export default function OnboardingProfileScreen() {
                     updateValue("avatarUrl", items[0]?.url ?? ""),
                 })
               }
-              variant="primary"
-            />
-            <Button
-              disabled={uploadingField === "avatar"}
-              label="Scatta foto"
-              leftIcon={
-                <Ionicons
-                  name="camera-outline"
-                  size={18}
-                  color={colors.accentStrong}
-                />
-              }
-              onPress={() =>
+              onRemove={avatarUrl ? () => updateValue("avatarUrl", "") : undefined}
+              onTakePhoto={() =>
                 handleCameraCapture({
                   field: "avatar",
                   folder: "avatars",
@@ -3109,21 +2952,26 @@ export default function OnboardingProfileScreen() {
                     updateValue("avatarUrl", items[0]?.url ?? ""),
                 })
               }
-              variant="secondary"
+              uploading={uploadingField === "avatar"}
+              value={avatarUrl ? withDefaultProfileAvatar(avatarUrl) : null}
             />
-            {avatarUrl ? (
-              <Button
-                label="Continua"
-                onPress={handleContinueFromPhoto}
-                variant="primary"
-              />
-            ) : (
-              <Button
-                label="Salta per ora"
-                onPress={handleContinueFromPhoto}
-                variant="tertiary"
-              />
-            )}
+
+            <PhotoTips
+              tips={[
+                "Usa una foto chiara e recente",
+                "Volto ben visibile",
+                "Sfondo neutro, meglio",
+              ]}
+            />
+
+            <Button
+              disabled={uploadingField === "avatar"}
+              label={avatarUrl ? "Continua" : "Salta per ora"}
+              onPress={handleContinueFromPhoto}
+              size="lg"
+              style={styles.primaryCta}
+              variant={avatarUrl ? "primary" : "secondary"}
+            />
           </View>
         ) : null}
 
@@ -3656,7 +3504,7 @@ export default function OnboardingProfileScreen() {
           <CareerExperienceStep
             addButtonLabel="Aggiungi carriera"
             careerEntries={agentPlayerCareerEntries}
-            emptyMessage="Puoi aggiungere le tue esperienze da calciatore ora oppure proseguire e completarle piu' tardi."
+            emptyMessage="Puoi aggiungere le tue esperienze da calciatore ora oppure proseguire e completarle più tardi."
             isBusy={isBusy}
             onSaveAndContinue={handleContinueFromAgentPlayerCareer}
             onSkip={handleContinueFromAgentPlayerCareer}
@@ -4689,100 +4537,8 @@ export default function OnboardingProfileScreen() {
           />
         ) : null}
 
-        {/* ============================================================= */}
-        {/* STEP: Complete                                                 */}
-        {/* ============================================================= */}
-        {step === "complete" ? (
-          <View style={styles.stepContainer}>
-            {role === "club_admin" ? (
-              <>
-                <View style={styles.clubSuccessContainer}>
-                  <View style={styles.clubSuccessIcon}>
-                    <Ionicons
-                      name="checkmark"
-                      size={48}
-                      color={colors.successForeground}
-                    />
-                  </View>
-                  <AppText variant="displaySm" style={styles.textCenter}>
-                    Profilo società{"\n"}creato con successo
-                  </AppText>
-                  <AppText
-                    variant="bodyLg"
-                    color="secondary"
-                    style={styles.clubSuccessDesc}
-                  >
-                    Benvenuto su ProLink. Inizia subito a cercare giocatori,
-                    allenatori e staff per la tua squadra.
-                  </AppText>
-                </View>
-
-                <Button
-                  label="Vai alla Home"
-                  onPress={() => finishOnboarding("feed")}
-                  variant="primary"
-                />
-                <Button
-                  label="Completa il profilo più tardi"
-                  onPress={() => finishOnboarding("profile")}
-                  variant="tertiary"
-                />
-              </>
-            ) : (
-              <>
-                <OnboardingSectionCard>
-                  <View style={styles.completionIcon}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={64}
-                      color={colors.success}
-                    />
-                  </View>
-                  <AppText variant="displaySm" style={styles.textCenter}>
-                    {role === "media"
-                      ? "Profilo media creato con successo"
-                      : role === "fan"
-                        ? "Profilo creato con successo"
-                        : "Il tuo profilo e' pronto!"}
-                  </AppText>
-                  <AppText
-                    variant="bodySm"
-                    color="secondary"
-                    style={styles.textCenter}
-                  >
-                    {role === "media"
-                      ? "Il tuo profilo e' pronto per raccontare il mondo del calcio e farsi trovare dalla community di ProLink."
-                      : role === "fan"
-                        ? "Ora puoi esplorare il network, seguire le aree che ti interessano e partecipare alla community."
-                        : "Ora puoi iniziare a connetterti con squadre, allenatori e giocatori. Se vuoi, potrai aggiungere altri dettagli in qualsiasi momento."}
-                  </AppText>
-                </OnboardingSectionCard>
-
-                <Button
-                  label={
-                    role === "fan" || role === "media"
-                      ? "Vai alla Home"
-                      : "Vai alla home feed"
-                  }
-                  onPress={() => finishOnboarding("feed")}
-                  variant="primary"
-                />
-                <Button
-                  label="Cerca squadre e contatti"
-                  onPress={() => finishOnboarding("network")}
-                  variant="secondary"
-                />
-                <Button
-                  label="Completa ulteriormente il profilo"
-                  onPress={() => finishOnboarding("profile")}
-                  variant="tertiary"
-                />
-              </>
-            )}
-          </View>
-        ) : null}
       </KeyboardAwareForm>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -4793,7 +4549,17 @@ export default function OnboardingProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
+  },
+  pageTitleGroup: {
+    gap: spacing[8],
+    paddingBottom: spacing[8],
+  },
+  primaryCta: {
+    minHeight: onboardingLayout.ctaHeight,
+  },
+  roleList: {
+    gap: spacing[10],
   },
   buttonRow: {
     flexDirection: "row",
@@ -4854,34 +4620,6 @@ const styles = StyleSheet.create({
   clubStepHeader: {
     gap: spacing[12],
   },
-  clubSuccessContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing[32],
-  },
-  clubSuccessDesc: {
-    marginTop: spacing[12],
-    maxWidth: 300,
-    textAlign: "center",
-  },
-  clubSuccessIcon: {
-    alignItems: "center",
-    backgroundColor: colors.successSoft,
-    borderRadius: radius.full,
-    height: 88,
-    justifyContent: "center",
-    marginBottom: spacing[24],
-    shadowColor: "rgba(16, 185, 129, 0.24)",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 1,
-    shadowRadius: 32,
-    elevation: 4,
-    width: 88,
-  },
-  completionIcon: {
-    alignItems: "center",
-    paddingVertical: spacing[8],
-  },
   fieldGap12: {
     gap: spacing[12],
   },
@@ -4890,115 +4628,9 @@ const styles = StyleSheet.create({
   },
   formContent: {
     gap: spacing[18],
-    paddingBottom: 28,
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[16],
-  },
-  genderCard: {
-    alignItems: "center",
-    borderColor: colors.border,
-    borderRadius: radius[8],
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    paddingVertical: spacing[14],
-  },
-  genderCardActive: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-  genderCardActiveText: {
-    color: colors.accent,
-  },
-  genderRow: {
-    flexDirection: "row",
-    gap: spacing[12],
-  },
-  photoCameraOverlay: {
-    alignItems: "center",
-    backgroundColor: colors.accent,
-    borderColor: colors.surface,
-    borderRadius: radius.full,
-    borderWidth: 3,
-    bottom: 0,
-    height: 38,
-    justifyContent: "center",
-    position: "absolute",
-    right: 0,
-    width: 38,
-  },
-  photoCircle: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: 70,
-    borderWidth: 2,
-    height: 140,
-    justifyContent: "center",
-    overflow: "hidden",
-    width: 140,
-  },
-  photoImage: {
-    height: "100%",
-    width: "100%",
-  },
-  photoPreviewContainer: {
-    alignItems: "center",
-    paddingVertical: spacing[16],
-  },
-  photoWrapper: {
-    height: 140,
-    width: 140,
-  },
-  roleCard: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[8],
-    borderWidth: 1,
-    flex: 1,
-    gap: spacing[12],
-    justifyContent: "center",
-    minHeight: 106,
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[16],
-    shadowColor: "rgba(15,23,36,0.04)",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 1,
-  },
-  roleCardActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-    shadowColor: "rgba(10,102,194,0.20)",
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 24,
-    elevation: 3,
-  },
-  roleCardActiveText: {
-    color: colors.inkInvert,
-  },
-  roleCardTitle: {
-    fontWeight: "600",
-  },
-  roleGrid: {
-    gap: spacing[14],
-  },
-  roleGridRow: {
-    flexDirection: "row",
-    gap: spacing[14],
-  },
-  roleIconCircle: {
-    alignItems: "center",
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius.full,
-    height: 42,
-    justifyContent: "center",
-    width: 42,
-  },
-  roleIconCircleActive: {
-    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingBottom: onboardingLayout.pagePaddingBottom,
+    paddingHorizontal: onboardingLayout.pagePaddingHorizontal,
+    paddingTop: onboardingLayout.pagePaddingTop,
   },
   sectionHeaderGap: {
     gap: spacing[8],
@@ -5020,9 +4652,6 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     gap: spacing[16],
-  },
-  textCenter: {
-    textAlign: "center",
   },
   youthCategoryGrid: {
     flexDirection: "row",

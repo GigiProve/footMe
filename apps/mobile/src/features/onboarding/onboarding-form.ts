@@ -341,9 +341,9 @@ const agentVisibleSteps: OnboardingVisibleStep[] = [
     step: "agent_agency",
   },
   {
-    description: "Definisci la tua attivita' principale",
+    description: "Definisci la tua attività principale",
     index: 4,
-    label: "Attivita'",
+    label: "Attività",
     step: "agent_players",
   },
   {
@@ -359,7 +359,7 @@ const agentVisibleSteps: OnboardingVisibleStep[] = [
     step: "agent_portfolio",
   },
   {
-    description: "Imposta disponibilita' e verifica",
+    description: "Imposta disponibilità e verifica",
     index: 7,
     label: "Verifica",
     step: "agent_availability",

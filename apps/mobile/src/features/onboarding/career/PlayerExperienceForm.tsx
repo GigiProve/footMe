@@ -644,8 +644,8 @@ export function PlayerExperienceForm({
         const seasonLabels = overlappingSeasons.map(formatSeasonShort).join(", ");
         nextErrors.period =
           overlappingSeasons.length === 1
-            ? `Il periodo personalizzato si sovrappone alla stagione ${seasonLabels} gia' inserita.`
-            : `Il periodo personalizzato si sovrappone alle stagioni ${seasonLabels} gia' inserite.`;
+            ? `Il periodo personalizzato si sovrappone alla stagione ${seasonLabels} già inserita.`
+            : `Il periodo personalizzato si sovrappone alle stagioni ${seasonLabels} già inserite.`;
       }
     }
 

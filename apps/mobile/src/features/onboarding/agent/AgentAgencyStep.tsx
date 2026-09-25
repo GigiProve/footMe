@@ -98,7 +98,7 @@ export function AgentAgencyStep({
         </Pressable>
 
         {!agencyLogoUrl ? (
-          <OnboardingInfoCard message="Il logo non e' obbligatorio, ma aiuta club e calciatori a riconoscere il tuo profilo." />
+          <OnboardingInfoCard message="Il logo non è obbligatorio, ma aiuta club e calciatori a riconoscere il tuo profilo." />
         ) : null}
 
         <View style={styles.previousSection}>
