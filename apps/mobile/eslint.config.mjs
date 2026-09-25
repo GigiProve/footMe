@@ -22,6 +22,15 @@ export default [
     files: ["**/*.{js,jsx,ts,tsx}"],
     rules: {
       "react-hooks/exhaustive-deps": "error",
+      // eslint-config-expo 57 ships react-hooks v6, which added these three
+      // rules. They flag ~139 pre-existing call sites across the app (mostly
+      // effects that seed state, and PanResponder/Animated refs read while
+      // rendering). Downgraded to warnings so the SDK 57 upgrade is not
+      // blocked on that refactor; the debt stays visible in lint output and
+      // should be paid off rule by rule.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/purity": "warn",
     },
   },
 ];

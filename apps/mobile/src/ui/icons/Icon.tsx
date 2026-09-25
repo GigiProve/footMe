@@ -1,3 +1,4 @@
+import { type ColorValue } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, sizes } from "../../styles";
@@ -12,7 +13,7 @@ const iconSizes = {
 
 type IconProps = {
   active?: boolean;
-  color?: string;
+  color?: ColorValue;
   name: IconName;
   size?: keyof typeof iconSizes;
 };

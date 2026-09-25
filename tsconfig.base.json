@@ -2,13 +2,12 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "bundler",
     "strict": true,
     "allowJs": false,
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx",
-    "baseUrl": "."
+    "jsx": "react-jsx"
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, SafeAreaView, StyleSheet, View } from "react-native";
+import { Pressable, SafeAreaView, StyleSheet, View, type ColorValue } from "react-native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Redirect, Tabs, usePathname } from "expo-router";
@@ -125,10 +125,10 @@ export default function TabsLayout() {
 function buildTabOptions(title: string, iconName: IconName) {
   return {
     title,
-    tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
+    tabBarIcon: ({ color, focused }: { color: ColorValue; focused: boolean }) => (
       <Icon active={focused} color={color} name={iconName} size="nav" />
     ),
-    tabBarLabel: ({ color, focused }: { color: string; focused: boolean }) => (
+    tabBarLabel: ({ color, focused }: { color: ColorValue; focused: boolean }) => (
       <View style={styles.tabLabelBlock}>
         <AppText style={[styles.tabLabel, { color }]} variant="navLabel">
           {title}

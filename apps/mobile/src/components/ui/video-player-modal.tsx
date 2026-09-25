@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
-import { Video, ResizeMode } from "expo-av";
+import { useEvent } from "expo";
+import { useVideoPlayer, VideoView } from "expo-video";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing, typography } from "../../theme/tokens";
@@ -12,17 +12,49 @@ type VideoPlayerModalProps = {
   visible: boolean;
 };
 
+/**
+ * Owns the `expo-video` player. Kept separate from the modal shell so the
+ * player is created only while the modal is open: React Native's `Modal`
+ * renders nothing when `visible` is false, so this unmounts and releases the
+ * player instead of playing audio behind a hidden modal.
+ */
+function FullScreenVideo({ url }: { url: string }) {
+  const player = useVideoPlayer(url, (instance) => {
+    instance.play();
+  });
+  const { status } = useEvent(player, "statusChange", { status: player.status });
+
+  if (status === "error") {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons color={colors.textMuted} name="alert-circle-outline" size={48} />
+        <Text style={styles.errorText}>Impossibile riprodurre il video.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      {status === "readyToPlay" ? null : (
+        <ActivityIndicator color={colors.accent} size="large" style={styles.loader} />
+      )}
+      <VideoView
+        contentFit="contain"
+        nativeControls
+        player={player}
+        style={styles.video}
+      />
+    </>
+  );
+}
+
 export function VideoPlayerModal({
   onClose,
   title = "Video",
   url,
   visible,
 }: VideoPlayerModalProps) {
-  const videoRef = useRef<Video>(null);
-  const [hasError, setHasError] = useState(false);
-
   function handleClose() {
-    setHasError(false);
     onClose();
   }
 
@@ -51,27 +83,7 @@ export function VideoPlayerModal({
         </View>
 
         <View style={styles.videoContainer}>
-          {hasError ? (
-            <View style={styles.errorContainer}>
-              <Ionicons color={colors.textMuted} name="alert-circle-outline" size={48} />
-              <Text style={styles.errorText}>
-                Impossibile riprodurre il video.
-              </Text>
-            </View>
-          ) : (
-            <>
-              <ActivityIndicator color={colors.accent} size="large" style={styles.loader} />
-              <Video
-                ref={videoRef}
-                onError={() => setHasError(true)}
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay
-                source={{ uri: url }}
-                style={styles.video}
-                useNativeControls
-              />
-            </>
-          )}
+          <FullScreenVideo url={url} />
         </View>
       </SafeAreaView>
     </Modal>

@@ -106,14 +106,14 @@ const styles = StyleSheet.create({
     gap: spacing[4],
   },
   image: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   loadMore: {
     alignItems: "center",
     paddingTop: spacing[8],
   },
   placeholder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     backgroundColor: colors.accentSoft,
     justifyContent: "center",

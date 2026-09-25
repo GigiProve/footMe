@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     width: "33.3333%",
   },
   gridImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   gridItem: {
     aspectRatio: 1,
@@ -618,13 +618,13 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   gridPlaceholder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     backgroundColor: colors.accentSoft,
     justifyContent: "center",
   },
   gridShade: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(11,43,64,0.08)",
   },
   header: {
@@ -736,10 +736,10 @@ const styles = StyleSheet.create({
     marginTop: spacing[6],
   },
   viewerImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   viewerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.28)",
   },
   viewerPage: {

@@ -145,7 +145,7 @@ export function FeedScreen() {
 
 const styles = StyleSheet.create({
   pane: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   paneHidden: {
     display: "none",
