@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   gridShade: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0, 0, 0, 0.18)",
   },
   header: {
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     top: spacing[8],
   },
   videoFallback: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     backgroundColor: colors.accentStrong,
     justifyContent: "center",

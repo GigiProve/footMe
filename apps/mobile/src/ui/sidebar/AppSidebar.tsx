@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
     zIndex: zIndex.modal,
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   safeArea: {
     flex: 1,

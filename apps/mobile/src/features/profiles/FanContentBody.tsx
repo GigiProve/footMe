@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Image, Pressable, StyleSheet, View } from "react-native";
-import { ResizeMode, Video } from "expo-av";
 
+import { VideoPreview } from "../../components/ui/video-preview";
 import { colors, radius, spacing } from "../../theme/tokens";
 import { AppText } from "../../ui";
 import { FootballPitchPreview } from "./FanProfileView";
@@ -88,14 +88,7 @@ export function FanContentBody({
 
       {post.kind === "photo" && post.media_url ? (
         post.media_type === "video" ? (
-          <Video
-            isMuted
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={false}
-            source={{ uri: post.media_url }}
-            style={styles.media}
-            useNativeControls
-          />
+          <VideoPreview nativeControls style={styles.media} url={post.media_url} />
         ) : (
           <Image source={{ uri: post.media_url }} style={styles.media} />
         )

@@ -22,7 +22,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQueryClient } from "@tanstack/react-query";
-import { ResizeMode, Video } from "expo-av";
+import { VideoPreview } from "../../components/ui/video-preview";
 
 import { VideoPlayerModal } from "../../components/ui/video-player-modal";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
@@ -1395,14 +1395,7 @@ function FanTribunaPostCard({
 
       {post.kind === "photo" && post.media_url ? (
         post.media_type === "video" ? (
-          <Video
-            isMuted
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={false}
-            source={{ uri: post.media_url }}
-            style={styles.tribunaMedia}
-            useNativeControls
-          />
+          <VideoPreview nativeControls style={styles.tribunaMedia} url={post.media_url} />
         ) : (
           <Image source={{ uri: post.media_url }} style={styles.tribunaMedia} />
         )
@@ -1953,14 +1946,7 @@ function FanCreateTribunaModal({
                   <Image source={{ uri: photoDraft.mediaUrl }} style={styles.createMediaImage} />
                 ) : photoDraft.mediaUrl ? (
                   <View style={styles.createVideoPreview}>
-                    <Video
-                      isMuted
-                      resizeMode={ResizeMode.COVER}
-                      shouldPlay={false}
-                      source={{ uri: photoDraft.mediaUrl }}
-                      style={styles.createMediaImage}
-                      useNativeControls={false}
-                    />
+                    <VideoPreview style={styles.createMediaImage} url={photoDraft.mediaUrl} />
                     <View style={styles.createVideoOverlay}>
                       <Ionicons color={colors.inkInvert} name="play" size={26} />
                     </View>
@@ -2718,14 +2704,7 @@ function PostThumbnail({
 
   if (post.visual_type === "video") {
     return (
-      <Video
-        isMuted
-        resizeMode={ResizeMode.COVER}
-        shouldPlay={false}
-        source={{ uri: post.visual_url }}
-        style={style as StyleProp<ViewStyle>}
-        useNativeControls={false}
-      />
+      <VideoPreview style={style as StyleProp<ViewStyle>} url={post.visual_url} />
     );
   }
 
@@ -2877,14 +2856,7 @@ function FanCreatePostModal({
               <Image source={{ uri: draft.visualUrl }} style={styles.createMediaImage} />
             ) : draft.visualUrl ? (
               <View style={styles.createVideoPreview}>
-                <Video
-                  isMuted
-                  resizeMode={ResizeMode.COVER}
-                  shouldPlay={false}
-                  source={{ uri: draft.visualUrl }}
-                  style={styles.createMediaImage}
-                  useNativeControls={false}
-                />
+                <VideoPreview style={styles.createMediaImage} url={draft.visualUrl} />
                 <View style={styles.createVideoOverlay}>
                   <Ionicons color={colors.inkInvert} name="play" size={26} />
                 </View>

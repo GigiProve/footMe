@@ -83,11 +83,8 @@ vi.mock("@expo/vector-icons/Ionicons", () => {
   };
 });
 
-vi.mock("expo-av", () => ({
-  ResizeMode: {
-    COVER: "cover",
-  },
-  Video: (props: Record<string, unknown>) =>
+vi.mock("../../components/ui/video-preview", () => ({
+  VideoPreview: (props: Record<string, unknown>) =>
     React.createElement("mock-video", props),
 }));
 

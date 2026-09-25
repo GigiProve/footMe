@@ -3704,7 +3704,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(16, 20, 28, 0.38)",
   },
   heroSection: {
@@ -4150,7 +4150,7 @@ const styles = StyleSheet.create({
     gap: spacing[8],
   },
   sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   sheetIcon: {
     alignItems: "center",
