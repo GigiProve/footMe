@@ -7,7 +7,7 @@ import { AppText, Button } from "../../../ui";
 import type { AvailabilityType } from "../onboarding-form";
 import { WhereToPlaySection } from "../where-to-play-section";
 import { OnboardingSectionCard } from "../onboarding-ui";
-import { AVAILABLE_FROM_OPTIONS } from "../coach/CoachRoleStep";
+import { AVAILABLE_FROM_OPTIONS } from "../coach/coach-options";
 
 type StaffAvailabilityStepProps = {
   availabilityType: AvailabilityType;

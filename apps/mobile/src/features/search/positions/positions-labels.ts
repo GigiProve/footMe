@@ -1,4 +1,4 @@
-import { COACH_PRIMARY_ROLE_OPTIONS } from "../../onboarding/coach/CoachRoleStep";
+import { COACH_PRIMARY_ROLE_OPTIONS } from "../../onboarding/coach/coach-options";
 import { STAFF_ROLE_OPTIONS } from "../../onboarding/onboarding-types";
 import {
   getPlayerPositionLabel,

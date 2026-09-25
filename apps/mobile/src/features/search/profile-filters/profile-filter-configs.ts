@@ -2,7 +2,10 @@ import {
   AGENT_MANAGED_PLAYERS_OPTIONS,
   AGENT_PLAYER_TYPE_OPTIONS,
 } from "../../onboarding/agent/agent-options";
-import { LICENSE_TYPE_OPTIONS } from "../../onboarding/coach/CoachRoleStep";
+import {
+  COACH_CATEGORY_OPTIONS,
+  LICENSE_TYPE_OPTIONS,
+} from "../../onboarding/coach/coach-options";
 import { STAFF_ROLE_OPTIONS } from "../../onboarding/onboarding-types";
 import { PROVINCE_OPTIONS, REGION_OPTIONS } from "../../profiles/profile-form-utils";
 import {
@@ -101,8 +104,7 @@ export const COACH_LICENSE_FILTER_OPTIONS = LICENSE_TYPE_OPTIONS.filter(
 
 /**
  * Coach filter roles — a distinct, smaller list than the onboarding
- * `COACH_PRIMARY_ROLE_OPTIONS` (which is not exported), per the approved
- * plan.
+ * `COACH_PRIMARY_ROLE_OPTIONS`, per the approved plan.
  */
 export const COACH_FILTER_ROLE_OPTIONS: { label: string; value: string }[] = [
   { label: "Allenatore", value: "Allenatore" },
@@ -113,19 +115,10 @@ export const COACH_FILTER_ROLE_OPTIONS: { label: string; value: string }[] = [
 ];
 
 /**
- * Coach/staff "categorie allenate" — mirrors the local (non-exported) list
- * in `CoachRoleStep.tsx`; duplicated here rather than exported from
- * onboarding to avoid widening that module's public surface.
+ * Coach/staff "categorie allenate": stessa tassonomia dell'onboarding, non
+ * una copia (REV-ONB-03 §F).
  */
-export const COACH_CATEGORY_FILTER_OPTIONS: { label: string; value: string }[] = [
-  { label: "Prima Squadra", value: "Prima Squadra" },
-  { label: "Juniores", value: "Juniores" },
-  { label: "Allievi", value: "Allievi" },
-  { label: "Giovanissimi", value: "Giovanissimi" },
-  { label: "Berretti", value: "Berretti" },
-  { label: "Scuola Calcio", value: "Scuola Calcio" },
-  { label: "Settore Giovanile", value: "Settore Giovanile" },
-];
+export const COACH_CATEGORY_FILTER_OPTIONS = COACH_CATEGORY_OPTIONS;
 
 export const COACH_CONTEXT_OPTIONS: { label: string; value: "prima_squadra" | "settore_giovanile" | "entrambi" }[] = [
   { label: "Prima squadra", value: "prima_squadra" },

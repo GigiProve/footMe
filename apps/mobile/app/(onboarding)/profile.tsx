@@ -61,7 +61,6 @@ import {
   trackPlayerOnboardingEvent,
 } from "../../src/features/onboarding/player";
 import { ONBOARDING_ROLE_OPTIONS } from "../../src/features/onboarding/onboarding-roles";
-import { WhereToPlaySection } from "../../src/features/onboarding/where-to-play-section";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
 import { CareerExperienceStep } from "../../src/features/onboarding/career/CareerExperienceStep";
 import { AgentAgencyStep } from "../../src/features/onboarding/agent/AgentAgencyStep";
@@ -79,12 +78,11 @@ import {
 } from "../../src/features/profiles/agent-profile";
 import type { CoachCareerEntry } from "../../src/features/onboarding/coach/coach-career-types";
 import {
-  AVAILABLE_FROM_OPTIONS,
-  CoachRoleStep,
-} from "../../src/features/onboarding/coach/CoachRoleStep";
+  CoachOnboardingFlow,
+  isCoachMasterStep,
+} from "../../src/features/onboarding/coach";
 import { CoachCareerStep } from "../../src/features/onboarding/coach/CoachCareerStep";
 import { PlayerCareerToggleStep } from "../../src/features/onboarding/coach/PlayerCareerToggleStep";
-import { CoachExtraStep } from "../../src/features/onboarding/coach/CoachExtraStep";
 import { StaffAvailabilityStep } from "../../src/features/onboarding/staff/StaffAvailabilityStep";
 import { StaffRoleStep } from "../../src/features/onboarding/staff/StaffRoleStep";
 import {
@@ -2545,6 +2543,75 @@ export default function OnboardingProfileScreen() {
     );
   }
 
+  // ---------------------------------------------------------------------
+  // Allenatore: stesse pagine intere del Master (REV-ONB-03). Le schermate
+  // comuni e la carriera da giocatore riusano i componenti del Calciatore.
+  // ---------------------------------------------------------------------
+  if (isCoachMasterStep(step, role)) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            fullScreenGestureEnabled: false,
+            gestureEnabled: false,
+            headerShown: false,
+          }}
+        />
+        <CoachOnboardingFlow
+          counter={counter}
+          form={form}
+          isBusy={isBusy}
+          nationalityCategory={nationalityCategory}
+          onBack={handleBackNavigation}
+          onClearValidationErrors={clearValidationErrors}
+          onContinueFromAvailability={handleContinueFromCoachAvailability}
+          onContinueFromCareer={handleContinueFromCoachCareer}
+          onContinueFromPersonalData={handleContinueFromBase}
+          onContinueFromPhoto={handleContinueFromPhoto}
+          onContinueFromPlayerCareer={handleContinueFromPlayerCareer}
+          onContinueFromPlayerCareerChoice={
+            handleContinueFromPlayerCareerToggle
+          }
+          onContinueFromQualification={handleContinueFromCoachRole}
+          onDomicileChange={handleDomicileChange}
+          onDomicileSelect={handleDomicileSelect}
+          onDomicileToggle={handleDomicileToggle}
+          onFinish={handleFinishCoachExtra}
+          onFormattedNameBlur={handleFormattedNameBlur}
+          onNationalityChange={handleNationalitySelect}
+          onPatchForm={patchForm}
+          onPickPhotoFromLibrary={() =>
+            handleMediaUpload({
+              field: "avatar",
+              folder: "avatars",
+              mediaTypes: ["images"],
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          onRegisterBack={registerStepBackOverride}
+          onRemovePhoto={() => updateValue("avatarUrl", "")}
+          onResidenceChange={handleResidenceChange}
+          onResidenceSelect={handleResidenceSelect}
+          onTakePhoto={() =>
+            handleCameraCapture({
+              field: "avatar",
+              folder: "avatars",
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          photoPreviewUrl={
+            avatarUrl ? withDefaultProfileAvatar(avatarUrl) : null
+          }
+          searchTeams={searchTeams}
+          step={step}
+          validationErrors={validationErrors}
+        />
+      </>
+    );
+  }
+
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <Stack.Screen
@@ -3515,110 +3582,6 @@ export default function OnboardingProfileScreen() {
           />
         ) : null}
 
-        {/* ============================================================= */}
-        {/* STEP: Coach Role (Qualifica)                                   */}
-        {/* ============================================================= */}
-        {step === "coach_role" ? (
-          <View style={styles.stepContainer}>
-            <CoachRoleStep
-              categoriesArray={coachCategoriesArray}
-              licenseType={coachLicenseType}
-              primaryRole={coachPrimaryRole}
-              onUpdate={(patch) => patchForm(patch)}
-              validationErrors={validationErrors}
-            />
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromCoachRole}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Coach Availability (disponibilità nuova squadra)         */}
-        {/* ============================================================= */}
-        {step === "coach_availability" ? (
-          <View style={styles.stepContainer}>
-            <OnboardingSectionCard
-              title="Disponibilità"
-              subtitle="Indica se sei disponibile per una nuova squadra e le zone di interesse."
-            >
-              <WhereToPlaySection
-                availabilityType={coachAvailabilityType}
-                categories={[]}
-                hideCategories
-                infoMessages={{
-                  ITALY: "",
-                  REGIONS:
-                    "Indica una o più regioni in cui sei disponibile ad allenare.",
-                  PROVINCES:
-                    "Indica una o più province in cui sei disponibile ad allenare.",
-                }}
-                isAvailable={openToNewRole}
-                onAvailabilityTypeChange={(value) =>
-                  patchForm({ coachAvailabilityType: value })
-                }
-                onCategoriesChange={() => undefined}
-                onIsAvailableChange={(value) => {
-                  patchForm({
-                    openToNewRole: value,
-                    ...(value
-                      ? {}
-                      : {
-                          coachAvailableFrom: "",
-                          coachProvincesArray: [],
-                          coachRegionsArray: [],
-                        }),
-                  });
-                }}
-                onProvincesChange={(value) =>
-                  patchForm({ coachProvincesArray: value })
-                }
-                onRegionsChange={(value) =>
-                  patchForm({ coachRegionsArray: value })
-                }
-                provinces={coachProvincesArray}
-                provincesHelperText="Puoi selezionare più province in cui allenare."
-                provincesLabel="Province di interesse"
-                regions={coachRegionsArray}
-                regionsHelperText="Puoi selezionare più regioni in cui allenare."
-                regionsLabel="Regioni di interesse"
-                toggleLabel="Disponibile per una nuova squadra"
-                toggleSubtitle="Il tuo profilo può comparire tra gli allenatori disponibili sul mercato."
-                validationErrors={validationErrors}
-              />
-              {openToNewRole ? (
-                <SelectField
-                  label="Disponibile da"
-                  onChange={(val) => patchForm({ coachAvailableFrom: val })}
-                  options={AVAILABLE_FROM_OPTIONS}
-                  placeholder="Seleziona disponibilità"
-                  value={coachAvailableFrom}
-                />
-              ) : null}
-            </OnboardingSectionCard>
-            <View style={styles.buttonRow}>
-              <View style={styles.flex1}>
-                <Button
-                  label="Indietro"
-                  onPress={handleBackNavigation}
-                  variant="secondary"
-                />
-              </View>
-              <View style={styles.flex1}>
-                <Button
-                  disabled={isBusy}
-                  label="Continua"
-                  onPress={handleContinueFromCoachAvailability}
-                  variant="primary"
-                />
-              </View>
-            </View>
-          </View>
-        ) : null}
-
         {step === "staff_role" ? (
           <View style={styles.stepContainer}>
             <StaffRoleStep
@@ -3650,23 +3613,6 @@ export default function OnboardingProfileScreen() {
             preferredProvinces={fromDelimitedString(staffPreferredProvinces)}
             preferredRegions={fromDelimitedString(staffPreferredRegions)}
             validationErrors={validationErrors}
-          />
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Coach Career                                             */}
-        {/* ============================================================= */}
-        {step === "coach_career" ? (
-          <CoachCareerStep
-            entries={coachCareerEntries as CoachCareerEntry[]}
-            isBusy={isBusy}
-            onContinue={handleContinueFromCoachCareer}
-            onRegisterBack={registerStepBackOverride}
-            onSkip={handleContinueFromCoachCareer}
-            onUpdateEntries={(entries) =>
-              patchForm({ coachCareerEntries: entries })
-            }
-            searchTeams={searchTeams}
           />
         ) : null}
 
@@ -3711,50 +3657,6 @@ export default function OnboardingProfileScreen() {
               patchForm({ staffPlayerCareerEntries: entries })
             }
             searchTeams={searchTeams}
-          />
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Player Career Toggle                                     */}
-        {/* ============================================================= */}
-        {step === "player_career_toggle" ? (
-          <PlayerCareerToggleStep
-            hasPlayedFootball={hasPlayedFootball}
-            isBusy={isBusy}
-            onContinue={handleContinueFromPlayerCareerToggle}
-            onUpdate={(value) => patchForm({ hasPlayedFootball: value })}
-          />
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Player Career                                            */}
-        {/* ============================================================= */}
-        {step === "player_career" ? (
-          <CareerExperienceStep
-            careerEntries={coachPlayerCareerEntries}
-            isBusy={isBusy}
-            onSaveAndContinue={handleContinueFromPlayerCareer}
-            onSkip={handleContinueFromPlayerCareer}
-            onUpdateEntries={(entries) =>
-              patchForm({ coachPlayerCareerEntries: entries })
-            }
-            searchTeams={searchTeams}
-          />
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Coach Extra (filosofia e stile)                          */}
-        {/* ============================================================= */}
-        {step === "coach_extra" ? (
-          <CoachExtraStep
-            bio={bio}
-            formation={coachFormation}
-            isBusy={isBusy}
-            languages={coachLanguages}
-            playStyle={coachPlayStyle}
-            onFinish={handleFinishCoachExtra}
-            onSkip={handleFinishCoachExtra}
-            onUpdate={(patch) => patchForm(patch)}
           />
         ) : null}
 

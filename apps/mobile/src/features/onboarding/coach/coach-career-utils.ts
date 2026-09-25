@@ -354,13 +354,8 @@ export function generateCoachEntryId(): string {
   return `coach-${Date.now()}-${idCounter}`;
 }
 
-export const COACH_ROLE_OPTIONS: { label: string; value: string }[] = [
-  { label: "Allenatore", value: "Allenatore" },
-  { label: "Vice allenatore", value: "Vice allenatore" },
-  { label: "Collaboratore tecnico", value: "Collaboratore tecnico" },
-  { label: "Allenatore portieri", value: "Allenatore portieri" },
-  { label: "Preparatore atletico", value: "Preparatore atletico" },
-];
+/** Tassonomia unica dei ruoli tecnici: vive in `coach-options.ts` (§D). */
+export { COACH_ROLE_OPTIONS } from "./coach-options";
 
 export const MONTH_LABEL_TO_NUM: Record<string, number> = {
   Gennaio: 1,
@@ -506,3 +501,37 @@ export const PLAYER_POSITION_OPTIONS: { label: string; value: string }[] = [
   { label: "Centravanti", value: "Centravanti" },
   { label: "Attaccante esterno", value: "Attaccante esterno" },
 ];
+
+// ---------------------------------------------------------------------------
+// Periodo ↔ valore del MonthYearPicker del Master (REV-ONB-03 §Y)
+// ---------------------------------------------------------------------------
+
+const MONTH_NUM_TO_LABEL: Record<number, string> = Object.fromEntries(
+  Object.entries(MONTH_LABEL_TO_NUM).map(([label, num]) => [num, label]),
+);
+
+/** Valore canonico del `DateSelector` in modalità mese+anno: "2026-01". */
+export function coachPeriodToDateValue(month: string, year: string): string {
+  const monthNumber = MONTH_LABEL_TO_NUM[month];
+
+  if (!year || !monthNumber) {
+    return "";
+  }
+
+  return `${year}-${String(monthNumber).padStart(2, "0")}`;
+}
+
+/** Inverso di `coachPeriodToDateValue`: "2026-01" → { Gennaio, 2026 }. */
+export function coachPeriodFromDateValue(value: string): {
+  month: string;
+  year: string;
+} {
+  const [year, month] = value.split("-");
+  const monthNumber = Number.parseInt(month ?? "", 10);
+
+  if (!year || Number.isNaN(monthNumber)) {
+    return { month: "", year: "" };
+  }
+
+  return { month: MONTH_NUM_TO_LABEL[monthNumber] ?? "", year };
+}

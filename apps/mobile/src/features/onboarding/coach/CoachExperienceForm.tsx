@@ -1,38 +1,46 @@
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
-import { SelectField } from "../../../components/ui/select-field";
-import { colors, radius, spacing } from "../../../theme/tokens";
-import { AppText, Button, Input } from "../../../ui";
+import { colors } from "../../../styles";
+import { AppText, Button } from "../../../ui";
 import {
   SENIOR_CATEGORY_OPTIONS,
   YOUTH_CATEGORY_OPTIONS,
 } from "../../profiles/player-sports";
 import type { TeamAutocompleteOption } from "../../profiles/player-sports";
 import { TeamAutocompleteInput } from "../../profiles/player-sports-section";
+import { MultiSeasonSelector } from "../career/MultiSeasonSelector";
+import {
+  FieldShell,
+  InlineError,
+  OnboardingSection,
+  OnboardingSelectField,
+  OnboardingTextField,
+  PeriodField,
+} from "../ui";
+import {
+  onboardingBorderWidth,
+  onboardingRadius,
+  onboardingSpacing,
+} from "../ui/onboarding-tokens";
 import type { CoachCareerEntry, CoachSeasonDetail } from "./coach-career-types";
 import {
   COACH_ROLE_OPTIONS,
-  MONTH_OPTIONS,
-  computeCoachSeasonsFromPeriod,
+  coachPeriodFromDateValue,
+  coachPeriodToDateValue,
   formatSeasonShort,
   generateCoachEntryId,
-  getCoachEndYearOptions,
   getCoachPeriodOverlapSeasons,
   getCoachSeasonSelectOptions,
-  getCoachStartYearOptions,
   getOccupiedCoachSeasonLabels,
-  getOlderCoachSeasonSelectOptions,
   sanitizeCoachPeriodSelection,
 } from "./coach-career-utils";
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
 
 type CoachExperienceFormProps = {
   categoryLabel?: string;
   categoryPlaceholder?: string;
+  descriptionLabel?: string;
+  descriptionPlaceholder?: string;
   entry: CoachCareerEntry;
   existingEntries?: CoachCareerEntry[];
   isEditing: boolean;
@@ -46,8 +54,6 @@ type CoachExperienceFormProps = {
   teamLabel?: string;
   teamPlaceholder?: string;
   title?: string;
-  descriptionLabel?: string;
-  descriptionPlaceholder?: string;
 };
 
 const COACH_EXPERIENCE_CATEGORY_OPTIONS = [
@@ -57,359 +63,98 @@ const COACH_EXPERIENCE_CATEGORY_OPTIONS = [
 
 type FormErrors = {
   category?: string;
-  role?: string;
-  teamName?: string;
-  seasons?: string;
-  startYear?: string;
-  endYear?: string;
+  endDate?: string;
   period?: string;
-  seasonDetails?: string;
+  role?: string;
+  seasonRoles?: string;
+  seasons?: string;
+  startDate?: string;
+  teamName?: string;
 };
-
-// ---------------------------------------------------------------------------
-// SeasonChipGrid — multi-select chips
-// ---------------------------------------------------------------------------
-
-function SeasonChipGrid({
-  disabledSeasons,
-  selectedSeasons,
-  onToggle,
-}: {
-  disabledSeasons?: Set<string>;
-  selectedSeasons: string[];
-  onToggle: (season: string) => void;
-}) {
-  const allSeasons = getCoachSeasonSelectOptions(disabledSeasons ?? new Set());
-  const selectedSet = new Set(selectedSeasons);
-
-  const olderSelected = selectedSeasons.filter(
-    (season) => !allSeasons.some((option) => option.value === season),
-  );
-  const olderSeasonOptions = getOlderCoachSeasonSelectOptions(
-    disabledSeasons ?? new Set(),
-  );
-  const availableOlderOptions = olderSeasonOptions.filter(
-    (o) => !selectedSet.has(o.value),
-  );
-
-  return (
-    <View style={chipStyles.container}>
-      {allSeasons.map((seasonOption) => {
-        const isSelected = selectedSet.has(seasonOption.value);
-        return (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{
-              disabled: seasonOption.disabled === true,
-              selected: isSelected,
-            }}
-            disabled={seasonOption.disabled === true}
-            key={seasonOption.value}
-            onPress={() => onToggle(seasonOption.value)}
-            style={[
-              chipStyles.chip,
-              seasonOption.disabled ? chipStyles.chipDisabled : null,
-              isSelected ? chipStyles.chipSelected : null,
-            ]}
-          >
-            <AppText
-              variant="bodySm"
-              style={[
-                isSelected ? chipStyles.chipTextSelected : chipStyles.chipText,
-                seasonOption.disabled ? chipStyles.chipTextDisabled : null,
-              ]}
-            >
-              {seasonOption.label}
-            </AppText>
-          </Pressable>
-        );
-      })}
-
-      {olderSelected.map((season) => (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ selected: true }}
-          key={season}
-          onPress={() => onToggle(season)}
-          style={[chipStyles.chip, chipStyles.chipSelected]}
-        >
-          <AppText variant="bodySm" style={chipStyles.chipTextSelected}>
-            {formatSeasonShort(season)}
-          </AppText>
-        </Pressable>
-      ))}
-
-      {availableOlderOptions.length > 0 ? (
-        <View style={chipStyles.olderPickerRow}>
-          <SelectField
-            label="Aggiungi stagione precedente"
-            onChange={(val) => {
-              if (val) {
-                onToggle(val);
-              }
-            }}
-            options={availableOlderOptions}
-            placeholder="Prima del 2010..."
-            searchable
-            searchPlaceholder="Cerca anno..."
-            value=""
-          />
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-const chipStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[8],
-  },
-  chip: {
-    paddingHorizontal: spacing[14],
-    paddingVertical: spacing[10],
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  chipSelected: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  chipDisabled: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    opacity: 0.5,
-  },
-  chipText: {
-    color: colors.textPrimary,
-  },
-  chipTextSelected: {
-    color: colors.inkInvert,
-    fontWeight: "600",
-  },
-  chipTextDisabled: {
-    color: colors.textMuted,
-  },
-  olderPickerRow: {
-    width: "100%",
-    marginTop: spacing[4],
-  },
-});
-
-// ---------------------------------------------------------------------------
-// PeriodSelector
-// ---------------------------------------------------------------------------
 
 type Period = NonNullable<CoachCareerEntry["period"]>;
 
-function PeriodSelector({
-  endYearOptions,
-  period,
-  onChange,
-  startYearOptions,
-  startYearError,
-  endYearError,
-  periodError,
-}: {
-  endYearOptions: { label: string; value: string; disabled?: boolean }[];
-  period: Period | null;
-  onChange: (period: Period) => void;
-  startYearOptions: { label: string; value: string; disabled?: boolean }[];
-  startYearError?: string;
-  endYearError?: string;
-  periodError?: string;
-}) {
-  const current: Period = period ?? {
-    startMonth: "",
-    startYear: "",
-    endMonth: "",
-    endYear: "",
-  };
-
-  function update(patch: Partial<Period>) {
-    onChange({ ...current, ...patch });
-  }
-
-  return (
-    <View style={periodStyles.container}>
-      <View style={periodStyles.row}>
-        <View style={periodStyles.field}>
-          <SelectField
-            allowClear
-            clearLabel="Rimuovi mese"
-            label="Dal (Mese)"
-            onChange={(val) => update({ startMonth: val })}
-            options={MONTH_OPTIONS}
-            placeholder="Mese"
-            value={current.startMonth}
-          />
-        </View>
-        <View style={periodStyles.field}>
-          <SelectField
-            label="Dal (Anno) *"
-            onChange={(val) => update({ startYear: val })}
-            options={startYearOptions}
-            placeholder="Anno"
-            searchable
-            searchPlaceholder="Cerca anno..."
-            value={current.startYear}
-          />
-        </View>
-      </View>
-      {startYearError ? (
-        <AppText variant="caption" color="danger">
-          {startYearError}
-        </AppText>
-      ) : null}
-
-      <View style={periodStyles.row}>
-        <View style={periodStyles.field}>
-          <SelectField
-            allowClear
-            clearLabel="Rimuovi mese"
-            label="Al (Mese)"
-            onChange={(val) => update({ endMonth: val })}
-            options={MONTH_OPTIONS}
-            placeholder="Mese"
-            value={current.endMonth}
-          />
-        </View>
-        <View style={periodStyles.field}>
-          <SelectField
-            label="Al (Anno) *"
-            onChange={(val) => update({ endYear: val })}
-            options={endYearOptions}
-            placeholder="Anno"
-            searchable
-            searchPlaceholder="Cerca anno..."
-            value={current.endYear}
-          />
-        </View>
-      </View>
-      {endYearError ? (
-        <AppText variant="caption" color="danger">
-          {endYearError}
-        </AppText>
-      ) : null}
-      {periodError ? (
-        <AppText variant="caption" color="danger">
-          {periodError}
-        </AppText>
-      ) : null}
-    </View>
-  );
-}
-
-const periodStyles = StyleSheet.create({
-  container: {
-    gap: spacing[10],
-  },
-  row: {
-    flexDirection: "row",
-    gap: spacing[10],
-  },
-  field: {
-    flex: 1,
-  },
-});
+const EMPTY_PERIOD: Period = {
+  endMonth: "",
+  endYear: "",
+  startMonth: "",
+  startYear: "",
+};
 
 // ---------------------------------------------------------------------------
-// SeasonDetailCard
+// SeasonRoleRow — una riga compatta per stagione (§T)
 // ---------------------------------------------------------------------------
 
-function SeasonDetailCard({
-  categoryOptions,
-  detail,
+function SeasonRoleRow({
+  isLast,
   onChange,
   roleOptions,
   season,
+  value,
 }: {
-  categoryOptions: { label: string; value: string }[];
-  detail: CoachSeasonDetail;
-  onChange: (field: keyof CoachSeasonDetail, value: string) => void;
+  isLast: boolean;
+  onChange: (role: string) => void;
   roleOptions: { label: string; value: string }[];
   season: string;
+  value: string;
 }) {
   return (
-    <View style={seasonDetailStyles.container}>
-      <View style={seasonDetailStyles.labelBadge}>
-        <AppText variant="caption" style={seasonDetailStyles.labelText}>
-          {formatSeasonShort(season)}
-        </AppText>
+    <View style={[styles.seasonRow, isLast ? null : styles.seasonRowDivider]}>
+      <AppText style={styles.seasonLabel} variant="metaStrong">
+        {formatSeasonShort(season)}
+      </AppText>
+
+      <View style={styles.seasonControl}>
+        <OnboardingSelectField
+          onChange={onChange}
+          options={roleOptions}
+          placeholder="Seleziona ruolo"
+          sheetTitle={`Ruolo ${formatSeasonShort(season)}`}
+          testID={`season-role-${season}`}
+          value={value}
+        />
       </View>
-
-      <SelectField
-        label="Categoria *"
-        onChange={(val) => onChange("category", val)}
-        options={categoryOptions}
-        placeholder="Seleziona categoria"
-        searchable
-        searchPlaceholder="Cerca categoria..."
-        value={detail.category}
-      />
-
-      <SelectField
-        label="Ruolo *"
-        onChange={(val) => onChange("role", val)}
-        options={roleOptions}
-        placeholder="Seleziona ruolo"
-        value={detail.role}
-      />
     </View>
   );
 }
-
-const seasonDetailStyles = StyleSheet.create({
-  container: {
-    gap: spacing[10],
-    padding: spacing[14],
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  labelBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: spacing[10],
-    paddingVertical: spacing[4],
-    borderRadius: radius.full,
-    backgroundColor: colors.heroSoft,
-    borderWidth: 1,
-    borderColor: colors.hero,
-  },
-  labelText: {
-    color: colors.hero,
-  },
-});
 
 // ---------------------------------------------------------------------------
 // CoachExperienceForm
 // ---------------------------------------------------------------------------
 
+/**
+ * Editor di un'esperienza da allenatore (REV-ONB-03 §Q–§Z).
+ *
+ * Unico per le tre modalità e unico fra onboarding e profilo: una modifica
+ * riapre questo stesso form precompilato (§AB).
+ *
+ * Due differenze sostanziali rispetto al Calciatore:
+ * — nessuna statistica, mai, in nessuna modalità (§V);
+ * — dentro "Più stagioni complete" squadra e categoria restano le stesse,
+ *   mentre il ruolo può cambiare stagione per stagione (§S, §U).
+ */
 export function CoachExperienceForm({
-  categoryLabel = "Categoria *",
+  categoryLabel = "Categoria",
   categoryPlaceholder = "Seleziona categoria",
+  descriptionLabel = "Attività svolte",
+  descriptionPlaceholder = "Riassumi in una o due righe attività, gestione del gruppo o coordinamento sportivo.",
   entry,
   existingEntries = [],
   isEditing,
   onCancel,
   onSave,
-  roleLabel = "Ruolo *",
+  roleLabel = "Ruolo",
   roleOptions = COACH_ROLE_OPTIONS,
   rolePlaceholder = "Seleziona ruolo",
   searchTeams,
   showDescription = false,
-  teamLabel = "Squadra *",
-  teamPlaceholder = "Es. ASD Pro Calcio",
+  teamLabel = "Squadra",
+  teamPlaceholder = "Cerca la squadra",
   title,
-  descriptionLabel = "Attività svolte",
-  descriptionPlaceholder = "Riassumi in una o due righe attività, gestione del gruppo o coordinamento sportivo.",
 }: CoachExperienceFormProps) {
   const [form, setForm] = useState<CoachCareerEntry>(entry);
   const [errors, setErrors] = useState<FormErrors>({});
+
   const occupiedSeasons = useMemo(
     () => getOccupiedCoachSeasonLabels(existingEntries, entry.id),
     [existingEntries, entry.id],
@@ -418,133 +163,146 @@ export function CoachExperienceForm({
     () => getCoachSeasonSelectOptions(occupiedSeasons),
     [occupiedSeasons],
   );
-  const startYearOptions = useMemo(
-    () =>
-      getCoachStartYearOptions(
-        form.period?.endYear ?? "",
-        form.period?.endMonth ?? "",
-        form.period?.startMonth ?? "",
-        occupiedSeasons,
-      ),
-    [form.period?.endMonth, form.period?.endYear, form.period?.startMonth, occupiedSeasons],
-  );
-  const endYearOptions = useMemo(
-    () =>
-      getCoachEndYearOptions(
-        form.period?.startYear ?? "",
-        form.period?.startMonth ?? "",
-        occupiedSeasons,
-      ),
-    [form.period?.startMonth, form.period?.startYear, occupiedSeasons],
-  );
 
-  const effectiveSeasons = useMemo(() => {
-    if (form.type === "MULTI_SEASON") {
-      return form.seasons.length > 1 ? form.seasons : [];
+  /** Stagioni che meritano una riga "Ruolo per stagione", più recenti prima. */
+  const roleSeasons = useMemo(() => {
+    if (form.type !== "MULTI_SEASON" || form.seasons.length < 2) {
+      return [];
     }
-    if (form.type === "CUSTOM_PERIOD" && form.period) {
-      const seasons = computeCoachSeasonsFromPeriod(form.period);
-      return seasons.length > 1 ? seasons : [];
-    }
-    return [];
-  }, [form.type, form.seasons, form.period]);
 
-  const isMultiSeason = effectiveSeasons.length > 1;
+    return [...form.seasons].sort((left, right) => right.localeCompare(left));
+  }, [form.seasons, form.type]);
 
-  function updateField<K extends keyof CoachCareerEntry>(
-    key: K,
-    value: CoachCareerEntry[K],
-  ) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-    setErrors((prev) => ({ ...prev, [key]: undefined }));
+  const period = form.period ?? EMPTY_PERIOD;
+  const startValue = coachPeriodToDateValue(period.startMonth, period.startYear);
+  const endValue = coachPeriodToDateValue(period.endMonth, period.endYear);
+
+  function getSeasonRole(season: string) {
+    return form.seasonDetails[season]?.role ?? form.role;
   }
 
   function handleToggleSeason(season: string) {
-    setForm((prev) => {
-      const isSelected = prev.seasons.includes(season);
+    setForm((current) => {
+      const isSelected = current.seasons.includes(season);
       const nextSeasons = isSelected
-        ? prev.seasons.filter((s) => s !== season)
-        : [...prev.seasons, season];
+        ? current.seasons.filter((entrySeason) => entrySeason !== season)
+        : [...current.seasons, season];
 
-      const nextDetails = { ...prev.seasonDetails };
-      if (!isSelected && !nextDetails[season]) {
-        nextDetails[season] = { category: prev.category, role: prev.role };
-      }
+      const nextDetails: Record<string, CoachSeasonDetail> = {
+        ...current.seasonDetails,
+      };
+
       if (isSelected) {
         delete nextDetails[season];
-      }
-
-      return { ...prev, seasons: nextSeasons, seasonDetails: nextDetails };
-    });
-    setErrors((prev) => ({ ...prev, seasons: undefined }));
-  }
-
-  function handlePeriodChange(period: NonNullable<CoachCareerEntry["period"]>) {
-    const nextPeriod = sanitizeCoachPeriodSelection(period, occupiedSeasons);
-
-    setForm((prev) => {
-      const newSeasons = computeCoachSeasonsFromPeriod(nextPeriod);
-      if (newSeasons.length <= 1) {
-        return { ...prev, period: nextPeriod, seasonDetails: {} };
-      }
-      const nextDetails: Record<string, CoachSeasonDetail> = {};
-      for (const season of newSeasons) {
-        nextDetails[season] = prev.seasonDetails[season] ?? {
-          category: prev.category,
-          role: prev.role,
+      } else {
+        // Il ruolo principale è solo un default: da qui in poi la stagione
+        // vive di vita propria (§T).
+        nextDetails[season] = {
+          category: current.category,
+          role: current.role,
         };
       }
-      return { ...prev, period: nextPeriod, seasonDetails: nextDetails };
+
+      return { ...current, seasonDetails: nextDetails, seasons: nextSeasons };
     });
-    setErrors((prev) => ({
-      ...prev,
-      startYear: undefined,
-      endYear: undefined,
-      period: undefined,
-    }));
+    setErrors((current) => ({ ...current, seasons: undefined }));
   }
 
-  function handleSeasonDetailChange(
-    season: string,
-    field: keyof CoachSeasonDetail,
-    value: string,
-  ) {
-    setForm((prev) => ({
-      ...prev,
+  function handleSingleSeasonSelect(season: string) {
+    setForm((current) => ({
+      ...current,
+      seasonDetails: {},
+      seasons: season ? [season] : [],
+    }));
+    setErrors((current) => ({ ...current, seasons: undefined }));
+  }
+
+  /** Cambiare un anno non tocca gli altri (§T). */
+  function handleSeasonRoleChange(season: string, role: string) {
+    setForm((current) => ({
+      ...current,
       seasonDetails: {
-        ...prev.seasonDetails,
-        [season]: { ...(prev.seasonDetails[season] ?? { category: "", role: "" }), [field]: value },
+        ...current.seasonDetails,
+        [season]: { category: current.category, role },
       },
     }));
-    setErrors((prev) => ({ ...prev, seasonDetails: undefined }));
+    setErrors((current) => ({ ...current, seasonRoles: undefined }));
   }
 
-  function handleSave() {
+  function handleRoleChange(role: string) {
+    setForm((current) => {
+      const nextDetails: Record<string, CoachSeasonDetail> = {};
+
+      // Il nuovo ruolo principale ridiventa il default delle stagioni non
+      // ancora personalizzate; quelle già cambiate restano dove sono.
+      for (const [season, detail] of Object.entries(current.seasonDetails)) {
+        nextDetails[season] =
+          !detail.role || detail.role === current.role
+            ? { ...detail, role }
+            : detail;
+      }
+
+      return { ...current, role, seasonDetails: nextDetails };
+    });
+    setErrors((current) => ({ ...current, role: undefined }));
+  }
+
+  function handleCategoryChange(category: string) {
+    setForm((current) => {
+      const nextDetails: Record<string, CoachSeasonDetail> = {};
+
+      // §U: dentro un blocco la categoria è una sola, quindi si propaga.
+      for (const [season, detail] of Object.entries(current.seasonDetails)) {
+        nextDetails[season] = { ...detail, category };
+      }
+
+      return { ...current, category, seasonDetails: nextDetails };
+    });
+    setErrors((current) => ({ ...current, category: undefined }));
+  }
+
+  function handlePeriodChange(patch: Partial<Period>) {
+    const requested = { ...period, ...patch };
+    const sanitized = sanitizeCoachPeriodSelection(requested, occupiedSeasons);
+    /**
+     * La sanitizzazione azzera l'estremo opposto quando la nuova data lo
+     * renderebbe impossibile: senza dirlo, la data scomparsa sembrerebbe un
+     * bug (§BH).
+     */
+    const clearedStart = Boolean(requested.startYear) && !sanitized.startYear;
+    const clearedEnd = Boolean(requested.endYear) && !sanitized.endYear;
+    const conflictMessage =
+      "Questo periodo si sovrappone a un'esperienza già inserita: scegli di nuovo l'altra data.";
+
+    setForm((current) => ({
+      ...current,
+      period: sanitizeCoachPeriodSelection(
+        { ...(current.period ?? EMPTY_PERIOD), ...patch },
+        occupiedSeasons,
+      ),
+      seasonDetails: {},
+    }));
+    setErrors((current) => ({
+      ...current,
+      endDate: clearedEnd ? conflictMessage : undefined,
+      period: undefined,
+      startDate: clearedStart ? conflictMessage : undefined,
+    }));
+  }
+
+  function validate(): FormErrors {
     const nextErrors: FormErrors = {};
 
     if (!form.teamName.trim()) {
       nextErrors.teamName = "La squadra è obbligatoria.";
     }
 
-    if (!isMultiSeason) {
-      if (!form.role.trim()) {
-        nextErrors.role = "Seleziona un ruolo.";
-      }
-      if (!form.category.trim()) {
-        nextErrors.category = "Seleziona una categoria.";
-      }
-    } else {
-      for (const season of effectiveSeasons) {
-        const detail = form.seasonDetails[season];
-        if (!detail?.category) {
-          nextErrors.seasonDetails = `Seleziona una categoria per la stagione ${formatSeasonShort(season)}.`;
-          break;
-        }
-        if (!detail?.role) {
-          nextErrors.seasonDetails = `Seleziona un ruolo per la stagione ${formatSeasonShort(season)}.`;
-          break;
-        }
-      }
+    if (!form.role.trim()) {
+      nextErrors.role = "Seleziona un ruolo.";
+    }
+
+    if (!form.category.trim()) {
+      nextErrors.category = "Seleziona una categoria.";
     }
 
     if (form.type === "MULTI_SEASON" && form.seasons.length === 0) {
@@ -555,231 +313,261 @@ export function CoachExperienceForm({
       nextErrors.seasons = "Seleziona una stagione.";
     }
 
+    for (const season of roleSeasons) {
+      if (!getSeasonRole(season).trim()) {
+        nextErrors.seasonRoles = `Seleziona un ruolo per la stagione ${formatSeasonShort(season)}.`;
+        break;
+      }
+    }
+
     if (form.type === "CUSTOM_PERIOD") {
-      if (!form.period?.startYear) {
-        nextErrors.startYear = "L'anno di inizio è obbligatorio.";
+      if (!startValue) {
+        nextErrors.startDate = "Indica il mese e l'anno di inizio.";
       }
-      if (!form.period?.endYear) {
-        nextErrors.endYear = "L'anno di fine è obbligatorio.";
+
+      if (!endValue) {
+        nextErrors.endDate = "Indica il mese e l'anno di fine.";
       }
-      const overlappingSeasons = getCoachPeriodOverlapSeasons(
+
+      // §Z: la data finale non può precedere quella iniziale.
+      if (startValue && endValue && endValue < startValue) {
+        nextErrors.endDate =
+          "La data finale deve essere successiva alla data iniziale.";
+      }
+
+      const overlapping = getCoachPeriodOverlapSeasons(
         form.period,
         occupiedSeasons,
       );
-      if (overlappingSeasons.length > 0) {
-        const seasonLabels = overlappingSeasons.map(formatSeasonShort).join(", ");
+
+      if (overlapping.length > 0) {
+        const labels = overlapping.map(formatSeasonShort).join(", ");
+
         nextErrors.period =
-          overlappingSeasons.length === 1
-            ? `Il periodo personalizzato si sovrappone alla stagione ${seasonLabels} già inserita.`
-            : `Il periodo personalizzato si sovrappone alle stagioni ${seasonLabels} già inserite.`;
+          overlapping.length === 1
+            ? `Il periodo si sovrappone alla stagione ${labels} già inserita.`
+            : `Il periodo si sovrappone alle stagioni ${labels} già inserite.`;
       }
     }
+
+    return nextErrors;
+  }
+
+  function handleSave() {
+    const nextErrors = validate();
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
     }
 
-    const entryToSave: CoachCareerEntry = {
-      ...form,
-      id: form.id || generateCoachEntryId(),
-    };
-
-    onSave(entryToSave);
+    onSave({ ...form, id: form.id || generateCoachEntryId() });
   }
 
   return (
-    <View style={formStyles.container}>
-      <AppText variant="headingMd">
-        {title ?? (isEditing ? "Modifica esperienza" : "Dettagli esperienza")}
-      </AppText>
+    <View style={styles.container}>
+      {title ? <AppText variant="headingSm">{title}</AppText> : null}
 
-      {/* Team name */}
-      <View style={formStyles.fieldGroup}>
-        <TeamAutocompleteInput
-          label={teamLabel}
-          onChangeText={(val) =>
-            setForm((prev) => ({
-              ...prev,
-              clubId: null,
-              teamCity: "",
-              teamLogoUrl: null,
-              teamName: val,
-            }))
+      <OnboardingSection>
+        <FieldShell errorMessage={errors.teamName} label={teamLabel}>
+          <TeamAutocompleteInput
+            onChangeText={(value) =>
+              setForm((current) => ({
+                ...current,
+                clubId: null,
+                teamCity: "",
+                teamLogoUrl: null,
+                teamName: value,
+              }))
+            }
+            onSelectTeam={(team) =>
+              setForm((current) => ({
+                ...current,
+                clubId: team.id,
+                teamCity: team.city ?? "",
+                teamLogoUrl: team.logoUrl,
+                teamName: team.name,
+              }))
+            }
+            placeholder={teamPlaceholder}
+            searchTeams={searchTeams}
+            value={form.teamName}
+          />
+        </FieldShell>
+
+        <OnboardingSelectField
+          errorMessage={errors.role}
+          helperText={
+            form.type === "MULTI_SEASON"
+              ? "Puoi cambiarlo per singola stagione qui sotto."
+              : undefined
           }
-          onSelectTeam={(team) =>
-            setForm((prev) => ({
-              ...prev,
-              clubId: team.id,
-              teamCity: team.city ?? "",
-              teamLogoUrl: team.logoUrl,
-              teamName: team.name,
-            }))
-          }
-          placeholder={teamPlaceholder}
-          searchTeams={searchTeams}
-          value={form.teamName}
+          label={roleLabel}
+          onChange={handleRoleChange}
+          options={roleOptions}
+          placeholder={rolePlaceholder}
+          sheetTitle="Ruolo"
+          testID="coach-experience-role"
+          value={form.role}
         />
-        {errors.teamName ? (
-          <AppText variant="caption" color="danger">
-            {errors.teamName}
-          </AppText>
-        ) : null}
-      </View>
 
-      {/* Category — only shown when single season */}
-      {!isMultiSeason ? (
-        <View style={formStyles.fieldGroup}>
-          <SelectField
-            label={categoryLabel}
-            onChange={(val) => updateField("category", val)}
-            options={COACH_EXPERIENCE_CATEGORY_OPTIONS}
-            placeholder={categoryPlaceholder}
-            searchable
-            searchPlaceholder="Cerca categoria..."
-            value={form.category}
-          />
-          {errors.category ? (
-            <AppText variant="caption" color="danger">
-              {errors.category}
-            </AppText>
-          ) : null}
-        </View>
-      ) : null}
+        <OnboardingSelectField
+          errorMessage={errors.category}
+          label={categoryLabel}
+          onChange={handleCategoryChange}
+          options={COACH_EXPERIENCE_CATEGORY_OPTIONS}
+          placeholder={categoryPlaceholder}
+          searchable
+          sheetTitle="Categoria"
+          testID="coach-experience-category"
+          value={form.category}
+        />
 
-      {/* Role — only shown when single season */}
-      {!isMultiSeason ? (
-        <View style={formStyles.fieldGroup}>
-          <SelectField
-            label={roleLabel}
-            onChange={(val) => updateField("role", val)}
-            options={roleOptions}
-            placeholder={rolePlaceholder}
-            value={form.role}
-          />
-          {errors.role ? (
-            <AppText variant="caption" color="danger">
-              {errors.role}
-            </AppText>
-          ) : null}
-        </View>
-      ) : null}
-
-      {/* Duration content by type */}
-      {form.type === "MULTI_SEASON" ? (
-        <View style={formStyles.fieldGroup}>
-          <AppText variant="caption" color="muted">
-            Stagioni (seleziona tutte quelle applicabili)
-          </AppText>
-          <SeasonChipGrid
+        {form.type === "MULTI_SEASON" ? (
+          <MultiSeasonSelector
             disabledSeasons={occupiedSeasons}
+            errorMessage={errors.seasons}
+            helperText="Seleziona tutte le stagioni nella stessa squadra."
             onToggle={handleToggleSeason}
             selectedSeasons={form.seasons}
+            testID="coach-multi-season-selector"
           />
-          {errors.seasons ? (
-            <AppText variant="caption" color="danger">
-              {errors.seasons}
-            </AppText>
-          ) : null}
-        </View>
-      ) : null}
+        ) : null}
 
-      {form.type === "SINGLE_SEASON" ? (
-        <View style={formStyles.fieldGroup}>
-          <SelectField
+        {form.type === "SINGLE_SEASON" ? (
+          <OnboardingSelectField
+            errorMessage={errors.seasons}
             label="Stagione"
-            onChange={(val) =>
-              setForm((prev) => ({ ...prev, seasons: val ? [val] : [] }))
-            }
+            onChange={handleSingleSeasonSelect}
             options={seasonOptions}
-            placeholder="Seleziona stagione"
+            placeholder="Seleziona la stagione"
             searchable
-            searchPlaceholder="Cerca stagione..."
+            sheetTitle="Stagione"
+            testID="coach-single-season-select"
             value={form.seasons[0] ?? ""}
           />
-          {errors.seasons ? (
-            <AppText variant="caption" color="danger">
-              {errors.seasons}
-            </AppText>
-          ) : null}
-        </View>
-      ) : null}
+        ) : null}
 
-      {form.type === "CUSTOM_PERIOD" ? (
-        <PeriodSelector
-          endYearOptions={endYearOptions}
-          endYearError={errors.endYear}
-          onChange={handlePeriodChange}
-          period={form.period}
-          periodError={errors.period}
-          startYearOptions={startYearOptions}
-          startYearError={errors.startYear}
-        />
-      ) : null}
+        {form.type === "CUSTOM_PERIOD" ? (
+          <>
+            {/* §Y: due sole righe, ognuna sceglie mese e anno insieme. */}
+            <PeriodField
+              endErrorMessage={errors.endDate}
+              endLabel="A"
+              endPlaceholder="Mese e anno di fine"
+              endTestID="coach-period-end"
+              endValue={endValue}
+              mode="monthYear"
+              onEndChange={(value) => {
+                const { month, year } = coachPeriodFromDateValue(value);
 
-      {/* Per-season category + role — only when multiple seasons selected */}
-      {isMultiSeason ? (
-        <View style={formStyles.fieldGroup}>
-          <AppText variant="caption" color="muted">
-            Categoria e ruolo per stagione
-          </AppText>
-          <View style={formStyles.seasonDetailsSection}>
-            {effectiveSeasons.map((season) => (
-              <SeasonDetailCard
-                key={season}
-                categoryOptions={COACH_EXPERIENCE_CATEGORY_OPTIONS}
-                detail={form.seasonDetails[season] ?? { category: form.category, role: form.role }}
-                onChange={(field, value) => handleSeasonDetailChange(season, field, value)}
-                roleOptions={roleOptions}
-                season={season}
-              />
-            ))}
-          </View>
-          {errors.seasonDetails ? (
-            <AppText variant="caption" color="danger">
-              {errors.seasonDetails}
-            </AppText>
-          ) : null}
-        </View>
-      ) : null}
+                handlePeriodChange({ endMonth: month, endYear: year });
+              }}
+              onStartChange={(value) => {
+                const { month, year } = coachPeriodFromDateValue(value);
 
-      {showDescription ? (
-        <View style={formStyles.fieldGroup}>
-          <Input
+                handlePeriodChange({ startMonth: month, startYear: year });
+              }}
+              startErrorMessage={errors.startDate}
+              startLabel="Da"
+              startPlaceholder="Mese e anno di inizio"
+              startTestID="coach-period-start"
+              startValue={startValue}
+            />
+
+            {errors.period ? <InlineError message={errors.period} /> : null}
+          </>
+        ) : null}
+
+        {showDescription ? (
+          <OnboardingTextField
             label={descriptionLabel}
             multiline
             numberOfLines={3}
-            onChangeText={(value) => updateField("description", value)}
+            onChangeText={(value) =>
+              setForm((current) => ({ ...current, description: value }))
+            }
+            optional
             placeholder={descriptionPlaceholder}
-            style={formStyles.descriptionInput}
-            textAlignVertical="top"
             value={form.description ?? ""}
           />
-        </View>
+        ) : null}
+      </OnboardingSection>
+
+      {roleSeasons.length > 0 ? (
+        <OnboardingSection
+          description="Un allenatore può avere ruoli diversi nelle diverse stagioni."
+          title="Ruolo per stagione"
+        >
+          <View style={styles.seasonList} testID="coach-season-roles">
+            {roleSeasons.map((season, index) => (
+              <SeasonRoleRow
+                isLast={index === roleSeasons.length - 1}
+                key={season}
+                onChange={(role) => handleSeasonRoleChange(season, role)}
+                roleOptions={roleOptions}
+                season={season}
+                value={getSeasonRole(season)}
+              />
+            ))}
+          </View>
+
+          {errors.seasonRoles ? (
+            <InlineError message={errors.seasonRoles} />
+          ) : null}
+        </OnboardingSection>
       ) : null}
 
-      {/* Action buttons */}
-      <Button
-        label={isEditing ? "Salva modifiche" : "Salva esperienza"}
-        onPress={handleSave}
-        variant="primary"
-      />
-      <Button label="Annulla" onPress={onCancel} variant="tertiary" />
+      <View style={styles.actions}>
+        <Button
+          fullWidth
+          label={isEditing ? "Salva modifiche" : "Salva esperienza"}
+          onPress={handleSave}
+          size="lg"
+          testID="coach-save-experience"
+          variant="primary"
+        />
+        <Button
+          fullWidth
+          label="Annulla"
+          onPress={onCancel}
+          size="md"
+          variant="tertiary"
+        />
+      </View>
     </View>
   );
 }
 
-const formStyles = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
-    gap: spacing[18],
+    gap: onboardingSpacing.s,
   },
-  fieldGroup: {
-    gap: spacing[8],
+  seasonList: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: onboardingRadius.card,
+    borderWidth: onboardingBorderWidth.hairline,
+    paddingHorizontal: onboardingSpacing.m - 4,
   },
-  descriptionInput: {
-    minHeight: 96,
+  seasonRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: onboardingSpacing.s + 4,
+    paddingVertical: onboardingSpacing.s + 2,
   },
-  seasonDetailsSection: {
-    gap: spacing[12],
+  seasonRowDivider: {
+    borderBottomColor: colors.divider,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  seasonLabel: {
+    minWidth: 62,
+  },
+  seasonControl: {
+    flex: 1,
+  },
+  actions: {
+    gap: onboardingSpacing.s,
+    paddingTop: onboardingSpacing.s,
   },
 });

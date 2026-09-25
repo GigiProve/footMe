@@ -44,7 +44,8 @@ import { AppText, Input, SectionCard } from "../../../ui";
 import { EditModalShell } from "./EditModalShell";
 import { WhereToPlaySection } from "../../onboarding/where-to-play-section";
 import type { AvailabilityType } from "../../onboarding/onboarding-form";
-import { AVAILABLE_FROM_OPTIONS, COACH_PRIMARY_ROLE_OPTIONS } from "../../onboarding/coach/CoachRoleStep";
+import { COACH_PRIMARY_ROLE_OPTIONS } from "../../onboarding/coach/coach-options";
+import { DateSelector } from "../../onboarding/ui";
 import type { ProfileGender } from "../../onboarding/create-initial-profile";
 import { OnboardingBaseFieldsSection } from "./OnboardingBaseFieldsSection";
 
@@ -587,13 +588,16 @@ export function EditCoachProfileModal({
           toggleSubtitle="Il tuo profilo può comparire tra gli allenatori disponibili."
         />
         {form.openToNewRole ? (
-          <SelectField
-            allowClear
-            clearLabel="Rimuovi disponibilità"
+          /* Stesso picker mese + anno dell'onboarding Allenatore (REV-ONB-03 §I). */
+          <DateSelector
+            firstYear={new Date().getFullYear() - 1}
             label="Disponibile da"
+            lastYear={new Date().getFullYear() + 6}
+            mode="monthYear"
             onChange={(value) => patch("coachAvailableFrom", value)}
-            options={AVAILABLE_FROM_OPTIONS}
-            placeholder="Seleziona disponibilità"
+            optional
+            placeholder="Seleziona mese e anno"
+            sheetTitle="Disponibile da"
             value={form.coachAvailableFrom}
           />
         ) : null}

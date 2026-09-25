@@ -9,7 +9,7 @@ import { AppText, Button, Input, SectionCard } from "../../../ui";
 import type { ProfileGender } from "../../onboarding/create-initial-profile";
 import type { AvailabilityType } from "../../onboarding/onboarding-form";
 import { STAFF_ROLE_OPTIONS } from "../../onboarding/onboarding-types";
-import { AVAILABLE_FROM_OPTIONS } from "../../onboarding/coach/CoachRoleStep";
+import { AVAILABLE_FROM_OPTIONS } from "../../onboarding/coach/coach-options";
 import { WhereToPlaySection } from "../../onboarding/where-to-play-section";
 import {
   pickAndUploadMedia,

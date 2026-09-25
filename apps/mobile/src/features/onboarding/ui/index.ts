@@ -20,6 +20,7 @@ export {
   OnboardingMultiSelectField,
   buildSelectionSummary,
 } from "./OnboardingMultiSelectField";
+export { OnboardingChipMultiSelect } from "./OnboardingChipMultiSelect";
 export {
   BottomSheetSelector,
   type SelectorOption,
