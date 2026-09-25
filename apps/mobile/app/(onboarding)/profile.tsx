@@ -19,7 +19,6 @@ import { NationalityAutocompleteInput } from "../../src/components/ui/nationalit
 import { PhoneInputWithCountryCode } from "../../src/components/ui/phone-input-with-country-code";
 import { ResidenceCityInput } from "../../src/components/ui/residence-city-input";
 import { SelectField } from "../../src/components/ui/select-field";
-import { WheelPickerField } from "../../src/components/ui/wheel-picker-field";
 import { useSession } from "../../src/features/auth/use-session";
 import {
   createInitialProfile,
@@ -56,6 +55,11 @@ import {
   SegmentedSelector,
   onboardingLayout,
 } from "../../src/features/onboarding/ui";
+import {
+  isPlayerMasterStep,
+  PlayerOnboardingFlow,
+  trackPlayerOnboardingEvent,
+} from "../../src/features/onboarding/player";
 import { ONBOARDING_ROLE_OPTIONS } from "../../src/features/onboarding/onboarding-roles";
 import { WhereToPlaySection } from "../../src/features/onboarding/where-to-play-section";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
@@ -114,10 +118,8 @@ import {
   MediaCollaborationsStep,
   MediaEntityStep,
 } from "../../src/features/onboarding/community";
-import { PlayerCharacteristicsSection } from "../../src/features/profiles/player-sports-section";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
-  excludePrimaryFromSecondaryPositions,
   parsePlayerExperienceForms,
   SENIOR_CATEGORY_OPTIONS,
   YOUTH_CATEGORY_OPTIONS,
@@ -404,9 +406,13 @@ export default function OnboardingProfileScreen() {
   routerRef.current = router;
   const stepBackOverrideRef = useRef<(() => void) | null>(null);
 
-  const registerCoachCareerBack = useCallback((fn: (() => void) | null) => {
-    stepBackOverrideRef.current = fn;
-  }, []);
+  /** Back di sistema delegato alla schermata interna di uno step (§DB). */
+  const registerStepBackOverride = useCallback(
+    (handler: (() => void) | null) => {
+      stepBackOverrideRef.current = handler;
+    },
+    [],
+  );
   const params = useLocalSearchParams<{ step?: string | string[] }>();
   const { refreshProfile, session } = useSession();
   const {
@@ -1150,9 +1156,18 @@ export default function OnboardingProfileScreen() {
     }
 
     setValidationErrors({});
+    trackPlayerOnboardingEvent({
+      name: "onboarding_profile_type_selected",
+      profileType: role,
+    });
+
     if (role === "fan" || role === "media") {
       navigateToStep("community_profile_type");
       return;
+    }
+
+    if (role === "player") {
+      trackPlayerOnboardingEvent({ name: "player_onboarding_started" });
     }
 
     navigateToStep(form.role === "club_admin" ? "club_representative" : "base");
@@ -1207,6 +1222,11 @@ export default function OnboardingProfileScreen() {
 
     setValidationErrors({});
     patchForm({ lastCompletedStep: "base" });
+
+    if (role === "player") {
+      trackPlayerOnboardingEvent({ name: "personal_info_completed" });
+    }
+
     navigateToStep("photo");
   }
 
@@ -1258,6 +1278,10 @@ export default function OnboardingProfileScreen() {
 
     setValidationErrors({});
     patchForm({ lastCompletedStep: "player_availability" });
+    trackPlayerOnboardingEvent({
+      experienceCount: careerEntries.length,
+      name: "career_step_opened",
+    });
     navigateToStep("experience");
   }
 
@@ -1458,8 +1482,13 @@ export default function OnboardingProfileScreen() {
         throw error;
       }
 
+      trackPlayerOnboardingEvent({
+        experienceCount: normalizedCareerEntries.length,
+        name: "player_onboarding_completed",
+      });
       goToCompletion("experience");
     } catch (error) {
+      // §CD: un errore di rete non azzera il form, che resta nella bozza.
       const message =
         error instanceof Error
           ? error.message
@@ -2417,6 +2446,10 @@ export default function OnboardingProfileScreen() {
   }
 
   if (step === "complete") {
+    // §BJ–§BL: per il Calciatore la chiusura ha un solo invito e nessun
+    // riepilogo del profilo.
+    const isPlayer = role === "player";
+
     return (
       <>
         <Stack.Screen
@@ -2427,11 +2460,86 @@ export default function OnboardingProfileScreen() {
           }}
         />
         <OnboardingCompletion
-          description={getCompletionDescription(role)}
+          description={
+            isPlayer
+              ? "Benvenuto in ProLink. Ora puoi iniziare a creare connessioni e scoprire nuove opportunità."
+              : getCompletionDescription(role)
+          }
           onPrimaryPress={() => finishOnboarding("feed")}
-          onSecondaryPress={() => finishOnboarding("profile")}
-          primaryLabel="Entra in ProLink"
-          secondaryLabel="Completa ulteriormente il profilo"
+          onSecondaryPress={
+            isPlayer ? undefined : () => finishOnboarding("profile")
+          }
+          primaryLabel={isPlayer ? "Scopri ProLink" : "Entra in ProLink"}
+          secondaryLabel={
+            isPlayer ? undefined : "Completa ulteriormente il profilo"
+          }
+          title="Il tuo profilo è pronto"
+        />
+      </>
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // Calciatore: i suoi passi vivono sulle pagine intere del Master
+  // (REV-ONB-02). La rotta resta proprietaria di navigazione e salvataggio.
+  // ---------------------------------------------------------------------
+  if (isPlayerMasterStep(step, role)) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            fullScreenGestureEnabled: false,
+            gestureEnabled: false,
+            headerShown: false,
+          }}
+        />
+        <PlayerOnboardingFlow
+          counter={counter}
+          form={form}
+          isBusy={isBusy}
+          nationalityCategory={nationalityCategory}
+          onBack={handleBackNavigation}
+          onClearValidationErrors={clearValidationErrors}
+          onContinueFromAvailability={handleContinueFromPlayerAvailability}
+          onContinueFromPersonalData={handleContinueFromBase}
+          onContinueFromPhoto={handleContinueFromPhoto}
+          onContinueFromSportsProfile={handleContinueFromTechnical}
+          onDomicileChange={handleDomicileChange}
+          onDomicileSelect={handleDomicileSelect}
+          onDomicileToggle={handleDomicileToggle}
+          onFormattedNameBlur={handleFormattedNameBlur}
+          onNationalityChange={handleNationalitySelect}
+          onPatchForm={patchForm}
+          onPickPhotoFromLibrary={() =>
+            handleMediaUpload({
+              field: "avatar",
+              folder: "avatars",
+              mediaTypes: ["images"],
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          onRegisterBack={registerStepBackOverride}
+          onRemovePhoto={() => updateValue("avatarUrl", "")}
+          onResidenceChange={handleResidenceChange}
+          onResidenceSelect={handleResidenceSelect}
+          onSaveCareer={handleSaveExperiences}
+          onShowPhysicalFieldsChange={setShowPhysicalFields}
+          onTakePhoto={() =>
+            handleCameraCapture({
+              field: "avatar",
+              folder: "avatars",
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          photoPreviewUrl={
+            avatarUrl ? withDefaultProfileAvatar(avatarUrl) : null
+          }
+          searchTeams={searchTeams}
+          showPhysicalFields={showPhysicalFields}
+          step={step}
+          validationErrors={validationErrors}
         />
       </>
     );
@@ -3165,89 +3273,6 @@ export default function OnboardingProfileScreen() {
         {/* ============================================================= */}
         {step === "technical" ? (
           <View style={styles.stepContainer}>
-            {role === "player" ? (
-              <>
-                <OnboardingSectionCard
-                  title="Informazioni tecniche"
-                  subtitle="Definisci il tuo profilo tecnico: ruolo, caratteristiche fisiche e piede preferito."
-                >
-                  <PlayerCharacteristicsSection
-                    editable
-                    primaryPositionError={validationErrors.primaryPosition}
-                    onPreferredFootChange={(value) =>
-                      updateValue("preferredFoot", value)
-                    }
-                    onPrimaryPositionChange={(value) => {
-                      patchForm({
-                        primaryPosition: value,
-                        secondaryPositions:
-                          excludePrimaryFromSecondaryPositions(
-                            secondaryPositions,
-                            value,
-                          ),
-                      });
-                      clearValidationErrors([
-                        "primaryPosition",
-                        "secondaryPositions",
-                      ]);
-                    }}
-                    onSecondaryPositionsChange={(value) => {
-                      patchForm({
-                        secondaryPositions:
-                          excludePrimaryFromSecondaryPositions(
-                            value,
-                            primaryPosition,
-                          ),
-                      });
-                      clearValidationErrors(["secondaryPositions"]);
-                    }}
-                    preferredFoot={preferredFoot}
-                    primaryPosition={primaryPosition}
-                    secondaryPositions={secondaryPositions}
-                  />
-
-                  <Toggle
-                    label="Vuoi mostrare altezza e peso nel profilo?"
-                    onValueChange={(value) => {
-                      setShowPhysicalFields(value);
-                      if (!value) {
-                        patchForm({ heightCm: "", weightKg: "" });
-                      }
-                    }}
-                    value={showPhysicalFields}
-                  />
-                  {showPhysicalFields ? (
-                    <View style={styles.buttonRow}>
-                      <View style={styles.flex1}>
-                        <WheelPickerField
-                          label="Altezza"
-                          max={220}
-                          min={140}
-                          onChange={(value) =>
-                            updateValue("heightCm", String(value))
-                          }
-                          unit="cm"
-                          value={parseWheelValue(heightCm)}
-                        />
-                      </View>
-                      <View style={styles.flex1}>
-                        <WheelPickerField
-                          label="Peso"
-                          max={130}
-                          min={40}
-                          onChange={(value) =>
-                            updateValue("weightKg", String(value))
-                          }
-                          unit="kg"
-                          value={parseWheelValue(weightKg)}
-                        />
-                      </View>
-                    </View>
-                  ) : null}
-                </OnboardingSectionCard>
-              </>
-            ) : null}
-
             {role === "coach" ? (
               <OnboardingSectionCard
                 title="Profilo allenatore"
@@ -3342,90 +3367,6 @@ export default function OnboardingProfileScreen() {
               </View>
             </View>
           </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Player Availability (dove vuoi giocare)                   */}
-        {/* ============================================================= */}
-        {step === "player_availability" ? (
-          <View style={styles.stepContainer}>
-            <OnboardingSectionCard
-              title="Dove vuoi giocare?"
-              subtitle="Seleziona le zone in cui sei disponibile a giocare e le categorie in cui vuoi ricevere opportunità."
-            >
-              <WhereToPlaySection
-                availabilityType={availabilityType}
-                categories={fromDelimitedString(preferredCategories)}
-                isAvailable={isOpenToTransfer}
-                onAvailabilityTypeChange={(type) => {
-                  patchForm({ availabilityType: type });
-                  clearValidationErrors([
-                    "transferRegions",
-                    "transferProvinces",
-                  ]);
-                }}
-                onCategoriesChange={(categories) => {
-                  updateValue("preferredCategories", categories.join(", "));
-                  clearValidationErrors(["preferredCategories"]);
-                }}
-                onIsAvailableChange={(value) => {
-                  patchForm({
-                    isOpenToTransfer: value,
-                    willingToChangeClub: value,
-                  });
-                  if (!value) {
-                    clearValidationErrors([
-                      "transferRegions",
-                      "transferProvinces",
-                      "preferredCategories",
-                    ]);
-                  }
-                }}
-                onProvincesChange={(nextProvinces) => {
-                  updateValue("transferProvinces", nextProvinces.join(", "));
-                  clearValidationErrors(["transferProvinces"]);
-                }}
-                onRegionsChange={(nextRegions) => {
-                  updateValue("transferRegions", nextRegions.join(", "));
-                  clearValidationErrors(["transferRegions"]);
-                }}
-                provinces={fromDelimitedString(transferProvinces)}
-                regions={fromDelimitedString(transferRegions)}
-                validationErrors={validationErrors}
-              />
-            </OnboardingSectionCard>
-            <View style={styles.buttonRow}>
-              <View style={styles.flex1}>
-                <Button
-                  label="Indietro"
-                  onPress={handleBackNavigation}
-                  variant="secondary"
-                />
-              </View>
-              <View style={styles.flex1}>
-                <Button
-                  disabled={isBusy}
-                  label="Continua"
-                  onPress={handleContinueFromPlayerAvailability}
-                  variant="primary"
-                />
-              </View>
-            </View>
-          </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Experience (player only, optional)                        */}
-        {/* ============================================================= */}
-        {step === "experience" ? (
-          <CareerExperienceStep
-            careerEntries={careerEntries}
-            isBusy={isBusy}
-            onSaveAndContinue={handleSaveExperiences}
-            onSkip={handleSaveExperiences}
-            onUpdateEntries={(entries) => updateValue("careerEntries", entries)}
-            searchTeams={searchTeams}
-          />
         ) : null}
 
         {step === "agent_agency" ? (
@@ -3720,7 +3661,7 @@ export default function OnboardingProfileScreen() {
             entries={coachCareerEntries as CoachCareerEntry[]}
             isBusy={isBusy}
             onContinue={handleContinueFromCoachCareer}
-            onRegisterBack={registerCoachCareerBack}
+            onRegisterBack={registerStepBackOverride}
             onSkip={handleContinueFromCoachCareer}
             onUpdateEntries={(entries) =>
               patchForm({ coachCareerEntries: entries })
@@ -4390,7 +4331,7 @@ export default function OnboardingProfileScreen() {
             entries={directorCareerEntries}
             isBusy={isBusy}
             onContinue={handleContinueFromDirectorCareer}
-            onRegisterBack={registerCoachCareerBack}
+            onRegisterBack={registerStepBackOverride}
             onSkip={handleContinueFromDirectorCareer}
             onUpdateEntries={(entries) =>
               patchForm({ directorCareerEntries: entries })
@@ -4447,7 +4388,7 @@ export default function OnboardingProfileScreen() {
             entries={directorCoachCareerEntries}
             isBusy={isBusy}
             onContinue={handleContinueFromDirectorCoachCareer}
-            onRegisterBack={registerCoachCareerBack}
+            onRegisterBack={registerStepBackOverride}
             onSkip={handleContinueFromDirectorCoachCareer}
             onUpdateEntries={(entries) =>
               patchForm({ directorCoachCareerEntries: entries })

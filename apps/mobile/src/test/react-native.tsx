@@ -233,3 +233,21 @@ export const Platform = {
   OS: "ios",
 };
 export const findNodeHandle = () => 1;
+
+/**
+ * `useReduceMotion` interroga AccessibilityInfo al mount: senza questo doppio
+ * ogni schermata che usa il progress o un toggle esplode in test.
+ */
+export const AccessibilityInfo = {
+  addEventListener: () => ({ remove: () => {} }),
+  isReduceMotionEnabled: () => Promise.resolve(false),
+};
+
+export const LayoutAnimation = {
+  Presets: { easeInEaseOut: {} },
+  configureNext: () => {},
+};
+
+export const UIManager = {
+  setLayoutAnimationEnabledExperimental: undefined,
+};

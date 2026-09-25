@@ -1,34 +1,18 @@
-import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, spacing } from "../../../theme/tokens";
-import { AppText, Button } from "../../../ui";
-import type { PlayerExperienceForm, TeamAutocompleteOption } from "../../profiles/player-sports";
-import { OnboardingInfoCard, OnboardingSectionCard } from "../onboarding-ui";
-import type { PlayerCareerEntry } from "./player-career-types";
-import {
-  formsToPlayerEntries,
-  generatePlayerEntryId,
-  playerEntriesToForms,
-  splitPlayerEntryBySeasonDetails,
-} from "./player-career-utils";
-import { PlayerCareerExperienceCard } from "./PlayerCareerExperienceCard";
+import { colors } from "../../../styles";
+import { Button } from "../../../ui";
+import type {
+  PlayerExperienceForm,
+  TeamAutocompleteOption,
+} from "../../profiles/player-sports";
+import { OnboardingEmptyState, OnboardingSection } from "../ui";
+import { onboardingSpacing } from "../ui/onboarding-tokens";
+import { CareerExperienceRow } from "./CareerExperienceRow";
 import { PlayerExperienceForm as PlayerExperienceFormComponent } from "./PlayerExperienceForm";
 import { PlayerExperienceTypeSelector } from "./PlayerExperienceTypeSelector";
-
-// ---------------------------------------------------------------------------
-// Internal flow screens
-// ---------------------------------------------------------------------------
-
-type FlowScreen =
-  | { type: "list" }
-  | { type: "select-type" }
-  | { type: "form"; entry: PlayerCareerEntry; editIndex: number | null };
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
+import { useCareerExperienceFlow } from "./use-career-experience-flow";
 
 type CareerExperienceStepProps = {
   addButtonLabel?: string;
@@ -43,166 +27,80 @@ type CareerExperienceStepProps = {
   title?: string;
 };
 
-// ---------------------------------------------------------------------------
-// CareerExperienceStep
-// ---------------------------------------------------------------------------
-
+/**
+ * Carriera calcistica come contenuto di uno step già incorniciato dalla
+ * rotta. Il Calciatore usa invece `PlayerCareerStep`, che monta le stesse
+ * parti su pagine intere: qui restano i flussi che non sono ancora passati
+ * al Master (allenatore, staff, agente, dirigente).
+ */
 export function CareerExperienceStep({
   addButtonLabel = "Aggiungi esperienza",
   careerEntries,
-  emptyMessage = "Puoi aggiungere le tue esperienze calcistiche ora oppure farlo in seguito dal tuo profilo.",
+  emptyMessage = "Aggiungi la tua prima esperienza per completare il profilo.",
   isBusy,
   onSaveAndContinue,
   onSkip,
   onUpdateEntries,
   searchTeams,
-  subtitle = "Aggiungi le tue esperienze calcistiche per completare il tuo profilo.",
+  subtitle = "Raccontaci la tua esperienza calcistica.",
   title = "La tua carriera",
 }: CareerExperienceStepProps) {
-  const [screen, setScreen] = useState<FlowScreen>({ type: "list" });
+  const flow = useCareerExperienceFlow({ careerEntries, onUpdateEntries });
+  const hasEntries = flow.entries.length > 0;
 
-  // Reconstruct PlayerCareerEntry[] from existing form entries
-  const entries = formsToPlayerEntries(careerEntries);
-  const hasEntries = entries.length > 0;
-
-  // ----------------------------------
-  // Handlers
-  // ----------------------------------
-
-  function handleSelectType(type: PlayerCareerEntry["type"]) {
-    setScreen({
-      type: "form",
-      entry: {
-        clubId: null,
-        id: generatePlayerEntryId(),
-        teamName: "",
-        teamCity: "",
-        teamLogoUrl: "",
-        category: "",
-        type,
-        seasons: [],
-        period: null,
-        seasonDetails: {},
-      },
-      editIndex: null,
-    });
-  }
-
-  function handleEdit(index: number) {
-    setScreen({
-      type: "form",
-      entry: { ...entries[index] },
-      editIndex: index,
-    });
-  }
-
-  function handleFormSave(saved: PlayerCareerEntry) {
-    const editIndex = screen.type === "form" ? screen.editIndex : null;
-    const splitEntries = splitPlayerEntryBySeasonDetails(saved);
-    let updated: PlayerCareerEntry[];
-
-    if (editIndex !== null) {
-      updated = [
-        ...entries.slice(0, editIndex),
-        ...splitEntries,
-        ...entries.slice(editIndex + 1),
-      ];
-    } else {
-      updated = [...entries, ...splitEntries];
-    }
-
-    onUpdateEntries(playerEntriesToForms(updated));
-    setScreen({ type: "list" });
-  }
-
-  function handleFormCancel() {
-    setScreen({ type: "list" });
-  }
-
-  // ----------------------------------
-  // Render: Type Selector
-  // ----------------------------------
-
-  if (screen.type === "select-type") {
+  if (flow.screen.type === "select-type") {
     return (
-      <View style={stepStyles.container}>
-        <OnboardingSectionCard>
-          <PlayerExperienceTypeSelector onSelect={handleSelectType} />
-        </OnboardingSectionCard>
+      <View style={styles.container}>
+        <PlayerExperienceTypeSelector
+          onSelect={flow.selectType}
+          title="Aggiungi esperienza"
+        />
+        <Button label="Annulla" onPress={flow.cancel} variant="tertiary" />
       </View>
     );
   }
 
-  // ----------------------------------
-  // Render: Form
-  // ----------------------------------
-
-  if (screen.type === "form") {
-    const typeLabels: Record<PlayerCareerEntry["type"], string> = {
-      MULTI_SEASON: "Più stagioni",
-      SINGLE_SEASON: "Singola stagione",
-      CUSTOM_PERIOD: "Periodo personalizzato",
-    };
-    const typeBadge = typeLabels[screen.entry.type];
-
+  if (flow.screen.type === "form") {
     return (
-      <View style={stepStyles.container}>
-        <OnboardingSectionCard>
-          <View style={stepStyles.formBadgeRow}>
-            <View style={stepStyles.typeBadge}>
-              <AppText variant="caption" style={stepStyles.typeBadgeText}>
-                {typeBadge}
-              </AppText>
-            </View>
-          </View>
-
-          <PlayerExperienceFormComponent
-            entry={screen.entry}
-            existingEntries={entries}
-            isEditing={screen.editIndex !== null}
-            onCancel={handleFormCancel}
-            onSave={handleFormSave}
-            searchTeams={searchTeams}
-          />
-        </OnboardingSectionCard>
+      <View style={styles.container}>
+        <PlayerExperienceFormComponent
+          entry={flow.screen.entry}
+          existingEntries={flow.entries}
+          isEditing={flow.screen.editIndex !== null}
+          onCancel={flow.cancel}
+          onSave={flow.save}
+          searchTeams={searchTeams}
+          title="Dettagli esperienza"
+        />
       </View>
     );
   }
-
-  // ----------------------------------
-  // Render: List
-  // ----------------------------------
 
   return (
-    <View style={stepStyles.container}>
-      <OnboardingSectionCard title={title} subtitle={subtitle}>
-        {!hasEntries ? (
-          <View style={stepStyles.emptyIcon}>
-            <Ionicons name="trophy-outline" size={48} color={colors.accent} />
-          </View>
-        ) : null}
-
-        {!hasEntries ? (
-          <OnboardingInfoCard message={emptyMessage} />
-        ) : null}
-
-        {entries.map((entry, index) => (
-          <PlayerCareerExperienceCard
-            entry={entry}
-            key={entry.id}
-            onEdit={() => handleEdit(index)}
+    <View style={styles.container}>
+      <OnboardingSection description={subtitle} title={title}>
+        {hasEntries ? (
+          flow.entries.map((entry, index) => (
+            <CareerExperienceRow
+              entry={entry}
+              key={entry.id}
+              onEdit={() => flow.edit(index)}
+            />
+          ))
+        ) : (
+          <OnboardingEmptyState
+            description={emptyMessage}
+            title="Nessuna esperienza aggiunta"
           />
-        ))}
+        )}
 
         <Button
           label={addButtonLabel}
-          leftIcon={
-            <Ionicons name="add-outline" size={20} color={colors.accent} />
-          }
-          onPress={() => setScreen({ type: "select-type" })}
+          leftIcon={<Ionicons color={colors.accent} name="add" size={18} />}
+          onPress={flow.startAdding}
           variant="secondary"
         />
-      </OnboardingSectionCard>
+      </OnboardingSection>
 
       <Button
         disabled={isBusy}
@@ -214,30 +112,8 @@ export function CareerExperienceStep({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
-const stepStyles = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
-    gap: spacing[16],
-  },
-  emptyIcon: {
-    alignItems: "center",
-    paddingVertical: spacing[16],
-  },
-  formBadgeRow: {
-    flexDirection: "row",
-  },
-  typeBadge: {
-    paddingHorizontal: spacing[10],
-    paddingVertical: spacing[4],
-    borderRadius: radius.full,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  typeBadgeText: {
-    color: colors.accentStrong,
+    gap: onboardingSpacing.m,
   },
 });

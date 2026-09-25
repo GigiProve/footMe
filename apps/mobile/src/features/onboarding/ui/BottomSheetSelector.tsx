@@ -52,6 +52,14 @@ type BottomSheetSelectorProps<T extends string> = SingleProps<T> | MultiProps<T>
 const MAX_LIST_HEIGHT = 380;
 
 /**
+ * CTA di conferma di una selezione multipla: porta con sé il numero di voci
+ * scelte — "Conferma [3]" — così l'utente non deve ricontarle (§Z).
+ */
+export function buildConfirmLabel(label: string, count: number) {
+  return count > 0 ? `${label} [${count}]` : label;
+}
+
+/**
  * Selector condiviso a bottom sheet (§X). È l'unico modo in cui l'onboarding
  * presenta liste lunghe: nessun ruolo apre una lista con una UI propria.
  *
@@ -272,7 +280,10 @@ export function BottomSheetSelector<T extends string>(
             </AppText>
             <Button
               fullWidth
-              label={props.confirmLabel ?? "Conferma"}
+              label={buildConfirmLabel(
+                props.confirmLabel ?? "Conferma",
+                draft.length,
+              )}
               onPress={() => {
                 props.onConfirm(draft);
                 onClose();

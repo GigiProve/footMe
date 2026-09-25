@@ -34,6 +34,12 @@ type OnboardingPageProps = {
   onBack?: () => void;
   /** Footer sticky con la CTA primaria. Omesso, la pagina non mostra footer. */
   footer?: OnboardingPageFooter;
+  /**
+   * `false` quando il contenuto scorre da sé — una lista lunga che deve
+   * restare virtualizzata. In quel caso il figlio riceve l'area piena e si
+   * occupa del proprio scroll; il resto della pagina non cambia.
+   */
+  scrollable?: boolean;
   testID?: string;
 };
 
@@ -48,6 +54,7 @@ export function OnboardingPage({
   currentStep,
   footer,
   onBack,
+  scrollable = true,
   stepLabel,
   subtitle,
   testID,
@@ -55,6 +62,17 @@ export function OnboardingPage({
   totalSteps,
 }: OnboardingPageProps) {
   const insets = useSafeAreaInsets();
+
+  const heading = title ? (
+    <View style={styles.titleGroup}>
+      <AppText variant="screenTitle">{title}</AppText>
+      {subtitle ? (
+        <AppText color="secondary" variant="bodyLg">
+          {subtitle}
+        </AppText>
+      ) : null}
+    </View>
+  ) : null;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]} testID={testID}>
@@ -65,20 +83,17 @@ export function OnboardingPage({
         totalSteps={totalSteps}
       />
 
-      <KeyboardAwareForm contentContainerStyle={styles.content}>
-        {title ? (
-          <View style={styles.titleGroup}>
-            <AppText variant="screenTitle">{title}</AppText>
-            {subtitle ? (
-              <AppText color="secondary" variant="bodyLg">
-                {subtitle}
-              </AppText>
-            ) : null}
-          </View>
-        ) : null}
-
-        {children}
-      </KeyboardAwareForm>
+      {scrollable ? (
+        <KeyboardAwareForm contentContainerStyle={styles.content}>
+          {heading}
+          {children}
+        </KeyboardAwareForm>
+      ) : (
+        <View style={styles.staticContent}>
+          {heading}
+          {children}
+        </View>
+      )}
 
       {footer ? (
         <OnboardingFooter {...footer} bottomInset={insets.bottom} />
@@ -94,6 +109,11 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: onboardingLayout.pagePaddingBottom,
+    paddingHorizontal: onboardingLayout.pagePaddingHorizontal,
+    paddingTop: onboardingLayout.pagePaddingTop,
+  },
+  staticContent: {
+    flex: 1,
     paddingHorizontal: onboardingLayout.pagePaddingHorizontal,
     paddingTop: onboardingLayout.pagePaddingTop,
   },

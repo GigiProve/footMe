@@ -1640,6 +1640,23 @@ function mapCommunityProfileTypeValidationError(
   };
 }
 
+/**
+ * Una data di nascita nel futuro non esiste (REV-ONB-02 §I). Il picker
+ * ferma già gli anni all'anno corrente: qui si chiude il mese.
+ */
+function isFutureDate(value: string) {
+  const parsed = Date.parse(value);
+
+  if (Number.isNaN(parsed)) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
+  return parsed > today.getTime();
+}
+
 function mapSimpleCommunityBasicValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
@@ -1890,6 +1907,8 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
 
   if (!form.birthDate.trim()) {
     errors.birthDate = "Questo campo è obbligatorio";
+  } else if (isFutureDate(form.birthDate)) {
+    errors.birthDate = "La data di nascita non può essere nel futuro.";
   }
 
   if (!form.nationality.trim()) {

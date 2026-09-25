@@ -1,87 +1,101 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, spacing } from "../../../theme/tokens";
+import { colors } from "../../../styles";
 import { AppText } from "../../../ui";
+import {
+  onboardingBorderWidth,
+  onboardingLayout,
+  onboardingRadius,
+  onboardingSpacing,
+} from "../ui/onboarding-tokens";
 import type { PlayerCareerType } from "./player-career-types";
 
+type PlayerExperienceTypeOption = {
+  icon: keyof typeof Ionicons.glyphMap;
+  subtitle: string;
+  title: string;
+  type: PlayerCareerType;
+};
+
 type PlayerExperienceTypeSelectorProps = {
-  options?: {
-    icon: keyof typeof Ionicons.glyphMap;
-    subtitle: string;
-    title: string;
-    type: PlayerCareerType;
-  }[];
+  options?: PlayerExperienceTypeOption[];
   subtitle?: string;
   title?: string;
   onSelect: (type: PlayerCareerType) => void;
 };
 
-const typeOptions: {
-  type: PlayerCareerType;
-  title: string;
-  subtitle: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}[] = [
+/** §AE–§AG: esattamente tre tipologie, nessuna quarta. */
+const typeOptions: PlayerExperienceTypeOption[] = [
   {
-    type: "MULTI_SEASON",
-    title: "Più stagioni complete",
-    subtitle:
-      "Es. 2022/23, 2023/24 nella stessa squadra con la stessa categoria.",
     icon: "layers-outline",
+    subtitle: "Es. 2022/23, 2023/24 nella stessa squadra.",
+    title: "Più stagioni complete",
+    type: "MULTI_SEASON",
   },
   {
-    type: "SINGLE_SEASON",
-    title: "Singola stagione",
-    subtitle: "Es. 2023/24, una sola stagione sportiva.",
     icon: "calendar-outline",
+    subtitle: "Es. 2023/24, una sola stagione sportiva.",
+    title: "Singola stagione",
+    type: "SINGLE_SEASON",
   },
   {
-    type: "CUSTOM_PERIOD",
-    title: "Periodo personalizzato",
-    subtitle:
-      "Es. da Gennaio 2023 a Maggio 2023. Utile per prestiti o periodi brevi.",
     icon: "time-outline",
+    subtitle: "Es. da Gennaio 2025 a Maggio 2025. Utile per prestiti o periodi brevi.",
+    title: "Periodo personalizzato",
+    type: "CUSTOM_PERIOD",
   },
 ];
 
+/**
+ * Scelta della tipologia di esperienza (REV-ONB-02 §AD–§AG).
+ *
+ * Ogni card apre un editor: mostra quindi un chevron, mai un check (§S).
+ */
 export function PlayerExperienceTypeSelector({
+  onSelect,
   options = typeOptions,
   subtitle = "Che tipo di esperienza vuoi inserire?",
-  title = "Aggiungi esperienza",
-  onSelect,
+  title,
 }: PlayerExperienceTypeSelectorProps) {
   return (
-    <View style={selectorStyles.container}>
-      <AppText variant="headingMd">{title}</AppText>
-      <AppText variant="bodySm" color="secondary">
-        {subtitle}
-      </AppText>
+    <View style={styles.container}>
+      {title ? <AppText variant="headingSm">{title}</AppText> : null}
+      {subtitle ? (
+        <AppText color="secondary" variant="bodyLg">
+          {subtitle}
+        </AppText>
+      ) : null}
 
-      <View style={selectorStyles.optionsContainer}>
+      <View style={styles.options}>
         {options.map((option) => (
           <Pressable
+            accessibilityHint="Apre i dettagli dell'esperienza"
+            accessibilityLabel={option.title}
             accessibilityRole="button"
             key={option.type}
             onPress={() => onSelect(option.type)}
             style={({ pressed }) => [
-              selectorStyles.optionCard,
-              pressed ? selectorStyles.optionCardPressed : null,
+              styles.card,
+              pressed ? styles.cardPressed : null,
             ]}
+            testID={`experience-type-${option.type}`}
           >
-            <View style={selectorStyles.optionIcon}>
-              <Ionicons name={option.icon} size={24} color={colors.accentStrong} />
+            <View style={styles.iconShell}>
+              <Ionicons color={colors.accent} name={option.icon} size={20} />
             </View>
-            <View style={selectorStyles.optionText}>
-              <AppText variant="titleMd">{option.title}</AppText>
-              <AppText variant="bodySm" color="secondary">
+
+            <View style={styles.body}>
+              <AppText variant="titleSm">{option.title}</AppText>
+              <AppText color="secondary" variant="meta">
                 {option.subtitle}
               </AppText>
             </View>
+
             <Ionicons
+              color={colors.textMuted}
               name="chevron-forward"
-              size={20}
-              color={colors.textSecondary}
+              size={18}
             />
           </Pressable>
         ))}
@@ -90,37 +104,39 @@ export function PlayerExperienceTypeSelector({
   );
 }
 
-const selectorStyles = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
-    gap: spacing[12],
+    gap: onboardingSpacing.s,
   },
-  optionsContainer: {
-    gap: spacing[12],
-    marginTop: spacing[8],
+  options: {
+    gap: onboardingSpacing.s + 4,
+    paddingTop: onboardingSpacing.s,
   },
-  optionCard: {
-    flexDirection: "row",
+  card: {
     alignItems: "center",
-    gap: spacing[14],
-    padding: spacing[18],
     backgroundColor: colors.surface,
-    borderRadius: radius[12],
-    borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: onboardingRadius.card,
+    borderWidth: onboardingBorderWidth.hairline,
+    flexDirection: "row",
+    gap: onboardingSpacing.s + 4,
+    minHeight: onboardingLayout.rowMinHeight + 10,
+    paddingHorizontal: onboardingSpacing.m - 2,
+    paddingVertical: onboardingSpacing.s + 4,
   },
-  optionCardPressed: {
+  cardPressed: {
     backgroundColor: colors.surfaceMuted,
   },
-  optionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.full,
-    backgroundColor: colors.accentSoft,
+  iconShell: {
     alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    borderRadius: onboardingRadius.pill,
+    height: 40,
     justifyContent: "center",
+    width: 40,
   },
-  optionText: {
+  body: {
     flex: 1,
-    gap: spacing[4],
+    gap: 2,
   },
 });

@@ -49,7 +49,8 @@ import {
 const TEAM_SEARCH_DEBOUNCE_MS = 250;
 
 type TeamAutocompleteInputProps = {
-  label: string;
+  /** Omessa quando la label la fornisce già il campo che lo contiene. */
+  label?: string;
   onChangeText: (value: string) => void;
   onSelectTeam: (team: TeamAutocompleteOption) => void;
   placeholder?: string;
@@ -276,7 +277,7 @@ export function TeamAutocompleteInput({
 
   return (
     <View style={styles.fieldGroup}>
-      <Text style={styles.subsectionLabel}>{label}</Text>
+      {label ? <Text style={styles.subsectionLabel}>{label}</Text> : null}
       <Input
         autoCapitalize="words"
         onChangeText={(nextValue) => {

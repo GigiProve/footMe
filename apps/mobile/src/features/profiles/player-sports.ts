@@ -42,10 +42,24 @@ export type TeamAutocompleteOption = {
 
 export type SeasonPeriod = "full" | "partial";
 
+/**
+ * Tipologia dichiarata di un'esperienza (REV-ONB-02 §CF). Viaggia insieme
+ * alla riga di stagione per non dover dedurre il tipo dai campi valorizzati.
+ */
+export type PlayerCareerTypeTag =
+  | "MULTI_SEASON"
+  | "SINGLE_SEASON"
+  | "CUSTOM_PERIOD";
+
 export type PlayerExperienceForm = {
   appearances: string;
   assists: string;
   awards: string;
+  /**
+   * Tipo dichiarato dell'esperienza a cui la riga appartiene. Assente sulle
+   * esperienze legacy: in quel caso viene ricostruito dai campi (§DG).
+   */
+  careerType?: PlayerCareerTypeTag;
   category: string;
   clubId: string | null;
   clubName: string;

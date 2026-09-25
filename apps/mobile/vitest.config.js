@@ -25,6 +25,10 @@ module.exports = defineConfig({
         process.cwd(),
         "src/test/async-storage.ts",
       ),
+      "react-native-svg": path.resolve(
+        process.cwd(),
+        "src/test/react-native-svg.tsx",
+      ),
       "react-native": path.resolve(process.cwd(), "src/test/react-native.tsx"),
       "react-native-safe-area-context": path.resolve(
         process.cwd(),

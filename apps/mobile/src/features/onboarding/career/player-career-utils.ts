@@ -40,6 +40,110 @@ export const MONTH_LABEL_TO_NUM: Record<string, number> = {
   Dicembre: 12,
 };
 
+export const MONTH_NUM_TO_LABEL: Record<number, string> = Object.fromEntries(
+  Object.entries(MONTH_LABEL_TO_NUM).map(([label, num]) => [num, label]),
+);
+
+// ---------------------------------------------------------------------------
+// Mese del periodo personalizzato
+// ---------------------------------------------------------------------------
+
+/**
+ * `PlayerCareerEntry.period` porta il mese come etichetta italiana, ma il
+ * livello di persistenza vuole un numero (§CI): una stringa localizzata non
+ * può essere l'unica fonte di verità. Queste due funzioni sono il confine.
+ */
+export function playerPeriodMonthToNumber(month: string): string {
+  if (!month) {
+    return "";
+  }
+
+  const fromLabel = MONTH_LABEL_TO_NUM[month];
+
+  if (fromLabel) {
+    return String(fromLabel);
+  }
+
+  const parsed = Number.parseInt(month, 10);
+
+  return parsed >= 1 && parsed <= 12 ? String(parsed) : "";
+}
+
+export function playerPeriodMonthToLabel(month: string): string {
+  if (!month) {
+    return "";
+  }
+
+  if (MONTH_LABEL_TO_NUM[month]) {
+    return month;
+  }
+
+  const parsed = Number.parseInt(month, 10);
+
+  return MONTH_NUM_TO_LABEL[parsed] ?? "";
+}
+
+/**
+ * Anno di calendario di un estremo del periodo, ricostruito dalla stagione
+ * che lo contiene e dal mese.
+ *
+ * È l'inverso esatto di `computePlayerSeasonsFromPeriod`: la stagione va da
+ * luglio dell'anno X a giugno di X+1, quindi un mese da gennaio a giugno
+ * appartiene alla seconda metà dell'etichetta. Senza questa inversione
+ * riaprire un'esperienza salvata sposterebbe indietro la data di inizio a
+ * ogni salvataggio.
+ */
+export function playerPeriodYearFromSeason(
+  seasonLabel: string,
+  month: string,
+  edge: "start" | "end",
+): string {
+  const seasonStart = Number.parseInt(seasonLabel.split("/")[0] ?? "", 10);
+
+  if (Number.isNaN(seasonStart)) {
+    return "";
+  }
+
+  const monthNumber = Number.parseInt(playerPeriodMonthToNumber(month), 10);
+
+  if (edge === "start") {
+    // Senza mese l'inizio coincide con l'apertura della stagione.
+    return String(
+      !Number.isNaN(monthNumber) && monthNumber <= 6
+        ? seasonStart + 1
+        : seasonStart,
+    );
+  }
+
+  return String(
+    !Number.isNaN(monthNumber) && monthNumber >= 7 ? seasonStart : seasonStart + 1,
+  );
+}
+
+/** Valore canonico del `DateSelector` in modalità mese+anno: "2026-01". */
+export function playerPeriodToDateValue(month: string, year: string): string {
+  const monthNumber = playerPeriodMonthToNumber(month);
+
+  if (!year || !monthNumber) {
+    return "";
+  }
+
+  return `${year}-${monthNumber.padStart(2, "0")}`;
+}
+
+export function playerPeriodFromDateValue(value: string): {
+  month: string;
+  year: string;
+} {
+  const [year, month] = value.split("-");
+
+  if (!year || !month) {
+    return { month: "", year: "" };
+  }
+
+  return { month: playerPeriodMonthToLabel(month), year };
+}
+
 // ---------------------------------------------------------------------------
 // ID generation
 // ---------------------------------------------------------------------------
@@ -449,13 +553,14 @@ export function validatePlayerEntry(
 export function splitPlayerEntryBySeasonDetails(
   entry: PlayerCareerEntry,
 ): PlayerCareerEntry[] {
-  let seasons: string[];
-  if (entry.type === "CUSTOM_PERIOD" && entry.period) {
-    seasons = computePlayerSeasonsFromPeriod(entry.period);
-  } else {
-    seasons = entry.seasons;
+  // Un periodo personalizzato non si spezza: le sue date sono il dato, e
+  // trasformarlo in più stagioni complete le perderebbe (§CF, §CI). Le sue
+  // categorie per stagione restano dentro `seasonDetails`.
+  if (entry.type === "CUSTOM_PERIOD") {
+    return [entry];
   }
 
+  const seasons = entry.seasons;
   const details = entry.seasonDetails ?? {};
 
   // Nothing to split: single season or no per-season details
@@ -476,17 +581,29 @@ export function splitPlayerEntryBySeasonDetails(
     groups.get(key)!.seasons.push(season);
   }
 
+  /** Le statistiche appartengono alla stagione, non al gruppo (§AM). */
+  function pickDetails(groupSeasons: string[]) {
+    const picked: Record<string, PlayerSeasonDetail> = {};
+
+    for (const season of groupSeasons) {
+      if (details[season]) {
+        picked[season] = details[season];
+      }
+    }
+
+    return picked;
+  }
+
   // All seasons share the same category — just normalise the entry
   if (groups.size === 1) {
     const [group] = groups.values();
     return [
       {
         ...entry,
-        type: entry.type === "CUSTOM_PERIOD" ? "MULTI_SEASON" : entry.type,
         category: group.category,
         seasons: group.seasons,
         period: null,
-        seasonDetails: {},
+        seasonDetails: pickDetails(group.seasons),
       },
     ];
   }
@@ -499,16 +616,57 @@ export function splitPlayerEntryBySeasonDetails(
     result.push({
       ...entry,
       id: isFirst ? entry.id : generatePlayerEntryId(),
-      type: "MULTI_SEASON",
+      // Un gruppo rimasto con una sola stagione è una stagione singola:
+      // etichettarlo MULTI_SEASON lo bloccherebbe in quella modalità.
+      type: group.seasons.length === 1 ? "SINGLE_SEASON" : "MULTI_SEASON",
       category: group.category,
       seasons: group.seasons,
       period: null,
-      seasonDetails: {},
+      seasonDetails: pickDetails(group.seasons),
     });
     isFirst = false;
   }
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Ordinamento del riepilogo carriera
+// ---------------------------------------------------------------------------
+
+/**
+ * Anno di riferimento più recente di un'esperienza: l'ultima stagione per
+ * stagione singola e multipla, l'anno di fine per il periodo personalizzato.
+ */
+export function getPlayerEntryRecencyKey(entry: PlayerCareerEntry): number {
+  if (entry.type === "CUSTOM_PERIOD" && entry.period) {
+    const endYear = parseInt(entry.period.endYear, 10);
+    const endMonth = entry.period.endMonth
+      ? (MONTH_LABEL_TO_NUM[entry.period.endMonth] ?? 12)
+      : 12;
+
+    return Number.isNaN(endYear) ? 0 : endYear * 12 + endMonth;
+  }
+
+  const years = entry.seasons
+    .map((season) => parseInt(season.split("/")[0] ?? "", 10))
+    .filter((year) => !Number.isNaN(year));
+
+  // Una stagione sportiva si chiude a giugno dell'anno successivo.
+  return years.length === 0 ? 0 : (Math.max(...years) + 1) * 12 + 6;
+}
+
+/**
+ * Riepilogo carriera ordinato dalla più recente alla più vecchia (§BH).
+ * Funziona mischiando le tre modalità perché la chiave è sempre temporale.
+ */
+export function sortPlayerEntriesByRecency(
+  entries: PlayerCareerEntry[],
+): PlayerCareerEntry[] {
+  return [...entries].sort(
+    (left, right) =>
+      getPlayerEntryRecencyKey(right) - getPlayerEntryRecencyKey(left),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -528,6 +686,7 @@ export function playerEntriesToForms(
           appearances: detail?.appearances || "",
           assists: detail?.assists || "",
           awards: detail?.awards || "",
+          careerType: entry.type,
           category: detail?.category || entry.category,
           clubId: entry.clubId ?? null,
           clubName: entry.teamName,
@@ -563,14 +722,21 @@ export function playerEntriesToForms(
           appearances: detail?.appearances || "",
           assists: detail?.assists || "",
           awards: detail?.awards || "",
+          careerType: entry.type,
           category: detail?.category || entry.category,
           clubId: entry.clubId ?? null,
           clubName: entry.teamName,
           goals: detail?.goals || "",
           groupId: entry.id,
           minutesPlayed: detail?.minutesPlayed || "",
-          periodEndMonth: isLast && entry.period ? entry.period.endMonth || "" : "",
-          periodStartMonth: isFirst && entry.period ? entry.period.startMonth || "" : "",
+          periodEndMonth:
+            isLast && entry.period
+              ? playerPeriodMonthToNumber(entry.period.endMonth)
+              : "",
+          periodStartMonth:
+            isFirst && entry.period
+              ? playerPeriodMonthToNumber(entry.period.startMonth)
+              : "",
           seasonLabel: season,
           seasonPeriod,
           teamCity: entry.teamCity ?? "",
@@ -590,21 +756,20 @@ export function formsToPlayerEntries(
 
   const groups = new Map<string, PlayerExperienceForm[]>();
 
+  /**
+   * Chiave di raggruppamento delle righe che arrivano dal database, dove né
+   * il tipo né l'id di gruppo sopravvivono: restano solo squadra e categoria.
+   *
+   * Un periodo personalizzato su più stagioni produce righe miste — le due
+   * estreme "partial", quelle in mezzo "full" — e distinguerle nella chiave
+   * spezzerebbe l'esperienza in tre. Squadra più categoria le tiene insieme,
+   * con la stessa tolleranza già accettata per le stagioni complete.
+   */
   function getFallbackGroupKey(form: PlayerExperienceForm): string {
     const clubKey = (form.clubId?.trim() || form.clubName.trim()).toLowerCase();
     const categoryKey = form.category.trim().toLowerCase();
 
-    if (form.seasonPeriod === "partial") {
-      return [
-        "partial",
-        clubKey,
-        categoryKey,
-        form.periodStartMonth.trim(),
-        form.periodEndMonth.trim(),
-      ].join(":");
-    }
-
-    return ["full", clubKey, categoryKey].join(":");
+    return [clubKey, categoryKey].join(":");
   }
 
   for (const form of forms) {
@@ -618,7 +783,12 @@ export function formsToPlayerEntries(
 
   for (const [, group] of groups) {
     const first = group[0];
-    const hasPartial = group.some((f) => f.seasonPeriod === "partial");
+    // Il tipo dichiarato vince sempre; i campi valorizzati sono solo il
+    // fallback per le esperienze legacy che non lo portano (§CF, §DG).
+    const declaredType = group.find((f) => f.careerType)?.careerType;
+    const hasPartial =
+      declaredType === "CUSTOM_PERIOD" ||
+      (!declaredType && group.some((f) => f.seasonPeriod === "partial"));
 
     if (hasPartial) {
       // CUSTOM_PERIOD
@@ -649,19 +819,29 @@ export function formsToPlayerEntries(
         type: "CUSTOM_PERIOD",
         seasons: [],
         period: {
-          startMonth: withStart.periodStartMonth || "",
-          startYear: withStart.seasonLabel.split("/")[0] || "",
-          endMonth: withEnd.periodEndMonth || "",
-          endYear:
-            withEnd.seasonLabel.split("/")[1] ||
-            String(Number(withEnd.seasonLabel.split("/")[0]) + 1),
+          startMonth: playerPeriodMonthToLabel(withStart.periodStartMonth),
+          startYear: playerPeriodYearFromSeason(
+            withStart.seasonLabel,
+            withStart.periodStartMonth,
+            "start",
+          ),
+          endMonth: playerPeriodMonthToLabel(withEnd.periodEndMonth),
+          endYear: playerPeriodYearFromSeason(
+            withEnd.seasonLabel,
+            withEnd.periodEndMonth,
+            "end",
+          ),
         },
         seasonDetails,
       });
     } else {
       const seasons = group.map((f) => f.seasonLabel).filter(Boolean);
       const type: PlayerCareerEntry["type"] =
-        seasons.length === 1 ? "SINGLE_SEASON" : "MULTI_SEASON";
+        declaredType === "MULTI_SEASON" || declaredType === "SINGLE_SEASON"
+          ? declaredType
+          : seasons.length === 1
+            ? "SINGLE_SEASON"
+            : "MULTI_SEASON";
 
       const seasonDetails: Record<string, PlayerSeasonDetail> = {};
       for (const f of group) {

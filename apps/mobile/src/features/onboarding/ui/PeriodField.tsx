@@ -22,6 +22,10 @@ type PeriodFieldProps = {
   currentLabel?: string;
   startErrorMessage?: string;
   endErrorMessage?: string;
+  startPlaceholder?: string;
+  endPlaceholder?: string;
+  startTestID?: string;
+  endTestID?: string;
 };
 
 /**
@@ -32,6 +36,8 @@ export function PeriodField({
   currentLabel = "In corso",
   endErrorMessage,
   endLabel = "Fine",
+  endPlaceholder,
+  endTestID,
   endValue,
   isCurrent = false,
   mode = "monthYear",
@@ -40,6 +46,8 @@ export function PeriodField({
   onStartChange,
   startErrorMessage,
   startLabel = "Inizio",
+  startPlaceholder,
+  startTestID,
   startValue,
 }: PeriodFieldProps) {
   return (
@@ -49,6 +57,9 @@ export function PeriodField({
         label={startLabel}
         mode={mode}
         onChange={onStartChange}
+        placeholder={startPlaceholder}
+        sheetTitle={startLabel}
+        testID={startTestID}
         value={startValue}
       />
 
@@ -66,6 +77,9 @@ export function PeriodField({
           label={endLabel}
           mode={mode}
           onChange={onEndChange}
+          placeholder={endPlaceholder}
+          sheetTitle={endLabel}
+          testID={endTestID}
           value={endValue}
         />
       )}

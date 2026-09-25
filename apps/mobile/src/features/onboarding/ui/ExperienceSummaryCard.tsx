@@ -48,7 +48,12 @@ export function ExperienceSummaryCard({
             {title}
           </AppText>
           {period ? (
-            <AppText color="secondary" variant="metaStrong">
+            <AppText
+              color="secondary"
+              numberOfLines={1}
+              style={styles.period}
+              variant="metaStrong"
+            >
               {period}
             </AppText>
           ) : null}
@@ -117,6 +122,11 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
+  },
+  /** Un periodo lungo ("2023/24, 2022/23, 2021/22") non schiaccia il nome. */
+  period: {
+    flexShrink: 1,
+    maxWidth: "50%",
   },
   action: {
     alignItems: "center",
