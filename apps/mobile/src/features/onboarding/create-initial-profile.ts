@@ -132,7 +132,9 @@ export function validateBaseProfileStep(input: CreateInitialProfileInput): Valid
     const missingFields = [
       input.role !== "agent" &&
       input.role !== "director" &&
-      input.role !== "fan" &&
+      // REV-ONB-08 §H: il Tifoso usa i Dati personali del Master, sesso
+      // compreso. Resta escluso solo il Media / Creator, che ha ancora la
+      // sua schermata semplificata in attesa della task dedicata.
       input.role !== "media" &&
       !input.gender
         ? "sesso"

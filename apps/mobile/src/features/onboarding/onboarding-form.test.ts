@@ -69,7 +69,7 @@ describe("onboarding-form", () => {
     });
   });
 
-  it("requires the community profile type before entering fan or media onboarding", () => {
+  it("requires the community path before entering the fan or media onboarding", () => {
     const errors = validateOnboardingStep("community_profile_type", {
       ...defaultOnboardingFormState,
       role: "fan",
@@ -80,10 +80,10 @@ describe("onboarding-form", () => {
     });
   });
 
-  it("validates the simplified fan/media basic step", () => {
-    const errors = validateOnboardingStep("fan_basic", {
+  it("validates the simplified media basic step", () => {
+    const errors = validateOnboardingStep("media_basic", {
       ...defaultOnboardingFormState,
-      role: "fan",
+      role: "media",
     });
 
     expect(errors).toMatchObject({
@@ -274,16 +274,65 @@ describe("onboarding-form", () => {
     ).toEqual({ agentFederation: "Seleziona la federazione o l'ente." });
   });
 
-  it("requires fast interests before completing the fan onboarding", () => {
-    const errors = validateOnboardingStep("fan_interests", {
-      ...defaultOnboardingFormState,
-      role: "fan",
+  /**
+   * REV-ONB-08 §N: senza almeno una tipologia non c'è nulla da personalizzare,
+   * quindi è l'unico obbligo dello step.
+   */
+  it("requires at least one kind of football before continuing", () => {
+    expect(
+      validateOnboardingStep("fan_football_types", {
+        ...defaultOnboardingFormState,
+        role: "fan",
+      }),
+    ).toEqual({
+      fanFootballTypes: "Seleziona almeno una tipologia di calcio da seguire.",
     });
 
-    expect(errors).toEqual({
-      fanInterestCategories: "Seleziona almeno una categoria di interesse.",
-      fanInterestRegions: "Seleziona almeno una regione di interesse.",
-    });
+    expect(
+      validateOnboardingStep("fan_football_types", {
+        ...defaultOnboardingFormState,
+        fanFootballTypes: ["amateur"],
+        role: "fan",
+      }),
+    ).toEqual({});
+  });
+
+  /**
+   * §R, §AL: "Tutta Italia" è già una risposta completa; le altre due
+   * modalità valgono solo con il loro dettaglio.
+   */
+  it("requires the detail of the selected geographic mode", () => {
+    expect(
+      validateOnboardingStep("fan_territories", {
+        ...defaultOnboardingFormState,
+        role: "fan",
+      }),
+    ).toEqual({});
+
+    expect(
+      validateOnboardingStep("fan_territories", {
+        ...defaultOnboardingFormState,
+        fanGeoScope: "REGIONS",
+        role: "fan",
+      }),
+    ).toEqual({ fanGeoScope: "Seleziona almeno una regione." });
+
+    expect(
+      validateOnboardingStep("fan_territories", {
+        ...defaultOnboardingFormState,
+        fanGeoScope: "PROVINCES",
+        role: "fan",
+      }),
+    ).toEqual({ fanGeoScope: "Seleziona almeno una provincia." });
+
+    expect(
+      validateOnboardingStep("fan_territories", {
+        ...defaultOnboardingFormState,
+        fanGeoScope: "PROVINCES",
+        fanProvinces: ["Milano"],
+        role: "fan",
+      }),
+    ).toEqual({});
   });
 
   it("requires media page details and editorial selections", () => {
@@ -645,18 +694,47 @@ describe("onboarding-form", () => {
 
   it("maps fan and media progress to the new community flows", () => {
     expect(getOnboardingProgress("community_profile_type", "fan")).toMatchObject({
-      percentage: 25,
+      percentage: 20,
       stepIndex: 0,
-      totalSteps: 4,
+      totalSteps: 5,
     });
     expect(getOnboardingProgress("media_channels", "media")).toMatchObject({
       percentage: 88,
       stepIndex: 6,
       totalSteps: 8,
     });
-    expect(getPreviousOnboardingStep("complete", null, "fan")).toBe("fan_interests");
+    expect(getPreviousOnboardingStep("complete", null, "fan")).toBe(
+      "fan_territories",
+    );
     expect(getPreviousOnboardingStep("complete", null, "media")).toBe(
       "media_collaborations",
     );
+  });
+
+  /**
+   * REV-ONB-08 §AK, §AU: una bozza aperta con il vecchio flusso Appassionato
+   * non deve ricominciare da zero né puntare a schermate rimosse.
+   */
+  it("migrates legacy fan drafts onto the master steps", () => {
+    const draft = normalizeOnboardingDraft({
+      currentStep: "fan_interests",
+      lastCompletedStep: "fan_photo",
+      role: "fan",
+    });
+
+    expect(draft.currentStep).toBe("fan_football_types");
+    expect(draft.lastCompletedStep).toBe("photo");
+    expect(draft.fanGeoScope).toBe("ITALY");
+    expect(draft.fanFootballTypes).toEqual([]);
+  });
+
+  it("keeps only the known football types when rereading a draft", () => {
+    const draft = normalizeOnboardingDraft({
+      // Una bozza salvata è JSON: può contenere token che oggi non esistono più.
+      fanFootballTypes: ["amateur", "serie-a", "women"] as never,
+      role: "fan",
+    });
+
+    expect(draft.fanFootballTypes).toEqual(["amateur", "women"]);
   });
 });

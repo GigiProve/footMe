@@ -388,7 +388,9 @@ describe("createInitialProfile", () => {
       clubRegion: "",
       domicile: "",
       fullName: "Fan Example",
-      gender: "" as never,
+      // REV-ONB-08 §H: il Tifoso passa dai Dati personali del Master, che
+      // chiedono il sesso come a ogni altro profilo.
+      gender: "male",
       nationality: "",
       phoneNumber: "",
       primaryPosition: "midfielder",

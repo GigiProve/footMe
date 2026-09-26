@@ -48,7 +48,7 @@ export const roleLabels: Record<AppRole, string> = {
   club_admin: "Societa'",
   coach: "Allenatore",
   director: "Dirigente",
-  fan: "Appassionato",
+  fan: "Tifoso",
   media: "Media",
   player: "Calciatore",
   staff: "Staff tecnico",

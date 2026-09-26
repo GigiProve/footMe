@@ -26,6 +26,10 @@ import {
   type AgentProfessionalMode,
 } from "./agent/agent-taxonomy";
 import {
+  isFanFootballType,
+  type FanFootballType,
+} from "./community/fan-taxonomy";
+import {
   type ClubStructure,
   clubStructureHasFirstTeam,
   clubStructureHasYouth,
@@ -50,9 +54,8 @@ export type OnboardingStep =
   | "technical"
   | "player_availability"
   | "experience"
-  | "fan_basic"
-  | "fan_photo"
-  | "fan_interests"
+  | "fan_football_types"
+  | "fan_territories"
   | "media_basic"
   | "media_photo"
   | "media_entity"
@@ -113,6 +116,10 @@ export type OnboardingStep =
   | "director_football_experience"
   | "director_player_career_toggle"
   | "director_club_type"
+  // REV-ONB-08: passi Tifoso rimossi, mantenuti per la migrazione bozze
+  | "fan_basic"
+  | "fan_photo"
+  | "fan_interests"
   | "complete"
   // Legacy steps kept for draft migration
   | "decision"
@@ -237,10 +244,12 @@ export type OnboardingFormState = {
   phoneCountryCode: string;
   phoneNumber: string;
   communityProfileType: "fan" | "media" | "";
-  fanFavoriteClubId: string | null;
-  fanFavoriteTeamName: string;
-  fanInterestCategories: string[];
-  fanInterestRegions: string[];
+  /** REV-ONB-08 §J: le quattro macro-categorie, mai i singoli campionati. */
+  fanFootballTypes: FanFootballType[];
+  /** §R: una sola modalità attiva fra tutta Italia, regioni e province. */
+  fanGeoScope: AvailabilityType;
+  fanProvinces: string[];
+  fanRegions: string[];
   mediaAffiliationName: string;
   mediaAffiliationType: string;
   mediaContentTypes: string[];
@@ -520,12 +529,21 @@ const defaultStepOrder: OnboardingStep[] = [
   "complete",
 ];
 
+/**
+ * Percorso del Tifoso dopo REV-ONB-08 (§C, §H–§J, §Q).
+ *
+ * Dati personali e foto sono i passi comuni `base` e `photo`, gli stessi di
+ * ogni altro profilo: non esiste più una versione semplificata riservata al
+ * ramo non professionale. Restano poi le due sole domande che servono —
+ * quale calcio, e da dove.
+ */
 const fanStepOrder: OnboardingStep[] = [
   "role",
   "community_profile_type",
-  "fan_basic",
-  "fan_photo",
-  "fan_interests",
+  "base",
+  "photo",
+  "fan_football_types",
+  "fan_territories",
   "complete",
 ];
 
@@ -685,36 +703,42 @@ const staffVisibleSteps: OnboardingVisibleStep[] = [
 
 const fanVisibleSteps: OnboardingVisibleStep[] = [
   {
-    description: "Scegli tra profilo base e profilo media",
+    description: "Scegli tra Tifoso e Media / Creator",
     index: 1,
-    label: "Tipo profilo",
+    label: "Percorso",
     step: "community_profile_type",
   },
   {
-    description: "Inserisci i dati personali essenziali",
+    description: "Inserisci i tuoi dati personali",
     index: 2,
     label: "Dati",
-    step: "fan_basic",
+    step: "base",
   },
   {
     description: "Aggiungi una foto profilo",
     index: 3,
     label: "Foto",
-    step: "fan_photo",
+    step: "photo",
   },
   {
-    description: "Seleziona interessi e regioni che vuoi seguire",
+    description: "Scegli il calcio che vuoi vedere più spesso",
     index: 4,
-    label: "Interessi",
-    step: "fan_interests",
+    label: "Calcio",
+    step: "fan_football_types",
+  },
+  {
+    description: "Scegli i territori da cui ricevere contenuti",
+    index: 5,
+    label: "Territori",
+    step: "fan_territories",
   },
 ];
 
 const mediaVisibleSteps: OnboardingVisibleStep[] = [
   {
-    description: "Scegli tra profilo base e profilo media",
+    description: "Scegli tra Tifoso e Media / Creator",
     index: 1,
-    label: "Tipo profilo",
+    label: "Percorso",
     step: "community_profile_type",
   },
   {
@@ -1006,10 +1030,10 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   phoneCountryCode: "+39",
   phoneNumber: "",
   communityProfileType: "",
-  fanFavoriteClubId: null,
-  fanFavoriteTeamName: "",
-  fanInterestCategories: [],
-  fanInterestRegions: [],
+  fanFootballTypes: [],
+  fanGeoScope: "ITALY",
+  fanProvinces: [],
+  fanRegions: [],
   mediaAffiliationName: "",
   mediaAffiliationType: "Nessuna",
   mediaContentTypes: [],
@@ -1119,6 +1143,15 @@ function migrateLegacyStep(step: OnboardingStep): OnboardingStep {
   if (step === "director_player_career_toggle")
     return "director_previous_experiences";
   if (step === "director_club_type") return "director_extra";
+  /**
+   * REV-ONB-08 §C, §AU: il Tifoso usa ora i passi comuni `base` e `photo` e
+   * non ha più una schermata "Interessi". Una bozza aperta con il vecchio
+   * flusso rientra dal passo che oggi raccoglie le stesse informazioni —
+   * squadra tifata e regioni a chip non esistono più come domande.
+   */
+  if (step === "fan_basic") return "base";
+  if (step === "fan_photo") return "photo";
+  if (step === "fan_interests") return "fan_football_types";
   return step;
 }
 
@@ -1206,20 +1239,18 @@ export function normalizeOnboardingDraft(
       value.communityProfileType === "fan" || value.communityProfileType === "media"
         ? value.communityProfileType
         : defaultOnboardingFormState.communityProfileType,
-    fanFavoriteClubId:
-      typeof value.fanFavoriteClubId === "string" && value.fanFavoriteClubId.trim()
-        ? value.fanFavoriteClubId
-        : null,
-    fanFavoriteTeamName:
-      typeof value.fanFavoriteTeamName === "string"
-        ? value.fanFavoriteTeamName
-        : defaultOnboardingFormState.fanFavoriteTeamName,
-    fanInterestCategories: Array.isArray(value.fanInterestCategories)
-      ? value.fanInterestCategories.filter((v): v is string => typeof v === "string")
-      : defaultOnboardingFormState.fanInterestCategories,
-    fanInterestRegions: Array.isArray(value.fanInterestRegions)
-      ? value.fanInterestRegions.filter((v): v is string => typeof v === "string")
-      : defaultOnboardingFormState.fanInterestRegions,
+    fanFootballTypes: Array.isArray(value.fanFootballTypes)
+      ? value.fanFootballTypes.filter(isFanFootballType)
+      : defaultOnboardingFormState.fanFootballTypes,
+    fanGeoScope:
+      coerceAvailabilityType(value.fanGeoScope) ??
+      defaultOnboardingFormState.fanGeoScope,
+    fanProvinces: Array.isArray(value.fanProvinces)
+      ? value.fanProvinces.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.fanProvinces,
+    fanRegions: Array.isArray(value.fanRegions)
+      ? value.fanRegions.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.fanRegions,
     primaryPosition:
       normalizePlayerPositions(value.primaryPosition)[0] ?? defaultOnboardingFormState.primaryPosition,
     residenceRegion:
@@ -1610,7 +1641,6 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
 
   const allSteps: OnboardingStep[] = [
     "role", "community_profile_type", "base", "photo", "technical", "player_availability", "experience",
-    "fan_basic", "fan_photo", "fan_interests",
     "media_basic", "media_photo", "media_entity", "media_content", "media_focus",
     "media_channels", "media_collaborations",
     "agent_professional", "agent_qualification", "agent_portfolio",
@@ -1631,6 +1661,8 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     "director_other_career", "director_extra",
     "director_categories", "director_market", "director_football_experience",
     "director_player_career_toggle", "director_club_type",
+    "fan_football_types", "fan_territories",
+    "fan_basic", "fan_photo", "fan_interests",
     "complete",
     // Legacy steps for draft migration
     "decision", "details", "club",
@@ -1746,7 +1778,7 @@ export function getPreviousOnboardingStep(
     if (role === "club_admin") return "club_profile";
     if (role === "agent") return "agent_presentation";
     if (role === "coach") return "coach_extra";
-    if (role === "fan") return "fan_interests";
+    if (role === "fan") return "fan_territories";
     if (role === "media") return "media_collaborations";
     /**
      * §AJ, §AK: il ritorno indietro deve rientrare nell'ultimo sotto-flusso
@@ -1829,12 +1861,16 @@ export function validateOnboardingStep(
     return mapCommunityProfileTypeValidationError(form);
   }
 
-  if (step === "fan_basic" || step === "media_basic") {
+  if (step === "media_basic") {
     return mapSimpleCommunityBasicValidationError(form);
   }
 
-  if (step === "fan_interests") {
-    return mapFanInterestsValidationError(form);
+  if (step === "fan_football_types") {
+    return mapFanFootballTypesValidationError(form);
+  }
+
+  if (step === "fan_territories") {
+    return mapFanTerritoriesValidationError(form);
   }
 
   if (step === "media_entity") {
@@ -1949,7 +1985,6 @@ export function validateOnboardingStep(
     step === "director_staff_career" ||
     step === "director_other_career" ||
     step === "director_extra" ||
-    step === "fan_photo" ||
     step === "media_photo" ||
     step === "media_channels"
   ) {
@@ -2077,20 +2112,39 @@ function mapSimpleCommunityBasicValidationError(
   return errors;
 }
 
-function mapFanInterestsValidationError(
+/**
+ * REV-ONB-08 §N: almeno una tipologia, perché senza non c'è nulla da
+ * personalizzare. Non è una domanda di forma: è l'unico dato che decide cosa
+ * il Tifoso vedrà.
+ */
+function mapFanFootballTypesValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
-  const errors: OnboardingValidationErrors = {};
-
-  if (form.fanInterestCategories.length === 0) {
-    errors.fanInterestCategories = "Seleziona almeno una categoria di interesse.";
+  if (form.fanFootballTypes.length > 0) {
+    return {};
   }
 
-  if (form.fanInterestRegions.length === 0) {
-    errors.fanInterestRegions = "Seleziona almeno una regione di interesse.";
+  return {
+    fanFootballTypes: "Seleziona almeno una tipologia di calcio da seguire.",
+  };
+}
+
+/**
+ * §AL: "Tutta Italia" è già completa di suo; le altre due modalità valgono
+ * solo con il loro dettaglio.
+ */
+function mapFanTerritoriesValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (form.fanGeoScope === "REGIONS" && form.fanRegions.length === 0) {
+    return { fanGeoScope: "Seleziona almeno una regione." };
   }
 
-  return errors;
+  if (form.fanGeoScope === "PROVINCES" && form.fanProvinces.length === 0) {
+    return { fanGeoScope: "Seleziona almeno una provincia." };
+  }
+
+  return {};
 }
 
 function mapMediaEntityValidationError(

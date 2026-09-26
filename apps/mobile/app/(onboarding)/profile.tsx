@@ -57,6 +57,7 @@ import {
 import {
   isPlayerMasterStep,
   PlayerOnboardingFlow,
+  resolveActiveAvailability,
   trackPlayerOnboardingEvent,
 } from "../../src/features/onboarding/player";
 import {
@@ -109,11 +110,12 @@ import {
 import {
   CommunityBasicInfoStep,
   CommunityChipGroup,
-  CommunityProfileTypeStep,
-  FanInterestsStep,
+  CommunityOnboardingFlow,
+  isCommunityMasterStep,
   MediaChannelsStep,
   MediaCollaborationsStep,
   MediaEntityStep,
+  trackFanOnboardingEvent,
 } from "../../src/features/onboarding/community";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
@@ -507,11 +509,10 @@ export default function OnboardingProfileScreen() {
     openToWork,
     phoneCountryCode,
     phoneNumber,
-    communityProfileType,
-    fanFavoriteClubId,
-    fanFavoriteTeamName,
-    fanInterestCategories,
-    fanInterestRegions,
+    fanFootballTypes,
+    fanGeoScope,
+    fanProvinces,
+    fanRegions,
     mediaAffiliationName,
     mediaAffiliationType,
     mediaContentTypes,
@@ -1207,6 +1208,7 @@ export default function OnboardingProfileScreen() {
     });
 
     if (role === "fan" || role === "media") {
+      trackFanOnboardingEvent({ name: "community_onboarding_started" });
       navigateToStep("community_profile_type");
       return;
     }
@@ -1232,12 +1234,23 @@ export default function OnboardingProfileScreen() {
 
     setValidationErrors({});
     patchForm({ lastCompletedStep: "community_profile_type" });
-    navigateToStep(role === "media" ? "media_basic" : "fan_basic");
+
+    /**
+     * REV-ONB-08 §G: dopo questa scelta i due percorsi non si incrociano più.
+     * Il Tifoso prosegue sui passi comuni del Master, il Media / Creator sulla
+     * sua schermata dati, in attesa della task dedicata.
+     */
+    if (role === "media") {
+      navigateToStep("media_basic");
+      return;
+    }
+
+    trackFanOnboardingEvent({ name: "fan_onboarding_started" });
+    navigateToStep("base");
   }
 
   function handleContinueFromCommunityBasic() {
-    const currentBasicStep = role === "media" ? "media_basic" : "fan_basic";
-    const nextErrors = validateOnboardingStep(currentBasicStep, form);
+    const nextErrors = validateOnboardingStep("media_basic", form);
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
@@ -1245,12 +1258,25 @@ export default function OnboardingProfileScreen() {
     }
 
     setValidationErrors({});
-    patchForm({ lastCompletedStep: currentBasicStep });
-    navigateToStep(role === "media" ? "media_photo" : "fan_photo");
+    patchForm({ lastCompletedStep: "media_basic" });
+    navigateToStep("media_photo");
   }
 
-  function handleContinueFromFanInterests() {
-    const nextErrors = validateOnboardingStep("fan_interests", form);
+  function handleContinueFromFanFootballTypes() {
+    const nextErrors = validateOnboardingStep("fan_football_types", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "fan_football_types" });
+    navigateToStep("fan_territories");
+  }
+
+  function handleContinueFromFanTerritories() {
+    const nextErrors = validateOnboardingStep("fan_territories", form);
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
@@ -1292,7 +1318,7 @@ export default function OnboardingProfileScreen() {
       trackDirectorOnboardingEvent({ name: "onboarding_director_started" });
       navigateToStep("director_roles");
     } else if (role === "fan") {
-      navigateToStep("fan_interests");
+      navigateToStep("fan_football_types");
     } else if (role === "media") {
       navigateToStep("media_entity");
     } else {
@@ -2150,6 +2176,17 @@ export default function OnboardingProfileScreen() {
       return;
     }
 
+    /**
+     * REV-ONB-08 §AA: la bozza può ricordare sia le regioni sia le province,
+     * così tornare indietro non costa una riselezione. Salvate va però solo
+     * la modalità attiva: il dato finale non può essere contraddittorio.
+     */
+    const activeFanTerritories = resolveActiveAvailability({
+      mode: fanGeoScope,
+      provinces: fanProvinces,
+      regions: fanRegions,
+    });
+
     try {
       setIsSubmitting(true);
 
@@ -2162,10 +2199,10 @@ export default function OnboardingProfileScreen() {
         coachProfile: null,
         directorProfile: null,
         fanProfile: {
-          favorite_club_id: fanFavoriteClubId,
-          favorite_team_name: fanFavoriteTeamName,
-          interest_categories: fanInterestCategories,
-          interest_regions: fanInterestRegions,
+          football_types: fanFootballTypes,
+          geo_scope: fanGeoScope,
+          interest_provinces: activeFanTerritories.provinces,
+          interest_regions: activeFanTerritories.regions,
         },
         mediaProfile: null,
         playerCareerEntries: [],
@@ -2196,7 +2233,13 @@ export default function OnboardingProfileScreen() {
         },
       });
 
-      goToCompletion("fan_interests");
+      trackFanOnboardingEvent({
+        footballTypeCount: fanFootballTypes.length,
+        mode: fanGeoScope,
+        name: "fan_onboarding_completed",
+      });
+
+      goToCompletion("fan_territories");
     } catch (error) {
       const message =
         error instanceof Error
@@ -2613,7 +2656,11 @@ export default function OnboardingProfileScreen() {
     // REV-ONB-07 §AL: e lo stesso per il Dirigente — nessun riepilogo,
     // nessuna percentuale, una sola CTA "Scopri ProLink".
     const isDirector = role === "director";
-    const hasSingleCta = isPlayer || isClub || isAgent || isDirector;
+    // REV-ONB-08 §AD, §AE: il Tifoso chiude sulla schermata comune, con un
+    // titolo di benvenuto e nessuna CTA secondaria — niente "Modifica
+    // preferenze", niente riepilogo di quanto appena scelto (§AC).
+    const isFan = role === "fan";
+    const hasSingleCta = isPlayer || isClub || isAgent || isDirector || isFan;
 
     return (
       <>
@@ -2634,9 +2681,17 @@ export default function OnboardingProfileScreen() {
                   ? "Benvenuto su ProLink. Sei pronto per connetterti con club e talenti e far crescere la tua rete professionale."
                   : isDirector
                     ? "Benvenuto su ProLink. Ora puoi costruire la tua rete, seguire i talenti e cogliere le opportunità giuste."
-                    : getCompletionDescription(role)
+                    : isFan
+                      ? "Il tuo profilo è pronto. Inizia a scoprire il calcio che vuoi seguire."
+                      : getCompletionDescription(role)
           }
-          onPrimaryPress={() => finishOnboarding("feed")}
+          onPrimaryPress={() => {
+            if (isFan) {
+              trackFanOnboardingEvent({ name: "fan_discover_cta_pressed" });
+            }
+
+            finishOnboarding("feed");
+          }}
           onSecondaryPress={
             hasSingleCta ? undefined : () => finishOnboarding("profile")
           }
@@ -2645,7 +2700,11 @@ export default function OnboardingProfileScreen() {
             hasSingleCta ? undefined : "Completa ulteriormente il profilo"
           }
           title={
-            isClub ? "La pagina del club è pronta" : "Il tuo profilo è pronto"
+            isClub
+              ? "La pagina del club è pronta"
+              : isFan
+                ? "Benvenuto su ProLink"
+                : "Il tuo profilo è pronto"
           }
         />
       </>
@@ -3091,6 +3150,72 @@ export default function OnboardingProfileScreen() {
     );
   }
 
+  // ---------------------------------------------------------------------
+  // Media e tifosi: il bivio Tifoso / Media-Creator e tutto il ramo Tifoso
+  // vivono sulle pagine intere del Master (REV-ONB-08). Dati personali e
+  // foto sono i componenti comuni, la geografia è il selettore già
+  // approvato per la Disponibilità del Calciatore.
+  // ---------------------------------------------------------------------
+  if (isCommunityMasterStep(step, role)) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            fullScreenGestureEnabled: false,
+            gestureEnabled: false,
+            headerShown: false,
+          }}
+        />
+        <CommunityOnboardingFlow
+          counter={counter}
+          form={form}
+          isBusy={isBusy}
+          nationalityCategory={nationalityCategory}
+          onBack={handleBackNavigation}
+          onCanGoBack={canGoBack}
+          onClearValidationErrors={clearValidationErrors}
+          onContinueFromFootballTypes={handleContinueFromFanFootballTypes}
+          onContinueFromPath={handleContinueFromCommunityProfileType}
+          onContinueFromPersonalData={handleContinueFromBase}
+          onContinueFromPhoto={handleContinueFromPhoto}
+          onContinueFromTerritories={handleContinueFromFanTerritories}
+          onDomicileChange={handleDomicileChange}
+          onDomicileSelect={handleDomicileSelect}
+          onDomicileToggle={handleDomicileToggle}
+          onFormattedNameBlur={handleFormattedNameBlur}
+          onNationalityChange={handleNationalitySelect}
+          onPatchForm={patchForm}
+          onPickPhotoFromLibrary={() =>
+            handleMediaUpload({
+              field: "avatar",
+              folder: "avatars",
+              mediaTypes: ["images"],
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          onRegisterBack={registerStepBackOverride}
+          onRemovePhoto={() => updateValue("avatarUrl", "")}
+          onResidenceChange={handleResidenceChange}
+          onResidenceSelect={handleResidenceSelect}
+          onTakePhoto={() =>
+            handleCameraCapture({
+              field: "avatar",
+              folder: "avatars",
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          photoPreviewUrl={
+            avatarUrl ? withDefaultProfileAvatar(avatarUrl) : null
+          }
+          step={step}
+          validationErrors={validationErrors}
+        />
+      </>
+    );
+  }
+
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <Stack.Screen
@@ -3162,29 +3287,10 @@ export default function OnboardingProfileScreen() {
           </View>
         ) : null}
 
-        {step === "community_profile_type" ? (
-          <View style={styles.stepContainer}>
-            <CommunityProfileTypeStep
-              errorMessage={validationErrors.communityProfileType}
-              onSelect={(value) => {
-                patchForm({ communityProfileType: value, role: value });
-                clearValidationErrors(["communityProfileType", "role"]);
-              }}
-              selectedValue={communityProfileType}
-            />
-            <Button
-              disabled={!communityProfileType}
-              label="Continua"
-              onPress={handleContinueFromCommunityProfileType}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
         {/* ============================================================= */}
         {/* STEP: Base (personal data)                                     */}
         {/* ============================================================= */}
-        {step === "fan_basic" || step === "media_basic" ? (
+        {step === "media_basic" ? (
           <View style={styles.stepContainer}>
             <CommunityBasicInfoStep
               birthDate={birthDate}
@@ -3195,11 +3301,7 @@ export default function OnboardingProfileScreen() {
                 patchForm(patch);
                 clearValidationErrors(fieldsToClear ?? Object.keys(patch));
               }}
-              subtitle={
-                step === "media_basic"
-                  ? "Inserisci i tuoi dati personali per creare il tuo account media."
-                  : "Inserisci le tue informazioni personali per creare il tuo profilo base."
-              }
+              subtitle="Inserisci i tuoi dati personali per creare il tuo account media."
               title="I tuoi dati"
               validationErrors={validationErrors}
             />
@@ -3549,7 +3651,7 @@ export default function OnboardingProfileScreen() {
         {/* ============================================================= */}
         {/* STEP: Photo                                                    */}
         {/* ============================================================= */}
-        {step === "photo" || step === "fan_photo" || step === "media_photo" ? (
+        {step === "photo" || step === "media_photo" ? (
           <View style={styles.stepContainer}>
             <View style={styles.pageTitleGroup}>
               <AppText variant="screenTitle">Aggiungi la tua foto</AppText>
@@ -3598,29 +3700,6 @@ export default function OnboardingProfileScreen() {
               size="lg"
               style={styles.primaryCta}
               variant={avatarUrl ? "primary" : "secondary"}
-            />
-          </View>
-        ) : null}
-
-        {step === "fan_interests" ? (
-          <View style={styles.stepContainer}>
-            <FanInterestsStep
-              favoriteClubId={fanFavoriteClubId}
-              favoriteTeamName={fanFavoriteTeamName}
-              interestCategories={fanInterestCategories}
-              interestRegions={fanInterestRegions}
-              onUpdate={(patch) => {
-                patchForm(patch);
-                clearValidationErrors(Object.keys(patch));
-              }}
-              searchTeams={searchTeams}
-              validationErrors={validationErrors}
-            />
-            <Button
-              disabled={isBusy}
-              label={isBusy ? "Salvataggio..." : "Completa registrazione"}
-              onPress={handleContinueFromFanInterests}
-              variant="primary"
             />
           </View>
         ) : null}

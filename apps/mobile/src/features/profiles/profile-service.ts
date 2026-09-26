@@ -294,7 +294,19 @@ export type DirectorProfileRecord = {
 export type FanProfileRecord = {
   favorite_club_id: string | null;
   favorite_team_name: string | null;
+  /**
+   * REV-ONB-08 §AF: macro-categorie di calcio seguite —
+   * professional / amateur / women / youth.
+   */
+  football_types: string[];
+  /** §R: ITALY, REGIONS o PROVINCES. Una sola modalità è attiva. */
+  geo_scope: string;
+  /**
+   * Categorie del vecchio flusso Appassionato. Non più alimentate
+   * dall'onboarding: restano per i profili creati prima di REV-ONB-08.
+   */
   interest_categories: string[];
+  interest_provinces: string[];
   interest_regions: string[];
   profile_id: string;
 };
@@ -524,10 +536,18 @@ export type CompleteProfessionalProfileUpdate = {
     responsibilities: string[];
     staff_career_entries?: unknown[];
   } | null;
+  /**
+   * REV-ONB-08 §O, §P: squadra tifata e interessi liberi non si chiedono più.
+   * `interest_categories` non compare qui perché nessun flusso la scrive: la
+   * colonna resta popolata per i profili storici, e un upsert che non la
+   * nomina non la cancella.
+   */
   fanProfile?: {
     favorite_club_id?: string | null;
     favorite_team_name?: string | null;
-    interest_categories: string[];
+    football_types?: string[];
+    geo_scope?: string;
+    interest_provinces?: string[];
     interest_regions: string[];
   } | null;
   mediaProfile?: {
@@ -1094,6 +1114,15 @@ function normalizeDirectorProfileRecord(
   } satisfies DirectorProfileRecord;
 }
 
+/**
+ * REV-ONB-08 §R: una modalità sconosciuta non deve diventare uno stato
+ * geografico inventato. In dubbio si torna alla scelta nazionale, che è
+ * l'unica che non promette un dettaglio che non abbiamo.
+ */
+function normalizeFanGeoScope(value: unknown): string {
+  return value === "REGIONS" || value === "PROVINCES" ? value : "ITALY";
+}
+
 function normalizeFanProfileRecord(
   profileId: string,
   rawProfile: Partial<FanProfileRecord> | null | undefined,
@@ -1109,7 +1138,10 @@ function normalizeFanProfileRecord(
         ? rawProfile.favorite_club_id
         : null,
     favorite_team_name: normalizeOptionalText(rawProfile.favorite_team_name),
+    football_types: normalizeStringArray(rawProfile.football_types),
+    geo_scope: normalizeFanGeoScope(rawProfile.geo_scope),
     interest_categories: normalizeStringArray(rawProfile.interest_categories),
+    interest_provinces: normalizeStringArray(rawProfile.interest_provinces),
     interest_regions: normalizeStringArray(rawProfile.interest_regions),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
   } satisfies FanProfileRecord;
@@ -1660,7 +1692,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("fan_profiles")
           .select(
-            "profile_id, interest_categories, interest_regions, favorite_team_name, favorite_club_id",
+            "profile_id, interest_categories, interest_regions, interest_provinces, football_types, geo_scope, favorite_team_name, favorite_club_id",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -2394,8 +2426,18 @@ export async function updateCompleteProfessionalProfile(
         input.fanProfile.favorite_team_name.trim()
           ? input.fanProfile.favorite_team_name.trim()
           : null,
-      interest_categories: input.fanProfile.interest_categories,
-      interest_regions: input.fanProfile.interest_regions,
+      football_types: input.fanProfile.football_types ?? [],
+      geo_scope: normalizeFanGeoScope(input.fanProfile.geo_scope),
+      // §R: solo la modalità attiva porta un elenco. Le selezioni della
+      // modalità abbandonata restano nella bozza, non nel database.
+      interest_provinces:
+        input.fanProfile.geo_scope === "PROVINCES"
+          ? (input.fanProfile.interest_provinces ?? [])
+          : [],
+      interest_regions:
+        input.fanProfile.geo_scope === "REGIONS"
+          ? input.fanProfile.interest_regions
+          : [],
       profile_id: input.profileId,
     });
 

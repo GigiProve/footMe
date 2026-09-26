@@ -277,7 +277,7 @@ export async function fetchFanTribunaPostDetail(
 
   return {
     ...post,
-    publisher_name: publisher?.full_name?.trim() || "Appassionato",
+    publisher_name: publisher?.full_name?.trim() || "Tifoso",
   };
 }
 

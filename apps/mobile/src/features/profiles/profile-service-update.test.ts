@@ -985,13 +985,13 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     );
   });
 
-  it("persists fan interests in fan_profiles", async () => {
+  it("persists the fan preferences collected during onboarding", async () => {
     await updateCompleteProfessionalProfile({
       ...buildUpdateInput(),
       fanProfile: {
-        favorite_club_id: "club-1",
-        favorite_team_name: "AC Como",
-        interest_categories: ["dilettanti", "mercato"],
+        football_types: ["amateur", "youth"],
+        geo_scope: "REGIONS",
+        interest_provinces: [],
         interest_regions: ["Umbria", "Toscana"],
       },
       playerCareerEntries: [],
@@ -1001,12 +1001,43 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     });
 
     expect(mocks.fanProfilesUpsertMock).toHaveBeenCalledWith({
-      favorite_club_id: "club-1",
-      favorite_team_name: "AC Como",
-      interest_categories: ["dilettanti", "mercato"],
+      favorite_club_id: null,
+      favorite_team_name: null,
+      football_types: ["amateur", "youth"],
+      geo_scope: "REGIONS",
+      interest_provinces: [],
       interest_regions: ["Umbria", "Toscana"],
       profile_id: "profile-1",
     });
+  });
+
+  /**
+   * REV-ONB-08 §R: la bozza può ricordare le regioni di una modalità
+   * abbandonata, il database no. Salvare "zone specifiche" non deve lasciare
+   * dietro di sé un elenco di regioni ancora attivo.
+   */
+  it("keeps only the active geographic mode in fan_profiles", async () => {
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      fanProfile: {
+        football_types: ["professional"],
+        geo_scope: "PROVINCES",
+        interest_provinces: ["Milano", "Bergamo"],
+        interest_regions: ["Lombardia"],
+      },
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "fan",
+      staffProfile: null,
+    });
+
+    expect(mocks.fanProfilesUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        geo_scope: "PROVINCES",
+        interest_provinces: ["Milano", "Bergamo"],
+        interest_regions: [],
+      }),
+    );
   });
 
   it("updates only the fan favorite team fields", async () => {

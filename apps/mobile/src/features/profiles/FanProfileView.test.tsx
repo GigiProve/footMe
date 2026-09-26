@@ -432,7 +432,10 @@ function buildFanProfile(): CompleteProfessionalProfile {
     fanProfile: {
       favorite_club_id: "club-1",
       favorite_team_name: "AC Como",
-      interest_categories: ["Serie D", "Eccellenza", "Giovani talenti"],
+      football_types: ["amateur", "youth"],
+      geo_scope: "REGIONS",
+      interest_categories: [],
+      interest_provinces: [],
       interest_regions: ["Lombardia"],
       profile_id: "fan-1",
     },
@@ -526,11 +529,11 @@ describe("FanProfileView", () => {
       />,
     );
 
-    expect(hasText(tree.root, "Appassionato calcio dilettantistico")).toBe(true);
+    expect(hasText(tree.root, "Tifoso")).toBe(true);
     expect(hasText(tree.root, "Tifa:")).toBe(true);
     expect(hasText(tree.root, "AC Como")).toBe(true);
-    expect(hasText(tree.root, "Serie D")).toBe(true);
-    expect(hasText(tree.root, "Eccellenza")).toBe(true);
+    expect(hasText(tree.root, "Calcio dilettantistico")).toBe(true);
+    expect(hasText(tree.root, "Calcio giovanile")).toBe(true);
     expect(hasText(tree.root, "Lombardia")).toBe(true);
     expect(tree.root.findByProps({ testID: "fan-follow-button" })).toBeTruthy();
     expect(tree.root.findByProps({ testID: "fan-profile-tabs" })).toBeTruthy();

@@ -39,7 +39,9 @@ import {
   updateFanFavoriteTeam,
   type AgentPlayerCandidate,
   type CompleteProfessionalProfile,
+  type FanProfileRecord,
 } from "./profile-service";
+import { formatFanFootballTypes } from "../onboarding/community/fan-taxonomy";
 import { TeamAutocompleteInput } from "./player-sports-section";
 import {
   addFanTribunaComment,
@@ -249,6 +251,16 @@ export function FanProfileView({
 
   const profile = completeProfile.profile;
   const fanProfile = completeProfile.fanProfile ?? null;
+  /**
+   * REV-ONB-08 §AF: le macro-categorie sono il dato nuovo. `interest_categories`
+   * resta la fonte per i profili creati prima della review, che non hanno
+   * `football_types` da mostrare.
+   */
+  const footballTypeLabels = formatFanFootballTypes(fanProfile?.football_types);
+  const followedFootballLabels =
+    footballTypeLabels.length > 0
+      ? footballTypeLabels
+      : fanProfile?.interest_categories;
   const avatarUrl = withDefaultProfileAvatar(profile.avatar_url);
   const orderedPosts = useMemo(
     () =>
@@ -690,7 +702,7 @@ export function FanProfileView({
             {profile.full_name}
           </AppText>
           <AppText align="center" color="accent" style={styles.roleLabel} variant="bodySm">
-            Appassionato calcio dilettantistico
+            Tifoso
           </AppText>
         </View>
 
@@ -726,12 +738,12 @@ export function FanProfileView({
           <InterestChips
             emptyLabel="Categorie da completare"
             label="Segue"
-            values={fanProfile?.interest_categories}
+            values={followedFootballLabels}
           />
           <View style={styles.infoLine}>
             <Ionicons color={colors.textSecondary} name="location-outline" size={14} />
             <AppText color="secondary" style={styles.infoText} variant="bodySm">
-              {formatAreaLabel(fanProfile?.interest_regions, profile.region)}
+              {formatAreaLabel(fanProfile, profile.region)}
             </AppText>
           </View>
         </View>
@@ -3049,10 +3061,37 @@ function formatFollowedCategories(categories: string[] | null | undefined) {
   return values.length > 0 ? values.join(" • ") : "Categorie da completare";
 }
 
-function formatAreaLabel(regions: string[] | null | undefined, fallbackRegion: string | null) {
-  const values = regions?.filter(Boolean) ?? [];
-  if (values.length > 0) {
-    return values.join(" • ");
+/**
+ * REV-ONB-08 §R, §AG: l'area segue la modalità scelta in onboarding. "Tutta
+ * Italia" è una risposta completa, non un dato mancante da riempire con la
+ * regione di residenza.
+ */
+function formatAreaLabel(
+  fanProfile:
+    | Pick<
+        FanProfileRecord,
+        "geo_scope" | "interest_provinces" | "interest_regions"
+      >
+    | null
+    | undefined,
+  fallbackRegion: string | null,
+) {
+  if (fanProfile?.geo_scope === "PROVINCES") {
+    const provinces = fanProfile.interest_provinces?.filter(Boolean) ?? [];
+
+    if (provinces.length > 0) {
+      return provinces.join(" • ");
+    }
+  }
+
+  const regions = fanProfile?.interest_regions?.filter(Boolean) ?? [];
+
+  if (regions.length > 0) {
+    return regions.join(" • ");
+  }
+
+  if (fanProfile?.geo_scope === "ITALY") {
+    return "Tutta Italia";
   }
 
   return fallbackRegion?.trim() || "Area da completare";

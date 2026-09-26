@@ -5,9 +5,9 @@ import type { AppRole } from "./create-initial-profile";
 /**
  * Le sette macro-voci della prima schermata di onboarding (§U).
  *
- * "Media e appassionati" è una voce sola: un tifoso e un creator scelgono la
- * stessa card e vengono distinti più avanti, nel flusso dedicato. Non esistono
- * due macro-profili separati a questo livello.
+ * "Media e tifosi" è una voce sola (REV-ONB-08 §D): un tifoso e un creator
+ * scelgono la stessa card e vengono distinti allo step successivo. Non
+ * esistono due macro-profili separati a questo livello.
  *
  * Le icone evitano simboli ambigui (§T): l'allenatore è una lavagna tattica,
  * non un fischietto.
@@ -59,9 +59,9 @@ export const ONBOARDING_ROLE_OPTIONS: OnboardingRoleOption[] = [
     value: "club_admin",
   },
   {
-    description: "Per tifosi, creator, giornalisti e pagine che vivono e raccontano il calcio.",
+    description: "Racconta, segui e vivi il calcio.",
     icon: "megaphone-outline",
-    label: "Media e appassionati",
+    label: "Media e tifosi",
     value: "community",
   },
 ];

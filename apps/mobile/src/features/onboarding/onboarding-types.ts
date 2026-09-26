@@ -173,20 +173,6 @@ export const DIRECTOR_LANGUAGE_OPTIONS = [
   "Arabo",
 ] as const;
 
-export const COMMUNITY_PROFILE_TYPE_OPTIONS = [
-  {
-    description: "Per seguire, commentare e interagire velocemente con la community.",
-    label: "Profilo base",
-    value: "fan",
-  },
-  {
-    description:
-      "Per giornalisti, creator, pagine, testate e progetti editoriali sul calcio.",
-    label: "Profilo media",
-    value: "media",
-  },
-] as const;
-
 export const MEDIA_CONTENT_TYPE_OPTIONS = [
   "Notizie",
   "Partite e risultati",
