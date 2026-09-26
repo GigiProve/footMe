@@ -34,7 +34,9 @@ import {
   getOnboardingVisibleSteps,
   getPreviousOnboardingStep,
   validateOnboardingStep,
+  DIRECTOR_SUB_FLOW_STEPS,
   type LegalStatus,
+  type OnboardingFormState,
   type OnboardingStep,
   type OnboardingValidationErrors,
 } from "../../src/features/onboarding/onboarding-form";
@@ -66,7 +68,6 @@ import {
 } from "../../src/features/onboarding/club";
 import { ONBOARDING_ROLE_OPTIONS } from "../../src/features/onboarding/onboarding-roles";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
-import { CareerExperienceStep } from "../../src/features/onboarding/career/CareerExperienceStep";
 import {
   AgentOnboardingFlow,
   getNextAgentStepAfterPreviousRoles,
@@ -85,8 +86,6 @@ import {
   CoachOnboardingFlow,
   isCoachMasterStep,
 } from "../../src/features/onboarding/coach";
-import { CoachCareerStep } from "../../src/features/onboarding/coach/CoachCareerStep";
-import { PlayerCareerToggleStep } from "../../src/features/onboarding/coach/PlayerCareerToggleStep";
 import {
   getNextStaffSubFlowStep,
   isStaffMasterStep,
@@ -101,21 +100,12 @@ import {
   MEDIA_FOCUS_AREA_OPTIONS,
 } from "../../src/features/onboarding/onboarding-types";
 import {
-  DirectorBasicInfoStep,
-  DirectorChipsStep,
-  DirectorExtraStep,
-  DirectorFootballExperienceStep,
-  DirectorRolesStep,
-  DirectorSingleSelectStep,
+  DirectorOnboardingFlow,
+  getNextDirectorSubFlowStep,
+  isDirectorMasterStep,
+  readDirectorPreviousRoles,
+  trackDirectorOnboardingEvent,
 } from "../../src/features/onboarding/director";
-import {
-  DIRECTOR_CATEGORY_OPTIONS,
-  DIRECTOR_CLUB_TYPE_OPTIONS,
-  DIRECTOR_FOCUS_OPTIONS,
-  DIRECTOR_MARKET_OPTIONS,
-  DIRECTOR_RESPONSIBILITY_OPTIONS,
-  DIRECTOR_ROLE_OPTIONS,
-} from "../../src/features/onboarding/onboarding-types";
 import {
   CommunityBasicInfoStep,
   CommunityChipGroup,
@@ -171,32 +161,6 @@ const LEGAL_STATUS_OPTIONS: { label: string; value: LegalStatus }[] = [
   { label: "Non ho il permesso di soggiorno", value: "no_permit" },
   { label: "In fase di richiesta", value: "pending_permit" },
 ];
-
-/** Le tre modalità di inserimento esperienza usate dai flussi non ancora
- *  migrati al Master (oggi: carriera dirigenziale). */
-const EXPERIENCE_TYPE_OPTIONS = [
-  {
-    type: "MULTI_SEASON" as const,
-    title: "Stagioni complete",
-    subtitle:
-      "Aggiungi più stagioni complete nella stessa squadra con lo stesso ruolo.",
-    icon: "layers-outline" as const,
-  },
-  {
-    type: "SINGLE_SEASON" as const,
-    title: "Singola stagione",
-    subtitle: "Inserisci una sola stagione sportiva.",
-    icon: "calendar-outline" as const,
-  },
-  {
-    type: "CUSTOM_PERIOD" as const,
-    title: "Periodo personalizzato",
-    subtitle:
-      "Specifica mese e anno di inizio e fine per incarichi brevi o subentri.",
-    icon: "time-outline" as const,
-  },
-];
-
 
 function parseOptionalText(value: string) {
   const trimmed = value.trim();
@@ -589,16 +553,22 @@ export default function OnboardingProfileScreen() {
     directorCategories,
     directorCoachCareerEntries,
     directorClubTypes,
-    directorHasOtherFootballExperience,
-    directorHasPlayedFootball,
     directorLanguages,
     directorMainFocus,
     directorMarketInvolvement,
+    directorOpenToClubs,
+    directorOpenToOthers,
+    directorOpenToPlayers,
+    directorOpenToStaff,
+    directorOtherCareerEntries,
     directorOtherFootballRoles,
+    directorOtherRoleLabel,
     directorPlayerCareerEntries,
+    directorPreviousRoles,
     directorPrimaryRole,
     directorResponsibilities,
     directorRoles,
+    directorStaffCareerEntries,
     technicalVideoUrl,
     transferProvinces,
     transferRegions,
@@ -1319,6 +1289,7 @@ export default function OnboardingProfileScreen() {
       trackStaffOnboardingEvent({ name: "onboarding_staff_started" });
       navigateToStep("staff_role");
     } else if (role === "director") {
+      trackDirectorOnboardingEvent({ name: "onboarding_director_started" });
       navigateToStep("director_roles");
     } else if (role === "fan") {
       navigateToStep("fan_interests");
@@ -1949,139 +1920,81 @@ export default function OnboardingProfileScreen() {
   // Director step handlers
   // -----------------------------------------------------------------------
 
-  function handleContinueFromDirectorRoles() {
-    const nextErrors = validateOnboardingStep("director_roles", form);
+  /**
+   * Avanzamento di uno step Dirigente con validazione (REV-ONB-07 §AT).
+   *
+   * Gli step senza campi obbligatori passano da qui con `nextStep` diretto:
+   * la validazione ritorna comunque vuota e il codice resta uno solo.
+   */
+  function advanceDirectorStep(
+    currentStep: OnboardingStep,
+    nextStep: OnboardingStep,
+    extraPatch: Partial<OnboardingFormState> = {},
+  ) {
+    const nextErrors = validateOnboardingStep(currentStep, form);
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
       return;
     }
 
-    const normalizedPrimaryRole =
-      directorRoles.length === 1 ? directorRoles[0] : directorPrimaryRole;
-
-    patchForm({
-      lastCompletedStep: "director_roles",
-      directorPrimaryRole: normalizedPrimaryRole,
-    });
+    patchForm({ ...extraPatch, lastCompletedStep: currentStep });
     setValidationErrors({});
-    navigateToStep("director_responsibilities");
+    navigateToStep(nextStep);
+  }
+
+  function handleContinueFromDirectorRoles() {
+    // §G: con un ruolo solo, quello è già il ruolo principale.
+    advanceDirectorStep("director_roles", "director_responsibilities", {
+      directorPrimaryRole:
+        directorRoles.length === 1 ? directorRoles[0] : directorPrimaryRole,
+    });
   }
 
   function handleContinueFromDirectorResponsibilities() {
-    const nextErrors = validateOnboardingStep(
-      "director_responsibilities",
-      form,
-    );
-
-    if (Object.keys(nextErrors).length > 0) {
-      setValidationErrors(nextErrors);
-      return;
-    }
-
-    patchForm({ lastCompletedStep: "director_responsibilities" });
-    setValidationErrors({});
-    navigateToStep("director_categories");
-  }
-
-  function handleContinueFromDirectorCategories() {
-    const nextErrors = validateOnboardingStep("director_categories", form);
-
-    if (Object.keys(nextErrors).length > 0) {
-      setValidationErrors(nextErrors);
-      return;
-    }
-
-    patchForm({ lastCompletedStep: "director_categories" });
-    setValidationErrors({});
-    navigateToStep("director_focus");
+    advanceDirectorStep("director_responsibilities", "director_focus");
   }
 
   function handleContinueFromDirectorFocus() {
-    const nextErrors = validateOnboardingStep("director_focus", form);
-
-    if (Object.keys(nextErrors).length > 0) {
-      setValidationErrors(nextErrors);
-      return;
-    }
-
-    patchForm({ lastCompletedStep: "director_focus" });
-    setValidationErrors({});
-    navigateToStep("director_market");
+    advanceDirectorStep("director_focus", "director_availability");
   }
 
-  function handleContinueFromDirectorMarket() {
-    const nextErrors = validateOnboardingStep("director_market", form);
-
-    if (Object.keys(nextErrors).length > 0) {
-      setValidationErrors(nextErrors);
-      return;
-    }
-
-    patchForm({ lastCompletedStep: "director_market" });
-    setValidationErrors({});
-    navigateToStep("director_career");
+  function handleContinueFromDirectorAvailability() {
+    advanceDirectorStep("director_availability", "director_career");
   }
 
   function handleContinueFromDirectorCareer() {
-    patchForm({ lastCompletedStep: "director_career" });
-    navigateToStep("director_football_experience");
+    advanceDirectorStep("director_career", "director_previous_experiences");
   }
 
-  function handleContinueFromDirectorFootballExperience() {
-    const nextErrors = validateOnboardingStep(
-      "director_football_experience",
-      form,
-    );
+  /**
+   * Uscita da "Altre esperienze nel calcio" e da ogni sotto-flusso (§AH).
+   *
+   * Si rientra sempre nell'onboarding Dirigente, mai in quello del ruolo
+   * precedente: il prossimo ramo dichiarato, o le informazioni aggiuntive
+   * quando non ne restano. Zero selezioni salta tutti i rami (§AB).
+   */
+  function advanceDirectorSubFlow(completedStep: OnboardingStep) {
+    const selection = readDirectorPreviousRoles(form);
+    const completed =
+      completedStep === "director_previous_experiences"
+        ? []
+        : [...DIRECTOR_SUB_FLOW_STEPS].slice(
+            0,
+            DIRECTOR_SUB_FLOW_STEPS.indexOf(completedStep) + 1,
+          );
+    const nextStep = getNextDirectorSubFlowStep(selection, completed);
 
-    if (Object.keys(nextErrors).length > 0) {
-      setValidationErrors(nextErrors);
-      return;
+    if (nextStep) {
+      trackDirectorOnboardingEvent({
+        branch: nextStep,
+        name: "director_previous_branch_opened",
+      });
     }
 
-    patchForm({ lastCompletedStep: "director_football_experience" });
+    patchForm({ lastCompletedStep: completedStep });
     setValidationErrors({});
-    if (
-      directorHasOtherFootballExperience &&
-      directorOtherFootballRoles.includes("Allenatore")
-    ) {
-      navigateToStep("director_coach_career");
-      return;
-    }
-    navigateToStep("director_player_career_toggle");
-  }
-
-  function handleContinueFromDirectorCoachCareer() {
-    patchForm({ lastCompletedStep: "director_coach_career" });
-    navigateToStep("director_player_career_toggle");
-  }
-
-  function handleContinueFromDirectorPlayerCareerToggle() {
-    patchForm({ lastCompletedStep: "director_player_career_toggle" });
-
-    if (directorHasPlayedFootball) {
-      navigateToStep("director_player_career");
-    } else {
-      navigateToStep("director_club_type");
-    }
-  }
-
-  function handleContinueFromDirectorPlayerCareer() {
-    patchForm({ lastCompletedStep: "director_player_career" });
-    navigateToStep("director_club_type");
-  }
-
-  function handleContinueFromDirectorClubType() {
-    const nextErrors = validateOnboardingStep("director_club_type", form);
-
-    if (Object.keys(nextErrors).length > 0) {
-      setValidationErrors(nextErrors);
-      return;
-    }
-
-    patchForm({ lastCompletedStep: "director_club_type" });
-    setValidationErrors({});
-    navigateToStep("director_extra");
+    navigateToStep(nextStep ?? "director_extra");
   }
 
   async function handleFinishDirectorExtra() {
@@ -2100,23 +2013,40 @@ export default function OnboardingProfileScreen() {
         clubSeasonEntries: [],
         coachProfile: null,
         directorProfile: {
-          career_entries: directorCareerEntries.map(normalizeCoachCareerEntryForJson),
-          coach_career_entries:
-            directorHasOtherFootballExperience &&
-            directorOtherFootballRoles.includes("Allenatore")
-              ? directorCoachCareerEntries.map(normalizeCoachCareerEntryForJson)
-              : [],
+          career_entries: directorCareerEntries.map(
+            normalizeCoachCareerEntryForJson,
+          ),
+          coach_career_entries: directorCoachCareerEntries.map(
+            normalizeCoachCareerEntryForJson,
+          ),
+          /**
+           * §K: le categorie non si dichiarano più come blocco unico, si
+           * ricavano dalle singole esperienze. Il campo resta scritto perché
+           * un profilo salvato prima della review continua a leggerlo.
+           */
           club_types: directorClubTypes,
           director_roles: directorRoles,
           experience_categories: directorCategories,
-          has_other_football_experience: directorHasOtherFootballExperience,
-          has_played_football: directorHasPlayedFootball,
+          has_other_football_experience: directorPreviousRoles.length > 0,
+          has_played_football: directorPreviousRoles.includes("player"),
           main_focus: directorMainFocus || null,
           market_involvement: directorMarketInvolvement || null,
+          open_to_clubs: directorOpenToClubs,
+          open_to_others: directorOpenToOthers,
+          open_to_players: directorOpenToPlayers,
+          open_to_staff: directorOpenToStaff,
+          other_career_entries: directorOtherCareerEntries.map(
+            normalizeCoachCareerEntryForJson,
+          ),
           other_football_roles: directorOtherFootballRoles,
+          other_role_label: directorOtherRoleLabel.trim() || null,
           player_career_entries: directorPlayerCareerEntries,
+          previous_roles: directorPreviousRoles,
           primary_role: directorPrimaryRole || null,
           responsibilities: directorResponsibilities,
+          staff_career_entries: directorStaffCareerEntries.map(
+            normalizeCoachCareerEntryForJson,
+          ),
         },
         playerCareerEntries: [],
         playerProfile: null,
@@ -2138,6 +2068,13 @@ export default function OnboardingProfileScreen() {
         },
       });
 
+      trackDirectorOnboardingEvent({
+        name: "director_additional_info_completed",
+      });
+      trackDirectorOnboardingEvent({
+        experienceCount: directorCareerEntries.length,
+        name: "onboarding_director_completed",
+      });
       goToCompletion("director_extra");
     } catch (error) {
       const message =
@@ -2673,7 +2610,10 @@ export default function OnboardingProfileScreen() {
     // REV-ONB-06 §BD, §BE: anche per il Procuratore la chiusura è un invito
     // con una sola CTA, senza riepilogo né portfolio summary.
     const isAgent = role === "agent";
-    const hasSingleCta = isPlayer || isClub || isAgent;
+    // REV-ONB-07 §AL: e lo stesso per il Dirigente — nessun riepilogo,
+    // nessuna percentuale, una sola CTA "Scopri ProLink".
+    const isDirector = role === "director";
+    const hasSingleCta = isPlayer || isClub || isAgent || isDirector;
 
     return (
       <>
@@ -2692,7 +2632,9 @@ export default function OnboardingProfileScreen() {
                 ? "Benvenuto in ProLink. Ora puoi iniziare a creare connessioni e scoprire nuove opportunità."
                 : isAgent
                   ? "Benvenuto su ProLink. Sei pronto per connetterti con club e talenti e far crescere la tua rete professionale."
-                  : getCompletionDescription(role)
+                  : isDirector
+                    ? "Benvenuto su ProLink. Ora puoi costruire la tua rete, seguire i talenti e cogliere le opportunità giuste."
+                    : getCompletionDescription(role)
           }
           onPrimaryPress={() => finishOnboarding("feed")}
           onSecondaryPress={
@@ -3064,6 +3006,91 @@ export default function OnboardingProfileScreen() {
     );
   }
 
+  // ---------------------------------------------------------------------
+  // Dirigente: stesse pagine intere del Master (REV-ONB-07). Schermate
+  // comuni e carriera da calciatore dal Calciatore, esperienze senza
+  // statistiche dall'Allenatore, carriera staff dallo Staff tecnico.
+  // ---------------------------------------------------------------------
+  if (isDirectorMasterStep(step, role)) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            fullScreenGestureEnabled: false,
+            gestureEnabled: false,
+            headerShown: false,
+          }}
+        />
+        <DirectorOnboardingFlow
+          counter={counter}
+          form={form}
+          isBusy={isBusy}
+          nationalityCategory={nationalityCategory}
+          onBack={handleBackNavigation}
+          onClearValidationErrors={clearValidationErrors}
+          onContinueFromAvailability={handleContinueFromDirectorAvailability}
+          onContinueFromCareer={handleContinueFromDirectorCareer}
+          onContinueFromCoachCareer={() =>
+            advanceDirectorSubFlow("director_coach_career")
+          }
+          onContinueFromFocus={handleContinueFromDirectorFocus}
+          onContinueFromOtherCareer={() =>
+            advanceDirectorSubFlow("director_other_career")
+          }
+          onContinueFromPersonalData={handleContinueFromBase}
+          onContinueFromPhoto={handleContinueFromPhoto}
+          onContinueFromPlayerCareer={() =>
+            advanceDirectorSubFlow("director_player_career")
+          }
+          onContinueFromPreviousExperiences={() =>
+            advanceDirectorSubFlow("director_previous_experiences")
+          }
+          onContinueFromResponsibilities={
+            handleContinueFromDirectorResponsibilities
+          }
+          onContinueFromRoles={handleContinueFromDirectorRoles}
+          onContinueFromStaffCareer={() =>
+            advanceDirectorSubFlow("director_staff_career")
+          }
+          onDomicileChange={handleDomicileChange}
+          onDomicileSelect={handleDomicileSelect}
+          onDomicileToggle={handleDomicileToggle}
+          onFinish={handleFinishDirectorExtra}
+          onFormattedNameBlur={handleFormattedNameBlur}
+          onNationalityChange={handleNationalitySelect}
+          onPatchForm={patchForm}
+          onPickPhotoFromLibrary={() =>
+            handleMediaUpload({
+              field: "avatar",
+              folder: "avatars",
+              mediaTypes: ["images"],
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          onRegisterBack={registerStepBackOverride}
+          onRemovePhoto={() => updateValue("avatarUrl", "")}
+          onResidenceChange={handleResidenceChange}
+          onResidenceSelect={handleResidenceSelect}
+          onTakePhoto={() =>
+            handleCameraCapture({
+              field: "avatar",
+              folder: "avatars",
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          photoPreviewUrl={
+            avatarUrl ? withDefaultProfileAvatar(avatarUrl) : null
+          }
+          searchTeams={searchTeams}
+          step={step}
+          validationErrors={validationErrors}
+        />
+      </>
+    );
+  }
+
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <Stack.Screen
@@ -3185,32 +3212,6 @@ export default function OnboardingProfileScreen() {
         ) : null}
 
         {step === "base" ? (
-          role === "director" ? (
-            <DirectorBasicInfoStep
-              birthDate={birthDate}
-              currentLocationCity={currentLocationCity}
-              currentLocationCountry={currentLocationCountry}
-              firstName={firstName}
-              lastName={lastName}
-              legalStatus={legalStatus as LegalStatus}
-              nationality={nationality}
-              phoneCountryCode={phoneCountryCode}
-              phoneNumber={phoneNumber}
-              residence={residence}
-              residenceCountry={residenceCountry}
-              residenceRegion={residenceRegion}
-              validationErrors={validationErrors}
-              onContinue={handleContinueFromBase}
-              onFormattedNameBlur={handleFormattedNameBlur}
-              onNationalityChange={handleNationalitySelect}
-              onResidenceChange={handleResidenceChange}
-              onResidenceSelect={handleResidenceSelect}
-              onUpdate={(patch, fieldsToClear) => {
-                patchForm(patch);
-                clearValidationErrors(fieldsToClear ?? Object.keys(patch));
-              }}
-            />
-          ) : (
             <View style={styles.stepContainer}>
               <OnboardingSectionCard
                 title="Informazioni personali"
@@ -3543,7 +3544,6 @@ export default function OnboardingProfileScreen() {
                 </View>
               </View>
             </View>
-          )
         ) : null}
 
         {/* ============================================================= */}
@@ -3886,292 +3886,6 @@ export default function OnboardingProfileScreen() {
               </View>
             </View>
           </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Roles                                           */}
-        {/* ============================================================= */}
-        {step === "director_roles" ? (
-          <View style={styles.stepContainer}>
-            <DirectorRolesStep
-              primaryRole={directorPrimaryRole}
-              selectedRoles={directorRoles}
-              validationErrors={validationErrors}
-              onUpdate={(patch) => patchForm(patch)}
-            />
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromDirectorRoles}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Responsibilities                                */}
-        {/* ============================================================= */}
-        {step === "director_responsibilities" ? (
-          <View style={styles.stepContainer}>
-            <DirectorChipsStep
-              options={DIRECTOR_RESPONSIBILITY_OPTIONS}
-              selectedValues={directorResponsibilities}
-              title="Aree di responsabilità"
-              subtitle="Seleziona le principali aree di cui ti occupi come dirigente."
-              errorMessage={validationErrors.directorResponsibilities}
-              onToggle={(value) => {
-                const next = directorResponsibilities.includes(value)
-                  ? directorResponsibilities.filter((v) => v !== value)
-                  : [...directorResponsibilities, value];
-                patchForm({ directorResponsibilities: next });
-                clearValidationErrors(["directorResponsibilities"]);
-              }}
-            />
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromDirectorResponsibilities}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Categories                                      */}
-        {/* ============================================================= */}
-        {step === "director_categories" ? (
-          <View style={styles.stepContainer}>
-            <DirectorChipsStep
-              options={DIRECTOR_CATEGORY_OPTIONS}
-              selectedValues={directorCategories}
-              title="Categorie di esperienza"
-              subtitle="Seleziona le categorie in cui hai operato o in cui desideri lavorare."
-              errorMessage={validationErrors.directorCategories}
-              onToggle={(value) => {
-                const next = directorCategories.includes(value)
-                  ? directorCategories.filter((v) => v !== value)
-                  : [...directorCategories, value];
-                patchForm({ directorCategories: next });
-                clearValidationErrors(["directorCategories"]);
-              }}
-            />
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromDirectorCategories}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Focus                                           */}
-        {/* ============================================================= */}
-        {step === "director_focus" ? (
-          <View style={styles.stepContainer}>
-            <DirectorSingleSelectStep
-              options={DIRECTOR_FOCUS_OPTIONS}
-              selectedValue={directorMainFocus}
-              title="Focus principale"
-              subtitle="Su quale area vuoi concentrare la tua attività dirigenziale?"
-              errorMessage={validationErrors.directorMainFocus}
-              onSelect={(value) => {
-                patchForm({ directorMainFocus: value });
-                clearValidationErrors(["directorMainFocus"]);
-              }}
-            />
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromDirectorFocus}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Market                                          */}
-        {/* ============================================================= */}
-        {step === "director_market" ? (
-          <View style={styles.stepContainer}>
-            <DirectorSingleSelectStep
-              options={DIRECTOR_MARKET_OPTIONS}
-              selectedValue={directorMarketInvolvement}
-              title="Coinvolgimento nel mercato"
-              subtitle="Sei coinvolto nelle operazioni di mercato calciatori?"
-              errorMessage={validationErrors.directorMarketInvolvement}
-              onSelect={(value) => {
-                patchForm({ directorMarketInvolvement: value });
-                clearValidationErrors(["directorMarketInvolvement"]);
-              }}
-            />
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromDirectorMarket}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Career                                          */}
-        {/* ============================================================= */}
-        {step === "director_career" ? (
-          <CoachCareerStep
-            addButtonLabel="Aggiungi esperienza dirigenziale"
-            defaultRole={directorPrimaryRole}
-            descriptionLabel="Attività svolte"
-            descriptionPlaceholder="Riassumi in una o due righe gestione rosa, mercato, scouting o coordinamento sportivo."
-            emptyMessage="Aggiungi le tue esperienze dirigenziali. Puoi inserirle ora o completarle in seguito dal tuo profilo."
-            entries={directorCareerEntries}
-            isBusy={isBusy}
-            onContinue={handleContinueFromDirectorCareer}
-            onRegisterBack={registerStepBackOverride}
-            onSkip={handleContinueFromDirectorCareer}
-            onUpdateEntries={(entries) =>
-              patchForm({ directorCareerEntries: entries })
-            }
-            roleOptions={DIRECTOR_ROLE_OPTIONS}
-            searchTeams={searchTeams}
-            selectorSubtitle="Scegli come vuoi inserire questa esperienza."
-            selectorTitle="Aggiungi esperienza dirigenziale"
-            showDescription
-            subtitle="Aggiungi le tue esperienze come dirigente per completare il profilo."
-            title="Carriera dirigenziale"
-            typeOptions={EXPERIENCE_TYPE_OPTIONS}
-          />
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Football Experience                             */}
-        {/* ============================================================= */}
-        {step === "director_football_experience" ? (
-          <DirectorFootballExperienceStep
-            hasOtherFootballExperience={directorHasOtherFootballExperience}
-            isBusy={isBusy}
-            otherFootballRoles={directorOtherFootballRoles}
-            errorMessage={validationErrors.directorOtherFootballRoles}
-            onContinue={handleContinueFromDirectorFootballExperience}
-            onToggleExperience={(value) =>
-              patchForm({
-                directorCoachCareerEntries: value ? directorCoachCareerEntries : [],
-                directorHasOtherFootballExperience: value,
-                directorOtherFootballRoles: value ? directorOtherFootballRoles : [],
-              })
-            }
-            onUpdateRoles={(roles) => {
-              patchForm({
-                directorCoachCareerEntries: roles.includes("Allenatore")
-                  ? directorCoachCareerEntries
-                  : [],
-                directorOtherFootballRoles: roles,
-              });
-            }}
-          />
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Coach Career                                    */}
-        {/* ============================================================= */}
-        {step === "director_coach_career" ? (
-          <CoachCareerStep
-            addButtonLabel="Aggiungi esperienza da allenatore"
-            defaultRole="Allenatore"
-            descriptionLabel="Attività svolte"
-            descriptionPlaceholder="Riassumi in una o due righe gestione del gruppo, sviluppo tecnico o coordinamento sportivo."
-            emptyMessage="Aggiungi eventuali esperienze da allenatore maturate prima del percorso dirigenziale."
-            entries={directorCoachCareerEntries}
-            isBusy={isBusy}
-            onContinue={handleContinueFromDirectorCoachCareer}
-            onRegisterBack={registerStepBackOverride}
-            onSkip={handleContinueFromDirectorCoachCareer}
-            onUpdateEntries={(entries) =>
-              patchForm({ directorCoachCareerEntries: entries })
-            }
-            searchTeams={searchTeams}
-            selectorSubtitle="Scegli come vuoi inserire questa esperienza precedente."
-            selectorTitle="Aggiungi esperienza da allenatore"
-            showDescription
-            subtitle="Mantieni separate le esperienze da allenatore dalla carriera dirigenziale."
-            title="Esperienze da allenatore"
-          />
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Player Career Toggle                            */}
-        {/* ============================================================= */}
-        {step === "director_player_career_toggle" ? (
-          <PlayerCareerToggleStep
-            hasPlayedFootball={directorHasPlayedFootball}
-            isBusy={isBusy}
-            onContinue={handleContinueFromDirectorPlayerCareerToggle}
-            onUpdate={(value) =>
-              patchForm({ directorHasPlayedFootball: value })
-            }
-            subtitle="Hai maturato esperienze come calciatore prima di diventare dirigente?"
-            title="Carriera da giocatore"
-          />
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Player Career                                   */}
-        {/* ============================================================= */}
-        {step === "director_player_career" ? (
-          <CareerExperienceStep
-            careerEntries={directorPlayerCareerEntries}
-            isBusy={isBusy}
-            onSaveAndContinue={handleContinueFromDirectorPlayerCareer}
-            onSkip={handleContinueFromDirectorPlayerCareer}
-            onUpdateEntries={(entries) =>
-              patchForm({ directorPlayerCareerEntries: entries })
-            }
-            searchTeams={searchTeams}
-            subtitle="Aggiungi la tua carriera in campo per arricchire il tuo profilo dirigenziale."
-            title="Carriera da giocatore"
-          />
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Club Type                                       */}
-        {/* ============================================================= */}
-        {step === "director_club_type" ? (
-          <View style={styles.stepContainer}>
-            <DirectorChipsStep
-              options={DIRECTOR_CLUB_TYPE_OPTIONS.map((o) => o.value)}
-              selectedValues={directorClubTypes}
-              title="Tipo di società"
-              subtitle="In quale tipo di società hai lavorato principalmente?"
-              errorMessage={validationErrors.directorClubTypes}
-              onToggle={(value) => {
-                const next = directorClubTypes.includes(value)
-                  ? directorClubTypes.filter((v) => v !== value)
-                  : [...directorClubTypes, value];
-                patchForm({ directorClubTypes: next });
-                clearValidationErrors(["directorClubTypes"]);
-              }}
-            />
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromDirectorClubType}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {/* ============================================================= */}
-        {/* STEP: Director Extra                                           */}
-        {/* ============================================================= */}
-        {step === "director_extra" ? (
-          <DirectorExtraStep
-            bio={directorBio}
-            isBusy={isBusy}
-            languages={directorLanguages}
-            onFinish={handleFinishDirectorExtra}
-            onSkip={handleFinishDirectorExtra}
-            onUpdate={(patch) => patchForm(patch)}
-          />
         ) : null}
 
       </KeyboardAwareForm>

@@ -421,25 +421,89 @@ describe("onboarding-form", () => {
     );
   });
 
-  it("maps the director coach career substep to the previous-experience progress group", () => {
-    expect(getOnboardingProgress("director_coach_career", "director")).toMatchObject({
-      stepIndex: 9,
-      totalSteps: 13,
-    });
+  /**
+   * REV-ONB-07 §AM: i quattro sotto-flussi condividono la posizione di
+   * "Altre esperienze nel calcio", così il contatore non cambia lunghezza a
+   * seconda dei rami aperti.
+   */
+  it("maps the director sub-flows to the previous-experience progress group", () => {
+    for (const step of [
+      "director_player_career",
+      "director_coach_career",
+      "director_staff_career",
+      "director_other_career",
+    ] as const) {
+      expect(getOnboardingProgress(step, "director")).toMatchObject({
+        stepIndex: 8,
+        totalSteps: 10,
+      });
+    }
+  });
+
+  /**
+   * §AN: il Back rientra nel ramo davvero percorso, non in uno mai aperto.
+   */
+  it("returns the director back step to the sub-flow actually visited", () => {
     expect(
       getPreviousOnboardingStep(
-        "director_player_career_toggle",
+        "director_extra",
         "director_coach_career",
         "director",
       ),
     ).toBe("director_coach_career");
     expect(
       getPreviousOnboardingStep(
-        "director_player_career_toggle",
-        "director_football_experience",
+        "director_extra",
+        "director_previous_experiences",
         "director",
       ),
-    ).toBe("director_football_experience");
+    ).toBe("director_previous_experiences");
+    expect(
+      getPreviousOnboardingStep(
+        "director_staff_career",
+        "director_player_career",
+        "director",
+      ),
+    ).toBe("director_player_career");
+    // Un ramo successivo non può essere il passo precedente di se stesso.
+    expect(
+      getPreviousOnboardingStep(
+        "director_player_career",
+        "director_other_career",
+        "director",
+      ),
+    ).toBe("director_previous_experiences");
+  });
+
+  /**
+   * §K, §AW: una bozza ferma su una schermata rimossa riprende dal passo che
+   * oggi raccoglie le stesse informazioni.
+   */
+  it("migrates director drafts parked on removed steps", () => {
+    expect(
+      normalizeOnboardingDraft({ currentStep: "director_categories" })
+        .currentStep,
+    ).toBe("director_responsibilities");
+    expect(
+      normalizeOnboardingDraft({ currentStep: "director_market" }).currentStep,
+    ).toBe("director_focus");
+    expect(
+      normalizeOnboardingDraft({ currentStep: "director_football_experience" })
+        .currentStep,
+    ).toBe("director_previous_experiences");
+    expect(
+      normalizeOnboardingDraft({ currentStep: "director_club_type" })
+        .currentStep,
+    ).toBe("director_extra");
+  });
+
+  it("derives director previous roles from the legacy football-experience flags", () => {
+    expect(
+      normalizeOnboardingDraft({
+        directorHasPlayedFootball: true,
+        directorOtherFootballRoles: ["Allenatore", "Preparatore atletico"],
+      }).directorPreviousRoles,
+    ).toEqual(["coach", "staff", "player"]);
   });
 
   it("normalizes director coach career draft entries with descriptions", () => {

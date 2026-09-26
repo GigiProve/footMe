@@ -30,7 +30,8 @@ const TYPE_BADGE_LABELS = {
  * Testi che cambiano da un profilo professionale all'altro.
  *
  * Solo copy e tassonomia: il flusso, l'editor e il riepilogo restano gli
- * stessi per l'Allenatore e per lo Staff tecnico (REV-ONB-04 §P, §Q).
+ * stessi per l'Allenatore, lo Staff tecnico e il Dirigente (REV-ONB-04 §P,
+ * §Q; REV-ONB-07 §P).
  */
 export type ExperiencesStepCopy = {
   addButtonLabel: string;
@@ -43,6 +44,21 @@ export type ExperiencesStepCopy = {
   summaryTitle: string;
   typeSelectorSubtitle: string;
   typeSelectorTitle: string;
+};
+
+/**
+ * Etichette dell'editor che cambiano da un profilo all'altro (REV-ONB-07
+ * §Q, §U, §AG): un dirigente non firma per una "squadra" ma per una società,
+ * e le sue attività svolte non sono quelle di una panchina.
+ *
+ * Restano etichette: il form, i suoi stati e le sue validazioni non cambiano.
+ */
+export type ExperienceFormCopy = {
+  descriptionLabel?: string;
+  descriptionPlaceholder?: string;
+  showDescription?: boolean;
+  teamLabel?: string;
+  teamPlaceholder?: string;
 };
 
 const COACH_COPY: ExperiencesStepCopy = {
@@ -69,6 +85,8 @@ type CoachExperiencesStepProps = {
   /** Ruolo principale del profilo: default delle nuove esperienze (§T). */
   defaultRole: string;
   entries: CoachCareerEntry[];
+  /** Etichette dell'editor. Default: quelle dell'Allenatore. */
+  formCopy?: ExperienceFormCopy;
   isBusy: boolean;
   onBack: () => void;
   onContinue: () => void;
@@ -98,6 +116,7 @@ export function CoachExperiencesStep({
   currentStep,
   defaultRole,
   entries,
+  formCopy,
   isBusy,
   onBack,
   onContinue,
@@ -177,6 +196,7 @@ export function CoachExperiencesStep({
         </View>
 
         <CoachExperienceForm
+          {...formCopy}
           allowOngoing={allowOngoing}
           entry={flow.screen.entry}
           existingEntries={flow.entries}

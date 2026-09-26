@@ -60,7 +60,14 @@ export function mapStaffRoleToSpecialization(
 }
 
 // Director-specific types
+/**
+ * REV-ONB-07 §F: un'unica sezione "Ruoli ricoperti". Presidente,
+ * Vicepresidente e Dirigente generico non sono una categoria a parte — stanno
+ * nella stessa lista, allo stesso livello degli altri ruoli.
+ */
 export type DirectorRole =
+  | "Presidente"
+  | "Vicepresidente"
   | "Direttore sportivo"
   | "Direttore generale"
   | "Team manager"
@@ -68,9 +75,12 @@ export type DirectorRole =
   | "Responsabile settore giovanile"
   | "Direttore tecnico"
   | "Segretario generale"
+  | "Dirigente generico"
   | "Altro";
 
 export const DIRECTOR_ROLE_OPTIONS: { label: string; value: DirectorRole }[] = [
+  { label: "Presidente", value: "Presidente" },
+  { label: "Vicepresidente", value: "Vicepresidente" },
   { label: "Direttore sportivo", value: "Direttore sportivo" },
   { label: "Direttore generale", value: "Direttore generale" },
   { label: "Team manager", value: "Team manager" },
@@ -78,6 +88,7 @@ export const DIRECTOR_ROLE_OPTIONS: { label: string; value: DirectorRole }[] = [
   { label: "Responsabile settore giovanile", value: "Responsabile settore giovanile" },
   { label: "Direttore tecnico", value: "Direttore tecnico" },
   { label: "Segretario generale", value: "Segretario generale" },
+  { label: "Dirigente generico", value: "Dirigente generico" },
   { label: "Altro", value: "Altro" },
 ];
 
@@ -91,6 +102,7 @@ export const DIRECTOR_RESPONSIBILITY_OPTIONS = [
   "Budget e finanze",
   "Comunicazione e sponsor",
   "Organizzazione logistica",
+  "Area legale",
   "Altro",
 ] as const;
 

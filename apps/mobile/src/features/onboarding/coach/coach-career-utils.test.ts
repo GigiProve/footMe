@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { CoachCareerEntry, SimplePlayerCareerEntry } from "./coach-career-types";
+import type { CoachCareerEntry } from "./coach-career-types";
 import {
   getCoachEndYearOptions,
   getCoachPeriodOverlapSeasons,
   getCoachSeasonSelectOptions,
   getCoachStartYearOptions,
   getOccupiedCoachSeasonLabels,
-  getSimplePlayerSeasonSelectOptions,
   sanitizeCoachPeriodSelection,
   sortCoachCareerEntriesBySeason,
 } from "./coach-career-utils";
@@ -78,30 +77,6 @@ describe("coach-career-utils", () => {
       endMonth: "",
       endYear: "",
     });
-  });
-
-  it("disables occupied seasons in simple player career options", () => {
-    const entries: SimplePlayerCareerEntry[] = [
-      {
-        id: "simple-1",
-        teamName: "ASD One",
-        season: "2024/2025",
-        category: "",
-        position: "",
-      },
-      {
-        id: "simple-2",
-        teamName: "ASD Two",
-        season: "2023/2024",
-        category: "",
-        position: "",
-      },
-    ];
-
-    const options = getSimplePlayerSeasonSelectOptions(entries, "simple-2");
-
-    expect(options.find((option) => option.value === "2024/2025")?.disabled).toBe(true);
-    expect(options.find((option) => option.value === "2023/2024")?.disabled).not.toBe(true);
   });
 
   it("sorts coach entries by most recent season first", () => {

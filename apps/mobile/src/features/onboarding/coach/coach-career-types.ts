@@ -24,11 +24,3 @@ export type CoachCareerEntry = {
   } | null; // used for CUSTOM_PERIOD
   seasonDetails: Record<string, CoachSeasonDetail>; // keyed by season label "2024/2025"
 };
-
-export type SimplePlayerCareerEntry = {
-  id: string;
-  teamName: string;
-  season: string;
-  category: string;
-  position: string;
-};

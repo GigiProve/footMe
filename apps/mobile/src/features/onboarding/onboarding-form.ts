@@ -98,16 +98,21 @@ export type OnboardingStep =
   | "coach_extra"
   | "director_roles"
   | "director_responsibilities"
-  | "director_categories"
   | "director_focus"
-  | "director_market"
+  | "director_availability"
   | "director_career"
-  | "director_football_experience"
+  | "director_previous_experiences"
   | "director_coach_career"
-  | "director_player_career_toggle"
   | "director_player_career"
-  | "director_club_type"
+  | "director_staff_career"
+  | "director_other_career"
   | "director_extra"
+  // REV-ONB-07: passi Dirigente rimossi, mantenuti per la migrazione bozze
+  | "director_categories"
+  | "director_market"
+  | "director_football_experience"
+  | "director_player_career_toggle"
+  | "director_club_type"
   | "complete"
   // Legacy steps kept for draft migration
   | "decision"
@@ -280,19 +285,35 @@ export type OnboardingFormState = {
   // Director fields
   directorRoles: string[];
   directorPrimaryRole: string;
+  /** REV-ONB-07 §H: ruolo libero dichiarato scegliendo "Altro". */
+  directorOtherRoleLabel: string;
   directorResponsibilities: string[];
-  directorCategories: string[];
   directorMainFocus: string;
-  directorMarketInvolvement: string;
+  /** REV-ONB-07 §M: da chi si è disponibili a ricevere contatti. */
+  directorOpenToClubs: boolean;
+  directorOpenToStaff: boolean;
+  directorOpenToPlayers: boolean;
+  directorOpenToOthers: boolean;
   directorCareerEntries: CoachCareerEntry[];
+  /** REV-ONB-07 §AA: altre esperienze nel calcio, selezione multipla. */
+  directorPreviousRoles: string[];
   directorCoachCareerEntries: CoachCareerEntry[];
+  directorStaffCareerEntries: CoachCareerEntry[];
+  directorOtherCareerEntries: CoachCareerEntry[];
   directorHasOtherFootballExperience: boolean;
   directorOtherFootballRoles: string[];
   directorHasPlayedFootball: boolean;
   directorPlayerCareerEntries: PlayerExperienceForm[];
-  directorClubTypes: string[];
   directorLanguages: string[];
   directorBio: string;
+  /**
+   * REV-ONB-07 §K, §AW: non più raccolti durante l'onboarding. Restano nel
+   * form perché una bozza aperta prima della review può ancora portarli e
+   * perché i profili già salvati continuano a leggerli.
+   */
+  directorCategories: string[];
+  directorMarketInvolvement: string;
+  directorClubTypes: string[];
   technicalVideoUrl: string;
   transferProvinces: string;
   transferRegions: string;
@@ -740,21 +761,41 @@ const mediaVisibleSteps: OnboardingVisibleStep[] = [
   },
 ];
 
+/**
+ * Sotto-flussi delle esperienze precedenti del Dirigente (REV-ONB-07 §AC–§AG).
+ *
+ * Sono passi condizionali: esistono nell'ordine del flusso ma si attraversano
+ * solo se dichiarati. Vivono qui perché sono conoscenza di ordinamento, e il
+ * modulo Dirigente li legge da qui per non tenerne una seconda copia.
+ */
+export const DIRECTOR_SUB_FLOW_STEPS: OnboardingStep[] = [
+  "director_player_career",
+  "director_coach_career",
+  "director_staff_career",
+  "director_other_career",
+];
+
+/**
+ * Percorso del Dirigente dopo REV-ONB-07.
+ *
+ * I quattro sotto-flussi delle esperienze precedenti stanno in coda: non si
+ * attraversano in sequenza, ci si entra solo se dichiarati e la navigazione
+ * fra loro è decisa da `getNextDirectorSubFlowStep` (§AC–§AH).
+ */
 const directorStepOrder: OnboardingStep[] = [
   "role",
   "base",
   "photo",
   "director_roles",
   "director_responsibilities",
-  "director_categories",
   "director_focus",
-  "director_market",
+  "director_availability",
   "director_career",
-  "director_football_experience",
-  "director_coach_career",
-  "director_player_career_toggle",
+  "director_previous_experiences",
   "director_player_career",
-  "director_club_type",
+  "director_coach_career",
+  "director_staff_career",
+  "director_other_career",
   "director_extra",
   "complete",
 ];
@@ -779,7 +820,7 @@ const directorVisibleSteps: OnboardingVisibleStep[] = [
     step: "photo",
   },
   {
-    description: "Il tuo ruolo nel calcio",
+    description: "I ruoli che ricopri nel club",
     index: 4,
     label: "Ruolo",
     step: "director_roles",
@@ -791,50 +832,36 @@ const directorVisibleSteps: OnboardingVisibleStep[] = [
     step: "director_responsibilities",
   },
   {
-    description: "Categorie di esperienza",
+    description: "Dove concentri la tua attività",
     index: 6,
-    label: "Categorie",
-    step: "director_categories",
-  },
-  {
-    description: "Focus principale",
-    index: 7,
     label: "Focus",
     step: "director_focus",
   },
   {
-    description: "Coinvolgimento nel mercato",
-    index: 8,
-    label: "Mercato",
-    step: "director_market",
+    description: "Da chi vuoi ricevere contatti",
+    index: 7,
+    label: "Disponibilità",
+    step: "director_availability",
   },
   {
-    description: "Esperienze dirigenziali",
-    index: 9,
+    description: "Le tue esperienze dirigenziali",
+    index: 8,
     label: "Carriera",
     step: "director_career",
   },
+  /**
+   * §AM: i sotto-flussi delle esperienze precedenti condividono questo passo
+   * nel contatore, così il totale non cambia a seconda dei rami aperti.
+   */
   {
-    description: "Altri ruoli nel calcio",
-    index: 10,
+    description: "Altre esperienze maturate nel calcio",
+    index: 9,
     label: "Esperienze",
-    step: "director_football_experience",
-  },
-  {
-    description: "Carriera da calciatore",
-    index: 11,
-    label: "Giocatore",
-    step: "director_player_career_toggle",
-  },
-  {
-    description: "Tipo di società prevalente",
-    index: 12,
-    label: "Società",
-    step: "director_club_type",
+    step: "director_previous_experiences",
   },
   {
     description: "Bio e lingue",
-    index: 13,
+    index: 10,
     label: "Profilo",
     step: "director_extra",
   },
@@ -1024,19 +1051,28 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   staffSpecialization: "fitness_coach",
   directorRoles: [],
   directorPrimaryRole: "",
+  directorOtherRoleLabel: "",
   directorResponsibilities: [],
-  directorCategories: [],
   directorMainFocus: "",
-  directorMarketInvolvement: "",
+  /** §M: si parte contattabili; ogni categoria resta disattivabile. */
+  directorOpenToClubs: true,
+  directorOpenToStaff: true,
+  directorOpenToPlayers: true,
+  directorOpenToOthers: true,
   directorCareerEntries: [],
+  directorPreviousRoles: [],
   directorCoachCareerEntries: [],
+  directorStaffCareerEntries: [],
+  directorOtherCareerEntries: [],
   directorHasOtherFootballExperience: false,
   directorOtherFootballRoles: [],
   directorHasPlayedFootball: false,
   directorPlayerCareerEntries: [],
-  directorClubTypes: [],
   directorLanguages: [],
   directorBio: "",
+  directorCategories: [],
+  directorMarketInvolvement: "",
+  directorClubTypes: [],
   technicalVideoUrl: "",
   transferProvinces: "",
   transferRegions: "",
@@ -1069,7 +1105,59 @@ function migrateLegacyStep(step: OnboardingStep): OnboardingStep {
   if (step === "agent_player_career_toggle") return "agent_previous_experiences";
   if (step === "agent_availability") return "agent_contact_preferences";
   if (step === "agent_extra") return "agent_presentation";
+  /**
+   * REV-ONB-07 §K, §AW: una bozza aperta con il vecchio onboarding Dirigente
+   * riprende dal passo che oggi raccoglie le stesse informazioni. "Categorie
+   * di esperienza", "Coinvolgimento nel mercato" e "Tipo di società" non
+   * esistono più come domande: chi era lì rientra dal passo precedente, non
+   * si ritrova davanti a una schermata rimossa.
+   */
+  if (step === "director_categories") return "director_responsibilities";
+  if (step === "director_market") return "director_focus";
+  if (step === "director_football_experience")
+    return "director_previous_experiences";
+  if (step === "director_player_career_toggle")
+    return "director_previous_experiences";
+  if (step === "director_club_type") return "director_extra";
   return step;
+}
+
+/**
+ * REV-ONB-07 §AW: le vecchie chip "altri ruoli nel calcio" diventano la
+ * selezione multipla di "Altre esperienze nel calcio".
+ *
+ * "Preparatore atletico" confluisce nello Staff tecnico, che è il flusso che
+ * ne raccoglie le esperienze; "Ex calciatore" diventa "Calciatore" perché il
+ * dato è la carriera, non il tempo verbale.
+ */
+const LEGACY_DIRECTOR_PREVIOUS_ROLES: Record<string, string> = {
+  Allenatore: "coach",
+  Altro: "other",
+  "Ex calciatore": "player",
+  "Preparatore atletico": "staff",
+  Procuratore: "agent",
+  Scout: "scout",
+  "Staff tecnico": "staff",
+};
+
+function deriveLegacyDirectorPreviousRoles(value: {
+  directorHasPlayedFootball?: unknown;
+  directorOtherFootballRoles?: unknown;
+}): string[] {
+  const legacyRoles = Array.isArray(value.directorOtherFootballRoles)
+    ? value.directorOtherFootballRoles
+    : [];
+
+  const derived = legacyRoles
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => LEGACY_DIRECTOR_PREVIOUS_ROLES[entry])
+    .filter((entry): entry is string => Boolean(entry));
+
+  if (value.directorHasPlayedFootball === true) {
+    derived.push("player");
+  }
+
+  return [...new Set(derived)];
 }
 
 export function normalizeOnboardingDraft(
@@ -1400,6 +1488,44 @@ export function normalizeOnboardingDraft(
           seasonDetails: e.seasonDetails ?? {},
         }))
       : defaultOnboardingFormState.directorCoachCareerEntries,
+    directorOtherRoleLabel:
+      typeof value.directorOtherRoleLabel === "string"
+        ? value.directorOtherRoleLabel
+        : defaultOnboardingFormState.directorOtherRoleLabel,
+    directorOpenToClubs:
+      typeof value.directorOpenToClubs === "boolean"
+        ? value.directorOpenToClubs
+        : defaultOnboardingFormState.directorOpenToClubs,
+    directorOpenToStaff:
+      typeof value.directorOpenToStaff === "boolean"
+        ? value.directorOpenToStaff
+        : defaultOnboardingFormState.directorOpenToStaff,
+    directorOpenToPlayers:
+      typeof value.directorOpenToPlayers === "boolean"
+        ? value.directorOpenToPlayers
+        : defaultOnboardingFormState.directorOpenToPlayers,
+    directorOpenToOthers:
+      typeof value.directorOpenToOthers === "boolean"
+        ? value.directorOpenToOthers
+        : defaultOnboardingFormState.directorOpenToOthers,
+    directorPreviousRoles: Array.isArray(value.directorPreviousRoles)
+      ? value.directorPreviousRoles.filter((v): v is string => typeof v === "string")
+      : deriveLegacyDirectorPreviousRoles({
+          directorHasPlayedFootball: value.directorHasPlayedFootball,
+          directorOtherFootballRoles: value.directorOtherFootballRoles,
+        }),
+    directorStaffCareerEntries: Array.isArray(value.directorStaffCareerEntries)
+      ? (value.directorStaffCareerEntries as CoachCareerEntry[]).map((e) => ({
+          ...e,
+          seasonDetails: e.seasonDetails ?? {},
+        }))
+      : defaultOnboardingFormState.directorStaffCareerEntries,
+    directorOtherCareerEntries: Array.isArray(value.directorOtherCareerEntries)
+      ? (value.directorOtherCareerEntries as CoachCareerEntry[]).map((e) => ({
+          ...e,
+          seasonDetails: e.seasonDetails ?? {},
+        }))
+      : defaultOnboardingFormState.directorOtherCareerEntries,
     directorHasOtherFootballExperience: value.directorHasOtherFootballExperience === true,
     directorOtherFootballRoles: Array.isArray(value.directorOtherFootballRoles)
       ? value.directorOtherFootballRoles.filter((v): v is string => typeof v === "string")
@@ -1499,10 +1625,12 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     "staff_previous_experiences", "staff_coach_career",
     "staff_player_career_toggle", "staff_player_career",
     "player_career_toggle", "player_career", "coach_extra",
-    "director_roles", "director_responsibilities", "director_categories",
-    "director_focus", "director_market", "director_career",
-    "director_football_experience", "director_coach_career", "director_player_career_toggle",
-    "director_player_career", "director_club_type", "director_extra",
+    "director_roles", "director_responsibilities", "director_focus",
+    "director_availability", "director_career", "director_previous_experiences",
+    "director_player_career", "director_coach_career", "director_staff_career",
+    "director_other_career", "director_extra",
+    "director_categories", "director_market", "director_football_experience",
+    "director_player_career_toggle", "director_club_type",
     "complete",
     // Legacy steps for draft migration
     "decision", "details", "club",
@@ -1546,12 +1674,16 @@ export function getOnboardingStepIndex(
     comparableStep = "agent_previous_experiences";
   }
 
-  if (role === "director" && effectiveStep === "director_player_career") {
-    comparableStep = "director_player_career_toggle";
-  }
-
-  if (role === "director" && effectiveStep === "director_coach_career") {
-    comparableStep = "director_football_experience";
+  /**
+   * REV-ONB-07 §AM: i quattro sotto-flussi delle esperienze precedenti sono
+   * condizionali e condividono la posizione di "Altre esperienze nel calcio".
+   * Il contatore non deve cambiare lunghezza a seconda dei rami aperti.
+   */
+  if (
+    role === "director" &&
+    DIRECTOR_SUB_FLOW_STEPS.includes(effectiveStep)
+  ) {
+    comparableStep = "director_previous_experiences";
   }
 
   const visibleIndex = visibleSteps.findIndex((entry) => entry.step === comparableStep);
@@ -1636,6 +1768,28 @@ export function getPreviousOnboardingStep(
   }
 
   /**
+   * REV-ONB-07 §AN: il Back rientra nel ramo davvero percorso. Chi non ha
+   * dichiarato "Calciatore" non deve ritrovarsi dentro la carriera da
+   * calciatore, e le esperienze già salvate non si perdono per strada.
+   */
+  if (
+    role === "director" &&
+    (effectiveStep === "director_extra" ||
+      DIRECTOR_SUB_FLOW_STEPS.includes(effectiveStep))
+  ) {
+    const openSubFlows = DIRECTOR_SUB_FLOW_STEPS.slice(
+      0,
+      effectiveStep === "director_extra"
+        ? DIRECTOR_SUB_FLOW_STEPS.length
+        : DIRECTOR_SUB_FLOW_STEPS.indexOf(effectiveStep),
+    );
+
+    return openSubFlows.includes(_lastCompletedStep as OnboardingStep)
+      ? (_lastCompletedStep as OnboardingStep)
+      : "director_previous_experiences";
+  }
+
+  /**
    * §BG: il Back rientra nel ramo davvero percorso. Chi non ha dichiarato
    * "Calciatore" non deve ritrovarsi dentro la carriera da calciatore.
    */
@@ -1649,18 +1803,6 @@ export function getPreviousOnboardingStep(
     return _lastCompletedStep === "staff_coach_career"
       ? "staff_coach_career"
       : "staff_previous_experiences";
-  }
-
-  if (role === "director" && effectiveStep === "director_club_type") {
-    return _lastCompletedStep === "director_player_career"
-      ? "director_player_career"
-      : "director_player_career_toggle";
-  }
-
-  if (role === "director" && effectiveStep === "director_player_career_toggle") {
-    return _lastCompletedStep === "director_coach_career"
-      ? "director_coach_career"
-      : "director_football_experience";
   }
 
   const previousIndex = stepOrder.indexOf(effectiveStep) - 1;
@@ -1789,28 +1931,23 @@ export function validateOnboardingStep(
   if (step === "director_responsibilities") {
     return mapDirectorResponsibilitiesValidationError(form);
   }
-  if (step === "director_categories") {
-    return mapDirectorCategoriesValidationError(form);
-  }
   if (step === "director_focus") {
     return mapDirectorFocusValidationError(form);
   }
-  if (step === "director_market") {
-    return mapDirectorMarketValidationError(form);
-  }
-  if (step === "director_football_experience") {
-    return mapDirectorFootballExperienceValidationError(form);
-  }
-  if (step === "director_club_type") {
-    return mapDirectorClubTypeValidationError(form);
-  }
 
-  // director career, toggle, player career, extra → no required validation
+  /**
+   * REV-ONB-07 §AB, §AK, §N: carriera, esperienze precedenti, sotto-flussi,
+   * disponibilità e informazioni aggiuntive non hanno campi obbligatori. Zero
+   * selezioni e zero esperienze sono risposte valide.
+   */
   if (
+    step === "director_availability" ||
     step === "director_career" ||
+    step === "director_previous_experiences" ||
     step === "director_coach_career" ||
-    step === "director_player_career_toggle" ||
     step === "director_player_career" ||
+    step === "director_staff_career" ||
+    step === "director_other_career" ||
     step === "director_extra" ||
     step === "fan_photo" ||
     step === "media_photo" ||
@@ -2200,7 +2337,9 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
     errors.lastName = "Questo campo è obbligatorio";
   }
 
-  if (form.role !== "agent" && form.role !== "director" && !form.gender) {
+  // REV-ONB-07 §D: il Dirigente usa integralmente il componente comune, sesso
+  // compreso. Nessun campo specifico e nessuna esclusione specifica.
+  if (form.role !== "agent" && !form.gender) {
     errors.gender = "Questo campo è obbligatorio";
   }
 
@@ -2381,54 +2520,31 @@ function mapAgentPreviousExperiencesValidationError(
   };
 }
 
+/** REV-ONB-07 §AT, §AX: un errore per volta, accanto al campo che lo causa. */
 function mapDirectorRolesValidationError(form: OnboardingFormState): OnboardingValidationErrors {
   if (form.directorRoles.length === 0) {
-    return { directorRoles: "Seleziona almeno un ruolo per continuare." };
+    return { directorRoles: "Seleziona almeno un ruolo." };
   }
   if (form.directorRoles.length > 1 && !form.directorPrimaryRole) {
-    return { directorPrimaryRole: "Seleziona il ruolo principale per continuare." };
+    return { directorPrimaryRole: "Seleziona un ruolo principale." };
+  }
+  // §H: "Altro" senza specifica non dice niente a chi legge il profilo.
+  if (form.directorRoles.includes("Altro") && !form.directorOtherRoleLabel.trim()) {
+    return { directorOtherRoleLabel: "Specifica il ruolo che ricopri." };
   }
   return {};
 }
 
 function mapDirectorResponsibilitiesValidationError(form: OnboardingFormState): OnboardingValidationErrors {
   if (form.directorResponsibilities.length === 0) {
-    return { directorResponsibilities: "Seleziona almeno una responsabilità per continuare." };
-  }
-  return {};
-}
-
-function mapDirectorCategoriesValidationError(form: OnboardingFormState): OnboardingValidationErrors {
-  if (form.directorCategories.length === 0) {
-    return { directorCategories: "Seleziona almeno una categoria per continuare." };
+    return { directorResponsibilities: "Seleziona almeno un'area di responsabilità." };
   }
   return {};
 }
 
 function mapDirectorFocusValidationError(form: OnboardingFormState): OnboardingValidationErrors {
   if (!form.directorMainFocus) {
-    return { directorMainFocus: "Seleziona il focus principale per continuare." };
-  }
-  return {};
-}
-
-function mapDirectorMarketValidationError(form: OnboardingFormState): OnboardingValidationErrors {
-  if (!form.directorMarketInvolvement) {
-    return { directorMarketInvolvement: "Seleziona una risposta per continuare." };
-  }
-  return {};
-}
-
-function mapDirectorFootballExperienceValidationError(form: OnboardingFormState): OnboardingValidationErrors {
-  if (form.directorHasOtherFootballExperience && form.directorOtherFootballRoles.length === 0) {
-    return { directorOtherFootballRoles: "Seleziona almeno un'esperienza calcistica." };
-  }
-  return {};
-}
-
-function mapDirectorClubTypeValidationError(form: OnboardingFormState): OnboardingValidationErrors {
-  if (form.directorClubTypes.length === 0) {
-    return { directorClubTypes: "Seleziona almeno un tipo di società per continuare." };
+    return { directorMainFocus: "Seleziona il tuo focus principale." };
   }
   return {};
 }

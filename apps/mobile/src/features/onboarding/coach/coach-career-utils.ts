@@ -1,5 +1,5 @@
 import type { SelectOption } from "../../profiles/profile-form-utils";
-import type { CoachCareerEntry, SimplePlayerCareerEntry } from "./coach-career-types";
+import type { CoachCareerEntry } from "./coach-career-types";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CHIP_FIRST_YEAR = 2010;
@@ -37,16 +37,6 @@ export function getOlderCoachSeasonOptions(): { label: string; value: string }[]
     options.push({ label: formatSeasonShort(season), value: season });
   }
   return options;
-}
-
-/** Last 20 seasons for player career dropdown. */
-export function getPlayerSeasonOptions(): { label: string; value: string }[] {
-  return Array.from({ length: 20 }, (_, i) => {
-    const year = CURRENT_YEAR - i;
-    const season = `${year}/${year + 1}`;
-    const label = `${year}/${String(year + 1).slice(2)}`;
-    return { label, value: season };
-  });
 }
 
 /** Last 30 years + current for period pickers. */
@@ -334,23 +324,6 @@ export function getCoachPeriodOverlapSeasons(
   return computeCoachSeasonsFromPeriod(period).filter((season) =>
     occupiedSeasons.has(season),
   );
-}
-
-export function getSimplePlayerSeasonSelectOptions(
-  entries: SimplePlayerCareerEntry[],
-  currentEntryId?: string,
-): SelectOption[] {
-  const occupied = new Set(
-    entries
-      .filter((entry) => entry.id !== currentEntryId)
-      .map((entry) => entry.season)
-      .filter((season) => season.trim() !== ""),
-  );
-
-  return getPlayerSeasonOptions().map((option) => ({
-    ...option,
-    disabled: occupied.has(option.value),
-  }));
 }
 
 export function formatSeasonShort(season: string): string {

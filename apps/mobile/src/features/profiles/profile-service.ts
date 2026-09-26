@@ -271,11 +271,24 @@ export type DirectorProfileRecord = {
   main_focus: string | null;
   market_involvement: string | null;
   media_items: DirectorMediaItemRecord[];
+  /** REV-ONB-07 §M: da chi il dirigente accetta di ricevere contatti. */
+  open_to_clubs: boolean;
+  open_to_others: boolean;
+  open_to_players: boolean;
+  open_to_staff: boolean;
+  /** REV-ONB-07 §AG: esperienze in ruoli senza un flusso carriera dedicato. */
+  other_career_entries: unknown[];
   other_football_roles: string[];
+  /** REV-ONB-07 §H: ruolo dichiarato scegliendo "Altro". */
+  other_role_label: string | null;
   player_career_entries: unknown[];
+  /** REV-ONB-07 §AA: altre esperienze nel calcio, selezione multipla. */
+  previous_roles: string[];
   primary_role: string | null;
   profile_id: string;
   responsibilities: string[];
+  /** REV-ONB-07 §AE: esperienze nel ramo Staff tecnico. */
+  staff_career_entries: unknown[];
 };
 
 export type FanProfileRecord = {
@@ -498,10 +511,18 @@ export type CompleteProfessionalProfileUpdate = {
     main_focus: string | null;
     market_involvement: string | null;
     media_items?: DirectorMediaItemRecord[];
+    open_to_clubs: boolean;
+    open_to_others: boolean;
+    open_to_players: boolean;
+    open_to_staff: boolean;
+    other_career_entries?: unknown[];
     other_football_roles: string[];
+    other_role_label?: string | null;
     player_career_entries: unknown[];
+    previous_roles?: string[];
     primary_role: string | null;
     responsibilities: string[];
+    staff_career_entries?: unknown[];
   } | null;
   fanProfile?: {
     favorite_club_id?: string | null;
@@ -1047,13 +1068,29 @@ function normalizeDirectorProfileRecord(
     main_focus: normalizeOptionalText(rawProfile.main_focus),
     market_involvement: normalizeOptionalText(rawProfile.market_involvement),
     media_items: normalizeDirectorMediaItems(rawProfile.media_items),
+    /**
+     * REV-ONB-07 §M: un profilo salvato prima della review non porta queste
+     * colonne. L'assenza vale "contattabile", che è il default del passo.
+     */
+    open_to_clubs: rawProfile.open_to_clubs !== false,
+    open_to_others: rawProfile.open_to_others !== false,
+    open_to_players: rawProfile.open_to_players !== false,
+    open_to_staff: rawProfile.open_to_staff !== false,
+    other_career_entries: Array.isArray(rawProfile.other_career_entries)
+      ? rawProfile.other_career_entries
+      : [],
     other_football_roles: normalizeStringArray(rawProfile.other_football_roles),
+    other_role_label: normalizeOptionalText(rawProfile.other_role_label),
     player_career_entries: Array.isArray(rawProfile.player_career_entries)
       ? rawProfile.player_career_entries
       : [],
+    previous_roles: normalizeStringArray(rawProfile.previous_roles),
     primary_role: normalizeOptionalText(rawProfile.primary_role),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
     responsibilities: normalizeStringArray(rawProfile.responsibilities),
+    staff_career_entries: Array.isArray(rawProfile.staff_career_entries)
+      ? rawProfile.staff_career_entries
+      : [],
   } satisfies DirectorProfileRecord;
 }
 
@@ -1614,7 +1651,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("director_profiles")
           .select(
-            "profile_id, director_roles, primary_role, responsibilities, experience_categories, main_focus, market_involvement, media_items, career_entries, coach_career_entries, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, club_types",
+            "profile_id, director_roles, primary_role, other_role_label, responsibilities, experience_categories, main_focus, market_involvement, media_items, career_entries, coach_career_entries, staff_career_entries, other_career_entries, has_other_football_experience, other_football_roles, previous_roles, has_played_football, player_career_entries, club_types, open_to_clubs, open_to_staff, open_to_players, open_to_others",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -2325,11 +2362,19 @@ export async function updateCompleteProfessionalProfile(
       main_focus: input.directorProfile.main_focus,
       market_involvement: input.directorProfile.market_involvement,
       media_items: input.directorProfile.media_items ?? [],
+      open_to_clubs: input.directorProfile.open_to_clubs,
+      open_to_others: input.directorProfile.open_to_others,
+      open_to_players: input.directorProfile.open_to_players,
+      open_to_staff: input.directorProfile.open_to_staff,
+      other_career_entries: input.directorProfile.other_career_entries ?? [],
       other_football_roles: input.directorProfile.other_football_roles,
+      other_role_label: input.directorProfile.other_role_label ?? null,
       player_career_entries: input.directorProfile.player_career_entries,
+      previous_roles: input.directorProfile.previous_roles ?? [],
       primary_role: input.directorProfile.primary_role,
       profile_id: input.profileId,
       responsibilities: input.directorProfile.responsibilities,
+      staff_career_entries: input.directorProfile.staff_career_entries ?? [],
     });
 
     if (error) {
@@ -2670,11 +2715,19 @@ export async function saveDirectorProfileMedia(input: {
     main_focus: input.directorProfile.main_focus,
     market_involvement: input.directorProfile.market_involvement,
     media_items: input.mediaItems,
+    open_to_clubs: input.directorProfile.open_to_clubs,
+    open_to_others: input.directorProfile.open_to_others,
+    open_to_players: input.directorProfile.open_to_players,
+    open_to_staff: input.directorProfile.open_to_staff,
+    other_career_entries: input.directorProfile.other_career_entries,
     other_football_roles: input.directorProfile.other_football_roles,
+    other_role_label: input.directorProfile.other_role_label,
     player_career_entries: input.directorProfile.player_career_entries,
+    previous_roles: input.directorProfile.previous_roles,
     primary_role: input.directorProfile.primary_role,
     profile_id: input.profileId,
     responsibilities: input.directorProfile.responsibilities,
+    staff_career_entries: input.directorProfile.staff_career_entries,
   });
 
   if (error) {
