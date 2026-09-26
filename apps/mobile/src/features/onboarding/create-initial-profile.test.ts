@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createInitialProfile, validateBaseProfileStep } from "./create-initial-profile";
 import type { StaffRole } from "./onboarding-types";
+import type { ClubStructure } from "./club/club-structure";
 
 const { fromMock, upsertMocks } = vi.hoisted(() => {
   const upsertMocks = {
@@ -95,8 +96,11 @@ describe("createInitialProfile", () => {
     clubPhone: "",
     clubRegion: "",
     clubStadium: "",
+    clubStructure: "" as ClubStructure,
+    clubTikTok: "",
     clubTotalMembers: "",
     clubWebsite: "",
+    clubYouTube: "",
     clubYouthCategories: [] as string[],
 
     currentLocationCity: "",

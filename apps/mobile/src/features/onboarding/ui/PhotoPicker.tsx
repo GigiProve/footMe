@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -24,6 +24,11 @@ type PhotoPickerProps = {
   onRetry?: () => void;
   /** Cerchio per una foto profilo, quadrato arrotondato per un logo. */
   shape?: "circle" | "square";
+  /**
+   * Segnaposto quando non c'è ancora un'immagine. Serve a dire che cosa si
+   * sta caricando — uno stemma non è una foto — non ad aggiungere decoro.
+   */
+  placeholderIcon?: ComponentProps<typeof Ionicons>["name"];
   addLabel?: string;
   replaceLabel?: string;
   sheetTitle?: string;
@@ -41,6 +46,7 @@ export function PhotoPicker({
   onRemove,
   onRetry,
   onTakePhoto,
+  placeholderIcon,
   replaceLabel = "Cambia foto",
   shape = "circle",
   sheetTitle = "Foto profilo",
@@ -102,7 +108,9 @@ export function PhotoPicker({
         ) : (
           <Ionicons
             color={colors.textMuted}
-            name={isCircle ? "person-outline" : "image-outline"}
+            name={
+              placeholderIcon ?? (isCircle ? "person-outline" : "image-outline")
+            }
             size={34}
           />
         )}

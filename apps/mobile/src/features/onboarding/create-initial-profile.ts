@@ -9,11 +9,17 @@ import {
   type StaffRole,
   type StaffSpecialization,
 } from "./onboarding-types";
+import {
+  type ClubStructure,
+  clubStructureHasFirstTeam,
+  clubStructureHasYouth,
+  deriveLegacyClubStructure,
+} from "./club/club-structure";
 
 export type { PlayerPosition } from "../profiles/player-sports";
 export type { AppRole, ProfileGender, StaffSpecialization } from "./onboarding-types";
 
-type CreateInitialProfileInput = {
+export type CreateInitialProfileInput = {
   authEmail: string;
   avatarUrl: string;
   birthDate: string;
@@ -34,8 +40,11 @@ type CreateInitialProfileInput = {
   clubPhone: string;
   clubRegion: string;
   clubStadium: string;
+  clubStructure: ClubStructure;
+  clubTikTok: string;
   clubTotalMembers: string;
   clubWebsite: string;
+  clubYouTube: string;
   clubYouthCategories: string[];
 
   currentLocationCity: string;
@@ -299,6 +308,29 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
   }
 
   if (input.role === "club_admin") {
+    /**
+     * REV-ONB-05 §BD: la struttura è un attributo della società, non una
+     * deduzione. Se manca — bozza legacy ripresa a metà — la ricostruiamo
+     * dai dati che il vecchio flusso aveva raccolto (§BC).
+     */
+    const structure: ClubStructure =
+      input.clubStructure ||
+      deriveLegacyClubStructure({
+        clubCategory: input.clubCategory,
+        clubHasYouthSector: input.clubHasYouthSector,
+        clubYouthCategories: input.clubYouthCategories,
+      });
+
+    const hasFirstTeam = clubStructureHasFirstTeam(structure);
+    const hasYouth = clubStructureHasYouth(structure);
+
+    // §Q, §T: un club senza prima squadra non deve risultare con una
+    // categoria di prima squadra attiva.
+    const firstTeamCategory = hasFirstTeam
+      ? parseOptionalText(input.clubCategory)
+      : null;
+    const youthCategories = hasYouth ? input.clubYouthCategories : [];
+
     const { data: clubData, error: clubError } = await supabase
       .from("clubs")
       .upsert(
@@ -306,12 +338,13 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
           owner_profile_id: input.userId,
           name: input.clubName.trim(),
           slug: slugify(input.clubName),
-          category: parseOptionalText(input.clubCategory),
+          category: firstTeamCategory,
           city: input.clubCity.trim(),
           region: input.clubRegion.trim(),
           club_colors: parseOptionalText(input.clubColors),
           club_email: parseOptionalText(input.clubEmail),
           club_phone: parseOptionalText(input.clubPhone),
+          club_structure: structure || null,
           country: input.clubCountry || "IT",
           description: parseOptionalText(input.clubDescription),
           facebook: parseOptionalText(input.clubFacebook),
@@ -323,10 +356,11 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
           representative_email: parseOptionalText(input.repEmail),
           representative_phone: parseOptionalText(input.repPhone),
           stadium: parseOptionalText(input.clubStadium),
+          tiktok: parseOptionalText(input.clubTikTok),
           total_members: parseOptionalInteger(input.clubTotalMembers),
           verification_status: "pending_review",
           website_url: parseOptionalText(input.clubWebsite),
-
+          youtube: parseOptionalText(input.clubYouTube),
         },
         { onConflict: "owner_profile_id" },
       )
@@ -337,18 +371,24 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
       throw clubError;
     }
 
-    if (clubData && input.clubCategory.trim()) {
-      const clubName = input.clubName.trim();
-      const logoUrl = parseOptionalText(input.clubLogoUrl);
-      const city = input.clubCity.trim();
-      const region = input.clubRegion.trim();
+    if (!clubData) {
+      return;
+    }
 
+    const clubName = input.clubName.trim();
+    const logoUrl = parseOptionalText(input.clubLogoUrl);
+    const city = input.clubCity.trim();
+    const region = input.clubRegion.trim();
+
+    let seniorTeamId: string | null = null;
+
+    if (hasFirstTeam && firstTeamCategory) {
       const { data: seniorTeam, error: seniorError } = await supabase
         .from("club_teams")
         .insert({
           club_id: clubData.id,
           name: clubName,
-          category: input.clubCategory.trim(),
+          category: firstTeamCategory,
           team_type: "senior",
           inherited: false,
           logo_url: logoUrl,
@@ -363,27 +403,31 @@ export async function createInitialProfile(input: CreateInitialProfileInput) {
         throw seniorError;
       }
 
-      if (input.clubHasYouthSector && input.clubYouthCategories.length > 0 && seniorTeam) {
-        const youthTeams = input.clubYouthCategories.map((category, index) => ({
-          club_id: clubData.id,
-          name: clubName,
-          category,
-          team_type: "youth" as const,
-          parent_team_id: seniorTeam.id,
-          inherited: true,
-          logo_url: logoUrl,
-          city,
-          region,
-          sort_order: index + 1,
-        }));
+      seniorTeamId = seniorTeam?.id ?? null;
+    }
 
-        const { error: youthError } = await supabase
-          .from("club_teams")
-          .insert(youthTeams);
+    if (youthCategories.length > 0) {
+      // §Q: senza prima squadra le squadre giovanili non ne ereditano una
+      // inventata — restano al primo livello della società.
+      const youthTeams = youthCategories.map((category, index) => ({
+        club_id: clubData.id,
+        name: clubName,
+        category,
+        team_type: "youth" as const,
+        parent_team_id: seniorTeamId,
+        inherited: seniorTeamId !== null,
+        logo_url: logoUrl,
+        city,
+        region,
+        sort_order: index + 1,
+      }));
 
-        if (youthError) {
-          throw youthError;
-        }
+      const { error: youthError } = await supabase
+        .from("club_teams")
+        .insert(youthTeams);
+
+      if (youthError) {
+        throw youthError;
       }
     }
   }

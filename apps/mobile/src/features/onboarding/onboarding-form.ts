@@ -18,6 +18,13 @@ import type {
   StaffSpecialization,
 } from "./onboarding-types";
 import type { CoachCareerEntry } from "./coach/coach-career-types";
+import {
+  type ClubStructure,
+  clubStructureHasFirstTeam,
+  clubStructureHasYouth,
+  coerceClubStructure,
+  deriveLegacyClubStructure,
+} from "./club/club-structure";
 
 export type OnboardingStep =
   | "role"
@@ -48,7 +55,10 @@ export type OnboardingStep =
   | "agent_extra"
   | "club_representative"
   | "club_data"
+  | "club_structure"
+  | "club_first_team"
   | "club_youth"
+  | "club_contacts"
   | "club_profile"
   | "coach_role"
   | "coach_availability"
@@ -136,8 +146,15 @@ export type OnboardingFormState = {
   clubPhoneCountryCode: string;
   clubRegion: string;
   clubStadium: string;
+  /**
+   * REV-ONB-05 §BD: com'è fatta davvero la società. È la sorgente unica del
+   * ramo condizionale, non una deduzione da `clubCategory`.
+   */
+  clubStructure: ClubStructure;
+  clubTikTok: string;
   clubTotalMembers: string;
   clubWebsite: string;
+  clubYouTube: string;
 
   coachedCategories: string;
   coachedClubs: string;
@@ -295,38 +312,82 @@ const defaultVisibleSteps: OnboardingVisibleStep[] = [
   },
 ];
 
-const clubVisibleSteps: OnboardingVisibleStep[] = [
-  {
-    description: "Seleziona il tipo di profilo da creare",
-    index: 1,
-    label: "Ruolo",
-    step: "role",
-  },
-  {
-    description: "Inserisci i dati del responsabile della società",
-    index: 2,
-    label: "Referente",
-    step: "club_representative",
-  },
-  {
-    description: "Aggiungi le informazioni ufficiali del club",
-    index: 3,
-    label: "Dati società",
-    step: "club_data",
-  },
-  {
-    description: "Configura il settore giovanile della società",
-    index: 4,
-    label: "Settore giovanile",
-    step: "club_youth",
-  },
-  {
-    description: "Completa il profilo della società",
-    index: 5,
-    label: "Profilo",
-    step: "club_profile",
-  },
-];
+/**
+ * Passi della Società (REV-ONB-05 §C).
+ *
+ * Prima squadra e Settore giovanile sono condizionali: l'elenco si costruisce
+ * sulla configurazione dichiarata, così non compaiono mai schermate che non
+ * riguardano il club che si sta registrando (§S).
+ *
+ * Finché la struttura non è stata scelta si assume il ramo più lungo — prima
+ * squadra più vivaio — perché §AP consente di fissare la progressione una
+ * volta nota la configurazione, ma non tollera un contatore che cresce.
+ */
+function buildClubVisibleSteps(
+  structure: ClubStructure,
+): OnboardingVisibleStep[] {
+  const effective: ClubStructure = structure || "first_team_and_youth";
+
+  const steps: Omit<OnboardingVisibleStep, "index">[] = [
+    {
+      description: "Seleziona il tipo di profilo da creare",
+      label: "Ruolo",
+      step: "role",
+    },
+    {
+      description: "I dati di chi gestirà il profilo della società",
+      label: "Referente",
+      step: "club_representative",
+    },
+    {
+      description: "Le informazioni principali della società",
+      label: "Il tuo club",
+      step: "club_data",
+    },
+    {
+      description: "La configurazione che rappresenta la società",
+      label: "Struttura",
+      step: "club_structure",
+    },
+    ...(clubStructureHasFirstTeam(effective)
+      ? [
+          {
+            description: "Il campionato in cui compete la prima squadra",
+            label: "Prima squadra",
+            step: "club_first_team" as const,
+          },
+        ]
+      : []),
+    ...(clubStructureHasYouth(effective)
+      ? [
+          {
+            description: "Le categorie presenti nel settore giovanile",
+            label: "Settore giovanile",
+            step: "club_youth" as const,
+          },
+        ]
+      : []),
+    {
+      description: "I riferimenti ufficiali della società",
+      label: "Sede e contatti",
+      step: "club_contacts",
+    },
+    {
+      description: "Qualche dettaglio per presentare il club",
+      label: "Profilo",
+      step: "club_profile",
+    },
+  ];
+
+  return steps.map((entry, position) => ({ ...entry, index: position + 1 }));
+}
+
+function buildClubStepOrder(structure: ClubStructure): OnboardingStep[] {
+  return [
+    ...buildClubVisibleSteps(structure).map((entry) => entry.step),
+    "complete",
+  ];
+}
 
 const agentVisibleSteps: OnboardingVisibleStep[] = [
   {
@@ -424,15 +485,6 @@ const agentStepOrder: OnboardingStep[] = [
   "agent_availability",
   "agent_verification",
   "agent_extra",
-  "complete",
-];
-
-const clubStepOrder: OnboardingStep[] = [
-  "role",
-  "club_representative",
-  "club_data",
-  "club_youth",
-  "club_profile",
   "complete",
 ];
 
@@ -740,8 +792,11 @@ const directorVisibleSteps: OnboardingVisibleStep[] = [
   },
 ];
 
-export function getOnboardingVisibleSteps(role: AppRole | ""): OnboardingVisibleStep[] {
-  if (role === "club_admin") return clubVisibleSteps;
+export function getOnboardingVisibleSteps(
+  role: AppRole | "",
+  clubStructure: ClubStructure = "",
+): OnboardingVisibleStep[] {
+  if (role === "club_admin") return buildClubVisibleSteps(clubStructure);
   if (role === "agent") return agentVisibleSteps;
   if (role === "coach") return coachVisibleSteps;
   if (role === "staff") return staffVisibleSteps;
@@ -751,8 +806,11 @@ export function getOnboardingVisibleSteps(role: AppRole | ""): OnboardingVisible
   return defaultVisibleSteps;
 }
 
-export function getOnboardingStepOrder(role: AppRole | ""): OnboardingStep[] {
-  if (role === "club_admin") return clubStepOrder;
+export function getOnboardingStepOrder(
+  role: AppRole | "",
+  clubStructure: ClubStructure = "",
+): OnboardingStep[] {
+  if (role === "club_admin") return buildClubStepOrder(clubStructure);
   if (role === "agent") return agentStepOrder;
   if (role === "coach") return coachStepOrder;
   if (role === "staff") return staffStepOrder;
@@ -817,8 +875,11 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   clubPhoneCountryCode: "+39",
   clubRegion: "",
   clubStadium: "",
+  clubStructure: "",
+  clubTikTok: "",
   clubTotalMembers: "",
   clubWebsite: "",
+  clubYouTube: "",
 
   coachedCategories: "",
   coachedClubs: "",
@@ -957,6 +1018,21 @@ export function normalizeOnboardingDraft(
     ...defaultOnboardingFormState,
     ...value,
     availabilityType: coerceAvailabilityType(value.availabilityType) ?? defaultOnboardingFormState.availabilityType,
+    /**
+     * REV-ONB-05 §BC: una bozza iniziata con il vecchio onboarding non
+     * conosce la struttura del club. La ricostruiamo da ciò che aveva già
+     * dichiarato, così chi riprende non perde niente e non si ritrova a
+     * rispondere due volte alla stessa domanda.
+     */
+    clubStructure:
+      coerceClubStructure(value.clubStructure) ||
+      deriveLegacyClubStructure({
+        clubCategory: value.clubCategory,
+        clubHasYouthSector: value.clubHasYouthSector,
+        clubYouthCategories: Array.isArray(value.clubYouthCategories)
+          ? value.clubYouthCategories
+          : null,
+      }),
     currentStep: migrateLegacyStep(rawCurrentStep),
     lastCompletedStep: rawLastCompleted ? migrateLegacyStep(rawLastCompleted) : null,
     gender: coerceProfileGender(value.gender) ?? defaultOnboardingFormState.gender,
@@ -1307,7 +1383,8 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     "agent_agency", "agent_players", "agent_football_experience",
     "agent_player_career_toggle", "agent_player_career", "agent_portfolio",
     "agent_availability", "agent_verification", "agent_extra",
-    "club_representative", "club_data", "club_youth", "club_profile",
+    "club_representative", "club_data", "club_structure", "club_first_team",
+    "club_youth", "club_contacts", "club_profile",
     "coach_role", "coach_availability", "coach_career", "staff_role", "staff_availability", "staff_career",
     "staff_previous_experiences", "staff_coach_career",
     "staff_player_career_toggle", "staff_player_career",
@@ -1325,8 +1402,12 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     : null;
 }
 
-export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" = "") {
-  const visibleSteps = getOnboardingVisibleSteps(role);
+export function getOnboardingStepIndex(
+  step: OnboardingStep,
+  role: AppRole | "" = "",
+  clubStructure: ClubStructure = "",
+) {
+  const visibleSteps = getOnboardingVisibleSteps(role, clubStructure);
   const effectiveStep = migrateLegacyStep(step);
   let comparableStep = effectiveStep;
 
@@ -1375,10 +1456,14 @@ export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" 
   return visibleSteps.length - 1;
 }
 
-export function getOnboardingProgress(step: OnboardingStep, role: AppRole | "" = "") {
-  const visibleSteps = getOnboardingVisibleSteps(role);
+export function getOnboardingProgress(
+  step: OnboardingStep,
+  role: AppRole | "" = "",
+  clubStructure: ClubStructure = "",
+) {
+  const visibleSteps = getOnboardingVisibleSteps(role, clubStructure);
   const effectiveStep = migrateLegacyStep(step);
-  const stepIndex = getOnboardingStepIndex(effectiveStep, role);
+  const stepIndex = getOnboardingStepIndex(effectiveStep, role, clubStructure);
   const completedSteps = effectiveStep === "complete" ? visibleSteps.length : stepIndex + 1;
   const totalSteps = visibleSteps.length;
   const percentage = Math.round((completedSteps / totalSteps) * 100);
@@ -1395,12 +1480,16 @@ export function getOnboardingProgress(step: OnboardingStep, role: AppRole | "" =
   };
 }
 
-export function getNextOnboardingStep(step: OnboardingStep, role: AppRole | "" = "") {
+export function getNextOnboardingStep(
+  step: OnboardingStep,
+  role: AppRole | "" = "",
+  clubStructure: ClubStructure = "",
+) {
   if (step === "complete") {
     return null;
   }
 
-  const stepOrder = getOnboardingStepOrder(role);
+  const stepOrder = getOnboardingStepOrder(role, clubStructure);
   const effectiveStep = migrateLegacyStep(step);
   return stepOrder[stepOrder.indexOf(effectiveStep) + 1] ?? null;
 }
@@ -1409,8 +1498,9 @@ export function getPreviousOnboardingStep(
   step: OnboardingStep,
   _lastCompletedStep: OnboardingStep | null = null,
   role: AppRole | "" = "",
+  clubStructure: ClubStructure = "",
 ) {
-  const stepOrder = getOnboardingStepOrder(role);
+  const stepOrder = getOnboardingStepOrder(role, clubStructure);
   const effectiveStep = migrateLegacyStep(step);
 
   if (effectiveStep === "complete") {
@@ -1522,8 +1612,20 @@ export function validateOnboardingStep(
     return mapClubDataValidationError(form);
   }
 
+  if (step === "club_structure") {
+    return mapClubStructureValidationError(form);
+  }
+
+  if (step === "club_first_team") {
+    return mapClubFirstTeamValidationError(form);
+  }
+
   if (step === "club_youth") {
     return mapClubYouthValidationError(form);
+  }
+
+  if (step === "club_contacts") {
+    return mapClubContactsValidationError(form);
   }
 
   if (step === "club_profile") {
@@ -1829,32 +1931,62 @@ function mapClubRepresentativeValidationError(form: OnboardingFormState): Onboar
   return errors;
 }
 
+/** §H–§K: identità del club. La categoria non si chiede qui (§H). */
 function mapClubDataValidationError(form: OnboardingFormState): OnboardingValidationErrors {
   const errors: OnboardingValidationErrors = {};
 
   if (!form.clubName.trim()) {
-    errors.clubName = "Questo campo è obbligatorio";
-  }
-
-  if (!form.clubCategory.trim()) {
-    errors.clubCategory = "Seleziona la categoria della prima squadra";
-  }
-
-  if (!form.clubCity.trim()) {
-    errors.clubCity = "Questo campo è obbligatorio";
-  }
-
-  if (!form.clubRegion.trim()) {
-    errors.clubRegion = "Questo campo è obbligatorio";
+    errors.clubName = "Inserisci il nome della società.";
   }
 
   if (form.clubFoundingYear.trim()) {
-    const year = parseInt(form.clubFoundingYear.trim(), 10);
+    const raw = form.clubFoundingYear.trim();
+    const year = parseInt(raw, 10);
     const currentYear = new Date().getFullYear();
 
-    if (isNaN(year) || year < 1850 || year > currentYear) {
+    if (!/^\d{4}$/.test(raw) || isNaN(year) || year < 1850 || year > currentYear) {
       errors.clubFoundingYear = `Inserisci un anno tra 1850 e ${currentYear}.`;
     }
+  }
+
+  return errors;
+}
+
+function mapClubStructureValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (!form.clubStructure) {
+    return { clubStructure: "Seleziona la struttura del club." };
+  }
+
+  return {};
+}
+
+function mapClubFirstTeamValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (!form.clubCategory.trim()) {
+    return { clubCategory: "Seleziona la categoria della prima squadra." };
+  }
+
+  return {};
+}
+
+/**
+ * §X: la presenza del vivaio è già stata decisa nello step Struttura, quindi
+ * qui si valida soltanto la selezione delle categorie.
+ */
+function mapClubYouthValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  if (form.clubYouthCategories.length === 0) {
+    return {
+      clubYouthCategories: "Seleziona almeno una categoria del settore giovanile.",
+    };
+  }
+
+  return {};
+}
+
+function mapClubContactsValidationError(form: OnboardingFormState): OnboardingValidationErrors {
+  const errors: OnboardingValidationErrors = {};
+
+  if (!form.clubCity.trim() || !form.clubRegion.trim()) {
+    errors.clubCity = "Scegli la città della società.";
   }
 
   if (form.clubEmail.trim() && !isBasicEmailFormat(form.clubEmail.trim())) {
@@ -1865,16 +1997,6 @@ function mapClubDataValidationError(form: OnboardingFormState): OnboardingValida
 
   if (phoneValue && !isPhoneNumberValid(phoneValue)) {
     errors.clubPhone = "Inserisci un numero di telefono valido.";
-  }
-
-  return errors;
-}
-
-function mapClubYouthValidationError(form: OnboardingFormState): OnboardingValidationErrors {
-  const errors: OnboardingValidationErrors = {};
-
-  if (form.clubHasYouthSector && form.clubYouthCategories.length === 0) {
-    errors.clubYouthCategories = "Seleziona almeno una categoria giovanile";
   }
 
   return errors;

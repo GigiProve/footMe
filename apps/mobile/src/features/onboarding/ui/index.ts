@@ -16,6 +16,8 @@ export { OnboardingSection } from "./OnboardingSection";
 export { FieldShell } from "./FieldShell";
 export { OnboardingTextField } from "./OnboardingTextField";
 export { OnboardingSelectField } from "./OnboardingSelectField";
+export { PhoneField } from "./PhoneField";
+export { CityAutocompleteField } from "./CityAutocompleteField";
 export {
   OnboardingMultiSelectField,
   buildSelectionSummary,
