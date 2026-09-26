@@ -133,7 +133,7 @@ export default function ManageRepresentationScreen() {
 
   function handleRemoveConfirm() {
     if (!detail) return;
-    const agentName = detail.agent_full_name ?? "l'agente";
+    const agentName = detail.agent_full_name ?? "il procuratore";
     const typeLabel = getRelationshipTypeLabel(
       detail.relationship_type as RelationshipType,
     );
@@ -200,7 +200,7 @@ export default function ManageRepresentationScreen() {
 
   // ── Visibility sub-view ──────────────────────────────────────────────────
   if (view === "visibility" && detail) {
-    const agentName = detail.agent_full_name ?? "l'agente";
+    const agentName = detail.agent_full_name ?? "il procuratore";
     const typeLabel = getRelationshipTypeLabel(
       detail.relationship_type as RelationshipType,
     );
@@ -291,13 +291,13 @@ export default function ManageRepresentationScreen() {
           {/* Agent header card */}
           <View style={styles.agentCard}>
             <Avatar
-              name={detail.agent_full_name ?? "Agente"}
+              name={detail.agent_full_name ?? "Procuratore"}
               size="lg"
               uri={detail.agent_avatar_url}
             />
             <View style={styles.agentInfo}>
               <AppText variant="titleSm" numberOfLines={1}>
-                {detail.agent_full_name ?? "Agente"}
+                {detail.agent_full_name ?? "Procuratore"}
               </AppText>
               <AppText color="secondary" variant="bodySm" numberOfLines={1}>
                 {getRelationshipTypeLabel(
@@ -329,7 +329,7 @@ export default function ManageRepresentationScreen() {
               <View style={styles.pendingBannerText}>
                 <AppText variant="bodySm">
                   <AppText variant="bodySm" style={styles.pendingBannerBold}>
-                    {detail.agent_full_name ?? "L'agente"}
+                    {detail.agent_full_name ?? "Il procuratore"}
                   </AppText>
                   {" propone di rendere pubblico il collegamento."}
                 </AppText>
@@ -411,7 +411,7 @@ export default function ManageRepresentationScreen() {
                   Rimuovi collegamento
                 </AppText>
                 <AppText color="secondary" variant="bodySm">
-                  Termina il rapporto professionale con questo agente.
+                  Termina il rapporto professionale con questo procuratore.
                 </AppText>
               </View>
               {isRemoving ? (

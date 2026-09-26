@@ -27,7 +27,7 @@ export function AgentCareerTabContent({
 }: AgentCareerTabContentProps) {
   const agentProfile = completeProfile.agentProfile;
   const currentAgency = agentProfile?.agency_name?.trim() || "Agenzia attuale da completare";
-  const currentRole = agentProfile?.agency_role?.trim() || "Agente sportivo";
+  const currentRole = agentProfile?.agency_role?.trim() || "Procuratore";
   const currentPeriod = formatAgentPeriod({
     endMonth: agentProfile?.period_end_month,
     endYear: agentProfile?.period_end_year,
@@ -62,7 +62,7 @@ export function AgentCareerTabContent({
           <AppText variant="displaySm">{currentAgency}</AppText>
           {isOwner ? (
             <Pressable
-              accessibilityLabel="Modifica carriera agente"
+              accessibilityLabel="Modifica carriera procuratore"
               hitSlop={8}
               onPress={onEdit}
               style={styles.editButton}

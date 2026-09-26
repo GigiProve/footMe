@@ -41,7 +41,7 @@ export function RepresentationSection({
     <SectionCard title={title} variant="flat">
       {representations.map((rep, index) => {
         const isLast = index === representations.length - 1;
-        const agentName = rep.agent_full_name ?? "Agente";
+        const agentName = rep.agent_full_name ?? "Procuratore";
         const typeLabel = getRelationshipTypeLabel(rep.relationship_type);
 
         if (isOwner) {

@@ -60,7 +60,7 @@ const EXPLORE_ITEMS: {
   {
     href: "/search/profiles",
     icon: "people-outline",
-    subtitle: "Calciatori, allenatori, staff e agenti",
+    subtitle: "Calciatori, allenatori, staff e procuratori",
     title: "Profili",
   },
   {

@@ -18,7 +18,7 @@ function roleLabel(role: FollowedEntity["role"]): string {
     case "coach":
       return "Allenatore";
     case "agent":
-      return "Agente";
+      return "Procuratore";
     case "staff":
       return "Staff";
     case "director":

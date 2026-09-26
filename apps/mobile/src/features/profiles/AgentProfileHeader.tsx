@@ -48,7 +48,7 @@ export function AgentProfileHeader({
     <View style={styles.container}>
       <View style={styles.topRow}>
         <AppText color="accent" variant="overline">
-          Profilo agente
+          Profilo procuratore
         </AppText>
         {statusBadge ? (
           <View style={styles.statusBadge}>

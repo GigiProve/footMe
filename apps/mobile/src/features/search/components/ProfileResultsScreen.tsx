@@ -47,7 +47,7 @@ const ROLE_OPTIONS: { label: string; value: SearchProfileRole | null }[] = [
   { label: "Calciatori", value: "player" },
   { label: "Allenatori", value: "coach" },
   { label: "Staff", value: "staff" },
-  { label: "Agenti", value: "agent" },
+  { label: "Procuratori", value: "agent" },
 ];
 
 export function ProfileResultsScreen() {

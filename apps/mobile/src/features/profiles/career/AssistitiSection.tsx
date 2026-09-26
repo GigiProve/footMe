@@ -134,7 +134,7 @@ export function AssistitiSection({ agentProfileId, isOwner }: AssistitiSectionPr
             Assistiti
           </AppText>
           <AppText color="secondary" variant="bodySm">
-            Calciatori collegati al profilo professionale dell'agente.
+            Calciatori collegati al profilo professionale del procuratore.
           </AppText>
         </View>
         {isOwner ? (

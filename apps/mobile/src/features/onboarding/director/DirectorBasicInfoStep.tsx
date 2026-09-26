@@ -13,7 +13,14 @@ import { AppText, Button, Input } from "../../../ui";
 import type { LegalStatus } from "../onboarding-form";
 import { OnboardingEyebrow, OnboardingSectionCard } from "../onboarding-ui";
 
-type AgentBasicInfoStepProps = {
+/**
+ * Dati personali del Dirigente.
+ *
+ * Era condiviso con il Procuratore: REV-ONB-06 §E porta quel ramo sulle
+ * pagine comuni del Master, quindi qui resta il solo consumatore rimasto.
+ */
+
+type DirectorBasicInfoStepProps = {
   birthDate: string;
   currentLocationCity: string;
   currentLocationCountry: string;
@@ -54,7 +61,7 @@ const LEGAL_STATUS_OPTIONS: { label: string; value: LegalStatus }[] = [
   { label: "In fase di richiesta", value: "pending_permit" },
 ];
 
-export function AgentBasicInfoStep({
+export function DirectorBasicInfoStep({
   birthDate,
   currentLocationCity,
   currentLocationCountry,
@@ -74,7 +81,7 @@ export function AgentBasicInfoStep({
   onResidenceChange,
   onResidenceSelect,
   onUpdate,
-}: AgentBasicInfoStepProps) {
+}: DirectorBasicInfoStepProps) {
   const nationalityCategory = getNationalityCategory(nationality);
 
   return (

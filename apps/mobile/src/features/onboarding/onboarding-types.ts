@@ -129,7 +129,7 @@ export const DIRECTOR_MARKET_OPTIONS: { label: string; value: DirectorMarketInvo
 export const DIRECTOR_EXTRA_FOOTBALL_ROLE_OPTIONS = [
   "Ex calciatore",
   "Allenatore",
-  "Agente",
+  "Procuratore",
   "Scout",
   "Staff tecnico",
   "Preparatore atletico",

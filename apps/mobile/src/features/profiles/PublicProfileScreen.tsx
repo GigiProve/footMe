@@ -442,7 +442,7 @@ export function PublicProfileScreen() {
       Alert.alert(
         accept ? "Rappresentanza accettata" : "Richiesta rifiutata",
         accept
-          ? "Hai accettato la rappresentanza dell'agente."
+          ? "Hai accettato la rappresentanza del procuratore."
           : "Hai rifiutato la richiesta di rappresentanza.",
       );
     } catch (error) {
@@ -952,7 +952,7 @@ function ProfileContentBlock({
         {hasIncomingRequest ? (
           <View style={styles.representationBar}>
             <AppText style={styles.representationIncomingLabel} variant="bodySm">
-              Un agente ha richiesto di rappresentarti
+              Un procuratore ha richiesto di rappresentarti
             </AppText>
             <View style={styles.representationActions}>
               <Button
@@ -984,7 +984,7 @@ function ProfileContentBlock({
           </View>
         ) : playerAgent ? (
           <Pressable
-            accessibilityLabel={`Apri profilo agente ${playerAgent.agent_full_name ?? ""}`}
+            accessibilityLabel={`Apri profilo procuratore ${playerAgent.agent_full_name ?? ""}`}
             accessibilityRole="button"
             onPress={() => onOpenPlayerProfile?.(playerAgent.agent_profile_id)}
             style={({ pressed }) => [
@@ -994,9 +994,9 @@ function ProfileContentBlock({
           >
             <Ionicons color={colors.textSecondary} name="person-outline" size={15} />
             <AppText color="secondary" variant="bodySm">
-              {"Agente: "}
+              {"Procuratore: "}
               <AppText color="accent" variant="bodySm">
-                {playerAgent.agent_full_name ?? "Agente"}
+                {playerAgent.agent_full_name ?? "Procuratore"}
               </AppText>
             </AppText>
             <Ionicons color={colors.textSecondary} name="chevron-forward" size={14} />
@@ -1115,7 +1115,7 @@ function ProfileContentBlock({
 function getProfileViewerTitle(role: AppRole) {
   switch (role) {
     case "agent":
-      return "Profilo agente";
+      return "Profilo procuratore";
     case "coach":
       return "Profilo allenatore";
     case "staff":

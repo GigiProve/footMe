@@ -163,7 +163,7 @@ const RESULTS_COUNT_NOUNS: Record<
   player: { singular: "calciatore", plural: "calciatori" },
   coach: { singular: "allenatore", plural: "allenatori" },
   staff: { singular: "profilo staff", plural: "profili staff" },
-  agent: { singular: "agente", plural: "agenti" },
+  agent: { singular: "procuratore", plural: "procuratori" },
 };
 
 /** "82 calciatori trovati" / "1 calciatore trovato" / "148 profili trovati". */

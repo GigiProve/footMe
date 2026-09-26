@@ -1,8 +1,4 @@
 import {
-  AGENT_MANAGED_PLAYERS_OPTIONS,
-  AGENT_PLAYER_TYPE_OPTIONS,
-} from "../../onboarding/agent/agent-options";
-import {
   COACH_CATEGORY_OPTIONS,
   LICENSE_TYPE_OPTIONS,
 } from "../../onboarding/coach/coach-options";
@@ -44,7 +40,7 @@ export const FILTER_MODAL_TITLES: Record<SearchProfileRole, string> = {
   player: "Filtri calciatori",
   coach: "Filtri allenatori",
   staff: "Filtri staff",
-  agent: "Filtri agenti",
+  agent: "Filtri procuratori",
 };
 
 export const FILTER_SECTIONS: Record<
@@ -141,15 +137,22 @@ export const PLAYER_SITUATION_OPTIONS: { label: string; value: import("./profile
   { label: "In scadenza", value: "in_scadenza" },
 ];
 
-/** Real managed-players bands from `agent-options.ts`, with the approved UI labels. */
+/**
+ * Fasce di portfolio scritte su `managed_players_count`.
+ *
+ * Il valore è la label salvata, non un token: la colonna è testuale da prima
+ * di REV-ONB-06 e la ricerca continua a filtrare su quella. Le voci nuove
+ * del Procuratore convivono con quelle del vecchio onboarding Agente.
+ */
 export const AGENT_MANAGED_BAND_OPTIONS: { label: string; value: string }[] = [
-  { label: "Fino a 5", value: AGENT_MANAGED_PLAYERS_OPTIONS[0] },
-  { label: "5–15", value: AGENT_MANAGED_PLAYERS_OPTIONS[1] },
-  { label: "Oltre 15", value: AGENT_MANAGED_PLAYERS_OPTIONS[2] },
+  { label: "Fino a 5", value: "1-5 calciatori" },
+  { label: "5–15", value: "5-15 calciatori" },
+  { label: "Oltre 15", value: "15+ calciatori" },
 ];
 
+/** Tipologie scritte su `player_types` dal modello legacy. */
 export const AGENT_PLAYER_TYPE_FILTER_OPTIONS: { label: string; value: string }[] =
-  AGENT_PLAYER_TYPE_OPTIONS.map((value) => ({ label: value, value }));
+  ["Giovani", "Senior", "Entrambi"].map((value) => ({ label: value, value }));
 
 /**
  * Agent operating-area values. No onboarding step currently collects a

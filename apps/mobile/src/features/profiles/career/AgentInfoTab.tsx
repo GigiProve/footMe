@@ -75,7 +75,7 @@ export function AgentInfoTab({
           </View>
           {isOwner ? (
             <Pressable
-              accessibilityLabel="Modifica posizionamento agente"
+              accessibilityLabel="Modifica posizionamento procuratore"
               accessibilityRole="button"
               hitSlop={8}
               onPress={() => onEdit("agentProfile")}
@@ -122,7 +122,7 @@ export function AgentInfoTab({
                 </AppText>
                 {isOwner ? (
                   <Pressable
-                    accessibilityLabel="Modifica contatti agente"
+                    accessibilityLabel="Modifica contatti procuratore"
                     accessibilityRole="button"
                     hitSlop={8}
                     onPress={() => onEdit("contact")}

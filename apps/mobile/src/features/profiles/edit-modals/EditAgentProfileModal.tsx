@@ -371,7 +371,7 @@ export function EditAgentProfileModal({
           period_end_year: entry.period_end_year,
           period_start_month: null,
           period_start_year: entry.period_start_year,
-          role: entry.role.trim() || "Agente",
+          role: entry.role.trim() || "Procuratore",
           sort_order: index,
         })),
         agentManagedPlayerEntries: sanitizedManagedPlayers.map((entry, index) => ({
@@ -387,23 +387,38 @@ export function EditAgentProfileModal({
           sort_order: index,
         })),
         agentProfile: {
+          // REV-ONB-06: questa modale non edita i campi introdotti
+          // dall'onboarding Procuratore, quindi li riporta come sono invece
+          // di azzerarli.
+          activity_scopes: completeProfile.agentProfile?.activity_scopes ?? [],
           agency_logo_url: form.agencyLogoUrl.trim() || null,
           agency_name: form.agencyName.trim() || null,
           agency_role: form.agencyRole.trim() || null,
           federation: form.isFederationLicensed ? form.federation.trim() || null : null,
+          has_no_previous_experience:
+            completeProfile.agentProfile?.has_no_previous_experience ?? false,
           has_other_football_experience: form.hasOtherFootballExperience,
           has_played_football: form.hasPlayedFootball,
           is_federation_licensed: form.isFederationLicensed,
+          license_number: form.isFederationLicensed
+            ? completeProfile.agentProfile?.license_number ?? null
+            : null,
           main_player_roles: derivedMainRoles,
           managed_players_count: derivedManagedPlayersCount
             ? `${sanitizedManagedPlayers.length} giocatori`
             : completeProfile.agentProfile?.managed_players_count ?? null,
           open_to_clubs: form.openToClubs,
           open_to_players: form.openToPlayers,
+          operating_area_type:
+            completeProfile.agentProfile?.operating_area_type ?? null,
+          operating_countries:
+            completeProfile.agentProfile?.operating_countries ?? [],
+          operating_macro_areas: form.operatingMacroAreas,
+          operating_provinces:
+            completeProfile.agentProfile?.operating_provinces ?? [],
+          operating_regions: parseDelimitedString(form.operatingRegions),
           operational_focuses: form.operationalFocuses,
           operational_note: form.operationalNote.trim() || null,
-          operating_macro_areas: form.operatingMacroAreas,
-          operating_regions: parseDelimitedString(form.operatingRegions),
           other_football_roles: form.hasOtherFootballExperience
             ? parseDelimitedString(form.otherFootballRoles)
             : [],
@@ -413,6 +428,11 @@ export function EditAgentProfileModal({
           period_start_year: parseYear(form.periodStartYear),
           player_career_entries: completeProfile.agentProfile?.player_career_entries ?? [],
           player_types: derivedPlayerTypes,
+          portfolio_range: completeProfile.agentProfile?.portfolio_range ?? null,
+          previous_roles: completeProfile.agentProfile?.previous_roles ?? [],
+          professional_mode:
+            completeProfile.agentProfile?.professional_mode ?? null,
+          works_abroad: completeProfile.agentProfile?.works_abroad ?? false,
         },
         ...basePayload,
         profileId: userId,
@@ -425,7 +445,7 @@ export function EditAgentProfileModal({
         "Errore",
         error instanceof Error
           ? error.message
-          : "Si è verificato un errore durante il salvataggio del profilo agente.",
+          : "Si è verificato un errore durante il salvataggio del profilo procuratore.",
       );
     } finally {
       setIsSaving(false);
@@ -437,7 +457,7 @@ export function EditAgentProfileModal({
       isSaving={isSaving}
       onClose={onClose}
       onSave={handleSave}
-      title="Profilo agente"
+      title="Profilo procuratore"
       visible={visible}
     >
       <OnboardingBaseFieldsSection
@@ -507,7 +527,7 @@ export function EditAgentProfileModal({
       <Input
         label="Ruolo in agenzia"
         onChangeText={(value) => patchForm("agencyRole", value)}
-        placeholder="Es. Founder, agente, partner"
+        placeholder="Es. Founder, procuratore, partner"
         value={form.agencyRole}
       />
 

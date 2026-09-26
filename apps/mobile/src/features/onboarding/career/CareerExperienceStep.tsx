@@ -31,7 +31,7 @@ type CareerExperienceStepProps = {
  * Carriera calcistica come contenuto di uno step già incorniciato dalla
  * rotta. Il Calciatore usa invece `PlayerCareerStep`, che monta le stesse
  * parti su pagine intere: qui restano i flussi che non sono ancora passati
- * al Master (allenatore, staff, agente, dirigente).
+ * al Master (allenatore, staff, procuratore, dirigente).
  */
 export function CareerExperienceStep({
   addButtonLabel = "Aggiungi esperienza",

@@ -172,7 +172,7 @@ export function AgentMediaTabContent({
         </View>
         {mode === "owner" ? (
           <Button
-            accessibilityLabel="Aggiungi contenuto media agente"
+            accessibilityLabel="Aggiungi contenuto media procuratore"
             label="+ Nuovo"
             onPress={handleAddContent}
             size="sm"
@@ -197,7 +197,7 @@ export function AgentMediaTabContent({
             return (
               <View key={item.id} style={[styles.gridCell, { width: gridItemSize }]}>
                 <Pressable
-                  accessibilityLabel={`Apri contenuto media agente ${item.id}`}
+                  accessibilityLabel={`Apri contenuto media procuratore ${item.id}`}
                   disabled={isGridInteractionLocked}
                   onPress={() => handleOpenItem(item.id)}
                   style={({ pressed }) => [
@@ -250,12 +250,12 @@ export function AgentMediaTabContent({
           </AppText>
           <AppText color="secondary" style={styles.emptySubtitle} variant="bodySm">
             {mode === "owner"
-              ? "Carica foto e video per costruire un portfolio agente credibile e aggiornato."
-              : "Questo agente non ha ancora contenuti nel portfolio media."}
+              ? "Carica foto e video per costruire un portfolio credibile e aggiornato."
+              : "Questo procuratore non ha ancora contenuti nel portfolio media."}
           </AppText>
           {mode === "owner" ? (
             <Button
-              accessibilityLabel="Aggiungi contenuto media agente"
+              accessibilityLabel="Aggiungi contenuto media procuratore"
               label="Pubblica contenuto"
               onPress={handleAddContent}
               variant="primary"
@@ -273,7 +273,7 @@ export function AgentMediaTabContent({
           <SafeAreaView style={styles.viewerRoot}>
             <View style={styles.viewerHeader}>
               <Pressable
-                accessibilityLabel="Chiudi portfolio media agente"
+                accessibilityLabel="Chiudi portfolio media procuratore"
                 hitSlop={8}
                 onPress={handleCloseViewer}
                 style={({ pressed }) => [
@@ -289,7 +289,7 @@ export function AgentMediaTabContent({
               {mode === "owner" ? (
                 <View style={styles.viewerHeaderActions}>
                   <Pressable
-                    accessibilityLabel="Modifica contenuto media agente"
+                    accessibilityLabel="Modifica contenuto media procuratore"
                     hitSlop={8}
                     onPress={handleEditCurrentItem}
                     style={({ pressed }) => [
@@ -300,7 +300,7 @@ export function AgentMediaTabContent({
                     <Ionicons color={colors.textPrimary} name="create-outline" size={18} />
                   </Pressable>
                   <Pressable
-                    accessibilityLabel="Elimina contenuto media agente"
+                    accessibilityLabel="Elimina contenuto media procuratore"
                     hitSlop={8}
                     onPress={handleDeleteCurrentItem}
                     style={({ pressed }) => [
@@ -350,7 +350,7 @@ export function AgentMediaTabContent({
 
                       {item.type === "video" ? (
                         <Pressable
-                          accessibilityLabel="Riproduci video portfolio agente"
+                          accessibilityLabel="Riproduci video portfolio procuratore"
                           onPress={() => {
                             setSelectedItemId(item.id);
                             setIsVideoPlayerOpen(true);
@@ -371,7 +371,7 @@ export function AgentMediaTabContent({
                         <View style={styles.viewerAuthorText}>
                           <AppText variant="titleSm">{authorName}</AppText>
                           <AppText color="secondary" variant="caption">
-                            Portfolio agente
+                            Portfolio procuratore
                           </AppText>
                         </View>
                       </View>

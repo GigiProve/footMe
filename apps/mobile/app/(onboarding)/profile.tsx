@@ -67,14 +67,14 @@ import {
 import { ONBOARDING_ROLE_OPTIONS } from "../../src/features/onboarding/onboarding-roles";
 import { useOnboardingForm } from "../../src/features/onboarding/onboarding-form-provider";
 import { CareerExperienceStep } from "../../src/features/onboarding/career/CareerExperienceStep";
-import { AgentAgencyStep } from "../../src/features/onboarding/agent/AgentAgencyStep";
-import { AgentAvailabilityStep } from "../../src/features/onboarding/agent/AgentAvailabilityStep";
-import { AgentBasicInfoStep } from "../../src/features/onboarding/agent/AgentBasicInfoStep";
-import { AgentExtraStep } from "../../src/features/onboarding/agent/AgentExtraStep";
-import { AgentFootballExperienceStep } from "../../src/features/onboarding/agent/AgentFootballExperienceStep";
-import { AgentPlayersStep } from "../../src/features/onboarding/agent/AgentPlayersStep";
-import { AgentPortfolioStep } from "../../src/features/onboarding/agent/AgentPortfolioStep";
-import { AgentVerificationStep } from "../../src/features/onboarding/agent/AgentVerificationStep";
+import {
+  AgentOnboardingFlow,
+  getNextAgentStepAfterPreviousRoles,
+  isAgentMasterStep,
+  readAgentPreviousRoles,
+  toLegacyManagedPlayersCount,
+  trackAgentOnboardingEvent,
+} from "../../src/features/onboarding/agent";
 import {
   deriveLegacyMainPlayerRoles,
   deriveLegacyManagedPlayersCount,
@@ -101,6 +101,7 @@ import {
   MEDIA_FOCUS_AREA_OPTIONS,
 } from "../../src/features/onboarding/onboarding-types";
 import {
+  DirectorBasicInfoStep,
   DirectorChipsStep,
   DirectorExtraStep,
   DirectorFootballExperienceStep,
@@ -446,25 +447,35 @@ export default function OnboardingProfileScreen() {
 
   const step = requestedStep ?? form.currentStep;
   const {
+    agentActivityScopes,
     agentAgencyLogoUrl,
     agentAgencyName,
     agentAgencyRole,
     agentAgencyStartYear,
     agentCareerEntries,
     agentFederation,
+    agentHasNoPreviousExperience,
     agentHasOtherFootballExperience,
     agentHasPlayedFootball,
     agentIsFederationLicensed,
     agentLanguages,
+    agentLicenseNumber,
     agentManagedPlayerEntries,
     agentOpenToClubs,
     agentOpenToPlayers,
+    agentOperatingAreaType,
+    agentOperatingCountries,
+    agentOperatingProvinces,
     agentOperationalFocuses,
     agentOperationalNote,
     agentOtherFootballRoles,
     agentOperatingMacroAreas,
     agentOperatingRegions,
     agentPlayerCareerEntries,
+    agentPortfolioRange,
+    agentPreviousRoles,
+    agentProfessionalMode,
+    agentWorksAbroad,
     availabilityType,
     avatarUrl,
     bio,
@@ -1301,7 +1312,7 @@ export default function OnboardingProfileScreen() {
   function handleContinueFromPhoto() {
     patchForm({ lastCompletedStep: "photo" });
     if (role === "agent") {
-      navigateToStep("agent_agency");
+      navigateToStep("agent_professional");
     } else if (role === "coach") {
       navigateToStep("coach_role");
     } else if (role === "staff") {
@@ -1568,61 +1579,29 @@ export default function OnboardingProfileScreen() {
     }
   }
 
-  function handleContinueFromAgentAgency() {
-    const nextErrors = validateOnboardingStep("agent_agency", form);
+  function handleContinueFromAgentProfessional() {
+    const nextErrors = validateOnboardingStep("agent_professional", form);
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
       return;
     }
 
-    patchForm({ lastCompletedStep: "agent_agency" });
+    patchForm({ lastCompletedStep: "agent_professional" });
     setValidationErrors({});
-    navigateToStep("agent_players");
+    navigateToStep("agent_qualification");
   }
 
-  function handleContinueFromAgentPlayers() {
-    const nextErrors = validateOnboardingStep("agent_players", form);
+  function handleContinueFromAgentQualification() {
+    const nextErrors = validateOnboardingStep("agent_qualification", form);
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
       return;
     }
 
-    patchForm({ lastCompletedStep: "agent_players" });
+    patchForm({ lastCompletedStep: "agent_qualification" });
     setValidationErrors({});
-    navigateToStep("agent_football_experience");
-  }
-
-  function handleContinueFromAgentFootballExperience() {
-    const nextErrors = validateOnboardingStep(
-      "agent_football_experience",
-      form,
-    );
-
-    if (Object.keys(nextErrors).length > 0) {
-      setValidationErrors(nextErrors);
-      return;
-    }
-
-    patchForm({ lastCompletedStep: "agent_football_experience" });
-    setValidationErrors({});
-    navigateToStep("agent_player_career_toggle");
-  }
-
-  function handleContinueFromAgentPlayerCareerToggle() {
-    patchForm({ lastCompletedStep: "agent_player_career_toggle" });
-
-    if (agentHasPlayedFootball) {
-      navigateToStep("agent_player_career");
-      return;
-    }
-
-    navigateToStep("agent_portfolio");
-  }
-
-  function handleContinueFromAgentPlayerCareer() {
-    patchForm({ lastCompletedStep: "agent_player_career" });
     navigateToStep("agent_portfolio");
   }
 
@@ -1636,36 +1615,64 @@ export default function OnboardingProfileScreen() {
 
     patchForm({ lastCompletedStep: "agent_portfolio" });
     setValidationErrors({});
-    navigateToStep("agent_availability");
+    navigateToStep("agent_activity");
   }
 
-  function handleContinueFromAgentAvailability() {
-    const nextErrors = validateOnboardingStep("agent_availability", form);
+  function handleContinueFromAgentActivity() {
+    const nextErrors = validateOnboardingStep("agent_activity", form);
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
       return;
     }
 
-    patchForm({ lastCompletedStep: "agent_availability" });
+    patchForm({ lastCompletedStep: "agent_activity" });
     setValidationErrors({});
-    navigateToStep("agent_verification");
+    navigateToStep("agent_previous_experiences");
   }
 
-  function handleContinueFromAgentVerification() {
-    const nextErrors = validateOnboardingStep("agent_verification", form);
+  function handleContinueFromAgentPreviousExperiences() {
+    const nextErrors = validateOnboardingStep(
+      "agent_previous_experiences",
+      form,
+    );
 
     if (Object.keys(nextErrors).length > 0) {
       setValidationErrors(nextErrors);
       return;
     }
 
-    patchForm({ lastCompletedStep: "agent_verification" });
+    patchForm({ lastCompletedStep: "agent_previous_experiences" });
     setValidationErrors({});
-    navigateToStep("agent_extra");
+    // §AM: solo "Calciatore" apre la carriera; gli altri ruoli proseguono.
+    navigateToStep(getNextAgentStepAfterPreviousRoles(readAgentPreviousRoles(form)));
   }
 
-  async function handleFinishAgentExtra() {
+  function handleContinueFromAgentPlayerCareer() {
+    patchForm({ lastCompletedStep: "agent_player_career" });
+    navigateToStep("agent_contact_preferences");
+  }
+
+  function handleContinueFromAgentContactPreferences() {
+    trackAgentOnboardingEvent({
+      name: "contact_preferences_completed",
+      openToClubs: agentOpenToClubs,
+      openToPlayers: agentOpenToPlayers,
+    });
+    patchForm({ lastCompletedStep: "agent_contact_preferences" });
+    setValidationErrors({});
+    navigateToStep("agent_presentation");
+  }
+
+  /**
+   * Salvataggio finale del Procuratore (REV-ONB-06 §BQ, §BR).
+   *
+   * Le colonne legacy continuano a essere scritte — `managed_players_count`,
+   * `player_types`, `main_player_roles` — così chi legge ancora il vecchio
+   * modello non trova il profilo vuoto. Le voci di portfolio inserite a mano
+   * con il vecchio onboarding restano dove sono e non vengono cancellate.
+   */
+  async function handleFinishAgentPresentation() {
     if (!session?.user) {
       return;
     }
@@ -1693,7 +1700,7 @@ export default function OnboardingProfileScreen() {
             period_end_year: entry.period_end_year,
             period_start_month: null,
             period_start_year: entry.period_start_year,
-            role: entry.role.trim() || "Agente",
+            role: entry.role.trim() || "Procuratore",
             sort_order: index,
           })),
         agentManagedPlayerEntries: agentManagedPlayerEntries
@@ -1711,23 +1718,36 @@ export default function OnboardingProfileScreen() {
             sort_order: index,
           })),
         agentProfile: {
+          activity_scopes: agentActivityScopes,
           agency_logo_url: parseOptionalText(agentAgencyLogoUrl),
           agency_name: parseOptionalText(agentAgencyName),
           agency_role: parseOptionalText(agentAgencyRole),
           federation: agentIsFederationLicensed
             ? parseOptionalText(agentFederation)
             : null,
+          has_no_previous_experience: agentHasNoPreviousExperience,
           has_other_football_experience: agentHasOtherFootballExperience,
           has_played_football: agentHasPlayedFootball,
           is_federation_licensed: agentIsFederationLicensed,
+          license_number: agentIsFederationLicensed
+            ? parseOptionalText(agentLicenseNumber)
+            : null,
           main_player_roles: derivedMainRoles,
-          managed_players_count: derivedManagedPlayersCount,
+          // §BQ: la colonna legacy resta leggibile. Quando il procuratore ha
+          // collegato dei calciatori il conteggio reale è più preciso della
+          // fascia dichiarata, altrimenti vale la fascia.
+          managed_players_count:
+            derivedManagedPlayersCount ??
+            toLegacyManagedPlayersCount(agentPortfolioRange),
           open_to_clubs: agentOpenToClubs,
           open_to_players: agentOpenToPlayers,
+          operating_area_type: agentOperatingAreaType || null,
+          operating_countries: agentWorksAbroad ? agentOperatingCountries : [],
+          operating_macro_areas: agentOperatingMacroAreas,
+          operating_provinces: fromDelimitedString(agentOperatingProvinces),
+          operating_regions: fromDelimitedString(agentOperatingRegions),
           operational_focuses: agentOperationalFocuses,
           operational_note: parseOptionalText(agentOperationalNote),
-          operating_macro_areas: agentOperatingMacroAreas,
-          operating_regions: fromDelimitedString(agentOperatingRegions),
           other_football_roles: agentOtherFootballRoles,
           period_end_month: null,
           period_end_year: null,
@@ -1735,6 +1755,10 @@ export default function OnboardingProfileScreen() {
           period_start_year: parseWheelValue(agentAgencyStartYear),
           player_career_entries: agentPlayerCareerEntries,
           player_types: derivedPlayerTypes,
+          portfolio_range: agentPortfolioRange || null,
+          previous_roles: agentPreviousRoles,
+          professional_mode: agentProfessionalMode || null,
+          works_abroad: agentWorksAbroad,
         },
         club: null,
         clubSeasonEntries: [],
@@ -1759,7 +1783,8 @@ export default function OnboardingProfileScreen() {
         },
       });
 
-      goToCompletion("agent_extra");
+      trackAgentOnboardingEvent({ name: "onboarding_procurator_completed" });
+      goToCompletion("agent_presentation");
     } catch (error) {
       const message =
         error instanceof Error
@@ -2645,7 +2670,10 @@ export default function OnboardingProfileScreen() {
     // REV-ONB-05 §AO: per la Società la chiusura è un invito, non un
     // cruscotto: nessun riepilogo, nessuna percentuale, una sola CTA.
     const isClub = role === "club_admin";
-    const hasSingleCta = isPlayer || isClub;
+    // REV-ONB-06 §BD, §BE: anche per il Procuratore la chiusura è un invito
+    // con una sola CTA, senza riepilogo né portfolio summary.
+    const isAgent = role === "agent";
+    const hasSingleCta = isPlayer || isClub || isAgent;
 
     return (
       <>
@@ -2662,7 +2690,9 @@ export default function OnboardingProfileScreen() {
               ? "Benvenuto su ProLink. Ora puoi iniziare a raccontare e far crescere il tuo club."
               : isPlayer
                 ? "Benvenuto in ProLink. Ora puoi iniziare a creare connessioni e scoprire nuove opportunità."
-                : getCompletionDescription(role)
+                : isAgent
+                  ? "Benvenuto su ProLink. Sei pronto per connetterti con club e talenti e far crescere la tua rete professionale."
+                  : getCompletionDescription(role)
           }
           onPrimaryPress={() => finishOnboarding("feed")}
           onSecondaryPress={
@@ -2885,6 +2915,99 @@ export default function OnboardingProfileScreen() {
   }
 
   // ---------------------------------------------------------------------
+  // Procuratore: stesse pagine intere del Master (REV-ONB-06). Il profilo
+  // prima chiamato Agente cambia nome in superficie, non identity: schermate
+  // comuni dal Calciatore, carriera da calciatore da REV-ONB-02.
+  // ---------------------------------------------------------------------
+  if (isAgentMasterStep(step, role)) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            fullScreenGestureEnabled: false,
+            gestureEnabled: false,
+            headerShown: false,
+          }}
+        />
+        <AgentOnboardingFlow
+          counter={counter}
+          form={form}
+          isBusy={isBusy}
+          nationalityCategory={nationalityCategory}
+          onBack={handleBackNavigation}
+          onClearValidationErrors={clearValidationErrors}
+          onContinueFromActivity={handleContinueFromAgentActivity}
+          onContinueFromContactPreferences={
+            handleContinueFromAgentContactPreferences
+          }
+          onContinueFromPersonalData={handleContinueFromBase}
+          onContinueFromPhoto={handleContinueFromPhoto}
+          onContinueFromPlayerCareer={handleContinueFromAgentPlayerCareer}
+          onContinueFromPortfolio={handleContinueFromAgentPortfolio}
+          onContinueFromPreviousExperiences={
+            handleContinueFromAgentPreviousExperiences
+          }
+          onContinueFromProfessional={handleContinueFromAgentProfessional}
+          onContinueFromQualification={handleContinueFromAgentQualification}
+          onDomicileChange={handleDomicileChange}
+          onDomicileSelect={handleDomicileSelect}
+          onDomicileToggle={handleDomicileToggle}
+          onFinish={handleFinishAgentPresentation}
+          onFormattedNameBlur={handleFormattedNameBlur}
+          onNationalityChange={handleNationalitySelect}
+          onPatchForm={patchForm}
+          onPickLogoFromLibrary={() =>
+            handleMediaUpload({
+              field: "agent-agency-logo",
+              folder: "agent-agencies",
+              mediaTypes: ["images"],
+              onUploaded: (items) =>
+                updateValue("agentAgencyLogoUrl", items[0]?.url ?? ""),
+            })
+          }
+          onPickPhotoFromLibrary={() =>
+            handleMediaUpload({
+              field: "avatar",
+              folder: "avatars",
+              mediaTypes: ["images"],
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          onRegisterBack={registerStepBackOverride}
+          onRemoveLogo={() => updateValue("agentAgencyLogoUrl", "")}
+          onRemovePhoto={() => updateValue("avatarUrl", "")}
+          onResidenceChange={handleResidenceChange}
+          onResidenceSelect={handleResidenceSelect}
+          onTakeLogoPhoto={() =>
+            handleCameraCapture({
+              field: "agent-agency-logo",
+              folder: "agent-agencies",
+              onUploaded: (items) =>
+                updateValue("agentAgencyLogoUrl", items[0]?.url ?? ""),
+            })
+          }
+          onTakePhoto={() =>
+            handleCameraCapture({
+              field: "avatar",
+              folder: "avatars",
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          photoPreviewUrl={
+            avatarUrl ? withDefaultProfileAvatar(avatarUrl) : null
+          }
+          searchPlayers={searchAgentPlayerCandidates}
+          searchTeams={searchTeams}
+          step={step}
+          validationErrors={validationErrors}
+        />
+      </>
+    );
+  }
+
+  // ---------------------------------------------------------------------
   // Società: stesse pagine intere del Master (REV-ONB-05). Il flusso si
   // adatta alla struttura reale del club invece di chiedere tutto a tutti.
   // ---------------------------------------------------------------------
@@ -3062,8 +3185,8 @@ export default function OnboardingProfileScreen() {
         ) : null}
 
         {step === "base" ? (
-          role === "agent" || role === "director" ? (
-            <AgentBasicInfoStep
+          role === "director" ? (
+            <DirectorBasicInfoStep
               birthDate={birthDate}
               currentLocationCity={currentLocationCity}
               currentLocationCountry={currentLocationCountry}
@@ -3763,152 +3886,6 @@ export default function OnboardingProfileScreen() {
               </View>
             </View>
           </View>
-        ) : null}
-
-        {step === "agent_agency" ? (
-          <AgentAgencyStep
-            agencyRole={agentAgencyRole}
-            agencyStartYear={agentAgencyStartYear}
-            careerEntries={agentCareerEntries}
-            agencyLogoUrl={agentAgencyLogoUrl}
-            agencyName={agentAgencyName}
-            errorMessage={validationErrors}
-            isUploading={uploadingField === "agent-agency-logo"}
-            onCareerEntriesChange={(entries) => patchForm({ agentCareerEntries: entries })}
-            onContinue={handleContinueFromAgentAgency}
-            onPickLogo={() =>
-              handleMediaUpload({
-                field: "agent-agency-logo",
-                folder: "agent-agencies",
-                mediaTypes: ["images"],
-                onUploaded: (items) =>
-                  patchForm({ agentAgencyLogoUrl: items[0]?.url ?? "" }),
-              })
-            }
-            onUpdate={(patch) => patchForm(patch)}
-          />
-        ) : null}
-
-        {step === "agent_players" ? (
-          <AgentPlayersStep
-            errorMessage={validationErrors.agentManagedPlayerEntries}
-            isBusy={isBusy}
-            managedPlayerEntries={agentManagedPlayerEntries}
-            onContinue={handleContinueFromAgentPlayers}
-            onUpdate={(entries) =>
-              patchForm({
-                agentManagedPlayerEntries: entries,
-              })
-            }
-            searchPlayers={searchAgentPlayerCandidates}
-          />
-        ) : null}
-
-        {step === "agent_football_experience" ? (
-          <AgentFootballExperienceStep
-            errorMessage={validationErrors.agentOtherFootballRoles}
-            hasOtherFootballExperience={agentHasOtherFootballExperience}
-            isBusy={isBusy}
-            onContinue={handleContinueFromAgentFootballExperience}
-            onToggleExperience={(value) =>
-              patchForm({
-                agentHasOtherFootballExperience: value,
-                ...(value ? {} : { agentOtherFootballRoles: [] }),
-              })
-            }
-            onUpdateRoles={(roles) =>
-              patchForm({ agentOtherFootballRoles: roles })
-            }
-            otherFootballRoles={agentOtherFootballRoles}
-          />
-        ) : null}
-
-        {step === "agent_player_career_toggle" ? (
-          <PlayerCareerToggleStep
-            buttonLabel={agentHasPlayedFootball ? "Continua" : "Salta"}
-            hasPlayedFootball={agentHasPlayedFootball}
-            isBusy={isBusy}
-            onContinue={handleContinueFromAgentPlayerCareerToggle}
-            onUpdate={(value) => patchForm({ agentHasPlayedFootball: value })}
-            subtitle="Hai giocato a calcio? Puoi aggiungere i tuoi trascorsi in campo per aumentare l'autorevolezza del profilo."
-            title="Carriera da giocatore"
-            toggleLabel="Aggiungi carriera da giocatore"
-            toggleSubtitle="Includi le esperienze da calciatore se sono rilevanti per il tuo percorso."
-          />
-        ) : null}
-
-        {step === "agent_player_career" ? (
-          <CareerExperienceStep
-            addButtonLabel="Aggiungi carriera"
-            careerEntries={agentPlayerCareerEntries}
-            emptyMessage="Puoi aggiungere le tue esperienze da calciatore ora oppure proseguire e completarle più tardi."
-            isBusy={isBusy}
-            onSaveAndContinue={handleContinueFromAgentPlayerCareer}
-            onSkip={handleContinueFromAgentPlayerCareer}
-            onUpdateEntries={(entries) =>
-              patchForm({ agentPlayerCareerEntries: entries })
-            }
-            searchTeams={searchTeams}
-            subtitle="Aggiungi i tuoi trascorsi da calciatore con lo stesso pattern usato negli altri onboarding."
-            title="Carriera da giocatore"
-          />
-        ) : null}
-
-        {step === "agent_portfolio" ? (
-          <AgentPortfolioStep
-            isBusy={isBusy}
-            onContinue={handleContinueFromAgentPortfolio}
-            onUpdateMacroAreas={(values) =>
-              patchForm({ agentOperatingMacroAreas: values })
-            }
-            onUpdateNote={(value) =>
-              patchForm({ agentOperationalNote: value })
-            }
-            onUpdateOperationalFocuses={(values) =>
-              patchForm({ agentOperationalFocuses: values })
-            }
-            onUpdateOperatingRegions={(value) =>
-              patchForm({ agentOperatingRegions: value })
-            }
-            operationalFocuses={agentOperationalFocuses}
-            operationalNote={agentOperationalNote}
-            operatingMacroAreas={agentOperatingMacroAreas}
-            operatingRegions={agentOperatingRegions}
-            validationErrors={validationErrors}
-          />
-        ) : null}
-
-        {step === "agent_availability" ? (
-          <AgentAvailabilityStep
-            errorMessage={validationErrors.agentAvailability}
-            isBusy={isBusy}
-            onContinue={handleContinueFromAgentAvailability}
-            onUpdate={(patch) => patchForm(patch)}
-            openToClubs={agentOpenToClubs}
-            openToPlayers={agentOpenToPlayers}
-          />
-        ) : null}
-
-        {step === "agent_verification" ? (
-          <AgentVerificationStep
-            federation={agentFederation}
-            isBusy={isBusy}
-            isFederationLicensed={agentIsFederationLicensed}
-            onContinue={handleContinueFromAgentVerification}
-            onUpdate={(patch) => patchForm(patch)}
-            validationErrors={validationErrors}
-          />
-        ) : null}
-
-        {step === "agent_extra" ? (
-          <AgentExtraStep
-            bio={bio}
-            isBusy={isBusy}
-            languages={agentLanguages}
-            onFinish={handleFinishAgentExtra}
-            onSkip={handleFinishAgentExtra}
-            onUpdate={(patch) => patchForm(patch)}
-          />
         ) : null}
 
         {/* ============================================================= */}

@@ -206,15 +206,72 @@ describe("onboarding-form", () => {
     expect(errors).toEqual({});
   });
 
-  it("requires portfolio data for the agent onboarding", () => {
-    const errors = validateOnboardingStep("agent_portfolio", {
-      ...defaultOnboardingFormState,
-      role: "agent",
+  // REV-ONB-06 §S, §U: la fascia è l'unico dato obbligatorio del portfolio.
+  // Collegare calciatori resta facoltativo anche dichiarando "6–15".
+  it("requires only the portfolio range for the procurator onboarding", () => {
+    expect(
+      validateOnboardingStep("agent_portfolio", {
+        ...defaultOnboardingFormState,
+        role: "agent",
+      }),
+    ).toEqual({
+      agentPortfolioRange: "Seleziona la dimensione del portfolio.",
     });
 
-    expect(errors).toEqual({
-      agentOperationalFocuses: "Seleziona almeno una modalità operativa.",
+    expect(
+      validateOnboardingStep("agent_portfolio", {
+        ...defaultOnboardingFormState,
+        agentPortfolioRange: "6_15",
+        role: "agent",
+      }),
+    ).toEqual({});
+  });
+
+  // REV-ONB-06 §I: a chi lavora per conto proprio non si chiede un'agenzia.
+  it("skips the agency fields for an independent procurator", () => {
+    expect(
+      validateOnboardingStep("agent_professional", {
+        ...defaultOnboardingFormState,
+        role: "agent",
+      }),
+    ).toEqual({ agentProfessionalMode: "Seleziona come lavori." });
+
+    expect(
+      validateOnboardingStep("agent_professional", {
+        ...defaultOnboardingFormState,
+        agentProfessionalMode: "independent",
+        role: "agent",
+      }),
+    ).toEqual({});
+
+    expect(
+      validateOnboardingStep("agent_professional", {
+        ...defaultOnboardingFormState,
+        agentProfessionalMode: "agency",
+        role: "agent",
+      }),
+    ).toEqual({
+      agentAgencyName: "Inserisci il nome dell'agenzia o dello studio.",
+      agentAgencyRole: "Seleziona il tuo ruolo attuale.",
     });
+  });
+
+  // REV-ONB-06 §O: non avere un'abilitazione non è un errore.
+  it("lets a procurator continue without a professional qualification", () => {
+    expect(
+      validateOnboardingStep("agent_qualification", {
+        ...defaultOnboardingFormState,
+        role: "agent",
+      }),
+    ).toEqual({});
+
+    expect(
+      validateOnboardingStep("agent_qualification", {
+        ...defaultOnboardingFormState,
+        agentIsFederationLicensed: true,
+        role: "agent",
+      }),
+    ).toEqual({ agentFederation: "Seleziona la federazione o l'ente." });
   });
 
   it("requires fast interests before completing the fan onboarding", () => {
@@ -301,29 +358,67 @@ describe("onboarding-form", () => {
     expect(getPreviousOnboardingStep("staff_player_career", "staff_previous_experiences", "staff")).toBe("staff_previous_experiences");
   });
 
-  it("maps agent optional substeps to the expected progress and back navigation", () => {
+  // REV-ONB-06 §BF, §BG: la carriera da calciatore è condizionale e non
+  // allunga il contatore; il Back rientra nel ramo davvero percorso.
+  it("keeps the procurator counter stable across the optional career branch", () => {
     expect(getOnboardingProgress("base", "agent")).toMatchObject({
-      percentage: 13,
       stepIndex: 0,
-      totalSteps: 8,
+      totalSteps: 9,
     });
+    expect(
+      getOnboardingProgress("agent_previous_experiences", "agent"),
+    ).toMatchObject({ stepIndex: 6, totalSteps: 9 });
     expect(getOnboardingProgress("agent_player_career", "agent")).toMatchObject({
-      percentage: 63,
-      stepIndex: 4,
-      totalSteps: 8,
+      stepIndex: 6,
+      totalSteps: 9,
     });
-    expect(getOnboardingProgress("agent_extra", "agent")).toMatchObject({
+    expect(getOnboardingProgress("agent_presentation", "agent")).toMatchObject({
       percentage: 100,
-      stepIndex: 7,
-      totalSteps: 8,
+      stepIndex: 8,
+      totalSteps: 9,
     });
+
     expect(
-      getPreviousOnboardingStep("agent_portfolio", "agent_player_career_toggle", "agent"),
-    ).toBe("agent_player_career_toggle");
+      getPreviousOnboardingStep(
+        "agent_contact_preferences",
+        "agent_previous_experiences",
+        "agent",
+      ),
+    ).toBe("agent_previous_experiences");
     expect(
-      getPreviousOnboardingStep("agent_portfolio", "agent_player_career", "agent"),
+      getPreviousOnboardingStep(
+        "agent_contact_preferences",
+        "agent_player_career",
+        "agent",
+      ),
     ).toBe("agent_player_career");
-    expect(getPreviousOnboardingStep("complete", null, "agent")).toBe("agent_extra");
+    expect(getPreviousOnboardingStep("complete", null, "agent")).toBe(
+      "agent_presentation",
+    );
+  });
+
+  // REV-ONB-06 §BQ: una bozza del vecchio onboarding Agente rientra sul passo
+  // Procuratore che raccoglie le stesse informazioni.
+  it("migrates a legacy agent draft onto the procurator steps", () => {
+    expect(getOnboardingProgress("agent_agency", "agent").currentStep?.step).toBe(
+      "agent_professional",
+    );
+    expect(
+      getOnboardingProgress("agent_verification", "agent").currentStep?.step,
+    ).toBe("agent_qualification");
+    expect(getOnboardingProgress("agent_players", "agent").currentStep?.step).toBe(
+      "agent_portfolio",
+    );
+    expect(
+      getOnboardingProgress("agent_football_experience", "agent").currentStep
+        ?.step,
+    ).toBe("agent_previous_experiences");
+    expect(
+      getOnboardingProgress("agent_availability", "agent").currentStep?.step,
+    ).toBe("agent_contact_preferences");
+    expect(getOnboardingProgress("agent_extra", "agent").currentStep?.step).toBe(
+      "agent_presentation",
+    );
   });
 
   it("maps the director coach career substep to the previous-experience progress group", () => {

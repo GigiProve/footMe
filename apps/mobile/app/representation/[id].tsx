@@ -84,7 +84,7 @@ export default function RepresentationDetailScreen() {
   function handleAccept() {
     if (!detail) return;
     const typeLabel = getRelationshipTypeLabel(detail.relationship_type);
-    const agentName = detail.agent_full_name ?? "Questo agente";
+    const agentName = detail.agent_full_name ?? "Questo procuratore";
     Alert.alert(
       "Accettare collegamento?",
       `${agentName} comparirà come ${typeLabel} nel tuo profilo pubblico. Potrai modificare la visibilità o rimuovere il collegamento in qualsiasi momento.`,
@@ -100,7 +100,7 @@ export default function RepresentationDetailScreen() {
 
   function handleReject() {
     if (!detail) return;
-    const agentName = detail.agent_full_name ?? "Questo agente";
+    const agentName = detail.agent_full_name ?? "Questo procuratore";
     Alert.alert(
       "Rifiutare richiesta?",
       `La richiesta di ${agentName} verrà rifiutata. Non verrà creato alcun collegamento.`,
@@ -164,7 +164,7 @@ export default function RepresentationDetailScreen() {
   const typeLabel = getRelationshipTypeLabel(detail.relationship_type);
   const visibilityLabel =
     detail.visibility === "public" ? "Pubblico sul profilo" : "Privato";
-  const agentName = detail.agent_full_name ?? "Agente";
+  const agentName = detail.agent_full_name ?? "Procuratore";
   const agentRole = formatRole(detail.agent_role);
 
   if (successState) {

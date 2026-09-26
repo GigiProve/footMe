@@ -3,22 +3,36 @@ import type { AgentMediaItemRecord } from "./agent-media";
 import { getPlayerPositionLabel, isPlayerPosition } from "./player-sports";
 
 export type AgentProfileRecord = {
+  /** REV-ONB-06 §Y: ambiti operativi strutturati. */
+  activity_scopes: string[];
   agency_logo_url: string | null;
   agency_name: string | null;
   agency_role: string | null;
   federation: string | null;
+  has_no_previous_experience: boolean;
   has_other_football_experience: boolean;
   has_played_football: boolean;
   is_federation_licensed: boolean;
+  license_number: string | null;
   main_player_roles: PlayerPosition[];
   managed_players_count: string | null;
   media_items: AgentMediaItemRecord[];
   open_to_clubs: boolean;
   open_to_players: boolean;
-  operational_focuses: string[];
-  operational_note: string | null;
+  /** REV-ONB-06 §AA: "ITALY" | "REGIONS" | "PROVINCES". */
+  operating_area_type: string | null;
+  operating_countries: string[];
+  /**
+   * REV-ONB-06 §AE: Nord/Centro/Sud/Isole non è più un modo di scegliere.
+   * La colonna resta per non perdere quanto già salvato.
+   */
   operating_macro_areas: string[];
+  operating_provinces: string[];
   operating_regions: string[];
+  /** REV-ONB-06 §Z: sostituito da activity_scopes, conservato per i dati. */
+  operational_focuses: string[];
+  /** REV-ONB-06 §AH: la descrizione professionale vive nella Bio. */
+  operational_note: string | null;
   other_football_roles: string[];
   period_end_month: string | null;
   period_end_year: number | null;
@@ -26,7 +40,13 @@ export type AgentProfileRecord = {
   period_start_year: number | null;
   player_career_entries: unknown[];
   player_types: string[];
+  /** REV-ONB-06 §S: fascia dichiarata, indipendente dai collegamenti. */
+  portfolio_range: string | null;
+  previous_roles: string[];
+  /** REV-ONB-06 §H: "independent" | "agency". */
+  professional_mode: string | null;
   profile_id: string;
+  works_abroad: boolean;
 };
 
 export type AgentCareerEntryRecord = {

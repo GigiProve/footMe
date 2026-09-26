@@ -826,11 +826,11 @@ export function buildAgentProfileHeaderDetails(
     bio: data.profile.bio?.trim() || null,
     fullName: formatProfileDisplayName(data.profile.full_name, null),
     locationLabel: locationLabel === "Da completare" ? undefined : locationLabel,
-    primaryRole: data.agentProfile?.agency_role?.trim() || "Agente sportivo",
+    primaryRole: data.agentProfile?.agency_role?.trim() || "Procuratore",
     statusBadge: data.agentProfile?.is_federation_licensed
       ? federation
         ? `Licenza ${federation}`
-        : "Agente verificato"
+        : "Procuratore verificato"
       : undefined,
   };
 }

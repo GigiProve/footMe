@@ -163,6 +163,6 @@ describe("formatResultsCount", () => {
     expect(formatResultsCount(26, "coach")).toBe("26 allenatori trovati");
     expect(formatResultsCount(18, "staff")).toBe("18 profili staff trovati");
     expect(formatResultsCount(1, "staff")).toBe("1 profilo staff trovato");
-    expect(formatResultsCount(12, "agent")).toBe("12 agenti trovati");
+    expect(formatResultsCount(12, "agent")).toBe("12 procuratori trovati");
   });
 });

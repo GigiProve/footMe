@@ -198,7 +198,7 @@ export function EditAgentMediaModal({
 
   async function handleSave() {
     if (!completeProfile.agentProfile) {
-      Alert.alert("Errore", "Profilo agente non disponibile.");
+      Alert.alert("Errore", "Profilo procuratore non disponibile.");
       return;
     }
 
@@ -249,7 +249,7 @@ export function EditAgentMediaModal({
       <SafeAreaView style={styles.root}>
         <View style={styles.header}>
           <Pressable
-            accessibilityLabel="Chiudi editor media agente"
+            accessibilityLabel="Chiudi editor media procuratore"
             hitSlop={8}
             onPress={onClose}
             style={({ pressed }) => [
@@ -265,7 +265,7 @@ export function EditAgentMediaModal({
           </AppText>
 
           <Pressable
-            accessibilityLabel={editingItem ? "Aggiorna contenuto media agente" : "Pubblica contenuto media agente"}
+            accessibilityLabel={editingItem ? "Aggiorna contenuto media procuratore" : "Pubblica contenuto media procuratore"}
             disabled={saveDisabled || isSaving}
             hitSlop={8}
             onPress={() => {
@@ -291,7 +291,7 @@ export function EditAgentMediaModal({
             label="Media"
             mediaType={draft.type}
             onPick={handlePickMedia}
-            previewLabel="Anteprima contenuto media agente"
+            previewLabel="Anteprima contenuto media procuratore"
             previewUrl={(draft.thumbnail_url ?? draft.url) || null}
           />
 

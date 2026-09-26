@@ -454,21 +454,27 @@ export type PlayerPalmaresInput = {
 
 export type CompleteProfessionalProfileUpdate = {
   agentProfile?: {
+    activity_scopes: string[];
     agency_logo_url: string | null;
     agency_name: string | null;
     agency_role: string | null;
     federation: string | null;
+    has_no_previous_experience: boolean;
     has_other_football_experience: boolean;
     has_played_football: boolean;
     is_federation_licensed: boolean;
+    license_number: string | null;
     main_player_roles: PlayerPosition[];
     managed_players_count: string | null;
     open_to_clubs: boolean;
     open_to_players: boolean;
+    operating_area_type: string | null;
+    operating_countries: string[];
+    operating_macro_areas: string[];
+    operating_provinces: string[];
+    operating_regions: string[];
     operational_focuses: string[];
     operational_note: string | null;
-    operating_macro_areas: string[];
-    operating_regions: string[];
     other_football_roles: string[];
     period_end_month: string | null;
     period_end_year: number | null;
@@ -476,6 +482,10 @@ export type CompleteProfessionalProfileUpdate = {
     period_start_year: number | null;
     player_career_entries: unknown[];
     player_types: string[];
+    portfolio_range: string | null;
+    previous_roles: string[];
+    professional_mode: string | null;
+    works_abroad: boolean;
   } | null;
   directorProfile?: {
     career_entries: unknown[];
@@ -926,24 +936,32 @@ function normalizeAgentProfileRecord(
   }
 
   return {
+    activity_scopes: normalizeStringArray(rawProfile.activity_scopes),
     agency_logo_url: normalizeOptionalText(rawProfile.agency_logo_url),
     agency_name: normalizeOptionalText(rawProfile.agency_name),
     agency_role: normalizeOptionalText(rawProfile.agency_role),
     federation: normalizeOptionalText(rawProfile.federation),
+    has_no_previous_experience: normalizeBoolean(
+      rawProfile.has_no_previous_experience,
+    ),
     has_other_football_experience: normalizeBoolean(
       rawProfile.has_other_football_experience,
     ),
     has_played_football: normalizeBoolean(rawProfile.has_played_football),
     is_federation_licensed: normalizeBoolean(rawProfile.is_federation_licensed),
+    license_number: normalizeOptionalText(rawProfile.license_number),
     main_player_roles: normalizePlayerPositions(rawProfile.main_player_roles),
     managed_players_count: normalizeOptionalText(rawProfile.managed_players_count),
     media_items: normalizeAgentMediaItems(rawProfile.media_items),
     open_to_clubs: normalizeBoolean(rawProfile.open_to_clubs, true),
     open_to_players: normalizeBoolean(rawProfile.open_to_players, true),
+    operating_area_type: normalizeOptionalText(rawProfile.operating_area_type),
+    operating_countries: normalizeStringArray(rawProfile.operating_countries),
+    operating_macro_areas: normalizeStringArray(rawProfile.operating_macro_areas),
+    operating_provinces: normalizeStringArray(rawProfile.operating_provinces),
+    operating_regions: normalizeStringArray(rawProfile.operating_regions),
     operational_focuses: normalizeStringArray(rawProfile.operational_focuses),
     operational_note: normalizeOptionalText(rawProfile.operational_note),
-    operating_macro_areas: normalizeStringArray(rawProfile.operating_macro_areas),
-    operating_regions: normalizeStringArray(rawProfile.operating_regions),
     other_football_roles: normalizeStringArray(rawProfile.other_football_roles),
     period_end_month: normalizeOptionalText(rawProfile.period_end_month),
     period_end_year: normalizeNumber(rawProfile.period_end_year),
@@ -953,7 +971,11 @@ function normalizeAgentProfileRecord(
       ? rawProfile.player_career_entries
       : [],
     player_types: normalizeStringArray(rawProfile.player_types),
+    portfolio_range: normalizeOptionalText(rawProfile.portfolio_range),
+    previous_roles: normalizeStringArray(rawProfile.previous_roles),
+    professional_mode: normalizeOptionalText(rawProfile.professional_mode),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+    works_abroad: normalizeBoolean(rawProfile.works_abroad),
   } satisfies AgentProfileRecord;
 }
 
@@ -971,7 +993,7 @@ function normalizeAgentCareerEntryRecord(
     period_end_year: normalizeNumber(rawEntry.period_end_year),
     period_start_month: normalizeOptionalText(rawEntry.period_start_month),
     period_start_year: normalizeNumber(rawEntry.period_start_year),
-    role: normalizeRequiredText(rawEntry.role, "Agente"),
+    role: normalizeRequiredText(rawEntry.role, "Procuratore"),
     sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
   } satisfies AgentCareerEntryRecord;
 }
@@ -1583,7 +1605,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("agent_profiles")
           .select(
-            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions",
+            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, license_number, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions, operating_provinces, operating_area_type, operating_countries, works_abroad, activity_scopes, portfolio_range, professional_mode, previous_roles, has_no_previous_experience",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -2590,22 +2612,28 @@ export async function saveAgentProfileMedia(input: {
   profileId: string;
 }) {
   const { error } = await supabase.from("agent_profiles").upsert({
+    activity_scopes: input.agentProfile.activity_scopes,
     agency_logo_url: input.agentProfile.agency_logo_url,
     agency_name: input.agentProfile.agency_name,
     agency_role: input.agentProfile.agency_role,
     federation: input.agentProfile.federation,
+    has_no_previous_experience: input.agentProfile.has_no_previous_experience,
     has_other_football_experience: input.agentProfile.has_other_football_experience,
     has_played_football: input.agentProfile.has_played_football,
     is_federation_licensed: input.agentProfile.is_federation_licensed,
+    license_number: input.agentProfile.license_number,
     main_player_roles: input.agentProfile.main_player_roles,
     managed_players_count: input.agentProfile.managed_players_count,
     media_items: input.mediaItems,
     open_to_clubs: input.agentProfile.open_to_clubs,
     open_to_players: input.agentProfile.open_to_players,
+    operating_area_type: input.agentProfile.operating_area_type,
+    operating_countries: input.agentProfile.operating_countries,
+    operating_macro_areas: input.agentProfile.operating_macro_areas,
+    operating_provinces: input.agentProfile.operating_provinces,
+    operating_regions: input.agentProfile.operating_regions,
     operational_focuses: input.agentProfile.operational_focuses,
     operational_note: input.agentProfile.operational_note,
-    operating_macro_areas: input.agentProfile.operating_macro_areas,
-    operating_regions: input.agentProfile.operating_regions,
     other_football_roles: input.agentProfile.other_football_roles,
     period_end_month: input.agentProfile.period_end_month,
     period_end_year: input.agentProfile.period_end_year,
@@ -2613,7 +2641,11 @@ export async function saveAgentProfileMedia(input: {
     period_start_year: input.agentProfile.period_start_year,
     player_career_entries: input.agentProfile.player_career_entries,
     player_types: input.agentProfile.player_types,
+    portfolio_range: input.agentProfile.portfolio_range,
+    previous_roles: input.agentProfile.previous_roles,
+    professional_mode: input.agentProfile.professional_mode,
     profile_id: input.profileId,
+    works_abroad: input.agentProfile.works_abroad,
   });
 
   if (error) {

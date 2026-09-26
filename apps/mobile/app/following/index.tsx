@@ -41,7 +41,7 @@ const FOLLOW_FILTERS: { label: string; value: FollowFilter }[] = [
   { label: "Calciatori", value: "player" },
   { label: "Media", value: "media" },
   { label: "Allenatori", value: "coach" },
-  { label: "Agenti", value: "agent" },
+  { label: "Procuratori", value: "agent" },
 ];
 
 export default function FollowingScreen() {

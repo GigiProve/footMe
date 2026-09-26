@@ -2,7 +2,7 @@
  * Token del Master UI onboarding (REV-ONB-01).
  *
  * Tutti i flussi di onboarding — Calciatore, Allenatore, Staff, Società,
- * Agente, Dirigente, Media e appassionati — leggono da qui. Nessuno step
+ * Procuratore, Dirigente, Media e appassionati — leggono da qui. Nessuno step
  * deve hardcodare altezze, padding o raggi propri: se un valore manca,
  * si aggiunge in questo file, non nel singolo screen.
  *

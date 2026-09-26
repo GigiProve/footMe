@@ -37,7 +37,7 @@ const COACH_SHARED_STEPS: OnboardingStep[] = ["base", "photo"];
  * L'Allenatore rende questi passi con le pagine intere del Master.
  *
  * `player_career_toggle` e `player_career` esistono solo nel ramo Allenatore:
- * lo Staff, l'Agente e il Dirigente hanno i propri passi omonimi con prefisso.
+ * lo Staff, il Procuratore e il Dirigente hanno i propri passi omonimi con prefisso.
  */
 export function isCoachMasterStep(step: OnboardingStep, role: string) {
   if (role !== "coach") {

@@ -19,12 +19,28 @@ import type {
 } from "./onboarding-types";
 import type { CoachCareerEntry } from "./coach/coach-career-types";
 import {
+  AGENT_ACTIVITY_SCOPE_OPTIONS,
+  AGENT_PORTFOLIO_RANGE_OPTIONS,
+  type AgentActivityScope,
+  type AgentPortfolioRange,
+  type AgentProfessionalMode,
+} from "./agent/agent-taxonomy";
+import {
   type ClubStructure,
   clubStructureHasFirstTeam,
   clubStructureHasYouth,
   coerceClubStructure,
   deriveLegacyClubStructure,
 } from "./club/club-structure";
+
+/** Token accettati quando si rilegge una bozza salvata. */
+const AGENT_ACTIVITY_SCOPE_VALUES = new Set<AgentActivityScope>(
+  AGENT_ACTIVITY_SCOPE_OPTIONS.map((option) => option.value),
+);
+
+const AGENT_PORTFOLIO_RANGE_VALUES = new Set<AgentPortfolioRange>(
+  AGENT_PORTFOLIO_RANGE_OPTIONS.map((option) => option.value),
+);
 
 export type OnboardingStep =
   | "role"
@@ -44,12 +60,19 @@ export type OnboardingStep =
   | "media_focus"
   | "media_channels"
   | "media_collaborations"
+  | "agent_professional"
+  | "agent_qualification"
+  | "agent_portfolio"
+  | "agent_activity"
+  | "agent_previous_experiences"
+  | "agent_player_career"
+  | "agent_contact_preferences"
+  | "agent_presentation"
+  // Passi del vecchio onboarding Agente, tenuti solo per migrare le bozze (§BQ)
   | "agent_agency"
   | "agent_players"
   | "agent_football_experience"
   | "agent_player_career_toggle"
-  | "agent_player_career"
-  | "agent_portfolio"
   | "agent_availability"
   | "agent_verification"
   | "agent_extra"
@@ -98,28 +121,41 @@ export type AvailabilityType = "ITALY" | "REGIONS" | "PROVINCES";
 export type LegalStatus = "has_permit" | "no_permit" | "pending_permit" | "";
 
 export type OnboardingFormState = {
+  agentActivityScopes: AgentActivityScope[];
   agentAgencyLogoUrl: string;
   agentAgencyName: string;
   agentAgencyRole: string;
   agentAgencyStartYear: string;
   agentCareerEntries: AgentCareerEntryDraft[];
   agentFederation: string;
+  agentHasNoPreviousExperience: boolean;
   agentHasOtherFootballExperience: boolean;
   agentHasPlayedFootball: boolean;
   agentIsFederationLicensed: boolean;
   agentLanguages: string[];
+  agentLicenseNumber: string;
   agentMainPlayerRoles: PlayerPosition[];
   agentManagedPlayersCount: string;
   agentManagedPlayerEntries: AgentManagedPlayerEntryDraft[];
   agentOpenToClubs: boolean;
   agentOpenToPlayers: boolean;
+  agentOperatingAreaType: AvailabilityType | "";
+  agentOperatingCountries: string[];
+  agentOperatingProvinces: string;
+  /** Legacy REV-ONB-06 §AE: sostituito dalle aree strutturate, mai riscritto. */
   agentOperationalFocuses: string[];
+  /** Legacy REV-ONB-06 §AH: la descrizione vive nella Bio. */
   agentOperationalNote: string;
   agentOtherFootballRoles: string[];
+  /** Legacy REV-ONB-06 §AE: Nord/Centro/Sud/Isole non sono più una scelta. */
   agentOperatingMacroAreas: string[];
   agentOperatingRegions: string;
   agentPlayerCareerEntries: PlayerExperienceForm[];
   agentPlayerTypes: string[];
+  agentPortfolioRange: AgentPortfolioRange;
+  agentPreviousRoles: string[];
+  agentProfessionalMode: AgentProfessionalMode;
+  agentWorksAbroad: boolean;
   availabilityType: AvailabilityType;
   avatarUrl: string;
   bio: string;
@@ -389,6 +425,13 @@ function buildClubStepOrder(structure: ClubStructure): OnboardingStep[] {
   ];
 }
 
+/**
+ * Passi contati del Procuratore (REV-ONB-06 §BF).
+ *
+ * La carriera da calciatore è condizionale: condivide la posizione di
+ * "Esperienze precedenti" invece di allungare il contatore a metà flusso,
+ * così chi non l'ha dichiarata non vede numerazioni che saltano.
+ */
 const agentVisibleSteps: OnboardingVisibleStep[] = [
   {
     description: "Completa i tuoi dati personali",
@@ -403,40 +446,46 @@ const agentVisibleSteps: OnboardingVisibleStep[] = [
     step: "photo",
   },
   {
-    description: "Configura il profilo professionale",
+    description: "Indica come lavori",
     index: 3,
     label: "Profilo",
-    step: "agent_agency",
+    step: "agent_professional",
   },
   {
-    description: "Definisci la tua attività principale",
+    description: "Indica la tua abilitazione professionale",
     index: 4,
-    label: "Attività",
-    step: "agent_players",
+    label: "Abilitazione",
+    step: "agent_qualification",
   },
   {
-    description: "Aggiungi le esperienze nel calcio",
+    description: "Definisci la dimensione del portfolio",
     index: 5,
-    label: "Esperienze",
-    step: "agent_football_experience",
-  },
-  {
-    description: "Indica il portfolio dei calciatori seguiti",
-    index: 6,
     label: "Portfolio",
     step: "agent_portfolio",
   },
   {
-    description: "Imposta disponibilità e verifica",
-    index: 7,
-    label: "Verifica",
-    step: "agent_availability",
+    description: "Scegli mercati e aree operative",
+    index: 6,
+    label: "Attività",
+    step: "agent_activity",
   },
   {
-    description: "Aggiungi i dettagli di verifica",
+    description: "Indica le esperienze precedenti nel calcio",
+    index: 7,
+    label: "Esperienze",
+    step: "agent_previous_experiences",
+  },
+  {
+    description: "Scegli quali opportunità ricevere",
     index: 8,
-    label: "Conferma",
-    step: "agent_verification",
+    label: "Opportunità",
+    step: "agent_contact_preferences",
+  },
+  {
+    description: "Presentati alla community",
+    index: 9,
+    label: "Presentazione",
+    step: "agent_presentation",
   },
 ];
 
@@ -476,15 +525,14 @@ const agentStepOrder: OnboardingStep[] = [
   "role",
   "base",
   "photo",
-  "agent_agency",
-  "agent_players",
-  "agent_football_experience",
-  "agent_player_career_toggle",
-  "agent_player_career",
+  "agent_professional",
+  "agent_qualification",
   "agent_portfolio",
-  "agent_availability",
-  "agent_verification",
-  "agent_extra",
+  "agent_activity",
+  "agent_previous_experiences",
+  "agent_player_career",
+  "agent_contact_preferences",
+  "agent_presentation",
   "complete",
 ];
 
@@ -827,21 +875,27 @@ export const onboardingVisibleSteps = defaultVisibleSteps;
 export const onboardingStepOrder = defaultStepOrder;
 
 export const defaultOnboardingFormState: OnboardingFormState = {
+  agentActivityScopes: [],
   agentAgencyLogoUrl: "",
   agentAgencyName: "",
   agentAgencyRole: "",
   agentAgencyStartYear: "",
   agentCareerEntries: [],
   agentFederation: "",
+  agentHasNoPreviousExperience: false,
   agentHasOtherFootballExperience: false,
   agentHasPlayedFootball: false,
   agentIsFederationLicensed: false,
   agentLanguages: [],
+  agentLicenseNumber: "",
   agentMainPlayerRoles: [],
   agentManagedPlayersCount: "",
   agentManagedPlayerEntries: [],
   agentOpenToClubs: true,
   agentOpenToPlayers: true,
+  agentOperatingAreaType: "",
+  agentOperatingCountries: [],
+  agentOperatingProvinces: "",
   agentOperationalFocuses: [],
   agentOperationalNote: "",
   agentOtherFootballRoles: [],
@@ -849,6 +903,10 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   agentOperatingRegions: "",
   agentPlayerCareerEntries: [],
   agentPlayerTypes: [],
+  agentPortfolioRange: "",
+  agentPreviousRoles: [],
+  agentProfessionalMode: "",
+  agentWorksAbroad: false,
   availabilityType: "ITALY",
   avatarUrl: "",
   bio: "",
@@ -999,6 +1057,18 @@ function migrateLegacyStep(step: OnboardingStep): OnboardingStep {
   if (step === "club") return "club_representative";
   // REV-ONB-04: il bivio "hai giocato?" diventa la multi-selezione §AE.
   if (step === "staff_player_career_toggle") return "staff_previous_experiences";
+  /**
+   * REV-ONB-06 §BQ: una bozza aperta con il vecchio onboarding Agente
+   * riprende dal passo Procuratore che ne raccoglie le stesse informazioni.
+   * Il portfolio manuale (§BR) non si perde: rientra dal passo Portfolio.
+   */
+  if (step === "agent_agency") return "agent_professional";
+  if (step === "agent_verification") return "agent_qualification";
+  if (step === "agent_players") return "agent_portfolio";
+  if (step === "agent_football_experience") return "agent_previous_experiences";
+  if (step === "agent_player_career_toggle") return "agent_previous_experiences";
+  if (step === "agent_availability") return "agent_contact_preferences";
+  if (step === "agent_extra") return "agent_presentation";
   return step;
 }
 
@@ -1177,12 +1247,22 @@ export function normalizeOnboardingDraft(
             role: typeof entry.role === "string" ? entry.role : "",
           }))
       : defaultOnboardingFormState.agentCareerEntries,
+    agentActivityScopes: Array.isArray(value.agentActivityScopes)
+      ? value.agentActivityScopes.filter((entry): entry is AgentActivityScope =>
+          AGENT_ACTIVITY_SCOPE_VALUES.has(entry as AgentActivityScope),
+        )
+      : defaultOnboardingFormState.agentActivityScopes,
+    agentHasNoPreviousExperience: value.agentHasNoPreviousExperience === true,
     agentHasOtherFootballExperience: value.agentHasOtherFootballExperience === true,
     agentHasPlayedFootball: value.agentHasPlayedFootball === true,
     agentIsFederationLicensed: value.agentIsFederationLicensed === true,
     agentLanguages: Array.isArray(value.agentLanguages)
       ? value.agentLanguages.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.agentLanguages,
+    agentLicenseNumber:
+      typeof value.agentLicenseNumber === "string"
+        ? value.agentLicenseNumber
+        : defaultOnboardingFormState.agentLicenseNumber,
     agentMainPlayerRoles: normalizePlayerPositions(value.agentMainPlayerRoles),
     agentManagedPlayerEntries: Array.isArray(value.agentManagedPlayerEntries)
       ? value.agentManagedPlayerEntries
@@ -1208,6 +1288,19 @@ export function normalizeOnboardingDraft(
       typeof value.agentManagedPlayersCount === "string"
         ? value.agentManagedPlayersCount
         : defaultOnboardingFormState.agentManagedPlayersCount,
+    agentOperatingAreaType:
+      value.agentOperatingAreaType === "ITALY" ||
+      value.agentOperatingAreaType === "REGIONS" ||
+      value.agentOperatingAreaType === "PROVINCES"
+        ? value.agentOperatingAreaType
+        : defaultOnboardingFormState.agentOperatingAreaType,
+    agentOperatingCountries: Array.isArray(value.agentOperatingCountries)
+      ? value.agentOperatingCountries.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.agentOperatingCountries,
+    agentOperatingProvinces:
+      typeof value.agentOperatingProvinces === "string"
+        ? value.agentOperatingProvinces
+        : defaultOnboardingFormState.agentOperatingProvinces,
     agentOperationalFocuses: Array.isArray(value.agentOperationalFocuses)
       ? value.agentOperationalFocuses.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.agentOperationalFocuses,
@@ -1231,6 +1324,20 @@ export function normalizeOnboardingDraft(
     agentPlayerTypes: Array.isArray(value.agentPlayerTypes)
       ? value.agentPlayerTypes.filter((v): v is string => typeof v === "string")
       : defaultOnboardingFormState.agentPlayerTypes,
+    agentPortfolioRange: AGENT_PORTFOLIO_RANGE_VALUES.has(
+      value.agentPortfolioRange as AgentPortfolioRange,
+    )
+      ? (value.agentPortfolioRange as AgentPortfolioRange)
+      : defaultOnboardingFormState.agentPortfolioRange,
+    agentPreviousRoles: Array.isArray(value.agentPreviousRoles)
+      ? value.agentPreviousRoles.filter((v): v is string => typeof v === "string")
+      : defaultOnboardingFormState.agentPreviousRoles,
+    agentProfessionalMode:
+      value.agentProfessionalMode === "independent" ||
+      value.agentProfessionalMode === "agency"
+        ? value.agentProfessionalMode
+        : defaultOnboardingFormState.agentProfessionalMode,
+    agentWorksAbroad: value.agentWorksAbroad === true,
     hasPlayedFootball: value.hasPlayedFootball === true,
     staffCareerEntries: Array.isArray(value.staffCareerEntries)
       ? (value.staffCareerEntries as CoachCareerEntry[]).map((e) => ({
@@ -1380,9 +1487,12 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     "fan_basic", "fan_photo", "fan_interests",
     "media_basic", "media_photo", "media_entity", "media_content", "media_focus",
     "media_channels", "media_collaborations",
+    "agent_professional", "agent_qualification", "agent_portfolio",
+    "agent_activity", "agent_previous_experiences", "agent_player_career",
+    "agent_contact_preferences", "agent_presentation",
     "agent_agency", "agent_players", "agent_football_experience",
-    "agent_player_career_toggle", "agent_player_career", "agent_portfolio",
-    "agent_availability", "agent_verification", "agent_extra",
+    "agent_player_career_toggle", "agent_availability", "agent_verification",
+    "agent_extra",
     "club_representative", "club_data", "club_structure", "club_first_team",
     "club_youth", "club_contacts", "club_profile",
     "coach_role", "coach_availability", "coach_career", "staff_role", "staff_availability", "staff_career",
@@ -1427,16 +1537,13 @@ export function getOnboardingStepIndex(
     comparableStep = "staff_previous_experiences";
   }
 
-  if (
-    role === "agent" &&
-    (effectiveStep === "agent_player_career_toggle" ||
-      effectiveStep === "agent_player_career")
-  ) {
-    comparableStep = "agent_football_experience";
-  }
-
-  if (role === "agent" && effectiveStep === "agent_extra") {
-    comparableStep = "agent_verification";
+  /**
+   * §BF: la carriera da calciatore è condizionale e condivide la posizione
+   * di "Esperienze precedenti", così il contatore non cambia lunghezza fra
+   * chi la dichiara e chi no.
+   */
+  if (role === "agent" && effectiveStep === "agent_player_career") {
+    comparableStep = "agent_previous_experiences";
   }
 
   if (role === "director" && effectiveStep === "director_player_career") {
@@ -1505,7 +1612,7 @@ export function getPreviousOnboardingStep(
 
   if (effectiveStep === "complete") {
     if (role === "club_admin") return "club_profile";
-    if (role === "agent") return "agent_extra";
+    if (role === "agent") return "agent_presentation";
     if (role === "coach") return "coach_extra";
     if (role === "fan") return "fan_interests";
     if (role === "media") return "media_collaborations";
@@ -1528,10 +1635,14 @@ export function getPreviousOnboardingStep(
     return "experience";
   }
 
-  if (role === "agent" && effectiveStep === "agent_portfolio") {
+  /**
+   * §BG: il Back rientra nel ramo davvero percorso. Chi non ha dichiarato
+   * "Calciatore" non deve ritrovarsi dentro la carriera da calciatore.
+   */
+  if (role === "agent" && effectiveStep === "agent_contact_preferences") {
     return _lastCompletedStep === "agent_player_career"
       ? "agent_player_career"
-      : "agent_player_career_toggle";
+      : "agent_previous_experiences";
   }
 
   if (role === "staff" && effectiveStep === "staff_player_career") {
@@ -1640,28 +1751,24 @@ export function validateOnboardingStep(
     return mapPlayerAvailabilityValidationError(form);
   }
 
-  if (step === "agent_agency") {
-    return mapAgentAgencyValidationError(form);
+  if (step === "agent_professional") {
+    return mapAgentProfessionalValidationError(form);
   }
 
-  if (step === "agent_players") {
-    return mapAgentPlayersValidationError(form);
-  }
-
-  if (step === "agent_football_experience") {
-    return mapAgentFootballExperienceValidationError(form);
+  if (step === "agent_qualification") {
+    return mapAgentQualificationValidationError(form);
   }
 
   if (step === "agent_portfolio") {
     return mapAgentPortfolioValidationError(form);
   }
 
-  if (step === "agent_availability") {
-    return mapAgentAvailabilityValidationError(form);
+  if (step === "agent_activity") {
+    return mapAgentActivityValidationError(form);
   }
 
-  if (step === "agent_verification") {
-    return mapAgentVerificationValidationError(form);
+  if (step === "agent_previous_experiences") {
+    return mapAgentPreviousExperiencesValidationError(form);
   }
 
   if (step === "staff_role") {
@@ -1719,9 +1826,9 @@ export function validateOnboardingStep(
     step === "staff_career" ||
     step === "staff_player_career_toggle" ||
     step === "staff_player_career" ||
-    step === "agent_player_career_toggle" ||
     step === "agent_player_career" ||
-    step === "agent_extra" ||
+    step === "agent_contact_preferences" ||
+    step === "agent_presentation" ||
     step === "player_career_toggle" ||
     step === "player_career" ||
     step === "coach_extra"
@@ -2164,43 +2271,53 @@ function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValida
   return errors;
 }
 
-function mapAgentAgencyValidationError(
+/**
+ * §BN: gli errori sono inline e parlano della scelta mancante, non del campo
+ * tecnico che la contiene.
+ */
+function mapAgentProfessionalValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
   const errors: OnboardingValidationErrors = {};
+
+  if (!form.agentProfessionalMode) {
+    errors.agentProfessionalMode = "Seleziona come lavori.";
+    return errors;
+  }
+
+  // §I: a chi lavora per conto proprio non si chiede nulla dell'agenzia.
+  if (form.agentProfessionalMode !== "agency") {
+    return errors;
+  }
 
   if (!form.agentAgencyName.trim()) {
     errors.agentAgencyName = "Inserisci il nome dell'agenzia o dello studio.";
   }
 
   if (!form.agentAgencyRole.trim()) {
-    errors.agentAgencyRole = "Inserisci il ruolo attuale in agenzia.";
+    errors.agentAgencyRole = "Seleziona il tuo ruolo attuale.";
+  }
+
+  // §K: l'anno è facoltativo, ma se c'è non può essere nel futuro.
+  const startYear = Number.parseInt(form.agentAgencyStartYear, 10);
+
+  if (
+    form.agentAgencyStartYear.trim() &&
+    (Number.isNaN(startYear) || startYear > new Date().getFullYear())
+  ) {
+    errors.agentAgencyStartYear = "Inserisci un anno valido, non futuro.";
   }
 
   return errors;
 }
 
-function mapAgentPlayersValidationError(
+function mapAgentQualificationValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
-  if (form.agentManagedPlayerEntries.length === 0) {
+  // §O: non avere un'abilitazione è una risposta, non un errore.
+  if (form.agentIsFederationLicensed && !form.agentFederation.trim()) {
     return {
-      agentManagedPlayerEntries: "Aggiungi almeno un calciatore al portfolio.",
-    };
-  }
-
-  return {};
-}
-
-function mapAgentFootballExperienceValidationError(
-  form: OnboardingFormState,
-): OnboardingValidationErrors {
-  if (
-    form.agentHasOtherFootballExperience &&
-    form.agentOtherFootballRoles.length === 0
-  ) {
-    return {
-      agentOtherFootballRoles: "Seleziona almeno un'esperienza calcistica.",
+      agentFederation: "Seleziona la federazione o l'ente.",
     };
   }
 
@@ -2210,37 +2327,58 @@ function mapAgentFootballExperienceValidationError(
 function mapAgentPortfolioValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
-  if (form.agentOperationalFocuses.length === 0) {
+  // §U: la fascia è obbligatoria, i collegamenti no.
+  if (!form.agentPortfolioRange) {
     return {
-      agentOperationalFocuses: "Seleziona almeno una modalità operativa.",
+      agentPortfolioRange: "Seleziona la dimensione del portfolio.",
     };
   }
 
   return {};
 }
 
-function mapAgentAvailabilityValidationError(
+function mapAgentActivityValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
-  if (!form.agentOpenToClubs && !form.agentOpenToPlayers) {
-    return {
-      agentAvailability: "Attiva almeno un canale di contatto.",
-    };
+  const errors: OnboardingValidationErrors = {};
+
+  if (form.agentActivityScopes.length === 0) {
+    errors.agentActivityScopes = "Seleziona almeno un ambito di attività.";
   }
 
-  return {};
+  if (!form.agentOperatingAreaType) {
+    errors.agentOperatingAreaType = "Seleziona almeno un'area operativa.";
+    return errors;
+  }
+
+  if (
+    form.agentOperatingAreaType === "REGIONS" &&
+    fromDelimitedString(form.agentOperatingRegions).length === 0
+  ) {
+    errors.agentOperatingAreaType = "Seleziona almeno una regione.";
+  }
+
+  if (
+    form.agentOperatingAreaType === "PROVINCES" &&
+    fromDelimitedString(form.agentOperatingProvinces).length === 0
+  ) {
+    errors.agentOperatingAreaType = "Seleziona almeno una provincia.";
+  }
+
+  return errors;
 }
 
-function mapAgentVerificationValidationError(
+function mapAgentPreviousExperiencesValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
-  if (form.agentIsFederationLicensed && !form.agentFederation.trim()) {
-    return {
-      agentFederation: "Inserisci la federazione di riferimento.",
-    };
+  // §AK: "Nessuna esperienza precedente" è già una risposta completa.
+  if (form.agentHasNoPreviousExperience || form.agentPreviousRoles.length > 0) {
+    return {};
   }
 
-  return {};
+  return {
+    agentPreviousRoles: "Seleziona almeno un'opzione per continuare.",
+  };
 }
 
 function mapDirectorRolesValidationError(form: OnboardingFormState): OnboardingValidationErrors {

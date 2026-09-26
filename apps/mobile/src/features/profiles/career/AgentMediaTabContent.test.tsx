@@ -56,12 +56,12 @@ describe("AgentMediaTabContent", () => {
 
     expect(
       ownerTree.root.findAllByProps({
-        accessibilityLabel: "Aggiungi contenuto media agente",
+        accessibilityLabel: "Aggiungi contenuto media procuratore",
       }).length,
     ).toBeGreaterThan(0);
     expect(() =>
       visitorTree.root.findByProps({
-        accessibilityLabel: "Aggiungi contenuto media agente",
+        accessibilityLabel: "Aggiungi contenuto media procuratore",
       }),
     ).toThrow();
   });
@@ -99,10 +99,10 @@ describe("AgentMediaTabContent", () => {
     });
 
     expect(
-      tree.root.findByProps({ accessibilityLabel: "Modifica contenuto media agente" }),
+      tree.root.findByProps({ accessibilityLabel: "Modifica contenuto media procuratore" }),
     ).toBeTruthy();
     expect(
-      tree.root.findByProps({ accessibilityLabel: "Elimina contenuto media agente" }),
+      tree.root.findByProps({ accessibilityLabel: "Elimina contenuto media procuratore" }),
     ).toBeTruthy();
     expect(tree.root.findByProps({ children: "Marco Rossi" })).toBeTruthy();
     expect(tree.root.findByProps({ children: "Inserimento attaccante classe 2003" })).toBeTruthy();
