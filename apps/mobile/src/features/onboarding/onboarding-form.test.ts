@@ -292,8 +292,13 @@ describe("onboarding-form", () => {
     });
     expect(getPreviousOnboardingStep("complete")).toBe("experience");
     expect(getPreviousOnboardingStep("complete", null, "club_admin")).toBe("club_profile");
-    expect(getPreviousOnboardingStep("complete", null, "staff")).toBe("staff_player_career_toggle");
+    // REV-ONB-04 §AE, §AJ: il bivio "hai giocato?" è diventato la
+    // multi-selezione "Esperienze precedenti", con due sotto-flussi opzionali.
+    expect(getPreviousOnboardingStep("complete", null, "staff")).toBe("staff_previous_experiences");
+    expect(getPreviousOnboardingStep("complete", "staff_coach_career", "staff")).toBe("staff_coach_career");
     expect(getPreviousOnboardingStep("complete", "staff_player_career", "staff")).toBe("staff_player_career");
+    expect(getPreviousOnboardingStep("staff_player_career", "staff_coach_career", "staff")).toBe("staff_coach_career");
+    expect(getPreviousOnboardingStep("staff_player_career", "staff_previous_experiences", "staff")).toBe("staff_previous_experiences");
   });
 
   it("maps agent optional substeps to the expected progress and back navigation", () => {

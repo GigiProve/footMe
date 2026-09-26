@@ -83,14 +83,18 @@ import {
 } from "../../src/features/onboarding/coach";
 import { CoachCareerStep } from "../../src/features/onboarding/coach/CoachCareerStep";
 import { PlayerCareerToggleStep } from "../../src/features/onboarding/coach/PlayerCareerToggleStep";
-import { StaffAvailabilityStep } from "../../src/features/onboarding/staff/StaffAvailabilityStep";
-import { StaffRoleStep } from "../../src/features/onboarding/staff/StaffRoleStep";
+import {
+  getNextStaffSubFlowStep,
+  isStaffMasterStep,
+  readStaffPreviousExperiences,
+  StaffOnboardingFlow,
+  trackStaffOnboardingEvent,
+} from "../../src/features/onboarding/staff";
 import {
   mapStaffRoleToSpecialization,
   MEDIA_AFFILIATION_TYPE_OPTIONS,
   MEDIA_CONTENT_TYPE_OPTIONS,
   MEDIA_FOCUS_AREA_OPTIONS,
-  STAFF_ROLE_OPTIONS,
 } from "../../src/features/onboarding/onboarding-types";
 import {
   DirectorChipsStep,
@@ -165,12 +169,9 @@ const LEGAL_STATUS_OPTIONS: { label: string; value: LegalStatus }[] = [
   { label: "In fase di richiesta", value: "pending_permit" },
 ];
 
-const staffExperienceRoleOptions = STAFF_ROLE_OPTIONS.map((option) => ({
-  label: option.label,
-  value: option.value,
-}));
-
-const staffExperienceTypeOptions = [
+/** Le tre modalità di inserimento esperienza usate dai flussi non ancora
+ *  migrati al Master (oggi: carriera dirigenziale). */
+const EXPERIENCE_TYPE_OPTIONS = [
   {
     type: "MULTI_SEASON" as const,
     title: "Stagioni complete",
@@ -192,6 +193,7 @@ const staffExperienceTypeOptions = [
     icon: "time-outline" as const,
   },
 ];
+
 
 function parseOptionalText(value: string) {
   const trimmed = value.trim();
@@ -554,7 +556,8 @@ export default function OnboardingProfileScreen() {
     staffAvailabilityType,
     staffAvailableFrom,
     staffCareerEntries,
-    staffHasPlayedFootball,
+    staffCoachCareerEntries,
+    staffHasCoachedFootball,
     staffPlayerCareerEntries,
     staffPrimaryRole,
     staffPreferredCategories,
@@ -1083,9 +1086,17 @@ export default function OnboardingProfileScreen() {
     };
   }
 
+  /**
+   * §AH–§AK: le carriere pregresse da allenatore e da calciatore arricchiscono
+   * lo stesso profilo Staff. Vengono incluse solo quando il relativo
+   * sotto-flusso è stato effettivamente completato, così un salvataggio
+   * intermedio non cancella né inventa nulla (§AU).
+   */
   async function saveStaffProfessionalProfile({
+    includeCoachCareer = false,
     includePlayerCareer = false,
   }: {
+    includeCoachCareer?: boolean;
     includePlayerCareer?: boolean;
   } = {}) {
     if (!session?.user) {
@@ -1110,6 +1121,11 @@ export default function OnboardingProfileScreen() {
       staffCareerEntries: (staffCareerEntries as CoachCareerEntry[]).map(
         (entry, index) => mapCoachCareerEntryToStaffRecord(profileId, entry, index),
       ),
+      staffCoachCareerEntries: includeCoachCareer
+        ? (staffCoachCareerEntries as CoachCareerEntry[]).map((entry, index) =>
+            mapCoachCareerEntryToStaffRecord(profileId, entry, index),
+          )
+        : [],
       staffPlayerCareerEntries: includePlayerCareer
         ? staffPlayerCareerEntries.map((entry, index) =>
             mapPlayerExperienceFormToStaffRecord(profileId, entry, index),
@@ -1235,6 +1251,7 @@ export default function OnboardingProfileScreen() {
     } else if (role === "coach") {
       navigateToStep("coach_role");
     } else if (role === "staff") {
+      trackStaffOnboardingEvent({ name: "onboarding_staff_started" });
       navigateToStep("staff_role");
     } else if (role === "director") {
       navigateToStep("director_roles");
@@ -1744,7 +1761,7 @@ export default function OnboardingProfileScreen() {
       await saveStaffProfessionalProfile();
 
       patchForm({ lastCompletedStep: "staff_career" });
-      navigateToStep("staff_player_career_toggle");
+      navigateToStep("staff_previous_experiences");
     } catch (error) {
       const message =
         error instanceof Error
@@ -1756,13 +1773,62 @@ export default function OnboardingProfileScreen() {
     }
   }
 
-  function handleContinueFromStaffPlayerCareerToggle() {
-    patchForm({ lastCompletedStep: "staff_player_career_toggle" });
+  /**
+   * §AJ: se l'utente sceglie entrambe le carriere pregresse si percorre prima
+   * l'Allenatore e poi il Calciatore, senza tornare all'inizio.
+   */
+  function handleContinueFromStaffPreviousExperiences() {
+    const nextErrors = validateOnboardingStep("staff_previous_experiences", form);
 
-    if (staffHasPlayedFootball) {
-      navigateToStep("staff_player_career");
-    } else {
-      goToCompletion("staff_player_career_toggle");
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    setValidationErrors({});
+    patchForm({ lastCompletedStep: "staff_previous_experiences" });
+
+    const nextStep = getNextStaffSubFlowStep(readStaffPreviousExperiences(form));
+
+    if (nextStep) {
+      navigateToStep(nextStep);
+      return;
+    }
+
+    finishStaffOnboarding("staff_previous_experiences");
+  }
+
+  async function handleContinueFromStaffCoachCareer() {
+    if (!session?.user) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await saveStaffProfessionalProfile({ includeCoachCareer: true });
+
+      patchForm({ lastCompletedStep: "staff_coach_career" });
+
+      const nextStep = getNextStaffSubFlowStep(
+        readStaffPreviousExperiences(form),
+        ["coach"],
+      );
+
+      if (nextStep) {
+        navigateToStep(nextStep);
+        return;
+      }
+
+      finishStaffOnboarding("staff_coach_career");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore inatteso nel completamento profilo.";
+      Alert.alert("Profilo non salvato", message);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -1774,10 +1840,13 @@ export default function OnboardingProfileScreen() {
     try {
       setIsSubmitting(true);
 
-      await saveStaffProfessionalProfile({ includePlayerCareer: true });
+      await saveStaffProfessionalProfile({
+        includeCoachCareer: staffHasCoachedFootball,
+        includePlayerCareer: true,
+      });
 
       patchForm({ lastCompletedStep: "staff_player_career" });
-      goToCompletion("staff_player_career");
+      finishStaffOnboarding("staff_player_career");
     } catch (error) {
       const message =
         error instanceof Error
@@ -1787,6 +1856,14 @@ export default function OnboardingProfileScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function finishStaffOnboarding(lastStep: OnboardingStep) {
+    trackStaffOnboardingEvent({
+      experienceCount: staffCareerEntries.length,
+      name: "onboarding_staff_completed",
+    });
+    goToCompletion(lastStep);
   }
 
   // -----------------------------------------------------------------------
@@ -2577,6 +2654,75 @@ export default function OnboardingProfileScreen() {
           onDomicileSelect={handleDomicileSelect}
           onDomicileToggle={handleDomicileToggle}
           onFinish={handleFinishCoachExtra}
+          onFormattedNameBlur={handleFormattedNameBlur}
+          onNationalityChange={handleNationalitySelect}
+          onPatchForm={patchForm}
+          onPickPhotoFromLibrary={() =>
+            handleMediaUpload({
+              field: "avatar",
+              folder: "avatars",
+              mediaTypes: ["images"],
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          onRegisterBack={registerStepBackOverride}
+          onRemovePhoto={() => updateValue("avatarUrl", "")}
+          onResidenceChange={handleResidenceChange}
+          onResidenceSelect={handleResidenceSelect}
+          onTakePhoto={() =>
+            handleCameraCapture({
+              field: "avatar",
+              folder: "avatars",
+              onUploaded: (items) =>
+                updateValue("avatarUrl", items[0]?.url ?? ""),
+            })
+          }
+          photoPreviewUrl={
+            avatarUrl ? withDefaultProfileAvatar(avatarUrl) : null
+          }
+          searchTeams={searchTeams}
+          step={step}
+          validationErrors={validationErrors}
+        />
+      </>
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // Staff tecnico: stesse pagine intere del Master (REV-ONB-04). Schermate
+  // comuni e disponibilità dal Calciatore, esperienze dall'Allenatore.
+  // ---------------------------------------------------------------------
+  if (isStaffMasterStep(step, role)) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            fullScreenGestureEnabled: false,
+            gestureEnabled: false,
+            headerShown: false,
+          }}
+        />
+        <StaffOnboardingFlow
+          counter={counter}
+          form={form}
+          isBusy={isBusy}
+          nationalityCategory={nationalityCategory}
+          onBack={handleBackNavigation}
+          onClearValidationErrors={clearValidationErrors}
+          onContinueFromAvailability={handleContinueFromStaffAvailability}
+          onContinueFromCareer={handleSaveStaffCareer}
+          onContinueFromCoachCareer={handleContinueFromStaffCoachCareer}
+          onContinueFromPersonalData={handleContinueFromBase}
+          onContinueFromPhoto={handleContinueFromPhoto}
+          onContinueFromPlayerCareer={handleContinueFromStaffPlayerCareer}
+          onContinueFromPreviousExperiences={
+            handleContinueFromStaffPreviousExperiences
+          }
+          onContinueFromRoles={handleContinueFromStaffRole}
+          onDomicileChange={handleDomicileChange}
+          onDomicileSelect={handleDomicileSelect}
+          onDomicileToggle={handleDomicileToggle}
           onFormattedNameBlur={handleFormattedNameBlur}
           onNationalityChange={handleNationalitySelect}
           onPatchForm={patchForm}
@@ -3582,84 +3728,6 @@ export default function OnboardingProfileScreen() {
           />
         ) : null}
 
-        {step === "staff_role" ? (
-          <View style={styles.stepContainer}>
-            <StaffRoleStep
-              certifications={certifications}
-              experienceSummary={experienceSummary}
-              primaryRole={staffPrimaryRole}
-              selectedRoles={staffRoles}
-              onUpdate={(patch) => patchForm(patch)}
-              validationErrors={validationErrors}
-            />
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromStaffRole}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {step === "staff_availability" ? (
-          <StaffAvailabilityStep
-            availabilityType={staffAvailabilityType}
-            availableFrom={staffAvailableFrom}
-            isBusy={isBusy}
-            onContinue={handleContinueFromStaffAvailability}
-            onUpdate={(patch) => patchForm(patch)}
-            openToWork={openToWork}
-            preferredCategories={fromDelimitedString(staffPreferredCategories)}
-            preferredProvinces={fromDelimitedString(staffPreferredProvinces)}
-            preferredRegions={fromDelimitedString(staffPreferredRegions)}
-            validationErrors={validationErrors}
-          />
-        ) : null}
-
-        {step === "staff_career" ? (
-          <CoachCareerStep
-            addButtonLabel="Aggiungi esperienza"
-            defaultRole={staffPrimaryRole}
-            entries={staffCareerEntries as CoachCareerEntry[]}
-            emptyMessage="Aggiungi le tue esperienze nello staff tecnico. Puoi inserirne anche più di una per la stessa squadra."
-            isBusy={isBusy}
-            onContinue={handleSaveStaffCareer}
-            onSkip={handleSaveStaffCareer}
-            onUpdateEntries={(entries) =>
-              patchForm({ staffCareerEntries: entries })
-            }
-            roleOptions={staffExperienceRoleOptions}
-            searchTeams={searchTeams}
-            selectorSubtitle="Scegli come vuoi inserire questa esperienza."
-            selectorTitle="Aggiungi esperienza"
-            subtitle="Aggiungi le tue esperienze da staff tecnico per completare il profilo."
-            title="Esperienze staff tecnico"
-            typeOptions={staffExperienceTypeOptions}
-          />
-        ) : null}
-
-        {step === "staff_player_career_toggle" ? (
-          <PlayerCareerToggleStep
-            hasPlayedFootball={staffHasPlayedFootball}
-            isBusy={isBusy}
-            onContinue={handleContinueFromStaffPlayerCareerToggle}
-            onUpdate={(value) => patchForm({ staffHasPlayedFootball: value })}
-          />
-        ) : null}
-
-        {step === "staff_player_career" ? (
-          <CareerExperienceStep
-            careerEntries={staffPlayerCareerEntries}
-            isBusy={isBusy}
-            onSaveAndContinue={handleContinueFromStaffPlayerCareer}
-            onSkip={handleContinueFromStaffPlayerCareer}
-            onUpdateEntries={(entries) =>
-              patchForm({ staffPlayerCareerEntries: entries })
-            }
-            searchTeams={searchTeams}
-          />
-        ) : null}
-
         {/* ============================================================= */}
         {/* STEP: Club Representative (Referente società)                  */}
         {/* ============================================================= */}
@@ -4245,7 +4313,7 @@ export default function OnboardingProfileScreen() {
             showDescription
             subtitle="Aggiungi le tue esperienze come dirigente per completare il profilo."
             title="Carriera dirigenziale"
-            typeOptions={staffExperienceTypeOptions}
+            typeOptions={EXPERIENCE_TYPE_OPTIONS}
           />
         ) : null}
 

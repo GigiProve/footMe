@@ -11,7 +11,10 @@ import {
   onboardingRadius,
   onboardingSpacing,
 } from "../ui/onboarding-tokens";
-import type { CoachCareerEntry } from "./coach-career-types";
+import type {
+  CoachCareerEntry,
+  CoachExperienceType,
+} from "./coach-career-types";
 import { CoachExperienceForm } from "./CoachExperienceForm";
 import { CoachExperienceRow } from "./CoachExperienceRow";
 import { CoachExperienceTypeSelector } from "./CoachExperienceTypeSelector";
@@ -23,7 +26,45 @@ const TYPE_BADGE_LABELS = {
   SINGLE_SEASON: "Singola stagione",
 } as const;
 
+/**
+ * Testi che cambiano da un profilo professionale all'altro.
+ *
+ * Solo copy e tassonomia: il flusso, l'editor e il riepilogo restano gli
+ * stessi per l'Allenatore e per lo Staff tecnico (REV-ONB-04 §P, §Q).
+ */
+export type ExperiencesStepCopy = {
+  addButtonLabel: string;
+  emptyDescription: string;
+  emptyTitle: string;
+  listSubtitle: string;
+  listTitle: string;
+  seasonRoleDescription: string;
+  summarySubtitle: string;
+  summaryTitle: string;
+  typeSelectorSubtitle: string;
+  typeSelectorTitle: string;
+};
+
+const COACH_COPY: ExperiencesStepCopy = {
+  addButtonLabel: "Aggiungi esperienza",
+  emptyDescription: "Aggiungi la tua prima esperienza per completare il profilo.",
+  emptyTitle: "Nessuna esperienza aggiunta",
+  listSubtitle: "Aggiungi le tappe della tua carriera in panchina.",
+  listTitle: "Carriera da allenatore",
+  seasonRoleDescription:
+    "Un allenatore può avere ruoli diversi nelle diverse stagioni.",
+  summarySubtitle: "Riepilogo delle esperienze aggiunte.",
+  summaryTitle: "Le tue esperienze da allenatore",
+  typeSelectorSubtitle:
+    "Scegli come vuoi inserire le tue esperienze da allenatore.",
+  typeSelectorTitle: "Aggiungi esperienza",
+};
+
 type CoachExperiencesStepProps = {
+  /** Ammette esperienze senza data di fine (§Z). */
+  allowOngoing?: boolean;
+  /** Copy e tassonomia del profilo che usa lo step. Default: Allenatore. */
+  copy?: ExperiencesStepCopy;
   currentStep: number;
   /** Ruolo principale del profilo: default delle nuove esperienze (§T). */
   defaultRole: string;
@@ -31,10 +72,16 @@ type CoachExperiencesStepProps = {
   isBusy: boolean;
   onBack: () => void;
   onContinue: () => void;
+  onExperienceAddStarted?: () => void;
+  onExperienceSaved?: (isEditing: boolean) => void;
+  onExperienceTypeSelected?: (type: CoachExperienceType) => void;
   onRegisterBack?: (handler: (() => void) | null) => void;
   onUpdateEntries: (entries: CoachCareerEntry[]) => void;
+  /** Ruoli selezionabili nell'esperienza. Default: ruoli tecnici allenatore. */
+  roleOptions?: { label: string; value: string }[];
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
   stepLabel: string;
+  testIDPrefix?: string;
   totalSteps: number;
 };
 
@@ -46,16 +93,23 @@ type CoachExperiencesStepProps = {
  * ancora esperienze prosegue con Continua (§AQ).
  */
 export function CoachExperiencesStep({
+  allowOngoing = false,
+  copy = COACH_COPY,
   currentStep,
   defaultRole,
   entries,
   isBusy,
   onBack,
   onContinue,
+  onExperienceAddStarted,
+  onExperienceSaved,
+  onExperienceTypeSelected,
   onRegisterBack,
   onUpdateEntries,
+  roleOptions,
   searchTeams,
   stepLabel,
+  testIDPrefix = "coach",
   totalSteps,
 }: CoachExperiencesStepProps) {
   const flow = useCoachExperienceFlow({
@@ -84,12 +138,17 @@ export function CoachExperiencesStep({
         currentStep={currentStep}
         onBack={flow.cancel}
         stepLabel={stepLabel}
-        subtitle="Scegli come vuoi inserire le tue esperienze da allenatore."
-        testID="coach-experience-type-screen"
-        title="Aggiungi esperienza"
+        subtitle={copy.typeSelectorSubtitle}
+        testID={`${testIDPrefix}-experience-type-screen`}
+        title={copy.typeSelectorTitle}
         totalSteps={totalSteps}
       >
-        <CoachExperienceTypeSelector onSelect={flow.selectType} />
+        <CoachExperienceTypeSelector
+          onSelect={(type) => {
+            onExperienceTypeSelected?.(type);
+            flow.selectType(type);
+          }}
+        />
       </OnboardingPage>
     );
   }
@@ -107,7 +166,7 @@ export function CoachExperiencesStep({
             ? "Inserisci i dati per subentri, esoneri o incarichi brevi."
             : "Inserisci i dettagli dell'esperienza."
         }
-        testID="coach-experience-form-screen"
+        testID={`${testIDPrefix}-experience-form-screen`}
         title={isEditing ? "Modifica esperienza" : "Dettagli esperienza"}
         totalSteps={totalSteps}
       >
@@ -118,12 +177,18 @@ export function CoachExperiencesStep({
         </View>
 
         <CoachExperienceForm
+          allowOngoing={allowOngoing}
           entry={flow.screen.entry}
           existingEntries={flow.entries}
           isEditing={isEditing}
           onCancel={flow.cancel}
-          onSave={flow.save}
+          onSave={(saved) => {
+            onExperienceSaved?.(isEditing);
+            flow.save(saved);
+          }}
+          roleOptions={roleOptions}
           searchTeams={searchTeams}
+          seasonRoleDescription={copy.seasonRoleDescription}
         />
       </OnboardingPage>
     );
@@ -136,19 +201,13 @@ export function CoachExperiencesStep({
         onPrimaryPress: onContinue,
         primaryLabel: "Continua",
         primaryLoading: isBusy,
-        primaryTestID: "coach-career-continue",
+        primaryTestID: `${testIDPrefix}-career-continue`,
       }}
       onBack={onBack}
       stepLabel={stepLabel}
-      subtitle={
-        hasEntries
-          ? "Riepilogo delle esperienze aggiunte."
-          : "Aggiungi le tappe della tua carriera in panchina."
-      }
-      testID="coach-career-step"
-      title={
-        hasEntries ? "Le tue esperienze da allenatore" : "Carriera da allenatore"
-      }
+      subtitle={hasEntries ? copy.summarySubtitle : copy.listSubtitle}
+      testID={`${testIDPrefix}-career-step`}
+      title={hasEntries ? copy.summaryTitle : copy.listTitle}
       totalSteps={totalSteps}
     >
       {hasEntries ? (
@@ -159,26 +218,29 @@ export function CoachExperiencesStep({
               key={entry.id}
               onEdit={() => flow.edit(index)}
               onRemove={() => flow.remove(index)}
-              testID={`coach-career-row-${entry.id}`}
+              testID={`${testIDPrefix}-career-row-${entry.id}`}
             />
           ))}
         </View>
       ) : (
         <OnboardingEmptyState
-          description="Aggiungi la tua prima esperienza per completare il profilo."
-          testID="coach-career-empty-state"
-          title="Nessuna esperienza aggiunta"
+          description={copy.emptyDescription}
+          testID={`${testIDPrefix}-career-empty-state`}
+          title={copy.emptyTitle}
         />
       )}
 
       <Button
         fullWidth
-        label="Aggiungi esperienza"
+        label={copy.addButtonLabel}
         leftIcon={<Ionicons color={colors.accent} name="add" size={18} />}
-        onPress={flow.startAdding}
+        onPress={() => {
+          onExperienceAddStarted?.();
+          flow.startAdding();
+        }}
         size="md"
         style={styles.addButton}
-        testID="coach-career-add-experience"
+        testID={`${testIDPrefix}-career-add-experience`}
         variant="secondary"
       />
     </OnboardingPage>

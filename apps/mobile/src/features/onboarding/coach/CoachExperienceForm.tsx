@@ -37,6 +37,11 @@ import {
 } from "./coach-career-utils";
 
 type CoachExperienceFormProps = {
+  /**
+   * Ammette un'esperienza senza data di fine (§Z). Il pattern è del Master;
+   * decide il flusso se offrirlo: lo Staff sì, l'Allenatore no.
+   */
+  allowOngoing?: boolean;
   categoryLabel?: string;
   categoryPlaceholder?: string;
   descriptionLabel?: string;
@@ -50,6 +55,8 @@ type CoachExperienceFormProps = {
   roleOptions?: { label: string; value: string }[];
   rolePlaceholder?: string;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  /** Copy della sezione "Ruolo per stagione": cambia da un profilo all'altro. */
+  seasonRoleDescription?: string;
   showDescription?: boolean;
   teamLabel?: string;
   teamPlaceholder?: string;
@@ -134,6 +141,7 @@ function SeasonRoleRow({
  *   mentre il ruolo può cambiare stagione per stagione (§S, §U).
  */
 export function CoachExperienceForm({
+  allowOngoing = false,
   categoryLabel = "Categoria",
   categoryPlaceholder = "Seleziona categoria",
   descriptionLabel = "Attività svolte",
@@ -147,6 +155,7 @@ export function CoachExperienceForm({
   roleOptions = COACH_ROLE_OPTIONS,
   rolePlaceholder = "Seleziona ruolo",
   searchTeams,
+  seasonRoleDescription = "Un allenatore può avere ruoli diversi nelle diverse stagioni.",
   showDescription = false,
   teamLabel = "Squadra",
   teamPlaceholder = "Cerca la squadra",
@@ -154,6 +163,16 @@ export function CoachExperienceForm({
 }: CoachExperienceFormProps) {
   const [form, setForm] = useState<CoachCareerEntry>(entry);
   const [errors, setErrors] = useState<FormErrors>({});
+  /**
+   * §Z: "nessuna data di fine" da solo è ambiguo — può voler dire "non l'ho
+   * ancora scelta". Lo stato esplicito distingue i due casi.
+   */
+  const [isOngoing, setIsOngoing] = useState(
+    allowOngoing &&
+      entry.type === "CUSTOM_PERIOD" &&
+      Boolean(entry.period?.startYear) &&
+      !entry.period?.endYear,
+  );
 
   const occupiedSeasons = useMemo(
     () => getOccupiedCoachSeasonLabels(existingEntries, entry.id),
@@ -325,11 +344,12 @@ export function CoachExperienceForm({
         nextErrors.startDate = "Indica il mese e l'anno di inizio.";
       }
 
-      if (!endValue) {
+      // §Z: una collaborazione ancora attiva non ha una data di fine.
+      if (!endValue && !isOngoing) {
         nextErrors.endDate = "Indica il mese e l'anno di fine.";
       }
 
-      // §Z: la data finale non può precedere quella iniziale.
+      // §BD: la data finale non può precedere quella iniziale.
       if (startValue && endValue && endValue < startValue) {
         nextErrors.endDate =
           "La data finale deve essere successiva alla data iniziale.";
@@ -457,7 +477,19 @@ export function CoachExperienceForm({
               endPlaceholder="Mese e anno di fine"
               endTestID="coach-period-end"
               endValue={endValue}
+              isCurrent={isOngoing}
               mode="monthYear"
+              onCurrentChange={
+                allowOngoing
+                  ? (value) => {
+                      setIsOngoing(value);
+
+                      if (value) {
+                        handlePeriodChange({ endMonth: "", endYear: "" });
+                      }
+                    }
+                  : undefined
+              }
               onEndChange={(value) => {
                 const { month, year } = coachPeriodFromDateValue(value);
 
@@ -496,7 +528,7 @@ export function CoachExperienceForm({
 
       {roleSeasons.length > 0 ? (
         <OnboardingSection
-          description="Un allenatore può avere ruoli diversi nelle diverse stagioni."
+          description={seasonRoleDescription}
           title="Ruolo per stagione"
         >
           <View style={styles.seasonList} testID="coach-season-roles">

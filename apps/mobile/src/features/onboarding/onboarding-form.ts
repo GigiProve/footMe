@@ -56,6 +56,8 @@ export type OnboardingStep =
   | "staff_role"
   | "staff_availability"
   | "staff_career"
+  | "staff_previous_experiences"
+  | "staff_coach_career"
   | "staff_player_career_toggle"
   | "staff_player_career"
   | "player_career_toggle"
@@ -209,6 +211,11 @@ export type OnboardingFormState = {
   staffAvailabilityType: AvailabilityType;
   staffAvailableFrom: string;
   staffCareerEntries: CoachCareerEntry[];
+  /** Carriera da allenatore dichiarata come esperienza precedente (§AH). */
+  staffCoachCareerEntries: CoachCareerEntry[];
+  staffHasCoachedFootball: boolean;
+  /** "Nessuna esperienza aggiuntiva": una risposta esplicita, non un default (§AG). */
+  staffHasNoPreviousExperience: boolean;
   staffHasPlayedFootball: boolean;
   staffPlayerCareerEntries: PlayerExperienceForm[];
   staffPrimaryRole: string;
@@ -449,7 +456,8 @@ const staffStepOrder: OnboardingStep[] = [
   "staff_role",
   "staff_availability",
   "staff_career",
-  "staff_player_career_toggle",
+  "staff_previous_experiences",
+  "staff_coach_career",
   "staff_player_career",
   "complete",
 ];
@@ -525,7 +533,7 @@ const staffVisibleSteps: OnboardingVisibleStep[] = [
     step: "photo",
   },
   {
-    description: "Seleziona i tuoi ruoli nello staff",
+    description: "Seleziona i ruoli che hai ricoperto nello staff",
     index: 4,
     label: "Ruoli",
     step: "staff_role",
@@ -542,11 +550,15 @@ const staffVisibleSteps: OnboardingVisibleStep[] = [
     label: "Esperienze",
     step: "staff_career",
   },
+  /**
+   * §C: i sotto-flussi Allenatore e Calciatore sono opzionali e condividono
+   * questo passo nel contatore, che resta così coerente per tutti i percorsi.
+   */
   {
-    description: "Carriera in campo",
+    description: "Altre esperienze maturate nel calcio",
     index: 7,
-    label: "Giocatore",
-    step: "staff_player_career_toggle",
+    label: "Precedenti",
+    step: "staff_previous_experiences",
   },
 ];
 
@@ -880,6 +892,9 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   staffAvailabilityType: "ITALY",
   staffAvailableFrom: "",
   staffCareerEntries: [],
+  staffCoachCareerEntries: [],
+  staffHasCoachedFootball: false,
+  staffHasNoPreviousExperience: false,
   staffHasPlayedFootball: false,
   staffPlayerCareerEntries: [],
   staffPrimaryRole: "",
@@ -921,6 +936,8 @@ function migrateLegacyStep(step: OnboardingStep): OnboardingStep {
   if (step === "decision") return "base";
   if (step === "details") return "technical";
   if (step === "club") return "club_representative";
+  // REV-ONB-04: il bivio "hai giocato?" diventa la multi-selezione §AE.
+  if (step === "staff_player_career_toggle") return "staff_previous_experiences";
   return step;
 }
 
@@ -1145,6 +1162,14 @@ export function normalizeOnboardingDraft(
           seasonDetails: e.seasonDetails ?? {},
         }))
       : defaultOnboardingFormState.staffCareerEntries,
+    staffCoachCareerEntries: Array.isArray(value.staffCoachCareerEntries)
+      ? (value.staffCoachCareerEntries as CoachCareerEntry[]).map((e) => ({
+          ...e,
+          seasonDetails: e.seasonDetails ?? {},
+        }))
+      : defaultOnboardingFormState.staffCoachCareerEntries,
+    staffHasCoachedFootball: value.staffHasCoachedFootball === true,
+    staffHasNoPreviousExperience: value.staffHasNoPreviousExperience === true,
     staffHasPlayedFootball: value.staffHasPlayedFootball === true,
     staffPlayerCareerEntries: Array.isArray(value.staffPlayerCareerEntries)
       ? value.staffPlayerCareerEntries
@@ -1284,6 +1309,7 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
     "agent_availability", "agent_verification", "agent_extra",
     "club_representative", "club_data", "club_youth", "club_profile",
     "coach_role", "coach_availability", "coach_career", "staff_role", "staff_availability", "staff_career",
+    "staff_previous_experiences", "staff_coach_career",
     "staff_player_career_toggle", "staff_player_career",
     "player_career_toggle", "player_career", "coach_extra",
     "director_roles", "director_responsibilities", "director_categories",
@@ -1308,8 +1334,16 @@ export function getOnboardingStepIndex(step: OnboardingStep, role: AppRole | "" 
     comparableStep = "player_career_toggle";
   }
 
-  if (role === "staff" && effectiveStep === "staff_player_career") {
-    comparableStep = "staff_player_career_toggle";
+  /**
+   * §C: i due sotto-flussi opzionali condividono il passo "Esperienze
+   * precedenti", così il contatore non cambia lunghezza a metà navigazione.
+   */
+  if (
+    role === "staff" &&
+    (effectiveStep === "staff_coach_career" ||
+      effectiveStep === "staff_player_career")
+  ) {
+    comparableStep = "staff_previous_experiences";
   }
 
   if (
@@ -1385,10 +1419,20 @@ export function getPreviousOnboardingStep(
     if (role === "coach") return "coach_extra";
     if (role === "fan") return "fan_interests";
     if (role === "media") return "media_collaborations";
+    /**
+     * §AJ, §AK: il ritorno indietro deve rientrare nell'ultimo sotto-flusso
+     * effettivamente percorso, non in uno che l'utente non ha mai aperto.
+     */
     if (role === "staff") {
-      return _lastCompletedStep === "staff_player_career"
-        ? "staff_player_career"
-        : "staff_player_career_toggle";
+      if (_lastCompletedStep === "staff_player_career") {
+        return "staff_player_career";
+      }
+
+      if (_lastCompletedStep === "staff_coach_career") {
+        return "staff_coach_career";
+      }
+
+      return "staff_previous_experiences";
     }
     if (role === "director") return "director_extra";
     return "experience";
@@ -1398,6 +1442,12 @@ export function getPreviousOnboardingStep(
     return _lastCompletedStep === "agent_player_career"
       ? "agent_player_career"
       : "agent_player_career_toggle";
+  }
+
+  if (role === "staff" && effectiveStep === "staff_player_career") {
+    return _lastCompletedStep === "staff_coach_career"
+      ? "staff_coach_career"
+      : "staff_previous_experiences";
   }
 
   if (role === "director" && effectiveStep === "director_club_type") {
@@ -1518,6 +1568,10 @@ export function validateOnboardingStep(
 
   if (step === "staff_availability") {
     return mapStaffAvailabilityValidationError(form);
+  }
+
+  if (step === "staff_previous_experiences") {
+    return mapStaffPreviousExperiencesValidationError(form);
   }
 
   if (step === "director_roles") {
@@ -1856,6 +1910,13 @@ function mapStaffRoleValidationError(form: OnboardingFormState): OnboardingValid
   return {};
 }
 
+/**
+ * §H–§O: con il toggle spento non si chiede nulla. Con il toggle acceso
+ * l'unico obbligo è che la modalità scelta sia completa: "Ovunque in Italia"
+ * lo è già (§K), le altre due vogliono almeno una voce.
+ *
+ * "Disponibile da" e le categorie di interesse restano dati opzionali (§G, §O).
+ */
 function mapStaffAvailabilityValidationError(
   form: OnboardingFormState,
 ): OnboardingValidationErrors {
@@ -1863,10 +1924,6 @@ function mapStaffAvailabilityValidationError(
 
   if (!form.openToWork) {
     return errors;
-  }
-
-  if (!form.staffAvailableFrom) {
-    errors.staffAvailableFrom = "Seleziona da quando sei disponibile.";
   }
 
   if (
@@ -1883,11 +1940,24 @@ function mapStaffAvailabilityValidationError(
     errors.staffPreferredProvinces = "Seleziona almeno una provincia.";
   }
 
-  if (fromDelimitedString(form.staffPreferredCategories).length === 0) {
-    errors.staffPreferredCategories = "Seleziona almeno una categoria.";
+  return errors;
+}
+
+/** §AE–§AG: una risposta serve, anche quando è "nessuna esperienza". */
+function mapStaffPreviousExperiencesValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (
+    form.staffHasCoachedFootball ||
+    form.staffHasPlayedFootball ||
+    form.staffHasNoPreviousExperience
+  ) {
+    return {};
   }
 
-  return errors;
+  return {
+    staffPreviousExperiences: "Seleziona almeno un'opzione per continuare.",
+  };
 }
 
 function mapBaseStepValidationError(form: OnboardingFormState): OnboardingValidationErrors {

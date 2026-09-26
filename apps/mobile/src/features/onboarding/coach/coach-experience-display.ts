@@ -17,6 +17,11 @@ export function formatCoachExperiencePeriod(entry: CoachCareerEntry): string {
     const start = startMonth ? `${startMonth} ${startYear}` : startYear;
     const end = endMonth ? `${endMonth} ${endYear}` : endYear;
 
+    if (start && !end) {
+      // §Z: l'esperienza è ancora in corso, non è un dato mancante.
+      return `Da ${start} a oggi`;
+    }
+
     return start && end ? `Da ${start} a ${end}` : start || end;
   }
 

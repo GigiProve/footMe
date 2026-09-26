@@ -112,7 +112,8 @@ export function MultiSeasonSelector({
             }
           }}
           options={olderOptions}
-          placeholder="Seleziona una stagione precedente"
+          // REV-ONB-04 §T: copy definitiva, condivisa da tutti i flussi.
+          placeholder="Seleziona stagioni"
           searchable
           sheetTitle="Stagioni precedenti"
           value=""

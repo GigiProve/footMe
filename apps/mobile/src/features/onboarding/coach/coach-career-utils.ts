@@ -88,10 +88,23 @@ function getEntrySortYears(entry: CoachCareerEntry): {
   if (entry.period) {
     const startYear = Number.parseInt(entry.period.startYear, 10);
     const endYear = Number.parseInt(entry.period.endYear, 10);
+    const hasStart = !Number.isNaN(startYear);
+
+    /**
+     * Un periodo iniziato e mai chiuso è un'esperienza in corso: nel riepilogo
+     * viene prima di tutte le altre (REV-ONB-04 §Z, §AD). Senza data di inizio
+     * non c'è nulla da ordinare e la riga scende in fondo.
+     */
+    if (hasStart && Number.isNaN(endYear)) {
+      return {
+        latestSeasonStartYear: Number.MAX_SAFE_INTEGER,
+        earliestSeasonStartYear: startYear,
+      };
+    }
 
     return {
       latestSeasonStartYear: Number.isNaN(endYear) ? 0 : endYear,
-      earliestSeasonStartYear: Number.isNaN(startYear) ? 0 : startYear,
+      earliestSeasonStartYear: hasStart ? startYear : 0,
     };
   }
 
