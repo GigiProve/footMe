@@ -30,6 +30,12 @@ import {
   type FanFootballType,
 } from "./community/fan-taxonomy";
 import {
+  coerceMediaCreatorType,
+  normalizeMediaContentTypes,
+  normalizeMediaScopes,
+  type MediaCreatorType,
+} from "./community/media-taxonomy";
+import {
   type ClubStructure,
   clubStructureHasFirstTeam,
   clubStructureHasYouth,
@@ -56,12 +62,15 @@ export type OnboardingStep =
   | "experience"
   | "fan_football_types"
   | "fan_territories"
-  | "media_basic"
-  | "media_photo"
   | "media_entity"
+  | "media_type"
+  | "media_logo"
   | "media_content"
   | "media_focus"
   | "media_channels"
+  // REV-ONB-09: passi Media rimossi, mantenuti per la migrazione bozze (§24)
+  | "media_basic"
+  | "media_photo"
   | "media_collaborations"
   | "agent_professional"
   | "agent_qualification"
@@ -250,9 +259,11 @@ export type OnboardingFormState = {
   fanGeoScope: AvailabilityType;
   fanProvinces: string[];
   fanRegions: string[];
-  mediaAffiliationName: string;
-  mediaAffiliationType: string;
   mediaContentTypes: string[];
+  /** REV-ONB-09 §13: categoria strutturata, mai stringa libera. */
+  mediaCreatorType: MediaCreatorType | "";
+  /** §14: usato solo finché la tipologia scelta è "Altro". */
+  mediaCreatorTypeOther: string;
   mediaEntityDescription: string;
   mediaEntityName: string;
   mediaFocusAreas: string[];
@@ -547,16 +558,25 @@ const fanStepOrder: OnboardingStep[] = [
   "complete",
 ];
 
+/**
+ * Percorso del Media / Creator dopo REV-ONB-09 §3.
+ *
+ * Identità e foto sono i passi comuni `base` e `photo`; il progetto si
+ * qualifica in quattro schermate (pagina, tipologia, immagine, contenuti),
+ * l'ambito e i canali chiudono. "Collaborazioni e riferimenti" non esiste più
+ * (§24): non è nascosto né saltato, è stato rimosso dal percorso.
+ */
 const mediaStepOrder: OnboardingStep[] = [
   "role",
   "community_profile_type",
-  "media_basic",
-  "media_photo",
+  "base",
+  "photo",
   "media_entity",
+  "media_type",
+  "media_logo",
   "media_content",
   "media_focus",
   "media_channels",
-  "media_collaborations",
   "complete",
 ];
 
@@ -734,54 +754,66 @@ const fanVisibleSteps: OnboardingVisibleStep[] = [
   },
 ];
 
+/**
+ * REV-ONB-09 §4: il contatore segue il percorso reale. Otto passi, nessun
+ * salto e nessun buco lasciato dallo step rimosso — l'immagine del progetto
+ * ne occupa uno proprio perché in fondo alla schermata della pagina risultava
+ * compressa (§15, §31).
+ */
 const mediaVisibleSteps: OnboardingVisibleStep[] = [
   {
-    description: "Scegli tra Tifoso e Media / Creator",
+    description: "Scegli tra Tifoso e Media/Creator",
     index: 1,
     label: "Percorso",
     step: "community_profile_type",
   },
   {
-    description: "Inserisci i dati personali essenziali",
+    description: "Inserisci i tuoi dati personali",
     index: 2,
     label: "Dati",
-    step: "media_basic",
+    step: "base",
   },
   {
     description: "Aggiungi una foto profilo",
     index: 3,
     label: "Foto",
-    step: "media_photo",
+    step: "photo",
   },
   {
-    description: "Configura la tua pagina o realtà editoriale",
+    description: "Presenta la tua pagina o realtà",
     index: 4,
     label: "Pagina",
     step: "media_entity",
   },
   {
-    description: "Definisci i contenuti che produci",
+    description: "Scegli la tipologia che ti rappresenta",
     index: 5,
+    label: "Tipologia",
+    step: "media_type",
+  },
+  {
+    description: "Carica il logo o l'immagine del progetto",
+    index: 6,
+    label: "Immagine",
+    step: "media_logo",
+  },
+  {
+    description: "Definisci i contenuti che produci",
+    index: 7,
     label: "Contenuti",
     step: "media_content",
   },
   {
-    description: "Seleziona l'ambito che segui maggiormente",
-    index: 6,
+    description: "Scegli gli ambiti del calcio che racconti",
+    index: 8,
     label: "Ambito",
     step: "media_focus",
   },
   {
     description: "Collega i tuoi canali social e web",
-    index: 7,
+    index: 9,
     label: "Canali",
     step: "media_channels",
-  },
-  {
-    description: "Aggiungi eventuali collaborazioni e riferimenti",
-    index: 8,
-    label: "Collaborazioni",
-    step: "media_collaborations",
   },
 ];
 
@@ -1034,9 +1066,9 @@ export const defaultOnboardingFormState: OnboardingFormState = {
   fanGeoScope: "ITALY",
   fanProvinces: [],
   fanRegions: [],
-  mediaAffiliationName: "",
-  mediaAffiliationType: "Nessuna",
   mediaContentTypes: [],
+  mediaCreatorType: "",
+  mediaCreatorTypeOther: "",
   mediaEntityDescription: "",
   mediaEntityName: "",
   mediaFacebook: "",
@@ -1152,6 +1184,16 @@ function migrateLegacyStep(step: OnboardingStep): OnboardingStep {
   if (step === "fan_basic") return "base";
   if (step === "fan_photo") return "photo";
   if (step === "fan_interests") return "fan_football_types";
+  /**
+   * REV-ONB-09 §7, §8, §24: anche il Media / Creator usa ora `base` e
+   * `photo`, e "Collaborazioni e riferimenti" non esiste più. Chi aveva una
+   * bozza aperta su una di queste tre schermate rientra dal passo che oggi
+   * raccoglie le stesse informazioni — l'ultimo, per le collaborazioni, è
+   * quello immediatamente precedente allo step rimosso.
+   */
+  if (step === "media_basic") return "base";
+  if (step === "media_photo") return "photo";
+  if (step === "media_collaborations") return "media_channels";
   return step;
 }
 
@@ -1193,8 +1235,17 @@ function deriveLegacyDirectorPreviousRoles(value: {
   return [...new Set(derived)];
 }
 
+/**
+ * Le bozze sono JSON persistito: possono contenere chiavi di flussi passati
+ * che lo stato corrente non dichiara più (REV-ONB-09 §30). Si leggono da qui,
+ * accanto al valore che ricostruiscono, e non rientrano mai nello stato.
+ */
+type LegacyDraftKeys = {
+  mediaAffiliationType?: unknown;
+};
+
 export function normalizeOnboardingDraft(
-  value: Partial<OnboardingFormState> | null | undefined,
+  value: (Partial<OnboardingFormState> & LegacyDraftKeys) | null | undefined,
 ): OnboardingFormState {
   if (!value) {
     return defaultOnboardingFormState;
@@ -1256,17 +1307,23 @@ export function normalizeOnboardingDraft(
     residenceRegion:
       typeof value.residenceRegion === "string" ? value.residenceRegion : defaultOnboardingFormState.residenceRegion,
     role: coerceAppRole(value.role) ?? defaultOnboardingFormState.role,
-    mediaAffiliationName:
-      typeof value.mediaAffiliationName === "string"
-        ? value.mediaAffiliationName
-        : defaultOnboardingFormState.mediaAffiliationName,
-    mediaAffiliationType:
-      typeof value.mediaAffiliationType === "string"
-        ? value.mediaAffiliationType
-        : defaultOnboardingFormState.mediaAffiliationType,
-    mediaContentTypes: Array.isArray(value.mediaContentTypes)
-      ? value.mediaContentTypes.filter((v): v is string => typeof v === "string")
-      : defaultOnboardingFormState.mediaContentTypes,
+    mediaContentTypes: normalizeMediaContentTypes(
+      Array.isArray(value.mediaContentTypes)
+        ? value.mediaContentTypes.filter((v): v is string => typeof v === "string")
+        : defaultOnboardingFormState.mediaContentTypes,
+    ),
+    /**
+     * REV-ONB-09 §30: una bozza nata prima della tipologia strutturata porta
+     * solo il vecchio tipo di collaborazione in testo libero. Rientra sulla
+     * categoria equivalente invece di ripartire da vuota.
+     */
+    mediaCreatorType: coerceMediaCreatorType(
+      value.mediaCreatorType ?? value.mediaAffiliationType,
+    ),
+    mediaCreatorTypeOther:
+      typeof value.mediaCreatorTypeOther === "string"
+        ? value.mediaCreatorTypeOther
+        : defaultOnboardingFormState.mediaCreatorTypeOther,
     mediaEntityDescription:
       typeof value.mediaEntityDescription === "string"
         ? value.mediaEntityDescription
@@ -1279,9 +1336,11 @@ export function normalizeOnboardingDraft(
       typeof value.mediaFacebook === "string"
         ? value.mediaFacebook
         : defaultOnboardingFormState.mediaFacebook,
-    mediaFocusAreas: Array.isArray(value.mediaFocusAreas)
-      ? value.mediaFocusAreas.filter((v): v is string => typeof v === "string")
-      : defaultOnboardingFormState.mediaFocusAreas,
+    mediaFocusAreas: normalizeMediaScopes(
+      Array.isArray(value.mediaFocusAreas)
+        ? value.mediaFocusAreas.filter((v): v is string => typeof v === "string")
+        : defaultOnboardingFormState.mediaFocusAreas,
+    ),
     mediaInstagram:
       typeof value.mediaInstagram === "string"
         ? value.mediaInstagram
@@ -1641,8 +1700,9 @@ export function coerceOnboardingStep(value: unknown): OnboardingStep | null {
 
   const allSteps: OnboardingStep[] = [
     "role", "community_profile_type", "base", "photo", "technical", "player_availability", "experience",
-    "media_basic", "media_photo", "media_entity", "media_content", "media_focus",
-    "media_channels", "media_collaborations",
+    "media_entity", "media_type", "media_logo", "media_content", "media_focus",
+    "media_channels",
+    "media_basic", "media_photo", "media_collaborations",
     "agent_professional", "agent_qualification", "agent_portfolio",
     "agent_activity", "agent_previous_experiences", "agent_player_career",
     "agent_contact_preferences", "agent_presentation",
@@ -1779,7 +1839,7 @@ export function getPreviousOnboardingStep(
     if (role === "agent") return "agent_presentation";
     if (role === "coach") return "coach_extra";
     if (role === "fan") return "fan_territories";
-    if (role === "media") return "media_collaborations";
+    if (role === "media") return "media_channels";
     /**
      * §AJ, §AK: il ritorno indietro deve rientrare nell'ultimo sotto-flusso
      * effettivamente percorso, non in uno che l'utente non ha mai aperto.
@@ -1861,10 +1921,6 @@ export function validateOnboardingStep(
     return mapCommunityProfileTypeValidationError(form);
   }
 
-  if (step === "media_basic") {
-    return mapSimpleCommunityBasicValidationError(form);
-  }
-
   if (step === "fan_football_types") {
     return mapFanFootballTypesValidationError(form);
   }
@@ -1877,16 +1933,16 @@ export function validateOnboardingStep(
     return mapMediaEntityValidationError(form);
   }
 
+  if (step === "media_type") {
+    return mapMediaCreatorTypeValidationError(form);
+  }
+
   if (step === "media_content") {
     return mapMediaContentValidationError(form);
   }
 
   if (step === "media_focus") {
     return mapMediaFocusValidationError(form);
-  }
-
-  if (step === "media_collaborations") {
-    return mapMediaCollaborationsValidationError(form);
   }
 
   if (step === "base") {
@@ -1985,7 +2041,12 @@ export function validateOnboardingStep(
     step === "director_staff_career" ||
     step === "director_other_career" ||
     step === "director_extra" ||
-    step === "media_photo" ||
+    /**
+     * REV-ONB-09 §15, §21: l'immagine del progetto e i canali sono
+     * facoltativi. Si attraversano anche vuoti; i canali scritti male si
+     * fermano sul campo, non sullo step.
+     */
+    step === "media_logo" ||
     step === "media_channels"
   ) {
     return {};
@@ -2092,26 +2153,6 @@ function isFutureDate(value: string) {
   return parsed > today.getTime();
 }
 
-function mapSimpleCommunityBasicValidationError(
-  form: OnboardingFormState,
-): OnboardingValidationErrors {
-  const errors: OnboardingValidationErrors = {};
-
-  if (!form.firstName.trim()) {
-    errors.firstName = "Questo campo è obbligatorio";
-  }
-
-  if (!form.lastName.trim()) {
-    errors.lastName = "Questo campo è obbligatorio";
-  }
-
-  if (!form.birthDate.trim()) {
-    errors.birthDate = "Questo campo è obbligatorio";
-  }
-
-  return errors;
-}
-
 /**
  * REV-ONB-08 §N: almeno una tipologia, perché senza non c'è nulla da
  * personalizzare. Non è una domanda di forma: è l'unico dato che decide cosa
@@ -2155,8 +2196,27 @@ function mapMediaEntityValidationError(
   }
 
   return {
-    mediaEntityName: "Inserisci il nome della tua pagina, testata o realtà.",
+    mediaEntityName: "Inserisci il nome della tua pagina o progetto.",
   };
+}
+
+/**
+ * REV-ONB-09 §13, §14: la tipologia è obbligatoria e strutturata. "Altro"
+ * vale solo se accompagnato da una descrizione: senza, resta una categoria
+ * vuota che non dice nulla al resto del prodotto.
+ */
+function mapMediaCreatorTypeValidationError(
+  form: OnboardingFormState,
+): OnboardingValidationErrors {
+  if (!form.mediaCreatorType) {
+    return { mediaCreatorType: "Seleziona una tipologia." };
+  }
+
+  if (form.mediaCreatorType === "other" && !form.mediaCreatorTypeOther.trim()) {
+    return { mediaCreatorTypeOther: "Specifica la tua tipologia." };
+  }
+
+  return {};
 }
 
 function mapMediaContentValidationError(
@@ -2181,22 +2241,6 @@ function mapMediaFocusValidationError(
   return {
     mediaFocusAreas: "Seleziona almeno un ambito principale.",
   };
-}
-
-function mapMediaCollaborationsValidationError(
-  form: OnboardingFormState,
-): OnboardingValidationErrors {
-  if (
-    form.mediaAffiliationType &&
-    form.mediaAffiliationType !== "Nessuna" &&
-    !form.mediaAffiliationName.trim()
-  ) {
-    return {
-      mediaAffiliationName: "Inserisci il nome del riferimento collegato.",
-    };
-  }
-
-  return {};
 }
 
 function isBasicEmailFormat(value: string) {

@@ -256,6 +256,8 @@ function buildCompleteProfile(
       covered_territories: ["Italia"],
       covered_topics: ["Calciomercato", "Interviste", "Giovanili", "Opinioni"],
       content_types: ["Calciomercato", "Nazionale"],
+      creator_type: null,
+      creator_type_other: null,
       editorial_type: "Testata giornalistica / Media sportivo",
       entity_name: "Gazzetta dello Sport",
       focus_areas: ["Serie A", "Serie B"],

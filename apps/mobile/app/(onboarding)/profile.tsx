@@ -94,12 +94,7 @@ import {
   StaffOnboardingFlow,
   trackStaffOnboardingEvent,
 } from "../../src/features/onboarding/staff";
-import {
-  mapStaffRoleToSpecialization,
-  MEDIA_AFFILIATION_TYPE_OPTIONS,
-  MEDIA_CONTENT_TYPE_OPTIONS,
-  MEDIA_FOCUS_AREA_OPTIONS,
-} from "../../src/features/onboarding/onboarding-types";
+import { mapStaffRoleToSpecialization } from "../../src/features/onboarding/onboarding-types";
 import {
   DirectorOnboardingFlow,
   getNextDirectorSubFlowStep,
@@ -108,14 +103,16 @@ import {
   trackDirectorOnboardingEvent,
 } from "../../src/features/onboarding/director";
 import {
-  CommunityBasicInfoStep,
-  CommunityChipGroup,
   CommunityOnboardingFlow,
   isCommunityMasterStep,
-  MediaChannelsStep,
-  MediaCollaborationsStep,
-  MediaEntityStep,
+  isMediaMasterStep,
+  mediaKindFromCreatorType,
+  MediaOnboardingFlow,
   trackFanOnboardingEvent,
+  trackMediaOnboardingEvent,
+  validateMediaChannel,
+  type MediaChannelKey,
+  type MediaCreatorType,
 } from "../../src/features/onboarding/community";
 import {
   DEFAULT_PLAYER_PRIMARY_POSITION,
@@ -163,6 +160,26 @@ const LEGAL_STATUS_OPTIONS: { label: string; value: LegalStatus }[] = [
   { label: "Non ho il permesso di soggiorno", value: "no_permit" },
   { label: "In fase di richiesta", value: "pending_permit" },
 ];
+
+/**
+ * REV-ONB-09 §21: i canali del Media / Creator e il campo che li conserva
+ * nella bozza. La mappa esiste perché lo step li tratta per chiave, non per
+ * nome di campo.
+ */
+const MEDIA_CHANNEL_FIELDS: Record<
+  MediaChannelKey,
+  "mediaFacebook" | "mediaInstagram" | "mediaTikTok" | "mediaWebsite" | "mediaYouTube"
+> = {
+  facebook: "mediaFacebook",
+  instagram: "mediaInstagram",
+  tiktok: "mediaTikTok",
+  website: "mediaWebsite",
+  youtube: "mediaYouTube",
+};
+
+const MEDIA_CHANNEL_KEYS = Object.keys(
+  MEDIA_CHANNEL_FIELDS,
+) as MediaChannelKey[];
 
 function parseOptionalText(value: string) {
   const trimmed = value.trim();
@@ -402,6 +419,14 @@ export default function OnboardingProfileScreen() {
   );
   const [validationErrors, setValidationErrors] =
     useState<OnboardingValidationErrors>({});
+  /**
+   * §23: gli errori dei canali nascono dal blur del singolo campo, non dalla
+   * validazione dello step — che per i canali non ha nulla da dire, essendo
+   * tutti facoltativi. Vivono quindi accanto alla schermata che li produce.
+   */
+  const [mediaChannelErrors, setMediaChannelErrors] = useState<
+    Partial<Record<MediaChannelKey, string>>
+  >({});
 
   const requestedStep = useMemo(() => {
     if (Array.isArray(params.step)) {
@@ -513,18 +538,13 @@ export default function OnboardingProfileScreen() {
     fanGeoScope,
     fanProvinces,
     fanRegions,
-    mediaAffiliationName,
-    mediaAffiliationType,
     mediaContentTypes,
+    mediaCreatorType,
+    mediaCreatorTypeOther,
     mediaEntityDescription,
     mediaEntityName,
-    mediaFacebook,
     mediaFocusAreas,
-    mediaInstagram,
     mediaLogoUrl,
-    mediaTikTok,
-    mediaWebsite,
-    mediaYouTube,
     playerMediaItems,
     preferredCategories,
     preferredFoot,
@@ -1236,30 +1256,17 @@ export default function OnboardingProfileScreen() {
     patchForm({ lastCompletedStep: "community_profile_type" });
 
     /**
-     * REV-ONB-08 §G: dopo questa scelta i due percorsi non si incrociano più.
-     * Il Tifoso prosegue sui passi comuni del Master, il Media / Creator sulla
-     * sua schermata dati, in attesa della task dedicata.
+     * REV-ONB-08 §G, REV-ONB-09 §7: dopo questa scelta i due percorsi non si
+     * incrociano più, ma i primi due passi restano gli stessi — dati
+     * personali e foto sono i componenti comuni del Master per entrambi.
      */
     if (role === "media") {
-      navigateToStep("media_basic");
-      return;
+      trackMediaOnboardingEvent({ name: "onboarding_media_creator_started" });
+    } else {
+      trackFanOnboardingEvent({ name: "fan_onboarding_started" });
     }
 
-    trackFanOnboardingEvent({ name: "fan_onboarding_started" });
     navigateToStep("base");
-  }
-
-  function handleContinueFromCommunityBasic() {
-    const nextErrors = validateOnboardingStep("media_basic", form);
-
-    if (Object.keys(nextErrors).length > 0) {
-      setValidationErrors(nextErrors);
-      return;
-    }
-
-    setValidationErrors({});
-    patchForm({ lastCompletedStep: "media_basic" });
-    navigateToStep("media_photo");
   }
 
   function handleContinueFromFanFootballTypes() {
@@ -2123,6 +2130,26 @@ export default function OnboardingProfileScreen() {
 
     patchForm({ lastCompletedStep: "media_entity" });
     setValidationErrors({});
+    trackMediaOnboardingEvent({ name: "media_project_details_completed" });
+    navigateToStep("media_type");
+  }
+
+  function handleContinueFromMediaCreatorType() {
+    const nextErrors = validateOnboardingStep("media_type", form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      return;
+    }
+
+    patchForm({ lastCompletedStep: "media_type" });
+    setValidationErrors({});
+    navigateToStep("media_logo");
+  }
+
+  function handleContinueFromMediaLogo() {
+    patchForm({ lastCompletedStep: "media_logo" });
+    setValidationErrors({});
     navigateToStep("media_content");
   }
 
@@ -2152,21 +2179,80 @@ export default function OnboardingProfileScreen() {
     navigateToStep("media_channels");
   }
 
-  function handleContinueFromMediaChannels() {
-    patchForm({ lastCompletedStep: "media_channels" });
-    setValidationErrors({});
-    navigateToStep("media_collaborations");
+  /**
+   * REV-ONB-09 §14: cambiando tipologia il testo libero di "Altro" smette di
+   * essere un dato attivo. Viene azzerato alla selezione, non solo nascosto,
+   * così un vecchio valore non riappare tornando indietro.
+   */
+  function handleSelectMediaCreatorType(value: MediaCreatorType) {
+    trackMediaOnboardingEvent({
+      creatorType: value,
+      name: "media_creator_type_selected",
+    });
+    patchForm({
+      mediaCreatorType: value,
+      ...(value === "other" ? {} : { mediaCreatorTypeOther: "" }),
+    });
+    clearValidationErrors(["mediaCreatorType", "mediaCreatorTypeOther"]);
   }
 
-  function handleContinueFromMediaCollaborations() {
-    const nextErrors = validateOnboardingStep("media_collaborations", form);
+  /**
+   * §23: mentre si digita l'errore sparisce e basta. Il verdetto arriva al
+   * blur e al Continua, e non tocca mai il valore scritto.
+   */
+  function handleChangeMediaChannel(key: MediaChannelKey, value: string) {
+    patchForm({ [MEDIA_CHANNEL_FIELDS[key]]: value });
+    setMediaChannelErrors((current) => {
+      if (!current[key]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function handleBlurMediaChannel(key: MediaChannelKey) {
+    const result = validateMediaChannel(key, form[MEDIA_CHANNEL_FIELDS[key]]);
+
+    /** §38: viaggia il tipo di canale, mai l'indirizzo. */
+    if (result.isValid && result.normalized) {
+      trackMediaOnboardingEvent({
+        channel: key,
+        name: "media_external_channel_added",
+      });
+    }
+
+    setMediaChannelErrors((current) => {
+      const next = { ...current };
+
+      if (result.isValid) {
+        delete next[key];
+      } else {
+        next[key] = "Inserisci un link valido.";
+      }
+
+      return next;
+    });
+  }
+
+  function handleContinueFromMediaChannels() {
+    const nextErrors: Partial<Record<MediaChannelKey, string>> = {};
+
+    for (const key of MEDIA_CHANNEL_KEYS) {
+      if (!validateMediaChannel(key, form[MEDIA_CHANNEL_FIELDS[key]]).isValid) {
+        nextErrors[key] = "Inserisci un link valido.";
+      }
+    }
+
+    setMediaChannelErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
-      setValidationErrors(nextErrors);
       return;
     }
 
-    patchForm({ lastCompletedStep: "media_collaborations" });
+    patchForm({ lastCompletedStep: "media_channels" });
     setValidationErrors({});
     handleFinishMediaOnboarding();
   }
@@ -2256,6 +2342,19 @@ export default function OnboardingProfileScreen() {
       return;
     }
 
+    const normalizedChannels = MEDIA_CHANNEL_KEYS.reduce<
+      Record<MediaChannelKey, string>
+    >(
+      (accumulator, key) => {
+        accumulator[key] = validateMediaChannel(
+          key,
+          form[MEDIA_CHANNEL_FIELDS[key]],
+        ).normalized;
+        return accumulator;
+      },
+      { facebook: "", instagram: "", tiktok: "", website: "", youtube: "" },
+    );
+
     try {
       setIsSubmitting(true);
 
@@ -2269,18 +2368,23 @@ export default function OnboardingProfileScreen() {
         directorProfile: null,
         fanProfile: null,
         mediaProfile: {
-          affiliation_name:
-            mediaAffiliationType !== "Nessuna"
-              ? parseOptionalText(mediaAffiliationName)
-              : null,
-          affiliation_type:
-            mediaAffiliationType !== "Nessuna"
-              ? parseOptionalText(mediaAffiliationType)
-              : null,
           content_types: mediaContentTypes,
+          /**
+           * REV-ONB-09 §13, §16, §29: la tipologia viaggia strutturata,
+           * `media_kind` la segue per la ricerca, e il logo del progetto
+           * resta un campo a sé — non sovrascrive mai l'avatar personale.
+           */
+          creator_type: mediaCreatorType || null,
+          creator_type_other:
+            mediaCreatorType === "other"
+              ? parseOptionalText(mediaCreatorTypeOther)
+              : null,
           entity_name: parseOptionalText(mediaEntityName),
           focus_areas: mediaFocusAreas,
           logo_url: parseOptionalText(mediaLogoUrl),
+          media_kind: mediaCreatorType
+            ? mediaKindFromCreatorType(mediaCreatorType)
+            : null,
           short_description: parseOptionalText(mediaEntityDescription),
         },
         playerCareerEntries: [],
@@ -2291,24 +2395,30 @@ export default function OnboardingProfileScreen() {
         profileId: session.user.id,
         role: role as AppRole,
         staffProfile: null,
+        /**
+         * §22: i canali si normalizzano al salvataggio, non mentre si
+         * digita. Un campo vuoto resta vuoto e non viene mostrato.
+         */
         userContacts: {
           email: "",
-          facebook: mediaFacebook,
-          instagram: mediaInstagram,
+          facebook: normalizedChannels.facebook,
+          instagram: normalizedChannels.instagram,
           phone: "",
           showEmail: false,
-          showFacebook: Boolean(mediaFacebook.trim()),
-          showInstagram: Boolean(mediaInstagram.trim()),
-          showTikTok: Boolean(mediaTikTok.trim()),
-          showWebsite: Boolean(mediaWebsite.trim()),
-          showYouTube: Boolean(mediaYouTube.trim()),
-          tiktok: mediaTikTok,
-          website: mediaWebsite,
-          youtube: mediaYouTube,
+          showFacebook: Boolean(normalizedChannels.facebook),
+          showInstagram: Boolean(normalizedChannels.instagram),
+          showTikTok: Boolean(normalizedChannels.tiktok),
+          showWebsite: Boolean(normalizedChannels.website),
+          showYouTube: Boolean(normalizedChannels.youtube),
+          tiktok: normalizedChannels.tiktok,
+          website: normalizedChannels.website,
+          youtube: normalizedChannels.youtube,
         },
       });
 
-      goToCompletion("media_collaborations");
+      trackMediaOnboardingEvent({ name: "media_creator_onboarding_completed" });
+
+      goToCompletion("media_channels");
     } catch (error) {
       const message =
         error instanceof Error
@@ -2660,7 +2770,11 @@ export default function OnboardingProfileScreen() {
     // titolo di benvenuto e nessuna CTA secondaria — niente "Modifica
     // preferenze", niente riepilogo di quanto appena scelto (§AC).
     const isFan = role === "fan";
-    const hasSingleCta = isPlayer || isClub || isAgent || isDirector || isFan;
+    // REV-ONB-09 §25: e lo stesso per il Media / Creator — la conclusione è
+    // quella comune, senza riepilogo di tipologia, contenuti o canali.
+    const isMedia = role === "media";
+    const hasSingleCta =
+      isPlayer || isClub || isAgent || isDirector || isFan || isMedia;
 
     return (
       <>
@@ -2683,7 +2797,9 @@ export default function OnboardingProfileScreen() {
                     ? "Benvenuto su ProLink. Ora puoi costruire la tua rete, seguire i talenti e cogliere le opportunità giuste."
                     : isFan
                       ? "Il tuo profilo è pronto. Inizia a scoprire il calcio che vuoi seguire."
-                      : getCompletionDescription(role)
+                      : isMedia
+                        ? "Benvenuto su ProLink. Ora puoi raccontare il calcio e farti trovare da club, persone e appassionati."
+                        : getCompletionDescription(role)
           }
           onPrimaryPress={() => {
             if (isFan) {
@@ -3216,6 +3332,91 @@ export default function OnboardingProfileScreen() {
     );
   }
 
+  // ---------------------------------------------------------------------
+  // Media / Creator: le schermate che qualificano il progetto (REV-ONB-09).
+  // Identità e foto sono passate di sopra, sulle pagine comuni del Master.
+  // ---------------------------------------------------------------------
+  if (isMediaMasterStep(step, role)) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            fullScreenGestureEnabled: false,
+            gestureEnabled: false,
+            headerShown: false,
+          }}
+        />
+        <MediaOnboardingFlow
+          channelErrors={mediaChannelErrors}
+          counter={counter}
+          form={form}
+          isBusy={isBusy}
+          logoPreviewUrl={mediaLogoUrl || null}
+          onBack={handleBackNavigation}
+          onBlurChannel={handleBlurMediaChannel}
+          onChangeChannel={handleChangeMediaChannel}
+          onClearValidationErrors={clearValidationErrors}
+          onContinueFromChannels={handleContinueFromMediaChannels}
+          onContinueFromContentTypes={handleContinueFromMediaContent}
+          onContinueFromCreatorType={handleContinueFromMediaCreatorType}
+          onContinueFromProject={handleContinueFromMediaEntity}
+          onContinueFromProjectImage={handleContinueFromMediaLogo}
+          onContinueFromScopes={handleContinueFromMediaFocus}
+          onPatchForm={patchForm}
+          /**
+           * §16: il logo del progetto ha la sua cartella e il suo campo.
+           * Caricarlo non tocca `avatarUrl`, e viceversa.
+           */
+          onPickLogoFromLibrary={() =>
+            handleMediaUpload({
+              field: "media-logo",
+              folder: "media-logos",
+              mediaTypes: ["images"],
+              onUploaded: (items) => {
+                patchForm({ mediaLogoUrl: items[0]?.url ?? "" });
+                trackMediaOnboardingEvent({
+                  name: "media_project_image_added",
+                });
+              },
+            })
+          }
+          onRemoveLogo={() => patchForm({ mediaLogoUrl: "" })}
+          onSelectCreatorType={handleSelectMediaCreatorType}
+          onSelectedContentTypes={(values) => {
+            trackMediaOnboardingEvent({
+              count: values.length,
+              name: "media_content_type_selected",
+            });
+            patchForm({ mediaContentTypes: values });
+            clearValidationErrors(["mediaContentTypes"]);
+          }}
+          onSelectedScopes={(values) => {
+            trackMediaOnboardingEvent({
+              count: values.length,
+              name: "media_scope_selected",
+            });
+            patchForm({ mediaFocusAreas: values });
+            clearValidationErrors(["mediaFocusAreas"]);
+          }}
+          onTakeLogoPhoto={() =>
+            handleCameraCapture({
+              field: "media-logo",
+              folder: "media-logos",
+              onUploaded: (items) => {
+                patchForm({ mediaLogoUrl: items[0]?.url ?? "" });
+                trackMediaOnboardingEvent({
+                  name: "media_project_image_added",
+                });
+              },
+            })
+          }
+          step={step}
+          validationErrors={validationErrors}
+        />
+      </>
+    );
+  }
+
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <Stack.Screen
@@ -3290,29 +3491,6 @@ export default function OnboardingProfileScreen() {
         {/* ============================================================= */}
         {/* STEP: Base (personal data)                                     */}
         {/* ============================================================= */}
-        {step === "media_basic" ? (
-          <View style={styles.stepContainer}>
-            <CommunityBasicInfoStep
-              birthDate={birthDate}
-              firstName={firstName}
-              lastName={lastName}
-              onFormattedNameBlur={handleFormattedNameBlur}
-              onUpdate={(patch, fieldsToClear) => {
-                patchForm(patch);
-                clearValidationErrors(fieldsToClear ?? Object.keys(patch));
-              }}
-              subtitle="Inserisci i tuoi dati personali per creare il tuo account media."
-              title="I tuoi dati"
-              validationErrors={validationErrors}
-            />
-            <Button
-              label="Continua"
-              onPress={handleContinueFromCommunityBasic}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
         {step === "base" ? (
             <View style={styles.stepContainer}>
               <OnboardingSectionCard
@@ -3651,14 +3829,12 @@ export default function OnboardingProfileScreen() {
         {/* ============================================================= */}
         {/* STEP: Photo                                                    */}
         {/* ============================================================= */}
-        {step === "photo" || step === "media_photo" ? (
+        {step === "photo" ? (
           <View style={styles.stepContainer}>
             <View style={styles.pageTitleGroup}>
               <AppText variant="screenTitle">Aggiungi la tua foto</AppText>
               <AppText color="secondary" variant="bodyLg">
-                {step === "media_photo"
-                  ? "Una foto personale rende riconoscibile il tuo account."
-                  : "Una foto chiara aiuta gli altri a riconoscerti."}
+                Una foto chiara aiuta gli altri a riconoscerti.
               </AppText>
             </View>
 
@@ -3704,167 +3880,6 @@ export default function OnboardingProfileScreen() {
           </View>
         ) : null}
 
-        {step === "media_entity" ? (
-          <View style={styles.stepContainer}>
-            <MediaEntityStep
-              description={mediaEntityDescription}
-              entityName={mediaEntityName}
-              errorMessage={validationErrors.mediaEntityName}
-              onUpdate={(patch) => {
-                patchForm(patch);
-                clearValidationErrors(Object.keys(patch));
-              }}
-            />
-
-            <OnboardingSectionCard
-              title="Logo o immagine"
-              subtitle="Carica un'immagine rappresentativa della tua pagina o progetto."
-            >
-              <MediaPickerField
-                buttonLabel="Carica immagine"
-                helperText="Puoi caricare un logo o una cover da usare come riferimento della tua pagina."
-                isUploading={uploadingField === "media-logo"}
-                label="Logo o immagine"
-                mediaType="image"
-                onPick={() =>
-                  handleMediaUpload({
-                    field: "media-logo",
-                    folder: "media-logos",
-                    mediaTypes: ["images"],
-                    onUploaded: (items) =>
-                      patchForm({ mediaLogoUrl: items[0]?.url ?? "" }),
-                  })
-                }
-                onRemove={() => patchForm({ mediaLogoUrl: "" })}
-                previewUrl={mediaLogoUrl}
-                removable
-              />
-            </OnboardingSectionCard>
-
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromMediaEntity}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {step === "media_content" ? (
-          <View style={styles.stepContainer}>
-            <OnboardingSectionCard
-              title="Che tipo di contenuti crei?"
-              subtitle="Seleziona uno o più tipi di contenuti che descrivono il tuo lavoro."
-            >
-              <CommunityChipGroup
-                onToggle={(value) => {
-                  const next = mediaContentTypes.includes(value)
-                    ? mediaContentTypes.filter((entry) => entry !== value)
-                    : [...mediaContentTypes, value];
-                  patchForm({ mediaContentTypes: next });
-                  clearValidationErrors(["mediaContentTypes"]);
-                }}
-                options={MEDIA_CONTENT_TYPE_OPTIONS}
-                selectedValues={mediaContentTypes}
-              />
-              {validationErrors.mediaContentTypes ? (
-                <AppText variant="caption" color="danger">
-                  {validationErrors.mediaContentTypes}
-                </AppText>
-              ) : null}
-            </OnboardingSectionCard>
-
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromMediaContent}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {step === "media_focus" ? (
-          <View style={styles.stepContainer}>
-            <OnboardingSectionCard
-              title="Ambito principale"
-              subtitle="Cosa segui principalmente nei tuoi contenuti?"
-            >
-              <CommunityChipGroup
-                onToggle={(value) => {
-                  const next = mediaFocusAreas.includes(value)
-                    ? mediaFocusAreas.filter((entry) => entry !== value)
-                    : [...mediaFocusAreas, value];
-                  patchForm({ mediaFocusAreas: next });
-                  clearValidationErrors(["mediaFocusAreas"]);
-                }}
-                options={MEDIA_FOCUS_AREA_OPTIONS}
-                selectedValues={mediaFocusAreas}
-              />
-              {validationErrors.mediaFocusAreas ? (
-                <AppText variant="caption" color="danger">
-                  {validationErrors.mediaFocusAreas}
-                </AppText>
-              ) : null}
-            </OnboardingSectionCard>
-
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromMediaFocus}
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {step === "media_channels" ? (
-          <View style={styles.stepContainer}>
-            <MediaChannelsStep
-              facebook={mediaFacebook}
-              instagram={mediaInstagram}
-              onUpdate={(patch) => patchForm(patch)}
-              tikTok={mediaTikTok}
-              website={mediaWebsite}
-              youTube={mediaYouTube}
-            />
-            <Button
-              disabled={isBusy}
-              label="Continua"
-              onPress={handleContinueFromMediaChannels}
-              variant="primary"
-            />
-            <Button
-              label="Salta"
-              onPress={handleContinueFromMediaChannels}
-              variant="tertiary"
-            />
-          </View>
-        ) : null}
-
-        {step === "media_collaborations" ? (
-          <View style={styles.stepContainer}>
-            <MediaCollaborationsStep
-              affiliationName={mediaAffiliationName}
-              affiliationType={mediaAffiliationType}
-              errorMessage={validationErrors.mediaAffiliationName}
-              onUpdate={(patch) => {
-                patchForm(patch);
-                clearValidationErrors(Object.keys(patch));
-              }}
-              options={MEDIA_AFFILIATION_TYPE_OPTIONS}
-            />
-            <Button
-              disabled={isBusy}
-              label={isBusy ? "Salvataggio..." : "Completa registrazione"}
-              onPress={handleContinueFromMediaCollaborations}
-              variant="primary"
-            />
-            <Button
-              label="Salta"
-              onPress={handleFinishMediaOnboarding}
-              variant="tertiary"
-            />
-          </View>
-        ) : null}
 
         {/* ============================================================= */}
         {/* STEP: Technical profile                                        */}

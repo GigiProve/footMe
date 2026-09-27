@@ -642,6 +642,8 @@ describe("getCompleteProfessionalProfile", () => {
       covered_territories: ["Italia"],
       covered_topics: ["Calciomercato"],
       content_types: ["Notizie", "Interviste"],
+      creator_type: null,
+      creator_type_other: null,
       editorial_type: "Testata giornalistica / Media sportivo",
       entity_name: "ProLink News",
       focus_areas: ["Serie A", "Calciomercato"],

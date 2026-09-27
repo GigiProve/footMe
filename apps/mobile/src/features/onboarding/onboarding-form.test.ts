@@ -6,6 +6,8 @@ import {
 import {
   defaultOnboardingFormState,
   getOnboardingProgress,
+  getOnboardingStepOrder,
+  getOnboardingVisibleSteps,
   getPreviousOnboardingStep,
   normalizeOnboardingDraft,
   validateOnboardingStep,
@@ -80,18 +82,41 @@ describe("onboarding-form", () => {
     });
   });
 
-  it("validates the simplified media basic step", () => {
-    const errors = validateOnboardingStep("media_basic", {
-      ...defaultOnboardingFormState,
-      role: "media",
-    });
+  /**
+   * REV-ONB-09 §13, §14: la tipologia è obbligatoria, e "Altro" da solo non
+   * dice nulla — serve il testo che lo qualifica.
+   */
+  it("requires a structured media creator type", () => {
+    expect(
+      validateOnboardingStep("media_type", {
+        ...defaultOnboardingFormState,
+        role: "media",
+      }),
+    ).toEqual({ mediaCreatorType: "Seleziona una tipologia." });
 
-    expect(errors).toMatchObject({
-      birthDate: "Questo campo è obbligatorio",
-      firstName: "Questo campo è obbligatorio",
-      lastName: "Questo campo è obbligatorio",
-    });
-    expect(errors.gender).toBeUndefined();
+    expect(
+      validateOnboardingStep("media_type", {
+        ...defaultOnboardingFormState,
+        mediaCreatorType: "other",
+        role: "media",
+      }),
+    ).toEqual({ mediaCreatorTypeOther: "Specifica la tua tipologia." });
+
+    expect(
+      validateOnboardingStep("media_type", {
+        ...defaultOnboardingFormState,
+        mediaCreatorType: "news_outlet",
+        role: "media",
+      }),
+    ).toEqual({});
+  });
+
+  /** §15, §21: immagine del progetto e canali si attraversano anche vuoti. */
+  it("lets the media creator skip the project image and the channels", () => {
+    const form = { ...defaultOnboardingFormState, role: "media" as const };
+
+    expect(validateOnboardingStep("media_logo", form)).toEqual({});
+    expect(validateOnboardingStep("media_channels", form)).toEqual({});
   });
 
   it("blocks invalid residence and phone values for Italian users", () => {
@@ -342,7 +367,7 @@ describe("onboarding-form", () => {
         role: "media",
       }),
     ).toEqual({
-      mediaEntityName: "Inserisci il nome della tua pagina, testata o realtà.",
+      mediaEntityName: "Inserisci il nome della tua pagina o progetto.",
     });
 
     expect(
@@ -698,17 +723,71 @@ describe("onboarding-form", () => {
       stepIndex: 0,
       totalSteps: 5,
     });
+    /**
+     * REV-ONB-09 §4: nove passi contati, dalla scelta del percorso ai canali.
+     * Nessun salto e nessun buco lasciato da "Collaborazioni e riferimenti".
+     */
     expect(getOnboardingProgress("media_channels", "media")).toMatchObject({
-      percentage: 88,
-      stepIndex: 6,
-      totalSteps: 8,
+      percentage: 100,
+      stepIndex: 8,
+      totalSteps: 9,
+    });
+    expect(getOnboardingProgress("media_logo", "media")).toMatchObject({
+      stepIndex: 5,
+      totalSteps: 9,
     });
     expect(getPreviousOnboardingStep("complete", null, "fan")).toBe(
       "fan_territories",
     );
     expect(getPreviousOnboardingStep("complete", null, "media")).toBe(
+      "media_channels",
+    );
+  });
+
+  /**
+   * §24: lo step rimosso non deve restare raggiungibile da nessuna parte —
+   * né dal percorso, né dal contatore, né da una bozza che ci era ferma.
+   */
+  it("removes the media collaborations step from the flow", () => {
+    expect(getOnboardingStepOrder("media")).not.toContain(
       "media_collaborations",
     );
+    expect(
+      getOnboardingVisibleSteps("media").map((entry) => entry.step),
+    ).toEqual([
+      "community_profile_type",
+      "base",
+      "photo",
+      "media_entity",
+      "media_type",
+      "media_logo",
+      "media_content",
+      "media_focus",
+      "media_channels",
+    ]);
+  });
+
+  /**
+   * §7, §8, §24, §30: una bozza del vecchio flusso Media rientra sui passi
+   * comuni e sulla tipologia strutturata equivalente, senza perdere quello
+   * che era già stato scelto.
+   */
+  it("migrates legacy media drafts onto the master steps", () => {
+    const draft = normalizeOnboardingDraft({
+      currentStep: "media_collaborations",
+      lastCompletedStep: "media_basic",
+      mediaAffiliationType: "Testata o sito",
+      mediaFocusAreas: ["Mercato", "Settore giovanile"],
+      role: "media",
+    });
+
+    expect(draft.currentStep).toBe("media_channels");
+    expect(draft.lastCompletedStep).toBe("base");
+    expect(draft.mediaCreatorType).toBe("news_outlet");
+    expect(draft.mediaFocusAreas).toEqual([
+      "Calciomercato",
+      "Calcio giovanile",
+    ]);
   });
 
   /**

@@ -18,29 +18,32 @@ const FAN_ONLY_STEPS: OnboardingStep[] = [
   "fan_territories",
 ];
 
-/** Passi condivisi con gli altri ruoli, resi con le pagine comuni (§C, §H, §I). */
-const FAN_SHARED_STEPS: OnboardingStep[] = ["base", "photo"];
+/**
+ * Passi condivisi con gli altri ruoli, resi con le pagine comuni (§C, §H, §I).
+ *
+ * REV-ONB-09 §7, §8: da questa task li attraversa anche il Media / Creator.
+ * Le vecchie schermate `media_basic` e `media_photo`, che riducevano i dati
+ * personali a tre campi e duplicavano il caricamento foto, non esistono più.
+ */
+const COMMUNITY_SHARED_STEPS: OnboardingStep[] = ["base", "photo"];
 
 /**
  * Il ramo "Media e tifosi" rende questi passi con le pagine intere del Master.
  *
  * La scelta del percorso (§E) appartiene a entrambi i rami, quindi vale anche
- * per il Media / Creator: è lo stesso bivio, non due schermate gemelle. Il
- * resto del percorso Media resta dov'era, in attesa della sua task (§B).
+ * per il Media / Creator: è lo stesso bivio, non due schermate gemelle. I
+ * passi propri del Media vivono in `MediaOnboardingFlow`.
  */
 export function isCommunityMasterStep(step: OnboardingStep, role: string) {
   if (role !== "fan" && role !== "media") {
     return false;
   }
 
-  if (step === "community_profile_type") {
+  if (step === "community_profile_type" || COMMUNITY_SHARED_STEPS.includes(step)) {
     return true;
   }
 
-  return (
-    role === "fan" &&
-    (FAN_ONLY_STEPS.includes(step) || FAN_SHARED_STEPS.includes(step))
-  );
+  return role === "fan" && FAN_ONLY_STEPS.includes(step);
 }
 
 type CitySelection = { name: string; region: string };

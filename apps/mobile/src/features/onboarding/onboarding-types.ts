@@ -173,32 +173,8 @@ export const DIRECTOR_LANGUAGE_OPTIONS = [
   "Arabo",
 ] as const;
 
-export const MEDIA_CONTENT_TYPE_OPTIONS = [
-  "Notizie",
-  "Partite e risultati",
-  "Highlights",
-  "Analisi",
-  "Interviste",
-  "Osservazione giocatori",
-  "Contenuti social",
-  "Foto",
-  "Video",
-  "Altro",
-] as const;
-
-export const MEDIA_FOCUS_AREA_OPTIONS = [
-  "Calcio locale",
-  "Calcio dilettantistico",
-  "Settore giovanile",
-  "Professionistico",
-  "Mercato",
-  "Calcio generale",
-] as const;
-
-export const MEDIA_AFFILIATION_TYPE_OPTIONS = [
-  "Nessuna",
-  "Società sportiva",
-  "Testata o sito",
-  "Pagina o progetto media",
-  "Altro",
-] as const;
+/**
+ * Il vocabolario Media / Creator vive in `community/media-taxonomy.ts`
+ * (REV-ONB-09): tipologia, contenuti e ambiti stanno accanto alle schermate
+ * che li usano. "Collaborazioni e riferimenti" non esiste più (§24).
+ */

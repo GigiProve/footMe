@@ -1,85 +1,113 @@
-import { StyleSheet, View } from "react-native";
+import { OnboardingPage, OnboardingSection, OnboardingTextField } from "../ui";
+import type { MediaChannelKey } from "./media-channels";
 
-import { AppText, Input } from "../../../ui";
-import { spacing } from "../../../theme/tokens";
-import { OnboardingSectionCard } from "../onboarding-ui";
-
-type MediaChannelsStepProps = {
-  facebook: string;
-  instagram: string;
-  tikTok: string;
-  website: string;
-  youTube: string;
-  onUpdate: (patch: {
-    mediaFacebook?: string;
-    mediaInstagram?: string;
-    mediaTikTok?: string;
-    mediaWebsite?: string;
-    mediaYouTube?: string;
-  }) => void;
+type MediaChannelField = {
+  key: MediaChannelKey;
+  label: string;
+  placeholder: string;
+  keyboardType: "url" | "default";
 };
 
+/** §21: cinque canali, tutti facoltativi, sempre nello stesso ordine. */
+const MEDIA_CHANNEL_FIELDS: MediaChannelField[] = [
+  {
+    key: "instagram",
+    keyboardType: "default",
+    label: "Instagram",
+    placeholder: "@username o link",
+  },
+  {
+    key: "tiktok",
+    keyboardType: "default",
+    label: "TikTok",
+    placeholder: "@username o link",
+  },
+  {
+    key: "youtube",
+    keyboardType: "url",
+    label: "YouTube",
+    placeholder: "Link al canale o @handle",
+  },
+  {
+    key: "facebook",
+    keyboardType: "url",
+    label: "Facebook",
+    placeholder: "Link alla pagina",
+  },
+  {
+    key: "website",
+    keyboardType: "url",
+    label: "Sito web",
+    placeholder: "tuosito.it",
+  },
+];
+
+type MediaChannelsStepProps = {
+  currentStep: number;
+  errors: Partial<Record<MediaChannelKey, string>>;
+  isBusy: boolean;
+  onBack: () => void;
+  onBlurChannel: (key: MediaChannelKey) => void;
+  onChangeChannel: (key: MediaChannelKey, value: string) => void;
+  onContinue: () => void;
+  stepLabel: string;
+  totalSteps: number;
+  values: Record<MediaChannelKey, string>;
+};
+
+/**
+ * "Dove possiamo trovarti?" (REV-ONB-09 §21–§23).
+ *
+ * Nessun canale è obbligatorio: si può attraversare lo step senza scrivere
+ * nulla. L'errore compare quando il campo perde il fuoco o si prova ad
+ * avanzare, mai mentre si digita, e non cancella quello che è stato scritto.
+ */
 export function MediaChannelsStep({
-  facebook,
-  instagram,
-  tikTok,
-  website,
-  youTube,
-  onUpdate,
+  currentStep,
+  errors,
+  isBusy,
+  onBack,
+  onBlurChannel,
+  onChangeChannel,
+  onContinue,
+  stepLabel,
+  totalSteps,
+  values,
 }: MediaChannelsStepProps) {
   return (
-    <OnboardingSectionCard
-      title="Collega i tuoi canali"
-      subtitle="Aggiungi i link principali. Puoi inserire username o URL completi."
+    <OnboardingPage
+      currentStep={currentStep}
+      footer={{
+        onPrimaryPress: onContinue,
+        primaryLabel: "Continua",
+        primaryLoading: isBusy,
+        primaryTestID: "media-channels-continue",
+      }}
+      onBack={onBack}
+      stepLabel={stepLabel}
+      subtitle="Aggiungi i canali che vuoi mostrare sul tuo profilo. Potrai aggiornarli anche in seguito."
+      testID="media-channels-step"
+      title="Dove possiamo trovarti?"
+      totalSteps={totalSteps}
     >
-      <View style={styles.fieldGroup}>
-        <Input
-          autoCapitalize="none"
-          label="Instagram"
-          onChangeText={(value) => onUpdate({ mediaInstagram: value })}
-          placeholder="@username o link"
-          value={instagram}
-        />
-        <Input
-          autoCapitalize="none"
-          label="TikTok"
-          onChangeText={(value) => onUpdate({ mediaTikTok: value })}
-          placeholder="@username o link"
-          value={tikTok}
-        />
-        <Input
-          autoCapitalize="none"
-          label="YouTube"
-          onChangeText={(value) => onUpdate({ mediaYouTube: value })}
-          placeholder="Link al canale"
-          value={youTube}
-        />
-        <Input
-          autoCapitalize="none"
-          label="Facebook"
-          onChangeText={(value) => onUpdate({ mediaFacebook: value })}
-          placeholder="Link alla pagina"
-          value={facebook}
-        />
-        <Input
-          autoCapitalize="none"
-          keyboardType="url"
-          label="Sito web"
-          onChangeText={(value) => onUpdate({ mediaWebsite: value })}
-          placeholder="https://"
-          value={website}
-        />
-      </View>
-
-      <AppText variant="caption" color="secondary">
-        Compila solo i canali che vuoi mostrare subito. Potrai aggiornarli anche in seguito.
-      </AppText>
-    </OnboardingSectionCard>
+      <OnboardingSection>
+        {MEDIA_CHANNEL_FIELDS.map((field) => (
+          <OnboardingTextField
+            autoCapitalize="none"
+            autoCorrect={false}
+            errorMessage={errors[field.key]}
+            key={field.key}
+            keyboardType={field.keyboardType}
+            label={field.label}
+            onBlur={() => onBlurChannel(field.key)}
+            onChangeText={(value) => onChangeChannel(field.key, value)}
+            optional
+            placeholder={field.placeholder}
+            testID={`media-channel-${field.key}`}
+            value={values[field.key]}
+          />
+        ))}
+      </OnboardingSection>
+    </OnboardingPage>
   );
 }
-
-const styles = StyleSheet.create({
-  fieldGroup: {
-    gap: spacing[12],
-  },
-});

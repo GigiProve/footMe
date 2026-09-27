@@ -78,10 +78,15 @@ describe("isCommunityMasterStep", () => {
     }
   });
 
-  /** §G: dopo il bivio i due percorsi non si incrociano più. */
-  it("intercetta del Media / Creator solo il bivio condiviso", () => {
+  /**
+   * §G, REV-ONB-09 §7, §8: il Media / Creator condivide il bivio e i due
+   * passi comuni di identità, poi prende la sua strada.
+   */
+  it("intercetta del Media / Creator il bivio e i passi comuni", () => {
     expect(isCommunityMasterStep("community_profile_type", "media")).toBe(true);
-    expect(isCommunityMasterStep("media_basic", "media")).toBe(false);
+    expect(isCommunityMasterStep("base", "media")).toBe(true);
+    expect(isCommunityMasterStep("photo", "media")).toBe(true);
+    expect(isCommunityMasterStep("media_entity", "media")).toBe(false);
     expect(isCommunityMasterStep("fan_football_types", "media")).toBe(false);
   });
 
@@ -112,10 +117,12 @@ describe("CommunityPathStep (§E, §F)", () => {
   it("propone due sole opzioni, con titolo e copy della task", () => {
     const rendered = texts(renderPath());
 
-    expect(rendered).toContain("Media e tifosi");
-    expect(rendered).toContain("Come vuoi vivere il calcio su ProLink?");
+    expect(rendered).toContain("Come vuoi usare ProLink?");
+    expect(rendered).toContain(
+      "Scegli il profilo che descrive meglio il tuo utilizzo della piattaforma.",
+    );
     expect(rendered).toContain("Tifoso");
-    expect(rendered).toContain("Media / Creator");
+    expect(rendered).toContain("Media/Creator");
     // §B: il vecchio vocabolario non è più visibile da nessuna parte.
     expect(rendered).not.toContain("Profilo base");
     expect(rendered).not.toContain("Media e appassionati");

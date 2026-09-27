@@ -319,6 +319,9 @@ export type MediaProfileRecord = {
   covered_territories: string[];
   covered_topics: string[];
   content_types: string[];
+  /** REV-ONB-09 §13: tipologia strutturata; null sui profili precedenti. */
+  creator_type: string | null;
+  creator_type_other: string | null;
   editorial_type: string | null;
   entity_name: string | null;
   focus_areas: string[];
@@ -551,17 +554,22 @@ export type CompleteProfessionalProfileUpdate = {
     interest_regions: string[];
   } | null;
   mediaProfile?: {
-    affiliation_name: string | null;
-    affiliation_type: string | null;
+    affiliation_name?: string | null;
+    affiliation_type?: string | null;
     covered_competitions?: string[];
     covered_teams?: string[];
     covered_territories?: string[];
     covered_topics?: string[];
     content_types: string[];
+    /** REV-ONB-09 §13: tipologia strutturata del progetto. */
+    creator_type?: string | null;
+    creator_type_other?: string | null;
     editorial_type?: string | null;
     entity_name: string | null;
     focus_areas: string[];
     logo_url: string | null;
+    /** Derivata da `creator_type`: vocabolario di ricerca (CER-05). */
+    media_kind?: string | null;
     short_description: string | null;
     verification_status?: string | null;
   } | null;
@@ -1163,6 +1171,8 @@ function normalizeMediaProfileRecord(
     covered_territories: normalizeStringArray(rawProfile.covered_territories),
     covered_topics: normalizeStringArray(rawProfile.covered_topics),
     content_types: normalizeStringArray(rawProfile.content_types),
+    creator_type: normalizeOptionalText(rawProfile.creator_type),
+    creator_type_other: normalizeOptionalText(rawProfile.creator_type_other),
     editorial_type: normalizeOptionalText(rawProfile.editorial_type),
     entity_name: normalizeOptionalText(rawProfile.entity_name),
     focus_areas: normalizeStringArray(rawProfile.focus_areas),
@@ -1701,7 +1711,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("media_profiles")
           .select(
-            "profile_id, entity_name, short_description, logo_url, content_types, focus_areas, affiliation_type, affiliation_name, editorial_type, verification_status, covered_competitions, covered_teams, covered_territories, covered_topics",
+            "profile_id, entity_name, short_description, logo_url, content_types, focus_areas, affiliation_type, affiliation_name, creator_type, creator_type_other, editorial_type, verification_status, covered_competitions, covered_teams, covered_territories, covered_topics",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -2448,17 +2458,20 @@ export async function updateCompleteProfessionalProfile(
 
   if (input.role === "media" && input.mediaProfile) {
     const { error } = await supabase.from("media_profiles").upsert({
-      affiliation_name: input.mediaProfile.affiliation_name,
-      affiliation_type: input.mediaProfile.affiliation_type,
+      affiliation_name: input.mediaProfile.affiliation_name ?? null,
+      affiliation_type: input.mediaProfile.affiliation_type ?? null,
       covered_competitions: input.mediaProfile.covered_competitions ?? [],
       covered_teams: input.mediaProfile.covered_teams ?? [],
       covered_territories: input.mediaProfile.covered_territories ?? [],
       covered_topics: input.mediaProfile.covered_topics ?? [],
       content_types: input.mediaProfile.content_types,
+      creator_type: input.mediaProfile.creator_type ?? null,
+      creator_type_other: input.mediaProfile.creator_type_other ?? null,
       editorial_type: input.mediaProfile.editorial_type ?? null,
       entity_name: input.mediaProfile.entity_name,
       focus_areas: input.mediaProfile.focus_areas,
       logo_url: input.mediaProfile.logo_url,
+      media_kind: input.mediaProfile.media_kind ?? null,
       profile_id: input.profileId,
       short_description: input.mediaProfile.short_description,
       verification_status: input.mediaProfile.verification_status ?? "unverified",

@@ -24,20 +24,22 @@ export type CommunityPathOption = {
  * §F: line icon, stesso stroke, dimensione contenuta. Niente illustrazioni,
  * niente simboli caricaturali: sono due modi di stare nel calcio, non due
  * mascotte.
+ *
+ * REV-ONB-09 §6: il copy dice a che cosa serve il profilo, non che cosa
+ * rappresenta in astratto. "Media/Creator" è il nome definitivo del
+ * sotto-profilo professionale.
  */
 export const COMMUNITY_PATH_OPTIONS: CommunityPathOption[] = [
   {
-    description:
-      "Segui il calcio, scopri club, persone e contenuti che ti interessano.",
+    description: "Per seguire, commentare e vivere il calcio.",
     icon: "people-outline",
     label: "Tifoso",
     value: "fan",
   },
   {
-    description:
-      "Racconta il calcio attraverso contenuti, informazione e progetti editoriali.",
+    description: "Per creator, pagine, testate e progetti editoriali.",
     icon: "newspaper-outline",
-    label: "Media / Creator",
+    label: "Media/Creator",
     value: "media",
   },
 ];

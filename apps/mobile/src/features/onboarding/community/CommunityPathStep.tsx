@@ -17,11 +17,13 @@ type CommunityPathStepProps = {
 };
 
 /**
- * Secondo livello di "Media e tifosi" (REV-ONB-08 §E–§G).
+ * Secondo livello di "Media e tifosi" (REV-ONB-08 §E–§G, REV-ONB-09 §6).
  *
  * La macro-scelta del Master resta una sola voce; qui si separa chi il calcio
  * lo segue da chi lo racconta. Scelta singola, card del Master, un solo check:
- * nessun toggle, nessuna checkbox multipla.
+ * nessun toggle, nessuna checkbox multipla. La CTA resta attiva e l'errore
+ * compare inline, come nella scelta del ruolo: è il comportamento comune del
+ * Master, non una variante di questa schermata.
  */
 export function CommunityPathStep({
   currentStep,
@@ -45,9 +47,9 @@ export function CommunityPathStep({
       }}
       onBack={onBack}
       stepLabel={stepLabel}
-      subtitle="Come vuoi vivere il calcio su ProLink?"
+      subtitle="Scegli il profilo che descrive meglio il tuo utilizzo della piattaforma."
       testID="community-path-step"
-      title="Media e tifosi"
+      title="Come vuoi usare ProLink?"
       totalSteps={totalSteps}
     >
       <View accessibilityRole="radiogroup" style={styles.options}>

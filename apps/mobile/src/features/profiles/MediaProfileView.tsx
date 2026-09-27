@@ -61,6 +61,10 @@ import {
   normalizeFacebookInput,
   normalizeInstagramInput,
 } from "./profile-form-utils";
+import {
+  formatMediaCreatorType,
+  type MediaCreatorType,
+} from "../onboarding/community/media-taxonomy";
 import { ContentTaggedHeader } from "../../features/content/components/ContentTaggedHeader";
 import { TagManageSheet } from "../../features/content/components/TagManageSheet";
 import { MediaPostComposer } from "./media-posts/MediaPostComposer";
@@ -247,9 +251,20 @@ export function MediaProfileView({
     (mediaProfile?.covered_territories ?? []).length > 0
       ? mediaProfile!.covered_territories.join(" • ")
       : buildAreaLabel(completeProfile);
-  const profileTypeLabel = buildMediaProfileTypeLabel(
-    mediaProfile?.editorial_type ?? mediaProfile?.affiliation_type,
-  );
+  /**
+   * REV-ONB-09 §13, §30: la tipologia strutturata, quando c'è, si legge così
+   * com'è stata scelta — "Altro" con il testo scritto dall'utente. I profili
+   * precedenti restano sull'euristica del vecchio testo libero.
+   */
+  const profileTypeLabel =
+    (mediaProfile?.creator_type === "other"
+      ? mediaProfile.creator_type_other?.trim()
+      : formatMediaCreatorType(
+          mediaProfile?.creator_type as MediaCreatorType | undefined,
+        )) ||
+    buildMediaProfileTypeLabel(
+      mediaProfile?.editorial_type ?? mediaProfile?.affiliation_type,
+    );
   const verificationStatus = mediaProfile
     ? (mediaProfile as { verification_status?: string; is_verified?: boolean })
         .verification_status
