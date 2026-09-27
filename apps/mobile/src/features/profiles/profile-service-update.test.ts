@@ -669,10 +669,8 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       p_career_entries: [
         {
           category: "Promozione",
-          club_id: null,
           description: "Salvezza raggiunta con tre giornate di anticipo.",
           experience_type: "MULTI_SEASON",
-          id: "coach-exp-1",
           period_end_month: null,
           period_end_year: null,
           period_start_month: null,
@@ -715,7 +713,6 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
           assists: 4,
           category: "Eccellenza",
           goals: 7,
-          id: "coach-player-1",
           position: null,
           season: "2012/2013",
           sort_order: 0,
@@ -725,6 +722,69 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       ],
       p_profile_id: "profile-1",
     });
+  });
+
+  it("keeps coach entry ids only when they are real uuids", async () => {
+    const careerUuid = "3f1d8a4e-5b2c-4d7a-9e11-2c4b6a8d0f13";
+    const clubUuid = "8c2e6b1a-4d3f-4a9b-8e21-7d5c3b9a1e04";
+
+    await updateCompleteProfessionalProfile({
+      ...buildUpdateInput(),
+      coachCareerEntries: [
+        {
+          category: null,
+          club_id: clubUuid,
+          coach_profile_id: "profile-1",
+          description: null,
+          experience_type: "SINGLE_SEASON",
+          id: careerUuid,
+          period_end_month: null,
+          period_end_year: null,
+          period_start_month: null,
+          period_start_year: null,
+          results: [],
+          role: "Allenatore",
+          season_details: {},
+          seasons: ["2024/2025"],
+          sort_order: 0,
+          team_logo_url: null,
+          team_name: "USD Virtus",
+        },
+      ],
+      coachDirectorCareerEntries: [],
+      coachPlayerCareerEntries: [],
+      coachProfile: {
+        availability_type: null,
+        available_from: null,
+        coached_categories: [],
+        coached_clubs: [],
+        contract_end: null,
+        current_club: null,
+        game_philosophy: null,
+        licenses: [],
+        media_items: [],
+        open_to_new_role: false,
+        play_styles: [],
+        preferred_categories: [],
+        preferred_formation: null,
+        preferred_provinces: [],
+        preferred_regions: [],
+        primary_role: null,
+        secondary_formations: [],
+        technical_video_url: null,
+      },
+      playerCareerEntries: [],
+      playerProfile: null,
+      role: "coach",
+      staffProfile: null,
+    });
+
+    const payload = mocks.rpcMock.mock.calls.find(
+      (call: unknown[]) => call[0] === "save_coach_career_details",
+    )?.[1] as { p_career_entries: Record<string, unknown>[] };
+
+    expect(payload.p_career_entries[0].id).toBe(careerUuid);
+    expect(payload.p_career_entries[0].club_id).toBe(clubUuid);
   });
 
   it("updates onboarding-aligned profile fields when they are provided", async () => {

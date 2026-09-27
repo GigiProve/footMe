@@ -78,6 +78,7 @@ import {
   trackAgentOnboardingEvent,
 } from "../../src/features/onboarding/agent";
 import {
+  createLocalUuid,
   deriveLegacyMainPlayerRoles,
   deriveLegacyManagedPlayersCount,
   deriveLegacyPlayerTypes,
@@ -143,6 +144,7 @@ import {
   type StaffCareerEntryRecord,
   type StaffPlayerCareerEntryRecord,
 } from "../../src/features/profiles/profile-service";
+import { readErrorMessage } from "../../src/lib/error-message";
 import { supabase } from "../../src/lib/supabase";
 import { colors, radius, spacing } from "../../src/theme/tokens";
 import { AppText, Button, Input, Toggle } from "../../src/ui";
@@ -337,9 +339,8 @@ function getBaseStepAlert(error: unknown) {
   return {
     title: "Salvataggio non riuscito",
     message:
-      error instanceof Error
-        ? error.message
-        : "Errore inatteso durante il salvataggio dei dati base.",
+      readErrorMessage(error) ??
+      "Errore inatteso durante il salvataggio dei dati base.",
   };
 }
 
@@ -359,8 +360,8 @@ function getMediaUploadAlert(field: string, error: unknown) {
     return {
       title: "Foto profilo non caricata",
       message:
-        error instanceof Error
-          ? `${error.message} Puoi continuare e aggiungerla più tardi.`
+        readErrorMessage(error)
+          ? `${readErrorMessage(error)} Puoi continuare e aggiungerla più tardi.`
           : "La foto profilo non è stata caricata, ma puoi continuare e aggiungerla più tardi.",
     };
   }
@@ -368,9 +369,8 @@ function getMediaUploadAlert(field: string, error: unknown) {
   return {
     title: "Caricamento non riuscito",
     message:
-      error instanceof Error
-        ? error.message
-        : "Errore inatteso durante il caricamento dei media.",
+      readErrorMessage(error) ??
+      "Errore inatteso durante il caricamento dei media.",
   };
 }
 
@@ -1482,9 +1482,8 @@ export default function OnboardingProfileScreen() {
       goToCompletion("technical");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel completamento profilo.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo sportivo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -1574,9 +1573,8 @@ export default function OnboardingProfileScreen() {
     } catch (error) {
       // §CD: un errore di rete non azzera il form, che resta nella bozza.
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel salvataggio.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel salvataggio.";
       Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -1791,9 +1789,8 @@ export default function OnboardingProfileScreen() {
       goToCompletion("agent_presentation");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel completamento profilo.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -1847,9 +1844,8 @@ export default function OnboardingProfileScreen() {
       navigateToStep("staff_previous_experiences");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel completamento profilo.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -1906,9 +1902,8 @@ export default function OnboardingProfileScreen() {
       finishStaffOnboarding("staff_coach_career");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel completamento profilo.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -1932,9 +1927,8 @@ export default function OnboardingProfileScreen() {
       finishStaffOnboarding("staff_player_career");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel completamento profilo.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -2111,9 +2105,8 @@ export default function OnboardingProfileScreen() {
       goToCompletion("director_extra");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel completamento profilo.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -2328,9 +2321,8 @@ export default function OnboardingProfileScreen() {
       goToCompletion("fan_territories");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel completamento profilo.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -2421,9 +2413,8 @@ export default function OnboardingProfileScreen() {
       goToCompletion("media_channels");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel completamento profilo media.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel completamento profilo media.";
       Alert.alert("Profilo media non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -2508,7 +2499,8 @@ export default function OnboardingProfileScreen() {
           category: entry.category || null,
           coach_profile_id: session.user.id,
           goals: Number.parseInt(entry.goals, 10) || 0,
-          id: entry.id ?? globalThis.crypto.randomUUID(),
+          // Hermes non espone globalThis.crypto: l'uuid va generato dall'helper.
+          id: entry.id ?? createLocalUuid(),
           position: null,
           season: entry.seasonLabel,
           sort_order: index,
@@ -2560,9 +2552,8 @@ export default function OnboardingProfileScreen() {
       goToCompletion("coach_extra");
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Errore inatteso nel completamento profilo.";
+        readErrorMessage(error) ??
+        "Errore inatteso nel completamento profilo.";
       Alert.alert("Profilo non salvato", message);
     } finally {
       setIsSubmitting(false);
@@ -2677,7 +2668,7 @@ export default function OnboardingProfileScreen() {
       navigateToStep("club_profile");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Errore inatteso.";
+        readErrorMessage(error) ?? "Errore inatteso.";
       Alert.alert("Verifica duplicati non riuscita", message);
     } finally {
       setIsSubmitting(false);

@@ -2236,10 +2236,12 @@ export async function updateCompleteProfessionalProfile(
       p_coach_profile: input.coachProfile,
       p_career_entries: (input.coachCareerEntries ?? []).map((entry) => ({
         category: entry.category,
-        club_id: entry.club_id,
+        // L'RPC legge id e club_id come uuid: gli id locali delle bozze
+        // (`coach-<timestamp>-<n>`) vanno omessi, non inoltrati.
+        ...(isUuidLike(entry.club_id) ? { club_id: entry.club_id } : {}),
         description: entry.description,
         experience_type: entry.experience_type,
-        id: entry.id,
+        ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
         period_end_month: entry.period_end_month,
         period_end_year: entry.period_end_year,
         period_start_month: entry.period_start_month,
@@ -2255,7 +2257,7 @@ export async function updateCompleteProfessionalProfile(
       p_director_entries: (input.coachDirectorCareerEntries ?? []).map((entry) => ({
         category: entry.category,
         description: entry.description,
-        id: entry.id,
+        ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
         role: entry.role,
         seasons: entry.seasons,
         sort_order: entry.sort_order,
@@ -2267,7 +2269,7 @@ export async function updateCompleteProfessionalProfile(
         assists: entry.assists,
         category: entry.category,
         goals: entry.goals,
-        id: entry.id,
+        ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
         position: entry.position,
         season: entry.season,
         sort_order: entry.sort_order,

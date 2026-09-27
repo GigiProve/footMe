@@ -2,13 +2,15 @@ import { NationalityAutocompleteInput } from "../../../components/ui/nationality
 import { PhoneInputWithCountryCode } from "../../../components/ui/phone-input-with-country-code";
 import { ResidenceCityInput } from "../../../components/ui/residence-city-input";
 import type { ProfileGender } from "../onboarding-types";
-import type { OnboardingValidationErrors } from "../onboarding-form";
+import type { LegalStatus, OnboardingValidationErrors } from "../onboarding-form";
 import {
   DateSelector,
+  FieldShell,
   OnboardingPage,
   OnboardingSection,
   OnboardingTextField,
   SegmentedSelector,
+  SelectionRow,
   ToggleRow,
 } from "../ui";
 
@@ -18,10 +20,19 @@ const GENDER_OPTIONS: { label: string; value: ProfileGender }[] = [
   { label: "Donna", value: "female" },
 ];
 
+/** Chiesto solo a chi ha nazionalità extra UE, come da validazione del passo. */
+const LEGAL_STATUS_OPTIONS: { label: string; value: LegalStatus }[] = [
+  { label: "Ho il permesso di soggiorno", value: "has_permit" },
+  { label: "Non ho il permesso di soggiorno", value: "no_permit" },
+  { label: "In fase di richiesta", value: "pending_permit" },
+];
+
 type CitySelection = { name: string; region: string };
 
 type PlayerPersonalDataStepProps = {
   birthDate: string;
+  currentLocationCity: string;
+  currentLocationCountry: string;
   currentStep: number;
   domicile: string;
   domicileRegion: string;
@@ -29,17 +40,21 @@ type PlayerPersonalDataStepProps = {
   gender: string;
   isBusy: boolean;
   lastName: string;
+  legalStatus: string;
   nationality: string;
   nationalityCategory: "italy" | "eu" | "non_eu" | "unknown";
   onBack: () => void;
   onBirthDateChange: (value: string) => void;
   onContinue: () => void;
+  onCurrentLocationCityChange: (value: string) => void;
+  onCurrentLocationCountryChange: (value: string) => void;
   onDomicileChange: (value: string) => void;
   onDomicileSelect: (value: CitySelection) => void;
   onDomicileToggle: (value: boolean) => void;
   onFieldChange: (field: "firstName" | "lastName", value: string) => void;
   onFormattedNameBlur: (field: "firstName" | "lastName") => void;
   onGenderChange: (value: ProfileGender) => void;
+  onLegalStatusChange: (value: LegalStatus) => void;
   onNationalityChange: (value: string) => void;
   onPhoneCountryCodeChange: (value: string) => void;
   onPhoneNumberChange: (value: string) => void;
@@ -65,6 +80,8 @@ type PlayerPersonalDataStepProps = {
  */
 export function PlayerPersonalDataStep({
   birthDate,
+  currentLocationCity,
+  currentLocationCountry,
   currentStep,
   domicile,
   domicileRegion,
@@ -72,17 +89,21 @@ export function PlayerPersonalDataStep({
   gender,
   isBusy,
   lastName,
+  legalStatus,
   nationality,
   nationalityCategory,
   onBack,
   onBirthDateChange,
   onContinue,
+  onCurrentLocationCityChange,
+  onCurrentLocationCountryChange,
   onDomicileChange,
   onDomicileSelect,
   onDomicileToggle,
   onFieldChange,
   onFormattedNameBlur,
   onGenderChange,
+  onLegalStatusChange,
   onNationalityChange,
   onPhoneCountryCodeChange,
   onPhoneNumberChange,
@@ -100,6 +121,13 @@ export function PlayerPersonalDataStep({
   validationErrors,
 }: PlayerPersonalDataStepProps) {
   const isItalian = nationalityCategory === "italy";
+  /**
+   * §I: a chi non è italiano si chiedono residenza, luogo attuale e — fuori
+   * dall'UE — lo stato legale. Sono gli stessi campi che la validazione del
+   * passo pretende: se non si mostrano, "Continua" non avanza mai.
+   */
+  const needsLegalStatus =
+    nationalityCategory === "non_eu" && Boolean(nationality.trim());
   /** §I: nessuna data di nascita nel futuro. */
   const lastSelectableYear = new Date().getFullYear();
 
@@ -207,14 +235,53 @@ export function PlayerPersonalDataStep({
             </ToggleRow>
           </>
         ) : (
-          <NationalityAutocompleteInput
-            errorMessage={validationErrors.residenceCountry}
-            label="Paese di residenza *"
-            onChange={onResidenceCountryChange}
-            value={residenceCountry}
-          />
+          <>
+            <NationalityAutocompleteInput
+              errorMessage={validationErrors.residenceCountry}
+              label="Paese di residenza *"
+              onChange={onResidenceCountryChange}
+              value={residenceCountry}
+            />
+
+            <NationalityAutocompleteInput
+              errorMessage={validationErrors.currentLocationCountry}
+              label="Paese in cui ti trovi ora *"
+              onChange={onCurrentLocationCountryChange}
+              value={currentLocationCountry}
+            />
+
+            <OnboardingTextField
+              autoCapitalize="words"
+              autoCorrect={false}
+              errorMessage={validationErrors.currentLocationCity}
+              label="Città in cui ti trovi ora *"
+              onChangeText={onCurrentLocationCityChange}
+              placeholder="Es. Madrid"
+              value={currentLocationCity}
+            />
+          </>
         )}
       </OnboardingSection>
+
+      {needsLegalStatus ? (
+        <OnboardingSection title="Stato legale">
+          <FieldShell
+            errorMessage={validationErrors.legalStatus}
+            helperText="La tua situazione rispetto al permesso di soggiorno in Italia."
+          >
+            {LEGAL_STATUS_OPTIONS.map((option) => (
+              <SelectionRow
+                control="radio"
+                key={option.value}
+                label={option.label}
+                onPress={() => onLegalStatusChange(option.value)}
+                selected={legalStatus === option.value}
+                testID={`legal-status-${option.value}`}
+              />
+            ))}
+          </FieldShell>
+        </OnboardingSection>
+      ) : null}
 
       <OnboardingSection title="Contatto">
         {/* §J: prefisso internazionale e numero restano due controlli distinti. */}

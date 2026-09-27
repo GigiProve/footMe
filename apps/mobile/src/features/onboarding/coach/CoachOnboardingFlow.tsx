@@ -125,6 +125,8 @@ export function CoachOnboardingFlow({
     return (
       <PlayerPersonalDataStep
         birthDate={form.birthDate}
+        currentLocationCity={form.currentLocationCity}
+        currentLocationCountry={form.currentLocationCountry}
         currentStep={counter.current}
         domicile={form.domicile}
         domicileRegion={form.domicileRegion}
@@ -132,6 +134,7 @@ export function CoachOnboardingFlow({
         gender={form.gender}
         isBusy={isBusy}
         lastName={form.lastName}
+        legalStatus={form.legalStatus}
         nationality={form.nationality}
         nationalityCategory={nationalityCategory}
         onBack={onBack}
@@ -140,6 +143,14 @@ export function CoachOnboardingFlow({
           onClearValidationErrors(["birthDate"]);
         }}
         onContinue={onContinueFromPersonalData}
+        onCurrentLocationCityChange={(value) => {
+          onPatchForm({ currentLocationCity: value });
+          onClearValidationErrors(["currentLocationCity"]);
+        }}
+        onCurrentLocationCountryChange={(value) => {
+          onPatchForm({ currentLocationCountry: value });
+          onClearValidationErrors(["currentLocationCountry"]);
+        }}
         onDomicileChange={onDomicileChange}
         onDomicileSelect={onDomicileSelect}
         onDomicileToggle={onDomicileToggle}
@@ -151,6 +162,10 @@ export function CoachOnboardingFlow({
         onGenderChange={(value: ProfileGender) => {
           onPatchForm({ gender: value });
           onClearValidationErrors(["gender"]);
+        }}
+        onLegalStatusChange={(value) => {
+          onPatchForm({ legalStatus: value });
+          onClearValidationErrors(["legalStatus"]);
         }}
         onNationalityChange={onNationalityChange}
         onPhoneCountryCodeChange={(value) => {
