@@ -9,6 +9,16 @@ import { useTaggedMediaItems } from "../../content/use-tagged-content";
 import type { GroupedExperience } from "./career-grouping";
 import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
 import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
+
+/**
+ * Lo Staff mantiene la terza tab "Info": "Dettagli" è il nome introdotto dal
+ * Master Profile del Calciatore (REV-PROF-01 §5) e riguarda solo quello.
+ */
+const STAFF_TABS: readonly { label: string; value: ProfileTab }[] = [
+  { label: "Carriera", value: "career" },
+  { label: "Media", value: "media" },
+  { label: "Info", value: "info" },
+];
 import { StaffCareerTabContent } from "./StaffCareerTabContent";
 import { StaffInfoTab } from "./StaffInfoTab";
 import type { StaffGroupedExperience } from "./staff-career-grouping";
@@ -73,7 +83,11 @@ export function StaffProfileTabView({
 
   return (
     <View style={styles.container}>
-      <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <ProfileTabBar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        tabs={STAFF_TABS}
+      />
 
       {activeTab === "career" ? (
         <StaffCareerTabContent
@@ -92,6 +106,11 @@ export function StaffProfileTabView({
         />
       ) : activeTab === "media" ? (
         <MediaTabContent
+          emptyDescription={
+            isOwner
+              ? "Aggiungi foto e video per mostrare il lavoro svolto sul campo."
+              : "Questo profilo non ha ancora pubblicato contenuti."
+          }
           authorName={completeProfile.profile.full_name}
           initialItems={[...mediaItems, ...taggedItems]}
           mode={isOwner ? "owner" : "visitor"}

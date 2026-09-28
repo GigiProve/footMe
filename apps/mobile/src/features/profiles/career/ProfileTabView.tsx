@@ -1,40 +1,44 @@
-import { useMemo, useState } from "react";
+/**
+ * Corpo a tab del Master Profile Calciatore (REV-PROF-01 §5, §10, §37).
+ *
+ * Owner e Visitor condividono questa stessa architettura: cambiano solo le
+ * azioni disponibili, non la struttura. Le tre tab restano montate dietro allo
+ * stesso stato, quindi il passaggio da una all'altra non rifà nessuna
+ * richiesta e non ricostruisce il modello di carriera.
+ */
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { sortPlayerExperiencesBySeason, toPlayerExperienceForm } from "../player-sports";
+import { toPlayerExperienceForm } from "../player-sports";
 import { withDefaultProfileAvatar } from "../profile-avatar";
+import { trackProfileEvent } from "../profile-analytics";
 import type { CompleteProfessionalProfile } from "../profile-service";
-import type { EditSection } from "../ProfileReadonlyView";
-import type { GroupedExperience } from "./career-grouping";
 import { useTaggedMediaItems } from "../../content/use-tagged-content";
+import type { PublicContact } from "../master/PublicContactsList";
 import { CareerTabContent } from "./CareerTabContent";
-import { InfoTab } from "./InfoTab";
 import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
+import { buildPlayerCareerView } from "./player-career-model";
+import { PlayerDetailsTab } from "./PlayerDetailsTab";
 import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
 import { getPlayerMediaTagMeta } from "../player-media";
 
 type ProfileTabViewProps = {
   completeProfile: CompleteProfessionalProfile;
   isOwner: boolean;
-  onAddExperience: () => void;
-  onDeleteExperience: (group: GroupedExperience) => void;
-  onEdit: (section: EditSection) => void;
   onManageMedia: () => void;
 };
 
 export function ProfileTabView({
   completeProfile,
   isOwner,
-  onAddExperience,
-  onDeleteExperience,
-  onEdit,
   onManageMedia,
 }: ProfileTabViewProps) {
+  // Carriera è la tab iniziale (§5).
   const [activeTab, setActiveTab] = useState<ProfileTab>("career");
 
-  const playerExperienceEntries = useMemo(
+  const careerView = useMemo(
     () =>
-      sortPlayerExperiencesBySeason(
+      buildPlayerCareerView(
         (completeProfile.playerCareerEntries ?? []).map((entry) =>
           toPlayerExperienceForm(entry),
         ),
@@ -42,17 +46,47 @@ export function ProfileTabView({
     [completeProfile.playerCareerEntries],
   );
 
+  useEffect(() => {
+    if (activeTab === "career") {
+      trackProfileEvent("career_section_viewed", {
+        profileType: "player",
+        viewerMode: isOwner ? "owner" : "visitor",
+      });
+    }
+  }, [activeTab, isOwner]);
+
+  function handleTabChange(tab: ProfileTab) {
+    setActiveTab(tab);
+    trackProfileEvent("profile_tab_changed", {
+      profileType: "player",
+      tab,
+      viewerMode: isOwner ? "owner" : "visitor",
+    });
+  }
+
+  function handleContactPress(contact: PublicContact) {
+    trackProfileEvent("public_contact_tapped", {
+      contactType: contact.type,
+      profileType: "player",
+      viewerMode: isOwner ? "owner" : "visitor",
+    });
+  }
+
   return (
     <View style={styles.container}>
-      <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <ProfileTabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
       {activeTab === "career" ? (
         <CareerTabContent
-          entries={playerExperienceEntries}
           isOwner={isOwner}
-          onAdd={onAddExperience}
-          onDelete={onDeleteExperience}
-          onEdit={onAddExperience}
+          onMetricChange={(metric) =>
+            trackProfileEvent("career_metric_changed", {
+              careerMetric: metric,
+              profileType: "player",
+              viewerMode: isOwner ? "owner" : "visitor",
+            })
+          }
+          view={careerView}
         />
       ) : activeTab === "media" ? (
         <MediaTab
@@ -61,10 +95,10 @@ export function ProfileTabView({
           onManageMedia={onManageMedia}
         />
       ) : (
-        <InfoTab
+        <PlayerDetailsTab
+          careerView={careerView}
           completeProfile={completeProfile}
-          isOwner={isOwner}
-          onEdit={onEdit}
+          onContactPress={handleContactPress}
         />
       )}
     </View>
@@ -72,7 +106,7 @@ export function ProfileTabView({
 }
 
 // ---------------------------------------------------------------------------
-// Media tab
+// Tab Media
 // ---------------------------------------------------------------------------
 
 function MediaTab({
@@ -143,9 +177,41 @@ function MediaTab({
   return (
     <MediaTabContent
       authorName={completeProfile.profile.full_name}
+      emptyCtaLabel="Aggiungi contenuto"
+      emptyDescription={
+        isOwner
+          ? "Condividi foto e video del tuo percorso sportivo."
+          : "Questo profilo non ha ancora pubblicato contenuti."
+      }
+      emptyTitle="Nessun contenuto ancora"
+      filtersEnabled
       initialItems={[...mediaItems, ...taggedItems]}
       mode={isOwner ? "owner" : "visitor"}
-      onAddContentPress={isOwner ? onManageMedia : undefined}
+      onAddContentPress={
+        isOwner
+          ? () => {
+              trackProfileEvent("profile_media_add_tapped", {
+                profileType: "player",
+                viewerMode: "owner",
+              });
+              onManageMedia();
+            }
+          : undefined
+      }
+      onFilterChange={(filter) =>
+        trackProfileEvent("media_filter_changed", {
+          mediaFilter: filter,
+          profileType: "player",
+          viewerMode: isOwner ? "owner" : "visitor",
+        })
+      }
+      onItemOpened={(item) =>
+        trackProfileEvent("profile_media_opened", {
+          mediaType: item.type,
+          profileType: "player",
+          viewerMode: isOwner ? "owner" : "visitor",
+        })
+      }
       onOpenTaggedItem={onOpenTaggedItem}
     />
   );

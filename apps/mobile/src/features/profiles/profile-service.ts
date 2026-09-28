@@ -402,15 +402,26 @@ type ClubRecord = {
 };
 
 export type PlayerCareerEntryRecord = {
-  appearances: number;
-  assists: number;
+  /**
+   * REV-PROF-01 §19: `null` significa "dato non disponibile", `0` è uno zero
+   * dichiarato. Le due cose non devono collassare nella stessa cella.
+   */
+  appearances: number | null;
+  assists: number | null;
   awards: string | null;
+  /** REV-PROF-01 §17: tipologia dichiarata in REV-ONB-02, ora persistita. */
+  career_type: "MULTI_SEASON" | "SINGLE_SEASON" | "CUSTOM_PERIOD" | null;
   club_id: string | null;
   club_name: string;
   competition_name: string | null;
-  goals: number;
+  /**
+   * REV-PROF-01 §12: identità dell'esperienza a cui la stagione appartiene.
+   * Due periodi distinti nello stesso club hanno gruppi diversi.
+   */
+  experience_group_id: string | null;
+  goals: number | null;
   id: string;
-  minutes_played: number;
+  minutes_played: number | null;
   period_end_month: number | null;
   period_start_month: number | null;
   player_profile_id: string;
@@ -764,9 +775,11 @@ function toPlayerCareerEntryRpcPayload(
     appearances: entry.appearances,
     assists: entry.assists,
     awards: entry.awards,
+    career_type: entry.career_type,
     club_id: entry.club_id,
     club_name: entry.club_name,
     competition_name: entry.competition_name,
+    experience_group_id: entry.experience_group_id,
     goals: entry.goals,
     ...(includeId ? { id: entry.id } : {}),
     minutes_played: entry.minutes_played,
@@ -1471,24 +1484,41 @@ function normalizeClubRecord(profileId: string, rawClub: Partial<ClubRecord> | n
   } satisfies ClubRecord;
 }
 
+function normalizePlayerCareerType(
+  value: unknown,
+): PlayerCareerEntryRecord["career_type"] {
+  return value === "MULTI_SEASON" ||
+    value === "SINGLE_SEASON" ||
+    value === "CUSTOM_PERIOD"
+    ? value
+    : null;
+}
+
 function normalizePlayerCareerEntryRecord(
   profileId: string,
   rawEntry: Partial<PlayerCareerEntryRecord>,
   index: number,
 ) {
   return {
-    appearances: normalizeNumber(rawEntry.appearances) ?? 0,
-    assists: normalizeNumber(rawEntry.assists) ?? 0,
+    // Nessun `?? 0`: una statistica assente resta assente (REV-PROF-01 §19).
+    appearances: normalizeNumber(rawEntry.appearances),
+    assists: normalizeNumber(rawEntry.assists),
     awards: normalizeOptionalText(rawEntry.awards),
+    career_type: normalizePlayerCareerType(rawEntry.career_type),
     club_id:
       typeof rawEntry.club_id === "string" && rawEntry.club_id.trim()
         ? rawEntry.club_id
         : null,
     club_name: normalizeRequiredText(rawEntry.club_name, ""),
     competition_name: normalizeOptionalText(rawEntry.competition_name),
-    goals: normalizeNumber(rawEntry.goals) ?? 0,
+    experience_group_id:
+      typeof rawEntry.experience_group_id === "string" &&
+      rawEntry.experience_group_id.trim()
+        ? rawEntry.experience_group_id
+        : null,
+    goals: normalizeNumber(rawEntry.goals),
     id: normalizeRequiredText(rawEntry.id, `${profileId}-career-${index}`),
-    minutes_played: normalizeNumber(rawEntry.minutes_played) ?? 0,
+    minutes_played: normalizeNumber(rawEntry.minutes_played),
     period_end_month: normalizeNumber(rawEntry.period_end_month),
     period_start_month: normalizeNumber(rawEntry.period_start_month),
     player_profile_id: normalizeRequiredText(rawEntry.player_profile_id, profileId),
@@ -1852,7 +1882,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       supabase
         .from("player_career_entries")
         .select(
-          "id, player_profile_id, season_label, club_id, club_name, competition_name, appearances, goals, assists, minutes_played, awards, sort_order, team_logo_url, season_period, period_start_month, period_end_month",
+          "id, player_profile_id, season_label, club_id, club_name, competition_name, appearances, goals, assists, minutes_played, awards, sort_order, team_logo_url, season_period, period_start_month, period_end_month, experience_group_id, career_type",
         )
         .eq("player_profile_id", profileId)
         .order("sort_order", { ascending: true })

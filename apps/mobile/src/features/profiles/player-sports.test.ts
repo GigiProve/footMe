@@ -62,16 +62,44 @@ describe("player-sports", () => {
     ]);
   });
 
+  // §19: il campo lasciato vuoto non diventa 0, resta `null`.
+  it("keeps empty statistics unknown instead of turning them into zero", () => {
+    const [payload] = parsePlayerExperienceForms([
+      {
+        appearances: "",
+        assists: "0",
+        awards: "",
+        category: "Promozione",
+        clubId: null,
+        clubName: "ASD Real Milano",
+        goals: "",
+        minutesPlayed: "",
+        periodEndMonth: "",
+        periodStartMonth: "",
+        seasonLabel: "2024/2025",
+        seasonPeriod: "full",
+        teamCity: "",
+        teamLogoUrl: "",
+      },
+    ]);
+
+    expect(payload?.appearances).toBeNull();
+    expect(payload?.goals).toBeNull();
+    expect(payload?.assists).toBe(0);
+  });
+
   it("parses reusable player experience forms into the centralized payload", () => {
     const result = parsePlayerExperienceForms([
       {
         appearances: "18",
         assists: "3",
         awards: "",
+        careerType: "SINGLE_SEASON",
         category: "Promozione",
         clubId: "club-1",
         clubName: "ASD Real Milano",
         goals: "6",
+        groupId: "group-1",
         id: "experience-1",
         minutesPlayed: "1440",
         periodEndMonth: "",
@@ -88,9 +116,11 @@ describe("player-sports", () => {
         appearances: 18,
         assists: 3,
         awards: null,
+        career_type: "SINGLE_SEASON",
         club_id: "club-1",
         club_name: "ASD Real Milano",
         competition_name: "Promozione",
+        experience_group_id: "group-1",
         goals: 6,
         id: "experience-1",
         minutes_played: 1440,

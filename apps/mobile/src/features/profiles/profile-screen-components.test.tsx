@@ -25,6 +25,37 @@ vi.mock("./profile-social-service", () => ({
   updateProfileCoverUrl: vi.fn(),
 }));
 
+const OWNER_QUICK_FACTS = [
+  { accessibilityLabel: "Età, 22 anni", key: "age", label: "Età", value: "22" },
+  {
+    accessibilityLabel: "Altezza, 185 centimetri",
+    key: "height",
+    label: "Altezza",
+    unit: "cm",
+    value: "185",
+  },
+  {
+    accessibilityLabel: "Peso, 78 chilogrammi",
+    key: "weight",
+    label: "Peso",
+    unit: "kg",
+    value: "78",
+  },
+  { accessibilityLabel: "Piede, destro", key: "foot", label: "Piede", value: "Destro" },
+] as const;
+
+const MISSING_QUICK_FACTS = [
+  { accessibilityLabel: "Età non indicata", key: "age", label: "Età", value: "—" },
+  {
+    accessibilityLabel: "Altezza non indicata",
+    key: "height",
+    label: "Altezza",
+    value: "—",
+  },
+  { accessibilityLabel: "Peso non indicato", key: "weight", label: "Peso", value: "—" },
+  { accessibilityLabel: "Piede non indicato", key: "foot", label: "Piede", value: "—" },
+] as const;
+
 describe("profile-screen-components", () => {
   it("renders readonly profile fields with a fallback value", () => {
     let tree: TestRenderer.ReactTestRenderer;
@@ -87,24 +118,16 @@ describe("profile-screen-components", () => {
     act(() => {
       tree = TestRenderer.create(
         <PlayerProfileHeader
-          ageLabel="22 anni"
-          availabilityBadges={["Sotto contratto", "Disponibile al trasferimento"]}
+          availabilityLabel="Disponibile al trasferimento · Sotto contratto"
           avatarUrl=""
-          bio="Attaccante dinamico, abituato ad attaccare la profondita'."
-          categoryBadges={["Serie D", "Eccellenza"]}
           clubLabel="ASD Esempio · Eccellenza"
           fullName="Marco Rossi"
-          heightLabel="185 cm"
           locationLabel="Milano, Lombardia"
           mode="owner"
-          onAddContentPress={() => undefined}
           onEditProfilePress={() => undefined}
-          preferredFootLabel="Destro"
           primaryRole="Attaccante"
-          regionBadges={["Lombardia", "Veneto"]}
+          quickFacts={OWNER_QUICK_FACTS}
           secondaryRole="Seconda punta"
-          statusBadge="Disponibile al trasferimento"
-          weightLabel="78 kg"
         />,
       );
     });
@@ -113,9 +136,33 @@ describe("profile-screen-components", () => {
     expect(tree!.root.findByProps({ children: "Attaccante" })).toBeTruthy();
     expect(tree!.root.findByProps({ children: "Seconda punta" })).toBeTruthy();
     expect(tree!.root.findByProps({ accessibilityLabel: "Modifica profilo" })).toBeTruthy();
-    expect(tree!.root.findByProps({ children: "Disponibilita'" })).toBeTruthy();
-    expect(tree!.root.findByProps({ children: "Categorie" })).toBeTruthy();
-    expect(tree!.root.findByProps({ children: "Zone" })).toBeTruthy();
+    // §6: l'Owner non vede azioni da Visitor verso sé stesso.
+    expect(() => tree!.root.findByProps({ accessibilityLabel: "Segui" })).toThrow();
+    expect(() => tree!.root.findByProps({ accessibilityLabel: "Contatta" })).toThrow();
+  });
+
+  // §9: le informazioni rapide non hanno icone e l'unità resta separata dal
+  // numero, così il valore può usare il peso Mulish senza trascinarsi "cm".
+  it("renders quick facts without icons and with units", () => {
+    let tree: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(
+        <PlayerProfileHeader
+          avatarUrl={null}
+          fullName="Marco Rossi"
+          mode="owner"
+          primaryRole="Attaccante"
+          quickFacts={OWNER_QUICK_FACTS}
+        />,
+      );
+    });
+
+    expect(
+      tree!.root.findByProps({ accessibilityLabel: "Altezza, 185 centimetri" }),
+    ).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "185" })).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "cm" })).toBeTruthy();
   });
 
   it("renders the shared player header in visitor mode with visitor actions only", () => {
@@ -124,17 +171,13 @@ describe("profile-screen-components", () => {
     act(() => {
       tree = TestRenderer.create(
         <PlayerProfileHeader
-          ageLabel="22 anni"
-          availabilityBadges={["Svincolato"]}
           avatarUrl={null}
           fullName="Marco Rossi"
-          heightLabel="Da definire"
           mode="visitor"
           onContactPress={() => undefined}
           onFollowPress={() => undefined}
-          preferredFootLabel="Da definire"
           primaryRole="Attaccante"
-          weightLabel="Da definire"
+          quickFacts={OWNER_QUICK_FACTS}
         />,
       );
     });
@@ -145,27 +188,27 @@ describe("profile-screen-components", () => {
     expect(() => tree!.root.findByProps({ accessibilityLabel: "Inserisci contenuti" })).toThrow();
   });
 
+  // §7: senza ruolo secondario non resta un separatore orfano né una
+  // ripetizione del ruolo principale.
   it("keeps the player header stable when optional data is missing", () => {
     let tree: TestRenderer.ReactTestRenderer;
 
     act(() => {
       tree = TestRenderer.create(
         <PlayerProfileHeader
-          ageLabel="Da definire"
           avatarUrl={null}
           fullName="Marco Rossi"
-          heightLabel="Da definire"
           mode="visitor"
-          preferredFootLabel="Da definire"
           primaryRole="Attaccante"
-          weightLabel="Da definire"
+          quickFacts={MISSING_QUICK_FACTS}
         />,
       );
     });
 
     expect(tree!.root.findByProps({ children: "Marco Rossi" })).toBeTruthy();
-    expect(tree!.root.findByProps({ children: "Attaccante" })).toBeTruthy();
-    expect(tree!.root.findAllByProps({ children: "Da definire" }).length).toBeGreaterThan(0);
+    expect(tree!.root.findAllByProps({ children: "Attaccante" }).length).toBeGreaterThan(0);
+    expect(() => tree!.root.findByProps({ children: "·" })).toThrow();
+    expect(tree!.root.findAllByProps({ children: "—" }).length).toBeGreaterThan(0);
   });
 
   it("renders the shared coach header in owner mode", () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -34,6 +34,11 @@ import {
   getCompleteProfessionalProfile,
   type CompleteProfessionalProfile,
 } from "./profile-service";
+import { ProfileSectionError } from "./master/ProfileSectionBlock";
+import {
+  trackPlayerProfileViewed,
+  trackProfileEvent,
+} from "./profile-analytics";
 import { CoachProfileTabView } from "./career/CoachProfileTabView";
 import { ProfileTabView } from "./career/ProfileTabView";
 import { StaffProfileTabView } from "./career/StaffProfileTabView";
@@ -168,6 +173,22 @@ export function PublicProfileScreen() {
     [completeProfile],
   );
 
+  // Una sola visualizzazione per profilo aperto: un rebuild o un cambio tab
+  // non devono rimandare lo stesso evento (§42).
+  const viewedProfilesRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!viewedProfileId || completeProfile?.profile.role !== "player") {
+      return;
+    }
+
+    trackPlayerProfileViewed(
+      viewedProfileId,
+      "visitor",
+      viewedProfilesRef.current,
+    );
+  }, [completeProfile?.profile.role, viewedProfileId]);
+
   const { data: coachSocialSummary } = useQuery({
     enabled: !!viewedProfileId && completeProfile?.profile.role === "coach",
     queryFn: () => fetchProfileSocialSummary(viewedProfileId as string),
@@ -194,13 +215,11 @@ export function PublicProfileScreen() {
       setErrorMessage(null);
       const data = await getCompleteProfessionalProfile(profileId);
       setCompleteProfile(data);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Impossibile caricare questo profilo.";
+    } catch {
+      // Copy leggibile: il messaggio del backend può contenere nomi di RPC,
+      // enum e status code, che non devono arrivare all'utente (§36).
       setCompleteProfile(null);
-      setErrorMessage(message);
+      setErrorMessage("Non è stato possibile caricare il profilo. Riprova.");
     } finally {
       setIsLoading(false);
     }
@@ -567,9 +586,11 @@ export function PublicProfileScreen() {
         ) : errorMessage ? (
           <View style={styles.stateBlock}>
             <AppText variant="titleSm">Profilo non disponibile</AppText>
-            <AppText color="secondary" variant="bodySm">
-              {errorMessage}
-            </AppText>
+            <ProfileSectionError
+              message={errorMessage}
+              onRetry={() => void loadProfile()}
+              testID="profile-load-error"
+            />
           </View>
         ) : completeProfile ? (
           <>
@@ -587,19 +608,44 @@ export function PublicProfileScreen() {
               isSaved={isProfileSaved}
               isShortlisted={canUseShortlistStar ? isShortlisted : undefined}
               onContactPress={
-                canFollowOrSave ? () => handleMessageProfile(completeProfile) : undefined
+                canFollowOrSave
+                  ? () => {
+                      trackProfileEvent("profile_message_tapped", {
+                        profileType: completeProfile.profile.role,
+                        viewerMode: "visitor",
+                      });
+                      void handleMessageProfile(completeProfile);
+                    }
+                  : undefined
               }
               onFollowersPress={() =>
                 router.push(
                   `/profile/connections?profileId=${completeProfile.profile.id}&mode=followers` as never,
                 )
               }
-              onFollowPress={canFollowOrSave ? handleToggleFollow : undefined}
+              onFollowPress={
+                canFollowOrSave
+                  ? () => {
+                      trackProfileEvent("profile_follow_tapped", {
+                        profileType: completeProfile.profile.role,
+                        viewerMode: "visitor",
+                      });
+                      void handleToggleFollow();
+                    }
+                  : undefined
+              }
               onMutualPress={() =>
                 router.push(
                   `/profile/connections?profileId=${completeProfile.profile.id}&mode=mutual` as never,
                 )
               }
+              onSharePress={() => {
+                trackProfileEvent("profile_share_tapped", {
+                  profileType: completeProfile.profile.role,
+                  viewerMode: "visitor",
+                });
+                void handleShareProfile();
+              }}
               onShortlistPress={canUseShortlistStar ? handleShortlistPress : undefined}
               playerHeaderDetails={playerHeaderDetails}
               staffHeaderDetails={staffHeaderDetails}
@@ -699,6 +745,7 @@ function ProfileHeaderBlock({
   onFollowPress,
   onMutualPress,
   onSavePress,
+  onSharePress,
   onShortlistPress,
   playerHeaderDetails,
   staffHeaderDetails,
@@ -717,6 +764,7 @@ function ProfileHeaderBlock({
   onFollowPress?: () => void;
   onMutualPress?: () => void;
   onSavePress?: () => void;
+  onSharePress?: () => void;
   onShortlistPress?: () => void;
   playerHeaderDetails: ReturnType<typeof buildPlayerProfileHeaderDetails>;
   staffHeaderDetails: ReturnType<typeof buildStaffProfileHeaderDetails>;
@@ -726,14 +774,11 @@ function ProfileHeaderBlock({
   if (role === "player" && playerHeaderDetails) {
     return (
       <PlayerProfileHeader
-        ageLabel={playerHeaderDetails.ageLabel}
-        availabilityBadges={playerHeaderDetails.availabilityBadges}
+        availabilityLabel={playerHeaderDetails.availabilityLabel}
         avatarUrl={completeProfile.profile.avatar_url}
-        bio={playerHeaderDetails.bio}
-        categoryBadges={completeProfile.playerProfile?.preferred_categories ?? []}
         clubLabel={playerHeaderDetails.clubLabel}
+        coverImageUrl={completeProfile.profile.cover_url}
         fullName={playerHeaderDetails.fullName}
-        heightLabel={playerHeaderDetails.heightLabel}
         locationLabel={playerHeaderDetails.locationLabel}
         mode="visitor"
         isFollowed={isFollowed}
@@ -744,12 +789,10 @@ function ProfileHeaderBlock({
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
         onShortlistPress={onShortlistPress}
-        preferredFootLabel={playerHeaderDetails.preferredFootLabel}
+        onSharePress={onSharePress}
         primaryRole={playerHeaderDetails.primaryRole}
-        regionBadges={playerHeaderDetails.regionBadges}
+        quickFacts={playerHeaderDetails.quickFacts}
         secondaryRole={playerHeaderDetails.secondaryRole}
-        statusBadge={playerHeaderDetails.statusBadge}
-        weightLabel={playerHeaderDetails.weightLabel}
       />
     );
   }
@@ -1006,9 +1049,6 @@ function ProfileContentBlock({
         <ProfileTabView
           completeProfile={completeProfile}
           isOwner={false}
-          onAddExperience={noop}
-          onDeleteExperience={noop}
-          onEdit={noop}
           onManageMedia={noop}
         />
       </View>

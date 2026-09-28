@@ -113,6 +113,13 @@ type UnifiedPlayerFormState = {
 type Props = {
   completeProfile: CompleteProfessionalProfile;
   onClose: () => void;
+  /**
+   * REV-PROF-01 §32: la Carriera read-only non ha più controlli inline, quindi
+   * gli editor di esperienze e situazione contrattuale si raggiungono da qui.
+   * Sono gli stessi editor già esistenti, non ne viene creato uno nuovo.
+   */
+  onOpenExperiences?: () => void;
+  onOpenSituation?: () => void;
   onSaved: () => void;
   userId: string;
   visible: boolean;
@@ -203,6 +210,8 @@ function buildFormFromProfile(
 export function EditPlayerProfileModal({
   completeProfile,
   onClose,
+  onOpenExperiences,
+  onOpenSituation,
   onSaved,
   userId,
   visible,
@@ -694,6 +703,35 @@ export function EditPlayerProfileModal({
           variant="outline"
         />
       </SectionCard>
+
+      {/* Carriera e situazione: rimandano agli editor dedicati già esistenti. */}
+      {onOpenExperiences ? (
+        <SectionCard
+          description="Esperienze, stagioni e statistiche del tuo percorso sportivo."
+          title="Carriera"
+        >
+          <Button
+            accessibilityLabel="Gestisci esperienze"
+            label="Gestisci esperienze"
+            onPress={onOpenExperiences}
+            variant="outline"
+          />
+        </SectionCard>
+      ) : null}
+
+      {onOpenSituation ? (
+        <SectionCard
+          description="Stato contrattuale, condizione attuale e disponibilità per provini."
+          title="Situazione attuale"
+        >
+          <Button
+            accessibilityLabel="Modifica situazione attuale"
+            label="Modifica situazione attuale"
+            onPress={onOpenSituation}
+            variant="outline"
+          />
+        </SectionCard>
+      ) : null}
 
       {/* Bio */}
       <SectionCard title="Bio">

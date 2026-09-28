@@ -13,6 +13,11 @@ import {
   updateProfileCoverUrl,
   type ProfileConnectionPreview,
 } from "./profile-social-service";
+import { ProfileHeroHeader } from "./master/ProfileHeroHeader";
+import {
+  ProfileQuickFacts,
+  type ProfileQuickFact,
+} from "./master/ProfileQuickFacts";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
 import { AppText, ActionSheet, Avatar, Badge, Button, Divider, Input } from "../../ui";
 
@@ -49,34 +54,35 @@ type ProfileFieldProps = {
 
 export type PlayerProfileHeaderMode = "owner" | "visitor";
 
+/**
+ * Header del Master Profile Calciatore (REV-PROF-01 §7–§9).
+ *
+ * La composizione vive in `master/ProfileHeroHeader` e
+ * `master/ProfileQuickFacts`: qui restano solo il mapping dei dati del
+ * Calciatore e le azioni, che sono l'unica differenza fra Owner e Visitor.
+ */
 type PlayerProfileHeaderProps = {
-  ageLabel: string;
-  availabilityBadges?: string[];
+  /** Riga discreta di disponibilità: "Disponibile al trasferimento · Sotto contratto". */
+  availabilityLabel?: string;
   avatarUrl: string | null | undefined;
-  bio?: string | null;
-  categoryBadges?: string[];
   clubLabel?: string;
   coverImageUrl?: string | null;
   fullName: string;
-  heightLabel: string;
   locationLabel?: string;
   mode: PlayerProfileHeaderMode;
-  onAddContentPress?: () => void;
   onContactPress?: () => void;
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
+  onSharePress?: () => void;
   isFollowed?: boolean;
   isMessaging?: boolean;
   isSaved?: boolean;
   onSavePress?: () => void;
   isShortlisted?: boolean;
   onShortlistPress?: () => void;
-  preferredFootLabel: string;
   primaryRole: string;
-  regionBadges?: string[];
+  quickFacts?: readonly ProfileQuickFact[];
   secondaryRole?: string;
-  statusBadge?: string;
-  weightLabel: string;
 };
 
 export type CoachProfileSocialSummary = {
@@ -123,123 +129,43 @@ const DEFAULT_PLAYER_COVER_URI =
   "https://storage.googleapis.com/banani-generated-images/generated-images/b339be2f-1f6e-4796-b76a-a714a1fe33d2.jpg";
 
 export function PlayerProfileHeader({
-  ageLabel,
-  availabilityBadges = [],
+  availabilityLabel,
   avatarUrl,
-  bio,
-  categoryBadges = [],
   clubLabel,
   coverImageUrl,
   fullName,
-  heightLabel,
   locationLabel,
   mode,
-  onAddContentPress,
   onContactPress,
   onEditProfilePress,
   onFollowPress,
+  onSharePress,
   isFollowed,
   isMessaging,
   isSaved,
   onSavePress,
   isShortlisted,
   onShortlistPress,
-  preferredFootLabel,
   primaryRole,
-  regionBadges = [],
+  quickFacts = [],
   secondaryRole,
-  statusBadge,
-  weightLabel,
 }: PlayerProfileHeaderProps) {
-  const resolvedAvatarUrl = withDefaultProfileAvatar(avatarUrl);
-  const infoGroups = [
-    {
-      label: "Disponibilita'",
-      values: availabilityBadges,
-      variant: "success" as const,
-    },
-    {
-      label: "Categorie",
-      values: categoryBadges,
-      variant: "default" as const,
-    },
-    {
-      label: "Zone",
-      values: regionBadges,
-      variant: "default" as const,
-    },
-  ].filter((group) => group.values.length > 0);
+  const metaRows = [
+    clubLabel ? { key: "club", text: clubLabel } : null,
+    locationLabel
+      ? { icon: "location-outline" as const, key: "location", text: locationLabel }
+      : null,
+  ].filter((row): row is NonNullable<typeof row> => row !== null);
 
   return (
     <View style={styles.playerHeaderSurface}>
-      <View style={styles.playerHeroBlock}>
-        <Image
-          accessibilityLabel="Copertina profilo giocatore"
-          source={{ uri: coverImageUrl || DEFAULT_PLAYER_COVER_URI }}
-          style={styles.playerCoverImage}
-        />
-        <View pointerEvents="none" style={styles.playerCoverOverlay} />
-        <View style={styles.playerAvatarShell}>
-          <Avatar name={fullName} size="xl" uri={resolvedAvatarUrl} />
-        </View>
-        <View style={styles.playerHeroContent}>
-          <View style={styles.playerIdentityStack}>
-            <AppText variant="headingLg">{fullName}</AppText>
-            <View style={styles.playerRoleRow}>
-              <AppText color="accent" style={styles.playerPrimaryRole} variant="titleSm">
-                {primaryRole}
-              </AppText>
-              {secondaryRole ? (
-                <>
-                  <AppText color="secondary" variant="titleSm">
-                    /
-                  </AppText>
-                  <AppText color="secondary" style={styles.playerSecondaryRole} variant="titleSm">
-                    {secondaryRole}
-                  </AppText>
-                </>
-              ) : null}
-            </View>
-            {clubLabel ? (
-              <View style={styles.playerMetaRow}>
-                <Ionicons
-                  color={colors.textSecondary}
-                  name="shield-outline"
-                  size={15}
-                />
-                <AppText color="secondary" variant="bodySm">
-                  {clubLabel}
-                </AppText>
-              </View>
-            ) : null}
-            {locationLabel ? (
-              <View style={styles.playerMetaRow}>
-                <Ionicons
-                  color={colors.textSecondary}
-                  name="location-outline"
-                  size={15}
-                />
-                <AppText color="secondary" variant="bodySm">
-                  {locationLabel}
-                </AppText>
-              </View>
-            ) : null}
-          </View>
-
-          {statusBadge ? (
-            <View style={styles.playerStatusBadge}>
-              <Ionicons
-                color={colors.successForeground}
-                name="checkmark-circle"
-                size={16}
-              />
-              <AppText color="success" variant="caption">
-                {statusBadge}
-              </AppText>
-            </View>
-          ) : null}
-
-          <View style={styles.playerActionsRow}>
+      <ProfileHeroHeader
+        actions={
+          <>
+            {/*
+              Le azioni cambiano con il viewer, non la struttura: l'Owner non
+              vede mai Segui o Messaggio verso sé stesso (§6).
+            */}
             {mode === "owner" ? (
               <HeaderActionButton
                 icon="create-outline"
@@ -259,55 +185,37 @@ export function PlayerProfileHeader({
                 onShortlistPress={onShortlistPress}
               />
             )}
-          </View>
-        </View>
-      </View>
+            {onSharePress ? (
+              <Pressable
+                accessibilityLabel="Condividi profilo"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={onSharePress}
+                style={({ pressed }) => [
+                  styles.headerSaveButton,
+                  pressed ? styles.headerSavePressed : null,
+                ]}
+              >
+                <Ionicons
+                  color={colors.textSecondary}
+                  name="share-outline"
+                  size={20}
+                />
+              </Pressable>
+            ) : null}
+          </>
+        }
+        availabilityLabel={availabilityLabel}
+        avatarUrl={withDefaultProfileAvatar(avatarUrl)}
+        coverImageUrl={coverImageUrl}
+        fullName={fullName}
+        metaRows={metaRows}
+        primaryRole={primaryRole}
+        secondaryRole={secondaryRole}
+        testID="player-profile-header"
+      />
 
-      <View style={styles.playerSummarySection}>
-        <View style={styles.playerStatsRow}>
-          <StatItem label="Eta'" value={ageLabel} />
-          <StatItem label="Altezza" value={heightLabel} />
-          <StatItem label="Peso" value={weightLabel} />
-          <StatItem label="Piede" value={preferredFootLabel} />
-        </View>
-      </View>
-
-      {bio?.trim() || infoGroups.length > 0 ? (
-        <>
-          <Divider />
-          <View style={styles.playerSummarySection}>
-          {bio?.trim() ? (
-            <View style={styles.playerInfoBlock}>
-              <AppText color="secondary" variant="overline">
-                Bio
-              </AppText>
-              <AppText numberOfLines={3} variant="bodySm">
-                {bio.trim()}
-              </AppText>
-            </View>
-          ) : null}
-
-          {bio?.trim() && infoGroups.length > 0 ? <Divider /> : null}
-
-          {infoGroups.length > 0 ? (
-            <View style={styles.playerChipSectionList}>
-              {infoGroups.map((group) => (
-                <View key={group.label} style={styles.playerInfoBlock}>
-                  <AppText color="secondary" variant="overline">
-                    {group.label}
-                  </AppText>
-                  <View style={styles.playerChipWrap}>
-                    {group.values.map((value) => (
-                      <Badge key={`${group.label}-${value}`} label={value} variant={group.variant} />
-                    ))}
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
-          </View>
-        </>
-      ) : null}
+      <ProfileQuickFacts facts={quickFacts} testID="player-quick-facts" />
     </View>
   );
 }
@@ -1189,19 +1097,6 @@ function HeaderActionButton({
   );
 }
 
-function StatItem({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.playerStatItem}>
-      <AppText color="secondary" variant="caption">
-        {label}
-      </AppText>
-      <AppText numberOfLines={1} style={styles.playerStatValue} variant="bodySm">
-        {value}
-      </AppText>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   avatar: {
     width: 104,
@@ -1444,20 +1339,10 @@ const styles = StyleSheet.create({
   playerSecondaryRole: {
     fontWeight: typography.fontWeight.semibold,
   },
-  playerStatItem: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: "center",
-    gap: spacing[4],
-  },
   playerStatsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: spacing[10],
-  },
-  playerStatValue: {
-    fontWeight: typography.fontWeight.semibold,
-    textAlign: "center",
   },
   playerStatusBadge: {
     alignSelf: "flex-start",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Linking,
@@ -106,6 +106,10 @@ import type { GroupedExperience } from "../../src/features/profiles/career/caree
 import type { CoachGroupedExperience } from "../../src/features/profiles/career/coach-career-grouping";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
 import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
+import {
+  trackPlayerProfileViewed,
+  trackProfileEvent,
+} from "../../src/features/profiles/profile-analytics";
 import { SavedSection } from "../../src/features/saved/SavedSection";
 import { FollowingSection } from "../../src/features/following/FollowingSection";
 import { colors, radius, spacing } from "../../src/theme/tokens";
@@ -231,17 +235,17 @@ export default function ProfileScreen() {
         setClubOverview(emptyClubOverview);
         setClubMembers([]);
       }
-    } catch (error) {
+    } catch {
       setClubTeams([]);
       setClubTeamProfiles({});
       setClubHeaderStats(emptyClubHeaderStats);
       setClubOverview(emptyClubOverview);
       setClubMembers([]);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Errore durante il caricamento del profilo.";
-      Alert.alert("Profilo non disponibile", message);
+      // Copy leggibile: niente messaggi tecnici del backend (§36).
+      Alert.alert(
+        "Profilo non disponibile",
+        "Non è stato possibile caricare il profilo. Riprova.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -293,6 +297,17 @@ export default function ProfileScreen() {
       completeProfile ? buildStaffProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
+
+  // Una sola visualizzazione per profilo aperto (§42).
+  const viewedProfilesRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!userId || profile?.role !== "player") {
+      return;
+    }
+
+    trackPlayerProfileViewed(userId, "owner", viewedProfilesRef.current);
+  }, [profile?.role, userId]);
 
   if (!userId || !profile) {
     return null;
@@ -761,26 +776,23 @@ export default function ProfileScreen() {
           />
         ) : completeProfile && role === "player" && playerHeaderDetails ? (
           <PlayerProfileHeader
-            ageLabel={playerHeaderDetails.ageLabel}
-            availabilityBadges={playerHeaderDetails.availabilityBadges}
+            availabilityLabel={playerHeaderDetails.availabilityLabel}
             avatarUrl={completeProfile.profile.avatar_url}
-            bio={playerHeaderDetails.bio}
-            categoryBadges={
-              completeProfile.playerProfile?.preferred_categories ?? []
-            }
             clubLabel={playerHeaderDetails.clubLabel}
+            coverImageUrl={completeProfile.profile.cover_url}
             fullName={playerHeaderDetails.fullName}
-            heightLabel={playerHeaderDetails.heightLabel}
             locationLabel={playerHeaderDetails.locationLabel}
             mode="owner"
-            onAddContentPress={() => handleEdit("playerSports")}
-            onEditProfilePress={() => handleEdit("editPlayerProfile")}
-            preferredFootLabel={playerHeaderDetails.preferredFootLabel}
+            onEditProfilePress={() => {
+              trackProfileEvent("profile_edit_tapped", {
+                profileType: "player",
+                viewerMode: "owner",
+              });
+              handleEdit("editPlayerProfile");
+            }}
             primaryRole={playerHeaderDetails.primaryRole}
-            regionBadges={playerHeaderDetails.regionBadges}
+            quickFacts={playerHeaderDetails.quickFacts}
             secondaryRole={playerHeaderDetails.secondaryRole}
-            statusBadge={playerHeaderDetails.statusBadge}
-            weightLabel={playerHeaderDetails.weightLabel}
           />
         ) : completeProfile && role === "coach" && coachHeaderDetails ? (
           <CoachProfileHeader
@@ -867,10 +879,7 @@ export default function ProfileScreen() {
         ) : completeProfile && role === "player" ? (
           <ProfileTabView
             completeProfile={completeProfile}
-            isOwner={true}
-            onAddExperience={() => handleEdit("playerExperiences")}
-            onDeleteExperience={handleDeleteExperience}
-            onEdit={handleEdit}
+            isOwner
             onManageMedia={() => handleEdit("playerMedia")}
           />
         ) : completeProfile && role === "coach" ? (
@@ -1011,6 +1020,8 @@ export default function ProfileScreen() {
                 onClose={handleCloseModal}
                 onSaved={handleSaved}
                 userId={userId}
+                onOpenExperiences={() => handleEdit("playerExperiences")}
+                onOpenSituation={() => handleEdit("playerSituation")}
                 visible={activeModal === "editPlayerProfile"}
               />
             </>

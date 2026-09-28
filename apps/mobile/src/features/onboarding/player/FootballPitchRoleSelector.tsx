@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Svg, { Circle, Line, Rect } from "react-native-svg";
 
 import { colors, typography } from "../../../styles";
 import { AppText } from "../../../ui";
@@ -12,28 +11,20 @@ import {
   onboardingSpacing,
 } from "../ui/onboarding-tokens";
 import {
+  PITCH_ASPECT_RATIO,
+  PITCH_GRASS,
+  PitchMarkings,
+} from "./PitchMarkings";
+import {
   PITCH_SLOTS,
   getPitchSlotAccessibilityLabel,
   getPitchSlotState,
   type PitchSlotState,
 } from "./player-pitch-positions";
 
-/**
- * Colori del manto erboso. Non sono token del Design System: descrivono un
- * oggetto reale — il campo — e vivono solo qui (§M). Tutto il resto della
- * schermata usa la palette ProLink.
- */
-const PITCH_GRASS = "#2F7D4F";
-const PITCH_GRASS_BAND = "#2A7248";
-const PITCH_LINE = "rgba(255,255,255,0.55)";
 /** Pastiglia di un ruolo non scelto: inchiostro velato sull'erba. */
 const PITCH_NODE_IDLE = "rgba(12,27,42,0.42)";
 const PITCH_NODE_OUTLINE = "rgba(255,255,255,0.55)";
-
-/** Metà campo FIFA in metri: il rettangolo resta proporzionato (§M). */
-const PITCH_VIEWBOX_WIDTH = 68;
-const PITCH_VIEWBOX_HEIGHT = 105;
-const PITCH_ASPECT_RATIO = PITCH_VIEWBOX_WIDTH / PITCH_VIEWBOX_HEIGHT;
 
 const NODE_SIZE = 42;
 const PITCH_MAX_WIDTH = 264;
@@ -106,133 +97,6 @@ export function FootballPitchRoleSelector({
 
       {errorMessage ? <InlineError message={errorMessage} /> : null}
     </View>
-  );
-}
-
-/** Linee del campo: laterali, fondo, metà campo, cerchio, aree, porte (§M). */
-function PitchMarkings() {
-  return (
-    <Svg
-      height="100%"
-      pointerEvents="none"
-      style={StyleSheet.absoluteFill}
-      viewBox={`0 0 ${PITCH_VIEWBOX_WIDTH} ${PITCH_VIEWBOX_HEIGHT}`}
-      width="100%"
-    >
-      {/* Fasce di taglio dell'erba: due toni, nessun gradiente. */}
-      {[0, 2, 4, 6, 8].map((band) => (
-        <Rect
-          fill={PITCH_GRASS_BAND}
-          height={PITCH_VIEWBOX_HEIGHT / 10}
-          key={band}
-          width={PITCH_VIEWBOX_WIDTH}
-          x={0}
-          y={(band * PITCH_VIEWBOX_HEIGHT) / 10}
-        />
-      ))}
-
-      {/* Perimetro: linee laterali e linee di fondo. */}
-      <Rect
-        fill="none"
-        height={PITCH_VIEWBOX_HEIGHT - 4}
-        stroke={PITCH_LINE}
-        strokeWidth={0.7}
-        width={PITCH_VIEWBOX_WIDTH - 4}
-        x={2}
-        y={2}
-      />
-
-      {/* Metà campo e cerchio di centrocampo. */}
-      <Line
-        stroke={PITCH_LINE}
-        strokeWidth={0.7}
-        x1={2}
-        x2={PITCH_VIEWBOX_WIDTH - 2}
-        y1={PITCH_VIEWBOX_HEIGHT / 2}
-        y2={PITCH_VIEWBOX_HEIGHT / 2}
-      />
-      <Circle
-        cx={PITCH_VIEWBOX_WIDTH / 2}
-        cy={PITCH_VIEWBOX_HEIGHT / 2}
-        fill="none"
-        r={9.15}
-        stroke={PITCH_LINE}
-        strokeWidth={0.7}
-      />
-      <Circle
-        cx={PITCH_VIEWBOX_WIDTH / 2}
-        cy={PITCH_VIEWBOX_HEIGHT / 2}
-        fill={PITCH_LINE}
-        r={0.7}
-      />
-
-      {/* Aree di rigore e aree piccole, in alto e in basso. */}
-      <Rect
-        fill="none"
-        height={16.5}
-        stroke={PITCH_LINE}
-        strokeWidth={0.7}
-        width={40.3}
-        x={13.85}
-        y={2}
-      />
-      <Rect
-        fill="none"
-        height={5.5}
-        stroke={PITCH_LINE}
-        strokeWidth={0.7}
-        width={18.3}
-        x={24.85}
-        y={2}
-      />
-      <Rect
-        fill="none"
-        height={16.5}
-        stroke={PITCH_LINE}
-        strokeWidth={0.7}
-        width={40.3}
-        x={13.85}
-        y={PITCH_VIEWBOX_HEIGHT - 18.5}
-      />
-      <Rect
-        fill="none"
-        height={5.5}
-        stroke={PITCH_LINE}
-        strokeWidth={0.7}
-        width={18.3}
-        x={24.85}
-        y={PITCH_VIEWBOX_HEIGHT - 7.5}
-      />
-
-      {/* Dischetti del rigore. */}
-      <Circle cx={PITCH_VIEWBOX_WIDTH / 2} cy={13} fill={PITCH_LINE} r={0.7} />
-      <Circle
-        cx={PITCH_VIEWBOX_WIDTH / 2}
-        cy={PITCH_VIEWBOX_HEIGHT - 13}
-        fill={PITCH_LINE}
-        r={0.7}
-      />
-
-      {/* Porte, appoggiate alla linea di fondo. */}
-      <Rect
-        fill="rgba(255,255,255,0.28)"
-        height={2}
-        stroke={PITCH_LINE}
-        strokeWidth={0.5}
-        width={12}
-        x={PITCH_VIEWBOX_WIDTH / 2 - 6}
-        y={0.2}
-      />
-      <Rect
-        fill="rgba(255,255,255,0.28)"
-        height={2}
-        stroke={PITCH_LINE}
-        strokeWidth={0.5}
-        width={12}
-        x={PITCH_VIEWBOX_WIDTH / 2 - 6}
-        y={PITCH_VIEWBOX_HEIGHT - 2.2}
-      />
-    </Svg>
   );
 }
 

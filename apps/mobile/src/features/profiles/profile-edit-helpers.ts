@@ -9,6 +9,8 @@ import type {
   CompleteProfessionalProfileUpdate,
 } from "./profile-service";
 import type { PlayerExperienceForm, PlayerPosition, PreferredFoot } from "./player-sports";
+import { buildPlayerCareerView } from "./career/player-career-model";
+import type { ProfileQuickFact } from "./master/ProfileQuickFacts";
 import type { ClubSeasonForm } from "./club-season-section";
 import { formToInput, recordToForm } from "./club-season-section";
 import {
@@ -631,20 +633,68 @@ export function buildHeaderDetails(data: CompleteProfessionalProfile) {
 }
 
 export type PlayerProfileHeaderDetails = {
-  ageLabel: string;
-  availabilityBadges: string[];
+  /** Riga discreta di disponibilità dell'header (REV-PROF-01 §7). */
+  availabilityLabel?: string;
   bio: string | null;
   clubLabel?: string;
   fullName: string;
-  heightLabel: string;
   locationLabel?: string;
-  preferredFootLabel: string;
   primaryRole: string;
-  regionBadges: string[];
+  /** Età, Altezza, Peso, Piede — senza icone, con unità separata (§9). */
+  quickFacts: ProfileQuickFact[];
   secondaryRole?: string;
-  statusBadge?: string;
-  weightLabel: string;
 };
+
+/**
+ * Informazioni rapide del Calciatore (§9).
+ *
+ * Un dato mancante non diventa zero e non diventa un "Non specificato" grande:
+ * mostra un trattino e lascia la riga in equilibrio.
+ */
+function buildPlayerQuickFacts(
+  data: CompleteProfessionalProfile,
+  age: number | null,
+): ProfileQuickFact[] {
+  const heightCm = data.playerProfile?.height_cm ?? null;
+  const weightKg = data.playerProfile?.weight_kg ?? null;
+  const foot = data.playerProfile?.preferred_foot ?? null;
+  const footLabel = foot ? getPreferredFootLabel(foot) : null;
+
+  return [
+    {
+      accessibilityLabel: age ? `Età, ${age} anni` : "Età non indicata",
+      key: "age",
+      label: "Età",
+      value: age ? String(age) : "—",
+    },
+    {
+      accessibilityLabel: heightCm
+        ? `Altezza, ${heightCm} centimetri`
+        : "Altezza non indicata",
+      key: "height",
+      label: "Altezza",
+      ...(heightCm ? { unit: "cm" } : {}),
+      value: heightCm ? String(heightCm) : "—",
+    },
+    {
+      accessibilityLabel: weightKg
+        ? `Peso, ${weightKg} chilogrammi`
+        : "Peso non indicato",
+      key: "weight",
+      label: "Peso",
+      ...(weightKg ? { unit: "kg" } : {}),
+      value: weightKg ? String(weightKg) : "—",
+    },
+    {
+      accessibilityLabel: footLabel
+        ? `Piede, ${footLabel.toLowerCase()}`
+        : "Piede non indicato",
+      key: "foot",
+      label: "Piede",
+      value: footLabel ?? "—",
+    },
+  ];
+}
 
 export type CoachProfileHeaderDetails = {
   assignmentLabel?: string;
@@ -681,56 +731,54 @@ export function buildPlayerProfileHeaderDetails(
   }
 
   const age = data.profile.age ?? calculateAge(data.profile.birth_date);
-  const latestEntry = getLatestPlayerExperience(
-    data.playerCareerEntries.map((entry) => toPlayerExperienceForm(entry)),
-  );
   const primaryRole = getPlayerPositionLabel(
     data.playerProfile?.primary_position ?? DEFAULT_PLAYER_PRIMARY_POSITION,
   );
   const secondaryRole = getPlayerPositionLabels(
     data.playerProfile?.secondary_positions,
   ).find((label) => label !== primaryRole);
-  const clubLabel = [latestEntry?.clubName?.trim(), latestEntry?.category?.trim()]
+  // Squadra e categoria attuali vengono dall'esperienza che copre la stagione
+  // in corso, non dall'ultima riga salvata: se nessuna è in corso la riga non
+  // compare, invece di indovinare una società (§7).
+  const currentExperience = buildPlayerCareerView(
+    data.playerCareerEntries.map((entry) => toPlayerExperienceForm(entry)),
+  ).experiences.find((experience) => experience.isCurrent);
+  const clubLabel = [
+    currentExperience?.clubName.trim(),
+    currentExperience?.seasons[0]?.category.trim(),
+  ]
     .filter(Boolean)
     .join(" · ");
   const locationLabel = formatLocationSummary(
     data.profile.city ?? data.profile.residence ?? data.profile.current_location_city,
     data.profile.region,
   );
-  const isAvailable =
+  const isAvailable = Boolean(
     data.profile.is_open_to_transfer ||
-    data.playerProfile?.willing_to_change_club;
-  const availabilityBadges = [
-    latestEntry?.clubName?.trim() ? "Sotto contratto" : "Svincolato",
-    isAvailable ? "Disponibile al trasferimento" : "In valutazione",
-  ];
+      data.playerProfile?.willing_to_change_club,
+  );
+  // Lo stato contrattuale è un dato del profilo, non qualcosa da dedurre
+  // dall'ultima esperienza salvata (§7, §28).
+  const contractStatus =
+    data.playerProfile?.contract_status === "tesserato"
+      ? "Sotto contratto"
+      : data.playerProfile?.contract_status === "svincolato"
+        ? "Svincolato"
+        : null;
+  const availabilityLabel =
+    [isAvailable ? "Disponibile al trasferimento" : null, contractStatus]
+      .filter(Boolean)
+      .join(" · ") || undefined;
 
   return {
-    ageLabel: age ? `${age} anni` : "Da definire",
-    availabilityBadges,
+    availabilityLabel,
     bio: data.profile.bio?.trim() || null,
     clubLabel: clubLabel || undefined,
     fullName: formatProfileDisplayName(data.profile.full_name, null),
-    heightLabel: data.playerProfile?.height_cm
-      ? `${data.playerProfile.height_cm} cm`
-      : "Da definire",
     locationLabel: locationLabel === "Da completare" ? undefined : locationLabel,
-    preferredFootLabel: getPreferredFootLabel(
-      data.playerProfile?.preferred_foot,
-      "Da definire",
-    ),
     primaryRole,
-    regionBadges: data.playerProfile?.show_regions_badge
-      ? (data.playerProfile?.transfer_regions?.filter(Boolean) ?? [])
-      : [],
+    quickFacts: buildPlayerQuickFacts(data, age),
     secondaryRole,
-    statusBadge:
-      data.playerProfile?.show_transfer_badge && isAvailable
-        ? "Disponibile al trasferimento"
-        : undefined,
-    weightLabel: data.playerProfile?.weight_kg
-      ? `${data.playerProfile.weight_kg} kg`
-      : "Da definire",
   };
 }
 

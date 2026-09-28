@@ -115,6 +115,11 @@ export function CoachProfileTabView({
         />
       ) : activeTab === "media" ? (
         <MediaTabContent
+          emptyDescription={
+            isOwner
+              ? "Aggiungi foto e video per mostrare il lavoro svolto sul campo."
+              : "Questo profilo allenatore non ha ancora pubblicato contenuti."
+          }
           authorName={completeProfile.profile.full_name}
           initialItems={[...mediaItems, ...taggedItems]}
           mode={isOwner ? "owner" : "visitor"}

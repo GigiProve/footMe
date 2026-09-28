@@ -20,14 +20,52 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { VideoPlayerModal } from "../../../components/ui/video-player-modal";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button } from "../../../ui";
+import { ProfileFilterChips } from "../master/ProfileFilterChips";
+
+/** "0:24" — i secondi sono sempre a due cifre. */
+export function formatMediaDuration(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.round(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+/** Un video comunica tipologia e durata, non solo "apri contenuto" (§39). */
+function buildMediaItemAccessibilityLabel(item: MediaContentItem): string {
+  if (item.type === "video") {
+    return item.durationSeconds != null
+      ? `Video, durata ${formatMediaDuration(item.durationSeconds)}`
+      : "Video";
+  }
+
+  return item.tag?.label ? `Foto, ${item.tag.label}` : "Foto";
+}
 
 export type MediaViewerMode = "owner" | "visitor";
 
+/** Filtri della galleria (REV-PROF-01 §23). */
+export type MediaFilter = "all" | "photo" | "video";
+
+const MEDIA_FILTER_OPTIONS: readonly { label: string; value: MediaFilter }[] = [
+  { label: "Tutti", value: "all" },
+  { label: "Foto", value: "photo" },
+  { label: "Video", value: "video" },
+];
+
 type MediaTabContentProps = {
   authorName: string;
+  /** Copy dell'empty state: cambia per tipologia di profilo (§24). */
+  emptyCtaLabel?: string;
+  emptyDescription?: string;
+  emptyTitle?: string;
+  /** Filtri Tutti/Foto/Video sopra la griglia. */
+  filtersEnabled?: boolean;
   initialItems?: MediaContentItem[];
   mode: MediaViewerMode;
   onAddContentPress?: () => void;
+  onFilterChange?: (filter: MediaFilter) => void;
+  onItemOpened?: (item: MediaContentItem) => void;
   onOpenTaggedItem?: (ref: { contentType: string; postId: string }) => void;
 };
 
@@ -55,6 +93,8 @@ export type MediaContentItem = {
   isSaved: boolean;
   likeCount: number;
   tag?: MediaContentTag;
+  /** Durata del video in secondi, quando la sorgente la conosce (§23). */
+  durationSeconds?: number;
   taggedRef?: { contentType: "club_media" | "fan_tribuna" | "media_profile"; postId: string };
   thumbnailUrl: string;
   type: "image" | "video";
@@ -63,12 +103,19 @@ export type MediaContentItem = {
 
 export function MediaTabContent({
   authorName,
+  emptyCtaLabel = "Aggiungi contenuto",
+  emptyDescription,
+  emptyTitle = "Nessun contenuto",
+  filtersEnabled = false,
   initialItems = [],
   mode,
   onAddContentPress,
+  onFilterChange,
+  onItemOpened,
   onOpenTaggedItem,
 }: MediaTabContentProps) {
   const [items, setItems] = useState(initialItems);
+  const [filter, setFilter] = useState<MediaFilter>("all");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [activeViewerIndex, setActiveViewerIndex] = useState(0);
   const [isGridInteractionLocked, setIsGridInteractionLocked] = useState(false);
@@ -102,11 +149,22 @@ export function MediaTabContent({
     [items],
   );
 
-  const selectedItem = useMemo(
-    () => orderedItems.find((item) => item.id === selectedItemId) ?? null,
-    [orderedItems, selectedItemId],
+  // Il filtro cambia davvero il contenuto mostrato, non solo la chip attiva.
+  const visibleItems = useMemo(
+    () =>
+      filter === "all"
+        ? orderedItems
+        : orderedItems.filter((item) =>
+            filter === "video" ? item.type === "video" : item.type === "image",
+          ),
+    [filter, orderedItems],
   );
-  const currentViewerItem = orderedItems[activeViewerIndex] ?? selectedItem;
+
+  const selectedItem = useMemo(
+    () => visibleItems.find((item) => item.id === selectedItemId) ?? null,
+    [selectedItemId, visibleItems],
+  );
+  const currentViewerItem = visibleItems[activeViewerIndex] ?? selectedItem;
 
   useEffect(() => {
     if (selectedItemId !== null && viewerScrollRef.current && viewportHeight > 0) {
@@ -122,7 +180,7 @@ export function MediaTabContent({
       return;
     }
 
-    const item = orderedItems.find((orderedItem) => orderedItem.id === itemId);
+    const item = visibleItems.find((visibleItem) => visibleItem.id === itemId);
     if (!item) {
       return;
     }
@@ -132,9 +190,22 @@ export function MediaTabContent({
       return;
     }
 
-    const itemIndex = orderedItems.indexOf(item);
+    onItemOpened?.(item);
+
+    // Il viewer sfoglia gli stessi contenuti della griglia: con il filtro su
+    // "Video" uno swipe non deve far comparire una foto (§23).
+    const itemIndex = visibleItems.indexOf(item);
     setActiveViewerIndex(itemIndex);
     setSelectedItemId(itemId);
+  }
+
+  function handleFilterChange(nextFilter: MediaFilter) {
+    // Gli indici del viewer valgono sulla lista filtrata: cambiando filtro
+    // vanno azzerati insieme alla selezione.
+    setSelectedItemId(null);
+    setActiveViewerIndex(0);
+    setFilter(nextFilter);
+    onFilterChange?.(nextFilter);
   }
 
   function handleCloseViewer() {
@@ -210,7 +281,7 @@ export function MediaTabContent({
   }
 
   function handleEditItem() {
-    const currentItem = orderedItems[activeViewerIndex];
+    const currentItem = visibleItems[activeViewerIndex];
 
     if (!currentItem) {
       return;
@@ -223,7 +294,7 @@ export function MediaTabContent({
   }
 
   function handleOpenComments() {
-    const currentItem = orderedItems[activeViewerIndex];
+    const currentItem = visibleItems[activeViewerIndex];
 
     if (!currentItem) {
       return;
@@ -243,24 +314,56 @@ export function MediaTabContent({
     }
 
     const nextIndex = Math.round(offsetY / viewportHeight);
-    const boundedIndex = Math.max(0, Math.min(nextIndex, orderedItems.length - 1));
+    const boundedIndex = Math.max(0, Math.min(nextIndex, visibleItems.length - 1));
     setActiveViewerIndex(boundedIndex);
   }
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <AppText variant="titleSm">Media</AppText>
-        {mode === "owner" && orderedItems.length > 0 ? (
-          <Button
-            accessibilityLabel="Aggiungi contenuto"
-            label="+ Aggiungi contenuto"
-            onPress={handleAddContent}
-            size="sm"
-            variant="primary"
+      {filtersEnabled ? (
+        <View style={styles.filtersRow}>
+          <ProfileFilterChips
+            accessibilityLabel="Filtro contenuti"
+            onChange={handleFilterChange}
+            options={MEDIA_FILTER_OPTIONS}
+            testID="media-filter"
+            value={filter}
           />
-        ) : null}
-      </View>
+          {mode === "owner" && orderedItems.length > 0 ? (
+            <Button
+              accessibilityLabel="Aggiungi contenuto"
+              label="+"
+              onPress={handleAddContent}
+              size="sm"
+              testID="media-add"
+              variant="primary"
+            />
+          ) : null}
+        </View>
+      ) : (
+        <View style={styles.header}>
+          <AppText variant="titleSm">Media</AppText>
+          {mode === "owner" && orderedItems.length > 0 ? (
+            <Button
+              accessibilityLabel="Aggiungi contenuto"
+              label="+ Aggiungi contenuto"
+              onPress={handleAddContent}
+              size="sm"
+              variant="primary"
+            />
+          ) : null}
+        </View>
+      )}
+
+      {orderedItems.length > 0 && visibleItems.length === 0 ? (
+        <View style={styles.filterEmpty} testID="media-filter-empty">
+          <AppText color="secondary" variant="bodySm">
+            {filter === "video"
+              ? "Nessun video in questo profilo."
+              : "Nessuna foto in questo profilo."}
+          </AppText>
+        </View>
+      ) : null}
 
       {orderedItems.length > 0 ? (
         <View
@@ -268,10 +371,10 @@ export function MediaTabContent({
           style={styles.grid}
           testID="media-grid"
         >
-          {orderedItems.map((item) => (
+          {visibleItems.map((item) => (
             <View key={item.id} style={styles.gridCell}>
               <Pressable
-                accessibilityLabel={`Apri contenuto ${item.tag?.label ?? "Media"}`}
+                accessibilityLabel={buildMediaItemAccessibilityLabel(item)}
                 disabled={isGridInteractionLocked}
                 onPress={() => handleOpenItem(item.id)}
                 style={({ pressed }) => [
@@ -303,7 +406,12 @@ export function MediaTabContent({
                 ) : null}
                 {item.type === "video" ? (
                   <View style={styles.videoBadge}>
-                    <Ionicons color={colors.inkInvert} name="play" size={12} />
+                    <Ionicons color={colors.inkInvert} name="play" size={11} />
+                    {item.durationSeconds != null ? (
+                      <AppText color="inverse" style={styles.videoDuration} variant="caption">
+                        {formatMediaDuration(item.durationSeconds)}
+                      </AppText>
+                    ) : null}
                   </View>
                 ) : null}
                 {item.isFeatured ? (
@@ -321,17 +429,18 @@ export function MediaTabContent({
             <Ionicons color={colors.textSecondary} name="images-outline" size={28} />
           </View>
           <AppText style={styles.emptyTitle} variant="titleSm">
-            Nessun contenuto
+            {emptyTitle}
           </AppText>
           <AppText color="secondary" style={styles.emptySubtitle} variant="bodySm">
-            {mode === "owner"
-              ? "Aggiungi foto e video per mostrare il lavoro svolto sul campo."
-              : "Questo profilo allenatore non ha ancora pubblicato contenuti."}
+            {emptyDescription ??
+              (mode === "owner"
+                ? "Aggiungi foto e video per mostrare il lavoro svolto sul campo."
+                : "Questo profilo non ha ancora pubblicato contenuti.")}
           </AppText>
           {mode === "owner" ? (
             <Button
-              accessibilityLabel="Aggiungi contenuto"
-              label="Aggiungi contenuto"
+              accessibilityLabel={emptyCtaLabel}
+              label={emptyCtaLabel}
               onPress={handleAddContent}
               variant="primary"
             />
@@ -365,7 +474,7 @@ export function MediaTabContent({
               scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
             >
-              {orderedItems.map((item) => (
+              {visibleItems.map((item) => (
                 <View
                   key={item.id}
                   style={[styles.viewerPage, { height: viewportHeight || undefined }]}
@@ -596,6 +705,19 @@ const styles = StyleSheet.create({
     top: spacing[6],
     width: 22,
   },
+  filterEmpty: {
+    paddingBottom: spacing[20],
+    paddingHorizontal: spacing[16],
+  },
+  filtersRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[8],
+    justifyContent: "space-between",
+    paddingBottom: spacing[14],
+    paddingHorizontal: spacing[16],
+    paddingTop: spacing[16],
+  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -672,11 +794,17 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(11, 43, 64, 0.74)",
     borderRadius: radius.full,
     bottom: spacing[6],
-    height: 22,
+    flexDirection: "row",
+    gap: 3,
     justifyContent: "center",
+    left: spacing[6],
+    minHeight: 20,
+    paddingHorizontal: spacing[6],
+    paddingVertical: 2,
     position: "absolute",
-    right: spacing[6],
-    width: 22,
+  },
+  videoDuration: {
+    lineHeight: 14,
   },
   videoPlayButton: {
     alignItems: "center",

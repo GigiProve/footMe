@@ -1,144 +1,82 @@
+/**
+ * Tab Carriera del Master Profile (REV-PROF-01 §11–§22).
+ *
+ * "Percorso professionale": un elenco unico ordinato dal più recente, i Totali
+ * carriera e l'Andamento carriera. Niente controlli inline di modifica — la
+ * carriera si modifica solo da Modifica profilo (§32) — e niente separazione
+ * fra prima squadra e settore giovanile, che spezzerebbe l'ordinamento
+ * canonico di REV-ONB-02 (§18).
+ */
 import { StyleSheet, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, spacing, typography } from "../../../theme/tokens";
-import { AppText, Button, EmptyState } from "../../../ui";
-import type { PlayerExperienceForm } from "../player-sports";
-import type { GroupedExperience } from "./career-grouping";
-import { groupExperiencesByTeam } from "./career-grouping";
-import { CareerChart } from "./CareerChart";
-import { ExperienceBlock } from "./ExperienceBlock";
+import { colors, spacing } from "../../../theme/tokens";
+import { AppText } from "../../../ui";
+import { CareerPerformanceChart } from "./CareerPerformanceChart";
+import { CareerTotals } from "./CareerTotals";
+import { PlayerCareerExperience } from "./PlayerCareerExperience";
+import type { CareerMetric, PlayerCareerView } from "./player-career-model";
 
 type CareerTabContentProps = {
-  entries: PlayerExperienceForm[];
   isOwner: boolean;
-  onAdd: () => void;
-  onDelete: (group: GroupedExperience) => void;
-  onEdit: (group: GroupedExperience) => void;
+  onMetricChange?: (metric: CareerMetric) => void;
+  view: PlayerCareerView;
 };
 
 export function CareerTabContent({
-  entries,
   isOwner,
-  onAdd,
-  onDelete,
-  onEdit,
+  onMetricChange,
+  view,
 }: CareerTabContentProps) {
-  const groups = groupExperiencesByTeam(entries);
-  const hasEntries = entries.length > 0;
-
-  return (
-    <View style={styles.container}>
-      {isOwner ? (
-        <View style={styles.addRow}>
-          <Button
-            label="Aggiungi esperienza"
-            leftIcon={<Ionicons color={colors.accent} name="add" size={16} />}
-            onPress={onAdd}
-            size="sm"
-            variant="secondary"
-          />
-        </View>
-      ) : null}
-
-      {!hasEntries && !isOwner ? (
-        <View style={styles.emptyContainer}>
-          <EmptyState
-            description="Questo calciatore non ha ancora aggiunto esperienze calcistiche."
-            title="Nessuna esperienza"
-          />
-        </View>
-      ) : null}
-
-      {groups.senior.length > 0 ? (
-        <ExperienceSection
-          groups={groups.senior}
-          isOwner={isOwner}
-          onDelete={onDelete}
-          onEdit={onEdit}
-          title="Prima squadra"
-        />
-      ) : null}
-
-      {groups.youth.length > 0 ? (
-        <ExperienceSection
-          groups={groups.youth}
-          isOwner={isOwner}
-          onDelete={onDelete}
-          onEdit={onEdit}
-          title="Settore giovanile"
-        />
-      ) : null}
-
-      {hasEntries ? <CareerChart entries={entries} /> : null}
-    </View>
-  );
-}
-
-type ExperienceSectionProps = {
-  groups: GroupedExperience[];
-  isOwner: boolean;
-  onDelete: (group: GroupedExperience) => void;
-  onEdit: (group: GroupedExperience) => void;
-  title: string;
-};
-
-function ExperienceSection({
-  groups,
-  isOwner,
-  onDelete,
-  onEdit,
-  title,
-}: ExperienceSectionProps) {
-  return (
-    <View style={styles.section}>
-      <AppText style={styles.sectionTitle} variant="headingSm">
-        {title}
-      </AppText>
-      <View style={styles.experienceList}>
-        {groups.map((group, index) => (
-          <ExperienceBlock
-            group={group}
-            isLast={index === groups.length - 1}
-            isOwner={isOwner}
-            key={`${group.clubId ?? group.clubName}-${group.startYear}-${group.endYear}`}
-            onDelete={onDelete}
-            onEdit={onEdit}
-          />
-        ))}
+  if (view.experiences.length === 0) {
+    return (
+      <View style={styles.empty} testID="career-empty">
+        <AppText variant="titleMd">Nessuna esperienza ancora</AppText>
+        <AppText color="secondary" variant="bodySm">
+          {isOwner
+            ? "Aggiungi il tuo percorso sportivo da Modifica profilo."
+            : "Questo profilo non ha ancora inserito il proprio percorso sportivo."}
+        </AppText>
       </View>
+    );
+  }
+
+  return (
+    <View testID="career-tab">
+      <View style={styles.section}>
+        <AppText accessibilityRole="header" variant="titleMd">
+          Percorso professionale
+        </AppText>
+
+        <View>
+          {view.experiences.map((experience, index) => (
+            <PlayerCareerExperience
+              experience={experience}
+              isLast={index === view.experiences.length - 1}
+              key={experience.id}
+            />
+          ))}
+        </View>
+
+        <CareerTotals totals={view.totals} />
+      </View>
+
+      <CareerPerformanceChart onMetricChange={onMetricChange} view={view} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  addRow: {
-    alignItems: "flex-end",
-    padding: spacing[16],
-    paddingBottom: 0,
-  },
-  container: {
-    backgroundColor: colors.surfaceMuted,
-    flex: 1,
+  empty: {
+    backgroundColor: colors.surface,
     gap: spacing[8],
-    paddingBottom: spacing[20],
-  },
-  emptyContainer: {
-    marginHorizontal: spacing[16],
-    marginTop: spacing[16],
-  },
-  experienceList: {
-    gap: 0,
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[32],
   },
   section: {
     backgroundColor: colors.surface,
-    gap: spacing[14],
-    paddingBottom: spacing[16],
+    gap: spacing[8],
     paddingHorizontal: spacing[16],
     paddingTop: spacing[18],
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize[18],
-    fontWeight: typography.fontWeight.bold,
+    paddingBottom: spacing[18],
   },
 });

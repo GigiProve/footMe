@@ -76,15 +76,20 @@ export type PlayerExperienceForm = {
 };
 
 export type PlayerExperiencePayload = {
-  appearances: number;
-  assists: number;
+  /** REV-PROF-01 §19: `null` = dato non disponibile, `0` = zero dichiarato. */
+  appearances: number | null;
+  assists: number | null;
   awards: string | null;
+  /** REV-PROF-01 §17: tipologia dichiarata, persistita insieme alla riga. */
+  career_type: PlayerCareerTypeTag | null;
   club_id: string | null;
   club_name: string;
   competition_name: string | null;
-  goals: number;
+  /** REV-PROF-01 §12: esperienza a cui la stagione appartiene. */
+  experience_group_id: string | null;
+  goals: number | null;
   id?: string;
-  minutes_played: number;
+  minutes_played: number | null;
   period_end_month: number | null;
   period_start_month: number | null;
   season_label: string;
@@ -94,15 +99,17 @@ export type PlayerExperiencePayload = {
 };
 
 type PlayerExperienceSource = {
-  appearances: number;
-  assists: number;
+  appearances: number | null;
+  assists: number | null;
   awards?: string | null;
+  career_type?: PlayerCareerTypeTag | null;
   club_id?: string | null;
   club_name: string;
   competition_name?: string | null;
-  goals: number;
+  experience_group_id?: string | null;
+  goals: number | null;
   id?: string;
-  minutes_played?: number;
+  minutes_played?: number | null;
   period_end_month?: number | null;
   period_start_month?: number | null;
   season_label: string;
@@ -486,6 +493,17 @@ export function normalizeNumericInput(value: string) {
   return value.replace(/[^\d]/g, "");
 }
 
+/**
+ * Statistica facoltativa: il campo lasciato vuoto resta `null` invece di
+ * diventare `0` (REV-PROF-01 §19). Un valore inserito passa dagli stessi
+ * controlli di validità di sempre.
+ */
+function parseOptionalStat(value: string, fieldLabel: string): number | null {
+  return value.trim()
+    ? parseNonNegativeStat(value, fieldLabel, { allowEmpty: false })
+    : null;
+}
+
 function parseNonNegativeStat(
   value: string,
   fieldLabel: string,
@@ -616,16 +634,23 @@ export function hasPlayerExperienceContent(entry: PlayerExperienceForm) {
 export function toPlayerExperienceForm(
   entry: PlayerExperienceSource,
 ): PlayerExperienceForm {
+  // Una statistica assente torna come stringa vuota, non come "0": il profilo
+  // deve poter distinguere lo zero dal dato mai inserito (REV-PROF-01 §19).
+  const statToInput = (value: number | null | undefined) =>
+    value == null ? "" : String(value);
+
   return {
-    appearances: String(entry.appearances ?? 0),
-    assists: String(entry.assists ?? 0),
+    appearances: statToInput(entry.appearances),
+    assists: statToInput(entry.assists),
     awards: entry.awards ?? "",
+    ...(entry.career_type ? { careerType: entry.career_type } : {}),
     category: entry.competition_name ?? "",
     clubId: entry.club_id ?? null,
     clubName: entry.club_name,
-    goals: String(entry.goals ?? 0),
+    goals: statToInput(entry.goals),
+    ...(entry.experience_group_id ? { groupId: entry.experience_group_id } : {}),
     id: entry.id,
-    minutesPlayed: String(entry.minutes_played ?? 0),
+    minutesPlayed: statToInput(entry.minutes_played),
     periodEndMonth: entry.period_end_month != null ? String(entry.period_end_month) : "",
     periodStartMonth: entry.period_start_month != null ? String(entry.period_start_month) : "",
     seasonLabel: normalizeSeasonLabelInput(entry.season_label),
@@ -665,15 +690,17 @@ export function parsePlayerExperienceForms(entries: PlayerExperienceForm[]) {
         : null;
 
       return {
-        appearances: parseNonNegativeStat(entry.appearances, "Presenze"),
-        assists: parseNonNegativeStat(entry.assists, "Assist"),
+        appearances: parseOptionalStat(entry.appearances, "Presenze"),
+        assists: parseOptionalStat(entry.assists, "Assist"),
         awards: parseOptionalText(entry.awards),
+        career_type: entry.careerType ?? null,
         club_id: entry.clubId,
         club_name: clubName,
         competition_name: category,
-        goals: parseNonNegativeStat(entry.goals, "Gol"),
+        experience_group_id: entry.groupId ?? null,
+        goals: parseOptionalStat(entry.goals, "Gol"),
         id: entry.id,
-        minutes_played: parseNonNegativeStat(entry.minutesPlayed, "Minuti giocati"),
+        minutes_played: parseOptionalStat(entry.minutesPlayed, "Minuti giocati"),
         period_end_month: periodEndMonth,
         period_start_month: periodStartMonth,
         season_label: seasonLabel,
