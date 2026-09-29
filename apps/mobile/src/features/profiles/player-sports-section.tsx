@@ -55,6 +55,7 @@ type TeamAutocompleteInputProps = {
   onSelectTeam: (team: TeamAutocompleteOption) => void;
   placeholder?: string;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  testID?: string;
   value: string;
 };
 
@@ -220,6 +221,7 @@ export function TeamAutocompleteInput({
   onSelectTeam,
   placeholder = "Cerca squadra",
   searchTeams,
+  testID,
   value,
 }: TeamAutocompleteInputProps) {
   const [suggestions, setSuggestions] = useState<TeamAutocompleteOption[]>([]);
@@ -286,6 +288,7 @@ export function TeamAutocompleteInput({
         }}
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
+        testID={testID}
         value={value}
       />
 

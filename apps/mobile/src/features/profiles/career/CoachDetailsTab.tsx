@@ -35,19 +35,9 @@ import type {
   CoachAchievementRecord,
   CompleteProfessionalProfile,
 } from "../profile-service";
+import { getCoachAwardIcon, sortCoachAwards } from "../coach-edit/coach-awards";
 import type { CoachCareerView } from "./coach-career-model";
 import { getCurrentCoachExperience } from "./coach-career-model";
-
-const ACHIEVEMENT_ICONS: Record<
-  CoachAchievementRecord["achievement_type"],
-  React.ComponentProps<typeof Ionicons>["name"]
-> = {
-  altro: "ribbon-outline",
-  campionato: "trophy-outline",
-  coppa: "shield-outline",
-  playoff: "star-outline",
-  promozione: "arrow-up-circle-outline",
-};
 
 const PHILOSOPHY_COLLAPSED_LINES = 3;
 
@@ -119,7 +109,9 @@ export function CoachDetailsTab({
   const philosophy = coachProfile?.game_philosophy?.trim() || "";
 
   // ---- Palmarès ----------------------------------------------------------
-  const achievements = coachProfile?.achievements ?? [];
+  // Stesso ordine dell editor: stagione più recente in cima. L API restituisce
+  // per `sort_order`, che dopo modifiche ed eliminazioni non dice più molto.
+  const achievements = sortCoachAwards(coachProfile?.achievements ?? []);
 
   // ---- Contatti pubblici -------------------------------------------------
   const publicContacts = buildPublicContacts(userContacts);
@@ -338,7 +330,13 @@ function AchievementRow({
 }: {
   achievement: CoachAchievementRecord;
 }) {
-  const description = achievement.description?.trim() || "";
+  /*
+    Dopo REV-PROF-05 il riconoscimento porta la società come campo: è quella
+    la seconda riga. `description` resta il fallback delle voci salvate prima,
+    che una società non ce l avevano.
+  */
+  const description =
+    achievement.club_name?.trim() || achievement.description?.trim() || "";
 
   return (
     <View
@@ -348,7 +346,7 @@ function AchievementRow({
     >
       <Ionicons
         color={colors.accent}
-        name={ACHIEVEMENT_ICONS[achievement.achievement_type] ?? "ribbon-outline"}
+        name={getCoachAwardIcon(achievement.achievement_type)}
         size={16}
       />
       <View style={styles.palmaresText}>

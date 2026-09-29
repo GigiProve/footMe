@@ -184,6 +184,8 @@ export type ProfileFormState = {
   residence: string;
   residenceCountry: string;
   showContactEmail: boolean;
+  /** REV-PROF-05: visibilità del telefono, che resta un contatto privato. */
+  showContactPhone: boolean;
   showContactFacebook: boolean;
   showContactInstagram: boolean;
   showContactTikTok: boolean;
@@ -302,6 +304,7 @@ export function buildInitialState(
     residence,
     residenceCountry: data.profile.residence_country ?? "",
     showContactEmail: data.userContacts.showEmail,
+    showContactPhone: data.userContacts.showPhone ?? false,
     showContactFacebook: data.userContacts.showFacebook,
     showContactInstagram: data.userContacts.showInstagram,
     showContactTikTok: data.userContacts.showTikTok ?? false,
@@ -551,6 +554,7 @@ export function buildFullUpdatePayload(
       website: formState.contactWebsite.trim(),
       youtube: formState.contactYouTube.trim(),
       showEmail: formState.showContactEmail,
+      showPhone: formState.showContactPhone,
       showFacebook: formState.showContactFacebook,
       showInstagram: formState.showContactInstagram,
       showTikTok: formState.showContactTikTok,

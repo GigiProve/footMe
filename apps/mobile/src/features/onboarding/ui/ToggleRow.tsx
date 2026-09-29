@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   Animated,
   LayoutAnimation,
@@ -46,6 +46,68 @@ type ToggleRowProps = {
   children?: ReactNode;
   testID?: string;
 };
+
+/**
+ * L'interruttore da solo, senza la riga che di solito lo accompagna.
+ *
+ * Esiste perché una schermata con righe proprie — icona, etichetta, valore —
+ * possa usare **questo** interruttore invece di disegnarne un secondo: la
+ * pista, il pollice e il tempo di animazione restano quelli di `ToggleRow`.
+ * Chi lo monta si prende in carico il bersaglio e l'etichetta accessibile.
+ */
+export function ToggleSwitch({
+  disabled = false,
+  onValueChange,
+  value,
+  ...accessibility
+}: {
+  accessibilityLabel?: string;
+  disabled?: boolean;
+  onValueChange: (value: boolean) => void;
+  testID?: string;
+  value: boolean;
+}) {
+  const reduceMotion = useReduceMotion();
+  // Inizializzatore di `useState` e non `useRef().current`: il valore va letto
+  // in render, e leggere una ref in render è proprio ciò che react-hooks
+  // segnala.
+  const [translateX] = useState(
+    () =>
+      new Animated.Value(
+        value ? TRACK_WIDTH - THUMB_SIZE - THUMB_INSET : THUMB_INSET,
+      ),
+  );
+
+  useEffect(() => {
+    const toValue = value
+      ? TRACK_WIDTH - THUMB_SIZE - THUMB_INSET
+      : THUMB_INSET;
+
+    if (reduceMotion) {
+      translateX.setValue(toValue);
+      return;
+    }
+
+    Animated.timing(translateX, {
+      duration: onboardingMotion.fast,
+      toValue,
+      useNativeDriver: true,
+    }).start();
+  }, [reduceMotion, translateX, value]);
+
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled }}
+      disabled={disabled}
+      onPress={() => onValueChange(!value)}
+      style={[styles.track, value ? styles.trackOn : null, disabled ? styles.disabled : null]}
+      {...accessibility}
+    >
+      <Animated.View style={[styles.thumb, { transform: [{ translateX }] }]} />
+    </Pressable>
+  );
+}
 
 /**
  * Riga con interruttore booleano (§O). È l'unico modo in cui l'onboarding

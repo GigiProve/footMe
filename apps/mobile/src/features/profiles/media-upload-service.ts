@@ -31,6 +31,13 @@ export type UploadedMediaItem = {
 
 type PickAndUploadMediaInput = {
   allowsMultipleSelection?: boolean;
+  /**
+   * Proporzione imposta al ritaglio, es. `[1, 1]` per una foto profilo.
+   * Onorata da Android; su iOS il ritaglio quadrato è già il comportamento di
+   * sistema quando `allowsEditing` è attivo. Assente = ritaglio libero, che
+   * resta il comportamento storico di ogni chiamante che non la passa.
+   */
+  aspect?: [number, number];
   folder: string;
   mediaTypes: ImagePicker.MediaType[] | ImagePicker.MediaTypeOptions;
   userId: string;
@@ -180,6 +187,7 @@ export async function pickAndUploadMedia(input: PickAndUploadMediaInput) {
   const result = await ImagePicker.launchImageLibraryAsync({
     allowsEditing: !input.allowsMultipleSelection,
     allowsMultipleSelection: input.allowsMultipleSelection ?? false,
+    ...(input.aspect ? { aspect: input.aspect } : {}),
     mediaTypes: input.mediaTypes,
     quality: 1,
     selectionLimit: input.allowsMultipleSelection ? 10 : 1,
@@ -198,7 +206,9 @@ export async function pickAndUploadMedia(input: PickAndUploadMediaInput) {
   }
 }
 
-export async function captureAndUploadPhoto(input: Omit<PickAndUploadMediaInput, "allowsMultipleSelection" | "mediaTypes">) {
+export async function captureAndUploadPhoto(
+  input: Omit<PickAndUploadMediaInput, "allowsMultipleSelection" | "mediaTypes">,
+) {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
 
   if (!permission.granted) {
@@ -210,6 +220,7 @@ export async function captureAndUploadPhoto(input: Omit<PickAndUploadMediaInput,
 
   const result = await ImagePicker.launchCameraAsync({
     allowsEditing: true,
+    ...(input.aspect ? { aspect: input.aspect } : {}),
     mediaTypes: ["images"],
     quality: 1,
   });

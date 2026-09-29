@@ -5,8 +5,10 @@
  * contatto non pubblico non arriva qui: non viene renderizzato, non finisce
  * negli analytics e non viaggia in nessun payload di questa vista.
  *
- * Il telefono resta fuori per costruzione — vive in `profile_private_contacts`
- * e il prodotto non ha una preferenza che lo renda pubblico.
+ * Il telefono vive in `profile_private_contacts` e resta privato per default:
+ * entra in questa lista solo se il proprietario ha acceso `showPhone`
+ * (REV-PROF-05). È l unico contatto la cui visibilità non sta in
+ * `profile_contacts`.
  */
 import { type ComponentProps } from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
@@ -100,8 +102,18 @@ export function buildPublicContacts(
   const websiteUrl = contacts.showWebsite
     ? normalizeUrl(contacts.website ?? "")
     : "";
+  const phone = contacts.showPhone ? contacts.phone.trim() : "";
 
   const rows: (PublicContact | null)[] = [
+    phone
+      ? {
+          href: `tel:${phone.replace(/\s+/g, "")}`,
+          icon: "call-outline" as const,
+          label: "Telefono",
+          type: "phone" as const,
+          value: phone,
+        }
+      : null,
     email
       ? {
           href: `mailto:${email}`,

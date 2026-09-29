@@ -44,6 +44,16 @@ export type ProfileAnalyticsEvent =
   | "profile_media_featured_changed"
   | "profile_media_delete_tapped"
   | "profile_media_deleted"
+  | "profile_media_upload_failed"
+  // REV-PROF-05: hub e moduli della Modifica profilo Allenatore.
+  | "coach_profile_edit_opened"
+  | "profile_edit_view_profile_tapped"
+  | "profile_edit_section_load_failed"
+  | "profile_edit_unsaved_exit"
+  | "profile_photo_change_completed"
+  | "profile_cover_change_completed"
+  | "profile_image_upload_failed"
+  | "award_delete_failed"
   // Master Profile Allenatore (REV-PROF-03)
   | "profile_viewed"
   | "profile_owner_viewed"
@@ -78,6 +88,7 @@ export type PublicContactType =
   | "email"
   | "facebook"
   | "instagram"
+  | "phone"
   | "tiktok"
   | "website"
   | "youtube";
@@ -92,7 +103,9 @@ export type ProfileEditSectionKey =
   | "career"
   | "awards"
   | "contacts"
-  | "media";
+  | "media"
+  /** REV-PROF-05: "Filosofia e stile di gioco", solo Allenatore. */
+  | "philosophy";
 
 /** Modalità temporale scelta, mai la società, il ruolo o le date. */
 export type CoachExperienceMode =

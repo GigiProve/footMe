@@ -90,6 +90,11 @@ export type UserContactsRecord = {
   showTikTok?: boolean;
   showWebsite?: boolean;
   showYouTube?: boolean;
+  /**
+   * REV-PROF-05: il numero resta in `profile_private_contacts`, questa è la
+   * sola preferenza che ne autorizza la pubblicazione. Spenta per default.
+   */
+  showPhone?: boolean;
 };
 
 type PlayerProfileRecord = {
@@ -226,12 +231,30 @@ export type CoachDirectorCareerEntryRecord = {
   sort_order: number;
 };
 
+/**
+ * Riconoscimento del palmarès Allenatore.
+ *
+ * REV-PROF-05 ha reso strutturati competizione, stagione e società: erano
+ * dentro `label`, che resta scritto ma ora è un titolo *derivato* dagli altri
+ * campi, non una cosa che l utente digita. `playoff` e `altro` non sono più
+ * offerti dall editor ma restano validi: esistono già sul database.
+ */
 export type CoachAchievementRecord = {
   id: string;
   coach_profile_id: string;
-  achievement_type: 'campionato' | 'promozione' | 'coppa' | 'playoff' | 'altro';
+  achievement_type:
+    | "campionato"
+    | "promozione"
+    | "coppa"
+    | "premio_personale"
+    | "playoff"
+    | "altro";
   label: string;
   description: string | null;
+  competition_name: string | null;
+  season_label: string | null;
+  club_name: string | null;
+  club_id: string | null;
   sort_order: number;
   created_at: string;
 };
@@ -956,15 +979,34 @@ function normalizeCoachAchievementRecord(
   rawEntry: Partial<CoachAchievementRecord>,
   index: number,
 ): CoachAchievementRecord {
-  const validTypes = ['campionato', 'promozione', 'coppa', 'playoff', 'altro'] as const;
+  const validTypes = [
+    "campionato",
+    "promozione",
+    "coppa",
+    "premio_personale",
+    "playoff",
+    "altro",
+  ] as const;
+
   return {
     id: normalizeRequiredText(rawEntry.id, `${profileId}-achievement-${index}`),
     coach_profile_id: normalizeRequiredText(rawEntry.coach_profile_id, profileId),
     achievement_type: validTypes.includes(rawEntry.achievement_type as typeof validTypes[number])
-      ? (rawEntry.achievement_type as CoachAchievementRecord['achievement_type'])
-      : 'altro',
-    label: normalizeRequiredText(rawEntry.label, ''),
+      ? (rawEntry.achievement_type as CoachAchievementRecord["achievement_type"])
+      : "altro",
+    label: normalizeRequiredText(rawEntry.label, ""),
     description: normalizeOptionalText(rawEntry.description),
+    /*
+      Le righe salvate prima di REV-PROF-05 non hanno la competizione come
+      campo: il titolo era tutto quello che esisteva, e riaprendole è quello
+      che l editor deve mostrare invece di un campo vuoto.
+    */
+    competition_name:
+      normalizeOptionalText(rawEntry.competition_name) ??
+      normalizeOptionalText(rawEntry.label),
+    season_label: normalizeOptionalText(rawEntry.season_label),
+    club_name: normalizeOptionalText(rawEntry.club_name),
+    club_id: normalizeOptionalText(rawEntry.club_id),
     sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
     created_at: normalizeRequiredText(rawEntry.created_at, new Date().toISOString()),
   };
@@ -1599,6 +1641,7 @@ export function normalizeUserProfile(input: {
   } | null;
   privateContacts?: {
     phone?: string | null;
+    show_phone?: boolean | null;
   } | null;
   staffCareerEntries?: Record<string, unknown>[] | null;
   staffCoachCareerEntries?: Record<string, unknown>[] | null;
@@ -1667,6 +1710,7 @@ export function normalizeUserProfile(input: {
       facebook: input.profileContacts?.facebook ?? "",
       instagram: input.profileContacts?.instagram ?? "",
       phone: input.privateContacts?.phone ?? "",
+      showPhone: normalizeBoolean(input.privateContacts?.show_phone),
       tiktok: input.profileContacts?.tiktok ?? "",
       website: input.profileContacts?.website ?? "",
       youtube: input.profileContacts?.youtube ?? "",
@@ -1676,6 +1720,65 @@ export function normalizeUserProfile(input: {
       showTikTok: normalizeBoolean(input.profileContacts?.show_tiktok),
       showWebsite: normalizeBoolean(input.profileContacts?.show_website),
       showYouTube: normalizeBoolean(input.profileContacts?.show_youtube),
+    },
+  };
+}
+
+/**
+ * Contatti pubblici di un profilo altrui.
+ *
+ * Restituisce soltanto i canali che il proprietario ha reso visibili: è la
+ * funzione SQL a filtrarli, non questo codice. I flag `show_*` vengono
+ * ricostruiti dalla presenza del valore, perché un canale che arriva fin qui
+ * è per definizione pubblico.
+ */
+async function fetchPublicProfileContacts(profileId: string) {
+  /*
+    Best effort su tutta la linea: la funzione può non essere ancora stata
+    deployata, e un client che non conosce questa RPC non deve far fallire il
+    caricamento di un profilo. In entrambi i casi il Visitor vede quello che
+    vedeva prima, cioè nessun contatto.
+  */
+  let row: Record<string, string | null> | undefined;
+
+  try {
+    const { data, error } = await supabase.rpc("get_profile_public_contacts", {
+      target_profile_id: profileId,
+    });
+
+    if (error || !data) {
+      return null;
+    }
+
+    row = (Array.isArray(data) ? data[0] : data) as
+      | Record<string, string | null>
+      | undefined;
+  } catch {
+    return null;
+  }
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    privateContacts: {
+      phone: row.phone ?? null,
+      show_phone: Boolean(row.phone),
+    },
+    profileContacts: {
+      email: row.email ?? null,
+      facebook: row.facebook ?? null,
+      instagram: row.instagram ?? null,
+      show_email: Boolean(row.email),
+      show_facebook: Boolean(row.facebook),
+      show_instagram: Boolean(row.instagram),
+      show_tiktok: Boolean(row.tiktok),
+      show_website: Boolean(row.website),
+      show_youtube: Boolean(row.youtube),
+      tiktok: row.tiktok ?? null,
+      website: row.website ?? null,
+      youtube: row.youtube ?? null,
     },
   };
 }
@@ -1837,7 +1940,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       .maybeSingle(),
     supabase
       .from("profile_private_contacts")
-      .select("phone")
+      .select("phone, show_phone")
       .eq("profile_id", profileId)
       .maybeSingle(),
     ]);
@@ -1972,7 +2075,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       supabase
         .from("coach_achievements")
         .select(
-          "id, coach_profile_id, achievement_type, label, description, sort_order, created_at",
+          "id, coach_profile_id, achievement_type, label, description, competition_name, season_label, club_name, club_id, sort_order, created_at",
         )
         .eq("coach_profile_id", profileId)
         .order("sort_order", { ascending: true }),
@@ -2129,6 +2232,22 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     clubSeasonEntries = (seasonData ?? []) as ClubSeasonEntryRecord[];
   }
 
+  /*
+    La RLS di `profile_contacts` è owner-only: a chi non è il proprietario la
+    select qui sopra non restituisce nulla, nemmeno i canali che il
+    proprietario ha reso pubblici. In quel caso — e solo in quello — si passa
+    da `get_profile_public_contacts`, che è l unica porta autorizzata e
+    applica la privacy nel backend: un canale con il flag spento torna NULL,
+    quindi il suo valore non lascia mai il database (REV-PROF-05, "Privacy dei
+    contatti").
+
+    Best effort: se la funzione non è ancora stata deployata il Visitor vede
+    quello che vedeva prima, cioè nessun contatto.
+  */
+  const publicContacts = profileContacts.data
+    ? null
+    : await fetchPublicProfileContacts(profileId);
+
   return normalizeUserProfile({
     agentCareerEntries,
     agentManagedPlayerEntries,
@@ -2155,9 +2274,9 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     playerCareerEntries,
     playerPalmares,
     playerProfile: (playerProfile.data as Partial<PlayerProfileRecord> | null) ?? null,
-    privateContacts: privateContacts.data,
+    privateContacts: privateContacts.data ?? publicContacts?.privateContacts,
     profile,
-    profileContacts: profileContacts.data,
+    profileContacts: profileContacts.data ?? publicContacts?.profileContacts,
     profileId,
     staffCareerEntries,
     staffCoachCareerEntries,
@@ -2257,6 +2376,7 @@ export async function updateCompleteProfessionalProfile(
     .upsert({
       phone: input.userContacts.phone || null,
       profile_id: input.profileId,
+      show_phone: input.userContacts.showPhone ?? false,
     });
 
   if (privateContactsError) {
@@ -3019,19 +3139,43 @@ function formatDirectorMediaProfileSubtitle(
   return location ? `${roleLabel} - ${location}` : roleLabel;
 }
 
+const COACH_ACHIEVEMENT_COLUMNS =
+  "id, coach_profile_id, achievement_type, label, description, competition_name, season_label, club_name, club_id, sort_order, created_at";
+
+/**
+ * Crea o aggiorna un riconoscimento.
+ *
+ * L id viaggia solo quando esiste: passarlo vuoto farebbe fallire l upsert
+ * (la colonna è `uuid`), passarlo sempre trasformerebbe ogni creazione in un
+ * aggiornamento della riga sbagliata.
+ */
 export async function upsertCoachAchievement(
-  data: Omit<CoachAchievementRecord, 'id' | 'created_at'>,
+  data: Omit<
+    CoachAchievementRecord,
+    "created_at" | "id" | "club_id" | "club_name" | "competition_name" | "season_label"
+  > &
+    Partial<
+      Pick<
+        CoachAchievementRecord,
+        "club_id" | "club_name" | "competition_name" | "season_label"
+      >
+    > & { id?: string },
 ): Promise<CoachAchievementRecord> {
   const { data: result, error } = await supabase
     .from("coach_achievements")
     .upsert({
-      coach_profile_id: data.coach_profile_id,
+      ...(data.id ? { id: data.id } : {}),
       achievement_type: data.achievement_type,
-      label: data.label,
+      club_id: data.club_id ?? null,
+      club_name: data.club_name ?? null,
+      coach_profile_id: data.coach_profile_id,
+      competition_name: data.competition_name ?? null,
       description: data.description ?? null,
+      label: data.label,
+      season_label: data.season_label ?? null,
       sort_order: data.sort_order,
     })
-    .select("id, coach_profile_id, achievement_type, label, description, sort_order, created_at")
+    .select(COACH_ACHIEVEMENT_COLUMNS)
     .single();
 
   if (error) {

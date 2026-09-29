@@ -378,6 +378,8 @@ describe("getCompleteProfessionalProfile", () => {
       showEmail: true,
       showFacebook: false,
       showInstagram: true,
+      // REV-PROF-05: il telefono resta privato finché non lo si pubblica.
+      showPhone: false,
       showTikTok: false,
       showWebsite: false,
       showYouTube: false,
@@ -758,6 +760,7 @@ describe("getCompleteProfessionalProfile", () => {
       showEmail: false,
       showFacebook: false,
       showInstagram: false,
+      showPhone: false,
       showTikTok: false,
       showWebsite: false,
       showYouTube: false,

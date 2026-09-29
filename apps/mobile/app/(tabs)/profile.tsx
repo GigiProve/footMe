@@ -842,9 +842,8 @@ export default function ProfileScreen() {
                 profileType: "coach",
                 viewerMode: "owner",
               });
-              // Il flusso di modifica resta quello esistente: la sua revisione
-              // e' oggetto di una task successiva.
-              handleEdit("editCoachProfile");
+              // REV-PROF-05: la CTA apre l hub modulare, non piu la modale.
+              router.push("/profile/coach-edit");
             }}
             onMorePress={() => {
               trackProfileEvent("profile_more_menu_opened", {
@@ -924,7 +923,7 @@ export default function ProfileScreen() {
             completeProfile={completeProfile}
             isOwner={true}
             onAddExperience={() => router.push("/profile/coach-career")}
-            onManageMedia={() => handleEdit("coachMedia")}
+            onManageMedia={() => router.push("/profile/coach-edit/media")}
             onOpenClub={handleOpenAffiliateClub}
           />
         ) : completeProfile && role === "staff" ? (

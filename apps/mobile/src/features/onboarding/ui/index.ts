@@ -29,7 +29,7 @@ export {
 } from "./BottomSheetSelector";
 export { SegmentedSelector } from "./SegmentedSelector";
 export { SelectionRow } from "./SelectionRow";
-export { ToggleRow } from "./ToggleRow";
+export { ToggleRow, ToggleSwitch } from "./ToggleRow";
 export { RoleCard } from "./RoleCard";
 export { PhotoPicker, PhotoTips } from "./PhotoPicker";
 export {

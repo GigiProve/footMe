@@ -35,12 +35,22 @@ export const LICENSE_TYPE_OPTIONS: { label: string; value: string }[] = [
   { label: "Nessun patentino", value: "Nessun patentino" },
 ];
 
-/** §F: categorie allenate, selezione multipla a chip. */
+/**
+ * §F: categorie allenate, selezione multipla.
+ *
+ * Le prime sei sono la tassonomia approvata da REV-PROF-05 e compaiono in
+ * quest'ordine nella schermata "Profilo allenatore". Le tre successive erano
+ * già sul database prima di quella task: restano perché un profilo che ha
+ * scelto "Berretti" non deve vedersi sparire la categoria, e perché la lista
+ * resta una sola — onboarding e modifica profilo leggono da qui.
+ */
 export const COACH_CATEGORY_OPTIONS: { label: string; value: string }[] = [
   { label: "Prima Squadra", value: "Prima Squadra" },
   { label: "Juniores", value: "Juniores" },
+  { label: "Primavera", value: "Primavera" },
   { label: "Allievi", value: "Allievi" },
   { label: "Giovanissimi", value: "Giovanissimi" },
+  { label: "Attività di base", value: "Attività di base" },
   { label: "Berretti", value: "Berretti" },
   { label: "Scuola Calcio", value: "Scuola Calcio" },
   { label: "Settore Giovanile", value: "Settore Giovanile" },
