@@ -4,6 +4,7 @@ import {
   Linking,
   Pressable,
   SafeAreaView,
+  Share,
   StyleSheet,
   View,
   type AlertButton,
@@ -52,7 +53,6 @@ import { EditCoachAchievementsModal } from "../../src/features/profiles/edit-mod
 import { EditCoachInfoModal } from "../../src/features/profiles/edit-modals/EditCoachInfoModal";
 import { EditCoachProfileModal } from "../../src/features/profiles/edit-modals/EditCoachProfileModal";
 import { EditCoachMediaModal } from "../../src/features/profiles/edit-modals/EditCoachMediaModal";
-import { EditCoachExperiencesModal } from "../../src/features/profiles/edit-modals/EditCoachExperiencesModal";
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditDirectorMediaModal } from "../../src/features/profiles/edit-modals/EditDirectorMediaModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
@@ -94,14 +94,14 @@ import {
   type CompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
 import { removeMediaFromStorage } from "../../src/features/profiles/media-upload-service";
-import { fetchProfileSocialSummary } from "../../src/features/profiles/profile-social-service";
 import type { DirectorMediaLinkedTarget } from "../../src/features/profiles/director-media";
 import type { GroupedExperience } from "../../src/features/profiles/career/career-grouping";
-import type { CoachGroupedExperience } from "../../src/features/profiles/career/coach-career-grouping";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
 import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
+import { ProfileSkeleton } from "../../src/features/profiles/master/ProfileSkeleton";
 import {
   trackPlayerProfileViewed,
+  trackProfileViewed,
   trackProfileEvent,
 } from "../../src/features/profiles/profile-analytics";
 import { colors, radius, spacing } from "../../src/theme/tokens";
@@ -169,12 +169,6 @@ export default function ProfileScreen() {
     queryFn: () => getUnreadCount(profileId),
     queryKey: ["notifications-unread", profileId],
   });
-  const { data: coachSocialSummary } = useQuery({
-    enabled: !!profileId && profile?.role === "coach",
-    queryFn: () => fetchProfileSocialSummary(profileId),
-    queryKey: ["profile-social-summary", profileId],
-  });
-
   const loadPendingMemberships = useCallback(async () => {
     if (!userId) {
       setPendingMemberships([]);
@@ -318,6 +312,19 @@ export default function ProfileScreen() {
     }
 
     trackPlayerProfileViewed(userId, "owner", viewedProfilesRef.current);
+  }, [profile?.role, userId]);
+
+  useEffect(() => {
+    if (!userId || profile?.role !== "coach") {
+      return;
+    }
+
+    trackProfileViewed(userId, {
+      profileType: "coach",
+      seen: viewedProfilesRef.current,
+      source: "own_profile_tab",
+      viewerMode: "owner",
+    });
   }, [profile?.role, userId]);
 
   if (!userId || !profile) {
@@ -510,36 +517,16 @@ export default function ProfileScreen() {
     );
   }
 
-  async function handleDeleteCoachExperience(group: CoachGroupedExperience) {
-    if (!completeProfile) return;
+  async function handleShareOwnProfile() {
+    const name = completeProfile?.profile.full_name ?? "il mio profilo";
 
-    Alert.alert(
-      "Elimina esperienza",
-      `Eliminare l'esperienza con ${group.teamName}?`,
-      [
-        { style: "cancel", text: "Annulla" },
-        {
-          onPress: async () => {
-            try {
-              const baseState = buildInitialState(completeProfile);
-              const payload = buildFullUpdatePayload(completeProfile, baseState);
-              payload.profile.birth_date =
-                validateBirthDateInput(baseState.birthDate).isoValue;
-              payload.coachCareerEntries = completeProfile.coachCareerEntries.filter(
-                (entry) => entry.id !== group.entryId,
-              );
-              await updateCompleteProfessionalProfile(payload);
-              await loadProfile();
-              Alert.alert("Esperienza eliminata", "La voce e' stata rimossa.");
-            } catch {
-              Alert.alert("Errore", "Impossibile eliminare l'esperienza.");
-            }
-          },
-          style: "destructive",
-          text: "Elimina",
-        },
-      ],
-    );
+    try {
+      await Share.share({
+        message: `Dai un'occhiata al profilo di ${name} su ProLink.`,
+      });
+    } catch {
+      // condivisione annullata o non disponibile: nessuna azione
+    }
   }
 
   function handleDeleteAgentMedia(itemId: string) {
@@ -693,6 +680,36 @@ export default function ProfileScreen() {
         </View>
         <ActionSheet
           actions={[
+            /*
+              REV-PROF-03: l'header dell'Allenatore non porta piu' la riga
+              social, cosi' follower e connessioni restano raggiungibili da qui
+              invece di sparire dal prodotto.
+            */
+            ...(role === "coach" && profileId
+              ? [
+                  {
+                    icon: "people-circle-outline" as const,
+                    label: "Follower e connessioni",
+                    subtitle: "Chi ti segue e chi segui.",
+                    onPress: () =>
+                      router.push(
+                        `/profile/connections?profileId=${profileId}&mode=followers` as never,
+                      ),
+                  },
+                  /*
+                    Il palmares non ha una sezione dentro "Modifica profilo" e
+                    le matite nelle sezioni pubbliche sono state rimosse: il suo
+                    editor esistente resta raggiungibile da qui finche' la
+                    revisione del flusso di modifica non lo assorbe.
+                  */
+                  {
+                    icon: "trophy-outline" as const,
+                    label: "Gestisci palmares",
+                    subtitle: "Titoli e riconoscimenti del tuo profilo.",
+                    onPress: () => handleEdit("coachAchievements"),
+                  },
+                ]
+              : []),
             {
               icon: "bookmark-outline",
               label: "Salvati",
@@ -812,44 +829,39 @@ export default function ProfileScreen() {
           />
         ) : completeProfile && role === "coach" && coachHeaderDetails ? (
           <CoachProfileHeader
-            assignmentLabel={coachHeaderDetails.assignmentLabel}
-            availabilityBadges={coachHeaderDetails.availabilityBadges}
+            availabilityLabel={coachHeaderDetails.availabilityLabel}
             avatarUrl={completeProfile.profile.avatar_url}
-            bio={coachHeaderDetails.bio}
-            categoryLocationLabel={coachHeaderDetails.categoryLocationLabel}
+            clubLabel={coachHeaderDetails.clubLabel}
             coverImageUrl={completeProfile.profile.cover_url}
             fullName={coachHeaderDetails.fullName}
-            licenseBadges={coachHeaderDetails.licenseBadges}
-            licenseYearsLabel={coachHeaderDetails.licenseYearsLabel}
+            isVerified={coachHeaderDetails.isVerified}
+            locationLabel={coachHeaderDetails.locationLabel}
             mode="owner"
-            onAddContentPress={() => handleEdit("coachMedia")}
-            onEditProfilePress={() => handleEdit("editCoachProfile")}
-            onFollowersPress={() =>
-              router.push(
-                `/profile/connections?profileId=${userId}&mode=followers` as never,
-              )
-            }
-            onFollowingPress={() => router.push("/following" as never)}
-            onImagesChanged={() => void loadProfile()}
-            onMutualPress={() =>
-              router.push(
-                `/profile/connections?profileId=${userId}&mode=mutual` as never,
-              )
-            }
+            onEditProfilePress={() => {
+              trackProfileEvent("profile_edit_tapped", {
+                profileType: "coach",
+                viewerMode: "owner",
+              });
+              // Il flusso di modifica resta quello esistente: la sua revisione
+              // e' oggetto di una task successiva.
+              handleEdit("editCoachProfile");
+            }}
+            onMorePress={() => {
+              trackProfileEvent("profile_more_menu_opened", {
+                profileType: "coach",
+                viewerMode: "owner",
+              });
+              setMoreMenuVisible(true);
+            }}
+            onSharePress={() => {
+              trackProfileEvent("profile_share_tapped", {
+                profileType: "coach",
+                viewerMode: "owner",
+              });
+              void handleShareOwnProfile();
+            }}
             primaryRole={coachHeaderDetails.primaryRole}
-            profileId={userId}
-            roleTypeLabel={coachHeaderDetails.roleTypeLabel}
-            socialSummary={
-              coachSocialSummary
-                ? {
-                    followerCount: coachSocialSummary.followerCount,
-                    followingCount: coachSocialSummary.followingCount,
-                    mutualPreview: coachSocialSummary.mutualPreview,
-                    mutualTotal: coachSocialSummary.mutualTotal,
-                  }
-                : undefined
-            }
-            statusBadge={coachHeaderDetails.statusBadge}
+            quickFacts={coachHeaderDetails.quickFacts}
           />
         ) : completeProfile && role === "staff" && staffHeaderDetails ? (
           <StaffProfileHeader
@@ -889,9 +901,18 @@ export default function ProfileScreen() {
         ) : null}
 
         {isLoading ? (
-          <AppText variant="bodySm" color="secondary">
-            Sto recuperando i dati professionali del tuo account...
-          </AppText>
+          role === "coach" ? (
+            /*
+              Scheletro al posto del testo di attesa (REV-PROF-03, "Loading"):
+              l'ingombro e' gia' quello della pagina finale, quindi l'arrivo dei
+              dati non sposta niente.
+            */
+            <ProfileSkeleton testID="coach-profile-loading-skeleton" />
+          ) : (
+            <AppText variant="bodySm" color="secondary">
+              Sto recuperando i dati professionali del tuo account...
+            </AppText>
+          )
         ) : completeProfile && role === "player" ? (
           <ProfileTabView
             completeProfile={completeProfile}
@@ -902,11 +923,9 @@ export default function ProfileScreen() {
           <CoachProfileTabView
             completeProfile={completeProfile}
             isOwner={true}
-            onAddExperience={() => handleEdit("coachExperiences")}
-            onDeleteExperience={handleDeleteCoachExperience}
-            onEdit={handleEdit}
-            onEditExperience={() => handleEdit("coachExperiences")}
+            onAddExperience={() => router.push("/profile/coach-career")}
             onManageMedia={() => handleEdit("coachMedia")}
+            onOpenClub={handleOpenAffiliateClub}
           />
         ) : completeProfile && role === "staff" ? (
           <StaffProfileTabView
@@ -1021,12 +1040,6 @@ export default function ProfileScreen() {
                 onSaved={handleSaved}
                 userId={userId}
                 visible={activeModal === "coachMedia"}
-              />
-              <EditCoachExperiencesModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                visible={activeModal === "coachExperiences"}
               />
               <EditCoachAchievementsModal
                 achievements={completeProfile.coachProfile?.achievements ?? []}

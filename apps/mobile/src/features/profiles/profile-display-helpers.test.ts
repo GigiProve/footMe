@@ -9,6 +9,7 @@ function makeEntry(
   return {
     id: overrides.id ?? "entry",
     coach_profile_id: "coach-1",
+    experience_group_id: null,
     team_name: overrides.team_name ?? "Team",
     team_logo_url: null,
     club_id: null,

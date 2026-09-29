@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   SafeAreaView,
@@ -35,8 +34,10 @@ import {
   type CompleteProfessionalProfile,
 } from "./profile-service";
 import { ProfileSectionError } from "./master/ProfileSectionBlock";
+import { ProfileSkeleton } from "./master/ProfileSkeleton";
 import {
   trackPlayerProfileViewed,
+  trackProfileViewed,
   trackProfileEvent,
 } from "./profile-analytics";
 import { CoachProfileTabView } from "./career/CoachProfileTabView";
@@ -67,7 +68,6 @@ import {
   saveProfile,
   unsaveProfile,
 } from "../saved/saved-service";
-import { fetchProfileSocialSummary } from "./profile-social-service";
 import { AddToShortlistFlow } from "../shortlist/components/AddToShortlistFlow";
 import { useShortlistPermissions } from "../shortlist/use-shortlist-permissions";
 import { fetchProfileShortlistMemberships } from "../shortlist/shortlist-service";
@@ -189,11 +189,18 @@ export function PublicProfileScreen() {
     );
   }, [completeProfile?.profile.role, viewedProfileId]);
 
-  const { data: coachSocialSummary } = useQuery({
-    enabled: !!viewedProfileId && completeProfile?.profile.role === "coach",
-    queryFn: () => fetchProfileSocialSummary(viewedProfileId as string),
-    queryKey: ["profile-social-summary", viewedProfileId],
-  });
+  useEffect(() => {
+    if (!viewedProfileId || completeProfile?.profile.role !== "coach") {
+      return;
+    }
+
+    trackProfileViewed(viewedProfileId, {
+      profileType: "coach",
+      seen: viewedProfilesRef.current,
+      source: "profile_link",
+      viewerMode: "visitor",
+    });
+  }, [completeProfile?.profile.role, viewedProfileId]);
 
   const shortlistProfileSubtitle =
     playerHeaderDetails?.primaryRole ??
@@ -577,12 +584,12 @@ export function PublicProfileScreen() {
 
       <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
         {isLoading || isSessionLoading ? (
-          <View style={styles.stateBlock}>
-            <ActivityIndicator color={colors.accent} />
-            <AppText color="secondary" variant="bodySm">
-              Caricamento profilo in corso...
-            </AppText>
-          </View>
+          /*
+            Scheletro al posto dello spinner (REV-PROF-03, "Loading"): la pagina
+            occupa già lo spazio che avrà, quindi l'arrivo dei dati non fa
+            saltare il layout.
+          */
+          <ProfileSkeleton testID="profile-loading-skeleton" />
         ) : errorMessage ? (
           <View style={styles.stateBlock}>
             <AppText variant="titleSm">Profilo non disponibile</AppText>
@@ -598,7 +605,6 @@ export function PublicProfileScreen() {
               completeProfile={completeProfile}
               agentHeaderDetails={agentHeaderDetails}
               coachHeaderDetails={coachHeaderDetails}
-              coachSocialSummary={coachSocialSummary}
               headerDetails={headerDetails}
               isFollowed={isFollowed}
               isMessaging={
@@ -618,11 +624,6 @@ export function PublicProfileScreen() {
                     }
                   : undefined
               }
-              onFollowersPress={() =>
-                router.push(
-                  `/profile/connections?profileId=${completeProfile.profile.id}&mode=followers` as never,
-                )
-              }
               onFollowPress={
                 canFollowOrSave
                   ? () => {
@@ -634,11 +635,13 @@ export function PublicProfileScreen() {
                     }
                   : undefined
               }
-              onMutualPress={() =>
-                router.push(
-                  `/profile/connections?profileId=${completeProfile.profile.id}&mode=mutual` as never,
-                )
-              }
+              onMorePress={() => {
+                trackProfileEvent("profile_more_menu_opened", {
+                  profileType: completeProfile.profile.role,
+                  viewerMode: "visitor",
+                });
+                setProfileActionsVisible(true);
+              }}
               onSharePress={() => {
                 trackProfileEvent("profile_share_tapped", {
                   profileType: completeProfile.profile.role,
@@ -652,6 +655,7 @@ export function PublicProfileScreen() {
             />
             <ProfileContentBlock
               completeProfile={completeProfile}
+              onOpenClub={handleOpenFavoriteClub}
               isConnecting={
                 profileAction?.profileId === completeProfile.profile.id &&
                 profileAction.type === "connect"
@@ -695,6 +699,23 @@ export function PublicProfileScreen() {
             subtitle: isProfileSaved ? undefined : "Ritrovalo nei tuoi Salvati.",
             onPress: handleToggleSaveProfile,
           },
+          /*
+            L'header dell'Allenatore non porta più la riga social: follower e
+            connessioni restano raggiungibili da qui, che è il menu delle azioni
+            autorizzate sul profilo.
+          */
+          ...(viewedProfileId
+            ? [
+                {
+                  icon: "people-outline" as const,
+                  label: "Follower e connessioni",
+                  onPress: () =>
+                    router.push(
+                      `/profile/connections?profileId=${viewedProfileId}&mode=followers` as never,
+                    ),
+                },
+              ]
+            : []),
           {
             icon: "share-outline",
             label: "Condividi profilo",
@@ -734,16 +755,14 @@ function ProfileHeaderBlock({
   completeProfile,
   agentHeaderDetails,
   coachHeaderDetails,
-  coachSocialSummary,
   headerDetails,
   isFollowed,
   isMessaging,
   isSaved,
   isShortlisted,
   onContactPress,
-  onFollowersPress,
   onFollowPress,
-  onMutualPress,
+  onMorePress,
   onSavePress,
   onSharePress,
   onShortlistPress,
@@ -753,16 +772,14 @@ function ProfileHeaderBlock({
   completeProfile: CompleteProfessionalProfile;
   agentHeaderDetails: ReturnType<typeof buildAgentProfileHeaderDetails>;
   coachHeaderDetails: ReturnType<typeof buildCoachProfileHeaderDetails>;
-  coachSocialSummary?: Awaited<ReturnType<typeof fetchProfileSocialSummary>>;
   headerDetails: ReturnType<typeof buildHeaderDetails> | null;
   isFollowed: boolean;
   isMessaging?: boolean;
   isSaved: boolean;
   isShortlisted?: boolean;
   onContactPress?: () => void;
-  onFollowersPress?: () => void;
   onFollowPress?: () => void;
-  onMutualPress?: () => void;
+  onMorePress?: () => void;
   onSavePress?: () => void;
   onSharePress?: () => void;
   onShortlistPress?: () => void;
@@ -800,30 +817,22 @@ function ProfileHeaderBlock({
   if (role === "coach" && coachHeaderDetails) {
     return (
       <CoachProfileHeader
-        assignmentLabel={coachHeaderDetails.assignmentLabel}
-        availabilityBadges={coachHeaderDetails.availabilityBadges}
+        availabilityLabel={coachHeaderDetails.availabilityLabel}
         avatarUrl={completeProfile.profile.avatar_url}
-        bio={coachHeaderDetails.bio}
-        categoryLocationLabel={coachHeaderDetails.categoryLocationLabel}
+        clubLabel={coachHeaderDetails.clubLabel}
         coverImageUrl={completeProfile.profile.cover_url}
         fullName={coachHeaderDetails.fullName}
-        licenseBadges={coachHeaderDetails.licenseBadges}
-        licenseYearsLabel={coachHeaderDetails.licenseYearsLabel}
-        mode="visitor"
         isFollowed={isFollowed}
         isMessaging={isMessaging}
-        isSaved={isSaved}
-        isShortlisted={isShortlisted}
-        onContactPress={onContactPress}
-        onFollowersPress={onFollowersPress}
+        isVerified={coachHeaderDetails.isVerified}
+        locationLabel={coachHeaderDetails.locationLabel}
+        mode="visitor"
         onFollowPress={onFollowPress}
-        onMutualPress={onMutualPress}
-        onSavePress={onSavePress}
-        onShortlistPress={onShortlistPress}
+        onMessagePress={onContactPress}
+        onMorePress={onMorePress}
+        onSharePress={onSharePress}
         primaryRole={coachHeaderDetails.primaryRole}
-        roleTypeLabel={coachHeaderDetails.roleTypeLabel}
-        socialSummary={coachSocialSummary}
-        statusBadge={coachHeaderDetails.statusBadge}
+        quickFacts={coachHeaderDetails.quickFacts}
       />
     );
   }
@@ -913,6 +922,7 @@ function ProfileContentBlock({
   onFollowPress,
   onMessage,
   onSavePress,
+  onOpenClub,
   onOpenDirectorLinkedTarget,
   onOpenFavoriteClub,
   onOpenPlayerProfile,
@@ -934,6 +944,7 @@ function ProfileContentBlock({
   onFollowPress?: () => void;
   onMessage?: () => void;
   onSavePress?: () => void;
+  onOpenClub?: (clubId: string) => void;
   onOpenDirectorLinkedTarget?: (target: DirectorMediaLinkedTarget) => void;
   onOpenFavoriteClub?: (clubId: string) => void;
   onOpenPlayerProfile?: (profileId: string) => void;
@@ -1060,11 +1071,8 @@ function ProfileContentBlock({
       <CoachProfileTabView
         completeProfile={completeProfile}
         isOwner={false}
-        onAddExperience={noop}
-        onDeleteExperience={noop}
-        onEdit={noop}
-        onEditExperience={noop}
         onManageMedia={noop}
+        onOpenClub={onOpenClub}
       />
     );
   }

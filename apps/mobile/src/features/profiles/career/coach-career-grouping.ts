@@ -188,15 +188,15 @@ export function groupCoachCareerEntries(
 function buildPlayerCareerDescription(entry: CoachPlayerCareerEntryRecord) {
   const parts = [entry.position, entry.category].filter(Boolean) as string[];
 
-  if (entry.appearances > 0) {
+  if ((entry.appearances ?? 0) > 0) {
     parts.push(`${entry.appearances} presenze`);
   }
 
-  if (entry.goals > 0) {
+  if ((entry.goals ?? 0) > 0) {
     parts.push(`${entry.goals} gol`);
   }
 
-  if (entry.assists > 0) {
+  if ((entry.assists ?? 0) > 0) {
     parts.push(`${entry.assists} assist`);
   }
 

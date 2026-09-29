@@ -43,7 +43,35 @@ export type ProfileAnalyticsEvent =
   | "profile_media_edit_tapped"
   | "profile_media_featured_changed"
   | "profile_media_delete_tapped"
-  | "profile_media_deleted";
+  | "profile_media_deleted"
+  // Master Profile Allenatore (REV-PROF-03)
+  | "profile_viewed"
+  | "profile_owner_viewed"
+  | "profile_visitor_viewed"
+  | "profile_more_menu_opened"
+  | "career_mode_changed"
+  | "profile_club_tapped"
+  | "career_empty_cta_tapped"
+  | "profile_load_failed"
+  | "profile_tab_load_failed"
+  // Gestione carriera Allenatore (REV-PROF-04)
+  | "coach_career_manager_opened"
+  | "coach_career_add_tapped"
+  | "coach_career_type_selected"
+  | "coach_career_season_roles_opened"
+  | "coach_career_experience_saved"
+  | "coach_career_experience_edited"
+  | "coach_career_experience_deleted"
+  | "coach_career_group_edited"
+  | "coach_career_group_deleted"
+  | "coach_career_player_opened"
+  | "coach_career_player_add_tapped"
+  | "coach_career_cancelled"
+  | "coach_career_unsaved_exit"
+  | "coach_career_completed"
+  | "coach_career_load_failed"
+  | "coach_career_save_failed"
+  | "coach_career_delete_failed";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -66,10 +94,22 @@ export type ProfileEditSectionKey =
   | "contacts"
   | "media";
 
+/** Modalità temporale scelta, mai la società, il ruolo o le date. */
+export type CoachExperienceMode =
+  | "MULTI_SEASON"
+  | "SINGLE_SEASON"
+  | "CUSTOM_PERIOD";
+
 type ProfileAnalyticsProps = {
   /** Tipo di riconoscimento, mai la competizione o la squadra. */
   awardType?: string;
   careerMetric?: CareerMetric;
+  /** Carriera mostrata dal selettore Allenatore/Calciatore (REV-PROF-03). */
+  careerMode?: "coach" | "player";
+  /** REV-PROF-04: modalità temporale dell'esperienza, mai il suo contenuto. */
+  experienceMode?: CoachExperienceMode;
+  /** Quante stagioni sono state selezionate, non quali. */
+  seasonCount?: number;
   contactType?: PublicContactType;
   /** Modalita geografica scelta, mai i nomi dei territori. */
   geographicMode?: string;
@@ -77,6 +117,8 @@ type ProfileAnalyticsProps = {
   mediaType?: "image" | "video";
   profileType?: string;
   section?: ProfileEditSectionKey;
+  /** Da dove arriva la visita: un identificatore di superficie, mai un url. */
+  source?: string;
   /** Quanti territori sono selezionati, non quali. */
   territoryCount?: number;
   /** Esito di un salvataggio: nessun messaggio di errore, nessun payload. */
@@ -94,6 +136,12 @@ export function trackProfileEvent(
   trackEvent(name, {
     ...(props.awardType ? { award_type: props.awardType } : {}),
     ...(props.careerMetric ? { career_metric: props.careerMetric } : {}),
+    ...(props.careerMode ? { career_mode: props.careerMode } : {}),
+    ...(props.experienceMode ? { experience_mode: props.experienceMode } : {}),
+    ...(typeof props.seasonCount === "number"
+      ? { season_count: props.seasonCount }
+      : {}),
+    ...(props.source ? { source: props.source } : {}),
     ...(props.geographicMode ? { geographic_mode: props.geographicMode } : {}),
     ...(props.section ? { section: props.section } : {}),
     ...(typeof props.success === "boolean" ? { success: props.success } : {}),
@@ -135,5 +183,46 @@ export function trackPlayerProfileViewed(
       ? "player_profile_owner_viewed"
       : "player_profile_visitor_viewed",
     { profileType: "player", viewerMode },
+  );
+}
+
+/**
+ * Variante per tipologia di profilo (REV-PROF-03). Stessa regola di
+ * `trackPlayerProfileViewed` — un solo invio per profilo aperto — con il tipo
+ * di profilo e la sorgente della visita al posto del "player" fisso.
+ *
+ * `source` è un identificatore di superficie ("search", "feed"), mai un url e
+ * mai un identificativo di persona.
+ */
+export function trackProfileViewed(
+  seenKey: string,
+  {
+    profileType,
+    seen,
+    source,
+    viewerMode,
+  }: {
+    profileType: string;
+    seen: Set<string>;
+    source?: string;
+    viewerMode: ProfileViewerMode;
+  },
+): void {
+  if (seen.has(seenKey)) {
+    return;
+  }
+
+  seen.add(seenKey);
+
+  const props = {
+    profileType,
+    viewerMode,
+    ...(source ? { source } : {}),
+  };
+
+  trackProfileEvent("profile_viewed", props);
+  trackProfileEvent(
+    viewerMode === "owner" ? "profile_owner_viewed" : "profile_visitor_viewed",
+    props,
   );
 }

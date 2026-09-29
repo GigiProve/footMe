@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
+import { router } from "expo-router";
 
 import { SelectField } from "../../../components/ui/select-field";
 import { MediaPickerField } from "../../../components/ui/media-picker-field";
@@ -40,7 +41,7 @@ import {
   type UploadedMediaItem,
 } from "../media-upload-service";
 import { spacing } from "../../../theme/tokens";
-import { AppText, Input, SectionCard } from "../../../ui";
+import { AppText, Button, Input, SectionCard } from "../../../ui";
 import { EditModalShell } from "./EditModalShell";
 import { WhereToPlaySection } from "../../onboarding/where-to-play-section";
 import type { AvailabilityType } from "../../onboarding/onboarding-form";
@@ -601,6 +602,26 @@ export function EditCoachProfileModal({
             value={form.coachAvailableFrom}
           />
         ) : null}
+      </SectionCard>
+
+      {/*
+        REV-PROF-04: la carriera non si modifica da qui. "Modifica profilo >
+        Carriera" è uno degli entry point del modulo Gestisci carriera, che
+        resta l'unico posto in cui le esperienze si creano e si cambiano.
+      */}
+      <SectionCard title="Carriera">
+        <Button
+          label="Gestisci carriera"
+          onPress={() => {
+            onClose();
+            router.push("/profile/coach-career");
+          }}
+          testID="coach-profile-manage-career"
+          variant="secondary"
+        />
+        <AppText color="secondary" style={{ marginTop: spacing[8] }} variant="bodySm">
+          Esperienze da allenatore ed eventuale carriera da calciatore.
+        </AppText>
       </SectionCard>
 
       <SectionCard title="Filosofia di gioco">

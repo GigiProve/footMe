@@ -1,0 +1,434 @@
+/**
+ * Tab Dettagli del Master Profile Allenatore (REV-PROF-03).
+ *
+ * Sei macroaree, nell'ordine fissato dalla task: Opportunità, Profilo tecnico,
+ * Situazione attuale, Filosofia di gioco, Palmarès e Contatti pubblici.
+ *
+ * Valgono le stesse regole del Master Profile Calciatore: una macroarea senza
+ * dati non viene mostrata a nessuno dei due viewer, e niente viene duplicato —
+ * patentino, disponibilità e situazione professionale compaiono una volta sola,
+ * qui o nell'header, mai in tutti e due.
+ */
+import { useState } from "react";
+import { Image, Pressable, StyleSheet, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+
+import { colors, radius, spacing } from "../../../theme/tokens";
+import { AppText } from "../../../ui";
+import {
+  buildPublicContacts,
+  hasPrivateContacts,
+  PublicContactsList,
+  type PublicContact,
+} from "../master/PublicContactsList";
+import {
+  ProfileDetailRow,
+  ProfileFactRow,
+  ProfileSectionBlock,
+} from "../master/ProfileSectionBlock";
+import {
+  buildAvailabilityZonesLabel,
+  formatCoachAvailableFrom,
+  summarizeList,
+} from "../profile-display-helpers";
+import type {
+  CoachAchievementRecord,
+  CompleteProfessionalProfile,
+} from "../profile-service";
+import type { CoachCareerView } from "./coach-career-model";
+import { getCurrentCoachExperience } from "./coach-career-model";
+
+const ACHIEVEMENT_ICONS: Record<
+  CoachAchievementRecord["achievement_type"],
+  React.ComponentProps<typeof Ionicons>["name"]
+> = {
+  altro: "ribbon-outline",
+  campionato: "trophy-outline",
+  coppa: "shield-outline",
+  playoff: "star-outline",
+  promozione: "arrow-up-circle-outline",
+};
+
+const PHILOSOPHY_COLLAPSED_LINES = 3;
+
+type CoachDetailsTabProps = {
+  careerView: CoachCareerView;
+  completeProfile: CompleteProfessionalProfile;
+  isOwner?: boolean;
+  onContactPress?: (contact: PublicContact) => void;
+  /** Assente quando la società non ha una pagina PROLINK: niente chevron. */
+  onOpenClub?: (clubId: string) => void;
+};
+
+export function CoachDetailsTab({
+  careerView,
+  completeProfile,
+  isOwner = false,
+  onContactPress,
+  onOpenClub,
+}: CoachDetailsTabProps) {
+  const { coachProfile, profile, userContacts } = completeProfile;
+
+  // ---- Opportunità -------------------------------------------------------
+  const isOpenToNewRole = Boolean(coachProfile?.open_to_new_role);
+  const zonesLabel = isOpenToNewRole
+    ? buildAvailabilityZonesLabel(
+        coachProfile?.availability_type ?? "",
+        coachProfile?.preferred_regions ?? [],
+        coachProfile?.preferred_provinces ?? [],
+      )
+    : null;
+  const availableFromLabel = formatCoachAvailableFrom(
+    coachProfile?.available_from,
+    isOpenToNewRole,
+  );
+  const hasOpportunities =
+    isOpenToNewRole || Boolean(zonesLabel) || Boolean(availableFromLabel);
+
+  // ---- Profilo tecnico ---------------------------------------------------
+  const technicalFacts = [
+    { key: "license", label: "Patentino", value: summarizeList(coachProfile?.licenses ?? []) },
+    {
+      key: "categories",
+      label: "Categorie allenate",
+      value: summarizeList(coachProfile?.coached_categories ?? []),
+    },
+    {
+      key: "formation",
+      label: "Modulo preferito",
+      value: coachProfile?.preferred_formation?.trim() || null,
+    },
+    {
+      key: "style",
+      label: "Stile di gioco",
+      value: summarizeList(coachProfile?.play_styles ?? []),
+    },
+    { key: "languages", label: "Lingue", value: summarizeList(profile.languages ?? []) },
+  ].filter((fact): fact is { key: string; label: string; value: string } =>
+    Boolean(fact.value),
+  );
+
+  // ---- Situazione attuale ------------------------------------------------
+  // Deriva dall'incarico in corso, mai da un secondo set di campi: se non c'è
+  // un incarico attuale la sezione tace invece di mostrare una card vuota.
+  const currentExperience = getCurrentCoachExperience(careerView);
+  const currentClubId = currentExperience?.clubId ?? null;
+  const canOpenClub = Boolean(currentClubId && onOpenClub);
+
+  // ---- Filosofia di gioco ------------------------------------------------
+  const philosophy = coachProfile?.game_philosophy?.trim() || "";
+
+  // ---- Palmarès ----------------------------------------------------------
+  const achievements = coachProfile?.achievements ?? [];
+
+  // ---- Contatti pubblici -------------------------------------------------
+  const publicContacts = buildPublicContacts(userContacts);
+  /*
+    Al Visitor non arriva niente di un contatto non pubblico. All'Owner, che i
+    propri contatti li ha inseriti, va detto perché non compaiono: nessun
+    valore viene renderizzato, solo il fatto che esistono.
+  */
+  const showsPrivateContactsHint = isOwner && hasPrivateContacts(userContacts);
+
+  return (
+    <View testID="coach-details-tab">
+      {hasOpportunities ? (
+        <ProfileSectionBlock testID="coach-details-opportunities" title="Opportunità">
+          {/* Lo stato non è affidato al colore: icona più testo (§accessibilità). */}
+          {isOpenToNewRole ? (
+            <ProfileDetailRow
+              icon="radio-button-on-outline"
+              label="Disponibile per una nuova squadra"
+            />
+          ) : null}
+          {zonesLabel ? (
+            <ProfileDetailRow
+              icon="map-outline"
+              label="Zone disponibili"
+              value={zonesLabel}
+            />
+          ) : null}
+          {availableFromLabel ? (
+            <ProfileDetailRow
+              icon="calendar-outline"
+              label="Disponibile da"
+              value={availableFromLabel}
+            />
+          ) : null}
+        </ProfileSectionBlock>
+      ) : null}
+
+      {technicalFacts.length > 0 ? (
+        <ProfileSectionBlock testID="coach-details-technical" title="Profilo tecnico">
+          {technicalFacts.map((fact, index) => (
+            <ProfileFactRow
+              isLast={index === technicalFacts.length - 1}
+              key={fact.key}
+              label={fact.label}
+              value={fact.value}
+            />
+          ))}
+        </ProfileSectionBlock>
+      ) : null}
+
+      {currentExperience ? (
+        <ProfileSectionBlock testID="coach-details-situation" title="Situazione attuale">
+          <CurrentClubRow
+            category={currentExperience.category}
+            clubName={currentExperience.clubName}
+            logoUrl={currentExperience.logoUrl}
+            onPress={
+              canOpenClub
+                ? () => onOpenClub?.(currentClubId as string)
+                : undefined
+            }
+            role={currentExperience.role}
+          />
+        </ProfileSectionBlock>
+      ) : null}
+
+      {philosophy ? (
+        <ProfileSectionBlock testID="coach-details-philosophy" title="Filosofia di gioco">
+          <ExpandableText text={philosophy} />
+        </ProfileSectionBlock>
+      ) : null}
+
+      {/*
+        Il Palmarès resta visibile anche vuoto, nella forma compatta del
+        mockup: "Nessuna voce" è una riga, non una card grande.
+      */}
+      <ProfileSectionBlock testID="coach-details-palmares" title="Palmarès">
+        {achievements.length > 0 ? (
+          achievements.map((achievement) => (
+            <AchievementRow achievement={achievement} key={achievement.id} />
+          ))
+        ) : (
+          <View style={styles.palmaresRow}>
+            <Ionicons color={colors.textMuted} name="trophy-outline" size={16} />
+            <AppText color="muted" style={styles.palmaresText} variant="bodySm">
+              Nessuna voce
+            </AppText>
+          </View>
+        )}
+      </ProfileSectionBlock>
+
+      {publicContacts.length > 0 || showsPrivateContactsHint ? (
+        <ProfileSectionBlock testID="coach-details-contacts" title="Contatti pubblici">
+          <PublicContactsList
+            contacts={publicContacts}
+            onContactPress={onContactPress}
+          />
+          {showsPrivateContactsHint ? (
+            <AppText color="secondary" variant="bodySm">
+              I tuoi contatti sono privati. Rendili visibili da Modifica
+              profilo.
+            </AppText>
+          ) : null}
+        </ProfileSectionBlock>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Riga della società attuale. Il chevron compare solo se la riga porta
+ * davvero da qualche parte: una società senza pagina PROLINK non promette una
+ * navigazione che non esiste.
+ */
+function CurrentClubRow({
+  category,
+  clubName,
+  logoUrl,
+  onPress,
+  role,
+}: {
+  category: string;
+  clubName: string;
+  logoUrl: string;
+  onPress?: () => void;
+  role: string;
+}) {
+  const accessibilityLabel = [clubName, category, role].filter(Boolean).join(", ");
+  const content = (
+    <>
+      <ClubLogo logoUrl={logoUrl} />
+      <View style={styles.situationText}>
+        <AppText numberOfLines={2} variant="titleSm">
+          {clubName}
+        </AppText>
+        {category ? (
+          <AppText color="secondary" variant="meta">
+            {category}
+          </AppText>
+        ) : null}
+        {role ? (
+          <AppText color="secondary" variant="meta">
+            {role}
+          </AppText>
+        ) : null}
+      </View>
+      {onPress ? (
+        <Ionicons color={colors.textMuted} name="chevron-forward" size={16} />
+      ) : null}
+    </>
+  );
+
+  if (!onPress) {
+    return (
+      <View accessible accessibilityLabel={accessibilityLabel} style={styles.situationRow}>
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.situationRow,
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      {content}
+    </Pressable>
+  );
+}
+
+/**
+ * Testo lungo con "Mostra altro" / "Mostra meno" (REV-PROF-03, "Filosofia di
+ * gioco"). I ritorni a capo restano quelli scritti dall'Allenatore: il testo
+ * non viene normalizzato né spezzato a metà parola.
+ */
+function ExpandableText({ text }: { text: string }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  // `onTextLayout` non è affidabile su tutte le piattaforme: la soglia è una
+  // stima sul contenuto, e il pulsante appare solo quando serve davvero.
+  const isLong = text.length > 160 || text.split("\n").length > PHILOSOPHY_COLLAPSED_LINES;
+
+  return (
+    <View style={styles.philosophy}>
+      <AppText
+        numberOfLines={isExpanded ? undefined : PHILOSOPHY_COLLAPSED_LINES}
+        variant="bodyLg"
+      >
+        {text}
+      </AppText>
+      {isLong ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isExpanded }}
+          hitSlop={8}
+          onPress={() => setIsExpanded((previous) => !previous)}
+          style={styles.philosophyToggle}
+          testID="coach-philosophy-toggle"
+        >
+          <AppText color="accent" variant="metaStrong">
+            {isExpanded ? "Mostra meno" : "Mostra altro"}
+          </AppText>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function AchievementRow({
+  achievement,
+}: {
+  achievement: CoachAchievementRecord;
+}) {
+  const description = achievement.description?.trim() || "";
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={[achievement.label, description].filter(Boolean).join(", ")}
+      style={styles.palmaresRow}
+    >
+      <Ionicons
+        color={colors.accent}
+        name={ACHIEVEMENT_ICONS[achievement.achievement_type] ?? "ribbon-outline"}
+        size={16}
+      />
+      <View style={styles.palmaresText}>
+        <AppText variant="bodyLg">{achievement.label}</AppText>
+        {description ? (
+          <AppText color="secondary" variant="meta">
+            {description}
+          </AppText>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function ClubLogo({ logoUrl }: { logoUrl: string }) {
+  if (logoUrl) {
+    return (
+      <View style={styles.clubLogo}>
+        <Image source={{ uri: logoUrl }} style={styles.clubLogoImage} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.clubLogo, styles.clubLogoFallback]}>
+      <Ionicons color={colors.accent} name="shield-outline" size={18} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  clubLogo: {
+    borderRadius: radius.full,
+    flexShrink: 0,
+    height: 36,
+    overflow: "hidden",
+    width: 36,
+  },
+  clubLogoFallback: {
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    justifyContent: "center",
+  },
+  clubLogoImage: {
+    height: "100%",
+    width: "100%",
+  },
+  palmaresRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[10],
+    minHeight: 32,
+    paddingVertical: spacing[4],
+  },
+  palmaresText: {
+    flex: 1,
+    gap: spacing[4],
+    minWidth: 0,
+  },
+  philosophy: {
+    gap: spacing[6],
+  },
+  philosophyToggle: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  situationRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[12],
+    minHeight: 44,
+    paddingVertical: spacing[4],
+  },
+  situationText: {
+    flex: 1,
+    gap: spacing[4],
+    minWidth: 0,
+  },
+});

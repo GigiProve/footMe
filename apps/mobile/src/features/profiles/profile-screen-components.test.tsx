@@ -56,6 +56,24 @@ const MISSING_QUICK_FACTS = [
   { accessibilityLabel: "Piede non indicato", key: "foot", label: "Piede", value: "—" },
 ] as const;
 
+/** Le quattro colonne dell'Allenatore (REV-PROF-03). */
+const COACH_QUICK_FACTS = [
+  { accessibilityLabel: "Eta, 31 anni", key: "age", label: "Eta", value: "31" },
+  {
+    accessibilityLabel: "Patentino, UEFA B",
+    key: "license",
+    label: "Patentino",
+    value: "UEFA B",
+  },
+  { accessibilityLabel: "Stagioni, 8", key: "seasons", label: "Stagioni", value: "8" },
+  {
+    accessibilityLabel: "Modulo, 4-3-3",
+    key: "formation",
+    label: "Modulo",
+    value: "4-3-3",
+  },
+] as const;
+
 describe("profile-screen-components", () => {
   it("renders readonly profile fields with a fallback value", () => {
     let tree: TestRenderer.ReactTestRenderer;
@@ -211,39 +229,24 @@ describe("profile-screen-components", () => {
     expect(tree!.root.findAllByProps({ children: "—" }).length).toBeGreaterThan(0);
   });
 
-  it("renders the shared coach header in owner mode", () => {
+  it("renders the coach master header in owner mode with the owner action bar", () => {
     let tree: TestRenderer.ReactTestRenderer;
 
     act(() => {
       tree = TestRenderer.create(
         <CoachProfileHeader
-          assignmentLabel="Allenatore Prima Squadra · AC Como"
-          availabilityBadges={["Lombardia", "Piemonte"]}
+          availabilityLabel="Disponibile per una nuova squadra"
           avatarUrl=""
-          bio="Allenatore focalizzato su intensità e organizzazione."
-          categoryLocationLabel="Serie D · Milano, Lombardia"
+          clubLabel="Torino FC · Prima Squadra"
           fullName="Marco Rossi"
-          licenseBadges={["UEFA A"]}
-          licenseYearsLabel="UEFA A · 8 anni di esperienza"
+          isVerified
+          locationLabel="Torino, Piemonte"
           mode="owner"
-          onAddContentPress={() => undefined}
           onEditProfilePress={() => undefined}
-          onFollowersPress={() => undefined}
-          onFollowingPress={() => undefined}
-          onMutualPress={() => undefined}
-          primaryRole="Allenatore Prima Squadra"
-          profileId="coach-1"
-          roleTypeLabel="Allenatore"
-          socialSummary={{
-            followerCount: 428,
-            followingCount: 186,
-            mutualPreview: [
-              { profileId: "p1", displayName: "Luca Bianchi", avatarUrl: null },
-              { profileId: "p2", displayName: "Varese Calcio", avatarUrl: null },
-            ],
-            mutualTotal: 14,
-          }}
-          statusBadge="Disponibile"
+          onMorePress={() => undefined}
+          onSharePress={() => undefined}
+          primaryRole="Allenatore"
+          quickFacts={COACH_QUICK_FACTS}
         />,
       );
     });
@@ -251,26 +254,24 @@ describe("profile-screen-components", () => {
     expect(tree!.root.findByProps({ children: "Marco Rossi" })).toBeTruthy();
     expect(tree!.root.findByProps({ children: "Allenatore" })).toBeTruthy();
     expect(
-      tree!.root.findByProps({ children: "Allenatore Prima Squadra · AC Como" }),
+      tree!.root.findByProps({ children: "Torino FC · Prima Squadra" }),
     ).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "Torino, Piemonte" })).toBeTruthy();
     expect(
-      tree!.root.findByProps({ children: "Serie D · Milano, Lombardia" }),
+      tree!.root.findByProps({ children: "Disponibile per una nuova squadra" }),
     ).toBeTruthy();
-    expect(
-      tree!.root.findByProps({ children: "UEFA A · 8 anni di esperienza" }),
-    ).toBeTruthy();
-    expect(tree!.root.findByProps({ children: "Disponibile" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "Profilo verificato" })).toBeTruthy();
     expect(tree!.root.findByProps({ accessibilityLabel: "Modifica profilo" })).toBeTruthy();
-    expect(tree!.root.findByProps({ accessibilityLabel: "Aggiungi contenuto" })).toBeTruthy();
-    expect(tree!.root.findByProps({ accessibilityLabel: "Modifica copertina" })).toBeTruthy();
-    expect(tree!.root.findByProps({ accessibilityLabel: "Modifica foto profilo" })).toBeTruthy();
-    expect(tree!.root.findByProps({ accessibilityLabel: "428 follower" })).toBeTruthy();
-    expect(tree!.root.findByProps({ accessibilityLabel: "186 seguiti" })).toBeTruthy();
-    expect(tree!.root.findByProps({ accessibilityLabel: "Vedi connessioni in comune" })).toBeTruthy();
-    expect(tree!.root.findByProps({ children: "Licenze" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "Condividi profilo" })).toBeTruthy();
+    expect(tree!.root.findByProps({ accessibilityLabel: "Altre azioni" })).toBeTruthy();
+    // Le quattro informazioni rapide della task, non le vecchie Licenze.
+    expect(tree!.root.findByProps({ children: "Patentino" })).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "Stagioni" })).toBeTruthy();
+    expect(tree!.root.findByProps({ children: "Modulo" })).toBeTruthy();
+    expect(() => tree!.root.findByProps({ children: "Licenze" })).toThrow();
   });
 
-  it("renders the shared coach header in visitor mode without owner-only controls", () => {
+  it("renders the coach master header in visitor mode with Segui and Messaggio", () => {
     let tree: TestRenderer.ReactTestRenderer;
 
     act(() => {
@@ -279,19 +280,42 @@ describe("profile-screen-components", () => {
           avatarUrl=""
           fullName="Marco Rossi"
           mode="visitor"
-          onContactPress={() => undefined}
           onFollowPress={() => undefined}
+          onMessagePress={() => undefined}
+          onSharePress={() => undefined}
           primaryRole="Allenatore"
         />,
       );
     });
 
     expect(tree!.root.findByProps({ accessibilityLabel: "Segui" })).toBeTruthy();
-    expect(tree!.root.findByProps({ accessibilityLabel: "Contatta" })).toBeTruthy();
+    // "Contatta" non esiste piu': la stessa azione ha un nome solo.
+    expect(tree!.root.findByProps({ accessibilityLabel: "Messaggio" })).toBeTruthy();
+    expect(() => tree!.root.findByProps({ accessibilityLabel: "Contatta" })).toThrow();
     expect(() => tree!.root.findByProps({ accessibilityLabel: "Modifica profilo" })).toThrow();
-    expect(() => tree!.root.findByProps({ accessibilityLabel: "Aggiungi contenuto" })).toThrow();
     expect(() => tree!.root.findByProps({ accessibilityLabel: "Modifica copertina" })).toThrow();
     expect(() => tree!.root.findByProps({ accessibilityLabel: "Modifica foto profilo" })).toThrow();
+  });
+
+  it("shows the followed state instead of a second Segui action", () => {
+    let tree: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(
+        <CoachProfileHeader
+          avatarUrl=""
+          fullName="Marco Rossi"
+          isFollowed
+          mode="visitor"
+          onFollowPress={() => undefined}
+          onMessagePress={() => undefined}
+          primaryRole="Allenatore"
+        />,
+      );
+    });
+
+    expect(tree!.root.findByProps({ accessibilityLabel: "Seguito" })).toBeTruthy();
+    expect(() => tree!.root.findByProps({ accessibilityLabel: "Segui" })).toThrow();
   });
 
   it("hides coach header rows that have no reliable data instead of showing empty placeholders", () => {
@@ -305,14 +329,14 @@ describe("profile-screen-components", () => {
           mode="owner"
           onEditProfilePress={() => undefined}
           primaryRole="Allenatore"
-          profileId="coach-1"
         />,
       );
     });
 
     expect(tree!.root.findByProps({ children: "Marco Rossi" })).toBeTruthy();
+    // Nessun badge di verifica su un profilo che non e' verificato.
     expect(() =>
-      tree!.root.findByProps({ accessibilityLabel: "Vedi connessioni in comune" }),
+      tree!.root.findByProps({ accessibilityLabel: "Profilo verificato" }),
     ).toThrow();
     expect(() => tree!.root.findByProps({ children: "Licenze" })).toThrow();
   });

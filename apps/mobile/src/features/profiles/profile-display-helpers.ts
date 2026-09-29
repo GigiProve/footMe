@@ -227,3 +227,85 @@ export function buildAvailabilityZonesLabel(
 
   return null;
 }
+
+// ────────────────────────────────
+// Elenchi e disponibilita (REV-PROF-03)
+// ────────────────────────────────
+
+const LIST_SUMMARY_LIMIT = 3;
+
+/**
+ * Elenco di valori con sintesi "+N" (REV-PROF-03, "Opportunita" e "Profilo
+ * tecnico"). La sintesi entra solo quando serve davvero: fino a
+ * `LIST_SUMMARY_LIMIT` voci l'elenco resta per esteso, perche un "+1" al posto
+ * di una parola non farebbe guadagnare niente.
+ *
+ * Nessun valore: la riga non esiste, invece di mostrare un placeholder.
+ */
+export function summarizeList(
+  values: readonly (string | null | undefined)[],
+  limit: number = LIST_SUMMARY_LIMIT,
+): string | null {
+  const cleaned = [
+    ...new Set(
+      values
+        .map((value) => value?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+
+  if (cleaned.length === 0) {
+    return null;
+  }
+
+  if (cleaned.length <= limit) {
+    return cleaned.join(", ");
+  }
+
+  return `${cleaned.slice(0, limit).join(", ")} +${cleaned.length - limit}`;
+}
+
+const AVAILABLE_FROM_MONTHS = [
+  "Gennaio",
+  "Febbraio",
+  "Marzo",
+  "Aprile",
+  "Maggio",
+  "Giugno",
+  "Luglio",
+  "Agosto",
+  "Settembre",
+  "Ottobre",
+  "Novembre",
+  "Dicembre",
+];
+
+/**
+ * "Disponibile da" dell'Allenatore (REV-PROF-03).
+ *
+ * La colonna e nata come testo libero ("Fine stagione") e da REV-ONB-03 riceve
+ * anche "YYYY-MM": l'uno viene mostrato com'e, l'altro tradotto in "Luglio
+ * 2026". Chi e disponibile ma non ha indicato una data e disponibile adesso.
+ * Chi non e disponibile non ha una data da mostrare.
+ */
+export function formatCoachAvailableFrom(
+  availableFrom: string | null | undefined,
+  openToNewRole: boolean,
+): string | null {
+  const trimmed = availableFrom?.trim();
+
+  if (!trimmed) {
+    return openToNewRole ? "Da subito" : null;
+  }
+
+  const match = /^(\d{4})-(\d{2})$/.exec(trimmed);
+
+  if (!match) {
+    return trimmed;
+  }
+
+  const monthIndex = Number.parseInt(match[2] as string, 10) - 1;
+  const monthLabel = AVAILABLE_FROM_MONTHS[monthIndex];
+
+  return monthLabel ? `${monthLabel} ${match[1]}` : trimmed;
+}

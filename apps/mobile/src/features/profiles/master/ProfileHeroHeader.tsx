@@ -38,6 +38,12 @@ type ProfileHeroHeaderProps = {
   availabilityLabel?: string;
   coverImageUrl?: string | null;
   fullName: string;
+  /**
+   * Badge di verifica accanto al nome. Compare solo su un profilo verificato
+   * davvero: l'assenza del dato non è una verifica mancata da disegnare, è una
+   * verifica che non c'è.
+   */
+  isVerified?: boolean;
   metaRows?: readonly ProfileHeroMetaRow[];
   primaryRole?: string;
   secondaryRole?: string;
@@ -50,6 +56,7 @@ export function ProfileHeroHeader({
   availabilityLabel,
   coverImageUrl,
   fullName,
+  isVerified = false,
   metaRows = [],
   primaryRole,
   secondaryRole,
@@ -81,9 +88,20 @@ export function ProfileHeroHeader({
       </View>
 
       <View style={styles.body}>
-        <AppText numberOfLines={2} variant="heroName">
-          {fullName}
-        </AppText>
+        <View style={styles.nameRow}>
+          <AppText numberOfLines={2} style={styles.name} variant="heroName">
+            {fullName}
+          </AppText>
+          {isVerified ? (
+            <Ionicons
+              accessibilityLabel="Profilo verificato"
+              color={colors.accent}
+              name="checkmark-circle"
+              size={20}
+              style={styles.verifiedBadge}
+            />
+          ) : null}
+        </View>
 
         {primaryRole ? (
           <View style={styles.roleRow}>
@@ -202,6 +220,15 @@ const styles = StyleSheet.create({
     gap: spacing[4],
     paddingTop: spacing[4],
   },
+  name: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  nameRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[6],
+  },
   metaText: {
     flexShrink: 1,
   },
@@ -210,5 +237,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing[6],
+  },
+  verifiedBadge: {
+    flexShrink: 0,
   },
 });

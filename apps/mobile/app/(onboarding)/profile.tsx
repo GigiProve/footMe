@@ -144,6 +144,9 @@ import {
   type StaffCareerEntryRecord,
   type StaffPlayerCareerEntryRecord,
 } from "../../src/features/profiles/profile-service";
+import { assignmentsToRecords } from "../../src/features/profiles/coach-career/coach-assignment-model";
+import { coachEntriesToAssignments } from "../../src/features/profiles/coach-career/coach-onboarding-bridge";
+import { formsToCoachPlayerRecords } from "../../src/features/profiles/coach-career/coach-player-career";
 import { readErrorMessage } from "../../src/lib/error-message";
 import { supabase } from "../../src/lib/supabase";
 import { colors, radius, spacing } from "../../src/theme/tokens";
@@ -2473,40 +2476,23 @@ export default function OnboardingProfileScreen() {
       await updateCompleteProfessionalProfile({
         club: null,
         clubSeasonEntries: [],
-        coachCareerEntries: coachCareerEntries.map((entry, index) => ({
-          category: entry.category || null,
-          club_id: entry.clubId ?? null,
-          coach_profile_id: session.user.id,
-          description: entry.description?.trim() || null,
-          experience_type: entry.type,
-          id: entry.id,
-          period_end_month: entry.period?.endMonth || null,
-          period_end_year: entry.period?.endYear ? Number(entry.period.endYear) : null,
-          period_start_month: entry.period?.startMonth || null,
-          period_start_year: entry.period?.startYear ? Number(entry.period.startYear) : null,
-          results: [],
-          role: entry.role,
-          season_details: entry.seasonDetails,
-          seasons: entry.seasons,
-          sort_order: index,
-          team_logo_url: entry.teamLogoUrl ?? null,
-          team_name: entry.teamName,
-        })),
+        // REV-PROF-04: la carriera si salva in assegnazioni — una stagione, un
+        // ruolo, una categoria — così un'esperienza inserita qui è già quella
+        // che Gestisci carriera apre e modifica.
+        coachCareerEntries: assignmentsToRecords(
+          coachEntriesToAssignments(coachCareerEntries),
+          session.user.id,
+        ),
         coachDirectorCareerEntries: [],
-        coachPlayerCareerEntries: coachPlayerCareerEntries.map((entry, index) => ({
-          appearances: Number.parseInt(entry.appearances, 10) || 0,
-          assists: Number.parseInt(entry.assists, 10) || 0,
-          category: entry.category || null,
-          coach_profile_id: session.user.id,
-          goals: Number.parseInt(entry.goals, 10) || 0,
+        coachPlayerCareerEntries: formsToCoachPlayerRecords(
           // Hermes non espone globalThis.crypto: l'uuid va generato dall'helper.
-          id: entry.id ?? createLocalUuid(),
-          position: null,
-          season: entry.seasonLabel,
-          sort_order: index,
-          team_logo_url: entry.teamLogoUrl || null,
-          team_name: entry.clubName,
-        })),
+          coachPlayerCareerEntries.map((entry) => ({
+            ...entry,
+            id: entry.id ?? createLocalUuid(),
+          })),
+          session.user.id,
+          new Map(),
+        ),
         coachProfile: {
           availability_type: coachAvailabilityType || null,
           available_from: openToNewRole

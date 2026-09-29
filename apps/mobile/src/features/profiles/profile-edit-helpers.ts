@@ -10,6 +10,10 @@ import type {
 } from "./profile-service";
 import type { PlayerExperienceForm, PlayerPosition, PreferredFoot } from "./player-sports";
 import { buildPlayerCareerView } from "./career/player-career-model";
+import {
+  buildCoachCareerView,
+  getCurrentCoachExperience,
+} from "./career/coach-career-model";
 import type { ProfileQuickFact } from "./master/ProfileQuickFacts";
 import type { ClubSeasonForm } from "./club-season-section";
 import { formToInput, recordToForm } from "./club-season-section";
@@ -35,10 +39,6 @@ import {
   getPlayerPositionLabels,
   getPreferredFootLabel,
 } from "./player-sports";
-import {
-  computeCoachExperienceYears,
-  formatCoachExperienceLabel,
-} from "./profile-display-helpers";
 
 // ────────────────────────────────
 // Role labels
@@ -722,22 +722,23 @@ function buildPlayerQuickFacts(
   ];
 }
 
+/**
+ * Dati dell'header del Master Profile Allenatore (REV-PROF-03).
+ *
+ * Stessa forma dei dati del Calciatore: identita, una riga societa/categoria,
+ * una riga localita, la disponibilita e quattro informazioni rapide. Patentino
+ * e disponibilita compaiono qui una volta sola e non vengono ripetuti in
+ * Dettagli sotto altro nome.
+ */
 export type CoachProfileHeaderDetails = {
-  assignmentLabel?: string;
-  availabilityBadges: string[];
-  bio: string | null;
-  categoryLabel?: string;
-  categoryLocationLabel?: string;
-  experienceLabel?: string;
+  availabilityLabel?: string;
+  /** "Torino FC · Prima Squadra", dall'incarico in corso. */
+  clubLabel?: string;
   fullName: string;
-  licenseBadges: string[];
-  licenseLabel?: string;
-  licenseYearsLabel?: string;
+  isVerified: boolean;
   locationLabel?: string;
   primaryRole: string;
-  roleTypeLabel: string;
-  statusBadge?: string;
-  teamLabel?: string;
+  quickFacts: ProfileQuickFact[];
 };
 
 export type AgentProfileHeaderDetails = {
@@ -816,70 +817,107 @@ export function buildCoachProfileHeaderDetails(
   }
 
   const roleTypeLabel = roleLabels.coach;
-  const latestEntry = data.coachCareerEntries[0];
-  const domicile = data.profile.domicile?.trim();
-  const residence = data.profile.residence?.trim();
-  const fallbackLocationLabel = formatLocationSummary(
-    data.profile.city,
+  // Societa, ruolo e categoria vengono dall'incarico in corso, non da un
+  // secondo set di campi e non dall'ultima riga salvata: se nessun incarico e
+  // in corso la riga non compare, invece di indovinare una societa.
+  const careerView = buildCoachCareerView(data.coachCareerEntries ?? []);
+  const currentExperience = getCurrentCoachExperience(careerView);
+
+  const locationSummary = formatLocationSummary(
+    data.profile.city ??
+      data.profile.residence ??
+      data.profile.current_location_city ??
+      data.profile.domicile,
     data.profile.region,
   );
   const locationLabel =
-    domicile ||
-    residence ||
-    (fallbackLocationLabel === "Da completare" ? undefined : fallbackLocationLabel);
-  const availabilityBadges =
-    data.coachProfile?.availability_type === "REGIONS"
-      ? data.coachProfile.preferred_regions
-      : data.coachProfile?.availability_type === "PROVINCES"
-        ? data.coachProfile.preferred_provinces
-        : data.coachProfile?.open_to_new_role
-          ? ["Tutta Italia"]
-          : [];
+    locationSummary === "Da completare" ? undefined : locationSummary;
 
   const primaryRole =
-    latestEntry?.role?.trim() ||
+    currentExperience?.role?.trim() ||
     data.coachProfile?.primary_role?.trim() ||
     roleTypeLabel;
-  const teamLabel =
-    latestEntry?.team_name?.trim() || data.coachProfile?.coached_clubs?.[0] || undefined;
-  // Avoid repeating "Allenatore / Allenatore" when the current assignment is
-  // identical to the generic role type and no team is available.
-  const assignmentLabel =
-    primaryRole === roleTypeLabel && !teamLabel
-      ? undefined
-      : teamLabel
-        ? `${primaryRole} · ${teamLabel}`
-        : primaryRole;
+  const clubLabel =
+    [currentExperience?.clubName.trim(), currentExperience?.category.trim()]
+      .filter(Boolean)
+      .join(" · ") || undefined;
 
-  const categoryLabel =
-    latestEntry?.category ?? data.coachProfile?.coached_categories?.[0] ?? undefined;
-  const categoryLocationLabel =
-    [categoryLabel, locationLabel].filter(Boolean).join(" · ") || undefined;
-
-  const licenseLabel = data.coachProfile?.licenses?.[0]?.trim() || undefined;
-  const experienceYears = computeCoachExperienceYears(data.coachCareerEntries);
-  const experienceLabel =
-    experienceYears !== null ? formatCoachExperienceLabel(experienceYears) : undefined;
-  const licenseYearsLabel =
-    [licenseLabel, experienceLabel].filter(Boolean).join(" · ") || undefined;
+  const age = data.profile.age ?? calculateAge(data.profile.birth_date);
+  const licenseLabel = data.coachProfile?.licenses?.[0]?.trim() || null;
+  const formation = data.coachProfile?.preferred_formation?.trim() || null;
 
   return {
-    assignmentLabel,
-    availabilityBadges,
-    bio: data.profile.bio?.trim() || null,
-    categoryLabel,
-    categoryLocationLabel,
-    experienceLabel,
+    availabilityLabel: data.coachProfile?.open_to_new_role
+      ? "Disponibile per una nuova squadra"
+      : undefined,
+    clubLabel,
     fullName: formatProfileDisplayName(data.profile.full_name, null),
-    licenseBadges: data.coachProfile?.licenses ?? [],
-    licenseLabel,
-    licenseYearsLabel,
+    /*
+      Il prodotto non ha ancora una verifica per i profili personali: nessuna
+      colonna la esprime, quindi il badge non viene mai acceso. Il giorno in cui
+      il dato esiste, questa e l'unica riga da cambiare.
+    */
+    isVerified: false,
     locationLabel,
     primaryRole,
-    roleTypeLabel,
-    statusBadge: data.coachProfile?.open_to_new_role ? "Disponibile" : undefined,
-    teamLabel,
+    quickFacts: buildCoachQuickFacts({
+      age,
+      licenseLabel,
+      formation,
+      seasonCount: careerView.seasonCount,
+    }),
   };
+}
+
+/**
+ * Quattro colonne, sempre le stesse e sempre quattro: Eta, Patentino, Stagioni
+ * e Modulo (REV-PROF-03). Un dato mancante mostra un trattino e lascia la riga
+ * in equilibrio, invece di far collassare la colonna.
+ */
+function buildCoachQuickFacts({
+  age,
+  formation,
+  licenseLabel,
+  seasonCount,
+}: {
+  age: number | null;
+  formation: string | null;
+  licenseLabel: string | null;
+  seasonCount: number;
+}): ProfileQuickFact[] {
+  return [
+    {
+      accessibilityLabel: age ? `Eta, ${age} anni` : "Eta non indicata",
+      key: "age",
+      label: "Eta",
+      value: age ? String(age) : "—",
+    },
+    {
+      accessibilityLabel: licenseLabel
+        ? `Patentino, ${licenseLabel}`
+        : "Patentino non indicato",
+      key: "license",
+      label: "Patentino",
+      value: licenseLabel ?? "—",
+    },
+    {
+      accessibilityLabel:
+        seasonCount > 0
+          ? `Stagioni, ${seasonCount}`
+          : "Stagioni non disponibili",
+      key: "seasons",
+      label: "Stagioni",
+      value: seasonCount > 0 ? String(seasonCount) : "—",
+    },
+    {
+      accessibilityLabel: formation
+        ? `Modulo, ${formation}`
+        : "Modulo non indicato",
+      key: "formation",
+      label: "Modulo",
+      value: formation ?? "—",
+    },
+  ];
 }
 
 export function buildAgentProfileHeaderDetails(

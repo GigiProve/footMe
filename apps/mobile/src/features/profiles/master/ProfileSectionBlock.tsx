@@ -87,6 +87,43 @@ export function ProfileDetailRow({
   );
 }
 
+type ProfileFactRowProps = {
+  /** Ultima riga del gruppo: niente hairline appesa in fondo alla sezione. */
+  isLast?: boolean;
+  label: string;
+  value: string;
+};
+
+/**
+ * Riga etichetta a sinistra / valore a destra (REV-PROF-03, "Profilo
+ * tecnico"). È la variante compatta di `ProfileDetailRow` per le coppie
+ * label/valore senza icona: stessa altezza minima e la stessa hairline
+ * `divider` fra le righe di uno stesso modulo.
+ *
+ * Il valore va a capo invece di essere troncato o rimpicciolito: categorie e
+ * lingue multiple restano leggibili anche a 320 px.
+ */
+export function ProfileFactRow({
+  isLast = false,
+  label,
+  value,
+}: ProfileFactRowProps) {
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${label}, ${value}`}
+      style={[styles.factRow, isLast ? null : styles.factRowDivided]}
+    >
+      <AppText color="secondary" style={styles.factLabel} variant="bodySm">
+        {label}
+      </AppText>
+      <AppText style={styles.factValue} variant="titleSm">
+        {value}
+      </AppText>
+    </View>
+  );
+}
+
 type ProfileSectionErrorProps = {
   /** Copy leggibile: mai status code, enum o nomi di API (§36). */
   message: string;
@@ -118,6 +155,27 @@ const styles = StyleSheet.create({
     borderRadius: radius[12],
     gap: spacing[10],
     padding: spacing[16],
+  },
+  factLabel: {
+    flexShrink: 0,
+    maxWidth: "45%",
+  },
+  factRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: spacing[12],
+    justifyContent: "space-between",
+    minHeight: 44,
+    paddingVertical: spacing[10],
+  },
+  factRowDivided: {
+    borderBottomColor: colors.divider,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  factValue: {
+    flexShrink: 1,
+    minWidth: 0,
+    textAlign: "right",
   },
   row: {
     alignItems: "center",

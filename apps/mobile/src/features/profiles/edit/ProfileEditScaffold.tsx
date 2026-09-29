@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing } from "../../../theme/tokens";
 import { AppText, Button } from "../../../ui";
+import { InfoMessage } from "../../onboarding/ui";
 
 type ProfileEditScaffoldProps = {
   children: ReactNode;
@@ -27,9 +28,22 @@ type ProfileEditScaffoldProps = {
   errorMessage?: string | null;
   onBack: () => void;
   onSave?: () => void;
+  /**
+   * Azione secondaria sotto la CTA ("Annulla", "Indietro"). Resta un'azione
+   * testuale: la schermata conserva una sola CTA primaria (REV-PROF-04).
+   */
+  onSecondary?: () => void;
+  /**
+   * Avviso non bloccante mostrato sopra la CTA: l'azione resta possibile, ma
+   * vale la pena guardarla due volte (REV-PROF-04).
+   */
+  notice?: string | null;
   saveDisabled?: boolean;
   saveLabel?: string;
   saving?: boolean;
+  secondaryLabel?: string;
+  /** Indicatore di passo, es. "1 di 2". Prende il posto dello spaziatore. */
+  stepLabel?: string;
   testID?: string;
   title: string;
 };
@@ -39,9 +53,13 @@ export function ProfileEditScaffold({
   errorMessage,
   onBack,
   onSave,
+  onSecondary,
+  notice,
   saveDisabled = false,
   saveLabel = "Salva modifiche",
   saving = false,
+  secondaryLabel,
+  stepLabel,
   testID,
   title,
 }: ProfileEditScaffoldProps) {
@@ -64,7 +82,13 @@ export function ProfileEditScaffold({
           {title}
         </AppText>
         {/* Speculare al back: tiene il titolo centrato senza una seconda azione. */}
-        <View style={styles.backButton} />
+        <View style={styles.backButton}>
+          {stepLabel ? (
+            <AppText color="muted" variant="meta">
+              {stepLabel}
+            </AppText>
+          ) : null}
+        </View>
       </View>
 
       <ScrollView
@@ -82,6 +106,7 @@ export function ProfileEditScaffold({
         <View
           style={[styles.footer, { paddingBottom: spacing[16] + insets.bottom }]}
         >
+          {notice ? <InfoMessage message={notice} tone="warning" /> : null}
           {errorMessage ? (
             <AppText
               accessibilityLiveRegion="polite"
@@ -101,6 +126,17 @@ export function ProfileEditScaffold({
             size="lg"
             testID="profile-edit-save"
           />
+          {onSecondary && secondaryLabel ? (
+            <Button
+              disabled={saving}
+              fullWidth
+              label={secondaryLabel}
+              onPress={onSecondary}
+              size="md"
+              testID="profile-edit-secondary"
+              variant="tertiary"
+            />
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -123,8 +159,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    minWidth: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },

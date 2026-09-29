@@ -14,6 +14,11 @@ export type ConfirmModalProps = {
   onConfirm: () => void;
   onCancel: () => void;
   isBusy?: boolean;
+  /**
+   * Conferma di un'azione irreversibile: la CTA prende lo stile distruttivo
+   * già previsto dal design system, invece di sembrare una conferma qualsiasi.
+   */
+  destructive?: boolean;
   children?: ReactNode;
 };
 
@@ -26,6 +31,7 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
   isBusy = false,
+  destructive = false,
   children,
 }: ConfirmModalProps) {
   return (
@@ -69,6 +75,7 @@ export function ConfirmModal({
               disabled={isBusy}
             />
             <Button
+              destructive={destructive}
               fullWidth
               label={isBusy ? "..." : confirmLabel}
               loading={isBusy}
