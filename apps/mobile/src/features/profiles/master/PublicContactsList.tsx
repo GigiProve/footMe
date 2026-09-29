@@ -64,6 +64,23 @@ function normalizeHandleUrl(value: string, baseUrl: string): string {
     : `${baseUrl}${trimmed.replace(/^@/, "")}`;
 }
 
+/**
+ * Un contatto salvato ma non marcato pubblico. Serve solo a dire all'Owner
+ * che esiste: il valore non viene mai letto né mostrato.
+ */
+export function hasPrivateContacts(contacts: UserContactsRecord): boolean {
+  const saved = [
+    contacts.email,
+    contacts.instagram,
+    contacts.facebook,
+    contacts.tiktok,
+    contacts.youtube,
+    contacts.website,
+  ].some((value) => Boolean(value?.trim()));
+
+  return saved && buildPublicContacts(contacts).length === 0;
+}
+
 export function buildPublicContacts(
   contacts: UserContactsRecord,
 ): PublicContact[] {

@@ -135,6 +135,10 @@ export type ProfileFormState = {
   contactFacebook: string;
   contactInstagram: string;
   contactPhone: string;
+  contactTikTok: string;
+  contactWebsite: string;
+  contactYouTube: string;
+  coverUrl: string;
   clubCategory: string;
   clubCity: string;
   clubSeasonEntries: ClubSeasonForm[];
@@ -182,6 +186,9 @@ export type ProfileFormState = {
   showContactEmail: boolean;
   showContactFacebook: boolean;
   showContactInstagram: boolean;
+  showContactTikTok: boolean;
+  showContactWebsite: boolean;
+  showContactYouTube: boolean;
   showTransferBadge: boolean;
   showRegionsBadge: boolean;
   secondaryPositions: PlayerPosition[];
@@ -238,6 +245,10 @@ export function buildInitialState(
     contactFacebook: data.userContacts.facebook,
     contactInstagram: data.userContacts.instagram,
     contactPhone: data.userContacts.phone,
+    contactTikTok: data.userContacts.tiktok ?? "",
+    contactWebsite: data.userContacts.website ?? "",
+    contactYouTube: data.userContacts.youtube ?? "",
+    coverUrl: data.profile.cover_url ?? "",
     clubCategory: club?.category ?? "",
     clubCity: club?.city ?? "",
     clubSeasonEntries: data.clubSeasonEntries.map(recordToForm),
@@ -293,6 +304,9 @@ export function buildInitialState(
     showContactEmail: data.userContacts.showEmail,
     showContactFacebook: data.userContacts.showFacebook,
     showContactInstagram: data.userContacts.showInstagram,
+    showContactTikTok: data.userContacts.showTikTok ?? false,
+    showContactWebsite: data.userContacts.showWebsite ?? false,
+    showContactYouTube: data.userContacts.showYouTube ?? false,
     showTransferBadge: playerProfile?.show_transfer_badge ?? false,
     showRegionsBadge: playerProfile?.show_regions_badge ?? false,
     secondaryPositions: playerProfile?.secondary_positions ?? [],
@@ -472,6 +486,7 @@ export function buildFullUpdatePayload(
       bio: parseOptionalText(formState.bio),
       birth_date: null, // Must be set by the calling modal after validation
       city: resolvedCity,
+      cover_url: parseOptionalText(formState.coverUrl),
       current_location_city:
         nationalityCategory === "italy" ? null : normalizedCurrentLocationCity,
       current_location_country:
@@ -522,14 +537,25 @@ export function buildFullUpdatePayload(
             staff_roles: resolvedStaffRoles,
           }
         : null,
+    /*
+      Tutti e sei i canali, non tre: updateCompleteProfessionalProfile riscrive
+      l intera riga di profile_contacts, quindi un canale assente qui non resta
+      com era — viene azzerato insieme al suo flag di visibilita.
+    */
     userContacts: {
       email: formState.contactEmail.trim().toLowerCase(),
       facebook: formState.contactFacebook.trim(),
       instagram: formState.contactInstagram.trim(),
       phone: formState.contactPhone.trim(),
+      tiktok: formState.contactTikTok.trim(),
+      website: formState.contactWebsite.trim(),
+      youtube: formState.contactYouTube.trim(),
       showEmail: formState.showContactEmail,
       showFacebook: formState.showContactFacebook,
       showInstagram: formState.showContactInstagram,
+      showTikTok: formState.showContactTikTok,
+      showWebsite: formState.showContactWebsite,
+      showYouTube: formState.showContactYouTube,
     },
   };
 }

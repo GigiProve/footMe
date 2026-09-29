@@ -64,6 +64,8 @@ type MediaTabContentProps = {
   initialItems?: MediaContentItem[];
   mode: MediaViewerMode;
   onAddContentPress?: () => void;
+  /** Apre l'editor del contenuto. Assente per il Visitor. */
+  onEditContentPress?: () => void;
   onFilterChange?: (filter: MediaFilter) => void;
   onItemOpened?: (item: MediaContentItem) => void;
   onOpenTaggedItem?: (ref: { contentType: string; postId: string }) => void;
@@ -110,6 +112,7 @@ export function MediaTabContent({
   initialItems = [],
   mode,
   onAddContentPress,
+  onEditContentPress,
   onFilterChange,
   onItemOpened,
   onOpenTaggedItem,
@@ -280,6 +283,11 @@ export function MediaTabContent({
     );
   }
 
+  /*
+    REV-PROF-02 §O.8: la matita dell Owner porta al form reale della sezione
+    "Media e contenuti", non piu a un avviso provvisorio. Il viewer si chiude
+    prima di navigare, altrimenti resterebbe aperto sopra l editor.
+  */
   function handleEditItem() {
     const currentItem = visibleItems[activeViewerIndex];
 
@@ -287,10 +295,8 @@ export function MediaTabContent({
       return;
     }
 
-    Alert.alert(
-      "Modifica contenuto",
-      `La scheda di modifica per "${currentItem.tag?.label ?? "Media"}" verra' collegata al form media dedicato.`,
-    );
+    setSelectedItemId(null);
+    onEditContentPress?.();
   }
 
   function handleOpenComments() {

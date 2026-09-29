@@ -661,6 +661,7 @@ export type CompleteProfessionalProfileUpdate = {
     bio: string | null;
     birth_date: string | null;
     city: string | null;
+    cover_url?: string | null;
     current_location_city?: string | null;
     current_location_country?: string | null;
     domicile?: string | null;
@@ -2156,6 +2157,11 @@ export async function updateCompleteProfessionalProfile(
   if ("current_location_country" in input.profile) {
     profileUpdatePayload.current_location_country =
       input.profile.current_location_country ?? null;
+  }
+
+  // La copertina era di sola lettura: letta dal profilo, mai riscritta.
+  if ("cover_url" in input.profile) {
+    profileUpdatePayload.cover_url = input.profile.cover_url ?? null;
   }
 
   if ("domicile" in input.profile) {

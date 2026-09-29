@@ -105,6 +105,17 @@ describe("ProfileTabView", () => {
     }
   });
 
+  // §10 / Screen Master: le tab coprono tutta la larghezza della testata.
+  it("distribuisce le tab su tutta la larghezza", () => {
+    const tree = render(false);
+    const tabs = tree.root.findAllByProps({ accessibilityRole: "tab" });
+
+    expect(tabs.length).toBeGreaterThan(0);
+    for (const tab of tabs) {
+      expect(JSON.stringify(tab.props.style)).toContain('"flex":1');
+    }
+  });
+
   it("apre sul Percorso professionale", () => {
     const tree = render(false);
 

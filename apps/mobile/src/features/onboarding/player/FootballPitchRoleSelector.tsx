@@ -13,7 +13,9 @@ import {
 import {
   PITCH_ASPECT_RATIO,
   PITCH_GRASS,
+  PITCH_LIGHT_SURFACE,
   PitchMarkings,
+  type PitchTone,
 } from "./PitchMarkings";
 import {
   PITCH_SLOTS,
@@ -25,6 +27,13 @@ import {
 /** Pastiglia di un ruolo non scelto: inchiostro velato sull'erba. */
 const PITCH_NODE_IDLE = "rgba(12,27,42,0.42)";
 const PITCH_NODE_OUTLINE = "rgba(255,255,255,0.55)";
+/*
+  Sul campo chiaro l'inchiostro velato sparirebbe: il nodo inattivo diventa
+  bianco con cornice e sigla scure, mantenendo lo stesso contrasto che ha
+  sull'erba.
+*/
+const PITCH_LIGHT_NODE_IDLE = "#FFFFFF";
+const PITCH_LIGHT_NODE_OUTLINE = "#C9D2DE";
 
 const NODE_SIZE = 42;
 const PITCH_MAX_WIDTH = 264;
@@ -36,6 +45,12 @@ type FootballPitchRoleSelectorProps = {
   secondaryPosition: PlayerPosition | "";
   onSelectPrimary: (position: PlayerPosition) => void;
   errorMessage?: string;
+  /**
+   * `grass` è il campo dell'onboarding. `light` è la resa su fondo bianco
+   * usata dall'editor profilo: stesso disegno e stessi marker, non un secondo
+   * campo.
+   */
+  tone?: PitchTone;
   testID?: string;
 };
 
@@ -53,6 +68,7 @@ export function FootballPitchRoleSelector({
   primaryPosition,
   secondaryPosition,
   testID,
+  tone = "grass",
 }: FootballPitchRoleSelectorProps) {
   const [pitchSize, setPitchSize] = useState({ height: 0, width: 0 });
 
@@ -66,10 +82,13 @@ export function FootballPitchRoleSelector({
           const { height, width } = event.nativeEvent.layout;
           setPitchSize({ height, width });
         }}
-        style={styles.pitch}
+        style={[
+          styles.pitch,
+          tone === "light" ? styles.pitchLight : null,
+        ]}
         testID={testID ? `${testID}-surface` : undefined}
       >
-        <PitchMarkings />
+        <PitchMarkings tone={tone} />
 
         {pitchSize.width > 0
           ? PITCH_SLOTS.map((slot) => {
@@ -88,6 +107,7 @@ export function FootballPitchRoleSelector({
                   position={slot.position}
                   state={state}
                   testID={`pitch-role-${slot.position}`}
+                  tone={tone}
                   top={NODE_INSET + slot.y * usableHeight}
                 />
               );
@@ -107,6 +127,7 @@ function PitchNode({
   position,
   state,
   testID,
+  tone,
   top,
 }: {
   abbreviation: string;
@@ -115,6 +136,7 @@ function PitchNode({
   position: PlayerPosition;
   state: PitchSlotState;
   testID: string;
+  tone: PitchTone;
   top: number;
 }) {
   const isPrimary = state === "primary";
@@ -133,6 +155,9 @@ function PitchNode({
           left: left - NODE_SIZE / 2,
           top: top - NODE_SIZE / 2,
         },
+        tone === "light" && !isPrimary && !isSecondary
+          ? styles.nodeIdleLight
+          : null,
         isPrimary ? styles.nodePrimary : null,
         isSecondary ? styles.nodeSecondary : null,
         pressed ? styles.nodePressed : null,
@@ -145,7 +170,9 @@ function PitchNode({
         anche senza percepire il colore (§BW).
       */}
       <AppText
-        color={isSecondary ? "primary" : "inverse"}
+        color={
+          isSecondary || (tone === "light" && !isPrimary) ? "primary" : "inverse"
+        }
         variant="chipLabel"
       >
         {abbreviation}
@@ -185,6 +212,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "absolute",
     width: NODE_SIZE,
+  },
+  pitchLight: {
+    backgroundColor: PITCH_LIGHT_SURFACE,
+    borderColor: "#E3E8EF",
+    borderWidth: 1,
+  },
+  nodeIdleLight: {
+    backgroundColor: PITCH_LIGHT_NODE_IDLE,
+    borderColor: PITCH_LIGHT_NODE_OUTLINE,
   },
   nodePrimary: {
     backgroundColor: colors.accent,

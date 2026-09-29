@@ -14,6 +14,12 @@ export type ProfileTab = "career" | "media" | "info" | "details";
  */
 type ProfileTabBarProps = {
   activeTab: ProfileTab;
+  /**
+   * Distribuisce le tab a larghezza uguale su tutta la testata, come nello
+   * Screen Master del Calciatore (REV-PROF-01 §10). Le altre tipologie di
+   * profilo mantengono l'allineamento a sinistra che hanno oggi.
+   */
+  fill?: boolean;
   onTabChange: (tab: ProfileTab) => void;
   tabs?: readonly TabBarItem<ProfileTab>[];
 };
@@ -26,8 +32,11 @@ const TABS: readonly TabBarItem<ProfileTab>[] = [
 
 export function ProfileTabBar({
   activeTab,
+  fill = false,
   onTabChange,
   tabs = TABS,
 }: ProfileTabBarProps) {
-  return <TabBar active={activeTab} items={tabs} onChange={onTabChange} />;
+  return (
+    <TabBar active={activeTab} fill={fill} items={tabs} onChange={onTabChange} />
+  );
 }

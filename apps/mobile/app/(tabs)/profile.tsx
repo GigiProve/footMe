@@ -9,7 +9,7 @@ import {
   type AlertButton,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
@@ -56,12 +56,6 @@ import { EditCoachExperiencesModal } from "../../src/features/profiles/edit-moda
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditDirectorMediaModal } from "../../src/features/profiles/edit-modals/EditDirectorMediaModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
-import { EditPlayerExperiencesModal } from "../../src/features/profiles/edit-modals/EditPlayerExperiencesModal";
-import { EditPlayerMediaModal } from "../../src/features/profiles/edit-modals/EditPlayerMediaModal";
-import { EditPlayerPalmaresModal } from "../../src/features/profiles/edit-modals/EditPlayerPalmaresModal";
-import { EditPlayerProfileModal } from "../../src/features/profiles/edit-modals/EditPlayerProfileModal";
-import { EditPlayerSituationModal } from "../../src/features/profiles/edit-modals/EditPlayerSituationModal";
-import { EditPlayerSportsModal } from "../../src/features/profiles/edit-modals/EditPlayerSportsModal";
 import { EditStaffExperiencesModal } from "../../src/features/profiles/edit-modals/EditStaffExperiencesModal";
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
 import { EditStaffMediaModal } from "../../src/features/profiles/edit-modals/EditStaffMediaModal";
@@ -110,8 +104,6 @@ import {
   trackPlayerProfileViewed,
   trackProfileEvent,
 } from "../../src/features/profiles/profile-analytics";
-import { SavedSection } from "../../src/features/saved/SavedSection";
-import { FollowingSection } from "../../src/features/following/FollowingSection";
 import { colors, radius, spacing } from "../../src/theme/tokens";
 import { ActionSheet, AppText, Button, HeaderBell, SectionCard } from "../../src/ui";
 
@@ -255,6 +247,25 @@ export default function ProfileScreen() {
     void loadProfile();
     void loadPendingMemberships();
   }, [loadProfile, loadPendingMemberships]);
+
+  /*
+    Rientro dall editor (REV-PROF-02 §P): le sezioni salvano su rotte proprie,
+    quindi il Master Profile va riletto quando torna in primo piano. Il primo
+    focus coincide con il mount, che ha gia caricato: saltarlo evita la doppia
+    fetch all apertura della tab.
+  */
+  const hasLoadedOnFocus = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasLoadedOnFocus.current) {
+        hasLoadedOnFocus.current = true;
+        return;
+      }
+
+      void loadProfile();
+    }, [loadProfile]),
+  );
 
   async function handleRespondMembership(memberId: string, accept: boolean) {
     try {
@@ -788,7 +799,12 @@ export default function ProfileScreen() {
                 profileType: "player",
                 viewerMode: "owner",
               });
-              handleEdit("editPlayerProfile");
+              trackProfileEvent("player_profile_edit_opened", {
+                profileType: "player",
+                viewerMode: "owner",
+              });
+              // REV-PROF-02 §E: la CTA apre l hub modulare, non piu il form unico.
+              router.push("/profile/edit");
             }}
             primaryRole={playerHeaderDetails.primaryRole}
             quickFacts={playerHeaderDetails.quickFacts}
@@ -880,7 +896,7 @@ export default function ProfileScreen() {
           <ProfileTabView
             completeProfile={completeProfile}
             isOwner
-            onManageMedia={() => handleEdit("playerMedia")}
+            onManageMedia={() => router.push("/profile/edit/media")}
           />
         ) : completeProfile && role === "coach" ? (
           <CoachProfileTabView
@@ -947,12 +963,11 @@ export default function ProfileScreen() {
             role={role}
           />
         ) : null}
-        {completeProfile ? (
-          <>
-            <SavedSection />
-            <FollowingSection />
-          </>
-        ) : null}
+        {/*
+          REV-PROF-01 §5: il Master Profile finisce con le tab. "Salvati" e
+          "Seguiti" sono aree personali con una schermata propria e restano
+          raggiungibili dal menu "..." qui sopra, non in coda al profilo.
+        */}
       </KeyboardAwareForm>
 
       {/* Per-section edit modals */}
@@ -979,53 +994,11 @@ export default function ProfileScreen() {
             userId={userId}
             visible={activeModal === "contact"}
           />
-          {role === "player" ? (
-            <>
-              <EditPlayerSportsModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "playerSports"}
-              />
-              <EditPlayerExperiencesModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                visible={activeModal === "playerExperiences"}
-              />
-              <EditPlayerMediaModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "playerMedia"}
-              />
-              <EditPlayerSituationModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "playerSituation"}
-              />
-              <EditPlayerPalmaresModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "playerPalmares"}
-              />
-              <EditPlayerProfileModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                onOpenExperiences={() => handleEdit("playerExperiences")}
-                onOpenSituation={() => handleEdit("playerSituation")}
-                visible={activeModal === "editPlayerProfile"}
-              />
-            </>
-          ) : null}
+          {/*
+            REV-PROF-02: il Calciatore non ha piu editor a modal. Tutte le sue
+            sezioni vivono sotto /profile/edit, una rotta per sezione, e il
+            vecchio form unico e stato rimosso invece di restare in parallelo.
+          */}
           {role === "coach" ? (
             <>
               <EditCoachProfileModal

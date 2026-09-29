@@ -432,6 +432,41 @@ describe("Master Profile Calciatore — Dettagli", () => {
     expect(() => tree.root.findByProps({ label: "Facebook" })).toThrow();
   });
 
+  it("spiega all'Owner perché i suoi contatti non compaiono, senza mostrarli", () => {
+    const privateContacts = buildProfile({
+      userContacts: {
+        email: "salvo@example.com",
+        facebook: "",
+        instagram: "salvosalvini_9",
+        phone: "+39 345 678 9012",
+        showEmail: false,
+        showFacebook: false,
+        showInstagram: false,
+      },
+    } as Partial<CompleteProfessionalProfile>);
+
+    const ownerTree = render(
+      <PlayerDetailsTab
+        careerView={CAREER_VIEW}
+        completeProfile={privateContacts}
+        isOwner
+      />,
+    );
+    const visitorTree = render(
+      <PlayerDetailsTab careerView={CAREER_VIEW} completeProfile={privateContacts} />,
+    );
+
+    expect(ownerTree.root.findAllByProps({ testID: "details-contacts" }).length)
+      .toBeGreaterThan(0);
+    // Il valore resta privato anche per l'Owner: compare solo il rimando.
+    expect(() =>
+      ownerTree.root.findByProps({ children: "salvo@example.com" }),
+    ).toThrow();
+    // Al Visitor non arriva nemmeno la sezione.
+    expect(visitorTree.root.findAllByProps({ testID: "details-contacts" }).length)
+      .toBe(0);
+  });
+
   it("nasconde Palmarès e Situazione attuale quando non ci sono dati", () => {
     const profile = buildProfile();
     const tree = render(

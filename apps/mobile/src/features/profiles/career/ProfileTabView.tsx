@@ -74,7 +74,7 @@ export function ProfileTabView({
 
   return (
     <View style={styles.container}>
-      <ProfileTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+      <ProfileTabBar activeTab={activeTab} fill onTabChange={handleTabChange} />
 
       {activeTab === "career" ? (
         <CareerTabContent
@@ -98,6 +98,7 @@ export function ProfileTabView({
         <PlayerDetailsTab
           careerView={careerView}
           completeProfile={completeProfile}
+          isOwner={isOwner}
           onContactPress={handleContactPress}
         />
       )}
@@ -198,6 +199,7 @@ function MediaTab({
             }
           : undefined
       }
+      onEditContentPress={isOwner ? onManageMedia : undefined}
       onFilterChange={(filter) =>
         trackProfileEvent("media_filter_changed", {
           mediaFilter: filter,

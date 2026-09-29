@@ -13,6 +13,7 @@ import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 import {
   buildPublicContacts,
+  hasPrivateContacts,
   PublicContactsList,
   type PublicContact,
 } from "../master/PublicContactsList";
@@ -25,7 +26,10 @@ import {
   getPreferredFootLabel,
   type PlayerPosition,
 } from "../player-sports";
-import { getOptionLabel, REGION_OPTIONS } from "../profile-form-utils";
+import {
+  buildAvailabilityZonesLabel,
+  formatContractStatus,
+} from "../profile-display-helpers";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import type { PlayerCareerView } from "./player-career-model";
 import { PlayerTechnicalPitch } from "./PlayerTechnicalPitch";
@@ -33,46 +37,14 @@ import { PlayerTechnicalPitch } from "./PlayerTechnicalPitch";
 type PlayerDetailsTabProps = {
   careerView: PlayerCareerView;
   completeProfile: CompleteProfessionalProfile;
+  isOwner?: boolean;
   onContactPress?: (contact: PublicContact) => void;
 };
-
-/** "Sotto contratto" / "Svincolato" vengono dal dato, non dall'esperienza. */
-function formatContractStatus(status: string | null | undefined): string | null {
-  if (status === "tesserato") return "Sotto contratto";
-  if (status === "svincolato") return "Svincolato";
-  return null;
-}
-
-/**
- * Zone disponibili (§26). Con la modalità "tutta Italia" si mostra soltanto
- * "Ovunque in Italia": elencare anche regioni o province sarebbe una
- * contraddizione.
- */
-function buildZonesLabel(
-  availabilityType: string,
-  regions: readonly string[],
-  provinces: readonly string[],
-): string | null {
-  if (availabilityType === "ITALY" || availabilityType === "ALL_ITALY") {
-    return "Ovunque in Italia";
-  }
-
-  if (availabilityType === "REGIONS") {
-    const labels = regions.map((code) => getOptionLabel(REGION_OPTIONS, code));
-
-    return labels.length > 0 ? labels.join(", ") : null;
-  }
-
-  if (availabilityType === "PROVINCES") {
-    return provinces.length > 0 ? provinces.join(", ") : null;
-  }
-
-  return null;
-}
 
 export function PlayerDetailsTab({
   careerView,
   completeProfile,
+  isOwner = false,
   onContactPress,
 }: PlayerDetailsTabProps) {
   const { playerPalmares, playerProfile, profile, userContacts } = completeProfile;
@@ -80,7 +52,7 @@ export function PlayerDetailsTab({
   const isOpenToTransfer =
     profile.is_open_to_transfer || playerProfile?.willing_to_change_club;
   const zonesLabel = isOpenToTransfer
-    ? buildZonesLabel(
+    ? buildAvailabilityZonesLabel(
         playerProfile?.availability_type ?? "ITALY",
         playerProfile?.transfer_regions ?? [],
         playerProfile?.transfer_provinces ?? [],
@@ -115,6 +87,13 @@ export function PlayerDetailsTab({
   const hasCurrentSituation = Boolean(currentExperience) || Boolean(contractStatus);
 
   const publicContacts = buildPublicContacts(userContacts);
+  /*
+    §30: al Visitor non arriva niente di un contatto non pubblico. All'Owner,
+    che i propri contatti li ha inseriti, va detto perché non compaiono —
+    altrimenti la sezione sembra rotta. Nessun valore viene renderizzato: solo
+    il fatto che esistono e dove si rendono pubblici.
+  */
+  const showsPrivateContactsHint = isOwner && hasPrivateContacts(userContacts);
 
   return (
     <View testID="player-details-tab">
@@ -234,12 +213,18 @@ export function PlayerDetailsTab({
         </ProfileSectionBlock>
       ) : null}
 
-      {publicContacts.length > 0 ? (
+      {publicContacts.length > 0 || showsPrivateContactsHint ? (
         <ProfileSectionBlock testID="details-contacts" title="Contatti pubblici">
           <PublicContactsList
             contacts={publicContacts}
             onContactPress={onContactPress}
           />
+          {showsPrivateContactsHint ? (
+            <AppText color="secondary" variant="bodySm">
+              I tuoi contatti sono privati. Rendili visibili da Modifica
+              profilo.
+            </AppText>
+          ) : null}
         </ProfileSectionBlock>
       ) : null}
     </View>

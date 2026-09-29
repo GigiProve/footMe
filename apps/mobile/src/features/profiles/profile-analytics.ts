@@ -25,7 +25,25 @@ export type ProfileAnalyticsEvent =
   | "media_filter_changed"
   | "profile_media_opened"
   | "profile_media_add_tapped"
-  | "public_contact_tapped";
+  | "public_contact_tapped"
+  // Editor profilo (REV-PROF-02 §Z)
+  | "player_profile_edit_opened"
+  | "profile_edit_section_opened"
+  | "profile_edit_section_saved"
+  | "profile_edit_section_save_failed"
+  | "profile_photo_change_tapped"
+  | "profile_cover_change_tapped"
+  | "profile_area_mode_changed"
+  | "current_experience_manage_tapped"
+  | "award_add_tapped"
+  | "award_created"
+  | "award_edited"
+  | "award_deleted"
+  | "public_contact_visibility_changed"
+  | "profile_media_edit_tapped"
+  | "profile_media_featured_changed"
+  | "profile_media_delete_tapped"
+  | "profile_media_deleted";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -36,14 +54,37 @@ export type PublicContactType =
   | "website"
   | "youtube";
 
+/** Sezione dell editor: un identificatore fisso, mai il contenuto del form. */
+export type ProfileEditSectionKey =
+  | "photo"
+  | "personal"
+  | "technical"
+  | "opportunities"
+  | "situation"
+  | "career"
+  | "awards"
+  | "contacts"
+  | "media";
+
 type ProfileAnalyticsProps = {
+  /** Tipo di riconoscimento, mai la competizione o la squadra. */
+  awardType?: string;
   careerMetric?: CareerMetric;
   contactType?: PublicContactType;
+  /** Modalita geografica scelta, mai i nomi dei territori. */
+  geographicMode?: string;
   mediaFilter?: "all" | "photo" | "video";
   mediaType?: "image" | "video";
   profileType?: string;
+  section?: ProfileEditSectionKey;
+  /** Quanti territori sono selezionati, non quali. */
+  territoryCount?: number;
+  /** Esito di un salvataggio: nessun messaggio di errore, nessun payload. */
+  success?: boolean;
   tab?: string;
   viewerMode?: ProfileViewerMode;
+  /** Un contatto e stato reso pubblico o privato. Il valore non passa di qui. */
+  visible?: boolean;
 };
 
 export function trackProfileEvent(
@@ -51,7 +92,15 @@ export function trackProfileEvent(
   props: ProfileAnalyticsProps = {},
 ): void {
   trackEvent(name, {
+    ...(props.awardType ? { award_type: props.awardType } : {}),
     ...(props.careerMetric ? { career_metric: props.careerMetric } : {}),
+    ...(props.geographicMode ? { geographic_mode: props.geographicMode } : {}),
+    ...(props.section ? { section: props.section } : {}),
+    ...(typeof props.success === "boolean" ? { success: props.success } : {}),
+    ...(typeof props.territoryCount === "number"
+      ? { territory_count: props.territoryCount }
+      : {}),
+    ...(typeof props.visible === "boolean" ? { visible: props.visible } : {}),
     ...(props.contactType ? { contact_type: props.contactType } : {}),
     ...(props.mediaFilter ? { media_filter: props.mediaFilter } : {}),
     ...(props.mediaType ? { media_type: props.mediaType } : {}),

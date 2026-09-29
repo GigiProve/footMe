@@ -1072,6 +1072,102 @@ export function normalizeFacebookInput(value: string) {
   return /^[A-Za-z0-9.\-]+$/.test(trimmed) ? `https://facebook.com/${trimmed}` : "";
 }
 
+/**
+ * Handle o URL di TikTok/YouTube verso un URL canonico.
+ *
+ * Accetta entrambe le forme perche il prodotto le ha sempre accettate
+ * entrambe; il doppio "@" e il caso da evitare, non un input da rifiutare.
+ */
+function normalizeSocialHandle(value: string, baseUrl: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `${baseUrl}${trimmed.replace(/^@+/, "")}`;
+}
+
+export function normalizeTikTokInput(value: string) {
+  return normalizeSocialHandle(value, "https://www.tiktok.com/@");
+}
+
+export function normalizeYouTubeInput(value: string) {
+  return normalizeSocialHandle(value, "https://www.youtube.com/@");
+}
+
+/**
+ * Sito web: il protocollo viene completato solo verso http/https.
+ *
+ * Aggiungere "https://" davanti a qualsiasi cosa trasformerebbe uno schema non
+ * supportato in un URL dall aspetto valido; qui uno schema diverso e un input
+ * non valido, non un input da correggere.
+ */
+export function normalizeWebsiteInput(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(trimmed)) {
+    return "";
+  }
+
+  return `https://${trimmed}`;
+}
+
+export function isWebsiteValid(value: string) {
+  const normalized = normalizeWebsiteInput(value);
+
+  return normalized.length > 0 && /^https?:\/\/[^\s.]+\.[^\s]{2,}$/i.test(normalized);
+}
+
+/**
+ * Nome e Cognome sono una decomposizione di PRESENTAZIONE: il modello ha una
+ * sola colonna, `profiles.full_name`.
+ *
+ * La divisione cade al primo spazio, così un cognome composto ("Di Maria",
+ * "Van Basten") resta intero nel cognome. Resta impreciso il caso opposto — un
+ * nome composto ("Maria Teresa Rossi") mostra Nome "Maria" e Cognome "Teresa
+ * Rossi" — ma è solo un'etichetta: la ricomposizione è la concatenazione esatta
+ * dei due campi, quindi il dato salvato non si degrada a furia di aperture e
+ * salvataggi.
+ */
+export function splitFullName(value: string | null | undefined): {
+  firstName: string;
+  lastName: string;
+} {
+  const trimmed = (value ?? "").trim().replace(/\s+/g, " ");
+
+  if (!trimmed) {
+    return { firstName: "", lastName: "" };
+  }
+
+  const separatorIndex = trimmed.indexOf(" ");
+
+  if (separatorIndex < 0) {
+    return { firstName: trimmed, lastName: "" };
+  }
+
+  return {
+    firstName: trimmed.slice(0, separatorIndex),
+    lastName: trimmed.slice(separatorIndex + 1),
+  };
+}
+
+export function joinFullName(firstName: string, lastName: string): string {
+  return [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+}
+
 export function normalizeContactEmail(value: string) {
   return value.trim().toLowerCase();
 }

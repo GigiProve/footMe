@@ -1,4 +1,5 @@
 import { getPlayerPositionLabel } from "./player-sports";
+import { getOptionLabel, REGION_OPTIONS } from "./profile-form-utils";
 import type {
   CoachCareerEntryRecord,
   CoachPlayerCareerEntryRecord,
@@ -174,4 +175,55 @@ export function computeCoachExperienceYears(
 
 export function formatCoachExperienceLabel(years: number): string {
   return years === 1 ? "1 anno di esperienza" : `${years} anni di esperienza`;
+}
+
+// ────────────────────────────────
+// Situazione attuale e disponibilita geografica
+// ────────────────────────────────
+
+/**
+ * "Sotto contratto" / "Svincolato" vengono dal dato, non dall esperienza.
+ *
+ * `contract_status` e una colonna `text` senza vincolo: qualsiasi altro
+ * valore resta sconosciuto e non viene tradotto in una label inventata.
+ */
+export function formatContractStatus(
+  status: string | null | undefined,
+): string | null {
+  if (status === "tesserato") {
+    return "Sotto contratto";
+  }
+
+  if (status === "svincolato") {
+    return "Svincolato";
+  }
+
+  return null;
+}
+
+/**
+ * Zone disponibili. Con la modalita "tutta Italia" si mostra soltanto
+ * "Ovunque in Italia": elencare anche regioni o province sarebbe una
+ * contraddizione. `ALL_ITALY` e un valore legacy equivalente a `ITALY`.
+ */
+export function buildAvailabilityZonesLabel(
+  availabilityType: string,
+  regions: readonly string[],
+  provinces: readonly string[],
+): string | null {
+  if (availabilityType === "ITALY" || availabilityType === "ALL_ITALY") {
+    return "Ovunque in Italia";
+  }
+
+  if (availabilityType === "REGIONS") {
+    const labels = regions.map((code) => getOptionLabel(REGION_OPTIONS, code));
+
+    return labels.length > 0 ? labels.join(", ") : null;
+  }
+
+  if (availabilityType === "PROVINCES") {
+    return provinces.length > 0 ? provinces.join(", ") : null;
+  }
+
+  return null;
 }
