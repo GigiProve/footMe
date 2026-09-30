@@ -10,11 +10,12 @@
  * qui o nell'header, mai in tutti e due.
  */
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, spacing } from "../../../theme/tokens";
+import { colors, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
+import { ProfileCurrentClubRow } from "../master/ProfileCurrentClubRow";
 import {
   buildPublicContacts,
   hasPrivateContacts,
@@ -165,7 +166,7 @@ export function CoachDetailsTab({
 
       {currentExperience ? (
         <ProfileSectionBlock testID="coach-details-situation" title="Situazione attuale">
-          <CurrentClubRow
+          <ProfileCurrentClubRow
             category={currentExperience.category}
             clubName={currentExperience.clubName}
             logoUrl={currentExperience.logoUrl}
@@ -219,72 +220,6 @@ export function CoachDetailsTab({
         </ProfileSectionBlock>
       ) : null}
     </View>
-  );
-}
-
-/**
- * Riga della società attuale. Il chevron compare solo se la riga porta
- * davvero da qualche parte: una società senza pagina PROLINK non promette una
- * navigazione che non esiste.
- */
-function CurrentClubRow({
-  category,
-  clubName,
-  logoUrl,
-  onPress,
-  role,
-}: {
-  category: string;
-  clubName: string;
-  logoUrl: string;
-  onPress?: () => void;
-  role: string;
-}) {
-  const accessibilityLabel = [clubName, category, role].filter(Boolean).join(", ");
-  const content = (
-    <>
-      <ClubLogo logoUrl={logoUrl} />
-      <View style={styles.situationText}>
-        <AppText numberOfLines={2} variant="titleSm">
-          {clubName}
-        </AppText>
-        {category ? (
-          <AppText color="secondary" variant="meta">
-            {category}
-          </AppText>
-        ) : null}
-        {role ? (
-          <AppText color="secondary" variant="meta">
-            {role}
-          </AppText>
-        ) : null}
-      </View>
-      {onPress ? (
-        <Ionicons color={colors.textMuted} name="chevron-forward" size={16} />
-      ) : null}
-    </>
-  );
-
-  if (!onPress) {
-    return (
-      <View accessible accessibilityLabel={accessibilityLabel} style={styles.situationRow}>
-        {content}
-      </View>
-    );
-  }
-
-  return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.situationRow,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      {content}
-    </Pressable>
   );
 }
 
@@ -361,39 +296,7 @@ function AchievementRow({
   );
 }
 
-function ClubLogo({ logoUrl }: { logoUrl: string }) {
-  if (logoUrl) {
-    return (
-      <View style={styles.clubLogo}>
-        <Image source={{ uri: logoUrl }} style={styles.clubLogoImage} />
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.clubLogo, styles.clubLogoFallback]}>
-      <Ionicons color={colors.accent} name="shield-outline" size={18} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  clubLogo: {
-    borderRadius: radius.full,
-    flexShrink: 0,
-    height: 36,
-    overflow: "hidden",
-    width: 36,
-  },
-  clubLogoFallback: {
-    alignItems: "center",
-    backgroundColor: colors.accentSoft,
-    justifyContent: "center",
-  },
-  clubLogoImage: {
-    height: "100%",
-    width: "100%",
-  },
   palmaresRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -416,17 +319,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.6,
-  },
-  situationRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[12],
-    minHeight: 44,
-    paddingVertical: spacing[4],
-  },
-  situationText: {
-    flex: 1,
-    gap: spacing[4],
-    minWidth: 0,
   },
 });

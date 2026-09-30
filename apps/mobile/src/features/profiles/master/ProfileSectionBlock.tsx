@@ -91,6 +91,13 @@ type ProfileFactRowProps = {
   /** Ultima riga del gruppo: niente hairline appesa in fondo alla sezione. */
   isLast?: boolean;
   label: string;
+  /**
+   * Rende la riga navigabile e aggiunge il chevron (REV-PROF-06, "Percorsi
+   * aggiuntivi"). Assente: la riga resta una coppia etichetta/valore e non
+   * promette una navigazione che non esiste.
+   */
+  onPress?: () => void;
+  testID?: string;
   value: string;
 };
 
@@ -106,21 +113,56 @@ type ProfileFactRowProps = {
 export function ProfileFactRow({
   isLast = false,
   label,
+  onPress,
+  testID,
   value,
 }: ProfileFactRowProps) {
-  return (
-    <View
-      accessible
-      accessibilityLabel={`${label}, ${value}`}
-      style={[styles.factRow, isLast ? null : styles.factRowDivided]}
-    >
+  const content = (
+    <>
       <AppText color="secondary" style={styles.factLabel} variant="bodySm">
         {label}
       </AppText>
       <AppText style={styles.factValue} variant="titleSm">
         {value}
       </AppText>
-    </View>
+      {onPress ? (
+        <Ionicons
+          color={colors.textMuted}
+          name="chevron-forward"
+          size={16}
+          style={styles.factChevron}
+        />
+      ) : null}
+    </>
+  );
+
+  if (!onPress) {
+    return (
+      <View
+        accessible
+        accessibilityLabel={`${label}, ${value}`}
+        style={[styles.factRow, isLast ? null : styles.factRowDivided]}
+        testID={testID}
+      >
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel={`${label}, ${value}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.factRow,
+        isLast ? null : styles.factRowDivided,
+        pressed ? styles.rowPressed : null,
+      ]}
+      testID={testID}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -155,6 +197,10 @@ const styles = StyleSheet.create({
     borderRadius: radius[12],
     gap: spacing[10],
     padding: spacing[16],
+  },
+  factChevron: {
+    flexShrink: 0,
+    marginLeft: spacing[8],
   },
   factLabel: {
     flexShrink: 0,

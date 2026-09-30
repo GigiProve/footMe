@@ -9,7 +9,7 @@ import {
   type ProfileQuickFact,
 } from "./master/ProfileQuickFacts";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
-import { AppText, Avatar, Badge, Button, Divider, Input } from "../../ui";
+import { AppText, Button, Input } from "../../ui";
 
 type ProfileHeaderProps = {
   avatarUrl: string | null | undefined;
@@ -76,14 +76,18 @@ type PlayerProfileHeaderProps = {
 };
 
 /**
- * Header del Master Profile Allenatore (REV-PROF-03).
+ * Header dei Master Profile a incarichi (REV-PROF-03 Allenatore, REV-PROF-06
+ * Staff tecnico).
  *
  * È la stessa composizione del Calciatore — `ProfileHeroHeader` più
- * `ProfileQuickFacts` — con i dati dell'Allenatore. Qui non c'è più nessuna
+ * `ProfileQuickFacts` — con i dati della tipologia. Qui non c'è nessuna
  * matita su copertina e avatar, nessuna sezione Licenze e nessuna riga social:
  * l'header si ferma alle informazioni rapide, poi cominciano le tab.
+ *
+ * Allenatore e Staff tecnico lo usano identico: cambia solo cosa il chiamante
+ * mette in `primaryRole`, `clubLabel`, `availabilityLabel` e `quickFacts`.
  */
-type CoachProfileHeaderProps = {
+type MasterProfileHeaderProps = {
   /** Riga discreta: "Disponibile per una nuova squadra". */
   availabilityLabel?: string;
   avatarUrl: string | null | undefined;
@@ -104,10 +108,9 @@ type CoachProfileHeaderProps = {
   onSharePress?: () => void;
   primaryRole: string;
   quickFacts?: readonly ProfileQuickFact[];
+  /** Prefisso dei testID: "coach-profile-header", "staff-quick-facts", ... */
+  testIDPrefix: string;
 };
-
-const DEFAULT_PLAYER_COVER_URI =
-  "https://storage.googleapis.com/banani-generated-images/generated-images/b339be2f-1f6e-4796-b76a-a714a1fe33d2.jpg";
 
 export function PlayerProfileHeader({
   availabilityLabel,
@@ -201,7 +204,7 @@ export function PlayerProfileHeader({
   );
 }
 
-export function CoachProfileHeader({
+function MasterProfileHeader({
   availabilityLabel,
   avatarUrl,
   clubLabel,
@@ -219,7 +222,8 @@ export function CoachProfileHeader({
   onSharePress,
   primaryRole,
   quickFacts = [],
-}: CoachProfileHeaderProps) {
+  testIDPrefix,
+}: MasterProfileHeaderProps) {
   const metaRows = [
     clubLabel ? { key: "club", text: clubLabel } : null,
     locationLabel
@@ -287,12 +291,34 @@ export function CoachProfileHeader({
         isVerified={isVerified}
         metaRows={metaRows}
         primaryRole={primaryRole}
-        testID="coach-profile-header"
+        testID={`${testIDPrefix}-profile-header`}
       />
 
-      <ProfileQuickFacts facts={quickFacts} testID="coach-quick-facts" />
+      <ProfileQuickFacts
+        facts={quickFacts}
+        testID={`${testIDPrefix}-quick-facts`}
+      />
     </View>
   );
+}
+
+/** Header del Master Profile Allenatore (REV-PROF-03). */
+export function CoachProfileHeader(
+  props: Omit<MasterProfileHeaderProps, "testIDPrefix">,
+) {
+  return <MasterProfileHeader {...props} testIDPrefix="coach" />;
+}
+
+/**
+ * Header del Master Profile Staff tecnico (REV-PROF-06, Screen 1).
+ *
+ * Nessun header dedicato: è lo stesso dell'Allenatore, con ruolo principale,
+ * società e categoria attuali, località e disponibilità dello Staff tecnico.
+ */
+export function StaffProfileHeader(
+  props: Omit<MasterProfileHeaderProps, "testIDPrefix">,
+) {
+  return <MasterProfileHeader {...props} testIDPrefix="staff" />;
 }
 
 /** Azione secondaria a sola icona dell'action bar: 44x44 di area toccabile. */
@@ -321,148 +347,6 @@ function HeaderIconButton({
   );
 }
 
-
-type StaffProfileHeaderProps = {
-  availabilityBadges?: string[];
-  avatarUrl: string | null | undefined;
-  bio?: string | null;
-  coverImageUrl?: string | null;
-  fullName: string;
-  locationLabel?: string;
-  mode: PlayerProfileHeaderMode;
-  onContactPress?: () => void;
-  onEditProfilePress?: () => void;
-  onFollowPress?: () => void;
-  isFollowed?: boolean;
-  isMessaging?: boolean;
-  isSaved?: boolean;
-  onSavePress?: () => void;
-  isShortlisted?: boolean;
-  onShortlistPress?: () => void;
-  primaryRole: string;
-  statusBadge?: string;
-};
-
-export function StaffProfileHeader({
-  availabilityBadges = [],
-  avatarUrl,
-  bio,
-  coverImageUrl,
-  fullName,
-  locationLabel,
-  mode,
-  onContactPress,
-  onEditProfilePress,
-  onFollowPress,
-  isFollowed,
-  isMessaging,
-  isSaved,
-  onSavePress,
-  isShortlisted,
-  onShortlistPress,
-  primaryRole,
-  statusBadge,
-}: StaffProfileHeaderProps) {
-  const resolvedAvatarUrl = withDefaultProfileAvatar(avatarUrl);
-
-  return (
-    <View style={styles.playerHeaderSurface}>
-      <View style={styles.playerHeroBlock}>
-        <Image
-          accessibilityLabel="Copertina profilo staff"
-          source={{ uri: coverImageUrl || DEFAULT_PLAYER_COVER_URI }}
-          style={styles.playerCoverImage}
-        />
-        <View pointerEvents="none" style={styles.playerCoverOverlay} />
-        <View style={styles.playerAvatarShell}>
-          <Avatar name={fullName} size="xl" uri={resolvedAvatarUrl} />
-        </View>
-        <View style={styles.playerHeroContent}>
-          <View style={styles.playerIdentityStack}>
-            <AppText variant="headingLg">{fullName}</AppText>
-            <View style={styles.playerRoleRow}>
-              <AppText color="accent" style={styles.playerPrimaryRole} variant="titleSm">
-                {primaryRole}
-              </AppText>
-            </View>
-            {locationLabel ? (
-              <View style={styles.playerMetaRow}>
-                <Ionicons color={colors.textSecondary} name="location-outline" size={15} />
-                <AppText color="secondary" variant="bodySm">
-                  {locationLabel}
-                </AppText>
-              </View>
-            ) : null}
-          </View>
-
-          {statusBadge ? (
-            <View style={styles.playerStatusBadge}>
-              <Ionicons color={colors.successForeground} name="checkmark-circle" size={16} />
-              <AppText color="success" variant="caption">
-                {statusBadge}
-              </AppText>
-            </View>
-          ) : null}
-
-          <View style={styles.playerActionsRow}>
-            {mode === "owner" ? (
-              <HeaderActionButton
-                icon="create-outline"
-                label="Modifica profilo"
-                onPress={onEditProfilePress}
-                variant="primary"
-              />
-            ) : (
-              <VisitorHeaderActions
-                isContactPending={isMessaging}
-                isFollowed={isFollowed}
-                isSaved={isSaved}
-                isShortlisted={isShortlisted}
-                onContactPress={onContactPress}
-                onFollowPress={onFollowPress}
-                onSavePress={onSavePress}
-                onShortlistPress={onShortlistPress}
-              />
-            )}
-          </View>
-        </View>
-      </View>
-
-      {bio?.trim() || availabilityBadges.length > 0 ? (
-        <>
-          <Divider />
-          <View style={styles.playerSummarySection}>
-            {bio?.trim() ? (
-              <View style={styles.playerInfoBlock}>
-                <AppText color="secondary" variant="overline">
-                  Bio
-                </AppText>
-                <AppText numberOfLines={3} variant="bodySm">
-                  {bio.trim()}
-                </AppText>
-              </View>
-            ) : null}
-
-            {bio?.trim() && availabilityBadges.length > 0 ? <Divider /> : null}
-
-            {availabilityBadges.length > 0 ? (
-              <View style={styles.playerInfoBlock}>
-                <AppText color="secondary" variant="overline">
-                  Disponibilita'
-                </AppText>
-                <View style={styles.playerChipWrap}>
-                  {availabilityBadges.map((badge) => (
-                    <Badge key={badge} label={badge} variant="success" />
-                  ))}
-                </View>
-              </View>
-            ) : null}
-          </View>
-        </>
-      ) : null}
-    </View>
-  );
-}
 
 export function ProfileHeader({
   avatarUrl,
@@ -909,12 +793,6 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.82,
   },
-  playerActionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: spacing[10],
-  },
   headerSaveButton: {
     width: 36,
     height: 36,
@@ -924,70 +802,11 @@ const styles = StyleSheet.create({
   headerSavePressed: {
     opacity: 0.75,
   },
-  playerAvatarShell: {
-    width: 112,
-    height: 112,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface,
-    padding: 4,
-    marginTop: -52,
-    marginLeft: spacing[16],
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
   playerChipSectionList: {
     gap: spacing[14],
   },
-  playerChipWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[8],
-  },
-  playerCoverImage: {
-    width: "100%",
-    height: 112,
-    backgroundColor: colors.backgroundStrong,
-  },
-  playerCoverOverlay: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    height: 112,
-    left: 0,
-    backgroundColor: "rgba(5, 52, 94, 0.2)",
-  },
   playerHeaderSurface: {
     backgroundColor: colors.surface,
-  },
-  playerHeroBlock: {
-    overflow: "hidden",
-    backgroundColor: colors.surface,
-  },
-  playerHeroContent: {
-    gap: spacing[14],
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[12],
-    paddingBottom: spacing[16],
-  },
-  playerIdentityStack: {
-    gap: spacing[4],
-  },
-  playerInfoBlock: {
-    gap: spacing[8],
-  },
-  playerMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing[6],
-  },
-  playerPrimaryRole: {
-    fontWeight: typography.fontWeight.bold,
-  },
-  playerRoleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: spacing[6],
   },
   playerSecondaryRole: {
     fontWeight: typography.fontWeight.semibold,
@@ -996,21 +815,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: spacing[10],
-  },
-  playerStatusBadge: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing[6],
-    borderRadius: radius[8],
-    paddingHorizontal: spacing[10],
-    paddingVertical: spacing[8],
-    backgroundColor: colors.successSoft,
-  },
-  playerSummarySection: {
-    gap: spacing[14],
-    padding: spacing[16],
-    backgroundColor: colors.surface,
   },
   readonlySurface: {
     borderRadius: radius[12],

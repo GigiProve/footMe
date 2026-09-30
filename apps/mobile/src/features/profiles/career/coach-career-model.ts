@@ -1,9 +1,15 @@
 /**
- * Modello di lettura della carriera dell'Allenatore (REV-PROF-03).
+ * Modello di lettura della carriera per incarichi (REV-PROF-03, REV-PROF-06).
  *
- * È la controparte di `player-career-model` per il Master Profile Allenatore:
- * un unico posto in cui gli incarichi vengono normalizzati, ordinati e resi in
- * stagioni. I componenti ricevono dati già pronti e non rifanno aggregazioni.
+ * È la controparte di `player-career-model` per i Master Profile Allenatore e
+ * Staff tecnico: un unico posto in cui gli incarichi vengono normalizzati,
+ * ordinati e resi in stagioni. I componenti ricevono dati già pronti e non
+ * rifanno aggregazioni.
+ *
+ * Le due tipologie salvano l'incarico nella stessa forma e differiscono solo
+ * in campi che questo modello non legge, quindi l'ingresso è tipizzato per
+ * struttura (`CareerEntryLike`) e non per tabella: lo Staff tecnico riusa
+ * questo modello invece di possederne una copia.
  *
  * Due vincoli espliciti della task guidano questo file:
  *
@@ -30,6 +36,20 @@ import { getCurrentSeasonKey } from "./player-career-model";
 // ---------------------------------------------------------------------------
 // Tipi
 // ---------------------------------------------------------------------------
+
+/**
+ * Forma minima di un incarico leggibile da questo modello.
+ *
+ * `experience_group_id` è opzionale perché esiste solo sulla carriera
+ * dell'Allenatore (REV-PROF-04): senza gruppo ogni riga resta un'esperienza a
+ * sé, che è esattamente il comportamento dello Staff tecnico.
+ */
+export type CareerEntryLike = Omit<
+  CoachCareerEntryRecord,
+  "coach_profile_id" | "experience_group_id"
+> & {
+  experience_group_id?: string | null;
+};
 
 export type CoachCareerSeason = {
   /** Categoria della singola stagione. Stringa vuota = non indicata. */
@@ -137,7 +157,7 @@ function toAbsoluteMonth(year: number, month: number): number {
   return year * 12 + month;
 }
 
-function hasCustomPeriod(entry: CoachCareerEntryRecord): boolean {
+function hasCustomPeriod(entry: CareerEntryLike): boolean {
   return Boolean(entry.period_start_year && entry.period_end_year);
 }
 
@@ -146,7 +166,7 @@ function hasCustomPeriod(entry: CoachCareerEntryRecord): boolean {
  * deriva dai suoi anni: è una derivazione dichiarata, non un dato inventato,
  * e serve solo a dare una riga per anno sportivo coperto.
  */
-function resolveSeasonKeys(entry: CoachCareerEntryRecord): string[] {
+function resolveSeasonKeys(entry: CareerEntryLike): string[] {
   const saved = entry.seasons.filter((season) => Boolean(season?.trim()));
 
   if (saved.length > 0) {
@@ -179,7 +199,7 @@ function resolveSeasonKeys(entry: CoachCareerEntryRecord): string[] {
   return keys;
 }
 
-function toCoachSeasons(entry: CoachCareerEntryRecord): CoachCareerSeason[] {
+function toCoachSeasons(entry: CareerEntryLike): CoachCareerSeason[] {
   const fallbackCategory = entry.category?.trim() ?? "";
   const fallbackRole = entry.role?.trim() ?? "";
 
@@ -201,7 +221,7 @@ function toCoachSeasons(entry: CoachCareerEntryRecord): CoachCareerSeason[] {
 }
 
 function buildPeriodLabel(
-  entry: CoachCareerEntryRecord,
+  entry: CareerEntryLike,
   seasons: CoachCareerSeason[],
   isCurrent: boolean,
 ): string {
@@ -242,7 +262,7 @@ type ExperienceBounds = {
 };
 
 function buildBounds(
-  entry: CoachCareerEntryRecord,
+  entry: CareerEntryLike,
   seasons: CoachCareerSeason[],
 ): ExperienceBounds {
   if (hasCustomPeriod(entry)) {
@@ -271,7 +291,7 @@ function buildBounds(
 }
 
 function toCoachExperience(
-  entry: CoachCareerEntryRecord,
+  entry: CareerEntryLike,
   currentSeasonKey: string,
   now: Date,
 ): CoachCareerExperience & { bounds: ExperienceBounds } {
@@ -316,9 +336,9 @@ function toCoachExperience(
  * un'esperienza a sé e attraversa questa funzione immutata.
  */
 function mergeCoachRecordsByGroup(
-  entries: readonly CoachCareerEntryRecord[],
-): CoachCareerEntryRecord[] {
-  const groups = new Map<string, CoachCareerEntryRecord[]>();
+  entries: readonly CareerEntryLike[],
+): CareerEntryLike[] {
+  const groups = new Map<string, CareerEntryLike[]>();
 
   for (const entry of entries) {
     const key = entry.experience_group_id?.trim() || entry.id;
@@ -372,12 +392,12 @@ function mergeCoachRecordsByGroup(
       results: records.flatMap((record) => record.results ?? []),
       season_details: seasonDetails,
       seasons,
-    } satisfies CoachCareerEntryRecord;
+    } satisfies CareerEntryLike;
   });
 }
 
-export function buildCoachCareerView(
-  rawEntries: readonly CoachCareerEntryRecord[],
+export function buildCareerView(
+  rawEntries: readonly CareerEntryLike[],
   { now = new Date() }: { now?: Date } = {},
 ): CoachCareerView {
   const currentSeasonKey = getCurrentSeasonKey(now);
@@ -408,17 +428,23 @@ export function buildCoachCareerView(
   return { experiences, seasonCount: seasonKeys.size };
 }
 
+/** Nome storico del builder, mantenuto per la carriera dell'Allenatore. */
+export const buildCoachCareerView = buildCareerView;
+
 /**
  * Incarico principale: quello marcato come esperienza in corso. Se ce n'è più
  * di uno vince il più recente per data di inizio, senza che gli altri spariscano
  * dalla carriera. Se non ce n'è nessuno la funzione tace, invece di promuovere
  * l'ultima riga salvata a "società attuale".
  */
-export function getCurrentCoachExperience(
+export function getCurrentExperience(
   view: CoachCareerView,
 ): CoachCareerExperience | null {
   return view.experiences.find((experience) => experience.isCurrent) ?? null;
 }
+
+/** Nome storico, mantenuto per la carriera dell'Allenatore. */
+export const getCurrentCoachExperience = getCurrentExperience;
 
 // ---------------------------------------------------------------------------
 // Carriera da ex calciatore

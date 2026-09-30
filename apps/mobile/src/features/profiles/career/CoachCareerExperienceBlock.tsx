@@ -1,11 +1,14 @@
 /**
- * Un incarico della Carriera da allenatore (REV-PROF-03, sezioni "Gruppo
- * società" e "Riga stagione").
+ * Un incarico della Carriera (REV-PROF-03, sezioni "Gruppo società" e "Riga
+ * stagione"; REV-PROF-06 per lo Staff tecnico).
  *
  * Ricalca uno a uno il blocco del Master Profile Calciatore — logo una volta
  * sola per incarico, tutte le stagioni visibili, nessun accordion — e cambia
  * solo il contenuto della riga: stagione, ruolo e categoria al posto delle
- * statistiche, che nella carriera da allenatore non esistono.
+ * statistiche, che in una carriera di incarichi non esistono.
+ *
+ * Lo Staff tecnico usa questo stesso blocco: cambia solo il prefisso dei
+ * testID, perché i due percorsi possono convivere nello stesso profilo.
  */
 import { Image, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -20,16 +23,19 @@ import type {
 type CoachCareerExperienceBlockProps = {
   experience: CoachCareerExperience;
   isLast: boolean;
+  /** Prefisso dei testID: distingue i percorsi dentro uno stesso profilo. */
+  testIDPrefix?: string;
 };
 
 export function CoachCareerExperienceBlock({
   experience,
   isLast,
+  testIDPrefix = "coach",
 }: CoachCareerExperienceBlockProps) {
   return (
     <View
       style={[styles.container, isLast ? styles.containerLast : null]}
-      testID={`coach-career-experience-${experience.id}`}
+      testID={`${testIDPrefix}-career-experience-${experience.id}`}
     >
       <View
         accessible
@@ -54,6 +60,7 @@ export function CoachCareerExperienceBlock({
             isLast={index === experience.seasons.length - 1}
             key={season.seasonKey}
             season={season}
+            testIDPrefix={testIDPrefix}
           />
         ))}
       </View>
@@ -69,10 +76,12 @@ function CoachSeasonRow({
   isFirst,
   isLast,
   season,
+  testIDPrefix,
 }: {
   isFirst: boolean;
   isLast: boolean;
   season: CoachCareerSeason;
+  testIDPrefix: string;
 }) {
   return (
     <View
@@ -85,7 +94,7 @@ function CoachSeasonRow({
         .filter(Boolean)
         .join(", ")}
       style={styles.row}
-      testID={`coach-career-season-${season.seasonKey}`}
+      testID={`${testIDPrefix}-career-season-${season.seasonKey}`}
     >
       <View style={styles.timeline}>
         <View

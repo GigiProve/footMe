@@ -62,7 +62,6 @@ import { EditStaffMediaModal } from "../../src/features/profiles/edit-modals/Edi
 import { StaffProfileTabView } from "../../src/features/profiles/career/StaffProfileTabView";
 import { AgentProfileTabView } from "../../src/features/profiles/career/AgentProfileTabView";
 import { DirectorProfileTabView } from "../../src/features/profiles/career/DirectorProfileTabView";
-import type { StaffGroupedExperience } from "../../src/features/profiles/career/staff-career-grouping";
 import {
   buildFullUpdatePayload,
   buildAgentProfileHeaderDetails,
@@ -95,7 +94,6 @@ import {
 } from "../../src/features/profiles/profile-service";
 import { removeMediaFromStorage } from "../../src/features/profiles/media-upload-service";
 import type { DirectorMediaLinkedTarget } from "../../src/features/profiles/director-media";
-import type { GroupedExperience } from "../../src/features/profiles/career/career-grouping";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
 import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
 import { ProfileSkeleton } from "../../src/features/profiles/master/ProfileSkeleton";
@@ -442,79 +440,6 @@ export default function ProfileScreen() {
     }
 
     router.push(`/profile/${target.target_id}` as never);
-  }
-
-  async function handleDeleteExperience(group: GroupedExperience) {
-    if (!completeProfile) return;
-
-    Alert.alert(
-      "Elimina esperienza",
-      `Eliminare tutte le stagioni con ${group.clubName}?`,
-      [
-        { style: "cancel", text: "Annulla" },
-        {
-          onPress: async () => {
-            try {
-              const baseState = buildInitialState(completeProfile);
-              const filteredEntries = baseState.careerEntries.filter((e) => {
-                if (group.clubId && e.clubId) return e.clubId !== group.clubId;
-                return e.clubName !== group.clubName;
-              });
-              const mergedState = { ...baseState, careerEntries: filteredEntries };
-              const payload = buildFullUpdatePayload(completeProfile, mergedState);
-              await updateCompleteProfessionalProfile(payload);
-              await loadProfile();
-              Alert.alert("Esperienza eliminata", "Le stagioni sono state rimosse.");
-            } catch {
-              Alert.alert("Errore", "Impossibile eliminare l'esperienza.");
-            }
-          },
-          style: "destructive",
-          text: "Elimina",
-        },
-      ],
-    );
-  }
-
-  async function handleDeleteStaffExperience(
-    group: StaffGroupedExperience,
-    section: "technical" | "coach",
-  ) {
-    if (!completeProfile) return;
-
-    Alert.alert(
-      "Elimina esperienza",
-      `Eliminare l'esperienza con ${group.teamName}?`,
-      [
-        { style: "cancel", text: "Annulla" },
-        {
-          onPress: async () => {
-            try {
-              const baseState = buildInitialState(completeProfile);
-              const payload = buildFullUpdatePayload(completeProfile, baseState);
-              if (section === "technical") {
-                payload.staffCareerEntries =
-                  completeProfile.staffCareerEntries.filter(
-                    (e) => e.id !== group.entryId,
-                  );
-              } else {
-                payload.staffCoachCareerEntries =
-                  completeProfile.staffCoachCareerEntries.filter(
-                    (e) => e.id !== group.entryId,
-                  );
-              }
-              await updateCompleteProfessionalProfile(payload);
-              await loadProfile();
-              Alert.alert("Esperienza eliminata", "La voce è stata rimossa.");
-            } catch {
-              Alert.alert("Errore", "Impossibile eliminare l'esperienza.");
-            }
-          },
-          style: "destructive",
-          text: "Elimina",
-        },
-      ],
-    );
   }
 
   async function handleShareOwnProfile() {
@@ -864,15 +789,39 @@ export default function ProfileScreen() {
           />
         ) : completeProfile && role === "staff" && staffHeaderDetails ? (
           <StaffProfileHeader
-            availabilityBadges={staffHeaderDetails.availabilityBadges}
+            availabilityLabel={staffHeaderDetails.availabilityLabel}
             avatarUrl={completeProfile.profile.avatar_url}
-            bio={staffHeaderDetails.bio}
+            clubLabel={staffHeaderDetails.clubLabel}
+            coverImageUrl={completeProfile.profile.cover_url}
             fullName={staffHeaderDetails.fullName}
+            isVerified={staffHeaderDetails.isVerified}
             locationLabel={staffHeaderDetails.locationLabel}
             mode="owner"
-            onEditProfilePress={() => handleEdit("staffInfo")}
+            onEditProfilePress={() => {
+              trackProfileEvent("profile_edit_tapped", {
+                profileType: "staff",
+                viewerMode: "owner",
+              });
+              // La Modifica profilo Staff tecnico non e in questa task: la CTA
+              // apre il flusso esistente finche il suo hub non esiste.
+              handleEdit("staffInfo");
+            }}
+            onMorePress={() => {
+              trackProfileEvent("profile_more_menu_opened", {
+                profileType: "staff",
+                viewerMode: "owner",
+              });
+              setMoreMenuVisible(true);
+            }}
+            onSharePress={() => {
+              trackProfileEvent("profile_share_tapped", {
+                profileType: "staff",
+                viewerMode: "owner",
+              });
+              void handleShareOwnProfile();
+            }}
             primaryRole={staffHeaderDetails.primaryRole}
-            statusBadge={staffHeaderDetails.statusBadge}
+            quickFacts={staffHeaderDetails.quickFacts}
           />
         ) : completeProfile && role === "agent" && agentHeaderDetails ? (
           <AgentProfileHeader
@@ -900,13 +849,13 @@ export default function ProfileScreen() {
         ) : null}
 
         {isLoading ? (
-          role === "coach" ? (
+          role === "coach" || role === "staff" ? (
             /*
               Scheletro al posto del testo di attesa (REV-PROF-03, "Loading"):
               l'ingombro e' gia' quello della pagina finale, quindi l'arrivo dei
               dati non sposta niente.
             */
-            <ProfileSkeleton testID="coach-profile-loading-skeleton" />
+            <ProfileSkeleton testID={`${role}-profile-loading-skeleton`} />
           ) : (
             <AppText variant="bodySm" color="secondary">
               Sto recuperando i dati professionali del tuo account...
@@ -931,11 +880,8 @@ export default function ProfileScreen() {
             completeProfile={completeProfile}
             isOwner={true}
             onAddExperience={() => handleEdit("staffExperiences")}
-            onDeleteExperience={handleDeleteStaffExperience}
-            onDeletePlayerExperience={handleDeleteExperience}
-            onEdit={handleEdit}
-            onEditExperience={() => handleEdit("staffExperiences")}
             onManageMedia={() => handleEdit("staffMedia")}
+            onOpenClub={handleOpenAffiliateClub}
           />
         ) : completeProfile && role === "agent" ? (
           <AgentProfileTabView

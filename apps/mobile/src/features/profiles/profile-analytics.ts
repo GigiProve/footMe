@@ -81,7 +81,10 @@ export type ProfileAnalyticsEvent =
   | "coach_career_completed"
   | "coach_career_load_failed"
   | "coach_career_save_failed"
-  | "coach_career_delete_failed";
+  | "coach_career_delete_failed"
+  // Master Profile Staff tecnico (REV-PROF-06)
+  | "profile_additional_career_tapped"
+  | "profile_career_add_tapped";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -117,8 +120,11 @@ type ProfileAnalyticsProps = {
   /** Tipo di riconoscimento, mai la competizione o la squadra. */
   awardType?: string;
   careerMetric?: CareerMetric;
-  /** Carriera mostrata dal selettore Allenatore/Calciatore (REV-PROF-03). */
-  careerMode?: "coach" | "player";
+  /**
+   * Carriera mostrata dal selettore (REV-PROF-03; REV-PROF-06 aggiunge
+   * "staff"). È un identificatore di percorso, mai una società o un ruolo.
+   */
+  careerMode?: "coach" | "player" | "staff";
   /** REV-PROF-04: modalità temporale dell'esperienza, mai il suo contenuto. */
   experienceMode?: CoachExperienceMode;
   /** Quante stagioni sono state selezionate, non quali. */

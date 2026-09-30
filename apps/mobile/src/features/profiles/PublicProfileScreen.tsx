@@ -190,12 +190,14 @@ export function PublicProfileScreen() {
   }, [completeProfile?.profile.role, viewedProfileId]);
 
   useEffect(() => {
-    if (!viewedProfileId || completeProfile?.profile.role !== "coach") {
+    const role = completeProfile?.profile.role;
+
+    if (!viewedProfileId || (role !== "coach" && role !== "staff")) {
       return;
     }
 
     trackProfileViewed(viewedProfileId, {
-      profileType: "coach",
+      profileType: role,
       seen: viewedProfilesRef.current,
       source: "profile_link",
       viewerMode: "visitor",
@@ -840,22 +842,22 @@ function ProfileHeaderBlock({
   if (role === "staff" && staffHeaderDetails) {
     return (
       <StaffProfileHeader
-        availabilityBadges={staffHeaderDetails.availabilityBadges}
+        availabilityLabel={staffHeaderDetails.availabilityLabel}
         avatarUrl={completeProfile.profile.avatar_url}
-        bio={staffHeaderDetails.bio}
+        clubLabel={staffHeaderDetails.clubLabel}
+        coverImageUrl={completeProfile.profile.cover_url}
         fullName={staffHeaderDetails.fullName}
-        locationLabel={staffHeaderDetails.locationLabel}
-        mode="visitor"
         isFollowed={isFollowed}
         isMessaging={isMessaging}
-        isSaved={isSaved}
-        isShortlisted={isShortlisted}
-        onContactPress={onContactPress}
+        isVerified={staffHeaderDetails.isVerified}
+        locationLabel={staffHeaderDetails.locationLabel}
+        mode="visitor"
         onFollowPress={onFollowPress}
-        onSavePress={onSavePress}
-        onShortlistPress={onShortlistPress}
+        onMessagePress={onContactPress}
+        onMorePress={onMorePress}
+        onSharePress={onSharePress}
         primaryRole={staffHeaderDetails.primaryRole}
-        statusBadge={staffHeaderDetails.statusBadge}
+        quickFacts={staffHeaderDetails.quickFacts}
       />
     );
   }
@@ -1082,12 +1084,8 @@ function ProfileContentBlock({
       <StaffProfileTabView
         completeProfile={completeProfile}
         isOwner={false}
-        onAddExperience={noop}
-        onDeleteExperience={noop}
-        onDeletePlayerExperience={noop}
-        onEdit={noop}
-        onEditExperience={noop}
         onManageMedia={noop}
+        onOpenClub={onOpenClub}
       />
     );
   }

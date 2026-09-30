@@ -14,6 +14,10 @@ import {
   buildCoachCareerView,
   getCurrentCoachExperience,
 } from "./career/coach-career-model";
+import {
+  buildStaffProfileCareer,
+  collectStaffRoles,
+} from "./career/staff-career-model";
 import type { ProfileQuickFact } from "./master/ProfileQuickFacts";
 import type { ClubSeasonForm } from "./club-season-section";
 import { formToInput, recordToForm } from "./club-season-section";
@@ -951,13 +955,20 @@ export function buildAgentProfileHeaderDetails(
   };
 }
 
+/**
+ * Header del Master Profile Staff tecnico (REV-PROF-06, Screen 1).
+ *
+ * Stessa forma di `CoachProfileHeaderDetails`, perché l'header è lo stesso.
+ */
 export type StaffProfileHeaderDetails = {
-  availabilityBadges: string[];
-  bio: string | null;
+  availabilityLabel?: string;
+  /** "AC Milan · Serie A", dall'incarico in corso. */
+  clubLabel?: string;
   fullName: string;
+  isVerified: boolean;
   locationLabel?: string;
   primaryRole: string;
-  statusBadge?: string;
+  quickFacts: ProfileQuickFact[];
 };
 
 export function buildStaffProfileHeaderDetails(
@@ -967,30 +978,116 @@ export function buildStaffProfileHeaderDetails(
     return null;
   }
 
-  const locationLabel = formatLocationSummary(
-    data.profile.city ?? data.profile.residence ?? data.profile.current_location_city,
+  // Societa e categoria vengono dall'incarico in corso, non da un secondo set
+  // di campi e non dall'ultima riga salvata: se nessun incarico e in corso la
+  // riga non compare, invece di indovinare una societa.
+  const career = buildStaffProfileCareer({
+    coachEntries: data.staffCoachCareerEntries,
+    playerEntries: data.staffPlayerCareerEntries,
+    staffEntries: data.staffCareerEntries,
+  });
+
+  const locationSummary = formatLocationSummary(
+    data.profile.city ??
+      data.profile.residence ??
+      data.profile.current_location_city ??
+      data.profile.domicile,
     data.profile.region,
   );
-  const availabilityBadges =
-    data.staffProfile?.availability_type === "REGIONS"
-      ? data.staffProfile.preferred_regions
-      : data.staffProfile?.availability_type === "PROVINCES"
-        ? data.staffProfile.preferred_provinces ?? []
-        : data.staffProfile?.open_to_work
-          ? ["Tutta Italia"]
-          : [];
+  const locationLabel =
+    locationSummary === "Da completare" ? undefined : locationSummary;
+
+  /*
+    Il ruolo principale e quello dichiarato dall'utente: e il suo
+    posizionamento professionale, non l'ultimo incarico ricoperto. Un'esperienza
+    piu recente con un altro ruolo non lo sostituisce mai.
+  */
+  const primaryRole =
+    data.staffProfile?.primary_staff_role?.trim() ||
+    formatSpecialization(data.staffProfile?.specialization ?? null) ||
+    "Staff tecnico";
+
+  const clubLabel =
+    [
+      career.currentExperience?.clubName.trim(),
+      career.currentExperience?.category.trim(),
+    ]
+      .filter(Boolean)
+      .join(" · ") || undefined;
 
   return {
-    availabilityBadges,
-    bio: data.profile.bio?.trim() || null,
+    // Disponibilita spenta: la riga sparisce del tutto, non diventa uno stato
+    // negativo e non si porta dietro zone o date.
+    availabilityLabel: data.staffProfile?.open_to_work
+      ? "Disponibile per nuove collaborazioni"
+      : undefined,
+    clubLabel,
     fullName: formatProfileDisplayName(data.profile.full_name, null),
-    locationLabel: locationLabel === "Da completare" ? undefined : locationLabel,
-    primaryRole:
-      data.staffProfile?.primary_staff_role?.trim() ||
-      formatSpecialization(data.staffProfile?.specialization ?? null) ||
-      "Staff tecnico",
-    statusBadge: data.staffProfile?.open_to_work ? "Disponibile" : undefined,
+    /*
+      Il prodotto non ha ancora una verifica per i profili personali: nessuna
+      colonna la esprime, quindi il badge non viene mai acceso. Il giorno in cui
+      il dato esiste, questa e l'unica riga da cambiare.
+    */
+    isVerified: false,
+    locationLabel,
+    primaryRole,
+    quickFacts: buildStaffQuickFacts({
+      age: data.profile.age ?? calculateAge(data.profile.birth_date),
+      clubCount: career.clubCount,
+      roleCount: collectStaffRoles(
+        data.staffProfile?.primary_staff_role,
+        data.staffProfile?.staff_roles,
+      ).length,
+      seasonCount: career.staff.seasonCount,
+    }),
   };
+}
+
+/**
+ * Quattro colonne, sempre le stesse e sempre quattro: Eta, Ruoli, Stagioni e
+ * Club (REV-PROF-06 §"Info rapide"). Nessun valore e memorizzato: ognuno viene
+ * ricalcolato dai record canonici a ogni render del profilo.
+ */
+function buildStaffQuickFacts({
+  age,
+  clubCount,
+  roleCount,
+  seasonCount,
+}: {
+  age: number | null;
+  clubCount: number;
+  roleCount: number;
+  seasonCount: number;
+}): ProfileQuickFact[] {
+  return [
+    {
+      accessibilityLabel: age ? `Eta, ${age} anni` : "Eta non indicata",
+      key: "age",
+      label: "Eta",
+      value: age ? String(age) : "—",
+    },
+    {
+      accessibilityLabel:
+        roleCount === 1 ? "1 ruolo tecnico" : `${roleCount} ruoli tecnici`,
+      key: "roles",
+      label: "Ruoli",
+      value: String(roleCount),
+    },
+    {
+      accessibilityLabel:
+        seasonCount === 1 ? "1 stagione" : `${seasonCount} stagioni`,
+      key: "seasons",
+      label: "Stagioni",
+      value: String(seasonCount),
+    },
+    {
+      accessibilityLabel:
+        clubCount === 1 ? "1 societa" : `${clubCount} societa`,
+      key: "clubs",
+      label: "Club",
+      value: String(clubCount),
+    },
+  ];
 }
 
 // ────────────────────────────────
