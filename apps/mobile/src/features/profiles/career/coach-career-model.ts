@@ -40,9 +40,10 @@ import { getCurrentSeasonKey } from "./player-career-model";
 /**
  * Forma minima di un incarico leggibile da questo modello.
  *
- * `experience_group_id` è opzionale perché esiste solo sulla carriera
- * dell'Allenatore (REV-PROF-04): senza gruppo ogni riga resta un'esperienza a
- * sé, che è esattamente il comportamento dello Staff tecnico.
+ * `experience_group_id` è opzionale perché una riga può non averlo: le
+ * carriere di Allenatore (REV-PROF-04) e Staff tecnico (REV-PROF-07) lo
+ * portano, ma le righe salvate prima delle rispettive migrazioni no. Senza
+ * gruppo ogni riga resta un'esperienza a sé.
  */
 export type CareerEntryLike = Omit<
   CoachCareerEntryRecord,

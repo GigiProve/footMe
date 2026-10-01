@@ -23,6 +23,33 @@ import type { CoachCareerEntryRecord } from "../profile-service";
 // Tipi
 // ---------------------------------------------------------------------------
 
+/**
+ * Le colonne che una riga di carriera deve avere per essere un'assegnazione,
+ * indipendentemente dalla tabella che la ospita.
+ *
+ * `coach_career_entries`, `staff_career_entries` e `staff_coach_career_entries`
+ * sono tre tabelle con tre chiavi esterne diverse ma **lo stesso modello**:
+ * quello che cambia è a quale profilo appartengono, non come si legge una
+ * stagione. Tipizzare la conversione su questa forma è ciò che evita una
+ * seconda copia del modello per lo Staff tecnico (REV-PROF-07).
+ */
+export type CareerAssignmentRecord = {
+  category: string | null;
+  club_id: string | null;
+  experience_group_id: string | null;
+  experience_type: "MULTI_SEASON" | "SINGLE_SEASON" | "CUSTOM_PERIOD";
+  id: string;
+  period_end_month: string | null;
+  period_end_year: number | null;
+  period_start_month: string | null;
+  period_start_year: number | null;
+  role: string;
+  season_details: Record<string, { category?: string; role?: string }>;
+  seasons: string[];
+  team_logo_url: string | null;
+  team_name: string;
+};
+
 export type CoachTemporalMode =
   | "MULTI_SEASON"
   | "SINGLE_SEASON"
@@ -273,7 +300,7 @@ export function clubIdentity(
  * testata, che restano il fallback.
  */
 export function recordToAssignments(
-  record: CoachCareerEntryRecord,
+  record: CareerAssignmentRecord,
 ): CoachAssignment[] {
   const teamName = record.team_name?.trim() ?? "";
   // Senza gruppo salvato la riga è l'esperienza: il suo id diventa il gruppo.
@@ -337,7 +364,7 @@ export function recordToAssignments(
 }
 
 export function recordsToAssignments(
-  records: readonly CoachCareerEntryRecord[],
+  records: readonly CareerAssignmentRecord[],
 ): CoachAssignment[] {
   return records.flatMap(recordToAssignments);
 }
@@ -347,15 +374,13 @@ export function recordsToAssignments(
  * assegnazione, `season_details` vuoto perché ruolo e categoria ora vivono
  * sulla riga.
  */
-export function assignmentsToRecords(
-  assignments: readonly CoachAssignment[],
-  coachProfileId: string,
-): CoachCareerEntryRecord[] {
-  return assignments.map((assignment, index) => ({
+export function assignmentToRecordFields(
+  assignment: CoachAssignment,
+  index: number,
+): CareerAssignmentRecord & { sort_order: number } {
+  return {
     category: assignment.category || null,
     club_id: assignment.clubId,
-    coach_profile_id: coachProfileId,
-    description: null,
     experience_group_id: assignment.groupId,
     experience_type: assignment.mode,
     id: assignment.id,
@@ -377,13 +402,29 @@ export function assignmentsToRecords(
       assignment.mode === "CUSTOM_PERIOD" && assignment.period?.startYear
         ? Number(assignment.period.startYear)
         : null,
-    results: [],
     role: assignment.role,
+    // Ruolo e categoria ora vivono sulla riga: il dettaglio per stagione non
+    // ha più niente da portare e resta vuoto.
     season_details: {},
     seasons: assignment.seasonKey ? [assignment.seasonKey] : [],
     sort_order: index,
     team_logo_url: assignment.teamLogoUrl || null,
     team_name: assignment.teamName,
+  };
+}
+
+/**
+ * Riporta le assegnazioni nella forma attesa da `coach_career_entries`.
+ */
+export function assignmentsToRecords(
+  assignments: readonly CoachAssignment[],
+  coachProfileId: string,
+): CoachCareerEntryRecord[] {
+  return assignments.map((assignment, index) => ({
+    ...assignmentToRecordFields(assignment, index),
+    coach_profile_id: coachProfileId,
+    description: null,
+    results: [],
   }));
 }
 

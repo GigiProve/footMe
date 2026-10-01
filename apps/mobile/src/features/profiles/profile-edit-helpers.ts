@@ -450,6 +450,18 @@ export function buildFullUpdatePayload(
       data.profile.role === "coach" ? data.coachDirectorCareerEntries : [],
     coachPlayerCareerEntries:
       data.profile.role === "coach" ? data.coachPlayerCareerEntries : [],
+    /*
+      Le tre carriere dello Staff tecnico vanno ripassate anche quando non è
+      questa la sezione che si sta salvando: save_staff_career_details cancella
+      tutto ciò che non trova nel payload, quindi ometterle azzererebbe la
+      carriera a ogni salvataggio di un'altra sezione (REV-PROF-07).
+    */
+    staffCareerEntries:
+      data.profile.role === "staff" ? data.staffCareerEntries : [],
+    staffCoachCareerEntries:
+      data.profile.role === "staff" ? data.staffCoachCareerEntries : [],
+    staffPlayerCareerEntries:
+      data.profile.role === "staff" ? data.staffPlayerCareerEntries : [],
     playerCareerEntries:
       data.profile.role === "player" ? parsedCareerEntries : [],
     playerProfile:

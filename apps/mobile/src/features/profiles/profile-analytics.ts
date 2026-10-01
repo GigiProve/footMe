@@ -84,7 +84,28 @@ export type ProfileAnalyticsEvent =
   | "coach_career_delete_failed"
   // Master Profile Staff tecnico (REV-PROF-06)
   | "profile_additional_career_tapped"
-  | "profile_career_add_tapped";
+  | "profile_career_add_tapped"
+  // Gestione carriera Staff tecnico (REV-PROF-07)
+  | "staff_career_manager_opened"
+  | "staff_career_add_tapped"
+  | "staff_career_type_selected"
+  | "staff_career_season_roles_opened"
+  | "staff_career_experience_saved"
+  | "staff_career_experience_edited"
+  | "staff_career_experience_deleted"
+  | "staff_career_group_edited"
+  | "staff_career_group_deleted"
+  | "staff_career_paths_opened"
+  | "staff_career_coach_opened"
+  | "staff_career_coach_add_tapped"
+  | "staff_career_player_opened"
+  | "staff_career_player_add_tapped"
+  | "staff_career_cancelled"
+  | "staff_career_unsaved_exit"
+  | "staff_career_completed"
+  | "staff_career_load_failed"
+  | "staff_career_save_failed"
+  | "staff_career_delete_failed";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =

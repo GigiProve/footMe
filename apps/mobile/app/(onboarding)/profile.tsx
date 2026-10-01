@@ -84,6 +84,8 @@ import {
   deriveLegacyPlayerTypes,
 } from "../../src/features/profiles/agent-profile";
 import type { CoachCareerEntry } from "../../src/features/onboarding/coach/coach-career-types";
+import { assignmentsToStaffRecords } from "../../src/features/profiles/staff-career/staff-assignment-model";
+import { formsToStaffPlayerRecords } from "../../src/features/profiles/staff-career/staff-player-career";
 import {
   CoachOnboardingFlow,
   isCoachMasterStep,
@@ -227,53 +229,29 @@ function toDelimitedString(values: string[]) {
   return values.join(", ");
 }
 
-function mapCoachCareerEntryToStaffRecord(
+/**
+ * Esperienze dell'onboarding Staff tecnico → righe canoniche (REV-PROF-07).
+ *
+ * Una sola conversione, condivisa con Gestisci carriera: un'esperienza
+ * multi-stagione diventa **una riga per stagione**, tutte legate dallo stesso
+ * `experience_group_id`. Se l'onboarding continuasse a salvare la vecchia riga
+ * unica, un'esperienza inserita lì non sarebbe modificabile dal profilo.
+ */
+function mapCoachCareerEntriesToStaffRecords(
   profileId: string,
-  entry: CoachCareerEntry,
-  index: number,
-): StaffCareerEntryRecord {
-  return {
-    category: entry.category || null,
-    club_id: entry.clubId ?? null,
-    description: entry.description?.trim() || null,
-    experience_type: entry.type,
-    head_coach_name: null,
-    id: entry.id,
-    period_end_month: entry.period?.endMonth || null,
-    period_end_year: entry.period?.endYear ? Number(entry.period.endYear) : null,
-    period_start_month: entry.period?.startMonth || null,
-    period_start_year: entry.period?.startYear
-      ? Number(entry.period.startYear)
-      : null,
-    results: [],
-    role: entry.role,
-    season_details: entry.seasonDetails,
-    seasons: entry.seasons,
-    sort_order: index,
-    staff_profile_id: profileId,
-    team_logo_url: entry.teamLogoUrl ?? null,
-    team_name: entry.teamName,
-  };
+  entries: CoachCareerEntry[],
+): StaffCareerEntryRecord[] {
+  return assignmentsToStaffRecords(
+    coachEntriesToAssignments(entries),
+    profileId,
+  );
 }
 
-function mapPlayerExperienceFormToStaffRecord(
+function mapPlayerExperienceFormsToStaffRecords(
   profileId: string,
-  entry: PlayerExperienceForm,
-  index: number,
-): StaffPlayerCareerEntryRecord {
-  return {
-    appearances: entry.appearances ? Number(entry.appearances) : 0,
-    assists: entry.assists ? Number(entry.assists) : 0,
-    category: entry.category || null,
-    goals: entry.goals ? Number(entry.goals) : 0,
-    id: entry.id ?? `${profileId}-staff-player-${index}`,
-    position: null,
-    season: entry.seasonLabel,
-    sort_order: index,
-    staff_profile_id: profileId,
-    team_logo_url: entry.teamLogoUrl || null,
-    team_name: entry.clubName,
-  };
+  entries: PlayerExperienceForm[],
+): StaffPlayerCareerEntryRecord[] {
+  return formsToStaffPlayerRecords(entries, profileId, new Map());
 }
 
 function normalizeCoachCareerEntryForJson(entry: CoachCareerEntry): CoachCareerEntry {
@@ -1173,17 +1151,20 @@ export default function OnboardingProfileScreen() {
       }),
       profileId,
       role: role as AppRole,
-      staffCareerEntries: (staffCareerEntries as CoachCareerEntry[]).map(
-        (entry, index) => mapCoachCareerEntryToStaffRecord(profileId, entry, index),
+      staffCareerEntries: mapCoachCareerEntriesToStaffRecords(
+        profileId,
+        staffCareerEntries as CoachCareerEntry[],
       ),
       staffCoachCareerEntries: includeCoachCareer
-        ? (staffCoachCareerEntries as CoachCareerEntry[]).map((entry, index) =>
-            mapCoachCareerEntryToStaffRecord(profileId, entry, index),
+        ? mapCoachCareerEntriesToStaffRecords(
+            profileId,
+            staffCoachCareerEntries as CoachCareerEntry[],
           )
         : [],
       staffPlayerCareerEntries: includePlayerCareer
-        ? staffPlayerCareerEntries.map((entry, index) =>
-            mapPlayerExperienceFormToStaffRecord(profileId, entry, index),
+        ? mapPlayerExperienceFormsToStaffRecords(
+            profileId,
+            staffPlayerCareerEntries,
           )
         : [],
       staffProfile: {

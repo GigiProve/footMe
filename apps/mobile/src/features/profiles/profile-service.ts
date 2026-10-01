@@ -160,6 +160,12 @@ export type CoachCareerEntryRecord = {
 export type StaffCareerEntryRecord = {
   id: string;
   staff_profile_id: string;
+  /**
+   * Assegnazioni nate da una sola operazione (REV-PROF-07). Raggruppa, non
+   * vincola: ogni riga resta modificabile ed eliminabile da sola. `text` e non
+   * `uuid` perché nasce nel client, come per l'Allenatore.
+   */
+  experience_group_id: string | null;
   team_name: string;
   team_logo_url: string | null;
   club_id: string | null;
@@ -184,14 +190,24 @@ export type StaffCoachCareerEntryRecord = StaffCareerEntryRecord;
 export type StaffPlayerCareerEntryRecord = {
   id: string;
   staff_profile_id: string;
+  /** Vedi `StaffCareerEntryRecord.experience_group_id`. */
+  experience_group_id: string | null;
+  /** Modalità temporale dell'esperienza a cui la riga appartiene. */
+  career_type: "MULTI_SEASON" | "SINGLE_SEASON" | "CUSTOM_PERIOD" | null;
   team_name: string;
   team_logo_url: string | null;
   season: string;
+  season_period: "full" | "partial";
+  period_start_month: number | null;
+  period_end_month: number | null;
   category: string | null;
   position: string | null;
-  appearances: number;
-  goals: number;
-  assists: number;
+  /** REV-PROF-07: `null` = statistica non disponibile, `0` = zero dichiarato. */
+  appearances: number | null;
+  goals: number | null;
+  assists: number | null;
+  minutes_played: number | null;
+  awards: string | null;
   sort_order: number;
 };
 
@@ -1432,6 +1448,7 @@ function normalizeStaffCareerEntryRecord(
   return {
     id: normalizeRequiredText(rawEntry.id, `${profileId}-staff-career-${index}`),
     staff_profile_id: normalizeRequiredText(rawEntry.staff_profile_id, profileId),
+    experience_group_id: normalizeOptionalText(rawEntry.experience_group_id),
     team_name: normalizeRequiredText(rawEntry.team_name, ""),
     team_logo_url: normalizeOptionalText(rawEntry.team_logo_url),
     club_id:
@@ -1479,14 +1496,27 @@ function normalizeStaffPlayerCareerEntryRecord(
   return {
     id: normalizeRequiredText(rawEntry.id, `${profileId}-staff-player-${index}`),
     staff_profile_id: normalizeRequiredText(rawEntry.staff_profile_id, profileId),
+    experience_group_id: normalizeOptionalText(rawEntry.experience_group_id),
+    career_type:
+      rawEntry.career_type === "MULTI_SEASON" ||
+      rawEntry.career_type === "SINGLE_SEASON" ||
+      rawEntry.career_type === "CUSTOM_PERIOD"
+        ? rawEntry.career_type
+        : null,
     team_name: normalizeRequiredText(rawEntry.team_name, ""),
     team_logo_url: normalizeOptionalText(rawEntry.team_logo_url),
     season: normalizeRequiredText(rawEntry.season, ""),
+    season_period: rawEntry.season_period === "partial" ? "partial" : "full",
+    period_start_month: normalizeNumber(rawEntry.period_start_month),
+    period_end_month: normalizeNumber(rawEntry.period_end_month),
     category: normalizeOptionalText(rawEntry.category),
     position: normalizeOptionalText(rawEntry.position),
-    appearances: normalizeNumber(rawEntry.appearances) ?? 0,
-    goals: normalizeNumber(rawEntry.goals) ?? 0,
-    assists: normalizeNumber(rawEntry.assists) ?? 0,
+    // `null` non diventa `0`: una statistica mai inserita resta vuota.
+    appearances: normalizeNumber(rawEntry.appearances),
+    goals: normalizeNumber(rawEntry.goals),
+    assists: normalizeNumber(rawEntry.assists),
+    minutes_played: normalizeNumber(rawEntry.minutes_played),
+    awards: normalizeOptionalText(rawEntry.awards),
     sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
   };
 }
@@ -2127,21 +2157,21 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       supabase
         .from("staff_career_entries")
         .select(
-          "id, staff_profile_id, team_name, team_logo_url, club_id, category, role, experience_type, seasons, period_start_month, period_start_year, period_end_month, period_end_year, season_details, results, description, head_coach_name, sort_order",
+          "id, staff_profile_id, experience_group_id, team_name, team_logo_url, club_id, category, role, experience_type, seasons, period_start_month, period_start_year, period_end_month, period_end_year, season_details, results, description, head_coach_name, sort_order",
         )
         .eq("staff_profile_id", profileId)
         .order("sort_order", { ascending: true }),
       supabase
         .from("staff_coach_career_entries")
         .select(
-          "id, staff_profile_id, team_name, team_logo_url, club_id, category, role, experience_type, seasons, period_start_month, period_start_year, period_end_month, period_end_year, season_details, results, description, head_coach_name, sort_order",
+          "id, staff_profile_id, experience_group_id, team_name, team_logo_url, club_id, category, role, experience_type, seasons, period_start_month, period_start_year, period_end_month, period_end_year, season_details, results, description, head_coach_name, sort_order",
         )
         .eq("staff_profile_id", profileId)
         .order("sort_order", { ascending: true }),
       supabase
         .from("staff_player_career_entries")
         .select(
-          "id, staff_profile_id, team_name, team_logo_url, season, category, position, appearances, goals, assists, sort_order",
+          "id, staff_profile_id, experience_group_id, career_type, team_name, team_logo_url, season, season_period, period_start_month, period_end_month, category, position, appearances, goals, assists, minutes_played, awards, sort_order",
         )
         .eq("staff_profile_id", profileId)
         .order("sort_order", { ascending: true }),
@@ -2498,6 +2528,7 @@ export async function updateCompleteProfessionalProfile(
         category: entry.category,
         ...(isUuidLike(entry.club_id) ? { club_id: entry.club_id } : {}),
         description: entry.description,
+        experience_group_id: entry.experience_group_id,
         experience_type: entry.experience_type,
         head_coach_name: entry.head_coach_name,
         ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
@@ -2517,6 +2548,7 @@ export async function updateCompleteProfessionalProfile(
         category: entry.category,
         ...(isUuidLike(entry.club_id) ? { club_id: entry.club_id } : {}),
         description: entry.description,
+        experience_group_id: entry.experience_group_id,
         experience_type: entry.experience_type,
         head_coach_name: entry.head_coach_name,
         ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
@@ -2535,11 +2567,18 @@ export async function updateCompleteProfessionalProfile(
       p_player_career_entries: (input.staffPlayerCareerEntries ?? []).map((entry) => ({
         appearances: entry.appearances,
         assists: entry.assists,
+        awards: entry.awards,
+        career_type: entry.career_type,
         category: entry.category,
+        experience_group_id: entry.experience_group_id,
         goals: entry.goals,
         ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
+        minutes_played: entry.minutes_played,
+        period_end_month: entry.period_end_month,
+        period_start_month: entry.period_start_month,
         position: entry.position,
         season: entry.season,
+        season_period: entry.season_period,
         sort_order: entry.sort_order,
         team_logo_url: entry.team_logo_url,
         team_name: entry.team_name,

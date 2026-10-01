@@ -41,6 +41,14 @@ export const COACH_CATEGORY_OPTIONS = [
 type CoachSeasonRolesStepProps = {
   draft: CoachExperienceDraft;
   errors: CoachDraftErrors;
+  /**
+   * Tassonomia dei ruoli della carriera in corso: Allenatore di default,
+   * Staff tecnico quando la stessa schermata serve quel percorso
+   * (REV-PROF-07). La schermata non sa quale sia, e non deve saperlo.
+   */
+  roleOptions?: { label: string; value: string }[];
+  /** Prefisso dei testID: "coach" per l'Allenatore, "staff" per lo Staff. */
+  testIDPrefix?: string;
   onChangeSeasonDetail: (
     seasonKey: string,
     patch: Partial<CoachSeasonDraftDetail>,
@@ -58,6 +66,8 @@ export function CoachSeasonRolesStep({
   errors,
   onChangeSeasonDetail,
   onRemoveSeason,
+  roleOptions = COACH_ROLE_OPTIONS,
+  testIDPrefix = "coach",
 }: CoachSeasonRolesStepProps) {
   const seasons = sortedDraftSeasons(draft);
   // L'ultima stagione non si rimuove: un gruppo senza stagioni non esiste, e
@@ -81,7 +91,7 @@ export function CoachSeasonRolesStep({
           <View
             key={seasonKey}
             style={[styles.card, rowError ? styles.cardInvalid : null]}
-            testID={`coach-season-role-card-${seasonKey}`}
+            testID={`${testIDPrefix}-season-role-card-${seasonKey}`}
           >
             <View style={styles.cardHeader}>
               <AppText
@@ -99,7 +109,7 @@ export function CoachSeasonRolesStep({
                   hitSlop={8}
                   onPress={() => onRemoveSeason?.(seasonKey)}
                   style={styles.removeButton}
-                  testID={`coach-season-remove-${seasonKey}`}
+                  testID={`${testIDPrefix}-season-remove-${seasonKey}`}
                 >
                   <Ionicons
                     color={colors.danger}
@@ -117,10 +127,10 @@ export function CoachSeasonRolesStep({
                   onChange={(value) =>
                     onChangeSeasonDetail(seasonKey, { role: value })
                   }
-                  options={COACH_ROLE_OPTIONS}
+                  options={roleOptions}
                   placeholder="Seleziona ruolo"
                   sheetTitle={`Ruolo ${seasonLabel}`}
-                  testID={`coach-season-role-${seasonKey}`}
+                  testID={`${testIDPrefix}-season-role-${seasonKey}`}
                   value={detail.role}
                 />
               </View>
@@ -135,7 +145,7 @@ export function CoachSeasonRolesStep({
                   placeholder="Seleziona categoria"
                   searchable
                   sheetTitle={`Categoria ${seasonLabel}`}
-                  testID={`coach-season-category-${seasonKey}`}
+                  testID={`${testIDPrefix}-season-category-${seasonKey}`}
                   value={detail.category}
                 />
               </View>

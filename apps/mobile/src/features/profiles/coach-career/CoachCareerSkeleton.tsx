@@ -10,13 +10,15 @@ import { StyleSheet, View } from "react-native";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { Skeleton } from "../../../ui";
 
-export function CoachCareerSkeleton() {
+export function CoachCareerSkeleton({
+  testID = "coach-career-skeleton",
+}: { testID?: string } = {}) {
   return (
     <View
       accessibilityLabel="Caricamento della carriera"
       accessible
       style={styles.container}
-      testID="coach-career-skeleton"
+      testID={testID}
     >
       <Skeleton.Row style={styles.eyebrow} />
 

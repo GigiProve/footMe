@@ -24,7 +24,7 @@ import {
   ProfileFactRow,
   ProfileSectionBlock,
 } from "../master/ProfileSectionBlock";
-import { AppText } from "../../../ui";
+import { AppText, Button } from "../../../ui";
 import {
   buildAvailabilityZonesLabel,
   formatCoachAvailableFrom,
@@ -43,6 +43,11 @@ type StaffDetailsTabProps = {
   completeProfile: CompleteProfessionalProfile;
   isOwner?: boolean;
   onContactPress?: (contact: PublicContact) => void;
+  /**
+   * Entry point Owner alla schermata "Percorsi aggiuntivi" del modulo carriera
+   * (REV-PROF-07). Assente al Visitor, che non gestisce niente.
+   */
+  onManageAdditionalPaths?: () => void;
   /** Porta alla tab Carriera sul percorso scelto, nello stesso profilo. */
   onOpenCareerPath?: (path: StaffCareerPath) => void;
   /** Assente quando la società non ha una pagina PROLINK: niente chevron. */
@@ -54,6 +59,7 @@ export function StaffDetailsTab({
   completeProfile,
   isOwner = false,
   onContactPress,
+  onManageAdditionalPaths,
   onOpenCareerPath,
   onOpenClub,
 }: StaffDetailsTabProps) {
@@ -197,6 +203,15 @@ export function StaffDetailsTab({
               value={formatExperienceCount(path.count)}
             />
           ))}
+          {isOwner && onManageAdditionalPaths ? (
+            <Button
+              label="Gestisci percorsi aggiuntivi"
+              onPress={onManageAdditionalPaths}
+              size="sm"
+              testID="staff-details-manage-paths"
+              variant="secondary"
+            />
+          ) : null}
         </ProfileSectionBlock>
       ) : null}
 

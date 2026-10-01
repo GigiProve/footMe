@@ -15,7 +15,8 @@ import {
   type CoachAssignment,
 } from "./coach-assignment-model";
 import { createCoachDraft, type CoachExperienceDraft } from "./coach-career-draft";
-import { CoachCareerHubStep } from "./steps/CoachCareerHubStep";
+import { CareerHubStep } from "../career-manager/steps/CareerHubStep";
+import type { CareerPathCopy } from "../career-manager/career-manager-config";
 import { CoachSeasonRolesStep } from "./steps/CoachSeasonRolesStep";
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
@@ -81,17 +82,40 @@ const GROUPS = buildCoachExperienceGroups(
   { now: NOW },
 );
 
-describe("CoachCareerHubStep", () => {
+/** Il solo percorso aggiuntivo dell'Allenatore, come lo configura il modulo. */
+const PLAYER_PATH: CareerPathCopy = {
+  appBarTitle: "Carriera da calciatore",
+  emptyCtaLabel: "Aggiungi carriera da calciatore",
+  emptyText: "Puoi aggiungere questo percorso anche in seguito.",
+  emptyTitle: "Nessuna esperienza da calciatore",
+  icon: "walk-outline",
+  key: "player",
+  title: "Calciatore",
+};
+
+function hub(
+  groups: typeof GROUPS,
+  playerExperienceCount: number,
+): React.ReactElement {
+  return (
+    <CareerHubStep
+      additionalEyebrow="Carriera da calciatore"
+      emptyText="Aggiungi le tue esperienze per raccontare il tuo percorso professionale."
+      emptyTitle="Completa la tua carriera"
+      eyebrow="Carriera da allenatore"
+      groups={groups}
+      onAddExperience={() => {}}
+      onEditGroup={() => {}}
+      onOpenPath={() => {}}
+      paths={[{ copy: PLAYER_PATH, count: playerExperienceCount }]}
+      testIDPrefix="coach"
+    />
+  );
+}
+
+describe("CareerHubStep — Allenatore", () => {
   it("riassume la società con stagioni e ruoli distinti", () => {
-    const tree = render(
-      <CoachCareerHubStep
-        groups={GROUPS}
-        onAddExperience={() => {}}
-        onEditGroup={() => {}}
-        onOpenPlayerCareer={() => {}}
-        playerExperienceCount={2}
-      />,
-    );
+    const tree = render(hub(GROUPS, 2));
 
     const rendered = texts(tree);
 
@@ -102,15 +126,7 @@ describe("CoachCareerHubStep", () => {
   });
 
   it("mostra l'empty state quando non c'è ancora una carriera", () => {
-    const tree = render(
-      <CoachCareerHubStep
-        groups={[]}
-        onAddExperience={() => {}}
-        onEditGroup={() => {}}
-        onOpenPlayerCareer={() => {}}
-        playerExperienceCount={0}
-      />,
-    );
+    const tree = render(hub([], 0));
 
     expect(tree.root.findAllByProps({ testID: "coach-career-hub-empty" }).length)
       .toBeGreaterThan(0);

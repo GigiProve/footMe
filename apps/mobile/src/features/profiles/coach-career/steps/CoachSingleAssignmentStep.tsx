@@ -40,7 +40,12 @@ type CoachSingleAssignmentStepProps = {
   draft: CoachExperienceDraft;
   errors: CoachDraftErrors;
   onChangeDraft: (patch: Partial<CoachExperienceDraft>) => void;
+  /** Vedi `CoachSeasonRolesStep`: la tassonomia arriva dal chiamante. */
+  roleOptions?: { label: string; value: string }[];
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  /** Copy del riquadro informativo del periodo personalizzato. */
+  periodHelpMessage?: string;
+  testIDPrefix?: string;
 };
 
 /** Tutte le stagioni, recenti e non: l'elenco è generato, mai hardcodato. */
@@ -58,7 +63,10 @@ export function CoachSingleAssignmentStep({
   draft,
   errors,
   onChangeDraft,
+  roleOptions = COACH_ROLE_OPTIONS,
   searchTeams,
+  periodHelpMessage = "Utile per subentri, incarichi brevi o periodi fuori stagione.",
+  testIDPrefix = "coach",
 }: CoachSingleAssignmentStepProps) {
   const isPeriod = draft.mode === "CUSTOM_PERIOD";
   const period = draft.period ?? EMPTY_PERIOD;
@@ -102,7 +110,7 @@ export function CoachSingleAssignmentStep({
             placeholder="Seleziona la stagione"
             searchable
             sheetTitle="Stagione"
-            testID="coach-single-season"
+            testID={`${testIDPrefix}-single-season`}
             value={draft.seasons[0] ?? ""}
           />
         ) : null}
@@ -111,10 +119,10 @@ export function CoachSingleAssignmentStep({
           errorMessage={errors.role}
           label="Ruolo"
           onChange={(value) => onChangeDraft({ role: value })}
-          options={COACH_ROLE_OPTIONS}
+          options={roleOptions}
           placeholder="Seleziona ruolo"
           sheetTitle="Ruolo"
-          testID="coach-assignment-role"
+          testID={`${testIDPrefix}-assignment-role`}
           value={draft.role}
         />
 
@@ -126,7 +134,7 @@ export function CoachSingleAssignmentStep({
           placeholder="Seleziona categoria"
           searchable
           sheetTitle="Categoria"
-          testID="coach-assignment-category"
+          testID={`${testIDPrefix}-assignment-category`}
           value={draft.category}
         />
 
@@ -137,7 +145,7 @@ export function CoachSingleAssignmentStep({
             endErrorMessage={errors.endDate}
             endLabel="A"
             endPlaceholder="Mese e anno di fine"
-            endTestID="coach-period-end"
+            endTestID={`${testIDPrefix}-period-end`}
             endValue={endValue}
             isCurrent={draft.isOngoing}
             mode="monthYear"
@@ -164,15 +172,13 @@ export function CoachSingleAssignmentStep({
             startErrorMessage={errors.startDate}
             startLabel="Da"
             startPlaceholder="Mese e anno di inizio"
-            startTestID="coach-period-start"
+            startTestID={`${testIDPrefix}-period-start`}
             startValue={startValue}
           />
         ) : null}
       </OnboardingSection>
 
-      {isPeriod ? (
-        <InfoMessage message="Utile per subentri, incarichi brevi o periodi fuori stagione." />
-      ) : null}
+      {isPeriod ? <InfoMessage message={periodHelpMessage} /> : null}
     </View>
   );
 }

@@ -25,6 +25,7 @@ type CoachSeasonsStepProps = {
   onChangeDraft: (patch: Partial<CoachExperienceDraft>) => void;
   onToggleSeason: (seasonKey: string) => void;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  testIDPrefix?: string;
 };
 
 export function CoachSeasonsStep({
@@ -33,6 +34,7 @@ export function CoachSeasonsStep({
   onChangeDraft,
   onToggleSeason,
   searchTeams,
+  testIDPrefix = "coach",
 }: CoachSeasonsStepProps) {
   return (
     <View style={styles.container}>
@@ -70,7 +72,7 @@ export function CoachSeasonsStep({
           label="Stagioni complete"
           onToggle={onToggleSeason}
           selectedSeasons={draft.seasons}
-          testID="coach-career-seasons"
+          testID={`${testIDPrefix}-career-seasons`}
         />
       </OnboardingSection>
 

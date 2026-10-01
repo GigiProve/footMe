@@ -32,9 +32,18 @@ type CoachPlayerCareerStepProps = {
   onSelectType: (type: PlayerCareerEntry["type"]) => void;
   screen: CoachPlayerCareerScreen;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  emptyCtaLabel?: string;
+  emptyText?: string;
+  emptyTitle?: string;
+  /** Da quale carriera resta separata: cambia fra Allenatore e Staff tecnico. */
+  separationNote?: string;
+  testIDPrefix?: string;
 };
 
 export function CoachPlayerCareerStep({
+  emptyCtaLabel = "Aggiungi carriera da calciatore",
+  emptyText = "Puoi aggiungere il tuo percorso da calciatore anche in seguito.",
+  emptyTitle = "Nessuna esperienza aggiunta",
   entries,
   onAdd,
   onCancelForm,
@@ -44,6 +53,8 @@ export function CoachPlayerCareerStep({
   onSelectType,
   screen,
   searchTeams,
+  separationNote = "Aggiungi le esperienze vissute da calciatore. Rimarranno separate dalla carriera da allenatore.",
+  testIDPrefix = "coach",
 }: CoachPlayerCareerStepProps) {
   if (screen.type === "select-type") {
     return (
@@ -73,16 +84,15 @@ export function CoachPlayerCareerStep({
       <View style={styles.intro}>
         <Badge label="Facoltativa" size="sm" variant="default" />
         <AppText color="secondary" variant="bodySm">
-          Aggiungi le esperienze vissute da calciatore. Rimarranno separate
-          dalla carriera da allenatore.
+          {separationNote}
         </AppText>
       </View>
 
       {entries.length === 0 ? (
-        <View style={styles.empty} testID="coach-player-career-empty">
-          <AppText variant="titleMd">Nessuna esperienza aggiunta</AppText>
+        <View style={styles.empty} testID={`${testIDPrefix}-player-career-empty`}>
+          <AppText variant="titleMd">{emptyTitle}</AppText>
           <AppText color="secondary" variant="bodySm">
-            Puoi aggiungere il tuo percorso da calciatore anche in seguito.
+            {emptyText}
           </AppText>
         </View>
       ) : (
@@ -98,15 +108,13 @@ export function CoachPlayerCareerStep({
 
       <Button
         label={
-          entries.length === 0
-            ? "Aggiungi carriera da calciatore"
-            : "Aggiungi esperienza da calciatore"
+          entries.length === 0 ? emptyCtaLabel : "Aggiungi esperienza da calciatore"
         }
         leftIcon={
           <Ionicons color={colors.accent} name="add-outline" size={20} />
         }
         onPress={onAdd}
-        testID="coach-player-career-add"
+        testID={`${testIDPrefix}-player-career-add`}
         variant="secondary"
       />
 

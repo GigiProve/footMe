@@ -35,6 +35,8 @@ type StaffProfileTabViewProps = {
   isOwner: boolean;
   /** Punto d'ingresso esistente alla gestione carriera. Solo Owner. */
   onAddExperience?: () => void;
+  /** Apre il modulo carriera sulla schermata "Percorsi aggiuntivi". Solo Owner. */
+  onManageAdditionalPaths?: () => void;
   onManageMedia: () => void;
   /** Apre la pagina società, quando la società ne ha una. */
   onOpenClub?: (clubId: string) => void;
@@ -44,6 +46,7 @@ export function StaffProfileTabView({
   completeProfile,
   isOwner,
   onAddExperience,
+  onManageAdditionalPaths,
   onManageMedia,
   onOpenClub,
 }: StaffProfileTabViewProps) {
@@ -155,6 +158,17 @@ export function StaffProfileTabView({
           completeProfile={completeProfile}
           isOwner={isOwner}
           onContactPress={handleContactPress}
+          onManageAdditionalPaths={
+            isOwner && onManageAdditionalPaths
+              ? () => {
+                  trackProfileEvent("profile_additional_career_tapped", {
+                    profileType: PROFILE_TYPE,
+                    viewerMode: "owner",
+                  });
+                  onManageAdditionalPaths();
+                }
+              : undefined
+          }
           onOpenCareerPath={handleOpenCareerPath}
           onOpenClub={onOpenClub ? handleOpenClub : undefined}
         />

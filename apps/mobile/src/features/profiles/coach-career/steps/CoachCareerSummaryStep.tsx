@@ -15,26 +15,39 @@ import { CoachExperienceGroupCard } from "../CoachExperienceGroupCard";
 import type { CoachExperienceGroup } from "../coach-assignment-model";
 
 type CoachCareerSummaryStepProps = {
+  /** Copy dell'empty state: cambia fra carriera del profilo e percorso. */
+  emptyCtaLabel?: string;
+  emptyText?: string;
+  emptyTitle?: string;
   groups: readonly CoachExperienceGroup[];
   onAddAnother: () => void;
   onEditGroup: (groupId: string) => void;
+  /** "Controlla il tuo percorso da allenatore." o l'equivalente Staff. */
+  subtitle?: string;
+  testIDPrefix?: string;
 };
 
 export function CoachCareerSummaryStep({
+  emptyCtaLabel,
+  emptyText,
+  emptyTitle,
   groups,
   onAddAnother,
   onEditGroup,
+  subtitle = "Controlla il tuo percorso da allenatore.",
+  testIDPrefix = "coach",
 }: CoachCareerSummaryStepProps) {
   return (
     <View style={styles.container}>
       <AppText color="secondary" variant="bodyLg">
-        Controlla il tuo percorso da allenatore.
+        {subtitle}
       </AppText>
 
       {groups.length === 0 ? (
-        <View style={styles.empty} testID="coach-career-summary-empty">
+        <View style={styles.empty} testID={`${testIDPrefix}-career-summary-empty`}>
+          {emptyTitle ? <AppText variant="titleMd">{emptyTitle}</AppText> : null}
           <AppText color="secondary" variant="bodySm">
-            Non hai ancora esperienze salvate.
+            {emptyText ?? "Non hai ancora esperienze salvate."}
           </AppText>
         </View>
       ) : (
@@ -44,18 +57,22 @@ export function CoachCareerSummaryStep({
             key={group.groupId}
             onEdit={() => onEditGroup(group.groupId)}
             showSeasons
-            testID={`coach-career-summary-${group.groupId}`}
+            testID={`${testIDPrefix}-career-summary-${group.groupId}`}
           />
         ))
       )}
 
       <Button
-        label="Aggiungi un'altra esperienza"
+        label={
+          groups.length === 0 && emptyCtaLabel
+            ? emptyCtaLabel
+            : "Aggiungi un'altra esperienza"
+        }
         leftIcon={
           <Ionicons color={colors.accent} name="add-outline" size={20} />
         }
         onPress={onAddAnother}
-        testID="coach-career-summary-add"
+        testID={`${testIDPrefix}-career-summary-add`}
         variant="secondary"
       />
     </View>
@@ -71,6 +88,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius[16],
     borderWidth: 1,
+    gap: spacing[8],
     padding: spacing[16],
   },
 });

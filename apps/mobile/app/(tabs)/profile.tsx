@@ -56,7 +56,6 @@ import { EditCoachMediaModal } from "../../src/features/profiles/edit-modals/Edi
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditDirectorMediaModal } from "../../src/features/profiles/edit-modals/EditDirectorMediaModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
-import { EditStaffExperiencesModal } from "../../src/features/profiles/edit-modals/EditStaffExperiencesModal";
 import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
 import { EditStaffMediaModal } from "../../src/features/profiles/edit-modals/EditStaffMediaModal";
 import { StaffProfileTabView } from "../../src/features/profiles/career/StaffProfileTabView";
@@ -879,7 +878,10 @@ export default function ProfileScreen() {
           <StaffProfileTabView
             completeProfile={completeProfile}
             isOwner={true}
-            onAddExperience={() => handleEdit("staffExperiences")}
+            onAddExperience={() => router.push("/profile/staff-career")}
+            onManageAdditionalPaths={() =>
+              router.push("/profile/staff-career?section=paths")
+            }
             onManageMedia={() => handleEdit("staffMedia")}
             onOpenClub={handleOpenAffiliateClub}
           />
@@ -1003,12 +1005,6 @@ export default function ProfileScreen() {
                 onSaved={handleSaved}
                 userId={userId}
                 visible={activeModal === "staffInfo"}
-              />
-              <EditStaffExperiencesModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                visible={activeModal === "staffExperiences"}
               />
               <EditStaffMediaModal
                 completeProfile={completeProfile}
