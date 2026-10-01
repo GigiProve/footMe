@@ -66,6 +66,15 @@ export type CoachPeriod = {
 export type CoachAssignment = {
   category: string;
   clubId: string | null;
+  /**
+   * Descrizione facoltativa dell'esperienza (REV-PROF-10 §"Descrizione
+   * opzionale"). Appartiene alla singola assegnazione, come ruolo e categoria.
+   *
+   * Opzionale perché non tutte le corsie la portano: `coach_career_entries` e
+   * `staff_career_entries` la conservano senza esporla, quindi le loro
+   * conversioni la lasciano indefinita e il campo già salvato resta intatto.
+   */
+  description?: string;
   groupId: string;
   id: string;
   /** Periodo personalizzato ancora aperto: data finale assente. */

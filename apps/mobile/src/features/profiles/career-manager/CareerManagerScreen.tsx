@@ -1,6 +1,6 @@
 /**
- * Gestisci carriera — modulo unico di Allenatore e Staff tecnico
- * (REV-PROF-04, REV-PROF-07).
+ * Gestisci carriera — modulo unico di Allenatore, Staff tecnico e Dirigente
+ * (REV-PROF-04, REV-PROF-07, REV-PROF-10).
  *
  * Le otto schermate del mockup sono passi di un'unica sessione, non otto
  * rotte: la bozza di un'esperienza multi-stagione attraversa due schermate e
@@ -19,6 +19,11 @@
  * testuale: la stessa macchina scrive su tabelle diverse a seconda di dove si
  * trova, e un'esperienza da allenatore non può finire nella carriera nello
  * staff neanche se ne condivide il ruolo.
+ *
+ * Le corsie aggiuntive sono una mappa, non una coppia di campi: il Dirigente
+ * ne porta quattro (Allenatore, Staff tecnico, Calciatore, Altri ruoli) e
+ * aggiungerle non ha aggiunto un passo al flusso — solo righe alla schermata
+ * "Percorsi aggiuntivi".
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -40,6 +45,7 @@ import {
   buildCoachExperienceGroups,
   formatSeasonLabel,
   type CoachAssignment,
+  type CoachExperienceGroup,
   type CoachTemporalMode,
 } from "../coach-career/coach-assignment-model";
 import {
@@ -69,6 +75,7 @@ import { CoachSeasonsStep } from "../coach-career/steps/CoachSeasonsStep";
 import { CoachSingleAssignmentStep } from "../coach-career/steps/CoachSingleAssignmentStep";
 import {
   CAREER_MANAGER_MESSAGES,
+  type AdditionalAssignmentLane,
   type AssignmentLane,
   type CareerManagerCopy,
   type CareerManagerEvents,
@@ -83,13 +90,23 @@ export type CareerPersistHandlers = {
   onSuccess: () => void;
 };
 
+/** Riferimento stabile per una corsia senza esperienze: evita un render in più. */
+const EMPTY_GROUPS: readonly CoachExperienceGroup[] = [];
+
 export type CareerManagerScreenProps = {
   /** Assegnazioni della carriera principale del profilo. */
   assignments: readonly CoachAssignment[];
-  /** Percorso aggiuntivo da allenatore. Presente solo per lo Staff tecnico. */
-  coachAssignments?: readonly CoachAssignment[];
-  /** Tassonomia dei ruoli del percorso da allenatore. */
-  coachRoleOptions?: { label: string; value: string }[];
+  /**
+   * Assegnazioni dei percorsi aggiuntivi, per corsia. Una corsia assente non è
+   * una corsia vuota: non esiste per quel profilo.
+   */
+  pathAssignments?: Partial<
+    Record<AdditionalAssignmentLane, readonly CoachAssignment[]>
+  >;
+  /** Tassonomia dei ruoli dei percorsi aggiuntivi, per corsia. */
+  pathRoleOptions?: Partial<
+    Record<AdditionalAssignmentLane, { label: string; value: string }[]>
+  >;
   copy: CareerManagerCopy;
   /** Ruolo principale del profilo: **solo** prefill, mai un legame. */
   defaultRole?: string;
@@ -129,6 +146,12 @@ type ManagerStep =
   | {
       type: "seasons";
       draft: CoachExperienceDraft;
+      /**
+       * La bozza com'era all'apertura. Senza, una modifica riaperta e chiusa
+       * subito risulterebbe "sporca" solo perché i campi sono pieni, e
+       * chiederebbe conferma a chi non ha cambiato niente.
+       */
+      initialDraft: CoachExperienceDraft;
       isEditing: boolean;
       lane: AssignmentLane;
       /**
@@ -141,6 +164,7 @@ type ManagerStep =
   | {
       type: "season-roles";
       draft: CoachExperienceDraft;
+      initialDraft: CoachExperienceDraft;
       isEditing: boolean;
       lane: AssignmentLane;
       originalTeamName: string;
@@ -148,6 +172,7 @@ type ManagerStep =
   | {
       type: "single";
       draft: CoachExperienceDraft;
+      initialDraft: CoachExperienceDraft;
       isEditing: boolean;
       lane: AssignmentLane;
     }
@@ -164,8 +189,6 @@ type PendingConfirm =
 
 export function CareerManagerScreen({
   assignments,
-  coachAssignments = [],
-  coachRoleOptions = COACH_ROLE_OPTIONS,
   copy,
   defaultRole = "",
   events,
@@ -178,6 +201,8 @@ export function CareerManagerScreen({
   onPersistPlayerEntries,
   onRetry,
   openSource,
+  pathAssignments,
+  pathRoleOptions,
   paths,
   playerEntries,
   primaryRoleOptions,
@@ -233,26 +258,42 @@ export function CareerManagerScreen({
   */
   const laneAssignments = useCallback(
     (lane: AssignmentLane): readonly CoachAssignment[] =>
-      lane === "primary" ? assignments : coachAssignments,
-    [assignments, coachAssignments],
+      lane === "primary" ? assignments : pathAssignments?.[lane] ?? [],
+    [assignments, pathAssignments],
   );
 
   const groups = useMemo(
     () => buildCoachExperienceGroups(assignments),
     [assignments],
   );
-  const coachGroups = useMemo(
-    () => buildCoachExperienceGroups(coachAssignments),
-    [coachAssignments],
-  );
+  /**
+   * Gruppi di ogni corsia aggiuntiva, calcolati una volta per render. Il
+   * conteggio mostrato nei "Percorsi aggiuntivi" è il numero di esperienze,
+   * cioè di gruppi: tre stagioni nella stessa società sono un'esperienza sola.
+   */
+  const pathGroups = useMemo(() => {
+    const entries = Object.entries(pathAssignments ?? {}) as [
+      AdditionalAssignmentLane,
+      readonly CoachAssignment[],
+    ][];
+
+    return new Map(
+      entries.map(([lane, laneItems]) => [
+        lane,
+        buildCoachExperienceGroups(laneItems),
+      ]),
+    );
+  }, [pathAssignments]);
   const pathCounts = useMemo(
     () =>
       paths.map((pathCopy) => ({
         copy: pathCopy,
         count:
-          pathCopy.key === "player" ? playerEntries.length : coachGroups.length,
+          pathCopy.key === "player"
+            ? playerEntries.length
+            : pathGroups.get(pathCopy.key)?.length ?? 0,
       })),
-    [coachGroups.length, paths, playerEntries.length],
+    [pathGroups, paths, playerEntries.length],
   );
 
   const activeDraft =
@@ -260,6 +301,12 @@ export function CareerManagerScreen({
     step.type === "season-roles" ||
     step.type === "single"
       ? step.draft
+      : null;
+  const activeInitialDraft =
+    step.type === "seasons" ||
+    step.type === "season-roles" ||
+    step.type === "single"
+      ? step.initialDraft
       : null;
   const activeLane: AssignmentLane =
     step.type === "seasons" ||
@@ -270,8 +317,13 @@ export function CareerManagerScreen({
       ? step.lane
       : "primary";
   const laneRoleOptions =
-    activeLane === "primary" ? primaryRoleOptions : coachRoleOptions;
-  const coachPathCopy = paths.find((path) => path.key === "coach");
+    activeLane === "primary"
+      ? primaryRoleOptions
+      : pathRoleOptions?.[activeLane] ?? COACH_ROLE_OPTIONS;
+  const activePathCopy =
+    activeLane === "primary"
+      ? undefined
+      : paths.find((path) => path.key === activeLane);
   const playerPathCopy = paths.find((path) => path.key === "player");
 
   // ------------------------------------------------------------------
@@ -428,7 +480,7 @@ export function CareerManagerScreen({
     trackProfileEvent(
       lane === "primary"
         ? events.addTapped
-        : events.coachPathAddTapped ?? events.addTapped,
+        : events.pathEvents[lane]?.addTapped ?? events.addTapped,
       { profileType },
     );
     setErrors({});
@@ -451,8 +503,15 @@ export function CareerManagerScreen({
     setErrors({});
     setStep(
       mode === "MULTI_SEASON"
-        ? { draft, isEditing: false, lane, originalTeamName: "", type: "seasons" }
-        : { draft, isEditing: false, lane, type: "single" },
+        ? {
+            draft,
+            initialDraft: draft,
+            isEditing: false,
+            lane,
+            originalTeamName: "",
+            type: "seasons",
+          }
+        : { draft, initialDraft: draft, isEditing: false, lane, type: "single" },
     );
   }
 
@@ -477,12 +536,13 @@ export function CareerManagerScreen({
       draft.mode === "MULTI_SEASON"
         ? {
             draft,
+            initialDraft: draft,
             isEditing: true,
             lane,
             originalTeamName: draft.teamName,
             type: "seasons",
           }
-        : { draft, isEditing: true, lane, type: "single" },
+        : { draft, initialDraft: draft, isEditing: true, lane, type: "single" },
     );
   }
 
@@ -739,32 +799,40 @@ export function CareerManagerScreen({
     setErrors({});
     setWarning(null);
 
+    const opened = events.pathEvents[path]?.opened;
+
     if (path === "player") {
-      trackProfileEvent(events.playerOpened, { profileType });
+      if (opened) {
+        trackProfileEvent(opened, { careerMode: "player", profileType });
+      }
+
       setStep({ screen: { type: "list" }, type: "player" });
       return;
     }
 
-    trackProfileEvent(events.coachPathOpened ?? events.playerOpened, {
-      careerMode: "coach",
-      profileType,
-    });
-    // Nessun hub ricorsivo: il percorso da allenatore si apre sul proprio
+    if (opened) {
+      trackProfileEvent(opened, { careerMode: path, profileType });
+    }
+
+    // Nessun hub ricorsivo: un percorso aggiuntivo si apre sul proprio
     // riepilogo, che è anche il punto da cui si aggiunge.
-    setStep({ lane: "coach", type: "summary" });
+    setStep({ lane: path, type: "summary" });
   }
 
   // ------------------------------------------------------------------
   // Uscita
   // ------------------------------------------------------------------
 
+  /*
+    Lo stato sporco è un confronto, non una somma di campi pieni: società,
+    stagioni, ruolo, categoria, date, toggle e descrizione entrano tutti nella
+    firma, quindi aggiungere un campo alla bozza non lascia indietro il
+    controllo delle modifiche non salvate.
+  */
   const isDraftDirty = Boolean(
     activeDraft &&
-      (activeDraft.teamName.trim() ||
-        activeDraft.seasons.length > 0 ||
-        activeDraft.role.trim() ||
-        activeDraft.category.trim() ||
-        activeDraft.period?.startYear),
+      activeInitialDraft &&
+      draftSignature(activeDraft) !== draftSignature(activeInitialDraft),
   );
 
   function handleBack() {
@@ -801,12 +869,14 @@ export function CareerManagerScreen({
 
     if (step.type === "select-type") {
       setStep(
-        step.lane === "primary" ? { type: "hub" } : { lane: "coach", type: "summary" },
+        step.lane === "primary"
+          ? { type: "hub" }
+          : { lane: step.lane, type: "summary" },
       );
       return;
     }
 
-    if (step.type === "summary" && step.lane === "coach") {
+    if (step.type === "summary" && step.lane !== "primary") {
       setStep({ type: pathOrigin });
       return;
     }
@@ -831,7 +901,7 @@ export function CareerManagerScreen({
 
   /** Chiude la sessione, oppure il solo sotto-flusso quando è un percorso. */
   function finishStep() {
-    if (step.type === "summary" && step.lane === "coach") {
+    if (step.type === "summary" && step.lane !== "primary") {
       setStep({ type: pathOrigin });
       return;
     }
@@ -866,7 +936,9 @@ export function CareerManagerScreen({
           title:
             step.lane === "primary"
               ? copy.typeSelectorTitle
-              : coachPathCopy?.appBarTitle ?? copy.typeSelectorTitle,
+              : activePathCopy?.typeSelectorTitle ??
+                activePathCopy?.appBarTitle ??
+                copy.typeSelectorTitle,
         };
       case "seasons":
         return {
@@ -909,7 +981,7 @@ export function CareerManagerScreen({
           : {
               onSave: finishStep,
               saveLabel: "Fine",
-              title: coachPathCopy?.appBarTitle ?? "Carriera da allenatore",
+              title: activePathCopy?.appBarTitle ?? "Percorso aggiuntivo",
             };
       case "paths":
         return { onSave: finishStep, saveLabel: "Fine", title: "Percorsi aggiuntivi" };
@@ -975,7 +1047,10 @@ export function CareerManagerScreen({
 
       {isReady && step.type === "paths" ? (
         <AdditionalPathsStep
-          description={`Aggiungi eventuali esperienze da allenatore o calciatore. Rimarranno separate dalla ${copy.primaryEyebrow.toLowerCase()}.`}
+          description={
+            copy.additionalDescription ??
+            `Aggiungi eventuali esperienze da allenatore o calciatore. Rimarranno separate dalla ${copy.primaryEyebrow.toLowerCase()}.`
+          }
           onOpenPath={(path) => openPath(path, "paths")}
           paths={pathCounts}
           testIDPrefix={testIDPrefix}
@@ -998,6 +1073,8 @@ export function CareerManagerScreen({
           onChangeDraft={patchDraft}
           onToggleSeason={toggleSeason}
           searchTeams={searchTeams}
+          teamLabel={copy.teamLabel}
+          teamPlaceholder={copy.teamPlaceholder}
           testIDPrefix={testIDPrefix}
         />
       ) : null}
@@ -1035,12 +1112,17 @@ export function CareerManagerScreen({
       {isReady && step.type === "single" ? (
         <>
           <CoachSingleAssignmentStep
+            descriptionLabel={copy.descriptionLabel}
+            descriptionPlaceholder={copy.descriptionPlaceholder}
             draft={step.draft}
             errors={errors}
             onChangeDraft={patchDraft}
             periodHelpMessage={copy.periodHelpMessage}
             roleOptions={laneRoleOptions}
             searchTeams={searchTeams}
+            showDescription={copy.showDescription}
+            teamLabel={copy.teamLabel}
+            teamPlaceholder={copy.teamPlaceholder}
             testIDPrefix={testIDPrefix}
           />
           {step.isEditing && step.draft.persistedId ? (
@@ -1061,25 +1143,26 @@ export function CareerManagerScreen({
 
       {isReady && step.type === "summary" ? (
         <CoachCareerSummaryStep
-          emptyCtaLabel={
-            step.lane === "primary" ? undefined : coachPathCopy?.emptyCtaLabel
+          emptyCtaLabel={activePathCopy?.emptyCtaLabel}
+          emptyText={activePathCopy?.emptyText}
+          emptyTitle={activePathCopy?.emptyTitle}
+          groups={
+            step.lane === "primary"
+              ? groups
+              : pathGroups.get(step.lane) ?? EMPTY_GROUPS
           }
-          emptyText={
-            step.lane === "primary" ? undefined : coachPathCopy?.emptyText
-          }
-          emptyTitle={
-            step.lane === "primary" ? undefined : coachPathCopy?.emptyTitle
-          }
-          groups={step.lane === "primary" ? groups : coachGroups}
           onAddAnother={() => startAdding(step.lane)}
           onEditGroup={(groupId) => editGroup(step.lane, groupId)}
           subtitle={
             step.lane === "primary"
               ? copy.summarySubtitle
-              : "Controlla il tuo percorso da allenatore."
+              : activePathCopy?.summarySubtitle ??
+                "Controlla il tuo percorso da allenatore."
           }
           testIDPrefix={
-            step.lane === "primary" ? testIDPrefix : `${testIDPrefix}-coach`
+            step.lane === "primary"
+              ? testIDPrefix
+              : `${testIDPrefix}-${step.lane}`
           }
         />
       ) : null}
@@ -1091,7 +1174,12 @@ export function CareerManagerScreen({
           emptyTitle={playerPathCopy?.emptyTitle}
           entries={playerEntries}
           onAdd={() => {
-            trackProfileEvent(events.playerAddTapped, { profileType });
+            const addTapped = events.pathEvents.player?.addTapped;
+
+            if (addTapped) {
+              trackProfileEvent(addTapped, { profileType });
+            }
+
             setStep({ screen: { type: "select-type" }, type: "player" });
           }}
           onCancelForm={() =>
@@ -1159,6 +1247,28 @@ export function CareerManagerScreen({
       />
     </ProfileEditScaffold>
   );
+}
+
+/**
+ * Firma dei campi che l'utente può toccare.
+ *
+ * Gli id persistiti restano fuori: non sono modifiche dell'utente e
+ * renderebbero sporca una bozza appena riaperta.
+ */
+function draftSignature(draft: CoachExperienceDraft): string {
+  return JSON.stringify({
+    category: draft.category.trim(),
+    clubId: draft.clubId,
+    description: draft.description.trim(),
+    descriptionBySeason: draft.descriptionBySeason,
+    isOngoing: draft.isOngoing,
+    mode: draft.mode,
+    period: draft.period,
+    role: draft.role.trim(),
+    seasonDetails: draft.seasonDetails,
+    seasons: [...draft.seasons].sort(),
+    teamName: draft.teamName.trim(),
+  });
 }
 
 /** §Screen 2: esattamente tre opzioni, con la copy della task. */

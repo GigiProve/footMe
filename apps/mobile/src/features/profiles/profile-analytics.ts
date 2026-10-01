@@ -108,7 +108,32 @@ export type ProfileAnalyticsEvent =
   | "staff_career_delete_failed"
   // Modifica profilo Staff tecnico (REV-PROF-08)
   | "staff_profile_edit_opened"
-  | "staff_primary_role_changed";
+  | "staff_primary_role_changed"
+  // Gestione carriera Dirigente (REV-PROF-10)
+  | "director_career_manager_opened"
+  | "director_career_add_tapped"
+  | "director_career_type_selected"
+  | "director_career_season_roles_opened"
+  | "director_career_experience_saved"
+  | "director_career_experience_edited"
+  | "director_career_experience_deleted"
+  | "director_career_group_edited"
+  | "director_career_group_deleted"
+  | "director_career_paths_opened"
+  | "director_career_coach_opened"
+  | "director_career_coach_add_tapped"
+  | "director_career_staff_opened"
+  | "director_career_staff_add_tapped"
+  | "director_career_player_opened"
+  | "director_career_player_add_tapped"
+  | "director_career_other_opened"
+  | "director_career_other_add_tapped"
+  | "director_career_cancelled"
+  | "director_career_unsaved_exit"
+  | "director_career_completed"
+  | "director_career_load_failed"
+  | "director_career_save_failed"
+  | "director_career_delete_failed";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =

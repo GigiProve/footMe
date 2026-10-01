@@ -25,6 +25,9 @@ type CoachSeasonsStepProps = {
   onChangeDraft: (patch: Partial<CoachExperienceDraft>) => void;
   onToggleSeason: (seasonKey: string) => void;
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
+  /** "Squadra" per chi allena, "Società / Club" per chi dirige. */
+  teamLabel?: string;
+  teamPlaceholder?: string;
   testIDPrefix?: string;
 };
 
@@ -34,12 +37,14 @@ export function CoachSeasonsStep({
   onChangeDraft,
   onToggleSeason,
   searchTeams,
+  teamLabel = "Squadra",
+  teamPlaceholder = "Cerca la squadra",
   testIDPrefix = "coach",
 }: CoachSeasonsStepProps) {
   return (
     <View style={styles.container}>
       <OnboardingSection>
-        <FieldShell errorMessage={errors.teamName} label="Squadra">
+        <FieldShell errorMessage={errors.teamName} label={teamLabel}>
           <TeamAutocompleteInput
             onChangeText={(value) =>
               onChangeDraft({
@@ -55,7 +60,7 @@ export function CoachSeasonsStep({
                 teamName: team.name,
               })
             }
-            placeholder="Cerca la squadra"
+            placeholder={teamPlaceholder}
             searchTeams={searchTeams}
             value={draft.teamName}
           />

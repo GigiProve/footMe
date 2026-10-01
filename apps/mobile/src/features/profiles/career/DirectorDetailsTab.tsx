@@ -65,6 +65,11 @@ type DirectorDetailsTabProps = {
   onContactPress?: (contact: PublicContact) => void;
   /** Apre il modulo canonico di modifica. Assente al Visitor. */
   onEditProfile?: () => void;
+  /**
+   * Apre "Percorsi aggiuntivi" nella gestione carriera (REV-PROF-10). Solo
+   * Owner: al Visitor non arriva nessun handler di modifica.
+   */
+  onManageAdditionalPaths?: () => void;
   /** Porta alla tab Carriera sul percorso scelto, nello stesso profilo. */
   onOpenCareerPath?: (path: DirectorCareerPath) => void;
   /** Assente quando la società non ha una pagina PROLINK: niente chevron. */
@@ -77,6 +82,7 @@ export function DirectorDetailsTab({
   isOwner = false,
   onContactPress,
   onEditProfile,
+  onManageAdditionalPaths,
   onOpenCareerPath,
   onOpenClub,
 }: DirectorDetailsTabProps) {
@@ -294,6 +300,15 @@ export function DirectorDetailsTab({
               value={formatExperienceCount(path.count)}
             />
           ))}
+          {isOwner && onManageAdditionalPaths ? (
+            <Button
+              label="Gestisci percorsi aggiuntivi"
+              onPress={onManageAdditionalPaths}
+              size="sm"
+              testID="director-details-manage-paths"
+              variant="secondary"
+            />
+          ) : null}
         </ProfileSectionBlock>
       ) : null}
 

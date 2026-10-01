@@ -13,6 +13,12 @@
  * vincolo garantisce la forma delle righe scritte prima della review. Una riga
  * illeggibile viene scartata, non fatta esplodere addosso al profilo.
  *
+ * È anche la frontiera della migrazione di REV-PROF-10: le righe vecchie
+ * portano N stagioni in un record solo, quelle nuove una stagione per record
+ * con un `experienceGroupId` in comune. Entrambe le forme attraversano questa
+ * funzione e arrivano identiche al modello condiviso — nessuna riscrittura del
+ * dato è necessaria perché il profilo si legga.
+ *
  * Nessun conteggio è memorizzato: ruoli, stagioni e società sono sempre
  * ricalcolati dai record, perché una colonna `director_season_count`
  * divergerebbe dalla carriera alla prima modifica.
@@ -198,12 +204,20 @@ function toCareerEntry(
     category: readText(record, "category") || null,
     club_id: readText(record, "clubId") || readText(record, "club_id") || null,
     description: readText(record, "description") || null,
+    /*
+      Il gruppo tiene insieme le stagioni nate da un solo inserimento
+      multi-stagione. Le righe scritte dall'onboarding non ce l'hanno — una
+      riga era già l'esperienza intera — e senza gruppo ognuna resta
+      un'esperienza a sé, che è esattamente ciò che erano. Da REV-PROF-10 la
+      gestione carriera scrive una riga per stagione e marca il gruppo, quindi
+      leggerlo è ciò che tiene unite quelle stagioni nel Master Profile.
+    */
+    experience_group_id:
+      readText(record, "experienceGroupId") ||
+      readText(record, "experience_group_id") ||
+      null,
     experience_type: readExperienceType(record, seasons.length),
     id: readText(record, "id") || `${prefix}-${index}`,
-    /*
-      Una riga per esperienza: il JSON del Dirigente non è mai stato spezzato
-      per stagione, quindi non c'è nessun gruppo da ricomporre.
-    */
     period_end_month: periodFields.endMonth,
     period_end_year: periodFields.endYear,
     period_start_month: periodFields.startMonth,
@@ -260,15 +274,29 @@ export function parseDirectorPlayerForms(
       }
 
       const seasonPeriod = readText(record, "seasonPeriod");
+      const careerType = readText(record, "careerType");
+      const groupId = readText(record, "groupId");
 
       return {
         appearances: readText(record, "appearances"),
         assists: readText(record, "assists"),
         awards: readText(record, "awards"),
+        /*
+          Tipo e gruppo sono ciò che tiene insieme le righe di una stessa
+          esperienza quando torna al flusso Calciatore. Senza, il
+          raggruppamento ricade su società + categoria e due passaggi distinti
+          nello stesso club collasserebbero in uno.
+        */
+        ...(careerType === "MULTI_SEASON" ||
+        careerType === "SINGLE_SEASON" ||
+        careerType === "CUSTOM_PERIOD"
+          ? { careerType }
+          : {}),
         category: readText(record, "category"),
         clubId: readText(record, "clubId") || null,
         clubName,
         goals: readText(record, "goals"),
+        ...(groupId ? { groupId } : {}),
         id: readText(record, "id") || `director-player-${index}`,
         minutesPlayed: readText(record, "minutesPlayed"),
         periodEndMonth: readText(record, "periodEndMonth"),

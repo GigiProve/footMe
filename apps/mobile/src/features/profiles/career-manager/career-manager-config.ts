@@ -16,16 +16,25 @@ import type { ProfileAnalyticsEvent } from "../profile-analytics";
  * Corsia di carriera dentro la sessione di gestione.
  *
  * `primary` è la carriera del profilo (Allenatore per l'Allenatore, Staff
- * tecnico per lo Staff); `coach` e `player` sono percorsi aggiuntivi. Le
- * assegnazioni non si distinguono per ruolo testuale ma per corsia, che è
- * l'identificativo canonico del tipo carriera.
+ * tecnico per lo Staff, dirigenziale per il Dirigente); le altre sono percorsi
+ * aggiuntivi. Le assegnazioni non si distinguono per ruolo testuale ma per
+ * corsia, che è l'identificativo canonico del tipo carriera: è la corsia a
+ * decidere dove finiscono le scritture, quindi un'esperienza da allenatore non
+ * può finire nella carriera dirigenziale neanche se ne condividesse il ruolo.
+ *
+ * L'elenco cresce con i ruoli che hanno un percorso aggiuntivo, non con le
+ * schermate: `staff` e `other` sono arrivati con il Dirigente (REV-PROF-10) e
+ * non hanno aggiunto nessun passo al flusso.
  */
-export type CareerLane = "primary" | "coach" | "player";
+export type CareerLane = "primary" | "coach" | "staff" | "other" | "player";
 
 /** Corsie che usano le schermate ad assegnazione (tutte tranne il Calciatore). */
 export type AssignmentLane = Exclude<CareerLane, "player">;
 
-export type CareerPathKey = "coach" | "player";
+/** Corsie ad assegnazione dei soli percorsi aggiuntivi. */
+export type AdditionalAssignmentLane = Exclude<AssignmentLane, "primary">;
+
+export type CareerPathKey = Exclude<CareerLane, "primary">;
 
 export type CareerManagerCopy = {
   /** Eyebrow della seconda sezione dell'hub. */
@@ -44,6 +53,25 @@ export type CareerManagerCopy = {
   periodHelpMessage: string;
   /** Sottotitolo della card "Periodo personalizzato". */
   customPeriodSubtitle: string;
+  /**
+   * Descrizione della schermata "Percorsi aggiuntivi". Senza, viene composta
+   * dall'eyebrow della carriera principale.
+   */
+  additionalDescription?: string;
+  /**
+   * Il campo società si chiama "Squadra" per chi allena e "Società / Club" per
+   * chi dirige: è la stessa entità, con il nome che quel ruolo le dà.
+   */
+  teamLabel?: string;
+  teamPlaceholder?: string;
+  /**
+   * Rende modificabile la descrizione facoltativa dell'esperienza nelle
+   * schermate a singola assegnazione. Spenta dove il flusso approvato non la
+   * chiede: il dato resta comunque preservato.
+   */
+  showDescription?: boolean;
+  descriptionLabel?: string;
+  descriptionPlaceholder?: string;
 };
 
 /** Copy di un percorso aggiuntivo, nell'hub e nella schermata dedicata. */
@@ -54,10 +82,27 @@ export type CareerPathCopy = {
   emptyText: string;
   emptyTitle: string;
   /** Icona Ionicons della riga. */
-  icon: "person-outline" | "walk-outline" | "clipboard-outline";
+  icon:
+    | "person-outline"
+    | "walk-outline"
+    | "clipboard-outline"
+    | "search-outline"
+    | "ellipsis-horizontal-outline";
   key: CareerPathKey;
+  /** Sottotitolo del riepilogo del percorso. */
+  summarySubtitle?: string;
+  /** App bar della scelta del tipo di esperienza dentro il percorso. */
+  typeSelectorTitle?: string;
   /** Titolo della riga nell'hub e nella schermata Percorsi aggiuntivi. */
   title: string;
+};
+
+/** Eventi di un singolo percorso aggiuntivo. */
+export type CareerPathEvents = {
+  /** Tap su "Aggiungi esperienza" dentro il percorso. */
+  addTapped?: ProfileAnalyticsEvent;
+  /** Apertura del percorso dall'hub o da "Percorsi aggiuntivi". */
+  opened: ProfileAnalyticsEvent;
 };
 
 /**
@@ -77,13 +122,14 @@ export type CareerManagerEvents = {
   groupEdited: ProfileAnalyticsEvent;
   loadFailed: ProfileAnalyticsEvent;
   opened: ProfileAnalyticsEvent;
+  /**
+   * Eventi dei percorsi aggiuntivi, uno per corsia. Una mappa invece di una
+   * coppia di campi per percorso: il Dirigente ne ha quattro e comporre i nomi
+   * a runtime renderebbe la tassonomia illeggibile.
+   */
+  pathEvents: Partial<Record<CareerPathKey, CareerPathEvents>>;
   /** Apertura della schermata "Percorsi aggiuntivi". Assente per l'Allenatore. */
   pathsOpened?: ProfileAnalyticsEvent;
-  playerAddTapped: ProfileAnalyticsEvent;
-  playerOpened: ProfileAnalyticsEvent;
-  /** Sotto-flusso da allenatore: esiste solo nello Staff tecnico. */
-  coachPathOpened?: ProfileAnalyticsEvent;
-  coachPathAddTapped?: ProfileAnalyticsEvent;
   saveFailed: ProfileAnalyticsEvent;
   seasonRolesOpened: ProfileAnalyticsEvent;
   typeSelected: ProfileAnalyticsEvent;

@@ -63,8 +63,12 @@ const EVENTS: CareerManagerEvents = {
   groupEdited: "coach_career_group_edited",
   loadFailed: "coach_career_load_failed",
   opened: "coach_career_manager_opened",
-  playerAddTapped: "coach_career_player_add_tapped",
-  playerOpened: "coach_career_player_opened",
+  pathEvents: {
+    player: {
+      addTapped: "coach_career_player_add_tapped",
+      opened: "coach_career_player_opened",
+    },
+  },
   saveFailed: "coach_career_save_failed",
   seasonRolesOpened: "coach_career_season_roles_opened",
   typeSelected: "coach_career_type_selected",

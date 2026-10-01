@@ -3026,6 +3026,66 @@ export async function saveDirectorProfileMedia(input: {
   }
 }
 
+/** Le cinque corsie di carriera del Dirigente, tutte `jsonb` sulla stessa riga. */
+export type DirectorCareerColumns = {
+  career_entries: unknown[];
+  coach_career_entries: unknown[];
+  other_career_entries: unknown[];
+  player_career_entries: unknown[];
+  staff_career_entries: unknown[];
+};
+
+/**
+ * Scrive la carriera del Dirigente (REV-PROF-10).
+ *
+ * **Qui sta l'atomicità del salvataggio multi-stagione**, e non è costruita
+ * lato client: le cinque corsie sono cinque colonne della stessa riga di
+ * `director_profiles`, quindi un `upsert` è una singola istruzione. Tre
+ * stagioni entrano tutte o non entra nessuna — non esiste uno stato in cui
+ * due sono salvate e la terza no, e un retry riscrive lo stesso insieme
+ * invece di aggiungerne una copia.
+ *
+ * Le colonne non di carriera vengono riscritte con i valori appena letti,
+ * come fa `saveDirectorProfileMedia`: l'upsert sostituisce la riga, quindi
+ * ometterle le azzererebbe.
+ */
+export async function saveDirectorProfileCareer(input: {
+  career: DirectorCareerColumns;
+  directorProfile: NonNullable<CompleteProfessionalProfile["directorProfile"]>;
+  profileId: string;
+}) {
+  const { error } = await supabase.from("director_profiles").upsert({
+    career_entries: input.career.career_entries,
+    club_types: input.directorProfile.club_types,
+    coach_career_entries: input.career.coach_career_entries,
+    director_roles: input.directorProfile.director_roles,
+    experience_categories: input.directorProfile.experience_categories,
+    has_other_football_experience:
+      input.directorProfile.has_other_football_experience,
+    has_played_football: input.directorProfile.has_played_football,
+    main_focus: input.directorProfile.main_focus,
+    market_involvement: input.directorProfile.market_involvement,
+    media_items: input.directorProfile.media_items,
+    open_to_clubs: input.directorProfile.open_to_clubs,
+    open_to_others: input.directorProfile.open_to_others,
+    open_to_players: input.directorProfile.open_to_players,
+    open_to_staff: input.directorProfile.open_to_staff,
+    other_career_entries: input.career.other_career_entries,
+    other_football_roles: input.directorProfile.other_football_roles,
+    other_role_label: input.directorProfile.other_role_label,
+    player_career_entries: input.career.player_career_entries,
+    previous_roles: input.directorProfile.previous_roles,
+    primary_role: input.directorProfile.primary_role,
+    profile_id: input.profileId,
+    responsibilities: input.directorProfile.responsibilities,
+    staff_career_entries: input.career.staff_career_entries,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function searchTeams(query: string, limit = 5) {
   const trimmedQuery = query.trim();
 

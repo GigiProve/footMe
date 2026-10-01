@@ -10,9 +10,11 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing } from "../../../../theme/tokens";
 import { AppText, Badge } from "../../../../ui";
+import type { CareerPathCopy } from "../career-manager-config";
 
 type CareerPathRowProps = {
-  icon: "person-outline" | "walk-outline" | "clipboard-outline";
+  /** Vedi `CareerPathCopy["icon"]`: la tassonomia delle icone vive lì. */
+  icon: CareerPathCopy["icon"];
   onPress: () => void;
   /** Mostrato sotto al titolo quando c'è, al suo posto quando manca. */
   summary: string;

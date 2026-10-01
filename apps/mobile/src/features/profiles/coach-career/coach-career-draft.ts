@@ -37,6 +37,18 @@ export type CoachExperienceDraft = {
   /** Ruolo e categoria di `SINGLE_SEASON` e `CUSTOM_PERIOD`. */
   category: string;
   clubId: string | null;
+  /** Descrizione di `SINGLE_SEASON` e `CUSTOM_PERIOD`, sempre facoltativa. */
+  description: string;
+  /**
+   * Descrizioni già salvate delle singole stagioni di un gruppo
+   * multi-stagione.
+   *
+   * Vivono qui e non in `description` perché la task è esplicita: la stessa
+   * descrizione non va replicata su tutte le stagioni senza un'azione
+   * dell'utente. Le schermate 3 e 4 non hanno un campo descrizione, quindi qui
+   * il dato viene solo attraversato — preservato riga per riga, mai propagato.
+   */
+  descriptionBySeason: Record<string, string>;
   groupId: string;
   /** Incarico in corso: solo `CUSTOM_PERIOD`. */
   isOngoing: boolean;
@@ -101,6 +113,8 @@ export function createCoachDraft(
   return {
     category: "",
     clubId: null,
+    description: "",
+    descriptionBySeason: {},
     groupId: generateCoachGroupId(),
     isOngoing: false,
     mode,
@@ -139,6 +153,15 @@ export function draftFromAssignments(
   return {
     category: head.category,
     clubId: head.clubId,
+    // La descrizione di testata è quella dell'assegnazione che si sta
+    // modificando: in un gruppo multi-stagione nessuna la rappresenta tutte,
+    // quindi lì resta vuota e ogni stagione conserva la propria.
+    description: isPeriod || seasons.length <= 1 ? head.description ?? "" : "",
+    descriptionBySeason: Object.fromEntries(
+      assignments
+        .filter((assignment) => assignment.seasonKey)
+        .map((assignment) => [assignment.seasonKey, assignment.description ?? ""]),
+    ),
     groupId: head.groupId,
     isOngoing: head.isOngoing,
     // Un gruppo con più stagioni resta multi-stagione anche se era stato
@@ -226,6 +249,7 @@ export function draftToAssignments(
       {
         ...base,
         category: draft.category,
+        description: draft.description,
         id: draft.persistedId ?? generateAssignmentId(),
         isOngoing: draft.isOngoing,
         mode: "CUSTOM_PERIOD",
@@ -244,6 +268,15 @@ export function draftToAssignments(
     return {
       ...base,
       category: detail.category,
+      /*
+        Una stagione sola è un'assegnazione singola e la sua descrizione è
+        quella del form; con più stagioni ognuna si tiene la propria, perché
+        propagare il testo di una riga alle altre sarebbe un dato inventato.
+      */
+      description:
+        seasons.length === 1
+          ? draft.description
+          : draft.descriptionBySeason[seasonKey] ?? "",
       // Una stagione già salvata conserva il proprio id anche se il gruppo
       // cambia forma: la modifica resta una modifica, non una ricreazione.
       id:

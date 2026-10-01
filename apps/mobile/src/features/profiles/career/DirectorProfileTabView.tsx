@@ -50,6 +50,8 @@ type DirectorProfileTabViewProps = {
   onEditProfile?: () => void;
   /** Apre l'editor di un contenuto già pubblicato. Solo Owner. */
   onEditMedia?: (itemId: string) => void;
+  /** Apre "Percorsi aggiuntivi" nella gestione carriera. Solo Owner. */
+  onManageAdditionalPaths?: () => void;
   onManageMedia?: () => void;
   /** Apre il profilo o la società collegati a un contenuto. */
   onOpenLinkedTarget?: (target: MediaLinkedTarget) => void;
@@ -66,6 +68,7 @@ export function DirectorProfileTabView({
   onDeleteMedia,
   onEditProfile,
   onEditMedia,
+  onManageAdditionalPaths,
   onManageMedia,
   onOpenLinkedTarget,
   onOpenClub,
@@ -177,6 +180,17 @@ export function DirectorProfileTabView({
           isOwner={isOwner}
           onContactPress={handleContactPress}
           onEditProfile={isOwner ? onEditProfile : undefined}
+          onManageAdditionalPaths={
+            isOwner && onManageAdditionalPaths
+              ? () => {
+                  trackProfileEvent("profile_additional_career_tapped", {
+                    profileType: PROFILE_TYPE,
+                    viewerMode: "owner",
+                  });
+                  onManageAdditionalPaths();
+                }
+              : undefined
+          }
           onOpenCareerPath={handleOpenCareerPath}
           onOpenClub={onOpenClub ? handleOpenClub : undefined}
         />

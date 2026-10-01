@@ -17,6 +17,7 @@ import {
   InfoMessage,
   OnboardingSection,
   OnboardingSelectField,
+  OnboardingTextField,
   PeriodField,
 } from "../../../onboarding/ui";
 import {
@@ -37,6 +38,9 @@ import {
 import { COACH_CATEGORY_OPTIONS } from "./CoachSeasonRolesStep";
 
 type CoachSingleAssignmentStepProps = {
+  /** Etichette della descrizione facoltativa, quando è mostrata. */
+  descriptionLabel?: string;
+  descriptionPlaceholder?: string;
   draft: CoachExperienceDraft;
   errors: CoachDraftErrors;
   onChangeDraft: (patch: Partial<CoachExperienceDraft>) => void;
@@ -45,6 +49,14 @@ type CoachSingleAssignmentStepProps = {
   searchTeams: (query: string) => Promise<TeamAutocompleteOption[]>;
   /** Copy del riquadro informativo del periodo personalizzato. */
   periodHelpMessage?: string;
+  /**
+   * Mostra il campo descrizione sotto i campi principali. Spento dove il
+   * flusso approvato non lo chiede (REV-PROF-04, REV-PROF-07).
+   */
+  showDescription?: boolean;
+  /** "Squadra" per chi allena, "Società / Club" per chi dirige. */
+  teamLabel?: string;
+  teamPlaceholder?: string;
   testIDPrefix?: string;
 };
 
@@ -60,12 +72,17 @@ function buildSeasonOptions() {
 }
 
 export function CoachSingleAssignmentStep({
+  descriptionLabel = "Attività svolte",
+  descriptionPlaceholder,
   draft,
   errors,
   onChangeDraft,
   roleOptions = COACH_ROLE_OPTIONS,
   searchTeams,
   periodHelpMessage = "Utile per subentri, incarichi brevi o periodi fuori stagione.",
+  showDescription = false,
+  teamLabel = "Squadra",
+  teamPlaceholder = "Cerca la squadra",
   testIDPrefix = "coach",
 }: CoachSingleAssignmentStepProps) {
   const isPeriod = draft.mode === "CUSTOM_PERIOD";
@@ -80,7 +97,7 @@ export function CoachSingleAssignmentStep({
   return (
     <View style={styles.container}>
       <OnboardingSection>
-        <FieldShell errorMessage={errors.teamName} label="Squadra">
+        <FieldShell errorMessage={errors.teamName} label={teamLabel}>
           <TeamAutocompleteInput
             onChangeText={(value) =>
               onChangeDraft({ clubId: null, teamLogoUrl: "", teamName: value })
@@ -92,7 +109,7 @@ export function CoachSingleAssignmentStep({
                 teamName: team.name,
               })
             }
-            placeholder="Cerca la squadra"
+            placeholder={teamPlaceholder}
             searchTeams={searchTeams}
             value={draft.teamName}
           />
@@ -174,6 +191,23 @@ export function CoachSingleAssignmentStep({
             startPlaceholder="Mese e anno di inizio"
             startTestID={`${testIDPrefix}-period-start`}
             startValue={startValue}
+          />
+        ) : null}
+
+        {/*
+          §"Descrizione opzionale": sotto i campi principali, mai obbligatoria
+          e mai promossa sopra il ruolo.
+        */}
+        {showDescription ? (
+          <OnboardingTextField
+            label={descriptionLabel}
+            multiline
+            numberOfLines={3}
+            onChangeText={(value) => onChangeDraft({ description: value })}
+            optional
+            placeholder={descriptionPlaceholder}
+            testID={`${testIDPrefix}-assignment-description`}
+            value={draft.description}
           />
         ) : null}
       </OnboardingSection>

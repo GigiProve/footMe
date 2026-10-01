@@ -58,8 +58,6 @@ const COPY: CareerManagerCopy = {
 const EVENTS: CareerManagerEvents = {
   addTapped: "staff_career_add_tapped",
   cancelled: "staff_career_cancelled",
-  coachPathAddTapped: "staff_career_coach_add_tapped",
-  coachPathOpened: "staff_career_coach_opened",
   completed: "staff_career_completed",
   deleteFailed: "staff_career_delete_failed",
   experienceDeleted: "staff_career_experience_deleted",
@@ -69,9 +67,17 @@ const EVENTS: CareerManagerEvents = {
   groupEdited: "staff_career_group_edited",
   loadFailed: "staff_career_load_failed",
   opened: "staff_career_manager_opened",
+  pathEvents: {
+    coach: {
+      addTapped: "staff_career_coach_add_tapped",
+      opened: "staff_career_coach_opened",
+    },
+    player: {
+      addTapped: "staff_career_player_add_tapped",
+      opened: "staff_career_player_opened",
+    },
+  },
   pathsOpened: "staff_career_paths_opened",
-  playerAddTapped: "staff_career_player_add_tapped",
-  playerOpened: "staff_career_player_opened",
   saveFailed: "staff_career_save_failed",
   seasonRolesOpened: "staff_career_season_roles_opened",
   typeSelected: "staff_career_type_selected",
@@ -150,8 +156,6 @@ export function StaffCareerManagerScreen() {
   return (
     <CareerManagerScreen
       assignments={assignments}
-      coachAssignments={coachAssignments}
-      coachRoleOptions={COACH_ROLE_OPTIONS}
       copy={COPY}
       // Il ruolo principale precompila e basta: cambiare il ruolo di una
       // stagione non tocca il profilo, e il profilo non riscrive le stagioni.
@@ -199,6 +203,8 @@ export function StaffCareerManagerScreen() {
       }}
       onRetry={() => profileQuery.refetch()}
       openSource={section === "paths" ? "additional_paths" : "career_tab"}
+      pathAssignments={{ coach: coachAssignments }}
+      pathRoleOptions={{ coach: COACH_ROLE_OPTIONS }}
       paths={PATHS}
       playerEntries={playerEntries}
       primaryRoleOptions={primaryRoleOptions}

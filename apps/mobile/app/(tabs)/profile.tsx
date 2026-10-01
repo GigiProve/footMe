@@ -957,17 +957,16 @@ export default function ProfileScreen() {
             onManageMedia={() => handleManageAgentMedia()}
           />
         ) : completeProfile && role === "director" ? (
-          /*
-            `onAddExperience` resta scollegato finche non esiste il modulo
-            Gestione carriera Dirigente, che ha una task propria: meglio un
-            empty state senza CTA che una CTA che non porta da nessuna parte.
-          */
           <DirectorProfileTabView
             completeProfile={completeProfile}
             isOwner
+            onAddExperience={() => router.push("/profile/director-career")}
             onDeleteMedia={handleDeleteDirectorMedia}
             onEditMedia={(itemId) => handleManageDirectorMedia(itemId)}
             onEditProfile={() => handleEdit("bio")}
+            onManageAdditionalPaths={() =>
+              router.push("/profile/director-career?section=paths")
+            }
             onManageMedia={() => handleManageDirectorMedia()}
             onOpenClub={handleOpenAffiliateClub}
             onOpenLinkedTarget={handleOpenDirectorLinkedTarget}
