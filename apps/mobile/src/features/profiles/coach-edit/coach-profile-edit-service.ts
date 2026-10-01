@@ -25,22 +25,20 @@ import {
   type UseMutationResult,
 } from "@tanstack/react-query";
 
-import {
-  buildFullUpdatePayload,
-  buildInitialState,
-  type ProfileFormState,
-} from "../profile-edit-helpers";
-import { parseBirthDateInput } from "../profile-form-utils";
+import type { ProfileFormState } from "../profile-edit-helpers";
 import {
   deleteCoachAchievement,
-  getCompleteProfessionalProfile,
-  updateCompleteProfessionalProfile,
   upsertCoachAchievement,
   type CoachAchievementRecord,
   type CompleteProfessionalProfile,
   type CompleteProfessionalProfileUpdate,
 } from "../profile-service";
 import { completeProfileQueryKey } from "../edit/player-profile-edit-service";
+import {
+  buildProfileSectionPayload,
+  useProfileSectionSave,
+  type SaveProfileSectionVariables,
+} from "../edit/profile-section-save";
 
 export {
   completeProfileQueryKey,
@@ -68,11 +66,10 @@ export function buildCoachSectionPayload(
   patch: CoachSectionPatch,
 ): CompleteProfessionalProfileUpdate {
   const { coachProfile: coachPatch, ...formPatch } = patch;
-  const merged: ProfileFormState = { ...buildInitialState(data), ...formPatch };
-  const payload = buildFullUpdatePayload(data, merged);
-
-  payload.profile.birth_date =
-    parseBirthDateInput(merged.birthDate)?.isoValue ?? data.profile.birth_date;
+  const payload = buildProfileSectionPayload(
+    data,
+    formPatch as Partial<ProfileFormState>,
+  );
 
   if (coachPatch && payload.coachProfile) {
     payload.coachProfile = { ...payload.coachProfile, ...coachPatch };
@@ -81,10 +78,8 @@ export function buildCoachSectionPayload(
   return payload;
 }
 
-export type SaveCoachSectionVariables = {
-  data: CompleteProfessionalProfile;
-  patch: CoachSectionPatch;
-};
+export type SaveCoachSectionVariables =
+  SaveProfileSectionVariables<CoachSectionPatch>;
 
 /**
  * Salvataggio di una sezione. Rilegge il profilo e riscrive la cache
@@ -97,22 +92,8 @@ export function useCoachSectionSave(
   Error,
   SaveCoachSectionVariables
 > {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ data, patch }: SaveCoachSectionVariables) => {
-      await updateCompleteProfessionalProfile(
-        buildCoachSectionPayload(data, patch),
-      );
-
-      return getCompleteProfessionalProfile(data.profile.id);
-    },
-    onSuccess: (fresh) => {
-      queryClient.setQueryData(
-        completeProfileQueryKey(profileId ?? fresh.profile.id),
-        fresh,
-      );
-    },
+  return useProfileSectionSave<CoachSectionPatch>(profileId, {
+    buildPayload: buildCoachSectionPayload,
   });
 }
 

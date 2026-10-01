@@ -1,5 +1,6 @@
 /**
- * Copertina e foto profilo dell'Allenatore (REV-PROF-05, schermata 2).
+ * Copertina e foto profilo del modulo "Foto e dati personali"
+ * (REV-PROF-05 e REV-PROF-08, schermata 2).
  *
  * La geometria è quella del Master Profile — copertina alta 150, avatar xl che
  * la scavalca — perché questa è un'anteprima di come il profilo verrà visto,
@@ -22,27 +23,30 @@ import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Avatar } from "../../../ui";
 import { PROFILE_COVER_HEIGHT } from "../master/ProfileHeroHeader";
 
-type CoachCoverAvatarEditorProps = {
+type ProfileCoverAvatarEditorProps = {
   avatarUrl: string | null;
   coverUrl: string | null;
   fullName: string;
   onEditAvatar: () => void;
   onEditCover: () => void;
+  /** Prefisso dei testID: ogni ruolo conserva i propri. */
+  testIDPrefix: string;
   uploading: "avatar" | "cover" | null;
 };
 
-export function CoachCoverAvatarEditor({
+export function ProfileCoverAvatarEditor({
   avatarUrl,
   coverUrl,
   fullName,
   onEditAvatar,
   onEditCover,
+  testIDPrefix,
   uploading,
-}: CoachCoverAvatarEditorProps) {
+}: ProfileCoverAvatarEditorProps) {
   const isBusy = uploading !== null;
 
   return (
-    <View style={styles.container} testID="coach-cover-avatar-editor">
+    <View style={styles.container} testID={`${testIDPrefix}-cover-avatar-editor`}>
       <View style={styles.cover}>
         {coverUrl ? (
           <Image
@@ -69,7 +73,7 @@ export function CoachCoverAvatarEditor({
             styles.coverAction,
             pressed ? styles.pressed : null,
           ]}
-          testID="coach-cover-edit"
+          testID={`${testIDPrefix}-cover-edit`}
         >
           {uploading === "cover" ? (
             <ActivityIndicator color={colors.textPrimary} size="small" />
@@ -87,7 +91,7 @@ export function CoachCoverAvatarEditor({
         disabled={isBusy}
         onPress={onEditAvatar}
         style={styles.avatarShell}
-        testID="coach-avatar-edit"
+        testID={`${testIDPrefix}-avatar-edit`}
       >
         <Avatar name={fullName} size="xl" uri={avatarUrl ?? undefined} />
 

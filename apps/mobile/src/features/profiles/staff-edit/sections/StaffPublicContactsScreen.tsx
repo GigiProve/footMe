@@ -1,21 +1,22 @@
 /**
- * Contatti pubblici dell'Allenatore (REV-PROF-05, schermata 8).
+ * Contatti pubblici dello Staff tecnico (REV-PROF-08, schermata 6).
  *
  * La schermata vive in `edit/sections/ProfilePublicContactsScreen`, condivisa
- * con lo Staff tecnico: canali, normalizzazioni e regole di privacy sono le
- * stesse per entrambi i ruoli.
+ * con l'Allenatore: i toggle governano solo la visibilità, il valore resta
+ * salvato e la privacy è applicata anche dal backend
+ * (`get_profile_public_contacts` restituisce NULL per i canali spenti).
  */
 import { ProfilePublicContactsScreen } from "../../edit/sections/ProfilePublicContactsScreen";
 import {
-  useCoachSectionSave,
   useCompleteProfileQuery,
-} from "../coach-profile-edit-service";
-import { useCoachEditorGuard } from "../use-coach-editor-guard";
+  useStaffSectionSave,
+} from "../staff-profile-edit-service";
+import { useStaffEditorGuard } from "../use-staff-editor-guard";
 
-export function CoachPublicContactsScreen() {
-  const { userId } = useCoachEditorGuard();
+export function StaffPublicContactsScreen() {
+  const { userId } = useStaffEditorGuard();
   const profileQuery = useCompleteProfileQuery(userId);
-  const save = useCoachSectionSave(userId);
+  const save = useStaffSectionSave(userId);
 
   return (
     <ProfilePublicContactsScreen
@@ -24,9 +25,9 @@ export function CoachPublicContactsScreen() {
       isPending={profileQuery.isPending}
       onRetry={() => void profileQuery.refetch()}
       onSave={(data, patch, handlers) => save.mutate({ data, patch }, handlers)}
-      profileType="coach"
+      profileType="staff"
       saving={save.isPending}
-      testIDPrefix="coach"
+      testIDPrefix="staff"
     />
   );
 }

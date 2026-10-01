@@ -8,26 +8,15 @@
  * contenuti" alla gestione condivisa, perché nessuno dei due viene
  * riscritto qui.
  */
-import type Ionicons from "@expo/vector-icons/Ionicons";
-import type { Href } from "expo-router";
+import type {
+  ProfileEditHubGroup,
+  ProfileEditHubSection,
+} from "../edit/ProfileEditHubScreen";
 
-import type { CoachEditSectionId } from "./coach-hub-summaries";
+export type CoachEditSection = ProfileEditHubSection;
+export type CoachEditSectionGroup = ProfileEditHubGroup;
 
-export type CoachEditSection = {
-  icon: keyof typeof Ionicons.glyphMap;
-  id: CoachEditSectionId;
-  route: Href;
-  /** Sottotitolo fisso. Le voci a conteggio lo calcolano dai dati. */
-  subtitle?: string;
-  title: string;
-};
-
-export type CoachEditSectionGroup = {
-  sections: readonly CoachEditSection[];
-  title: string;
-};
-
-export const COACH_EDIT_SECTION_GROUPS: readonly CoachEditSectionGroup[] = [
+export const COACH_EDIT_SECTION_GROUPS: readonly ProfileEditHubGroup[] = [
   {
     sections: [
       {

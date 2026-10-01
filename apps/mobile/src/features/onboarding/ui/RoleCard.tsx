@@ -16,6 +16,18 @@ type RoleCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
   selected: boolean;
   onPress: () => void;
+  /**
+   * Porta anche l etichetta sul blu quando la card e selezionata. Serve dove
+   * il mockup lo chiede esplicitamente; resta spento altrove per non cambiare
+   * la resa dei flussi gia approvati.
+   */
+  emphasizeSelection?: boolean;
+  /**
+   * Scelta singola (default) o multipla. Cambia solo come lo screen reader
+   * annuncia la card: "radio" per una scelta esclusiva, "checkbox" quando le
+   * card selezionabili sono piu di una insieme.
+   */
+  selectionMode?: "single" | "multiple";
   testID?: string;
 };
 
@@ -26,16 +38,18 @@ type RoleCardProps = {
  */
 export function RoleCard({
   description,
+  emphasizeSelection = false,
   icon,
   label,
   onPress,
   selected,
+  selectionMode = "single",
   testID,
 }: RoleCardProps) {
   return (
     <Pressable
       accessibilityLabel={label}
-      accessibilityRole="radio"
+      accessibilityRole={selectionMode === "multiple" ? "checkbox" : "radio"}
       accessibilityState={{ checked: selected, selected }}
       onPress={onPress}
       style={({ pressed }) => [
@@ -54,7 +68,12 @@ export function RoleCard({
       </View>
 
       <View style={styles.text}>
-        <AppText variant="titleSm">{label}</AppText>
+        <AppText
+          color={selected && emphasizeSelection ? "accent" : "primary"}
+          variant="titleSm"
+        >
+          {label}
+        </AppText>
         {description ? (
           <AppText color="secondary" numberOfLines={2} variant="meta">
             {description}

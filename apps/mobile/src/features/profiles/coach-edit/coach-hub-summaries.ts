@@ -16,9 +16,12 @@
 import { buildCoachCareerView } from "../career/coach-career-model";
 import { buildPublicContacts } from "../master/PublicContactsList";
 import { normalizeCoachMediaItems } from "../coach-media";
+import type { ProfileEditSectionKey } from "../profile-analytics";
 import type { CompleteProfessionalProfile } from "../profile-service";
 
-export type CoachEditSectionId =
+/** Voci dell'hub Allenatore: un sottoinsieme delle sezioni dell'editor. */
+export type CoachEditSectionId = Extract<
+  ProfileEditSectionKey,
   | "personal"
   | "technical"
   | "opportunities"
@@ -26,7 +29,8 @@ export type CoachEditSectionId =
   | "career"
   | "awards"
   | "contacts"
-  | "media";
+  | "media"
+>;
 
 function pluralize(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
@@ -59,7 +63,7 @@ export function countCoachMediaItems(
  * sottotitolo fisso non passano di qui.
  */
 export function buildCoachSectionSummary(
-  sectionId: CoachEditSectionId,
+  sectionId: ProfileEditSectionKey,
   data: CompleteProfessionalProfile,
 ): string | undefined {
   switch (sectionId) {

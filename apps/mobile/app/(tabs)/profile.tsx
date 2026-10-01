@@ -801,9 +801,8 @@ export default function ProfileScreen() {
                 profileType: "staff",
                 viewerMode: "owner",
               });
-              // La Modifica profilo Staff tecnico non e in questa task: la CTA
-              // apre il flusso esistente finche il suo hub non esiste.
-              handleEdit("staffInfo");
+              // REV-PROF-08: la CTA apre l hub modulare, non piu la modale.
+              router.push("/profile/staff-edit");
             }}
             onMorePress={() => {
               trackProfileEvent("profile_more_menu_opened", {

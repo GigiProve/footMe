@@ -105,7 +105,10 @@ export type ProfileAnalyticsEvent =
   | "staff_career_completed"
   | "staff_career_load_failed"
   | "staff_career_save_failed"
-  | "staff_career_delete_failed";
+  | "staff_career_delete_failed"
+  // Modifica profilo Staff tecnico (REV-PROF-08)
+  | "staff_profile_edit_opened"
+  | "staff_primary_role_changed";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -129,7 +132,11 @@ export type ProfileEditSectionKey =
   | "contacts"
   | "media"
   /** REV-PROF-05: "Filosofia e stile di gioco", solo Allenatore. */
-  | "philosophy";
+  | "philosophy"
+  /** REV-PROF-08: "Profilo professionale", solo Staff tecnico. */
+  | "professional"
+  /** REV-PROF-08: "Percorsi aggiuntivi", solo Staff tecnico. */
+  | "paths";
 
 /** Modalità temporale scelta, mai la società, il ruolo o le date. */
 export type CoachExperienceMode =
@@ -150,6 +157,8 @@ type ProfileAnalyticsProps = {
   experienceMode?: CoachExperienceMode;
   /** Quante stagioni sono state selezionate, non quali. */
   seasonCount?: number;
+  /** Quanti ruoli sono selezionati, non quali. */
+  roleCount?: number;
   contactType?: PublicContactType;
   /** Modalita geografica scelta, mai i nomi dei territori. */
   geographicMode?: string;
@@ -180,6 +189,9 @@ export function trackProfileEvent(
     ...(props.experienceMode ? { experience_mode: props.experienceMode } : {}),
     ...(typeof props.seasonCount === "number"
       ? { season_count: props.seasonCount }
+      : {}),
+    ...(typeof props.roleCount === "number"
+      ? { role_count: props.roleCount }
       : {}),
     ...(props.source ? { source: props.source } : {}),
     ...(props.geographicMode ? { geographic_mode: props.geographicMode } : {}),

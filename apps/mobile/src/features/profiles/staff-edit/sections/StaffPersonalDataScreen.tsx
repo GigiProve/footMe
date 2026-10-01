@@ -1,30 +1,29 @@
 /**
- * Foto e dati personali dell'Allenatore (REV-PROF-05, schermata 2).
+ * Foto e dati personali dello Staff tecnico (REV-PROF-08, schermata 2).
  *
  * La schermata vive in `edit/sections/ProfilePersonalDataScreen`, condivisa
- * con lo Staff tecnico: qui restano la sorgente dei dati, il salvataggio
- * dell'Allenatore e la nota in fondo al form.
+ * con l'Allenatore: copertina, comando fotocamera sovrapposto all'avatar —
+ * mai un pulsante separato "Modifica foto" — e form anagrafico sono gli stessi.
  */
 import {
   ProfilePersonalDataScreen,
   type ProfilePersonalDataConfig,
 } from "../../edit/sections/ProfilePersonalDataScreen";
 import {
-  useCoachSectionSave,
   useCompleteProfileQuery,
-} from "../coach-profile-edit-service";
-import { useCoachEditorGuard } from "../use-coach-editor-guard";
+  useStaffSectionSave,
+} from "../staff-profile-edit-service";
+import { useStaffEditorGuard } from "../use-staff-editor-guard";
 
 const CONFIG: ProfilePersonalDataConfig = {
-  footerHint: "Nome, foto e copertina compaiono nel tuo profilo pubblico.",
-  profileType: "coach",
-  testIDPrefix: "coach",
+  profileType: "staff",
+  testIDPrefix: "staff",
 };
 
-export function CoachPersonalDataScreen() {
-  const { userId } = useCoachEditorGuard();
+export function StaffPersonalDataScreen() {
+  const { userId } = useStaffEditorGuard();
   const profileQuery = useCompleteProfileQuery(userId);
-  const save = useCoachSectionSave(userId);
+  const save = useStaffSectionSave(userId);
 
   return (
     <ProfilePersonalDataScreen
