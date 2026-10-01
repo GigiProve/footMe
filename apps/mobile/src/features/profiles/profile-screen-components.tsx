@@ -321,6 +321,20 @@ export function StaffProfileHeader(
   return <MasterProfileHeader {...props} testIDPrefix="staff" />;
 }
 
+/**
+ * Header del Master Profile Dirigente (REV-PROF-09, Screen 1).
+ *
+ * Nessun header esclusivo del Dirigente: è lo stesso degli altri Master
+ * Profile a incarichi, con ruolo principale, società e categoria attuali,
+ * località e disponibilità del Dirigente. Owner e Visitor condividono la
+ * stessa composizione e differiscono soltanto per le azioni.
+ */
+export function DirectorProfileHeader(
+  props: Omit<MasterProfileHeaderProps, "testIDPrefix">,
+) {
+  return <MasterProfileHeader {...props} testIDPrefix="director" />;
+}
+
 /** Azione secondaria a sola icona dell'action bar: 44x44 di area toccabile. */
 function HeaderIconButton({
   icon,

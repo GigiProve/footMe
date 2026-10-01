@@ -18,6 +18,10 @@ import {
   buildStaffProfileCareer,
   collectStaffRoles,
 } from "./career/staff-career-model";
+import {
+  buildDirectorProfileCareer,
+  resolveDirectorPrimaryRole,
+} from "./career/director-career-model";
 import type { ProfileQuickFact } from "./master/ProfileQuickFacts";
 import type { ClubSeasonForm } from "./club-season-section";
 import { formToInput, recordToForm } from "./club-season-section";
@@ -1100,6 +1104,145 @@ function buildStaffQuickFacts({
       value: String(clubCount),
     },
   ];
+}
+
+/**
+ * Header del Master Profile Dirigente (REV-PROF-09, Screen 1).
+ *
+ * Stessa forma di `StaffProfileHeaderDetails`, perche l'header e lo stesso
+ * componente condiviso: cambia solo da dove arrivano ruolo, societa attuale e
+ * disponibilita.
+ */
+export type DirectorProfileHeaderDetails = StaffProfileHeaderDetails;
+
+export function buildDirectorProfileHeaderDetails(
+  data: CompleteProfessionalProfile,
+): DirectorProfileHeaderDetails | null {
+  if (data.profile.role !== "director") {
+    return null;
+  }
+
+  // Societa e categoria vengono dall'incarico in corso, non da un secondo set
+  // di campi e non dall'ultima riga salvata: se nessun incarico e in corso la
+  // riga non compare, invece di indovinare una societa.
+  const career = buildDirectorProfileCareer({
+    directorProfile: data.directorProfile,
+  });
+
+  const locationSummary = formatLocationSummary(
+    data.profile.city ??
+      data.profile.residence ??
+      data.profile.current_location_city ??
+      data.profile.domicile,
+    data.profile.region,
+  );
+  const locationLabel =
+    locationSummary === "Da completare" ? undefined : locationSummary;
+
+  const clubLabel =
+    [
+      career.currentExperience?.clubName.trim(),
+      career.currentExperience?.category.trim(),
+    ]
+      .filter(Boolean)
+      .join(" · ") || undefined;
+
+  /*
+    Il Dirigente non ha un interruttore "cerco lavoro": ha quattro preferenze
+    di contatto (REV-ONB-07 §M). Almeno una accesa vale come disponibilita
+    pubblica; spente tutte la riga sparisce del tutto, invece di diventare uno
+    stato negativo che il prodotto non prevede. I destinatari restano nei
+    Dettagli: l'header dice che c'e disponibilita, non per chi.
+  */
+  const isOpenToOpportunities = Boolean(
+    data.directorProfile?.open_to_clubs ||
+      data.directorProfile?.open_to_staff ||
+      data.directorProfile?.open_to_players ||
+      data.directorProfile?.open_to_others,
+  );
+
+  return {
+    availabilityLabel: isOpenToOpportunities
+      ? "Disponibile per nuove opportunita"
+      : undefined,
+    clubLabel,
+    fullName: formatProfileDisplayName(data.profile.full_name, null),
+    /*
+      Il prodotto non ha ancora una verifica per i profili personali: nessuna
+      colonna la esprime, quindi il badge non viene mai acceso. Il giorno in cui
+      il dato esiste, questa e l'unica riga da cambiare.
+    */
+    isVerified: false,
+    locationLabel,
+    primaryRole: resolveDirectorPrimaryRole(data.directorProfile),
+    quickFacts: buildDirectorQuickFacts({
+      age: data.profile.age ?? calculateAge(data.profile.birth_date),
+      clubCount: career.clubCount,
+      roleCount: career.roleCount,
+      seasonCount: career.director.seasonCount,
+    }),
+  };
+}
+
+/**
+ * Eta, Ruoli, Stagioni e Club (REV-PROF-09 §"Informazioni rapide").
+ *
+ * A differenza degli altri Master Profile un dato che non c'e non diventa un
+ * trattino: la colonna sparisce e le altre si ridistribuiscono, perche un "—"
+ * al posto di un'eta non pubblica racconterebbe un dato mancante invece di un
+ * dato riservato. Nessun valore e memorizzato: ognuno viene ricalcolato dai
+ * record canonici a ogni render del profilo.
+ */
+function buildDirectorQuickFacts({
+  age,
+  clubCount,
+  roleCount,
+  seasonCount,
+}: {
+  age: number | null;
+  clubCount: number;
+  roleCount: number;
+  seasonCount: number;
+}): ProfileQuickFact[] {
+  return [
+    age
+      ? {
+          accessibilityLabel: `Eta, ${age} anni`,
+          key: "age",
+          label: "Eta",
+          value: String(age),
+        }
+      : null,
+    roleCount > 0
+      ? {
+          accessibilityLabel:
+            roleCount === 1
+              ? "1 ruolo dirigenziale"
+              : `${roleCount} ruoli dirigenziali`,
+          key: "roles",
+          label: "Ruoli",
+          value: String(roleCount),
+        }
+      : null,
+    seasonCount > 0
+      ? {
+          accessibilityLabel:
+            seasonCount === 1 ? "1 stagione" : `${seasonCount} stagioni`,
+          key: "seasons",
+          label: "Stagioni",
+          value: String(seasonCount),
+        }
+      : null,
+    clubCount > 0
+      ? {
+          accessibilityLabel:
+            clubCount === 1 ? "1 societa" : `${clubCount} societa`,
+          key: "clubs",
+          label: "Club",
+          value: String(clubCount),
+        }
+      : null,
+  ].filter((fact): fact is ProfileQuickFact => fact !== null);
 }
 
 // ────────────────────────────────

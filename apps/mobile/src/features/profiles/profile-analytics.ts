@@ -150,9 +150,10 @@ type ProfileAnalyticsProps = {
   careerMetric?: CareerMetric;
   /**
    * Carriera mostrata dal selettore (REV-PROF-03; REV-PROF-06 aggiunge
-   * "staff"). È un identificatore di percorso, mai una società o un ruolo.
+   * "staff"; REV-PROF-09 "director" e "other"). È un identificatore di
+   * percorso, mai una società o un ruolo.
    */
-  careerMode?: "coach" | "player" | "staff";
+  careerMode?: "coach" | "director" | "other" | "player" | "staff";
   /** REV-PROF-04: modalità temporale dell'esperienza, mai il suo contenuto. */
   experienceMode?: CoachExperienceMode;
   /** Quante stagioni sono state selezionate, non quali. */

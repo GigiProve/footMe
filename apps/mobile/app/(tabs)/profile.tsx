@@ -67,6 +67,7 @@ import {
   buildHeaderDetails,
   buildInitialState,
   buildCoachProfileHeaderDetails,
+  buildDirectorProfileHeaderDetails,
   buildPlayerProfileHeaderDetails,
   buildStaffProfileHeaderDetails,
 } from "../../src/features/profiles/profile-edit-helpers";
@@ -77,6 +78,7 @@ import {
 } from "../../src/features/profiles/ProfileReadonlyView";
 import {
   CoachProfileHeader,
+  DirectorProfileHeader,
   PlayerProfileHeader,
   ProfileHeader,
   StaffProfileHeader,
@@ -92,7 +94,7 @@ import {
   type CompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
 import { removeMediaFromStorage } from "../../src/features/profiles/media-upload-service";
-import type { DirectorMediaLinkedTarget } from "../../src/features/profiles/director-media";
+import type { MediaLinkedTarget } from "../../src/features/profiles/career/MediaTabContent";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
 import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
 import { ProfileSkeleton } from "../../src/features/profiles/master/ProfileSkeleton";
@@ -299,6 +301,11 @@ export default function ProfileScreen() {
       completeProfile ? buildStaffProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
+  const directorHeaderDetails = useMemo(
+    () =>
+      completeProfile ? buildDirectorProfileHeaderDetails(completeProfile) : null,
+    [completeProfile],
+  );
 
   // Una sola visualizzazione per profilo aperto (§42).
   const viewedProfilesRef = useRef(new Set<string>());
@@ -312,12 +319,14 @@ export default function ProfileScreen() {
   }, [profile?.role, userId]);
 
   useEffect(() => {
-    if (!userId || profile?.role !== "coach") {
+    const role = profile?.role;
+
+    if (!userId || (role !== "coach" && role !== "director")) {
       return;
     }
 
     trackProfileViewed(userId, {
-      profileType: "coach",
+      profileType: role,
       seen: viewedProfilesRef.current,
       source: "own_profile_tab",
       viewerMode: "owner",
@@ -432,7 +441,7 @@ export default function ProfileScreen() {
     router.push(`/profile/${profileId}` as never);
   }
 
-  function handleOpenDirectorLinkedTarget(target: DirectorMediaLinkedTarget) {
+  function handleOpenDirectorLinkedTarget(target: MediaLinkedTarget) {
     if (target.target_type === "club") {
       router.push(`/club/${target.target_id}` as never);
       return;
@@ -573,13 +582,10 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.screen, role === "director" ? styles.directorScreen : null]}>
-      <KeyboardAwareForm
-        contentContainerStyle={[
-          styles.scrollContent,
-          role === "director" ? styles.directorScrollContent : null,
-        ]}
-      >
+    // REV-PROF-09: il Dirigente non ha piu' una superficie propria. Usa la
+    // stessa dei Master Profile gia' approvati, come ogni altra tipologia.
+    <SafeAreaView style={styles.screen}>
+      <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
         <View style={styles.profileTopBar}>
           <HeaderBell
             count={unreadCount}
@@ -631,6 +637,24 @@ export default function ProfileScreen() {
                     label: "Gestisci palmares",
                     subtitle: "Titoli e riconoscimenti del tuo profilo.",
                     onPress: () => handleEdit("coachAchievements"),
+                  },
+                ]
+              : []),
+            /*
+              REV-PROF-09: nemmeno l'header del Dirigente porta una riga
+              social, quindi follower e connessioni restano raggiungibili da
+              qui come per l'Allenatore.
+            */
+            ...(role === "director" && profileId
+              ? [
+                  {
+                    icon: "people-circle-outline" as const,
+                    label: "Follower e connessioni",
+                    subtitle: "Chi ti segue e chi segui.",
+                    onPress: () =>
+                      router.push(
+                        `/profile/connections?profileId=${profileId}&mode=followers` as never,
+                      ),
                   },
                 ]
               : []),
@@ -833,7 +857,46 @@ export default function ProfileScreen() {
             primaryRole={agentHeaderDetails.primaryRole}
             statusBadge={agentHeaderDetails.statusBadge}
           />
-        ) : completeProfile && (role === "director" || role === "fan" || role === "media") ? null : completeProfile && headerDetails ? (
+        ) : completeProfile && role === "director" && directorHeaderDetails ? (
+          <DirectorProfileHeader
+            availabilityLabel={directorHeaderDetails.availabilityLabel}
+            avatarUrl={completeProfile.profile.avatar_url}
+            clubLabel={directorHeaderDetails.clubLabel}
+            coverImageUrl={completeProfile.profile.cover_url}
+            fullName={directorHeaderDetails.fullName}
+            isVerified={directorHeaderDetails.isVerified}
+            locationLabel={directorHeaderDetails.locationLabel}
+            mode="owner"
+            onEditProfilePress={() => {
+              trackProfileEvent("profile_edit_tapped", {
+                profileType: "director",
+                viewerMode: "owner",
+              });
+              /*
+                La Modifica profilo Dirigente ha una task dedicata: la CTA
+                apre il flusso di modifica che esiste oggi, senza aprire una
+                seconda versione provvisoria dell'editor.
+              */
+              handleEdit("personalInfo");
+            }}
+            onMorePress={() => {
+              trackProfileEvent("profile_more_menu_opened", {
+                profileType: "director",
+                viewerMode: "owner",
+              });
+              setMoreMenuVisible(true);
+            }}
+            onSharePress={() => {
+              trackProfileEvent("profile_share_tapped", {
+                profileType: "director",
+                viewerMode: "owner",
+              });
+              void handleShareOwnProfile();
+            }}
+            primaryRole={directorHeaderDetails.primaryRole}
+            quickFacts={directorHeaderDetails.quickFacts}
+          />
+        ) : completeProfile && (role === "fan" || role === "media") ? null : completeProfile && headerDetails ? (
           <ProfileHeader
             avatarUrl={completeProfile.profile.avatar_url}
             badges={headerDetails.badges}
@@ -847,7 +910,7 @@ export default function ProfileScreen() {
         ) : null}
 
         {isLoading ? (
-          role === "coach" || role === "staff" ? (
+          role === "coach" || role === "staff" || role === "director" ? (
             /*
               Scheletro al posto del testo di attesa (REV-PROF-03, "Loading"):
               l'ingombro e' gia' quello della pagina finale, quindi l'arrivo dei
@@ -894,12 +957,19 @@ export default function ProfileScreen() {
             onManageMedia={() => handleManageAgentMedia()}
           />
         ) : completeProfile && role === "director" ? (
+          /*
+            `onAddExperience` resta scollegato finche non esiste il modulo
+            Gestione carriera Dirigente, che ha una task propria: meglio un
+            empty state senza CTA che una CTA che non porta da nessuna parte.
+          */
           <DirectorProfileTabView
             completeProfile={completeProfile}
             isOwner
             onDeleteMedia={handleDeleteDirectorMedia}
             onEditMedia={(itemId) => handleManageDirectorMedia(itemId)}
+            onEditProfile={() => handleEdit("bio")}
             onManageMedia={() => handleManageDirectorMedia()}
+            onOpenClub={handleOpenAffiliateClub}
             onOpenLinkedTarget={handleOpenDirectorLinkedTarget}
             onToggleMediaFeatured={handleToggleDirectorMediaFeatured}
           />
@@ -1154,12 +1224,6 @@ const styles = StyleSheet.create({
   },
   moreButtonPressed: {
     opacity: 0.7,
-  },
-  directorScreen: {
-    backgroundColor: "#F7FAFD",
-  },
-  directorScrollContent: {
-    backgroundColor: "#F7FAFD",
   },
   screen: {
     flex: 1,

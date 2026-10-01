@@ -41,6 +41,38 @@ export const DIRECTOR_RESPONSIBILITY_CHIP_OPTIONS: {
 }));
 
 /**
+ * Icona di un'area di responsabilità (REV-PROF-09, Screen 4).
+ *
+ * Accompagna l'etichetta, non la sostituisce: nessuna informazione passa dalla
+ * sola icona. Un'area salvata prima della review e non più fra le opzioni
+ * ricade sull'icona neutra invece di restare senza.
+ */
+const DIRECTOR_RESPONSIBILITY_ICONS: Record<
+  string,
+  keyof typeof Ionicons.glyphMap
+> = {
+  "Area legale": "document-text-outline",
+  Altro: "ellipsis-horizontal-outline",
+  "Budget e finanze": "stats-chart-outline",
+  "Comunicazione e sponsor": "megaphone-outline",
+  "Gestione allenatori e staff": "clipboard-outline",
+  "Gestione rose e contratti": "people-outline",
+  "Mercato calciatori": "swap-horizontal-outline",
+  "Organizzazione logistica": "calendar-outline",
+  "Relazioni con la federazione": "business-outline",
+  "Scouting e osservazione": "search-outline",
+  "Settore giovanile": "school-outline",
+};
+
+export function getDirectorResponsibilityIcon(
+  responsibility: string,
+): keyof typeof Ionicons.glyphMap {
+  return (
+    DIRECTOR_RESPONSIBILITY_ICONS[responsibility.trim()] ?? "grid-outline"
+  );
+}
+
+/**
  * §L: scelta singola resa a card, non tre toggle indipendenti.
  */
 export const DIRECTOR_FOCUS_CARD_OPTIONS: {

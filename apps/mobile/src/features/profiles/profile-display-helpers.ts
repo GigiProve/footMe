@@ -228,6 +228,59 @@ export function buildAvailabilityZonesLabel(
   return null;
 }
 
+/**
+ * Macroarea geografica di una regione italiana (REV-PROF-09, "Area
+ * operativa").
+ *
+ * Serve a dare alla regione dichiarata un contesto piu ampio — "Sicilia,
+ * Isole" — senza chiedere all'utente un secondo dato che non esiste nel
+ * modello. Una regione fuori elenco non produce nessuna macroarea: meglio una
+ * riga piu corta di una classificazione inventata.
+ */
+const REGION_MACRO_AREAS: Record<string, string> = {
+  Abruzzo: "Centro Italia",
+  Basilicata: "Sud Italia",
+  Calabria: "Sud Italia",
+  Campania: "Sud Italia",
+  "Emilia-Romagna": "Nord Italia",
+  "Friuli-Venezia Giulia": "Nord Italia",
+  Lazio: "Centro Italia",
+  Liguria: "Nord Italia",
+  Lombardia: "Nord Italia",
+  Marche: "Centro Italia",
+  Molise: "Sud Italia",
+  Piemonte: "Nord Italia",
+  Puglia: "Sud Italia",
+  Sardegna: "Isole",
+  Sicilia: "Isole",
+  Toscana: "Centro Italia",
+  "Trentino-Alto Adige": "Nord Italia",
+  Umbria: "Centro Italia",
+  "Valle d'Aosta": "Nord Italia",
+  Veneto: "Nord Italia",
+};
+
+/**
+ * Area operativa in formato compatto: "Sicilia, Isole".
+ *
+ * Nessuna regione dichiarata: si ricade sulla localita pubblica gia mostrata
+ * altrove nel profilo, e se non c'e nemmeno quella la riga non esiste.
+ */
+export function buildOperatingAreaLabel(
+  region: string | null | undefined,
+  fallbackLocation?: string | null,
+): string | null {
+  const normalizedRegion = region?.trim();
+
+  if (!normalizedRegion) {
+    return fallbackLocation?.trim() || null;
+  }
+
+  const macroArea = REGION_MACRO_AREAS[normalizedRegion];
+
+  return macroArea ? `${normalizedRegion}, ${macroArea}` : normalizedRegion;
+}
+
 // ────────────────────────────────
 // Elenchi e disponibilita (REV-PROF-03)
 // ────────────────────────────────

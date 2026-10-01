@@ -105,6 +105,12 @@ vi.mock("./profile-edit-helpers", () => ({
     statusBadge: "Licenza FIGC",
   }),
   buildCoachProfileHeaderDetails: () => null,
+  buildDirectorProfileHeaderDetails: () => ({
+    fullName: "Marco Rossi",
+    isVerified: false,
+    primaryRole: "Direttore sportivo",
+    quickFacts: [],
+  }),
   buildHeaderDetails: () => null,
   buildPlayerProfileHeaderDetails: () => null,
   buildStaffProfileHeaderDetails: () => null,
@@ -179,6 +185,7 @@ vi.mock("./ProfileReadonlyView", () => ({
 
 vi.mock("./profile-screen-components", () => ({
   CoachProfileHeader: () => React.createElement("CoachProfileHeader"),
+  DirectorProfileHeader: () => React.createElement("DirectorProfileHeader"),
   PlayerProfileHeader: () => React.createElement("PlayerProfileHeader"),
   ProfileHeader: () => React.createElement("ProfileHeader"),
   StaffProfileHeader: () => React.createElement("StaffProfileHeader"),

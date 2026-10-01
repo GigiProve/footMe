@@ -64,16 +64,38 @@ type MediaTabContentProps = {
   initialItems?: MediaContentItem[];
   mode: MediaViewerMode;
   onAddContentPress?: () => void;
-  /** Apre l'editor del contenuto. Assente per il Visitor. */
-  onEditContentPress?: () => void;
+  /**
+   * Elimina il contenuto sul serio (REV-PROF-09). Senza handler la griglia
+   * resta sul comportamento storico, cioè toglie la riga dallo stato locale:
+   * chi persiste passa di qui, chi non lo fa ancora non cambia.
+   */
+  onDeleteContentPress?: (itemId: string) => void;
+  /**
+   * Apre l'editor del contenuto. Assente per il Visitor. Riceve l'id del
+   * contenuto aperto nel viewer, per gli editor che lavorano su una riga sola.
+   */
+  onEditContentPress?: (itemId?: string) => void;
   onFilterChange?: (filter: MediaFilter) => void;
   onItemOpened?: (item: MediaContentItem) => void;
+  /** Apre il profilo o la società collegati al contenuto. */
+  onOpenLinkedTarget?: (target: MediaLinkedTarget) => void;
   onOpenTaggedItem?: (ref: { contentType: string; postId: string }) => void;
+  /** Persiste l'evidenza. Vedi `onDeleteContentPress` per il fallback. */
+  onToggleFeaturedPress?: (itemId: string) => void;
 };
 
 type MediaContentTag = {
   icon: ComponentProps<typeof Ionicons>["name"];
   label: string;
+};
+
+/** Profilo o società collegati a un contenuto, quando la sorgente li porta. */
+export type MediaLinkedTarget = {
+  avatar_url: string | null;
+  display_name: string;
+  subtitle: string | null;
+  target_id: string;
+  target_type: "profile" | "club";
 };
 
 type MediaComment = {
@@ -94,6 +116,8 @@ export type MediaContentItem = {
   isLiked: boolean;
   isSaved: boolean;
   likeCount: number;
+  /** Profili e società collegati al contenuto in fase di pubblicazione. */
+  linkedTargets?: readonly MediaLinkedTarget[];
   tag?: MediaContentTag;
   /** Durata del video in secondi, quando la sorgente la conosce (§23). */
   durationSeconds?: number;
@@ -112,10 +136,13 @@ export function MediaTabContent({
   initialItems = [],
   mode,
   onAddContentPress,
+  onDeleteContentPress,
   onEditContentPress,
   onFilterChange,
   onItemOpened,
+  onOpenLinkedTarget,
   onOpenTaggedItem,
+  onToggleFeaturedPress,
 }: MediaTabContentProps) {
   const [items, setItems] = useState(initialItems);
   const [filter, setFilter] = useState<MediaFilter>("all");
@@ -239,6 +266,11 @@ export function MediaTabContent({
   }
 
   function handleToggleFeatured(itemId: string) {
+    if (onToggleFeaturedPress) {
+      onToggleFeaturedPress(itemId);
+      return;
+    }
+
     setItems((currentItems) =>
       currentItems.map((item) =>
         item.id === itemId
@@ -249,6 +281,17 @@ export function MediaTabContent({
   }
 
   function handleDeleteItem(itemId: string) {
+    /*
+      Con un handler di persistenza il viewer si chiude e la decisione passa
+      al chiamante, che può chiedere conferma e ricaricare: togliere la riga
+      qui mostrerebbe un'eliminazione che il backend non ha ancora accettato.
+    */
+    if (onDeleteContentPress) {
+      handleCloseViewer();
+      onDeleteContentPress(itemId);
+      return;
+    }
+
     setItems((currentItems) => currentItems.filter((item) => item.id !== itemId));
     if (selectedItemId === itemId) {
       handleCloseViewer();
@@ -296,7 +339,7 @@ export function MediaTabContent({
     }
 
     setSelectedItemId(null);
-    onEditContentPress?.();
+    onEditContentPress?.(currentItem.id);
   }
 
   function handleOpenComments() {
@@ -576,6 +619,42 @@ export function MediaTabContent({
                     <AppText color="inverse" style={styles.viewerStats} variant="caption">
                       {`Piace a ${formatCount(item.likeCount)} persone • ${item.commentCount} commenti`}
                     </AppText>
+
+                    {item.linkedTargets && item.linkedTargets.length > 0 ? (
+                      <View style={styles.viewerLinkedList}>
+                        {item.linkedTargets.map((target) => (
+                          <Pressable
+                            accessibilityLabel={`Apri ${target.display_name}`}
+                            accessibilityRole="button"
+                            disabled={!onOpenLinkedTarget}
+                            key={`${item.id}-${target.target_type}-${target.target_id}`}
+                            onPress={() => onOpenLinkedTarget?.(target)}
+                            style={({ pressed }) => [
+                              styles.viewerLinkedItem,
+                              pressed ? styles.pressed : null,
+                            ]}
+                          >
+                            <Ionicons
+                              color={colors.inkInvert}
+                              name={
+                                target.target_type === "club"
+                                  ? "business-outline"
+                                  : "person-outline"
+                              }
+                              size={14}
+                            />
+                            <AppText
+                              color="inverse"
+                              numberOfLines={1}
+                              style={styles.viewerLinkedLabel}
+                              variant="caption"
+                            >
+                              {target.display_name}
+                            </AppText>
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : null}
 
                     <View style={styles.commentsPreview}>
                       {item.comments.length > 0 ? (
@@ -871,6 +950,27 @@ const styles = StyleSheet.create({
   },
   viewerImage: {
     ...StyleSheet.absoluteFill,
+  },
+  viewerLinkedItem: {
+    alignItems: "center",
+    borderColor: "rgba(255,255,255,0.45)",
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: spacing[6],
+    maxWidth: "100%",
+    minHeight: 32,
+    paddingHorizontal: spacing[10],
+  },
+  viewerLinkedLabel: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  viewerLinkedList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
+    marginTop: spacing[10],
   },
   viewerOverlay: {
     ...StyleSheet.absoluteFill,

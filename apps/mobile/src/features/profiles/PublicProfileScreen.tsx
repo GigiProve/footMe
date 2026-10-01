@@ -18,6 +18,7 @@ import { AgentProfileHeader } from "./AgentProfileHeader";
 import {
   buildAgentProfileHeaderDetails,
   buildCoachProfileHeaderDetails,
+  buildDirectorProfileHeaderDetails,
   buildHeaderDetails,
   buildPlayerProfileHeaderDetails,
   buildStaffProfileHeaderDetails,
@@ -25,6 +26,7 @@ import {
 import { ProfileReadonlyView } from "./ProfileReadonlyView";
 import {
   CoachProfileHeader,
+  DirectorProfileHeader,
   PlayerProfileHeader,
   ProfileHeader,
   StaffProfileHeader,
@@ -45,10 +47,9 @@ import { ProfileTabView } from "./career/ProfileTabView";
 import { StaffProfileTabView } from "./career/StaffProfileTabView";
 import { AgentProfileTabView } from "./career/AgentProfileTabView";
 import { DirectorProfileTabView } from "./career/DirectorProfileTabView";
-import type { DirectorMediaLinkedTarget } from "./director-media";
+import type { MediaLinkedTarget } from "./career/MediaTabContent";
 import { FanProfileView } from "./FanProfileView";
 import { MediaProfileView } from "./MediaProfileView";
-import { requestConnection } from "../networking/networking-service";
 import { openDirectConversation } from "../messaging/messaging-service";
 import {
   fetchPlayerAgent,
@@ -86,7 +87,7 @@ export function PublicProfileScreen() {
     useState<CompleteProfessionalProfile | null>(null);
   const [profileAction, setProfileAction] = useState<{
     profileId: string;
-    type: "connect" | "message";
+    type: "message";
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -172,6 +173,11 @@ export function PublicProfileScreen() {
       completeProfile ? buildStaffProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
+  const directorHeaderDetails = useMemo(
+    () =>
+      completeProfile ? buildDirectorProfileHeaderDetails(completeProfile) : null,
+    [completeProfile],
+  );
 
   // Una sola visualizzazione per profilo aperto: un rebuild o un cambio tab
   // non devono rimandare lo stesso evento (§42).
@@ -192,7 +198,10 @@ export function PublicProfileScreen() {
   useEffect(() => {
     const role = completeProfile?.profile.role;
 
-    if (!viewedProfileId || (role !== "coach" && role !== "staff")) {
+    if (
+      !viewedProfileId ||
+      (role !== "coach" && role !== "staff" && role !== "director")
+    ) {
       return;
     }
 
@@ -208,6 +217,7 @@ export function PublicProfileScreen() {
     playerHeaderDetails?.primaryRole ??
     coachHeaderDetails?.primaryRole ??
     staffHeaderDetails?.primaryRole ??
+    directorHeaderDetails?.primaryRole ??
     agentHeaderDetails?.primaryRole ??
     "";
 
@@ -411,22 +421,6 @@ export function PublicProfileScreen() {
     });
   }
 
-  async function handleConnectToProfile(targetProfile: CompleteProfessionalProfile) {
-    try {
-      setProfileAction({ profileId: targetProfile.profile.id, type: "connect" });
-      await requestConnection(targetProfile.profile.id);
-      Alert.alert("Richiesta inviata", "La richiesta di collegamento e' stata inviata.");
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Errore durante l'invio della richiesta.";
-      Alert.alert("Connessione non inviata", message);
-    } finally {
-      setProfileAction(null);
-    }
-  }
-
   async function handleMessageProfile(targetProfile: CompleteProfessionalProfile) {
     try {
       setProfileAction({ profileId: targetProfile.profile.id, type: "message" });
@@ -482,7 +476,7 @@ export function PublicProfileScreen() {
     }
   }
 
-  function handleOpenDirectorLinkedTarget(target: DirectorMediaLinkedTarget) {
+  function handleOpenDirectorLinkedTarget(target: MediaLinkedTarget) {
     if (target.target_type === "club") {
       router.push(`/club/${target.target_id}` as never);
       return;
@@ -511,11 +505,14 @@ export function PublicProfileScreen() {
     return <Redirect href="/(tabs)/profile" />;
   }
 
-  const isDirectorProfile = completeProfile?.profile.role === "director";
-
   return (
-    <SafeAreaView style={[styles.screen, isDirectorProfile ? styles.directorScreen : null]}>
-      <View style={[styles.topBar, isDirectorProfile ? styles.directorTopBar : null]}>
+    /*
+      REV-PROF-09: il Dirigente non ha piu' una superficie, una app bar e un
+      titolo propri. La schermata del Visitor e' una sola per tutte le
+      tipologie, come i Master Profile gia' approvati.
+    */
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.topBar}>
         <Pressable
           accessibilityLabel="Torna indietro"
           accessibilityRole="button"
@@ -523,17 +520,11 @@ export function PublicProfileScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons
-            color={isDirectorProfile ? "#061223" : colors.textPrimary}
-            name="chevron-back"
-            size={20}
-          />
+          <Ionicons color={colors.textPrimary} name="chevron-back" size={20} />
         </Pressable>
-        <AppText style={isDirectorProfile ? styles.directorTopBarTitle : null} variant="titleSm">
+        <AppText variant="titleSm">
           {completeProfile
-            ? isDirectorProfile
-              ? completeProfile.profile.full_name
-              : getProfileViewerTitle(completeProfile.profile.role as AppRole)
+            ? getProfileViewerTitle(completeProfile.profile.role as AppRole)
             : "Profilo"}
         </AppText>
         {canFollowOrSave ? (
@@ -551,13 +542,7 @@ export function PublicProfileScreen() {
               ]}
             >
               <Ionicons
-                color={
-                  isProfileSaved
-                    ? colors.accent
-                    : isDirectorProfile
-                      ? "#061223"
-                      : colors.textPrimary
-                }
+                color={isProfileSaved ? colors.accent : colors.textPrimary}
                 name={isProfileSaved ? "bookmark" : "bookmark-outline"}
                 size={22}
               />
@@ -573,7 +558,7 @@ export function PublicProfileScreen() {
               ]}
             >
               <Ionicons
-                color={isDirectorProfile ? "#061223" : colors.textPrimary}
+                color={colors.textPrimary}
                 name="ellipsis-horizontal"
                 size={22}
               />
@@ -607,6 +592,7 @@ export function PublicProfileScreen() {
               completeProfile={completeProfile}
               agentHeaderDetails={agentHeaderDetails}
               coachHeaderDetails={coachHeaderDetails}
+              directorHeaderDetails={directorHeaderDetails}
               headerDetails={headerDetails}
               isFollowed={isFollowed}
               isMessaging={
@@ -658,19 +644,11 @@ export function PublicProfileScreen() {
             <ProfileContentBlock
               completeProfile={completeProfile}
               onOpenClub={handleOpenFavoriteClub}
-              isConnecting={
-                profileAction?.profileId === completeProfile.profile.id &&
-                profileAction.type === "connect"
-              }
-              isFollowed={isFollowed}
               isMessaging={
                 profileAction?.profileId === completeProfile.profile.id &&
                 profileAction.type === "message"
               }
-              isProfileSaved={isProfileSaved}
               isRepresentationLoading={isRepresentationLoading}
-              onConnect={() => handleConnectToProfile(completeProfile)}
-              onFollowPress={canFollowOrSave ? handleToggleFollow : undefined}
               onMessage={() => handleMessageProfile(completeProfile)}
               onOpenDirectorLinkedTarget={handleOpenDirectorLinkedTarget}
               onOpenFavoriteClub={handleOpenFavoriteClub}
@@ -757,6 +735,7 @@ function ProfileHeaderBlock({
   completeProfile,
   agentHeaderDetails,
   coachHeaderDetails,
+  directorHeaderDetails,
   headerDetails,
   isFollowed,
   isMessaging,
@@ -774,6 +753,7 @@ function ProfileHeaderBlock({
   completeProfile: CompleteProfessionalProfile;
   agentHeaderDetails: ReturnType<typeof buildAgentProfileHeaderDetails>;
   coachHeaderDetails: ReturnType<typeof buildCoachProfileHeaderDetails>;
+  directorHeaderDetails: ReturnType<typeof buildDirectorProfileHeaderDetails>;
   headerDetails: ReturnType<typeof buildHeaderDetails> | null;
   isFollowed: boolean;
   isMessaging?: boolean;
@@ -884,8 +864,27 @@ function ProfileHeaderBlock({
     );
   }
 
-  if (role === "director") {
-    return null;
+  if (role === "director" && directorHeaderDetails) {
+    return (
+      <DirectorProfileHeader
+        availabilityLabel={directorHeaderDetails.availabilityLabel}
+        avatarUrl={completeProfile.profile.avatar_url}
+        clubLabel={directorHeaderDetails.clubLabel}
+        coverImageUrl={completeProfile.profile.cover_url}
+        fullName={directorHeaderDetails.fullName}
+        isFollowed={isFollowed}
+        isMessaging={isMessaging}
+        isVerified={directorHeaderDetails.isVerified}
+        locationLabel={directorHeaderDetails.locationLabel}
+        mode="visitor"
+        onFollowPress={onFollowPress}
+        onMessagePress={onContactPress}
+        onMorePress={onMorePress}
+        onSharePress={onSharePress}
+        primaryRole={directorHeaderDetails.primaryRole}
+        quickFacts={directorHeaderDetails.quickFacts}
+      />
+    );
   }
 
   if (role === "fan") {
@@ -915,15 +914,9 @@ function ProfileHeaderBlock({
 
 function ProfileContentBlock({
   completeProfile,
-  isConnecting = false,
-  isFollowed = false,
   isMessaging = false,
-  isProfileSaved = false,
   isRepresentationLoading = false,
-  onConnect,
-  onFollowPress,
   onMessage,
-  onSavePress,
   onOpenClub,
   onOpenDirectorLinkedTarget,
   onOpenFavoriteClub,
@@ -937,17 +930,11 @@ function ProfileContentBlock({
   viewerRole,
 }: {
   completeProfile: CompleteProfessionalProfile;
-  isConnecting?: boolean;
-  isFollowed?: boolean;
   isMessaging?: boolean;
-  isProfileSaved?: boolean;
   isRepresentationLoading?: boolean;
-  onConnect?: () => void;
-  onFollowPress?: () => void;
   onMessage?: () => void;
-  onSavePress?: () => void;
   onOpenClub?: (clubId: string) => void;
-  onOpenDirectorLinkedTarget?: (target: DirectorMediaLinkedTarget) => void;
+  onOpenDirectorLinkedTarget?: (target: MediaLinkedTarget) => void;
   onOpenFavoriteClub?: (clubId: string) => void;
   onOpenPlayerProfile?: (profileId: string) => void;
   onRequestRepresentation?: () => void;
@@ -1105,18 +1092,17 @@ function ProfileContentBlock({
 
   if (role === "director") {
     return (
+      /*
+        Stesso corpo dell'Owner. Segui, Messaggio, Condividi e il menu
+        contestuale vivono nell'header condiviso, non qui dentro: al Visitor
+        non arriva nessun handler di modifica, quindi nessun controllo Owner
+        può essere renderizzato.
+      */
       <DirectorProfileTabView
         completeProfile={completeProfile}
-        isConnecting={isConnecting}
-        isFollowed={isFollowed}
-        isMessaging={isMessaging}
         isOwner={false}
-        isSaved={isProfileSaved}
-        onConnect={onConnect}
-        onFollowPress={onFollowPress}
-        onMessage={onMessage}
+        onOpenClub={onOpenClub}
         onOpenLinkedTarget={onOpenDirectorLinkedTarget}
-        onSavePress={onSavePress}
       />
     );
   }
@@ -1221,16 +1207,6 @@ const styles = StyleSheet.create({
   },
   topBarIconPressed: {
     opacity: 0.6,
-  },
-  directorScreen: {
-    backgroundColor: "#F7FAFD",
-  },
-  directorTopBar: {
-    backgroundColor: "#F7FAFD",
-    borderBottomColor: "#00000014",
-  },
-  directorTopBarTitle: {
-    color: "#061223",
   },
   representationActions: {
     flexDirection: "row",

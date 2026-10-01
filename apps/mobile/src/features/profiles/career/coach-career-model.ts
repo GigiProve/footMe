@@ -158,8 +158,31 @@ function toAbsoluteMonth(year: number, month: number): number {
   return year * 12 + month;
 }
 
+/**
+ * Un incarico espresso come periodo, non come stagioni.
+ *
+ * Basta la data di inizio: un periodo ancora aperto non ha una data di fine e
+ * fino a REV-PROF-09 finiva qui dentro come "periodo assente", quindi usciva
+ * dalla carriera senza stagioni, senza etichetta e senza mai risultare in
+ * corso. La fine mancante significa "oggi", non "mai iniziato".
+ */
 function hasCustomPeriod(entry: CareerEntryLike): boolean {
-  return Boolean(entry.period_start_year && entry.period_end_year);
+  return Boolean(entry.period_start_year);
+}
+
+/** Fine effettiva del periodo: la data salvata, oppure adesso se è aperto. */
+function resolvePeriodEnd(
+  entry: CareerEntryLike,
+  now: Date,
+): { month: number; year: number } {
+  if (entry.period_end_year) {
+    return {
+      month: monthToNumber(entry.period_end_month) ?? 6,
+      year: entry.period_end_year,
+    };
+  }
+
+  return { month: now.getMonth() + 1, year: now.getFullYear() };
 }
 
 /**
@@ -167,7 +190,7 @@ function hasCustomPeriod(entry: CareerEntryLike): boolean {
  * deriva dai suoi anni: è una derivazione dichiarata, non un dato inventato,
  * e serve solo a dare una riga per anno sportivo coperto.
  */
-function resolveSeasonKeys(entry: CareerEntryLike): string[] {
+function resolveSeasonKeys(entry: CareerEntryLike, now: Date): string[] {
   const saved = entry.seasons.filter((season) => Boolean(season?.trim()));
 
   if (saved.length > 0) {
@@ -178,10 +201,11 @@ function resolveSeasonKeys(entry: CareerEntryLike): string[] {
     return [];
   }
 
+  const periodEnd = resolvePeriodEnd(entry, now);
   const startYear = entry.period_start_year as number;
-  const endYear = entry.period_end_year as number;
+  const endYear = periodEnd.year;
   const startMonth = monthToNumber(entry.period_start_month) ?? 7;
-  const endMonth = monthToNumber(entry.period_end_month) ?? 6;
+  const endMonth = periodEnd.month;
   // Luglio apre la stagione sportiva: un periodo che inizia prima appartiene
   // ancora alla stagione cominciata l'anno precedente.
   const firstSeason = startMonth >= 7 ? startYear : startYear - 1;
@@ -200,11 +224,11 @@ function resolveSeasonKeys(entry: CareerEntryLike): string[] {
   return keys;
 }
 
-function toCoachSeasons(entry: CareerEntryLike): CoachCareerSeason[] {
+function toCoachSeasons(entry: CareerEntryLike, now: Date): CoachCareerSeason[] {
   const fallbackCategory = entry.category?.trim() ?? "";
   const fallbackRole = entry.role?.trim() ?? "";
 
-  return resolveSeasonKeys(entry)
+  return resolveSeasonKeys(entry, now)
     .map((seasonKey) => {
       // Il dettaglio per stagione è la source of truth di ruolo e categoria:
       // nella stessa società l'incarico può cambiare da una stagione all'altra.
@@ -265,13 +289,14 @@ type ExperienceBounds = {
 function buildBounds(
   entry: CareerEntryLike,
   seasons: CoachCareerSeason[],
+  now: Date,
 ): ExperienceBounds {
   if (hasCustomPeriod(entry)) {
+    const periodEnd = resolvePeriodEnd(entry, now);
     const startMonth = monthToNumber(entry.period_start_month) ?? 7;
-    const endMonth = monthToNumber(entry.period_end_month) ?? 6;
 
     return {
-      end: toAbsoluteMonth(entry.period_end_year as number, endMonth),
+      end: toAbsoluteMonth(periodEnd.year, periodEnd.month),
       start: toAbsoluteMonth(entry.period_start_year as number, startMonth),
     };
   }
@@ -296,8 +321,8 @@ function toCoachExperience(
   currentSeasonKey: string,
   now: Date,
 ): CoachCareerExperience & { bounds: ExperienceBounds } {
-  const seasons = toCoachSeasons(entry);
-  const bounds = buildBounds(entry, seasons);
+  const seasons = toCoachSeasons(entry, now);
+  const bounds = buildBounds(entry, seasons, now);
   const nowMonth = toAbsoluteMonth(now.getFullYear(), now.getMonth() + 1);
   const isCurrent =
     hasCustomPeriod(entry) && entry.seasons.length === 0
