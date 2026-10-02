@@ -1148,17 +1148,18 @@ export function buildDirectorProfileHeaderDetails(
       .join(" · ") || undefined;
 
   /*
-    Il Dirigente non ha un interruttore "cerco lavoro": ha quattro preferenze
-    di contatto (REV-ONB-07 §M). Almeno una accesa vale come disponibilita
-    pubblica; spente tutte la riga sparisce del tutto, invece di diventare uno
-    stato negativo che il prodotto non prevede. I destinatari restano nei
+    Due condizioni, non una (REV-PROF-11): l'interruttore di disponibilita e
+    almeno un destinatario. Spegnere l'interruttore non cancella i destinatari
+    — si ritrovano riaccendendolo — quindi da solo il secondo dato non basta
+    piu a dire se il profilo e disponibile. I destinatari restano nei
     Dettagli: l'header dice che c'e disponibilita, non per chi.
   */
   const isOpenToOpportunities = Boolean(
-    data.directorProfile?.open_to_clubs ||
-      data.directorProfile?.open_to_staff ||
-      data.directorProfile?.open_to_players ||
-      data.directorProfile?.open_to_others,
+    data.directorProfile?.open_to_work &&
+      (data.directorProfile?.open_to_clubs ||
+        data.directorProfile?.open_to_staff ||
+        data.directorProfile?.open_to_players ||
+        data.directorProfile?.open_to_others),
   );
 
   return {

@@ -51,10 +51,23 @@ import { useUnsavedChangesGuard } from "../use-unsaved-changes-guard";
 type InternalScreen = "main" | "regions" | "provinces";
 
 export type OpportunitiesDraft = {
+  /**
+   * Destinatari selezionati (REV-PROF-11). Vuoto per i ruoli che non li
+   * raccolgono: senza `audienceOptions` il campo non viene né mostrato né
+   * validato.
+   */
+  audiences: string[];
   availability: GeographicAvailabilityDraft;
   /** "" = "Da subito". Altrimenti "YYYY-MM", il formato canonico del profilo. */
   availableFrom: string;
   isAvailable: boolean;
+};
+
+/** Una riga di "Disponibile per". L'elenco arriva dalla tassonomia del ruolo. */
+export type ProfileOpportunitiesAudience = {
+  description?: string;
+  label: string;
+  value: string;
 };
 
 const GENERIC_SAVE_ERROR =
@@ -95,7 +108,15 @@ function buildAvailableFromOptions(now: Date) {
   return options;
 }
 
-export type ProfileOpportunitiesConfig = {
+export type ProfileOpportunitiesConfig<TPatch = Partial<ProfileFormState>> = {
+  /**
+   * Destinatari della disponibilità (REV-PROF-11). Assenti: la sezione non
+   * esiste e nessuna validazione la pretende, che è il caso di Allenatore e
+   * Staff tecnico.
+   */
+  audienceOptions?: readonly ProfileOpportunitiesAudience[];
+  /** Titolo della sezione destinatari. */
+  audienceTitle?: string;
   /** Descrizione sotto il toggle. */
   availabilityDescription: string;
   /** Etichetta del toggle: "nuova squadra" per l'Allenatore, "nuove collaborazioni" per lo Staff. */
@@ -103,29 +124,39 @@ export type ProfileOpportunitiesConfig = {
   /** Legge la disponibilità corrente dal profilo canonico. */
   read: (data: CompleteProfessionalProfile) => OpportunitiesDraft;
   profileType: string;
+  /** Azione del riepilogo territoriale. */
+  recapActionLabel?: string;
+  /** Titolo del riepilogo territoriale. */
+  recapTitle?: string;
+  /** Titolo della modalità a regioni: il Dirigente parla di "aree". */
+  regionsModeTitle?: string;
+  /** Alcuni ruoli non raccolgono "Disponibile da". */
+  showAvailableFrom?: boolean;
   testIDPrefix: string;
   /** Traduce la bozza nei campi dello stato condiviso del proprio ruolo. */
   write: (
     draft: OpportunitiesDraft,
     active: { provinces: string[]; regions: string[] },
-  ) => Partial<ProfileFormState>;
+  ) => TPatch;
+  /** Titolo della sezione geografica. */
+  zonesTitle?: string;
 };
 
-type ProfileOpportunitiesScreenProps = {
-  config: ProfileOpportunitiesConfig;
+type ProfileOpportunitiesScreenProps<TPatch> = {
+  config: ProfileOpportunitiesConfig<TPatch>;
   data: CompleteProfessionalProfile | undefined;
   isError: boolean;
   isPending: boolean;
   onRetry: () => void;
   onSave: (
     data: CompleteProfessionalProfile,
-    patch: Partial<ProfileFormState>,
+    patch: TPatch,
     handlers: { onError: (error: Error) => void; onSuccess: () => void },
   ) => void;
   saving: boolean;
 };
 
-export function ProfileOpportunitiesScreen({
+export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
   config,
   data,
   isError,
@@ -133,14 +164,21 @@ export function ProfileOpportunitiesScreen({
   onRetry,
   onSave,
   saving,
-}: ProfileOpportunitiesScreenProps) {
+}: ProfileOpportunitiesScreenProps<TPatch>) {
   const {
+    audienceOptions,
+    audienceTitle = "Disponibile per",
     availabilityDescription,
     availabilityLabel,
     profileType,
     read,
+    recapActionLabel = "Modifica zone",
+    recapTitle = "Zone selezionate",
+    regionsModeTitle = "In una o più regioni",
+    showAvailableFrom = true,
     testIDPrefix,
     write,
+    zonesTitle = "Disponibilità geografica",
   } = config;
 
   const initialForm = useMemo<OpportunitiesDraft | null>(
@@ -217,6 +255,15 @@ export function ProfileOpportunitiesScreen({
     }
 
     if (form.isAvailable) {
+      /*
+        Una disponibilità accesa senza destinatari non dice niente a nessuno:
+        il profilo risulterebbe disponibile e invisibile insieme.
+      */
+      if (audienceOptions && form.audiences.length === 0) {
+        setErrorMessage("Seleziona almeno un destinatario.");
+        return;
+      }
+
       const availabilityError = getAvailabilityErrorMessage(form.availability);
 
       if (availabilityError) {
@@ -342,19 +389,46 @@ export function ProfileOpportunitiesScreen({
           */}
           {form.isAvailable ? (
             <>
-              <OnboardingSelectField
-                label="Disponibile da"
-                onChange={(value) => patch({ availableFrom: value })}
-                options={availableFromOptions}
-                placeholder="Da subito"
-                searchable
-                sheetTitle="Disponibile da"
-                testID={`${testIDPrefix}-opportunities-available-from`}
-                value={form.availableFrom}
-              />
+              {showAvailableFrom ? (
+                <OnboardingSelectField
+                  label="Disponibile da"
+                  onChange={(value) => patch({ availableFrom: value })}
+                  options={availableFromOptions}
+                  placeholder="Da subito"
+                  searchable
+                  sheetTitle="Disponibile da"
+                  testID={`${testIDPrefix}-opportunities-available-from`}
+                  value={form.availableFrom}
+                />
+              ) : null}
+
+              {audienceOptions ? (
+                <View style={styles.zones}>
+                  <AppText variant="titleSm">{audienceTitle}</AppText>
+
+                  {audienceOptions.map((option) => (
+                    <ToggleRow
+                      description={option.description}
+                      key={option.value}
+                      label={option.label}
+                      onValueChange={(value) =>
+                        patch({
+                          audiences: value
+                            ? [...form.audiences, option.value]
+                            : form.audiences.filter(
+                                (entry) => entry !== option.value,
+                              ),
+                        })
+                      }
+                      testID={`${testIDPrefix}-opportunities-audience-${option.value}`}
+                      value={form.audiences.includes(option.value)}
+                    />
+                  ))}
+                </View>
+              ) : null}
 
               <View style={styles.zones}>
-                <AppText variant="titleSm">Disponibilità geografica</AppText>
+                <AppText variant="titleSm">{zonesTitle}</AppText>
 
                 <AvailabilityModeCard
                   affordance="direct"
@@ -376,7 +450,7 @@ export function ProfileOpportunitiesScreen({
                     "regione",
                   )}
                   testID={`${testIDPrefix}-opportunities-mode-regions`}
-                  title="In una o più regioni"
+                  title={regionsModeTitle}
                 />
                 <AvailabilityModeCard
                   affordance="drilldown"
@@ -404,14 +478,14 @@ export function ProfileOpportunitiesScreen({
                 >
                   <View style={styles.recapText}>
                     <AppText color="secondary" variant="eyebrow">
-                      Zone selezionate
+                      {recapTitle}
                     </AppText>
                     <AppText variant="bodySm">
                       {zonesLabel ?? "Nessuna zona selezionata"}
                     </AppText>
                   </View>
                   <Button
-                    label="Modifica zone"
+                    label={recapActionLabel}
                     onPress={() =>
                       setScreen(
                         form.availability.mode === "REGIONS"

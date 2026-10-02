@@ -363,6 +363,10 @@ function buildDirectorProfile(): CompleteProfessionalProfile {
     ...profile,
     agentProfile: null,
     directorProfile: {
+      availability_type: null,
+      open_to_work: true,
+      preferred_provinces: [],
+      preferred_regions: [],
       career_entries: [],
       coach_career_entries: [],
       club_types: ["Societa dilettantistica"],

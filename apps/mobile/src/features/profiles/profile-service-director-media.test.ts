@@ -106,6 +106,10 @@ describe("director media profile service", () => {
   it("loads director media items from director profile", async () => {
     mocks.directorMaybeSingleMock.mockResolvedValue({
       data: {
+        availability_type: null,
+        open_to_work: true,
+        preferred_provinces: [],
+        preferred_regions: [],
         career_entries: [],
         coach_career_entries: [],
         club_types: ["Societa dilettantistica"],
@@ -183,6 +187,10 @@ describe("director media profile service", () => {
   it("persists director media items through director_profiles upsert", async () => {
     await saveDirectorProfileMedia({
       directorProfile: {
+        availability_type: null,
+        open_to_work: true,
+        preferred_provinces: [],
+        preferred_regions: [],
         career_entries: [],
         coach_career_entries: [],
         club_types: [],
@@ -224,6 +232,16 @@ describe("director media profile service", () => {
     });
 
     expect(mocks.directorProfilesUpsertMock).toHaveBeenCalledWith({
+      /*
+        REV-PROF-11: l'upsert riscrive la riga intera, quindi disponibilità e
+        area operativa devono ripassare anche salvando solo i media. Se un
+        giorno sparissero da qui, salvare un contenuto azzererebbe le
+        Opportunità del profilo.
+      */
+      availability_type: null,
+      open_to_work: true,
+      preferred_provinces: [],
+      preferred_regions: [],
       career_entries: [],
       coach_career_entries: [],
       club_types: [],

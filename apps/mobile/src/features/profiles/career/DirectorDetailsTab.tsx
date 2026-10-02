@@ -32,6 +32,7 @@ import {
   ProfileSectionBlock,
 } from "../master/ProfileSectionBlock";
 import {
+  buildAvailabilityZonesLabel,
   buildOperatingAreaLabel,
   summarizeList,
 } from "../profile-display-helpers";
@@ -90,21 +91,36 @@ export function DirectorDetailsTab({
 
   // ---- Opportunità -------------------------------------------------------
   /*
-    Il Dirigente non ha un interruttore "cerco lavoro": ha quattro preferenze
-    di contatto (REV-ONB-07 §M). Spente tutte e quattro non c'è nessuna
-    disponibilità da raccontare e la macroarea sparisce, invece di diventare
-    uno stato negativo che il prodotto non prevede.
+    Due condizioni (REV-PROF-11): l'interruttore di disponibilità e almeno un
+    destinatario. Spegnere l'interruttore conserva i destinatari — si
+    ritrovano riaccendendolo — quindi la macroarea si misura su entrambi,
+    invece di diventare uno stato negativo che il prodotto non prevede.
   */
-  const audiences = directorProfile
-    ? DIRECTOR_CONTACT_AUDIENCE_OPTIONS.filter(
-        (option) => directorProfile[CONTACT_AUDIENCE_FIELDS[option.value]],
-      )
-    : [];
+  const isAvailable = directorProfile?.open_to_work ?? false;
+  const audiences =
+    directorProfile && isAvailable
+      ? DIRECTOR_CONTACT_AUDIENCE_OPTIONS.filter(
+          (option) => directorProfile[CONTACT_AUDIENCE_FIELDS[option.value]],
+        )
+      : [];
   const audiencesLabel = summarizeList(audiences.map((option) => option.label));
-  const operatingAreaLabel = buildOperatingAreaLabel(
-    profile.region,
-    profile.city ?? profile.residence ?? profile.current_location_city,
-  );
+  /*
+    L'area operativa è ora un dato dichiarato (REV-PROF-11). Finché un profilo
+    non l'ha mai scelta resta la derivazione storica da regione e località:
+    cambiare schermata non deve far sparire una riga che c'era.
+  */
+  const operatingAreaLabel =
+    (directorProfile?.availability_type
+      ? buildAvailabilityZonesLabel(
+          directorProfile.availability_type,
+          directorProfile.preferred_regions ?? [],
+          directorProfile.preferred_provinces ?? [],
+        )
+      : null) ??
+    buildOperatingAreaLabel(
+      profile.region,
+      profile.city ?? profile.residence ?? profile.current_location_city,
+    );
 
   // ---- Profilo professionale ---------------------------------------------
   const primaryRole = resolveDirectorPrimaryRole(directorProfile);

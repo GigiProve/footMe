@@ -316,6 +316,8 @@ export type StaffProfileRecord = {
 };
 
 export type DirectorProfileRecord = {
+  /** REV-PROF-11: ITALY | REGIONS | PROVINCES. NULL vale ITALY. */
+  availability_type: string | null;
   career_entries: unknown[];
   coach_career_entries: unknown[];
   club_types: string[];
@@ -331,12 +333,21 @@ export type DirectorProfileRecord = {
   open_to_others: boolean;
   open_to_players: boolean;
   open_to_staff: boolean;
+  /**
+   * REV-PROF-11: disponibilità generale, distinta dai destinatari. Spegnerla
+   * non cancella le preferenze, così riaccendendola si ritrovano.
+   */
+  open_to_work: boolean;
   /** REV-ONB-07 §AG: esperienze in ruoli senza un flusso carriera dedicato. */
   other_career_entries: unknown[];
   other_football_roles: string[];
   /** REV-ONB-07 §H: ruolo dichiarato scegliendo "Altro". */
   other_role_label: string | null;
   player_career_entries: unknown[];
+  /** REV-PROF-11: province dell'area operativa, usate solo in PROVINCES. */
+  preferred_provinces: string[];
+  /** REV-PROF-11: regioni dell'area operativa, usate solo in REGIONS. */
+  preferred_regions: string[];
   /** REV-ONB-07 §AA: altre esperienze nel calcio, selezione multipla. */
   previous_roles: string[];
   primary_role: string | null;
@@ -582,6 +593,7 @@ export type CompleteProfessionalProfileUpdate = {
     works_abroad: boolean;
   } | null;
   directorProfile?: {
+    availability_type?: string | null;
     career_entries: unknown[];
     coach_career_entries: unknown[];
     club_types: string[];
@@ -596,10 +608,13 @@ export type CompleteProfessionalProfileUpdate = {
     open_to_others: boolean;
     open_to_players: boolean;
     open_to_staff: boolean;
+    open_to_work?: boolean;
     other_career_entries?: unknown[];
     other_football_roles: string[];
     other_role_label?: string | null;
     player_career_entries: unknown[];
+    preferred_provinces?: string[];
+    preferred_regions?: string[];
     previous_roles?: string[];
     primary_role: string | null;
     responsibilities: string[];
@@ -1168,6 +1183,7 @@ function normalizeDirectorProfileRecord(
   }
 
   return {
+    availability_type: normalizeOptionalText(rawProfile.availability_type),
     career_entries: Array.isArray(rawProfile.career_entries)
       ? rawProfile.career_entries
       : [],
@@ -1192,6 +1208,18 @@ function normalizeDirectorProfileRecord(
     open_to_others: rawProfile.open_to_others !== false,
     open_to_players: rawProfile.open_to_players !== false,
     open_to_staff: rawProfile.open_to_staff !== false,
+    /*
+      REV-PROF-11: prima della colonna la disponibilità era derivata dai
+      destinatari. Una riga che non la porta ancora torna a quella regola
+      invece di risultare indisponibile.
+    */
+    open_to_work:
+      typeof rawProfile.open_to_work === "boolean"
+        ? rawProfile.open_to_work
+        : rawProfile.open_to_clubs !== false ||
+          rawProfile.open_to_staff !== false ||
+          rawProfile.open_to_players !== false ||
+          rawProfile.open_to_others !== false,
     other_career_entries: Array.isArray(rawProfile.other_career_entries)
       ? rawProfile.other_career_entries
       : [],
@@ -1200,6 +1228,8 @@ function normalizeDirectorProfileRecord(
     player_career_entries: Array.isArray(rawProfile.player_career_entries)
       ? rawProfile.player_career_entries
       : [],
+    preferred_provinces: normalizeStringArray(rawProfile.preferred_provinces),
+    preferred_regions: normalizeStringArray(rawProfile.preferred_regions),
     previous_roles: normalizeStringArray(rawProfile.previous_roles),
     primary_role: normalizeOptionalText(rawProfile.primary_role),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
@@ -1888,7 +1918,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("director_profiles")
           .select(
-            "profile_id, director_roles, primary_role, other_role_label, responsibilities, experience_categories, main_focus, market_involvement, media_items, career_entries, coach_career_entries, staff_career_entries, other_career_entries, has_other_football_experience, other_football_roles, previous_roles, has_played_football, player_career_entries, club_types, open_to_clubs, open_to_staff, open_to_players, open_to_others",
+            "profile_id, director_roles, primary_role, other_role_label, responsibilities, experience_categories, main_focus, market_involvement, media_items, career_entries, coach_career_entries, staff_career_entries, other_career_entries, has_other_football_experience, other_football_roles, previous_roles, has_played_football, player_career_entries, club_types, open_to_clubs, open_to_staff, open_to_players, open_to_others, open_to_work, availability_type, preferred_regions, preferred_provinces",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -2629,6 +2659,7 @@ export async function updateCompleteProfessionalProfile(
 
   if (input.role === "director" && input.directorProfile) {
     const { error } = await supabase.from("director_profiles").upsert({
+      availability_type: input.directorProfile.availability_type ?? null,
       career_entries: input.directorProfile.career_entries,
       coach_career_entries: input.directorProfile.coach_career_entries,
       club_types: input.directorProfile.club_types,
@@ -2644,10 +2675,13 @@ export async function updateCompleteProfessionalProfile(
       open_to_others: input.directorProfile.open_to_others,
       open_to_players: input.directorProfile.open_to_players,
       open_to_staff: input.directorProfile.open_to_staff,
+      open_to_work: input.directorProfile.open_to_work ?? true,
       other_career_entries: input.directorProfile.other_career_entries ?? [],
       other_football_roles: input.directorProfile.other_football_roles,
       other_role_label: input.directorProfile.other_role_label ?? null,
       player_career_entries: input.directorProfile.player_career_entries,
+      preferred_provinces: input.directorProfile.preferred_provinces ?? [],
+      preferred_regions: input.directorProfile.preferred_regions ?? [],
       previous_roles: input.directorProfile.previous_roles ?? [],
       primary_role: input.directorProfile.primary_role,
       profile_id: input.profileId,
@@ -2995,6 +3029,7 @@ export async function saveDirectorProfileMedia(input: {
   profileId: string;
 }) {
   const { error } = await supabase.from("director_profiles").upsert({
+    availability_type: input.directorProfile.availability_type,
     career_entries: input.directorProfile.career_entries,
     coach_career_entries: input.directorProfile.coach_career_entries,
     club_types: input.directorProfile.club_types,
@@ -3010,10 +3045,13 @@ export async function saveDirectorProfileMedia(input: {
     open_to_others: input.directorProfile.open_to_others,
     open_to_players: input.directorProfile.open_to_players,
     open_to_staff: input.directorProfile.open_to_staff,
+    open_to_work: input.directorProfile.open_to_work,
     other_career_entries: input.directorProfile.other_career_entries,
     other_football_roles: input.directorProfile.other_football_roles,
     other_role_label: input.directorProfile.other_role_label,
     player_career_entries: input.directorProfile.player_career_entries,
+    preferred_provinces: input.directorProfile.preferred_provinces,
+    preferred_regions: input.directorProfile.preferred_regions,
     previous_roles: input.directorProfile.previous_roles,
     primary_role: input.directorProfile.primary_role,
     profile_id: input.profileId,
@@ -3055,6 +3093,7 @@ export async function saveDirectorProfileCareer(input: {
   profileId: string;
 }) {
   const { error } = await supabase.from("director_profiles").upsert({
+    availability_type: input.directorProfile.availability_type,
     career_entries: input.career.career_entries,
     club_types: input.directorProfile.club_types,
     coach_career_entries: input.career.coach_career_entries,
@@ -3070,10 +3109,13 @@ export async function saveDirectorProfileCareer(input: {
     open_to_others: input.directorProfile.open_to_others,
     open_to_players: input.directorProfile.open_to_players,
     open_to_staff: input.directorProfile.open_to_staff,
+    open_to_work: input.directorProfile.open_to_work,
     other_career_entries: input.career.other_career_entries,
     other_football_roles: input.directorProfile.other_football_roles,
     other_role_label: input.directorProfile.other_role_label,
     player_career_entries: input.career.player_career_entries,
+    preferred_provinces: input.directorProfile.preferred_provinces,
+    preferred_regions: input.directorProfile.preferred_regions,
     previous_roles: input.directorProfile.previous_roles,
     primary_role: input.directorProfile.primary_role,
     profile_id: input.profileId,

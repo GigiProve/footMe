@@ -170,6 +170,9 @@ function buildDirectorProfileRecord(
     open_to_others: false,
     open_to_players: false,
     open_to_staff: true,
+    // REV-PROF-11: la disponibilità è un dato suo, non la somma dei
+    // destinatari. Il profilo di riferimento è disponibile.
+    open_to_work: true,
     other_career_entries: [],
     other_football_roles: [],
     other_role_label: null,
@@ -511,6 +514,21 @@ describe("Master Profile Dirigente — Header", () => {
     expect(closed?.availabilityLabel).toBeUndefined();
   });
 
+  it("spegne la disponibilità con l'interruttore, pur conservando i destinatari", () => {
+    /*
+      REV-PROF-11: spegnere "Disponibile per nuove opportunità" non cancella i
+      destinatari — si ritrovano riaccendendolo — quindi l'header deve
+      guardare l'interruttore, non solo i quattro flag.
+    */
+    const closed = buildDirectorProfileHeaderDetails(
+      buildProfile({
+        directorProfile: buildDirectorProfileRecord({ open_to_work: false }),
+      }),
+    );
+
+    expect(closed?.availabilityLabel).toBeUndefined();
+  });
+
   it("non accende mai il badge verificato senza un dato che lo esprima", () => {
     expect(buildDirectorProfileHeaderDetails(buildProfile())?.isVerified).toBe(false);
   });
@@ -577,6 +595,37 @@ describe("Master Profile Dirigente — Dettagli", () => {
         accessibilityLabel: "Area operativa, Sicilia, Isole",
       }).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("mostra l'area operativa dichiarata al posto di quella derivata", () => {
+    /*
+      REV-PROF-11: finché il profilo non l'ha mai scelta, l'area operativa
+      resta derivata da regione e località. Appena viene dichiarata, è quella
+      a comparire — altrimenti salvare le Opportunità non cambierebbe niente
+      nel Master Profile.
+    */
+    const tree = renderDetails({
+      directorProfile: buildDirectorProfileRecord({
+        availability_type: "REGIONS",
+        preferred_regions: ["Lombardia", "Piemonte"],
+      }),
+    });
+
+    expect(
+      tree.root.findAllByProps({
+        accessibilityLabel: "Area operativa, Lombardia, Piemonte",
+      }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("nasconde Opportunità quando la disponibilità è spenta", () => {
+    const tree = renderDetails({
+      directorProfile: buildDirectorProfileRecord({ open_to_work: false }),
+    });
+
+    expect(
+      tree.root.findAllByProps({ testID: "director-details-opportunities" }),
+    ).toHaveLength(0);
   });
 
   it("nasconde Opportunità quando nessun destinatario è attivo", () => {

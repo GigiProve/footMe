@@ -25,7 +25,9 @@ const CONFIG: ProfileOpportunitiesConfig = {
     "Il tuo profilo può comparire tra i profili dello staff disponibili.",
   availabilityLabel: "Disponibile per nuove collaborazioni",
   profileType: "staff",
+  // Il Dirigente ha i destinatari, questo ruolo no: la sezione non esiste.
   read: (data) => ({
+    audiences: [],
     availability: {
       mode: normalizeAvailabilityType(data.staffProfile?.availability_type),
       provinces: data.staffProfile?.preferred_provinces ?? [],

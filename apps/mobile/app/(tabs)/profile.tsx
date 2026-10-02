@@ -872,12 +872,8 @@ export default function ProfileScreen() {
                 profileType: "director",
                 viewerMode: "owner",
               });
-              /*
-                La Modifica profilo Dirigente ha una task dedicata: la CTA
-                apre il flusso di modifica che esiste oggi, senza aprire una
-                seconda versione provvisoria dell'editor.
-              */
-              handleEdit("personalInfo");
+              // REV-PROF-11: hub modulare, non più la modale anagrafica.
+              router.push("/profile/director-edit");
             }}
             onMorePress={() => {
               trackProfileEvent("profile_more_menu_opened", {
@@ -963,7 +959,8 @@ export default function ProfileScreen() {
             onAddExperience={() => router.push("/profile/director-career")}
             onDeleteMedia={handleDeleteDirectorMedia}
             onEditMedia={(itemId) => handleManageDirectorMedia(itemId)}
-            onEditProfile={() => handleEdit("bio")}
+            // REV-PROF-11: stesso hub della CTA nell'header.
+            onEditProfile={() => router.push("/profile/director-edit")}
             onManageAdditionalPaths={() =>
               router.push("/profile/director-career?section=paths")
             }

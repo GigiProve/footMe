@@ -22,7 +22,9 @@ const CONFIG: ProfileOpportunitiesConfig = {
     "Il tuo profilo può comparire tra gli allenatori disponibili sul mercato.",
   availabilityLabel: "Disponibile per una nuova squadra",
   profileType: "coach",
+  // Il Dirigente ha i destinatari, questo ruolo no: la sezione non esiste.
   read: (data) => ({
+    audiences: [],
     availability: {
       mode: normalizeAvailabilityType(data.coachProfile?.availability_type),
       provinces: data.coachProfile?.preferred_provinces ?? [],

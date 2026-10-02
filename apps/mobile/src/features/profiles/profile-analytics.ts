@@ -133,7 +133,10 @@ export type ProfileAnalyticsEvent =
   | "director_career_completed"
   | "director_career_load_failed"
   | "director_career_save_failed"
-  | "director_career_delete_failed";
+  | "director_career_delete_failed"
+  // Modifica profilo Dirigente (REV-PROF-11)
+  | "director_profile_edit_opened"
+  | "director_primary_role_changed";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -158,10 +161,14 @@ export type ProfileEditSectionKey =
   | "media"
   /** REV-PROF-05: "Filosofia e stile di gioco", solo Allenatore. */
   | "philosophy"
-  /** REV-PROF-08: "Profilo professionale", solo Staff tecnico. */
+  /** REV-PROF-08: "Profilo professionale", Staff tecnico e Dirigente. */
   | "professional"
-  /** REV-PROF-08: "Percorsi aggiuntivi", solo Staff tecnico. */
-  | "paths";
+  /** REV-PROF-08: "Percorsi aggiuntivi", Staff tecnico e Dirigente. */
+  | "paths"
+  /** REV-PROF-11: "Responsabilità e focus", solo Dirigente. */
+  | "responsibilities"
+  /** REV-PROF-11: "Bio e lingue", solo Dirigente. */
+  | "bio";
 
 /** Modalità temporale scelta, mai la società, il ruolo o le date. */
 export type CoachExperienceMode =

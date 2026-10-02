@@ -211,8 +211,13 @@ export function DirectorProfileTabView({
  * Evidenza ed eliminazione restano persistite — era già così prima della
  * review — perché la griglia condivisa delega al chiamante quando riceve i
  * due handler. Al Visitor non arriva nessuno dei due.
+ *
+ * Esportata perché la voce "Media e contenuti" dell'hub Modifica profilo
+ * (REV-PROF-11) apre **questa** superficie e non una copia: lì cambia solo la
+ * cornice — app bar e ritorno all'hub — mentre griglia, viewer, filtri,
+ * pubblicazione e persistenza restano queste.
  */
-function DirectorMediaTab({
+export function DirectorMediaTab({
   completeProfile,
   isOwner,
   onDeleteMedia,
