@@ -8,9 +8,10 @@
  * ragiona per periodi datati e non per stagioni sportive.
  *
  * Il selettore dei percorsi compare solo quando esistono carriere aggiuntive —
- * oggi la sola carriera da ex calciatore raccolta in onboarding — e sparisce
- * del tutto per chi ha il solo percorso da procuratore, invece di lasciare una
- * chip che non sceglie niente.
+ * da REV-PROF-15 anche quelle da dirigente, allenatore e staff tecnico, ognuna
+ * con il renderer già approvato per il suo modello — e sparisce del tutto per
+ * chi ha il solo percorso da procuratore, invece di lasciare una chip che non
+ * sceglie niente.
  */
 import { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -23,6 +24,8 @@ import type { AgentPublicAssistito } from "../../relationships/agent-representat
 import { getRelationshipTypeLabel } from "../../relationships/agent-representation-service";
 import { getPlayerPositionLabel } from "../player-sports";
 import { CareerTotals } from "./CareerTotals";
+import { CoachCareerExperienceBlock } from "./CoachCareerExperienceBlock";
+import type { CoachCareerView } from "./coach-career-model";
 import { PlayerCareerExperience } from "./PlayerCareerExperience";
 import { buildPlayerCareerView } from "./player-career-model";
 import {
@@ -130,7 +133,13 @@ export function AgentCareerTab({
         />
       ) : null}
 
-      {activePath === "agent" ? (
+      {activePath === "director" ? (
+        <ExperienceList testIDPrefix="agent-director" view={career.director} />
+      ) : activePath === "coach" ? (
+        <ExperienceList testIDPrefix="agent-coach" view={career.coach} />
+      ) : activePath === "staff" ? (
+        <ExperienceList testIDPrefix="agent-staff" view={career.staff} />
+      ) : activePath === "agent" ? (
         <AgentCareerBody
           assistiti={assistiti}
           assistitiFailed={assistitiFailed}
@@ -161,6 +170,32 @@ export function AgentCareerTab({
           testID="agent-player-career-error"
         />
       )}
+    </View>
+  );
+}
+
+/**
+ * Un percorso aggiuntivo: lo stesso blocco esperienza di Allenatore, Staff
+ * tecnico e Dirigente, perché è lo stesso modello. Nessuna versione
+ * semplificata ricreata qui.
+ */
+function ExperienceList({
+  testIDPrefix,
+  view,
+}: {
+  testIDPrefix: string;
+  view: CoachCareerView;
+}) {
+  return (
+    <View>
+      {view.experiences.map((experience, index) => (
+        <CoachCareerExperienceBlock
+          experience={experience}
+          isLast={index === view.experiences.length - 1}
+          key={experience.id}
+          testIDPrefix={testIDPrefix}
+        />
+      ))}
     </View>
   );
 }

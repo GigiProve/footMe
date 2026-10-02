@@ -8,6 +8,15 @@ export type AgentProfileRecord = {
   agency_logo_url: string | null;
   agency_name: string | null;
   agency_role: string | null;
+  /**
+   * REV-PROF-15: il profilo e passato al modello canonico della carriera.
+   * Finche e `null` le colonne legacy restano la rete di sicurezza
+   * dell'incarico attuale; dopo, la carriera e la sola fonte.
+   */
+  career_migrated_at: string | null;
+  /** REV-PROF-15: percorsi aggiuntivi, separati dalla carriera da procuratore. */
+  coach_career_entries: unknown[];
+  director_career_entries: unknown[];
   federation: string | null;
   has_no_previous_experience: boolean;
   has_other_football_experience: boolean;
@@ -46,34 +55,74 @@ export type AgentProfileRecord = {
   /** REV-ONB-06 §H: "independent" | "agency". */
   professional_mode: string | null;
   profile_id: string;
+  staff_career_entries: unknown[];
   works_abroad: boolean;
 };
 
 export type AgentCareerEntryInput = Omit<
   AgentCareerEntryRecord,
-  "is_current" | "is_primary" | "organization_mode" | "visibility"
+  | "description"
+  | "is_current"
+  | "is_primary"
+  | "manual_organization_id"
+  | "organization_city"
+  | "organization_club_id"
+  | "organization_country"
+  | "organization_mode"
+  | "period_end_precision"
+  | "period_start_precision"
+  | "visibility"
 > & {
+  description?: string | null;
   is_current?: boolean;
   is_primary?: boolean;
+  manual_organization_id?: string | null;
+  organization_city?: string | null;
+  organization_club_id?: string | null;
+  organization_country?: string | null;
   organization_mode?: string;
+  period_end_precision?: AgentPeriodPrecision;
+  period_start_precision?: AgentPeriodPrecision;
   visibility?: string;
 };
+
+/**
+ * Precisione del periodo (REV-PROF-15 "Date e precisione temporale").
+ *
+ * I dati raccolti dal vecchio onboarding hanno solo l'anno. Un mese non si
+ * inventa: la riga dichiara di essere annuale e viene mostrata come tale
+ * finche l'utente non riscrive quel periodo.
+ */
+export type AgentPeriodPrecision = "month" | "year";
 
 export type AgentCareerEntryRecord = {
   agency_logo_url: string | null;
   /** `null` per un professionista indipendente (REV-PROF-13). */
   agency_name: string | null;
   agent_profile_id: string;
+  /** Descrizione facoltativa del ruolo (REV-PROF-15). */
+  description: string | null;
   id: string;
   /** L'incarico e in corso. Prima era implicito nell'assenza di una data di fine. */
   is_current: boolean;
   /** L'incarico principale fra quelli in corso: quello mostrato nell'header. */
   is_primary: boolean;
+  /**
+   * Riferimento privato a un'organizzazione non presente su PROLINK: raggruppa
+   * gli incarichi svolti nello stesso posto senza creare una pagina pubblica.
+   */
+  manual_organization_id: string | null;
+  organization_city: string | null;
+  /** Organizzazione canonica gia presente su PROLINK (REV-PROF-15). */
+  organization_club_id: string | null;
+  organization_country: string | null;
   /** "agency" oppure "independent". */
   organization_mode: string;
   period_end_month: string | null;
+  period_end_precision: AgentPeriodPrecision;
   period_end_year: number | null;
   period_start_month: string | null;
+  period_start_precision: AgentPeriodPrecision;
   period_start_year: number | null;
   role: string;
   sort_order: number;

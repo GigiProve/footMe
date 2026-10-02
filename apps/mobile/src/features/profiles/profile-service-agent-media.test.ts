@@ -144,7 +144,11 @@ describe("agent media profile service", () => {
       data: {
         agency_logo_url: null,
         agency_name: "MB Football Management",
-        agency_role: "Founder",
+        career_migrated_at: null,
+    coach_career_entries: [],
+    director_career_entries: [],
+    staff_career_entries: [],
+    agency_role: "Founder",
         federation: "FIGC",
         has_no_previous_experience: false,
         has_other_football_experience: true,
@@ -227,6 +231,9 @@ describe("agent media profile service", () => {
         agency_logo_url: null,
         agency_name: "MB Football Management",
         agency_role: "Founder",
+        career_migrated_at: null,
+        coach_career_entries: [],
+        director_career_entries: [],
         federation: "FIGC",
         has_no_previous_experience: false,
         has_other_football_experience: true,
@@ -257,6 +264,7 @@ describe("agent media profile service", () => {
         professional_mode: null,
         works_abroad: false,
         profile_id: "agent-1",
+        staff_career_entries: [],
       },
       mediaItems: [
         {

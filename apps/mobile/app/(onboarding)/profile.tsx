@@ -78,6 +78,7 @@ import {
   toLegacyManagedPlayersCount,
   trackAgentOnboardingEvent,
 } from "../../src/features/onboarding/agent";
+import { buildAgentOnboardingCareerEntries } from "../../src/features/profiles/agent-career/agent-onboarding-career";
 import {
   createLocalUuid,
   deriveLegacyMainPlayerRoles,
@@ -1675,21 +1676,26 @@ export default function OnboardingProfileScreen() {
       );
       const derivedPlayerTypes = deriveLegacyPlayerTypes(agentManagedPlayerEntries);
 
+      /*
+        REV-PROF-15: l'onboarding scrive la stessa carriera canonica che la
+        Gestione carriera legge e modifica. L'incarico attuale — che fino a
+        REV-PROF-13 viveva solo nelle colonne di `agent_profiles` — diventa un
+        record in corso e principale; le esperienze precedenti diventano
+        incarichi conclusi con la precisione che hanno davvero, cioè il solo
+        anno. Nessun mese viene inventato, e nessuna copia parallela nasce qui.
+      */
+      const agentOnboardingEntries = buildAgentOnboardingCareerEntries({
+        agencyLogoUrl: agentAgencyLogoUrl,
+        agencyName: agentAgencyName,
+        agencyRole: agentAgencyRole,
+        agencyStartYear: parseWheelValue(agentAgencyStartYear),
+        previousEntries: agentCareerEntries,
+        professionalMode: agentProfessionalMode,
+        profileId: session.user.id,
+      });
+
       await updateCompleteProfessionalProfile({
-        agentCareerEntries: agentCareerEntries
-          .filter((entry) => entry.agency_name.trim())
-          .map((entry, index) => ({
-            agency_logo_url: entry.agency_logo_url,
-            agency_name: entry.agency_name.trim(),
-            agent_profile_id: session.user.id,
-            id: entry.id,
-            period_end_month: null,
-            period_end_year: entry.period_end_year,
-            period_start_month: null,
-            period_start_year: entry.period_start_year,
-            role: entry.role.trim() || "Procuratore",
-            sort_order: index,
-          })),
+        agentCareerEntries: agentOnboardingEntries,
         agentManagedPlayerEntries: agentManagedPlayerEntries
           .filter((entry) => entry.display_name.trim())
           .map((entry, index) => ({

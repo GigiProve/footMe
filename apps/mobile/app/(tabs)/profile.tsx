@@ -977,7 +977,12 @@ export default function ProfileScreen() {
           <AgentProfileTabView
             completeProfile={completeProfile}
             isOwner={true}
-            onAddExperience={() => handleEdit("agentProfile")}
+            /*
+              REV-PROF-15: "Aggiungi esperienza" apre la gestione carriera, non
+              l'editor di profilo. È l'unico modulo che scrive la carriera, e
+              tutti gli entry point passano di lì.
+            */
+            onAddExperience={() => router.push("/profile/agent-career" as never)}
             onDeleteMedia={handleDeleteAgentMedia}
             onEditMedia={(itemId) => handleManageAgentMedia(itemId)}
             onEditProfile={() => handleEdit("agentProfile")}

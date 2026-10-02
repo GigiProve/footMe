@@ -113,6 +113,15 @@ export type CareerManagerScreenProps = {
   events: CareerManagerEvents;
   /** Apre il modulo direttamente su una schermata diversa dall'hub. */
   initialStep?: "hub" | "paths";
+  /**
+   * Apre il modulo direttamente su un percorso aggiuntivo, saltando sia l'hub
+   * sia la schermata "Percorsi aggiuntivi". Serve ai profili la cui carriera
+   * principale vive altrove — il Procuratore (REV-PROF-15) ragiona per periodi
+   * e ha il proprio modulo — ma i cui percorsi aggiuntivi sono esattamente
+   * questi. Da lì il back esce dal modulo, perché non c'e nessuna schermata
+   * precedente da riaprire.
+   */
+  initialPath?: CareerPathKey;
   /** Superficie da cui il modulo è stato aperto: un identificatore, mai un url. */
   openSource?: string;
   isError: boolean;
@@ -192,6 +201,7 @@ export function CareerManagerScreen({
   copy,
   defaultRole = "",
   events,
+  initialPath,
   initialStep = "hub",
   isError,
   isLoading,
@@ -211,7 +221,15 @@ export function CareerManagerScreen({
 }: CareerManagerScreenProps) {
   const { showToast } = useToast();
 
-  const [step, setStep] = useState<ManagerStep>({ type: initialStep });
+  const [step, setStep] = useState<ManagerStep>(() => {
+    if (!initialPath) {
+      return { type: initialStep };
+    }
+
+    return initialPath === "player"
+      ? { screen: { type: "list" }, type: "player" }
+      : { lane: initialPath, type: "summary" };
+  });
   const [errors, setErrors] = useState<CoachDraftErrors>({});
   const [warning, setWarning] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -223,8 +241,8 @@ export function CareerManagerScreen({
     e non sempre all'hub, altrimenti chi arriva da "Percorsi aggiuntivi" perde
     il contesto a ogni salvataggio.
   */
-  const [pathOrigin, setPathOrigin] = useState<"hub" | "paths">(
-    initialStep === "paths" ? "paths" : "hub",
+  const [pathOrigin, setPathOrigin] = useState<"hub" | "paths" | "exit">(
+    initialPath ? "exit" : initialStep === "paths" ? "paths" : "hub",
   );
   const openedRef = useRef(false);
 
@@ -243,7 +261,28 @@ export function CareerManagerScreen({
     if (initialStep === "paths" && events.pathsOpened) {
       trackProfileEvent(events.pathsOpened, { profileType });
     }
-  }, [events.opened, events.pathsOpened, initialStep, openSource, profileType]);
+
+    // Aperto direttamente su un percorso: l'evento del percorso va tracciato
+    // qui, perche `openPath` non viene mai attraversato.
+    const directPathEvent = initialPath
+      ? events.pathEvents[initialPath]?.opened
+      : undefined;
+
+    if (directPathEvent && initialPath) {
+      trackProfileEvent(directPathEvent, {
+        careerMode: initialPath,
+        profileType,
+      });
+    }
+  }, [
+    events.opened,
+    events.pathEvents,
+    events.pathsOpened,
+    initialPath,
+    initialStep,
+    openSource,
+    profileType,
+  ]);
 
   useEffect(() => {
     if (isError) {
@@ -877,12 +916,12 @@ export function CareerManagerScreen({
     }
 
     if (step.type === "summary" && step.lane !== "primary") {
-      setStep({ type: pathOrigin });
+      leavePath();
       return;
     }
 
     if (step.type === "player") {
-      setStep({ type: pathOrigin });
+      leavePath();
       return;
     }
 
@@ -899,15 +938,30 @@ export function CareerManagerScreen({
     router.back();
   }
 
+  /**
+   * Torna alla schermata da cui il percorso aggiuntivo è stato aperto. Quando
+   * il modulo era stato aperto direttamente su quel percorso non c'è nessuna
+   * schermata precedente: si esce, e chi ha aperto il percorso aggiorna i
+   * propri conteggi al rientro.
+   */
+  function leavePath() {
+    if (pathOrigin === "exit") {
+      router.back();
+      return;
+    }
+
+    setStep({ type: pathOrigin });
+  }
+
   /** Chiude la sessione, oppure il solo sotto-flusso quando è un percorso. */
   function finishStep() {
     if (step.type === "summary" && step.lane !== "primary") {
-      setStep({ type: pathOrigin });
+      leavePath();
       return;
     }
 
     if (step.type === "player") {
-      setStep({ type: pathOrigin });
+      leavePath();
       return;
     }
 

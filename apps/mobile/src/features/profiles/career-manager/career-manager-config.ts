@@ -24,9 +24,16 @@ import type { ProfileAnalyticsEvent } from "../profile-analytics";
  *
  * L'elenco cresce con i ruoli che hanno un percorso aggiuntivo, non con le
  * schermate: `staff` e `other` sono arrivati con il Dirigente (REV-PROF-10) e
- * non hanno aggiunto nessun passo al flusso.
+ * `director` con il Procuratore (REV-PROF-15), senza che nessuno dei due
+ * aggiungesse un passo al flusso.
  */
-export type CareerLane = "primary" | "coach" | "staff" | "other" | "player";
+export type CareerLane =
+  | "primary"
+  | "coach"
+  | "staff"
+  | "director"
+  | "other"
+  | "player";
 
 /** Corsie che usano le schermate ad assegnazione (tutte tranne il Calciatore). */
 export type AssignmentLane = Exclude<CareerLane, "player">;
@@ -86,6 +93,7 @@ export type CareerPathCopy = {
     | "person-outline"
     | "walk-outline"
     | "clipboard-outline"
+    | "briefcase-outline"
     | "search-outline"
     | "ellipsis-horizontal-outline";
   key: CareerPathKey;

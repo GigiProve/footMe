@@ -11,22 +11,24 @@ import {
 } from "../ui/onboarding-tokens";
 import type { CoachExperienceType } from "./coach-career-types";
 
-type CoachExperienceTypeOption = {
+type CoachExperienceTypeOption<TType extends string> = {
   icon: keyof typeof Ionicons.glyphMap;
   subtitle: string;
   title: string;
-  type: CoachExperienceType;
+  type: TType;
 };
 
-type CoachExperienceTypeSelectorProps = {
-  options?: CoachExperienceTypeOption[];
+type CoachExperienceTypeSelectorProps<TType extends string> = {
+  options?: CoachExperienceTypeOption<TType>[];
   subtitle?: string;
+  /** Prefisso dei testID, uno per flusso che riusa queste card. */
+  testIDPrefix?: string;
   title?: string;
-  onSelect: (type: CoachExperienceType) => void;
+  onSelect: (type: TType) => void;
 };
 
 /** §P: le stesse tre tipologie del Calciatore, nessuna quarta. */
-const typeOptions: CoachExperienceTypeOption[] = [
+const typeOptions: CoachExperienceTypeOption<CoachExperienceType>[] = [
   {
     icon: "layers-outline",
     subtitle: "Aggiungi più stagioni consecutive in una volta sola.",
@@ -52,13 +54,20 @@ const typeOptions: CoachExperienceTypeOption[] = [
  *
  * Stesso pattern visuale del Calciatore: ogni card apre un editor, quindi
  * mostra un chevron e mai una spunta.
+ *
+ * Le opzioni sono un parametro perché le tipologie cambiano con il flusso: le
+ * tre stagionali qui sotto per chi ragiona per stagioni, le due modalità
+ * professionali del Procuratore (REV-PROF-15). Quello che non cambia — la
+ * card interamente interattiva, il chevron, la gerarchia — vive qui una volta
+ * sola.
  */
-export function CoachExperienceTypeSelector({
+export function CoachExperienceTypeSelector<TType extends string = CoachExperienceType>({
   onSelect,
-  options = typeOptions,
+  options = typeOptions as unknown as CoachExperienceTypeOption<TType>[],
   subtitle,
+  testIDPrefix = "coach-experience-type",
   title,
-}: CoachExperienceTypeSelectorProps) {
+}: CoachExperienceTypeSelectorProps<TType>) {
   return (
     <View style={styles.container}>
       {title ? <AppText variant="headingSm">{title}</AppText> : null}
@@ -80,7 +89,7 @@ export function CoachExperienceTypeSelector({
               styles.card,
               pressed ? styles.cardPressed : null,
             ]}
-            testID={`coach-experience-type-${option.type}`}
+            testID={`${testIDPrefix}-${option.type}`}
           >
             <View style={styles.iconShell}>
               <Ionicons color={colors.accent} name={option.icon} size={20} />

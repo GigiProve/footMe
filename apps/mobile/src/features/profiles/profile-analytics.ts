@@ -139,7 +139,42 @@ export type ProfileAnalyticsEvent =
   | "director_primary_role_changed"
   // Master Profile Procuratore (REV-PROF-13)
   | "agent_assistito_tapped"
-  | "agent_assistiti_see_all_tapped";
+  | "agent_assistiti_see_all_tapped"
+  // Gestione carriera Procuratore (REV-PROF-15)
+  | "agent_career_manager_opened"
+  | "agent_career_add_tapped"
+  | "agent_career_type_selected"
+  | "agent_career_organization_search_started"
+  | "agent_career_organization_search_empty"
+  | "agent_career_organization_selected"
+  | "agent_career_manual_opened"
+  | "agent_career_manual_completed"
+  | "agent_career_experience_saved"
+  | "agent_career_independent_saved"
+  | "agent_career_primary_set"
+  | "agent_career_experience_edited"
+  | "agent_career_organization_changed"
+  | "agent_career_assignment_ended"
+  | "agent_career_experience_deleted"
+  | "agent_career_paths_opened"
+  | "agent_career_director_opened"
+  | "agent_career_coach_opened"
+  | "agent_career_staff_opened"
+  | "agent_career_player_opened"
+  | "agent_career_director_add_tapped"
+  | "agent_career_coach_add_tapped"
+  | "agent_career_staff_add_tapped"
+  | "agent_career_player_add_tapped"
+  | "agent_career_cancelled"
+  | "agent_career_unsaved_exit"
+  | "agent_career_completed"
+  | "agent_career_closed"
+  | "agent_career_load_failed"
+  | "agent_career_search_failed"
+  | "agent_career_save_failed"
+  | "agent_career_update_failed"
+  | "agent_career_end_failed"
+  | "agent_career_delete_failed";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -192,6 +227,11 @@ type ProfileAnalyticsProps = {
   careerMode?: "agent" | "coach" | "director" | "other" | "player" | "staff";
   /** REV-PROF-04: modalità temporale dell'esperienza, mai il suo contenuto. */
   experienceMode?: CoachExperienceMode;
+  /**
+   * REV-PROF-15: come l'incarico è stato svolto — presso un'organizzazione
+   * oppure per conto proprio. Mai il nome dell'organizzazione.
+   */
+  organizationMode?: "agency" | "independent";
   /** Quante stagioni sono state selezionate, non quali. */
   seasonCount?: number;
   /** Quanti ruoli sono selezionati, non quali. */

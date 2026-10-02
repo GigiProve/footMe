@@ -15,6 +15,11 @@
  * prima modifica. La migrazione 20261002120000 mappa le colonne legacy dentro
  * la carriera; questo modulo legge solo la carriera e usa le colonne legacy
  * soltanto come rete di sicurezza per un profilo non ancora migrato.
+ *
+ * Da REV-PROF-15 quella rete si spegne da sola. `career_migrated_at` dice che
+ * quel profilo è passato al modello canonico: da lì in poi la carriera è la
+ * sola fonte, e chi cancella il proprio ultimo incarico non si vede ricomparire
+ * la vecchia agenzia dalle colonne legacy, che restano scritte ma inerti.
  */
 import type {
   AgentCareerEntryRecord,
@@ -23,6 +28,8 @@ import type {
 } from "../agent-profile";
 import { AGENT_ACTIVITY_SCOPE_OPTIONS } from "../../onboarding/agent/agent-taxonomy";
 import type { PlayerExperienceForm } from "../player-sports";
+import { buildCareerView, type CoachCareerView } from "./coach-career-model";
+import { parseDirectorCareerEntries } from "./director-career-model";
 
 /** Percorso professionale mostrato dal selettore della tab Carriera. */
 export type AgentCareerPath =
@@ -55,6 +62,17 @@ export type AgentCareerExperience = {
 export type AgentProfileCareer = {
   /** Anni di attività da procuratore, periodi sovrapposti uniti una volta sola. */
   activityYears: number | null;
+  /**
+   * REV-PROF-15: i percorsi aggiuntivi, nel modello già approvato per gli
+   * altri ruoli. Non vengono mai convertiti in incarichi da procuratore: sono
+   * carriere a stagioni, e restano tali.
+   */
+  coach: CoachCareerView;
+  coachExperienceCount: number;
+  director: CoachCareerView;
+  directorExperienceCount: number;
+  staff: CoachCareerView;
+  staffExperienceCount: number;
   /** Incarico principale in corso, o `null` se nessuno lo è. */
   currentExperience: AgentCareerExperience | null;
   /** Tutte le esperienze pubbliche, già ordinate. */
@@ -422,6 +440,23 @@ export function getAvailableAgentPaths(
 ): AgentCareerPath[] {
   const paths: AgentCareerPath[] = ["agent"];
 
+  /*
+    REV-PROF-15: i percorsi aggiuntivi del Procuratore sono quattro. Compaiono
+    nel selettore solo quando contengono davvero qualcosa — una chip che non
+    sceglie niente non è un percorso disponibile.
+  */
+  if (career.directorExperienceCount > 0) {
+    paths.push("director");
+  }
+
+  if (career.coachExperienceCount > 0) {
+    paths.push("coach");
+  }
+
+  if (career.staffExperienceCount > 0) {
+    paths.push("staff");
+  }
+
   if (career.playerExperienceCount > 0) {
     paths.push("player");
   }
@@ -469,7 +504,10 @@ export function buildAgentProfileCareer({
   );
 
   const fromCareer = visibleEntries.map(toExperience);
-  const legacy = fromCareer.length === 0 ? buildLegacyExperience(agentProfile) : null;
+  const legacy =
+    fromCareer.length === 0 && !agentProfile?.career_migrated_at
+      ? buildLegacyExperience(agentProfile)
+      : null;
   const experiences = sortExperiences(legacy ? [legacy] : fromCareer);
   const currentExperience = resolveCurrentExperience(experiences);
   const playerForms = readPlayerForms(agentProfile);
@@ -480,9 +518,28 @@ export function buildAgentProfileCareer({
     .map((role) => PREVIOUS_ROLE_LABELS[role] ?? role)
     .filter(Boolean);
 
+  const coach = buildCareerView(
+    parseDirectorCareerEntries(agentProfile?.coach_career_entries, "agent-coach"),
+  );
+  const director = buildCareerView(
+    parseDirectorCareerEntries(
+      agentProfile?.director_career_entries,
+      "agent-director",
+    ),
+  );
+  const staff = buildCareerView(
+    parseDirectorCareerEntries(agentProfile?.staff_career_entries, "agent-staff"),
+  );
+
   return {
     activityYears: computeAgentActivityYears(experiences),
+    coach,
+    coachExperienceCount: coach.experiences.length,
     currentExperience,
+    director,
+    directorExperienceCount: director.experiences.length,
+    staff,
+    staffExperienceCount: staff.experiences.length,
     experiences,
     marketCount: marketLabels.length,
     marketLabels,

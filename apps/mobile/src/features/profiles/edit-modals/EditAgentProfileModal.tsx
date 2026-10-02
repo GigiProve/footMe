@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { router } from "expo-router";
 
 import { MediaPickerField } from "../../../components/ui/media-picker-field";
 import {
@@ -8,11 +9,9 @@ import {
   deriveLegacyMainPlayerRoles,
   deriveLegacyManagedPlayersCount,
   deriveLegacyPlayerTypes,
-  type AgentCareerEntryDraft,
   type AgentManagedPlayerEntryDraft,
   type AgentProfileRecord,
 } from "../agent-profile";
-import { AgentCareerEntriesEditor } from "../agent/AgentCareerEntriesEditor";
 import { AgentManagedPlayersEditor } from "../agent/AgentManagedPlayersEditor";
 import {
   buildFullUpdatePayload,
@@ -38,7 +37,7 @@ import {
   type UploadedMediaItem,
 } from "../media-upload-service";
 import { colors, radius, spacing } from "../../../theme/tokens";
-import { AppText, Input, Toggle } from "../../../ui";
+import { AppText, Button, Input, Toggle } from "../../../ui";
 import { EditModalShell } from "./EditModalShell";
 import { OnboardingBaseFieldsSection } from "./OnboardingBaseFieldsSection";
 
@@ -119,23 +118,6 @@ function getInitialFormState(
   };
 }
 
-function mapCareerEntries(
-  completeProfile: CompleteProfessionalProfile,
-): AgentCareerEntryDraft[] {
-  return completeProfile.agentCareerEntries.length > 0
-    ? completeProfile.agentCareerEntries.map((entry) => ({
-        agency_logo_url: entry.agency_logo_url,
-        agency_name: entry.agency_name ?? "",
-        id: entry.id,
-        period_end_month: entry.period_end_month,
-        period_end_year: entry.period_end_year,
-        period_start_month: entry.period_start_month,
-        period_start_year: entry.period_start_year,
-        role: entry.role,
-      }))
-    : [];
-}
-
 function mapManagedPlayers(
   completeProfile: CompleteProfessionalProfile,
 ): AgentManagedPlayerEntryDraft[] {
@@ -161,9 +143,6 @@ export function EditAgentProfileModal({
   const [form, setForm] = useState<AgentProfileFormState>(() =>
     getInitialFormState(completeProfile),
   );
-  const [careerEntries, setCareerEntries] = useState<AgentCareerEntryDraft[]>(() =>
-    mapCareerEntries(completeProfile),
-  );
   const [managedPlayers, setManagedPlayers] = useState<AgentManagedPlayerEntryDraft[]>(() =>
     mapManagedPlayers(completeProfile),
   );
@@ -176,7 +155,6 @@ export function EditAgentProfileModal({
     }
 
     setForm(getInitialFormState(completeProfile));
-    setCareerEntries(mapCareerEntries(completeProfile));
     setManagedPlayers(mapManagedPlayers(completeProfile));
     setUploadingField(null);
   }, [completeProfile, visible]);
@@ -349,9 +327,6 @@ export function EditAgentProfileModal({
       };
       const basePayload = buildFullUpdatePayload(completeProfile, mergedState);
       basePayload.profile.birth_date = birthDateResult.isoValue;
-      const sanitizedCareerEntries = careerEntries.filter(
-        (entry) => entry.agency_name.trim().length > 0,
-      );
       const sanitizedManagedPlayers = managedPlayers.filter(
         (entry) => entry.display_name.trim().length > 0,
       );
@@ -362,18 +337,9 @@ export function EditAgentProfileModal({
       const derivedPlayerTypes = deriveLegacyPlayerTypes(sanitizedManagedPlayers);
 
       await updateCompleteProfessionalProfile({
-        agentCareerEntries: sanitizedCareerEntries.map((entry, index) => ({
-          agency_logo_url: entry.agency_logo_url,
-          agency_name: entry.agency_name.trim(),
-          agent_profile_id: userId,
-          id: entry.id,
-          period_end_month: null,
-          period_end_year: entry.period_end_year,
-          period_start_month: null,
-          period_start_year: entry.period_start_year,
-          role: entry.role.trim() || "Procuratore",
-          sort_order: index,
-        })),
+        // `agentCareerEntries` resta assente di proposito: la RPC lo legge come
+        // "non è affar mio" e lascia la carriera dov'è. Passarne una copia da
+        // qui avrebbe cancellato gli incarichi scritti dalla gestione carriera.
         agentManagedPlayerEntries: sanitizedManagedPlayers.map((entry, index) => ({
           agent_profile_id: userId,
           avatar_url: entry.avatar_url,
@@ -661,12 +627,26 @@ export function EditAgentProfileModal({
         />
       </View>
 
+      {/*
+        REV-PROF-15: la carriera non si modifica più da qui. Le esperienze
+        hanno un modulo proprio — periodi, incarichi contemporanei, esperienza
+        principale — e tenerne una seconda copia in questo editor era il modo
+        in cui i due si sarebbero contraddetti al primo salvataggio.
+      */}
       <View style={styles.fieldGroup}>
-        <AppText variant="titleSm">Esperienze precedenti</AppText>
-        <AgentCareerEntriesEditor
-          addButtonLabel="Aggiungi esperienza precedente"
-          entries={careerEntries}
-          onChange={setCareerEntries}
+        <AppText variant="titleSm">Carriera professionale</AppText>
+        <AppText color="secondary" variant="bodySm">
+          Le esperienze professionali si gestiscono da "Gestisci carriera".
+        </AppText>
+        <Button
+          label="Gestisci carriera"
+          onPress={() => {
+            onClose();
+            router.push("/profile/agent-career" as never);
+          }}
+          size="sm"
+          testID="agent-profile-manage-career"
+          variant="secondary"
         />
       </View>
     </EditModalShell>

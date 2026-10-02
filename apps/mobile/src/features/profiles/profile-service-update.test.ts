@@ -993,10 +993,26 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         {
           agency_logo_url: null,
           agency_name: "Agency Before",
+          /*
+            REV-PROF-15: il payload porta anche le colonne canoniche. Un client
+            che non le conosce le manda a `null`, e la RPC le deduce dal dato
+            invece di azzerarle — il mese mancante resta un dato annuale, non
+            un gennaio inventato.
+          */
+          description: null,
           id: "11111111-1111-4111-8111-111111111111",
+          is_current: null,
+          is_primary: null,
+          manual_organization_id: null,
+          organization_city: null,
+          organization_club_id: null,
+          organization_country: null,
+          organization_mode: null,
           period_end_month: null,
+          period_end_precision: null,
           period_end_year: 2020,
           period_start_month: null,
+          period_start_precision: null,
           period_start_year: 2018,
           role: "Scout",
           sort_order: 0,

@@ -41,13 +41,22 @@ import { assignmentsToDirectorEntries } from "./director-assignment-model";
 
 export { useCompleteProfileQuery } from "../edit/player-profile-edit-service";
 
-/** Colonna di `director_profiles` su cui scrive ciascuna corsia. */
-const LANE_COLUMNS: Record<AssignmentLane, keyof DirectorCareerColumns> = {
-  coach: "coach_career_entries",
-  other: "other_career_entries",
-  primary: "career_entries",
-  staff: "staff_career_entries",
-};
+/**
+ * Colonna di `director_profiles` su cui scrive ciascuna corsia.
+ *
+ * La mappa e parziale perche le corsie sono quelle dei ruoli che hanno un
+ * percorso aggiuntivo, non quelle di questo profilo: la corsia `director`
+ * esiste per il Procuratore (REV-PROF-15) e qui non ha una colonna, perche per
+ * un Dirigente quella e gia la carriera principale. Una corsia senza colonna
+ * non scrive niente invece di finire nella colonna sbagliata.
+ */
+const LANE_COLUMNS: Partial<Record<AssignmentLane, keyof DirectorCareerColumns>> =
+  {
+    coach: "coach_career_entries",
+    other: "other_career_entries",
+    primary: "career_entries",
+    staff: "staff_career_entries",
+  };
 
 export type DirectorCareerPatch = {
   /** Assegnazioni di una corsia ad assegnazione. `undefined` la lascia com'è. */
@@ -70,10 +79,10 @@ export function buildDirectorCareerColumns(
     staff_career_entries: [...(directorProfile?.staff_career_entries ?? [])],
   };
 
-  if (patch.lane && patch.assignments) {
-    columns[LANE_COLUMNS[patch.lane]] = assignmentsToDirectorEntries(
-      patch.assignments,
-    );
+  const column = patch.lane ? LANE_COLUMNS[patch.lane] : undefined;
+
+  if (column && patch.assignments) {
+    columns[column] = assignmentsToDirectorEntries(patch.assignments);
   }
 
   if (patch.playerCareerEntries) {

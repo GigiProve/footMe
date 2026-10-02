@@ -1099,6 +1099,13 @@ function normalizeAgentProfileRecord(
     agency_logo_url: normalizeOptionalText(rawProfile.agency_logo_url),
     agency_name: normalizeOptionalText(rawProfile.agency_name),
     agency_role: normalizeOptionalText(rawProfile.agency_role),
+    career_migrated_at: normalizeOptionalText(rawProfile.career_migrated_at),
+    coach_career_entries: Array.isArray(rawProfile.coach_career_entries)
+      ? rawProfile.coach_career_entries
+      : [],
+    director_career_entries: Array.isArray(rawProfile.director_career_entries)
+      ? rawProfile.director_career_entries
+      : [],
     federation: normalizeOptionalText(rawProfile.federation),
     has_no_previous_experience: normalizeBoolean(
       rawProfile.has_no_previous_experience,
@@ -1134,6 +1141,9 @@ function normalizeAgentProfileRecord(
     previous_roles: normalizeStringArray(rawProfile.previous_roles),
     professional_mode: normalizeOptionalText(rawProfile.professional_mode),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+    staff_career_entries: Array.isArray(rawProfile.staff_career_entries)
+      ? rawProfile.staff_career_entries
+      : [],
     works_abroad: normalizeBoolean(rawProfile.works_abroad),
   } satisfies AgentProfileRecord;
 }
@@ -1147,6 +1157,7 @@ function normalizeAgentCareerEntryRecord(
     agency_logo_url: normalizeOptionalText(rawEntry.agency_logo_url),
     agency_name: normalizeOptionalText(rawEntry.agency_name),
     agent_profile_id: normalizeRequiredText(rawEntry.agent_profile_id, profileId),
+    description: normalizeOptionalText(rawEntry.description),
     id: normalizeRequiredText(rawEntry.id, `${profileId}-agent-career-${index}`),
     /*
       Un record scritto prima di REV-PROF-13 non porta questi campi: l'assenza
@@ -1158,11 +1169,32 @@ function normalizeAgentCareerEntryRecord(
         ? rawEntry.is_current
         : rawEntry.period_end_year == null && rawEntry.period_end_month == null,
     is_primary: rawEntry.is_primary === true,
+    manual_organization_id: normalizeOptionalText(rawEntry.manual_organization_id),
+    organization_city: normalizeOptionalText(rawEntry.organization_city),
+    organization_club_id: normalizeOptionalText(rawEntry.organization_club_id),
+    organization_country: normalizeOptionalText(rawEntry.organization_country),
     organization_mode:
       rawEntry.organization_mode === "independent" ? "independent" : "agency",
     period_end_month: normalizeOptionalText(rawEntry.period_end_month),
+    /*
+      REV-PROF-15: un record senza mese non e un record a cui manca un mese, e
+      un dato annuale. In assenza della colonna si deduce dal dato stesso,
+      mai inventando gennaio o dicembre.
+    */
+    period_end_precision:
+      rawEntry.period_end_precision === "year" ||
+      (rawEntry.period_end_precision == null &&
+        normalizeOptionalText(rawEntry.period_end_month) === null)
+        ? "year"
+        : "month",
     period_end_year: normalizeNumber(rawEntry.period_end_year),
     period_start_month: normalizeOptionalText(rawEntry.period_start_month),
+    period_start_precision:
+      rawEntry.period_start_precision === "year" ||
+      (rawEntry.period_start_precision == null &&
+        normalizeOptionalText(rawEntry.period_start_month) === null)
+        ? "year"
+        : "month",
     period_start_year: normalizeNumber(rawEntry.period_start_year),
     role: normalizeRequiredText(rawEntry.role, "Procuratore"),
     sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
@@ -1929,7 +1961,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("agent_profiles")
           .select(
-            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, license_number, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions, operating_provinces, operating_area_type, operating_countries, works_abroad, activity_scopes, portfolio_range, professional_mode, previous_roles, has_no_previous_experience",
+            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, coach_career_entries, staff_career_entries, director_career_entries, career_migrated_at, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, license_number, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions, operating_provinces, operating_area_type, operating_countries, works_abroad, activity_scopes, portfolio_range, professional_mode, previous_roles, has_no_previous_experience",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -2257,7 +2289,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       supabase
         .from("agent_career_entries")
         .select(
-          "id, agent_profile_id, agency_name, agency_logo_url, role, period_start_month, period_start_year, period_end_month, period_end_year, sort_order, is_current, is_primary, organization_mode, visibility",
+          "id, agent_profile_id, agency_name, agency_logo_url, organization_club_id, manual_organization_id, organization_city, organization_country, description, role, period_start_month, period_start_year, period_start_precision, period_end_month, period_end_year, period_end_precision, sort_order, is_current, is_primary, organization_mode, visibility",
         )
         .eq("agent_profile_id", profileId)
         .order("sort_order", { ascending: true }),
@@ -2647,17 +2679,37 @@ export async function updateCompleteProfessionalProfile(
   if (input.role === "agent" && input.agentProfile) {
     const { error } = await supabase.rpc("save_agent_profile_details", {
       p_agent_profile: input.agentProfile,
-      p_career_entries: (input.agentCareerEntries ?? []).map((entry, index) => ({
-        agency_logo_url: entry.agency_logo_url,
-        agency_name: entry.agency_name,
-        ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
-        period_end_month: entry.period_end_month,
-        period_end_year: entry.period_end_year,
-        period_start_month: entry.period_start_month,
-        period_start_year: entry.period_start_year,
-        role: entry.role,
-        sort_order: entry.sort_order ?? index,
-      })),
+      /*
+        REV-PROF-15: la carriera appartiene alla Gestione carriera, non
+        all'editor di profilo. `null` dice alla RPC di non toccarla: senza,
+        un salvataggio del profilo cancellerebbe gli incarichi scritti da
+        quel modulo. Chi la possiede davvero — l'onboarding — continua a
+        passare l'elenco completo, comprese le colonne canoniche.
+      */
+      p_career_entries:
+        input.agentCareerEntries === undefined
+          ? null
+          : input.agentCareerEntries.map((entry, index) => ({
+              agency_logo_url: entry.agency_logo_url,
+              agency_name: entry.agency_name,
+              description: entry.description ?? null,
+              ...(isUuidLike(entry.id) ? { id: entry.id } : {}),
+              is_current: entry.is_current ?? null,
+              is_primary: entry.is_primary ?? null,
+              manual_organization_id: entry.manual_organization_id ?? null,
+              organization_city: entry.organization_city ?? null,
+              organization_club_id: entry.organization_club_id ?? null,
+              organization_country: entry.organization_country ?? null,
+              organization_mode: entry.organization_mode ?? null,
+              period_end_month: entry.period_end_month,
+              period_end_precision: entry.period_end_precision ?? null,
+              period_end_year: entry.period_end_year,
+              period_start_month: entry.period_start_month,
+              period_start_precision: entry.period_start_precision ?? null,
+              period_start_year: entry.period_start_year,
+              role: entry.role,
+              sort_order: entry.sort_order ?? index,
+            })),
       p_managed_player_entries: (input.agentManagedPlayerEntries ?? []).map((entry, index) => ({
         avatar_url: entry.avatar_url,
         birth_year: entry.birth_year,
