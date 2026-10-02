@@ -1,3 +1,17 @@
+/**
+ * Superficie Media condivisa dai Master Profile — Calciatore, Allenatore,
+ * Staff tecnico, Dirigente e ogni profilo futuro che la riusi: griglia,
+ * filtri, viewer a schermo intero e azioni owner.
+ *
+ * REV-PROF-12, regola globale sulla griglia: le thumbnail non espongono
+ * alcun controllo "Salva". Nessuna icona bookmark, nessuno stato
+ * salvato/non salvato, nessuna hit-area invisibile — l'unico gesto della
+ * thumbnail è aprire il contenuto. Il salvataggio vive nel dettaglio
+ * contenuto (rail destro del viewer, lato Visitor) con il comportamento già
+ * esistente; badge durata, filtri, spacing e CTA owner restano invariati.
+ * Chi tocca questo file non reintroduca l'icona in griglia: la copertura è
+ * in `MediaTabContent.test.tsx`.
+ */
 import {
   type ComponentProps,
   useEffect,

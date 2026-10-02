@@ -2,7 +2,7 @@ import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 
-import { MediaTabContent } from "./MediaTabContent";
+import { MediaTabContent, type MediaContentItem } from "./MediaTabContent";
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: (props: Record<string, unknown>) => React.createElement("Ionicon", props),
@@ -126,5 +126,112 @@ describe("MediaTabContent", () => {
       .map((node) => node.props.testID);
 
     expect(gridItemIds[0]).toBe("media-grid-item-featured-item");
+  });
+
+  /*
+    REV-PROF-12: la griglia Media non ha più alcun "Salva" sulle thumbnail —
+    né icona, né stato, né hit-area invisibile — mentre il dettaglio contenuto
+    lo conserva. Il test vale per tutti i Master Profile, visto che montano
+    tutti questo componente.
+  */
+  const REV_PROF_12_ITEMS: MediaContentItem[] = [
+    {
+      commentCount: 3,
+      comments: [],
+      description: "Assist di tacco.",
+      durationSeconds: 24,
+      id: "clip",
+      isFeatured: false,
+      isLiked: false,
+      isSaved: true,
+      likeCount: 9,
+      thumbnailUrl: "https://example.com/clip.jpg",
+      type: "video",
+      videoUrl: "https://example.com/clip.mp4",
+    },
+    {
+      commentCount: 0,
+      comments: [],
+      description: "",
+      id: "shot",
+      isFeatured: false,
+      isLiked: false,
+      isSaved: false,
+      likeCount: 0,
+      thumbnailUrl: "https://example.com/shot.jpg",
+      type: "image",
+    },
+  ];
+
+  it.each(["owner", "visitor"] as const)(
+    "never renders a save control over the grid thumbnails (%s)",
+    (mode) => {
+      const tree = renderMediaTabContent(
+        <MediaTabContent
+          authorName="Alessandro Bianchi"
+          filtersEnabled
+          initialItems={[...REV_PROF_12_ITEMS]}
+          mode={mode}
+        />,
+      );
+
+      const grid = tree.root.findByProps({ testID: "media-grid" });
+
+      expect(
+        grid.findAll(
+          (node) =>
+            typeof node.props.name === "string" && node.props.name.startsWith("bookmark"),
+        ),
+      ).toHaveLength(0);
+      expect(
+        grid.findAll(
+          (node) =>
+            typeof node.props.accessibilityLabel === "string" &&
+            /salv/i.test(node.props.accessibilityLabel),
+        ),
+      ).toHaveLength(0);
+
+      /*
+        Un solo gesto per thumbnail: ogni nodo premibile dentro la cella è la
+        Pressable "apri contenuto" (o il suo host), nessun pulsante nascosto.
+      */
+      const tile = grid.findByProps({ testID: "media-grid-item-clip" });
+
+      expect(
+        tile
+          .findAll((node) => typeof node.props.onPress === "function")
+          .every((node) => node.props.testID === "media-grid-item-clip"),
+      ).toBe(true);
+
+      // Il badge durata resta: la rimozione tocca solo il bookmark.
+      expect(grid.findAllByProps({ children: "0:24" }).length).toBeGreaterThan(0);
+    },
+  );
+
+  it("keeps the save action in the content detail for the visitor", () => {
+    const tree = renderMediaTabContent(
+      <MediaTabContent
+        authorName="Alessandro Bianchi"
+        initialItems={[...REV_PROF_12_ITEMS]}
+        mode="visitor"
+      />,
+    );
+
+    act(() => {
+      tree.root.findByProps({ testID: "media-grid-item-clip" }).props.onPress();
+    });
+
+    function findSaveAction() {
+      return tree.root.findAllByProps({ accessibilityLabel: "Salva contenuto" })[0]!;
+    }
+
+    // Lo stato salvato arriva dal contenuto, non dalla griglia.
+    expect(findSaveAction().props.active).toBe(true);
+
+    act(() => {
+      findSaveAction().props.onPress();
+    });
+
+    expect(findSaveAction().props.active).toBe(false);
   });
 });
