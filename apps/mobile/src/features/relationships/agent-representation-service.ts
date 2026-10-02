@@ -29,6 +29,8 @@ export function getRelationshipTypeLabel(t: RelationshipType): string {
 
 export type AgentRepresentation = {
   agent_profile_id: string;
+  /** Data dichiarata di fine rapporto (REV-PROF-14), non il momento tecnico. */
+  ended_on?: string | null;
   id: string;
   message?: string | null;
   pending_visibility?: RepresentationVisibility | null;
@@ -36,6 +38,8 @@ export type AgentRepresentation = {
   private_note?: string | null;
   relationship_type: RelationshipType;
   requested_by: string;
+  /** Data dichiarata di inizio rapporto (REV-PROF-14). */
+  started_on?: string | null;
   status: RepresentationStatus;
   visibility: RepresentationVisibility;
 };
@@ -70,13 +74,19 @@ export async function requestRepresentation(
   opts: {
     message?: string;
     relationshipType?: RelationshipType;
+    startedOn?: string | null;
     visibility?: RepresentationVisibility;
   } = {},
 ): Promise<string> {
+  // `p_started_on` viene passato sempre, anche quando è null: se su un database
+  // con deriva di schema sopravvivesse la vecchia firma a quattro parametri, una
+  // chiamata senza di esso combacerebbe con entrambe le versioni e PostgREST la
+  // rifiuterebbe come ambigua.
   const { data, error } = await supabase.rpc("request_agent_representation", {
     p_message: opts.message ?? null,
     p_player_profile_id: playerProfileId,
     p_relationship_type: opts.relationshipType ?? "procuratore",
+    p_started_on: opts.startedOn ?? null,
     p_visibility: opts.visibility ?? "public",
   });
 
@@ -242,7 +252,7 @@ export async function fetchRepresentationDetail(id: string): Promise<
   const { data, error } = await supabase
     .from("agent_representations")
     .select(
-      "id, agent_profile_id, player_profile_id, status, visibility, requested_by, relationship_type, message, pending_visibility, private_note, profiles!agent_representations_agent_profile_id_fkey(full_name, avatar_url, role)",
+      "id, agent_profile_id, player_profile_id, status, visibility, requested_by, relationship_type, message, pending_visibility, private_note, started_on, ended_on, profiles!agent_representations_agent_profile_id_fkey(full_name, avatar_url, role)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -264,6 +274,7 @@ export async function fetchRepresentationDetail(id: string): Promise<
     agent_full_name: agent?.full_name ?? null,
     agent_profile_id: data.agent_profile_id,
     agent_role: agent?.role ?? null,
+    ended_on: data.ended_on ?? null,
     id: data.id,
     message: data.message ?? null,
     pending_visibility: data.pending_visibility ?? null,
@@ -271,6 +282,7 @@ export async function fetchRepresentationDetail(id: string): Promise<
     private_note: data.private_note ?? null,
     relationship_type: data.relationship_type as RelationshipType,
     requested_by: data.requested_by,
+    started_on: data.started_on ?? null,
     status: data.status as RepresentationStatus,
     visibility: data.visibility as RepresentationVisibility,
   };

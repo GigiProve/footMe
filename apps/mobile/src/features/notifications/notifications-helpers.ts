@@ -40,7 +40,8 @@ export function resolveNotificationCategory(
     item.type === "agent_representation_request" ||
     item.type === "agent_representation_responded" ||
     item.type === "agent_representation_visibility_proposed" ||
-    item.type === "agent_representation_removed"
+    item.type === "agent_representation_removed" ||
+    item.type === "agent_invite_reconciled"
   ) {
     return "richieste";
   }

@@ -153,7 +153,9 @@ export default function AgentPortfolioScreen() {
         <View style={styles.ownerActions}>
           <Button
             label="Gestisci assistiti"
-            onPress={() => router.push("/representation/add" as never)}
+            onPress={() =>
+              router.push("/representation/hub?source=portfolio" as never)
+            }
             variant="secondary"
           />
         </View>

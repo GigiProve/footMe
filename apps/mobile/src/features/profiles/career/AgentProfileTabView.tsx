@@ -80,6 +80,15 @@ type AgentProfileTabViewProps = {
   onManageMedia?: () => void;
   /** Entry point esistente alla gestione assistiti. Solo Owner. */
   onManageAssistiti?: () => void;
+  /**
+   * REV-PROF-14: la route lo incrementa quando il profilo torna in primo
+   * piano. Il profilo e' una tab e non viene rimontato al ritorno dallo stack
+   * della gestione assistiti: senza questo mostrerebbe i numeri di prima
+   * dell'operazione appena conclusa. Sta qui e non dentro il componente perche'
+   * importare il focus di expo-router da un file di `features` trascina il
+   * router in ogni test che renderizza questa tab.
+   */
+  refreshToken?: number;
   /** Apre il portfolio completo degli assistiti. */
   onOpenAllAssistiti?: () => void;
   onOpenAssistito?: (playerProfileId: string) => void;
@@ -103,6 +112,7 @@ export function AgentProfileTabView({
   onOpenAssistito,
   onOpenLinkedTarget,
   onToggleMediaFeatured,
+  refreshToken = 0,
 }: AgentProfileTabViewProps) {
   // Carriera è la tab iniziale, come negli altri Master Profile.
   const [activeTab, setActiveTab] = useState<ProfileTab>(() =>
@@ -123,6 +133,7 @@ export function AgentProfileTabView({
   const { assistiti, hasFailed, isLoading, reload } = usePublicAssistiti(
     completeProfile.profile.id,
     viewerMode,
+    refreshToken,
   );
 
   useEffect(() => {
@@ -251,6 +262,7 @@ export function AgentProfileTabView({
 function usePublicAssistiti(
   agentProfileId: string,
   viewerMode: "owner" | "visitor",
+  externalRefreshToken: number,
 ) {
   const [assistiti, setAssistiti] = useState<AgentPublicAssistito[]>([]);
   const [hasFailed, setHasFailed] = useState(false);
@@ -295,7 +307,7 @@ function usePublicAssistiti(
     return () => {
       isActive = false;
     };
-  }, [agentProfileId, reloadToken, viewerMode]);
+  }, [agentProfileId, externalRefreshToken, reloadToken, viewerMode]);
 
   return { assistiti, hasFailed, isLoading, reload };
 }

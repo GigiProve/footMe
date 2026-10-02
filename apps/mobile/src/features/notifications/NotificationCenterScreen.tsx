@@ -132,6 +132,14 @@ export function NotificationCenterScreen() {
       if (representationId) {
         router.push(`/representation/assistito/${representationId}` as never);
       }
+    } else if (item.type === "agent_invite_reconciled") {
+      // REV-PROF-14: l'assistito invitato si e' collegato. Il procuratore
+      // arriva sulla gestione del rapporto appena nato, non su un invito che
+      // ormai non esiste piu'.
+      const representationId = item.data?.representation_id;
+      if (representationId) {
+        router.push(`/representation/assistito/${representationId}` as never);
+      }
     } else if (item.type === "agent_representation_visibility_proposed") {
       const representationId = item.data?.representation_id;
       if (representationId) {

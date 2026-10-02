@@ -85,8 +85,16 @@ export const Linking = {
   addEventListener: () => ({
     remove: () => undefined,
   }),
+  canOpenURL: async () => true,
   getInitialURL: async () => null,
   openURL: async () => true,
+};
+// Lo share sheet di sistema: i test devono poter distinguere una condivisione
+// avvenuta da una annullata, perche' solo la prima cambia lo stato dell'invito.
+export const Share = {
+  dismissedAction: "dismissedAction",
+  share: async () => ({ action: "sharedAction" }),
+  sharedAction: "sharedAction",
 };
 export const Dimensions = {
   get: () => ({
@@ -231,6 +239,8 @@ export const StyleSheet = {
 };
 export const Platform = {
   OS: "ios",
+  select: (options: Record<string, unknown>) =>
+    options.ios ?? options.default ?? options.native,
 };
 export const findNodeHandle = () => 1;
 

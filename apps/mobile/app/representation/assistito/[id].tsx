@@ -1,7 +1,20 @@
-import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+/**
+ * Gestione di un rapporto attivo o di una richiesta pendente, lato Procuratore
+ * (REV-PROF-14).
+ *
+ * È l'unico form di modifica del rapporto: hub, notifiche e schermata richieste
+ * portano tutti qui, quindi tipo, visibilità e date hanno un solo posto dove
+ * cambiare.
+ *
+ * La visibilità non si modifica come gli altri campi: passare a "Pubblico"
+ * manda una proposta al calciatore e diventa effettiva solo con il suo
+ * consenso. Tornare privato è immediato, perché togliere visibilità non ha
+ * bisogno del permesso di nessuno.
+ */
+import { useCallback, useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Screen } from "../../../src/components/ui/screen";
 import { KeyboardAwareForm } from "../../../src/components/ui/keyboard-aware-form";
@@ -13,25 +26,48 @@ import {
   ConfirmModal,
   Divider,
   Input,
-  SectionCard,
   ScreenHeader,
   useToast,
 } from "../../../src/ui";
+import { useSession } from "../../../src/features/auth/use-session";
 import {
   fetchRepresentationDetail,
-  getRelationshipTypeLabel,
+  proposeVisibility,
   removeRepresentation,
   setPrivateNote,
+  type AgentRepresentation,
 } from "../../../src/features/relationships/agent-representation-service";
+import { trackAssistitiEvent } from "../../../src/features/relationships/assistiti/assistiti-analytics";
+import {
+  describeAssistitiError,
+  formatIsoDate,
+  isFutureDate,
+  parseStartDateInput,
+  type RelationshipType,
+  type RepresentationVisibility,
+} from "../../../src/features/relationships/assistiti/assistiti-model";
+import {
+  assistitiQueryKeys,
+  endRepresentation,
+  updateRepresentationTerms,
+} from "../../../src/features/relationships/assistiti/assistiti-service";
+import {
+  AssistitiSkeleton,
+  BackButton,
+  RelationshipTypeChoice,
+  SectionError,
+  VisibilityChoice,
+} from "../../../src/features/relationships/assistiti/assistiti-ui";
 import { supabase } from "../../../src/lib/supabase";
-import { colors, radius, shadows, spacing } from "../../../src/theme/tokens";
+import { colors, radius, spacing } from "../../../src/theme/tokens";
 
-type PlayerProfile = {
-  avatar_url: string | null;
-  full_name: string | null;
+type Detail = AgentRepresentation & {
+  agent_full_name: string | null;
 };
 
-async function fetchPlayerProfile(profileId: string): Promise<PlayerProfile> {
+type PendingAction = "end" | "remove" | null;
+
+async function fetchPlayerProfile(profileId: string) {
   const { data } = await supabase
     .from("profiles")
     .select("full_name, avatar_url")
@@ -39,267 +75,417 @@ async function fetchPlayerProfile(profileId: string): Promise<PlayerProfile> {
     .maybeSingle();
 
   return {
-    avatar_url: data?.avatar_url ?? null,
-    full_name: data?.full_name ?? null,
+    avatar_url: (data?.avatar_url as string | null) ?? null,
+    full_name: (data?.full_name as string | null) ?? null,
   };
 }
 
 export default function AssistitoDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const { profile } = useSession();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const representationId = typeof id === "string" ? id : "";
 
-  const backAction = (
-    <Pressable
-      accessibilityLabel="Indietro"
-      accessibilityRole="button"
-      hitSlop={8}
-      onPress={() => router.back()}
-      style={({ pressed }) => [styles.backButton, pressed ? styles.pressedOp : null]}
-    >
-      <Ionicons color={colors.textPrimary} name="arrow-back" size={20} />
-    </Pressable>
-  );
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const [player, setPlayer] = useState<{
+    avatar_url: string | null;
+    full_name: string | null;
+  }>({ avatar_url: null, full_name: null });
+  const [isLoading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [detail, setDetail] = useState<Awaited<
-    ReturnType<typeof fetchRepresentationDetail>
-  > | null>(null);
-  const [player, setPlayer] = useState<PlayerProfile>({
-    avatar_url: null,
-    full_name: null,
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+  const [relationshipType, setRelationshipType] =
+    useState<RelationshipType | null>(null);
+  const [visibility, setVisibility] =
+    useState<RepresentationVisibility | null>(null);
+  const [startedOn, setStartedOn] = useState("");
+  const [endedOn, setEndedOn] = useState("");
   const [note, setNote] = useState("");
-  const [savingNote, setSavingNote] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [isSaving, setSaving] = useState(false);
+  const [isSavingNote, setSavingNote] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [isActing, setActing] = useState(false);
 
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [terminating, setTerminating] = useState(false);
+  const load = useCallback(async () => {
+    if (!representationId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError(null);
+
+    try {
+      const row = await fetchRepresentationDetail(representationId);
+
+      if (!row) {
+        setLoadError("Collegamento non trovato.");
+        return;
+      }
+
+      setDetail(row);
+      setRelationshipType(row.relationship_type);
+      setVisibility(row.visibility);
+      setStartedOn(formatIsoDate(row.started_on ?? null));
+      setNote(row.private_note ?? "");
+      setPlayer(await fetchPlayerProfile(row.player_profile_id));
+    } catch {
+      setLoadError("Non è stato possibile caricare il rapporto.");
+    } finally {
+      setLoading(false);
+    }
+  }, [representationId]);
 
   useEffect(() => {
-    if (!id) return;
+    void load();
+  }, [load]);
 
-    let cancelled = false;
+  async function refreshLists() {
+    if (!profile?.id) {
+      return;
+    }
 
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const rep = await fetchRepresentationDetail(id as string);
-        if (cancelled) return;
-        if (!rep) {
-          setError("Collegamento non trovato.");
-          return;
-        }
-        setDetail(rep);
-        setNote(rep.private_note ?? "");
-        const prof = await fetchPlayerProfile(rep.player_profile_id);
-        if (!cancelled) {
-          setPlayer(prof);
-        }
-      } catch {
-        if (!cancelled) {
-          setError("Impossibile caricare i dati.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+    await queryClient.invalidateQueries({
+      queryKey: assistitiQueryKeys.overview(profile.id),
+    });
+    await queryClient.invalidateQueries({
+      queryKey: assistitiQueryKeys.counts(profile.id),
+    });
+  }
+
+  async function handleSave() {
+    if (!detail || isSaving) {
+      return;
+    }
+
+    let isoStart: string | null = null;
+
+    if (startedOn.trim()) {
+      isoStart = parseStartDateInput(startedOn);
+
+      if (!isoStart || isFutureDate(isoStart)) {
+        setFieldError("La data iniziale non è valida.");
+        return;
       }
     }
 
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+    setFieldError(null);
+    setSaving(true);
+
+    try {
+      await updateRepresentationTerms({
+        id: detail.id,
+        relationshipType: relationshipType ?? undefined,
+        startedOn: isoStart,
+      });
+
+      if (visibility && visibility !== detail.visibility) {
+        // Passa dalla proposta: il backend applica "privato" subito e manda
+        // "pubblico" in approvazione al calciatore.
+        await proposeVisibility(detail.id, visibility);
+      }
+
+      trackAssistitiEvent("assistiti_relationship_updated", {
+        relationshipType: relationshipType ?? undefined,
+        success: true,
+        visibility: visibility ?? undefined,
+      });
+
+      await refreshLists();
+      await load();
+      showToast({ message: "Rapporto aggiornato.", tone: "success" });
+    } catch (error) {
+      setFieldError(
+        describeAssistitiError(
+          error,
+          "Non è stato possibile aggiornare il rapporto. Riprova.",
+        ),
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleSaveNote() {
-    if (!id) return;
+    if (!detail) {
+      return;
+    }
+
     setSavingNote(true);
+
     try {
-      await setPrivateNote(id as string, note.trim());
-      showToast({ message: "Nota salvata." });
+      await setPrivateNote(detail.id, note.trim());
+      showToast({ message: "Nota salvata.", tone: "success" });
     } catch {
-      showToast({ message: "Errore nel salvataggio della nota." });
+      showToast({ message: "Non è stato possibile salvare la nota." });
     } finally {
       setSavingNote(false);
     }
   }
 
-  async function handleTerminate() {
-    if (!id) return;
-    setTerminating(true);
+  async function handlePendingAction() {
+    if (!detail || !pendingAction) {
+      return;
+    }
+
+    setActing(true);
+
     try {
-      await removeRepresentation(id as string);
-      showToast({ message: "Collegamento terminato." });
-      setShowConfirm(false);
+      if (pendingAction === "end") {
+        let isoEnd: string | null = null;
+
+        if (endedOn.trim()) {
+          isoEnd = parseStartDateInput(endedOn);
+
+          if (!isoEnd || isFutureDate(isoEnd)) {
+            setFieldError("La data finale non è valida.");
+            setPendingAction(null);
+            return;
+          }
+        }
+
+        await endRepresentation(detail.id, isoEnd);
+        trackAssistitiEvent("assistiti_relationship_ended", { success: true });
+        showToast({ message: "Rapporto concluso.", tone: "success" });
+      } else {
+        await removeRepresentation(detail.id);
+        trackAssistitiEvent("assistiti_relationship_removed", { success: true });
+        showToast({ message: "Collegamento rimosso.", tone: "success" });
+      }
+
+      await refreshLists();
+      setPendingAction(null);
       router.back();
-    } catch {
-      showToast({ message: "Errore nella terminazione del collegamento." });
-      setShowConfirm(false);
+    } catch (error) {
+      showToast({
+        message: describeAssistitiError(
+          error,
+          "Non è stato possibile aggiornare il rapporto. Riprova.",
+        ),
+      });
+      setPendingAction(null);
     } finally {
-      setTerminating(false);
+      setActing(false);
     }
   }
 
   const playerName = player.full_name ?? "Calciatore";
-
-  if (loading) {
-    return (
-      <Screen>
-        <ScreenHeader title="Dettaglio assistito" action={backAction} />
-        <View style={styles.centered}>
-          <AppText variant="bodySm" color="secondary">
-            Caricamento...
-          </AppText>
-        </View>
-      </Screen>
-    );
-  }
-
-  if (error || !detail) {
-    return (
-      <Screen>
-        <ScreenHeader title="Dettaglio assistito" action={backAction} />
-        <View style={styles.centered}>
-          <AppText variant="bodySm" color="secondary">
-            {error ?? "Collegamento non trovato."}
-          </AppText>
-        </View>
-      </Screen>
-    );
-  }
-
-  const visibilityLabel =
-    detail.visibility === "public" ? "Pubblico" : "Privato";
-  const relationshipLabel = getRelationshipTypeLabel(detail.relationship_type);
-  const subtitleLine = `${relationshipLabel} • ${visibilityLabel}`;
-
-  const isActive =
-    detail.status === "accepted" || detail.status === "pending";
-  const statusLabel = detail.status === "accepted" ? "Attivo" : "In attesa";
-  const statusBadgeVariant =
-    detail.status === "accepted" ? "success" : "warning";
+  const isAccepted = detail?.status === "accepted";
+  const isPending = detail?.status === "pending";
 
   return (
     <Screen>
-      <ScreenHeader title="Dettaglio assistito" action={backAction} />
-
-      <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
-        {/* Player header card */}
-        <View style={styles.playerCard}>
-          <Avatar uri={player.avatar_url ?? undefined} name={playerName} size="lg" />
-          <View style={styles.playerInfo}>
-            <AppText variant="titleSm" numberOfLines={1}>
-              {playerName}
-            </AppText>
-            <AppText variant="bodySm" color="secondary" numberOfLines={1}>
-              {subtitleLine}
-            </AppText>
-            <Badge label={statusLabel} variant={statusBadgeVariant} />
-          </View>
-        </View>
-
-        {/* Vedi profilo link */}
-        <Button
-          label="Vedi profilo"
-          onPress={() =>
-            router.push({
-              pathname: "/profile/[id]",
-              params: { id: detail.player_profile_id },
-            })
-          }
-          size="sm"
-          variant="outline"
-        />
-
-        <Divider />
-
-        {/* Nota privata */}
-        <SectionCard title="Nota privata">
-          <AppText variant="caption" color="secondary" style={styles.noteHelp}>
-            Visibile solo a te.
-          </AppText>
-          <Input
-            multiline
-            placeholder="Aggiungi una nota privata su questo assistito..."
-            value={note}
-            onChangeText={setNote}
-          />
-          <Button
-            label="Salva nota"
-            loading={savingNote}
-            onPress={handleSaveNote}
-            variant="primary"
-            fullWidth
-          />
-        </SectionCard>
-
-        {/* Termina collegamento */}
-        {isActive ? (
-          <>
-            <Divider />
-            <Button
-              label="Termina collegamento"
-              onPress={() => setShowConfirm(true)}
-              variant="danger"
-              fullWidth
-            />
-          </>
-        ) : null}
-      </KeyboardAwareForm>
-
-      <ConfirmModal
-        cancelLabel="Annulla"
-        confirmLabel="Termina"
-        isBusy={terminating}
-        message={`${playerName} non comparirà più tra i tuoi assistiti. Il collegamento sarà rimosso anche dal profilo del calciatore.`}
-        onCancel={() => setShowConfirm(false)}
-        onConfirm={handleTerminate}
-        title="Terminare collegamento?"
-        visible={showConfirm}
+      <ScreenHeader
+        leading={<BackButton onPress={() => router.back()} />}
+        title="Gestisci rapporto"
       />
+
+      {isLoading ? (
+        <AssistitiSkeleton rows={3} />
+      ) : loadError || !detail ? (
+        <SectionError
+          message={loadError ?? "Collegamento non trovato."}
+          onRetry={() => void load()}
+        />
+      ) : (
+        <>
+          <KeyboardAwareForm contentContainerStyle={styles.form}>
+            <View style={styles.playerCard}>
+              <Avatar
+                name={playerName}
+                size="lg"
+                uri={player.avatar_url ?? undefined}
+              />
+              <View style={styles.playerBody}>
+                <AppText numberOfLines={1} variant="titleSm">
+                  {playerName}
+                </AppText>
+                <Badge
+                  label={
+                    isAccepted
+                      ? "Attivo"
+                      : isPending
+                        ? "In attesa"
+                        : "Non attivo"
+                  }
+                  variant={isAccepted ? "success" : "warning"}
+                />
+                {detail.pending_visibility ? (
+                  <AppText color="secondary" variant="caption">
+                    Proposta di visibilità in attesa di conferma.
+                  </AppText>
+                ) : null}
+              </View>
+            </View>
+
+            <Button
+              label="Vedi profilo"
+              onPress={() =>
+                router.push({
+                  params: { id: detail.player_profile_id },
+                  pathname: "/profile/[id]",
+                })
+              }
+              size="sm"
+              variant="outline"
+            />
+
+            <Divider />
+
+            <View style={styles.block}>
+              <AppText color="muted" variant="eyebrow">
+                Tipo di rapporto
+              </AppText>
+              <RelationshipTypeChoice
+                onChange={setRelationshipType}
+                value={relationshipType}
+              />
+            </View>
+
+            <View style={styles.block}>
+              <AppText color="muted" variant="eyebrow">
+                Visibilità nel profilo
+              </AppText>
+              <VisibilityChoice onChange={setVisibility} value={visibility} />
+              <AppText color="muted" variant="caption">
+                Rendere pubblico il rapporto richiede la conferma del
+                Calciatore.
+              </AppText>
+            </View>
+
+            <Input
+              keyboardType="numbers-and-punctuation"
+              label="Dal"
+              onChangeText={setStartedOn}
+              placeholder="Anno (2024) o gg/mm/aaaa"
+              testID="assistito-detail-start"
+              value={startedOn}
+            />
+
+            {fieldError ? (
+              <AppText color="danger" variant="bodySm">
+                {fieldError}
+              </AppText>
+            ) : null}
+
+            <Button
+              fullWidth
+              label="Salva modifiche"
+              loading={isSaving}
+              onPress={() => void handleSave()}
+              testID="assistito-detail-save"
+            />
+
+            <Divider />
+
+            <View style={styles.block}>
+              <AppText color="muted" variant="eyebrow">
+                Nota privata
+              </AppText>
+              <AppText color="secondary" variant="caption">
+                Visibile solo a te.
+              </AppText>
+              <Input
+                multiline
+                onChangeText={setNote}
+                placeholder="Aggiungi una nota privata su questo assistito…"
+                value={note}
+              />
+              <Button
+                label="Salva nota"
+                loading={isSavingNote}
+                onPress={() => void handleSaveNote()}
+                size="sm"
+                variant="secondary"
+              />
+            </View>
+
+            {isAccepted ? (
+              <>
+                <Divider />
+                <View style={styles.block}>
+                  <AppText color="muted" variant="eyebrow">
+                    Concludi rapporto
+                  </AppText>
+                  <Input
+                    keyboardType="numbers-and-punctuation"
+                    label="Data finale (facoltativa)"
+                    onChangeText={setEndedOn}
+                    placeholder="Anno (2026) o gg/mm/aaaa"
+                    value={endedOn}
+                  />
+                  <Button
+                    fullWidth
+                    label="Concludi rapporto"
+                    onPress={() => setPendingAction("end")}
+                    variant="outline"
+                  />
+                </View>
+              </>
+            ) : null}
+
+            <Divider />
+
+            <Button
+              destructive
+              fullWidth
+              label="Rimuovi collegamento"
+              onPress={() => setPendingAction("remove")}
+              variant="danger"
+            />
+          </KeyboardAwareForm>
+
+          <ConfirmModal
+            cancelLabel="Annulla"
+            confirmLabel={
+              pendingAction === "end" ? "Concludi rapporto" : "Rimuovi"
+            }
+            destructive
+            isBusy={isActing}
+            message={
+              pendingAction === "end"
+                ? "Il rapporto verrà spostato nello storico e non comparirà più tra gli assistiti attivi."
+                : `${playerName} verrà rimosso dal tuo portfolio.`
+            }
+            onCancel={() => setPendingAction(null)}
+            onConfirm={() => void handlePendingAction()}
+            title={
+              pendingAction === "end"
+                ? "Concludere questo rapporto?"
+                : "Rimuovere il collegamento?"
+            }
+            visible={pendingAction != null}
+          />
+        </>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  backButton: {
-    alignItems: "center",
-    height: 40,
-    justifyContent: "center",
-    width: 40,
+  block: {
+    gap: spacing[8],
   },
-  pressedOp: {
-    opacity: 0.6,
-  },
-  scrollContent: {
+  form: {
     gap: spacing[16],
     paddingBottom: spacing[40],
   },
-  centered: {
+  playerBody: {
+    alignItems: "flex-start",
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    gap: spacing[6],
+    minWidth: 0,
   },
   playerCard: {
     alignItems: "center",
-    backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius[8],
+    borderRadius: radius[16],
     borderWidth: 1,
     flexDirection: "row",
     gap: spacing[14],
     padding: spacing[16],
-    ...shadows.subtle,
-  },
-  playerInfo: {
-    flex: 1,
-    gap: spacing[6],
-  },
-  noteHelp: {
-    marginBottom: spacing[8],
   },
 });

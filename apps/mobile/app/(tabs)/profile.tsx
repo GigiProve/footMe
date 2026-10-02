@@ -248,9 +248,16 @@ export default function ProfileScreen() {
     fetch all apertura della tab.
   */
   const hasLoadedOnFocus = useRef(false);
+  const [profileRefreshToken, setProfileRefreshToken] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
+      // REV-PROF-14: il portfolio assistiti vive dentro la tab del profilo e
+      // non viene rimontato al ritorno dalla gestione. Il token lo costringe a
+      // rileggere la proiezione pubblica, cosi' conteggi ed elenco non restano
+      // indietro di un'operazione.
+      setProfileRefreshToken((token) => token + 1);
+
       if (!hasLoadedOnFocus.current) {
         hasLoadedOnFocus.current = true;
         return;
@@ -974,12 +981,15 @@ export default function ProfileScreen() {
             onDeleteMedia={handleDeleteAgentMedia}
             onEditMedia={(itemId) => handleManageAgentMedia(itemId)}
             onEditProfile={() => handleEdit("agentProfile")}
-            onManageAssistiti={() => router.push("/representation/add" as never)}
+            onManageAssistiti={() =>
+              router.push("/representation/hub?source=profile" as never)
+            }
             onManageMedia={() => handleManageAgentMedia()}
             onOpenAllAssistiti={() =>
               router.push(`/representation/portfolio/${profileId}` as never)
             }
             onOpenAssistito={handleOpenProfile}
+            refreshToken={profileRefreshToken}
           />
         ) : completeProfile && role === "director" ? (
           <DirectorProfileTabView

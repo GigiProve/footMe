@@ -18,6 +18,7 @@ import { PhoneInputWithCountryCode } from "../../src/components/ui/phone-input-w
 import { ResidenceCityInput } from "../../src/components/ui/residence-city-input";
 import { SelectField } from "../../src/components/ui/select-field";
 import { useSession } from "../../src/features/auth/use-session";
+import { syncOnboardingPortfolio } from "../../src/features/relationships/assistiti/assistiti-service";
 import {
   createInitialProfile,
   BaseProfileValidationError,
@@ -1768,6 +1769,20 @@ export default function OnboardingProfileScreen() {
           showInstagram: false,
         },
       });
+
+      // REV-PROF-14: il portfolio dell'onboarding entra nel modello canonico.
+      // Chi era collegato a un profilo reale riceve una richiesta di
+      // collegamento, chi era un nome scritto a mano diventa un record manuale
+      // privato. L'onboarding tiene la sua composizione visuale, ma la logica
+      // di dominio e' la stessa della gestione assistiti: senza questo, il
+      // Master Profile continuerebbe a leggere una lista che nessuno ha mai
+      // accettato. Idempotente, e un errore qui non puo' far fallire la
+      // registrazione appena completata.
+      try {
+        await syncOnboardingPortfolio();
+      } catch {
+        // Il procuratore potra' ricollegare gli assistiti dall'hub.
+      }
 
       trackAgentOnboardingEvent({ name: "onboarding_procurator_completed" });
       goToCompletion("agent_presentation");

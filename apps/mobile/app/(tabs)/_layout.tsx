@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "../../src/features/auth/use-session";
 import { fetchCommunications } from "../../src/features/messaging/communications-service";
 import { fetchInboxConversations } from "../../src/features/messaging/messaging-service";
+import { usePendingAssistitoInvite } from "../../src/features/relationships/assistiti/use-pending-assistito-invite";
 import { AppSidebar } from "../../src/ui/sidebar";
 import { colors, radius, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
 import { AppText, Icon, type IconName } from "../../src/ui";
@@ -34,6 +35,10 @@ export default function TabsLayout() {
     queryFn: () => fetchCommunications(),
     queryKey: ["communications", profileId],
   });
+
+  // Un invito aperto prima del login riparte da qui: le tab sono il punto in
+  // cui confluiscono sia chi accede sia chi finisce l'onboarding.
+  usePendingAssistitoInvite(Boolean(session) && !needsOnboarding && !isLoading);
 
   const unreadThreadsCount = profileId
     ? (conversationsQuery.data ?? []).filter((item) => item.unread_count > 0).length +
