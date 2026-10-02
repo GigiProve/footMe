@@ -20,6 +20,7 @@ import {
   type CoachMediaItemRecord,
 } from "./coach-media";
 import type {
+  AgentCareerEntryInput,
   AgentCareerEntryRecord,
   AgentManagedPlayerEntryRecord,
   AgentPlayerCandidate,
@@ -44,6 +45,7 @@ import {
 } from "./director-media";
 
 export type {
+  AgentCareerEntryInput,
   AgentCareerEntryRecord,
   AgentManagedPlayerEntryRecord,
   AgentPlayerCandidate,
@@ -673,7 +675,12 @@ export type CompleteProfessionalProfileUpdate = {
     region: string;
     website_url: string | null;
   } | null;
-  agentCareerEntries?: AgentCareerEntryRecord[];
+  /**
+   * REV-PROF-13: lo stato canonico dell'esperienza — in corso, principale,
+   * modalità organizzativa, visibilità — è derivato dal database, non scritto
+   * dagli editor. Chi salva la carriera manda i soli campi che modifica.
+   */
+  agentCareerEntries?: AgentCareerEntryInput[];
   agentManagedPlayerEntries?: AgentManagedPlayerEntryRecord[];
   clubSeasonEntries: ClubSeasonEntryInput[];
   coachProfile: {
@@ -1138,15 +1145,28 @@ function normalizeAgentCareerEntryRecord(
 ) {
   return {
     agency_logo_url: normalizeOptionalText(rawEntry.agency_logo_url),
-    agency_name: normalizeRequiredText(rawEntry.agency_name, ""),
+    agency_name: normalizeOptionalText(rawEntry.agency_name),
     agent_profile_id: normalizeRequiredText(rawEntry.agent_profile_id, profileId),
     id: normalizeRequiredText(rawEntry.id, `${profileId}-agent-career-${index}`),
+    /*
+      Un record scritto prima di REV-PROF-13 non porta questi campi: l'assenza
+      di una data di fine resta la lettura di riserva di "in corso", la stessa
+      che la migrazione usa per il backfill.
+    */
+    is_current:
+      typeof rawEntry.is_current === "boolean"
+        ? rawEntry.is_current
+        : rawEntry.period_end_year == null && rawEntry.period_end_month == null,
+    is_primary: rawEntry.is_primary === true,
+    organization_mode:
+      rawEntry.organization_mode === "independent" ? "independent" : "agency",
     period_end_month: normalizeOptionalText(rawEntry.period_end_month),
     period_end_year: normalizeNumber(rawEntry.period_end_year),
     period_start_month: normalizeOptionalText(rawEntry.period_start_month),
     period_start_year: normalizeNumber(rawEntry.period_start_year),
     role: normalizeRequiredText(rawEntry.role, "Procuratore"),
     sort_order: normalizeNumber(rawEntry.sort_order) ?? index,
+    visibility: rawEntry.visibility === "private" ? "private" : "public",
   } satisfies AgentCareerEntryRecord;
 }
 
@@ -2237,7 +2257,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       supabase
         .from("agent_career_entries")
         .select(
-          "id, agent_profile_id, agency_name, agency_logo_url, role, period_start_month, period_start_year, period_end_month, period_end_year, sort_order",
+          "id, agent_profile_id, agency_name, agency_logo_url, role, period_start_month, period_start_year, period_end_month, period_end_year, sort_order, is_current, is_primary, organization_mode, visibility",
         )
         .eq("agent_profile_id", profileId)
         .order("sort_order", { ascending: true }),

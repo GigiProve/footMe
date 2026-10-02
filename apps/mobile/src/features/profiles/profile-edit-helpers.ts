@@ -22,6 +22,12 @@ import {
   buildDirectorProfileCareer,
   resolveDirectorPrimaryRole,
 } from "./career/director-career-model";
+import {
+  buildAgentProfileCareer,
+  formatAgentOrganizationLabel,
+} from "./career/agent-career-model";
+import { buildAgentLicenseLabel } from "../onboarding/agent/agent-taxonomy";
+import type { ProfileHeroBadge } from "./master/ProfileHeroHeader";
 import type { ProfileQuickFact } from "./master/ProfileQuickFacts";
 import type { ClubSeasonForm } from "./club-season-section";
 import { formToInput, recordToForm } from "./club-season-section";
@@ -765,13 +771,17 @@ export type CoachProfileHeaderDetails = {
   quickFacts: ProfileQuickFact[];
 };
 
-export type AgentProfileHeaderDetails = {
-  agencyLabel?: string;
-  bio: string | null;
-  fullName: string;
-  locationLabel?: string;
-  primaryRole: string;
-  statusBadge?: string;
+/**
+ * Header del Master Profile Procuratore (REV-PROF-13, Screen 1).
+ *
+ * Stessa forma di `StaffProfileHeaderDetails`, perché l'header è lo stesso
+ * componente condiviso: cambia solo da dove arrivano ruolo, organizzazione
+ * attuale e disponibilità. In più c'è la pill della licenza, che gli altri
+ * ruoli non hanno.
+ */
+export type AgentProfileHeaderDetails = StaffProfileHeaderDetails & {
+  /** Pill "Licenza FIGC (Italia)", costruita dai dati o assente. */
+  badges: ProfileHeroBadge[];
 };
 
 export function buildPlayerProfileHeaderDetails(
@@ -944,31 +954,162 @@ function buildCoachQuickFacts({
   ];
 }
 
+/**
+ * Header del Master Profile Procuratore (REV-PROF-13, Screen 1).
+ *
+ * Agenzia e ruolo non vengono più da `agent_profiles.agency_name` /
+ * `agency_role`: vengono dall'incarico in corso della carriera, la stessa
+ * fonte che alimenta "Situazione attuale" nei Dettagli. Se nessun incarico è
+ * in corso la riga non compare, invece di promuovere l'ultima esperienza
+ * salvata a situazione di oggi.
+ */
 export function buildAgentProfileHeaderDetails(
   data: CompleteProfessionalProfile,
+  /**
+   * Assistiti pubblici già contati dalla proiezione pubblica del portfolio.
+   * È un parametro e non una derivazione locale perché il numero deve
+   * coincidere con l'elenco mostrato, che arriva dal backend.
+   */
+  publicAssistitiCount: number | null = null,
 ): AgentProfileHeaderDetails | null {
   if (data.profile.role !== "agent") {
     return null;
   }
 
-  const locationLabel = formatLocationSummary(
-    data.profile.city ?? data.profile.residence ?? data.profile.current_location_city,
+  const career = buildAgentProfileCareer({
+    agentCareerEntries: data.agentCareerEntries,
+    agentProfile: data.agentProfile,
+  });
+
+  const locationSummary = formatLocationSummary(
+    data.profile.city ??
+      data.profile.residence ??
+      data.profile.current_location_city ??
+      data.profile.domicile,
     data.profile.region,
   );
-  const federation = data.agentProfile?.federation?.trim();
+  const locationLabel =
+    locationSummary === "Da completare" ? undefined : locationSummary;
+
+  /*
+    La riga che per Allenatore e Dirigente porta la società qui porta
+    l'organizzazione: è lo stesso fatto — dove lavora oggi questa persona — e
+    un indipendente la riempie con la propria modalità di lavoro, non con un
+    nome vuoto.
+  */
+  const clubLabel = career.currentExperience
+    ? [
+        formatAgentOrganizationLabel(career.currentExperience),
+        career.currentExperience.role,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : undefined;
+
+  const licenseLabel = buildAgentLicenseLabel({
+    federation: data.agentProfile?.federation,
+    isLicensed: data.agentProfile?.is_federation_licensed,
+  });
+
+  /*
+    Una sola disponibilità nell'header, per priorità (§"Disponibilità"):
+    prima le richieste di rappresentanza, poi la collaborazione con i club. Il
+    dettaglio completo resta nei Dettagli, dove c'è spazio per entrambe.
+  */
+  const availabilityLabel = data.agentProfile?.open_to_players
+    ? "Aperto a nuove rappresentanze"
+    : data.agentProfile?.open_to_clubs
+      ? "Disponibile a collaborare con club"
+      : undefined;
 
   return {
-    agencyLabel: data.agentProfile?.agency_name?.trim() || undefined,
-    bio: data.profile.bio?.trim() || null,
+    availabilityLabel,
+    badges: licenseLabel
+      ? [
+          {
+            icon: "shield-checkmark-outline" as const,
+            key: "license",
+            label: licenseLabel,
+          },
+        ]
+      : [],
+    clubLabel,
     fullName: formatProfileDisplayName(data.profile.full_name, null),
-    locationLabel: locationLabel === "Da completare" ? undefined : locationLabel,
-    primaryRole: data.agentProfile?.agency_role?.trim() || "Procuratore",
-    statusBadge: data.agentProfile?.is_federation_licensed
-      ? federation
-        ? `Licenza ${federation}`
-        : "Procuratore verificato"
-      : undefined,
+    /*
+      Il prodotto non ha ancora una verifica per i profili personali, e una
+      licenza non è una verifica d'identità: il badge resta spento finché una
+      colonna non lo accende davvero.
+    */
+    isVerified: false,
+    locationLabel,
+    /** Denominazione approvata, indipendente dall'enum `agent` del modello. */
+    primaryRole: "Procuratore sportivo",
+    quickFacts: buildAgentQuickFacts({
+      activityYears: career.activityYears,
+      age: data.profile.age ?? calculateAge(data.profile.birth_date),
+      assistitiCount: publicAssistitiCount,
+      marketCount: career.marketCount,
+    }),
   };
+}
+
+/**
+ * Età, Assistiti, Mercati e Anni (REV-PROF-13 §"Informazioni rapide").
+ *
+ * Come per il Dirigente un dato che non c'è non diventa un trattino: la
+ * colonna sparisce e le altre si ridistribuiscono. Un'età non pubblica e un
+ * portfolio vuoto non devono raccontare la stessa cosa di uno zero.
+ */
+function buildAgentQuickFacts({
+  activityYears,
+  age,
+  assistitiCount,
+  marketCount,
+}: {
+  activityYears: number | null;
+  age: number | null;
+  assistitiCount: number | null;
+  marketCount: number;
+}): ProfileQuickFact[] {
+  return [
+    age
+      ? {
+          accessibilityLabel: `Eta, ${age} anni`,
+          key: "age",
+          label: "Eta",
+          value: String(age),
+        }
+      : null,
+    assistitiCount !== null && assistitiCount > 0
+      ? {
+          accessibilityLabel:
+            assistitiCount === 1 ? "1 assistito" : `${assistitiCount} assistiti`,
+          key: "assistiti",
+          label: "Assistiti",
+          value: String(assistitiCount),
+        }
+      : null,
+    marketCount > 0
+      ? {
+          accessibilityLabel:
+            marketCount === 1 ? "1 mercato" : `${marketCount} mercati`,
+          key: "markets",
+          label: "Mercati",
+          value: String(marketCount),
+        }
+      : null,
+    activityYears !== null
+      ? {
+          accessibilityLabel:
+            activityYears === 1
+              ? "1 anno di attivita"
+              : `${activityYears} anni di attivita`,
+          key: "years",
+          label: "Anni",
+          value: String(activityYears),
+        }
+      : null,
+  ].filter((fact): fact is ProfileQuickFact => fact !== null);
 }
 
 /**

@@ -136,7 +136,10 @@ export type ProfileAnalyticsEvent =
   | "director_career_delete_failed"
   // Modifica profilo Dirigente (REV-PROF-11)
   | "director_profile_edit_opened"
-  | "director_primary_role_changed";
+  | "director_primary_role_changed"
+  // Master Profile Procuratore (REV-PROF-13)
+  | "agent_assistito_tapped"
+  | "agent_assistiti_see_all_tapped";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -182,10 +185,11 @@ type ProfileAnalyticsProps = {
   careerMetric?: CareerMetric;
   /**
    * Carriera mostrata dal selettore (REV-PROF-03; REV-PROF-06 aggiunge
-   * "staff"; REV-PROF-09 "director" e "other"). È un identificatore di
+   * "staff"; REV-PROF-09 "director" e "other"; REV-PROF-13 "agent"). È un
+   * identificatore di
    * percorso, mai una società o un ruolo.
    */
-  careerMode?: "coach" | "director" | "other" | "player" | "staff";
+  careerMode?: "agent" | "coach" | "director" | "other" | "player" | "staff";
   /** REV-PROF-04: modalità temporale dell'esperienza, mai il suo contenuto. */
   experienceMode?: CoachExperienceMode;
   /** Quante stagioni sono state selezionate, non quali. */

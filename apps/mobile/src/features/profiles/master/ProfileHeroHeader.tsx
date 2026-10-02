@@ -27,10 +27,22 @@ export type ProfileHeroMetaRow = {
   text: string;
 };
 
+export type ProfileHeroBadge = {
+  icon?: React.ComponentProps<typeof Ionicons>["name"];
+  key: string;
+  label: string;
+};
+
 type ProfileHeroHeaderProps = {
   /** Azioni della riga sotto l'identità: cambiano fra Owner e Visitor (§6). */
   actions?: ReactNode;
   avatarUrl: string | null | undefined;
+  /**
+   * Badge compatti sotto le righe meta: licenza professionale, certificazioni.
+   * Testo costruito dai dati reali del profilo, mai un'etichetta fissa
+   * (REV-PROF-13 §"Licenza"). Lista vuota: nessuna riga, nessuno spazio.
+   */
+  badges?: readonly ProfileHeroBadge[];
   /**
    * Disponibilità: visibile ma discreta — testo navy e un punto blu, mai un
    * badge verde o una card dedicata (§7).
@@ -54,6 +66,7 @@ export function ProfileHeroHeader({
   actions,
   avatarUrl,
   availabilityLabel,
+  badges = [],
   coverImageUrl,
   fullName,
   isVerified = false,
@@ -145,6 +158,29 @@ export function ProfileHeroHeader({
           </View>
         ) : null}
 
+        {badges.length > 0 ? (
+          <View style={styles.badgeRow}>
+            {badges.map((badge) => (
+              /*
+                Pill, non card: la licenza è un attributo dell'identità, non una
+                sezione. Il testo è già annunciato, quindi l'icona resta muta.
+              */
+              <View accessible key={badge.key} style={styles.badge}>
+                {badge.icon ? (
+                  <Ionicons
+                    color={colors.accent}
+                    name={badge.icon}
+                    size={13}
+                  />
+                ) : null}
+                <AppText color="accent" variant="metaStrong">
+                  {badge.label}
+                </AppText>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {availabilityLabel ? (
           <View style={styles.availabilityRow}>
             <View style={styles.availabilityDot} />
@@ -178,6 +214,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing[8],
     paddingTop: spacing[4],
+  },
+  badge: {
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.full,
+    flexDirection: "row",
+    gap: spacing[6],
+    paddingHorizontal: spacing[10],
+    paddingVertical: spacing[4],
+  },
+  badgeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[6],
+    paddingTop: spacing[6],
   },
   avatarShell: {
     backgroundColor: colors.surface,

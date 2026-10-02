@@ -209,3 +209,53 @@ export function fromLegacyManagedPlayersCount(
 
   return "";
 }
+
+/**
+ * Paese della federazione, quando il dato esiste (REV-PROF-13 §"Licenza").
+ *
+ * Serve a costruire la pill "Licenza FIGC (Italia)" dal dato reale invece di
+ * scriverne il testo: una federazione senza paese — FIFA, UEFA, un ente
+ * dichiarato come "altro" — mostra la sola sigla, non un paese inventato.
+ */
+const AGENT_FEDERATION_COUNTRIES: Record<string, string> = {
+  AIACS: "Italia",
+  "ASFC": "Svizzera",
+  DFB: "Germania",
+  FFF: "Francia",
+  FIGC: "Italia",
+  "FIGC SGS": "Italia",
+  FPF: "Portogallo",
+  RFEF: "Spagna",
+  "SFV-ASF": "Svizzera",
+  "THE-FA": "Inghilterra",
+};
+
+/**
+ * Etichetta della licenza mostrata nell'header e nei Dettagli.
+ *
+ * Restituisce `null` quando il procuratore non dichiara una licenza: un badge
+ * assente è un dato che non c'è, non uno stato negativo da disegnare. Il
+ * numero di licenza non passa mai di qui — resta nella sola schermata che lo
+ * prevede.
+ */
+export function buildAgentLicenseLabel({
+  federation,
+  isLicensed,
+}: {
+  federation: string | null | undefined;
+  isLicensed: boolean | null | undefined;
+}): string | null {
+  if (!isLicensed) {
+    return null;
+  }
+
+  const code = federation?.trim();
+
+  if (!code || code === "OTHER") {
+    return "Licenza federale";
+  }
+
+  const country = AGENT_FEDERATION_COUNTRIES[code];
+
+  return country ? `Licenza ${code} (${country})` : `Licenza ${code}`;
+}

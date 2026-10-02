@@ -49,17 +49,36 @@ export type AgentProfileRecord = {
   works_abroad: boolean;
 };
 
+export type AgentCareerEntryInput = Omit<
+  AgentCareerEntryRecord,
+  "is_current" | "is_primary" | "organization_mode" | "visibility"
+> & {
+  is_current?: boolean;
+  is_primary?: boolean;
+  organization_mode?: string;
+  visibility?: string;
+};
+
 export type AgentCareerEntryRecord = {
   agency_logo_url: string | null;
-  agency_name: string;
+  /** `null` per un professionista indipendente (REV-PROF-13). */
+  agency_name: string | null;
   agent_profile_id: string;
   id: string;
+  /** L'incarico e in corso. Prima era implicito nell'assenza di una data di fine. */
+  is_current: boolean;
+  /** L'incarico principale fra quelli in corso: quello mostrato nell'header. */
+  is_primary: boolean;
+  /** "agency" oppure "independent". */
+  organization_mode: string;
   period_end_month: string | null;
   period_end_year: number | null;
   period_start_month: string | null;
   period_start_year: number | null;
   role: string;
   sort_order: number;
+  /** "public" oppure "private": un'esperienza puo restare fuori dal profilo. */
+  visibility: string;
 };
 
 export type AgentManagedPlayerEntryRecord = {

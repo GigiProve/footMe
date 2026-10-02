@@ -413,3 +413,45 @@ export async function fetchPlayerAgent(
     agent_profile_id: data.agent_profile_id,
   };
 }
+
+/**
+ * Riga del portfolio pubblico di un procuratore (REV-PROF-13).
+ *
+ * Non è `AgentAssistito` con meno campi: è un tipo diverso perché la
+ * proiezione pubblica non porta stato, visibilità, messaggio o data di
+ * nascita. Quello che non arriva qui non può finire a schermo per distrazione.
+ */
+export type AgentPublicAssistito = {
+  created_at: string;
+  current_team: string | null;
+  id: string;
+  player_avatar_url: string | null;
+  player_full_name: string | null;
+  player_profile_id: string;
+  primary_position: string | null;
+  relationship_type: RelationshipType;
+};
+
+/**
+ * Portfolio pubblico di un procuratore: solo relazioni accettate e pubbliche.
+ *
+ * Owner e visitor chiamano questa stessa funzione e ottengono la stessa
+ * risposta — è il punto in cui il Master Profile owner diventa davvero una
+ * proiezione di ciò che vedono gli altri. Richieste pendenti, relazioni
+ * private, rifiutate, revocate o concluse restano fuori, e con loro restano
+ * fuori dal conteggio pubblico: la gestione dedicata è l'unico posto in cui
+ * compaiono.
+ */
+export async function fetchAgentPublicAssistiti(
+  agentProfileId: string,
+): Promise<AgentPublicAssistito[]> {
+  const { data, error } = await supabase.rpc("fetch_agent_public_assistiti", {
+    p_agent_profile_id: agentProfileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as AgentPublicAssistito[];
+}

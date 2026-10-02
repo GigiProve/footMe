@@ -125,7 +125,7 @@ function mapCareerEntries(
   return completeProfile.agentCareerEntries.length > 0
     ? completeProfile.agentCareerEntries.map((entry) => ({
         agency_logo_url: entry.agency_logo_url,
-        agency_name: entry.agency_name,
+        agency_name: entry.agency_name ?? "",
         id: entry.id,
         period_end_month: entry.period_end_month,
         period_end_year: entry.period_end_year,

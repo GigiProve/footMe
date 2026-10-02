@@ -3,7 +3,10 @@ import { Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { withDefaultProfileAvatar } from "./profile-avatar";
-import { ProfileHeroHeader } from "./master/ProfileHeroHeader";
+import {
+  ProfileHeroHeader,
+  type ProfileHeroBadge,
+} from "./master/ProfileHeroHeader";
 import {
   ProfileQuickFacts,
   type ProfileQuickFact,
@@ -91,6 +94,12 @@ type MasterProfileHeaderProps = {
   /** Riga discreta: "Disponibile per una nuova squadra". */
   availabilityLabel?: string;
   avatarUrl: string | null | undefined;
+  /**
+   * Pill sotto le righe meta: licenza professionale e simili, costruite dai
+   * dati reali del profilo (REV-PROF-13). Assenti per gli altri ruoli, che
+   * non passano la prop e non cambiano di un pixel.
+   */
+  badges?: readonly ProfileHeroBadge[];
   /** "Torino FC · Prima Squadra", derivato dall'incarico in corso. */
   clubLabel?: string;
   coverImageUrl?: string | null;
@@ -207,6 +216,7 @@ export function PlayerProfileHeader({
 function MasterProfileHeader({
   availabilityLabel,
   avatarUrl,
+  badges,
   clubLabel,
   coverImageUrl,
   fullName,
@@ -286,6 +296,7 @@ function MasterProfileHeader({
         }
         availabilityLabel={availabilityLabel}
         avatarUrl={withDefaultProfileAvatar(avatarUrl)}
+        badges={badges}
         coverImageUrl={coverImageUrl}
         fullName={fullName}
         isVerified={isVerified}
@@ -333,6 +344,22 @@ export function DirectorProfileHeader(
   props: Omit<MasterProfileHeaderProps, "testIDPrefix">,
 ) {
   return <MasterProfileHeader {...props} testIDPrefix="director" />;
+}
+
+/**
+ * Header del Master Profile Procuratore (REV-PROF-13, Screen 1).
+ *
+ * Nessun header dedicato al Procuratore: è lo stesso degli altri Master
+ * Profile a incarichi. L'unica aggiunta è la pill della licenza, che arriva
+ * come `badges` ed è costruita dai dati reali — federazione, paese, stato —
+ * mai da un'etichetta fissa. L'agenzia attuale occupa la riga che per
+ * Allenatore e Dirigente porta la società, perché è lo stesso fatto: dove
+ * lavora oggi questa persona.
+ */
+export function AgentProfileHeader(
+  props: Omit<MasterProfileHeaderProps, "testIDPrefix">,
+) {
+  return <MasterProfileHeader {...props} testIDPrefix="agent" />;
 }
 
 /** Azione secondaria a sola icona dell'action bar: 44x44 di area toccabile. */

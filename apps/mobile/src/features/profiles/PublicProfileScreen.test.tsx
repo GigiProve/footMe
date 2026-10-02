@@ -97,12 +97,13 @@ vi.mock("../relationships/agent-representation-service", () => ({
 
 vi.mock("./profile-edit-helpers", () => ({
   buildAgentProfileHeaderDetails: () => ({
-    agencyLabel: "MB Football Management",
-    bio: null,
+    badges: [],
+    clubLabel: "MB Football Management · Titolare",
     fullName: "Davide Rossi",
+    isVerified: false,
     locationLabel: "Milano",
-    primaryRole: "Procuratore",
-    statusBadge: "Licenza FIGC",
+    primaryRole: "Procuratore sportivo",
+    quickFacts: [],
   }),
   buildCoachProfileHeaderDetails: () => null,
   buildDirectorProfileHeaderDetails: () => ({
@@ -114,19 +115,6 @@ vi.mock("./profile-edit-helpers", () => ({
   buildHeaderDetails: () => null,
   buildPlayerProfileHeaderDetails: () => null,
   buildStaffProfileHeaderDetails: () => null,
-}));
-
-vi.mock("./AgentProfileHeader", () => ({
-  AgentProfileHeader: ({
-    onEditProfilePress,
-  }: {
-    onEditProfilePress?: () => void;
-  }) =>
-    React.createElement(
-      "AgentProfileHeader",
-      { mode: onEditProfilePress ? "owner" : "visitor" },
-      onEditProfilePress ? "owner" : "visitor",
-    ),
 }));
 
 vi.mock("./career/AgentProfileTabView", () => ({
@@ -184,6 +172,8 @@ vi.mock("./ProfileReadonlyView", () => ({
 }));
 
 vi.mock("./profile-screen-components", () => ({
+  AgentProfileHeader: ({ mode }: { mode?: string }) =>
+    React.createElement("AgentProfileHeader", { mode }, mode ?? "visitor"),
   CoachProfileHeader: () => React.createElement("CoachProfileHeader"),
   DirectorProfileHeader: () => React.createElement("DirectorProfileHeader"),
   PlayerProfileHeader: () => React.createElement("PlayerProfileHeader"),

@@ -77,13 +77,13 @@ import {
   type EditSection,
 } from "../../src/features/profiles/ProfileReadonlyView";
 import {
+  AgentProfileHeader,
   CoachProfileHeader,
   DirectorProfileHeader,
   PlayerProfileHeader,
   ProfileHeader,
   StaffProfileHeader,
 } from "../../src/features/profiles/profile-screen-components";
-import { AgentProfileHeader } from "../../src/features/profiles/AgentProfileHeader";
 import { FanProfileView } from "../../src/features/profiles/FanProfileView";
 import { MediaProfileView } from "../../src/features/profiles/MediaProfileView";
 import {
@@ -847,15 +847,38 @@ export default function ProfileScreen() {
           />
         ) : completeProfile && role === "agent" && agentHeaderDetails ? (
           <AgentProfileHeader
-            agencyLabel={agentHeaderDetails.agencyLabel}
+            availabilityLabel={agentHeaderDetails.availabilityLabel}
             avatarUrl={completeProfile.profile.avatar_url}
-            bio={agentHeaderDetails.bio}
+            badges={agentHeaderDetails.badges}
+            clubLabel={agentHeaderDetails.clubLabel}
+            coverImageUrl={completeProfile.profile.cover_url}
             fullName={agentHeaderDetails.fullName}
+            isVerified={agentHeaderDetails.isVerified}
             locationLabel={agentHeaderDetails.locationLabel}
-            onEditAvatarPress={() => handleEdit("bio")}
-            onEditProfilePress={() => handleEdit("agentProfile")}
+            mode="owner"
+            onEditProfilePress={() => {
+              trackProfileEvent("profile_edit_tapped", {
+                profileType: "agent",
+                viewerMode: "owner",
+              });
+              handleEdit("agentProfile");
+            }}
+            onMorePress={() => {
+              trackProfileEvent("profile_more_menu_opened", {
+                profileType: "agent",
+                viewerMode: "owner",
+              });
+              setMoreMenuVisible(true);
+            }}
+            onSharePress={() => {
+              trackProfileEvent("profile_share_tapped", {
+                profileType: "agent",
+                viewerMode: "owner",
+              });
+              void handleShareOwnProfile();
+            }}
             primaryRole={agentHeaderDetails.primaryRole}
-            statusBadge={agentHeaderDetails.statusBadge}
+            quickFacts={agentHeaderDetails.quickFacts}
           />
         ) : completeProfile && role === "director" && directorHeaderDetails ? (
           <DirectorProfileHeader
@@ -947,10 +970,16 @@ export default function ProfileScreen() {
           <AgentProfileTabView
             completeProfile={completeProfile}
             isOwner={true}
+            onAddExperience={() => handleEdit("agentProfile")}
             onDeleteMedia={handleDeleteAgentMedia}
-            onEdit={handleEdit}
             onEditMedia={(itemId) => handleManageAgentMedia(itemId)}
+            onEditProfile={() => handleEdit("agentProfile")}
+            onManageAssistiti={() => router.push("/representation/add" as never)}
             onManageMedia={() => handleManageAgentMedia()}
+            onOpenAllAssistiti={() =>
+              router.push(`/representation/portfolio/${profileId}` as never)
+            }
+            onOpenAssistito={handleOpenProfile}
           />
         ) : completeProfile && role === "director" ? (
           <DirectorProfileTabView

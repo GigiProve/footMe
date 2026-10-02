@@ -14,7 +14,6 @@ import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
 import { useSession } from "../auth/use-session";
 import type { AppRole } from "../onboarding/create-initial-profile";
-import { AgentProfileHeader } from "./AgentProfileHeader";
 import {
   buildAgentProfileHeaderDetails,
   buildCoachProfileHeaderDetails,
@@ -25,6 +24,7 @@ import {
 } from "./profile-edit-helpers";
 import { ProfileReadonlyView } from "./ProfileReadonlyView";
 import {
+  AgentProfileHeader,
   CoachProfileHeader,
   DirectorProfileHeader,
   PlayerProfileHeader,
@@ -768,6 +768,7 @@ function ProfileHeaderBlock({
   playerHeaderDetails: ReturnType<typeof buildPlayerProfileHeaderDetails>;
   staffHeaderDetails: ReturnType<typeof buildStaffProfileHeaderDetails>;
 }) {
+  const router = useRouter();
   const role = completeProfile.profile.role as AppRole;
 
   if (role === "player" && playerHeaderDetails) {
@@ -845,21 +846,23 @@ function ProfileHeaderBlock({
   if (role === "agent" && agentHeaderDetails) {
     return (
       <AgentProfileHeader
-        agencyLabel={agentHeaderDetails.agencyLabel}
+        availabilityLabel={agentHeaderDetails.availabilityLabel}
         avatarUrl={completeProfile.profile.avatar_url}
-        bio={agentHeaderDetails.bio}
+        badges={agentHeaderDetails.badges}
+        clubLabel={agentHeaderDetails.clubLabel}
+        coverImageUrl={completeProfile.profile.cover_url}
         fullName={agentHeaderDetails.fullName}
         isFollowed={isFollowed}
         isMessaging={isMessaging}
-        isSaved={isSaved}
-        isShortlisted={isShortlisted}
+        isVerified={agentHeaderDetails.isVerified}
         locationLabel={agentHeaderDetails.locationLabel}
-        onContactPress={onContactPress}
+        mode="visitor"
         onFollowPress={onFollowPress}
-        onSavePress={onSavePress}
-        onShortlistPress={onShortlistPress}
+        onMessagePress={onContactPress}
+        onMorePress={onMorePress}
+        onSharePress={onSharePress}
         primaryRole={agentHeaderDetails.primaryRole}
-        statusBadge={agentHeaderDetails.statusBadge}
+        quickFacts={agentHeaderDetails.quickFacts}
       />
     );
   }
@@ -945,6 +948,7 @@ function ProfileContentBlock({
   viewerProfileId?: string | null;
   viewerRole?: AppRole | null;
 }) {
+  const router = useRouter();
   const role = completeProfile.profile.role as AppRole;
 
   if (role === "player") {
@@ -1079,13 +1083,21 @@ function ProfileContentBlock({
 
   if (role === "agent") {
     return (
+      /*
+        Stesso corpo dell'Owner. Segui, Messaggio, Condividi e il menu
+        contestuale vivono nell'header condiviso, non qui dentro: al Visitor
+        non arriva nessun handler di modifica, quindi nessun controllo Owner
+        può essere renderizzato.
+      */
       <AgentProfileTabView
         completeProfile={completeProfile}
         isOwner={false}
-        onDeleteMedia={noop}
-        onEdit={noop}
-        onEditMedia={noop}
-        onManageMedia={noop}
+        onOpenAllAssistiti={() =>
+          router.push(
+            `/representation/portfolio/${completeProfile.profile.id}` as never,
+          )
+        }
+        onOpenAssistito={onOpenPlayerProfile}
       />
     );
   }

@@ -1,9 +1,21 @@
+import type { ComponentProps } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
+
+/**
+ * REV-PROF-13: le etichette dei contenuti portano ora un'icona, come per gli
+ * altri Master Profile, perché la griglia Media condivisa la mostra nel badge
+ * del tag. I `value` restano quelli salvati: nessun dato cambia.
+ */
 export const AGENT_MEDIA_TAG_OPTIONS = [
-  { label: "Trasferimento", value: "transfer" },
-  { label: "Firma", value: "signature" },
-  { label: "Evento", value: "event" },
-  { label: "Highlights", value: "highlights" },
-] as const;
+  { icon: "swap-horizontal-outline", label: "Trasferimento", value: "transfer" },
+  { icon: "create-outline", label: "Firma", value: "signature" },
+  { icon: "calendar-outline", label: "Evento", value: "event" },
+  { icon: "play-circle-outline", label: "Highlights", value: "highlights" },
+] as const satisfies readonly {
+  icon: ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  value: string;
+}[];
 
 export const AGENT_MEDIA_OPERATION_TYPE_OPTIONS = [
   { label: "Inserimento", value: "insertion" },
