@@ -26,14 +26,25 @@ import { AppText } from "../../../../ui";
 import { OnboardingTextField, ToggleSwitch } from "../../../onboarding/ui";
 
 type PublicContactChannelRowProps = {
+  /**
+   * Testo e affordance di un canale senza valore. Quando è dichiarato, una
+   * riga vuota invita ad aggiungerlo con un chevron invece di mostrare un
+   * interruttore disattivato: un canale che non esiste non ha una visibilità
+   * da regolare (REV-PROF-22, Screen 7).
+   */
+  emptyActionLabel?: string;
   expanded: boolean;
   icon: keyof typeof Ionicons.glyphMap;
+  /** Tinta dell'icona quando il canale è pubblicabile. Default: accent. */
+  iconColor?: string;
   invalidMessage: string;
   keyboardType?: "email-address" | "phone-pad" | "url";
   label: string;
   /** Risultato vuoto = valore non pubblicabile. Un campo vuoto non è un errore. */
   normalize: (value: string) => string;
   onChangeValue: (value: string) => void;
+  /** Apre il canale in una scheda esterna. Mostrato solo con un valore valido. */
+  onOpenValue?: () => void;
   onToggleExpanded: () => void;
   onVisibilityChange: (visible: boolean) => void;
   placeholder: string;
@@ -43,13 +54,16 @@ type PublicContactChannelRowProps = {
 };
 
 export function PublicContactChannelRow({
+  emptyActionLabel,
   expanded,
   icon,
+  iconColor,
   invalidMessage,
   keyboardType,
   label,
   normalize,
   onChangeValue,
+  onOpenValue,
   onToggleExpanded,
   onVisibilityChange,
   placeholder,
@@ -59,11 +73,17 @@ export function PublicContactChannelRow({
 }: PublicContactChannelRowProps) {
   const isPublishable = normalize(value).length > 0;
   const showsInvalid = value.trim().length > 0 && !isPublishable;
+  const isEmpty = value.trim().length === 0;
+  const showsEmptyAction = Boolean(emptyActionLabel) && isEmpty;
 
   return (
     <View style={styles.channel}>
       <Pressable
-        accessibilityHint="Modifica il valore del contatto"
+        accessibilityHint={
+          showsEmptyAction
+            ? "Aggiunge il valore del canale"
+            : "Modifica il valore del contatto"
+        }
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         onPress={onToggleExpanded}
@@ -71,7 +91,9 @@ export function PublicContactChannelRow({
         testID={`${testID}-row`}
       >
         <IoniconsComponent
-          color={isPublishable ? colors.accent : colors.textSecondary}
+          color={
+            isPublishable ? (iconColor ?? colors.accent) : colors.textSecondary
+          }
           name={icon}
           size={20}
         />
@@ -79,23 +101,59 @@ export function PublicContactChannelRow({
           <AppText color="secondary" variant="meta">
             {label}
           </AppText>
-          {/* Mai un valore finto: se non c'è, si dice che non c'è. */}
-          <AppText
-            color={value.trim() ? "primary" : "muted"}
-            numberOfLines={1}
-            variant="bodySm"
-          >
-            {value.trim() || "Non configurato"}
-          </AppText>
+          {/*
+            Mai un valore finto: se non c'è, si dice che non c'è — e quando la
+            riga ha un'azione di aggiunta il posto del valore resta al testo
+            dell'azione, non a un segnaposto.
+          */}
+          {showsEmptyAction ? null : (
+            <AppText
+              color={isEmpty ? "muted" : "primary"}
+              numberOfLines={1}
+              variant="bodySm"
+            >
+              {value.trim() || "Non configurato"}
+            </AppText>
+          )}
         </View>
 
-        <ToggleSwitch
-          accessibilityLabel={`Rendi visibile ${label}`}
-          disabled={!isPublishable}
-          onValueChange={onVisibilityChange}
-          testID={`${testID}-visibility`}
-          value={visible}
-        />
+        {showsEmptyAction ? (
+          <View style={styles.emptyAction}>
+            <AppText color="accent" variant="actionLabel">
+              {emptyActionLabel}
+            </AppText>
+            <IoniconsComponent
+              color={colors.textMuted}
+              name="chevron-forward"
+              size={16}
+            />
+          </View>
+        ) : (
+          <View style={styles.trailing}>
+            <ToggleSwitch
+              accessibilityLabel={`Rendi visibile ${label}`}
+              disabled={!isPublishable}
+              onValueChange={onVisibilityChange}
+              testID={`${testID}-visibility`}
+              value={visible}
+            />
+            {onOpenValue && isPublishable ? (
+              <Pressable
+                accessibilityLabel={`Apri ${label}`}
+                accessibilityRole="link"
+                hitSlop={8}
+                onPress={onOpenValue}
+                testID={`${testID}-open`}
+              >
+                <IoniconsComponent
+                  color={colors.textSecondary}
+                  name="open-outline"
+                  size={18}
+                />
+              </Pressable>
+            ) : null}
+          </View>
+        )}
       </Pressable>
 
       {expanded ? (
@@ -140,5 +198,15 @@ const styles = StyleSheet.create({
   rowText: {
     flex: 1,
     gap: spacing[4],
+  },
+  emptyAction: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[4],
+  },
+  trailing: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[12],
   },
 });

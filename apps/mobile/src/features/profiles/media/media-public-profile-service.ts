@@ -27,8 +27,15 @@ export type MediaPublicEntity = {
   affiliationType: string | null;
   channels: MediaPublicChannel[];
   contentTypes: string[];
+  /**
+   * REV-PROF-22: modalità della copertura geografica. `null` finché la
+   * realtà non l'ha dichiarata — non equivale a "Tutta Italia".
+   */
+  coverageScope: "ITALY" | "REGIONS" | "PROVINCES" | null;
   coverUrl: string | null;
   coveredCompetitions: string[];
+  /** REV-PROF-22: zone, quando `coverageScope` è `PROVINCES`. */
+  coveredProvinces: string[];
   coveredTeams: string[];
   coveredTerritories: string[];
   coveredTopics: string[];
@@ -86,8 +93,10 @@ export async function fetchPublicMediaProfile(
       affiliationType: text(entity.affiliation_type),
       channels: normalizeChannels(entity.channels),
       contentTypes: stringArray(entity.content_types),
+      coverageScope: coverageScope(entity.coverage_scope),
       coverUrl: text(entity.cover_url),
       coveredCompetitions: stringArray(entity.covered_competitions),
+      coveredProvinces: stringArray(entity.covered_provinces),
       coveredTeams: stringArray(entity.covered_teams),
       coveredTerritories: stringArray(entity.covered_territories),
       coveredTopics: stringArray(entity.covered_topics),
@@ -123,6 +132,14 @@ function normalizeChannels(value: unknown): MediaPublicChannel[] {
         : null;
     })
     .filter((channel): channel is MediaPublicChannel => channel !== null);
+}
+
+function coverageScope(
+  value: unknown,
+): "ITALY" | "REGIONS" | "PROVINCES" | null {
+  return value === "ITALY" || value === "REGIONS" || value === "PROVINCES"
+    ? value
+    : null;
 }
 
 function stringArray(value: unknown): string[] {

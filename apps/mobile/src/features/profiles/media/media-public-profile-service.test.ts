@@ -157,8 +157,15 @@ describe("fetchPublicMediaProfile", () => {
       "affiliationType",
       "channels",
       "contentTypes",
+      /*
+        REV-PROF-22: modalità e zone della copertura editoriale. Sono
+        dichiarazioni della realtà, non dati di chi la amministra: la
+        residenza del proprietario resta fuori da questo elenco.
+      */
       "coverUrl",
+      "coverageScope",
       "coveredCompetitions",
+      "coveredProvinces",
       "coveredTeams",
       "coveredTerritories",
       "coveredTopics",

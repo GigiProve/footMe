@@ -71,6 +71,7 @@ import {
   formatMediaEntityQualifier,
   formatMediaEntityType,
   normalizeExternalUrl,
+  resolveMediaCoverageAreas,
   type MediaProfileTab,
 } from "./media/media-master-profile";
 import {
@@ -121,6 +122,14 @@ type MediaProfileViewProps = {
    * accesso, non un composer proprio.
    */
   shouldOpenComposer?: boolean;
+  /**
+   * REV-PROF-22: cambia quando la schermata che contiene il profilo torna in
+   * primo piano — per esempio al ritorno da un modulo di Modifica profilo. Il
+   * payload pubblico viene riletto, così header, tab Info e CTA "Visita sito"
+   * mostrano subito quello che è appena stato salvato, senza un refresh
+   * manuale e senza riavviare l'app.
+   */
+  refreshToken?: number;
   viewerProfileId?: string | null;
 };
 
@@ -138,6 +147,7 @@ export function MediaProfileView({
   onOpenContent,
   onOpenProfile,
   onSharePress,
+  refreshToken = 0,
   shouldOpenComposer = false,
   viewerProfileId,
 }: MediaProfileViewProps) {
@@ -180,7 +190,13 @@ export function MediaProfileView({
     } finally {
       setIsLoadingProfile(false);
     }
-  }, [mediaProfileId, mode]);
+    /*
+      `refreshToken` entra nelle dipendenze di proposito, anche se il corpo
+      non lo legge: è il segnale con cui la schermata contenitore chiede di
+      rileggere il payload pubblico dopo un salvataggio (REV-PROF-22).
+    */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaProfileId, mode, refreshToken]);
 
   useEffect(() => {
     void loadPublicProfile();
@@ -680,8 +696,19 @@ export function MediaProfileView({
     [entity?.contentTypes],
   );
   const areasLabel = useMemo(
-    () => formatMediaCoverageAreas(entity?.coveredTerritories),
-    [entity?.coveredTerritories],
+    /*
+      REV-PROF-22: la riga segue la modalità dichiarata — "Tutta Italia", le
+      regioni oppure le zone — e non la sola lista storica dei territori.
+    */
+    () =>
+      formatMediaCoverageAreas(
+        resolveMediaCoverageAreas({
+          coverageScope: entity?.coverageScope,
+          coveredProvinces: entity?.coveredProvinces,
+          coveredTerritories: entity?.coveredTerritories,
+        }),
+      ),
+    [entity?.coverageScope, entity?.coveredProvinces, entity?.coveredTerritories],
   );
   const channelRows = useMemo(
     () => buildMediaChannelRows(entity?.channels ?? []),

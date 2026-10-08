@@ -182,6 +182,39 @@ export function formatMediaCoverageAreas(
   return unique.length > 0 ? unique.join(" · ") : null;
 }
 
+/** REV-PROF-22: etichetta della copertura nazionale, in un posto solo. */
+export const MEDIA_COVERAGE_ALL_ITALY_LABEL = "Tutta Italia";
+
+export type MediaCoverageScope = "ITALY" | "REGIONS" | "PROVINCES";
+
+/**
+ * Aree effettivamente coperte, risolte dalla modalità (REV-PROF-22, Screen 6).
+ *
+ * Le due liste non vengono mai fuse: la modalità dice quale delle due è
+ * quella attiva, e l'altra resta nel database senza comparire da nessuna
+ * parte. "Tutta Italia" non è una lista vuota — è una dichiarazione, e si
+ * legge come tale.
+ *
+ * Una realtà che non ha ancora scelto una modalità ricade sui territori
+ * storici: erano già pubblici prima di questa task, e non diventano
+ * "Tutta Italia" per effetto di una colonna nuova.
+ */
+export function resolveMediaCoverageAreas(entity: {
+  coverageScope?: MediaCoverageScope | null;
+  coveredProvinces?: readonly string[] | null;
+  coveredTerritories?: readonly string[] | null;
+}): string[] {
+  if (entity.coverageScope === "ITALY") {
+    return [MEDIA_COVERAGE_ALL_ITALY_LABEL];
+  }
+
+  return normalizeUniqueLabels(
+    entity.coverageScope === "PROVINCES"
+      ? entity.coveredProvinces
+      : entity.coveredTerritories,
+  );
+}
+
 /**
  * Nome pubblico della realtà. Assente, resta assente: il nome e cognome del
  * proprietario non sono un nome editoriale e non lo diventano per riempire

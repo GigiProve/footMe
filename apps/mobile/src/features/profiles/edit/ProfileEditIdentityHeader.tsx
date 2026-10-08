@@ -11,6 +11,13 @@ import { colors, spacing } from "../../../theme/tokens";
 import { AppText, Avatar } from "../../../ui";
 
 type ProfileEditIdentityHeaderProps = {
+  /**
+   * Nome da cui ricavare il monogramma quando manca l'immagine. Serve ai
+   * profili la cui testata può essere incompleta: il Media/Creator senza
+   * nome editoriale mostra "Da completare" come testo, ma non deve farne
+   * delle iniziali (REV-PROF-22).
+   */
+  avatarName?: string;
   avatarUrl: string | null;
   fullName: string;
   onViewProfile: () => void;
@@ -18,6 +25,7 @@ type ProfileEditIdentityHeaderProps = {
 };
 
 export function ProfileEditIdentityHeader({
+  avatarName,
   avatarUrl,
   fullName,
   onViewProfile,
@@ -25,7 +33,11 @@ export function ProfileEditIdentityHeader({
 }: ProfileEditIdentityHeaderProps) {
   return (
     <View style={styles.container} testID="profile-edit-identity">
-      <Avatar name={fullName} size="lg" uri={avatarUrl ?? undefined} />
+      <Avatar
+        name={avatarName ?? fullName}
+        size="lg"
+        uri={avatarUrl ?? undefined}
+      />
       <View style={styles.textBlock}>
         <AppText numberOfLines={1} variant="titleMd">
           {fullName}

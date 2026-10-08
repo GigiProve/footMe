@@ -641,7 +641,10 @@ describe("getCompleteProfessionalProfile", () => {
     expect(result.mediaProfile).toEqual({
       affiliation_name: "ProLink News",
       affiliation_type: "Testata o sito",
+      /* REV-PROF-22: modalità della copertura, non ancora dichiarata. */
+      coverage_scope: null,
       covered_competitions: ["Serie A"],
+      covered_provinces: [],
       covered_teams: ["Como"],
       covered_territories: ["Italia"],
       covered_topics: ["Calciomercato"],
@@ -654,6 +657,8 @@ describe("getCompleteProfessionalProfile", () => {
       logo_url: "https://example.com/logo.png",
       profile_id: "media-1",
       short_description: "Aggiornamenti quotidiani sul calcio.",
+      /* REV-PROF-22: condizione delle UPDATE per sezione dell'editor. */
+      updated_at: null,
       verification_status: "verified",
     });
     expect(result.mediaProfileChannels).toEqual([

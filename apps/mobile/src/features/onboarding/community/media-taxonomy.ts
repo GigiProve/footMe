@@ -172,8 +172,37 @@ export const MEDIA_CONTENT_TYPE_OPTIONS = [
   "Contenuti social",
   "Foto",
   "Video",
+  /*
+    REV-PROF-22: un podcast è un formato che una redazione dichiara di
+    produrre, non una capability tecnica. Dichiararlo non crea un dominio
+    Podcast e non abilita niente: resta un'etichetta accanto alle altre.
+  */
+  "Podcast",
   "Altro",
 ] as const;
+
+/**
+ * Icona di ciascun tipo di contenuto (REV-PROF-22, Screen 5). Accompagna
+ * l'etichetta per distinguere le righe a colpo d'occhio; lo stato di
+ * selezione non è mai affidato all'icona né al colore, ma al controllo
+ * accanto al testo.
+ */
+export const MEDIA_CONTENT_TYPE_ICONS: Record<
+  string,
+  keyof typeof Ionicons.glyphMap
+> = {
+  Altro: "ellipsis-horizontal-outline",
+  Analisi: "bar-chart-outline",
+  "Contenuti social": "chatbubble-outline",
+  Foto: "image-outline",
+  Highlights: "film-outline",
+  Interviste: "reader-outline",
+  Notizie: "newspaper-outline",
+  "Osservazione giocatori": "eye-outline",
+  "Partite e risultati": "football-outline",
+  Podcast: "mic-outline",
+  Video: "videocam-outline",
+};
 
 // ---------------------------------------------------------------------------
 // Ambito calcistico (§19, §20)
@@ -185,13 +214,38 @@ export const MEDIA_CONTENT_TYPE_OPTIONS = [
  * settore unico da dichiarare.
  */
 export const MEDIA_SCOPE_OPTIONS = [
-  "Calcio locale",
+  "Calcio professionistico",
   "Calcio dilettantistico",
   "Calcio giovanile",
-  "Calcio professionistico",
+  /* REV-PROF-22: ambito richiesto dalla task e assente dal vocabolario. */
+  "Calcio femminile",
   "Calciomercato",
+  /*
+    Due voci storiche: non sono nel mockup, ma sono selezionate da profili
+    reali e toglierle le cancellerebbe alla prima modifica. Restano in coda,
+    dopo gli ambiti del mockup.
+  */
+  "Calcio locale",
   "Calcio generale",
 ] as const;
+
+/**
+ * Icona di ciascun ambito (REV-PROF-22, Screen 4). Stessa regola dei tipi di
+ * contenuto: accompagna l'etichetta, non la sostituisce e non comunica la
+ * selezione.
+ */
+export const MEDIA_SCOPE_ICONS: Record<
+  string,
+  keyof typeof Ionicons.glyphMap
+> = {
+  "Calcio dilettantistico": "football-outline",
+  "Calcio femminile": "flower-outline",
+  "Calcio generale": "globe-outline",
+  "Calcio giovanile": "shield-outline",
+  "Calcio locale": "location-outline",
+  "Calcio professionistico": "trophy-outline",
+  Calciomercato: "swap-horizontal-outline",
+};
 
 /**
  * §30: le etichette precedenti coprivano gli stessi ambiti con altri nomi.

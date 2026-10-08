@@ -53,6 +53,12 @@ export type ProfileEditHubGroup = {
  * forme di dato.
  */
 export type ProfileEditHubIdentity = {
+  /**
+   * Nome da cui ricavare il monogramma quando manca l immagine. Si dichiara
+   * solo quando `name` può essere un segnaposto ("Da completare") che non
+   * deve diventare delle iniziali.
+   */
+  avatarName?: string;
   avatarUrl: string | null;
   name: string;
 };
@@ -142,6 +148,7 @@ export function ProfileEditHubScreen<TData>({
       {data ? (
         <>
           <ProfileEditIdentityHeader
+            avatarName={getIdentity(data).avatarName}
             avatarUrl={getIdentity(data).avatarUrl}
             fullName={getIdentity(data).name}
             /*

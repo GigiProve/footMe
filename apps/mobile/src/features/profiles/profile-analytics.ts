@@ -241,7 +241,16 @@ export type ProfileAnalyticsEvent =
   | "media_tribuna_created"
   | "media_tribuna_opened"
   | "media_tribuna_voted"
-  | "media_website_tapped";
+  | "media_website_tapped"
+  // Modifica profilo Media/Creator (REV-PROF-22). Passano la sezione, il tipo
+  // di canale e l'esito: mai il nome della realtà, la descrizione, le aree
+  // scelte, un handle, un URL o un dato personale dell'owner.
+  | "media_profile_edit_opened"
+  | "media_areas_selector_opened"
+  | "media_channel_added"
+  | "media_channel_removed"
+  | "media_channel_visibility_changed"
+  | "media_profile_edit_conflict";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -292,7 +301,17 @@ export type ProfileEditSectionKey =
   | "description"
   | "teams"
   | "affiliates"
-  | "positions";
+  | "positions"
+  /**
+   * REV-PROF-22: i moduli del Media/Creator oltre a "identity", "areas",
+   * "personal" e "media". Tre domini distinti, tre chiavi distinte:
+   * "coverage" sono gli ambiti calcistici raccontati, "contentTypes" i
+   * formati prodotti, "areas" la geografia.
+   */
+  | "presentation"
+  | "coverage"
+  | "contentTypes"
+  | "channels";
 
 /** Modalità temporale scelta, mai la società, il ruolo o le date. */
 export type CoachExperienceMode =

@@ -398,10 +398,20 @@ export type FanProfileRecord = {
   updated_at: string | null;
 };
 
+/**
+ * REV-PROF-22: modalità della copertura geografica editoriale. `null` sui
+ * profili che non l'hanno ancora dichiarata — non è "Tutta Italia".
+ */
+export type MediaCoverageScope = "ITALY" | "REGIONS" | "PROVINCES";
+
 export type MediaProfileRecord = {
   affiliation_name: string | null;
   affiliation_type: string | null;
+  /** REV-PROF-22: modalità delle Aree coperte. */
+  coverage_scope: MediaCoverageScope | null;
   covered_competitions: string[];
+  /** REV-PROF-22: zone, quando `coverage_scope` è `PROVINCES`. */
+  covered_provinces: string[];
   covered_teams: string[];
   covered_territories: string[];
   covered_topics: string[];
@@ -415,6 +425,12 @@ export type MediaProfileRecord = {
   logo_url: string | null;
   profile_id: string;
   short_description: string | null;
+  /**
+   * REV-PROF-22: condizione delle UPDATE per sezione. L'editor la rimanda
+   * indietro e il backend scrive solo se nessun'altra sessione ha toccato la
+   * riga nel frattempo.
+   */
+  updated_at: string | null;
   verification_status: string;
 };
 
@@ -1357,10 +1373,17 @@ function normalizeMediaProfileRecord(
     return null;
   }
 
+  const scope = normalizeOptionalText(rawProfile.coverage_scope);
+
   return {
     affiliation_name: normalizeOptionalText(rawProfile.affiliation_name),
     affiliation_type: normalizeOptionalText(rawProfile.affiliation_type),
+    coverage_scope:
+      scope === "ITALY" || scope === "REGIONS" || scope === "PROVINCES"
+        ? scope
+        : null,
     covered_competitions: normalizeStringArray(rawProfile.covered_competitions),
+    covered_provinces: normalizeStringArray(rawProfile.covered_provinces),
     covered_teams: normalizeStringArray(rawProfile.covered_teams),
     covered_territories: normalizeStringArray(rawProfile.covered_territories),
     covered_topics: normalizeStringArray(rawProfile.covered_topics),
@@ -1373,6 +1396,7 @@ function normalizeMediaProfileRecord(
     logo_url: normalizeOptionalText(rawProfile.logo_url),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
     short_description: normalizeOptionalText(rawProfile.short_description),
+    updated_at: normalizeOptionalText(rawProfile.updated_at),
     verification_status: normalizeRequiredText(
       rawProfile.verification_status,
       "unverified",
@@ -2018,7 +2042,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("media_profiles")
           .select(
-            "profile_id, entity_name, short_description, logo_url, content_types, focus_areas, affiliation_type, affiliation_name, creator_type, creator_type_other, editorial_type, verification_status, covered_competitions, covered_teams, covered_territories, covered_topics",
+            "profile_id, entity_name, short_description, logo_url, content_types, focus_areas, affiliation_type, affiliation_name, creator_type, creator_type_other, editorial_type, verification_status, coverage_scope, covered_competitions, covered_provinces, covered_teams, covered_territories, covered_topics, updated_at",
           )
           .eq("profile_id", profileId)
           .maybeSingle()

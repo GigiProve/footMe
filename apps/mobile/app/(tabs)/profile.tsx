@@ -470,24 +470,19 @@ export default function ProfileScreen() {
   }
 
   /**
-   * "Modifica profilo" del Media/Creator (REV-PROF-21).
+   * "Modifica profilo" del Media/Creator (REV-PROF-21 → REV-PROF-22).
    *
-   * La destinazione è REV-PROF-22, che non esiste ancora, e il profilo
-   * editoriale non ha un editor corrente da aprire nel frattempo: l'unico
-   * posto in cui `media_profiles` si scrive oggi è l'onboarding. La CTA resta
-   * quindi al suo posto — l'Owner deve vederla, e il punto d'ingresso è uno
-   * solo — e dice la verità invece di aprire una schermata che non c'è o di
-   * anticipare l'hub della task successiva.
+   * L'hub modulare è l'unico punto di modifica della realtà editoriale: da
+   * qui si entra, e ogni modulo salva per conto proprio. Non esiste un
+   * secondo editor, e l'onboarding non è più l'unico posto in cui
+   * `media_profiles` si scrive.
    */
   function handleEditMediaProfile() {
     trackProfileEvent("profile_edit_tapped", {
       profileType: "media",
       viewerMode: "owner",
     });
-    Alert.alert(
-      "Modifica profilo",
-      "La modifica del profilo editoriale arriva con il prossimo aggiornamento.",
-    );
+    router.push("/profile/media-edit");
   }
 
   function handleOpenDirectorLinkedTarget(target: MediaLinkedTarget) {
@@ -1143,6 +1138,13 @@ export default function ProfileScreen() {
               });
               void handleShareOwnProfile();
             }}
+            /*
+              REV-PROF-22: al ritorno da un modulo di Modifica profilo il
+              token cambia e il payload pubblico viene riletto, così header,
+              tab Info e "Visita sito" mostrano subito il dato salvato, senza
+              un refresh manuale.
+            */
+            refreshToken={profileRefreshToken}
             shouldOpenComposer={composeIntent === "media"}
             viewerProfileId={userId}
           />

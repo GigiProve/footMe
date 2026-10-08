@@ -16,11 +16,12 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
 import { NationalityAutocompleteInput } from "../../../../components/ui/nationality-autocomplete-input";
 import { ResidenceCityInput } from "../../../../components/ui/residence-city-input";
-import { spacing } from "../../../../theme/tokens";
+import { colors, spacing } from "../../../../theme/tokens";
 import { ActionSheet, AppText } from "../../../../ui";
 import {
   DateSelector,
@@ -76,10 +77,17 @@ type PersonalForm = {
   gender: ProfileGender | "";
   lastName: string;
   nationality: string;
+  /** REV-PROF-22: numero privato dell'account, mai un contatto pubblico. */
+  phone: string;
   region: string;
   residence: string;
   useResidenceForDomicile: boolean;
 };
+
+/** Un numero plausibile: almeno otto cifre, prefisso facoltativo. */
+function isPhoneValid(value: string): boolean {
+  return /^\+?\d{8,15}$/.test(value.trim().replace(/[\s.\-()]/g, ""));
+}
 
 const GENERIC_SAVE_ERROR =
   "Non è stato possibile salvare le modifiche. Riprova.";
@@ -93,12 +101,31 @@ const GENERIC_UPLOAD_ERROR =
  * toccato — il patch lo rimanda indietro così com'era letto — quindi
  * nascondere un campo non lo cancella.
  */
-export type ProfilePersonalDataHiddenField = "domicile" | "gender";
+export type ProfilePersonalDataHiddenField =
+  | "domicile"
+  | "gender"
+  /**
+   * REV-PROF-22: copertina e logo del Media/Creator appartengono alla realtà
+   * editoriale e si modificano da "Identità editoriale". Qui si modificano i
+   * dati della persona, e la persona non ha una testata da mostrare.
+   */
+  | "images";
 
 export type ProfilePersonalDataConfig = {
   /** Nota in fondo al form. Omessa quando il mockup non la prevede. */
   footerHint?: string;
   hiddenFields?: readonly ProfilePersonalDataHiddenField[];
+  /**
+   * REV-PROF-22: il telefono privato dell'account. Si dichiara solo per i
+   * ruoli il cui hub non ha un modulo Contatti, altrimenti il numero
+   * sarebbe modificabile da due posti.
+   */
+  includePhone?: boolean;
+  /**
+   * Etichetta in evidenza sopra il form, con il lucchetto. Dice a chi sono
+   * visibili i dati; non è la protezione, che resta nel backend.
+   */
+  privacyBadge?: string;
   /**
    * Avviso di privacy associato ai campi, reso con il riquadro informativo
    * condiviso. Non sostituisce l'esclusione lato backend: la dice.
@@ -106,6 +133,8 @@ export type ProfilePersonalDataConfig = {
   privacyNotice?: string;
   profileType: string;
   testIDPrefix: string;
+  /** Titolo della app bar. Default: il modulo con copertina e avatar. */
+  title?: string;
 };
 
 type ProfilePersonalDataScreenProps = {
@@ -133,10 +162,19 @@ export function ProfilePersonalDataScreen({
   saving,
   userId,
 }: ProfilePersonalDataScreenProps) {
-  const { footerHint, hiddenFields, privacyNotice, profileType, testIDPrefix } =
-    config;
+  const {
+    footerHint,
+    hiddenFields,
+    includePhone = false,
+    privacyBadge,
+    privacyNotice,
+    profileType,
+    testIDPrefix,
+    title = "Foto e dati personali",
+  } = config;
   const showsGender = !hiddenFields?.includes("gender");
   const showsDomicile = !hiddenFields?.includes("domicile");
+  const showsImages = !hiddenFields?.includes("images");
 
   const initialForm = useMemo<PersonalForm | null>(() => {
     if (!data) {
@@ -155,6 +193,7 @@ export function ProfilePersonalDataScreen({
       gender: base.gender,
       lastName,
       nationality: base.nationality,
+      phone: base.contactPhone,
       region: base.region,
       residence: base.residence,
       useResidenceForDomicile: base.useResidenceForDomicile,
@@ -314,6 +353,15 @@ export function ProfilePersonalDataScreen({
       return;
     }
 
+    /*
+      Il numero è facoltativo: cancellarlo è legittimo. Non lo è lasciarne uno
+      che non si può chiamare.
+    */
+    if (includePhone && form.phone.trim() && !isPhoneValid(form.phone)) {
+      setErrorMessage("Inserisci un numero di telefono valido.");
+      return;
+    }
+
     const previousAvatar = data.profile.avatar_url ?? "";
     const previousCover = data.profile.cover_url ?? "";
 
@@ -331,6 +379,13 @@ export function ProfilePersonalDataScreen({
         region: form.region,
         residence: form.residence,
         useResidenceForDomicile: form.useResidenceForDomicile,
+        /*
+          Il numero viaggia solo per i ruoli che lo modificano da qui, e la
+          sua preferenza di visibilità non viene toccata: resta quella che
+          era, spenta per default. Un numero privato non diventa pubblico
+          perché è stato corretto.
+        */
+        ...(includePhone ? { contactPhone: form.phone } : {}),
       },
       {
         onError: (error) => {
@@ -381,7 +436,7 @@ export function ProfilePersonalDataScreen({
       saveDisabled={uploading !== null}
       saving={saving}
       testID={`${testIDPrefix}-profile-edit-personal`}
-      title="Foto e dati personali"
+      title={title}
     >
       {isPending ? (
         <ProfileEditFieldsSkeleton
@@ -399,15 +454,34 @@ export function ProfilePersonalDataScreen({
 
       {form && data ? (
         <>
-          <ProfileCoverAvatarEditor
-            avatarUrl={form.avatarUrl || null}
-            coverUrl={form.coverUrl || null}
-            fullName={data.profile.full_name}
-            onEditAvatar={() => setPickerTarget("avatar")}
-            onEditCover={() => setPickerTarget("cover")}
-            testIDPrefix={testIDPrefix}
-            uploading={uploading}
-          />
+          {showsImages ? (
+            <ProfileCoverAvatarEditor
+              avatarUrl={form.avatarUrl || null}
+              coverUrl={form.coverUrl || null}
+              fullName={data.profile.full_name}
+              onEditAvatar={() => setPickerTarget("avatar")}
+              onEditCover={() => setPickerTarget("cover")}
+              testIDPrefix={testIDPrefix}
+              uploading={uploading}
+            />
+          ) : null}
+
+          {/*
+            La privacy è scritta, non solo disegnata: il lucchetto da solo non
+            direbbe niente a chi usa uno screen reader.
+          */}
+          {privacyBadge ? (
+            <View
+              accessible
+              style={styles.privacyBadge}
+              testID={`${testIDPrefix}-personal-privacy-badge`}
+            >
+              <Ionicons color={colors.accent} name="lock-closed" size={14} />
+              <AppText color="accent" variant="metaStrong">
+                {privacyBadge}
+              </AppText>
+            </View>
+          ) : null}
 
           <View style={styles.fields}>
             <OnboardingTextField
@@ -488,6 +562,24 @@ export function ProfilePersonalDataScreen({
               </ToggleRow>
             ) : null}
 
+            {includePhone ? (
+              <OnboardingTextField
+                autoCapitalize="none"
+                errorMessage={
+                  form.phone.trim() && !isPhoneValid(form.phone)
+                    ? "Inserisci un numero di telefono valido."
+                    : undefined
+                }
+                keyboardType="phone-pad"
+                label="Telefono"
+                onChangeText={(value) => patch({ phone: value })}
+                optional
+                placeholder="+39 000 000 0000"
+                testID={`${testIDPrefix}-personal-phone`}
+                value={form.phone}
+              />
+            ) : null}
+
             {privacyNotice ? (
               <InfoMessage
                 message={privacyNotice}
@@ -566,5 +658,11 @@ export function ProfilePersonalDataScreen({
 const styles = StyleSheet.create({
   fields: {
     gap: spacing[16],
+  },
+  privacyBadge: {
+    alignItems: "center",
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: spacing[4],
   },
 });
