@@ -18,6 +18,7 @@ export default function ClubAdminLayout() {
       <Stack.Screen name="roster" />
       <Stack.Screen name="invites" />
       <Stack.Screen name="teams" />
+      <Stack.Screen name="affiliates" />
       <Stack.Screen name="permissions/index" />
       <Stack.Screen name="permissions/[memberId]" />
     </Stack>

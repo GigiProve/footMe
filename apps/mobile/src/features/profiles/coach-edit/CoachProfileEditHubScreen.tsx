@@ -19,6 +19,10 @@ export function CoachProfileEditHubScreen() {
     <ProfileEditHubScreen
       buildSummary={buildCoachSectionSummary}
       data={profileQuery.data}
+      getIdentity={(profile) => ({
+        avatarUrl: profile.profile.avatar_url,
+        name: profile.profile.full_name,
+      })}
       groups={COACH_EDIT_SECTION_GROUPS}
       isError={profileQuery.isError}
       isPending={profileQuery.isPending}

@@ -31,7 +31,6 @@ import {
   ProfileEditErrorState,
   ProfileEditHubSkeleton,
 } from "./ProfileEditStates";
-import type { CompleteProfessionalProfile } from "../profile-service";
 
 export type ProfileEditHubSection = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -47,36 +46,52 @@ export type ProfileEditHubGroup = {
   title: string;
 };
 
-type ProfileEditHubScreenProps = {
+/**
+ * Identità mostrata in testata. Il Calciatore ha un avatar e un nome, la
+ * Società un logo e una denominazione: è l unico punto in cui i due modelli
+ * divergono, quindi lo risolve il chiamante invece di insegnare all hub due
+ * forme di dato.
+ */
+export type ProfileEditHubIdentity = {
+  avatarUrl: string | null;
+  name: string;
+};
+
+type ProfileEditHubScreenProps<TData> = {
   /** Sottotitolo dinamico di una voce. `undefined` lascia quello fisso. */
   buildSummary: (
     sectionId: ProfileEditSectionKey,
-    data: CompleteProfessionalProfile,
+    data: TData,
   ) => string | undefined;
+  getIdentity: (data: TData) => ProfileEditHubIdentity;
   groups: readonly ProfileEditHubGroup[];
   isError: boolean;
   isPending: boolean;
+  /** Messaggio dell errore di caricamento, specifico del ruolo. */
+  loadErrorMessage?: string;
   /** Evento di apertura dell'hub, specifico del ruolo. */
   openedEvent: ProfileAnalyticsEvent;
-  data: CompleteProfessionalProfile | undefined;
+  data: TData | undefined;
   onRetry: () => void;
   profileType: string;
   roleLabel: string;
   testIDPrefix: string;
 };
 
-export function ProfileEditHubScreen({
+export function ProfileEditHubScreen<TData>({
   buildSummary,
   data,
+  getIdentity,
   groups,
   isError,
   isPending,
+  loadErrorMessage = "Non è stato possibile caricare il profilo.",
   onRetry,
   openedEvent,
   profileType,
   roleLabel,
   testIDPrefix,
-}: ProfileEditHubScreenProps) {
+}: ProfileEditHubScreenProps<TData>) {
   useFocusEffect(
     useCallback(() => {
       trackProfileEvent(openedEvent, { profileType, viewerMode: "owner" });
@@ -118,7 +133,7 @@ export function ProfileEditHubScreen({
 
       {isError ? (
         <ProfileEditErrorState
-          message="Non è stato possibile caricare il profilo."
+          message={loadErrorMessage}
           onRetry={onRetry}
           testID={`${testIDPrefix}-edit-error`}
         />
@@ -127,8 +142,8 @@ export function ProfileEditHubScreen({
       {data ? (
         <>
           <ProfileEditIdentityHeader
-            avatarUrl={data.profile.avatar_url}
-            fullName={data.profile.full_name}
+            avatarUrl={getIdentity(data).avatarUrl}
+            fullName={getIdentity(data).name}
             /*
               L'hub si apre solo dal Master Profile: tornare indietro ci riporta
               esattamente lì, in modalità owner, mentre un push ne impilerebbe

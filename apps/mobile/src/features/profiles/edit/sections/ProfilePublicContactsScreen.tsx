@@ -25,13 +25,12 @@
  * contatto già salvato da un altro flusso.
  */
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { StyleSheet, View } from "react-native";
+import type Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
-import { colors, radius, spacing } from "../../../../theme/tokens";
+import { colors, radius } from "../../../../theme/tokens";
 import { AppText } from "../../../../ui";
-import { OnboardingTextField, ToggleSwitch } from "../../../onboarding/ui";
 import {
   trackProfileEvent,
   type PublicContactType,
@@ -50,6 +49,7 @@ import {
 import type { ProfileFormState } from "../../profile-edit-helpers";
 import type { CompleteProfessionalProfile } from "../../profile-service";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
+import { PublicContactChannelRow } from "./PublicContactChannelRow";
 import {
   ProfileEditErrorState,
   ProfileEditFieldsSkeleton,
@@ -341,95 +341,43 @@ export function ProfilePublicContactsScreen({
           </AppText>
 
           <View style={styles.list}>
-            {CHANNELS.map((channel) => {
-              const value = form[channel.key];
-              const normalized = channel.normalize(value);
-              const isPublishable = normalized.length > 0;
-              const isExpanded = expandedKey === channel.key;
-              const showsInvalid = value.trim().length > 0 && !isPublishable;
-
-              return (
-                <View key={channel.key} style={styles.channel}>
-                  <Pressable
-                    accessibilityHint="Modifica il valore del contatto"
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: isExpanded }}
-                    onPress={() =>
-                      setExpandedKey(isExpanded ? null : channel.key)
-                    }
-                    style={styles.row}
-                    testID={`${testIDPrefix}-contact-${channel.key}-row`}
-                  >
-                    <Ionicons
-                      color={
-                        isPublishable ? colors.accent : colors.textSecondary
-                      }
-                      name={channel.icon}
-                      size={20}
-                    />
-                    <View style={styles.rowText}>
-                      <AppText color="secondary" variant="meta">
-                        {channel.label}
-                      </AppText>
-                      {/* Mai un valore finto: se non c'è, si dice che non c'è. */}
-                      <AppText
-                        color={value.trim() ? "primary" : "muted"}
-                        numberOfLines={1}
-                        variant="bodySm"
-                      >
-                        {value.trim() || "Non configurato"}
-                      </AppText>
-                    </View>
-
-                    <ToggleSwitch
-                      accessibilityLabel={`Rendi visibile ${channel.label}`}
-                      disabled={!isPublishable}
-                      onValueChange={(visible) => {
-                        trackProfileEvent("public_contact_visibility_changed", {
-                          contactType: channel.key,
-                          profileType,
-                          section: "contacts",
-                          visible,
-                        });
-                        patch({
-                          visibility: {
-                            ...form.visibility,
-                            [channel.key]: visible,
-                          },
-                        });
-                      }}
-                      testID={`${testIDPrefix}-contact-${channel.key}-visibility`}
-                      value={form.visibility[channel.key]}
-                    />
-                  </Pressable>
-
-                  {isExpanded ? (
-                    <View style={styles.editor}>
-                      <OnboardingTextField
-                        autoCapitalize="none"
-                        errorMessage={
-                          showsInvalid ? channel.invalidMessage : undefined
-                        }
-                        helperText={
-                          isPublishable
-                            ? undefined
-                            : "Inserisci un valore valido per poterlo rendere pubblico."
-                        }
-                        keyboardType={channel.keyboardType}
-                        onChangeText={(next) =>
-                          patch({
-                            [channel.key]: next,
-                          } as Partial<ContactsForm>)
-                        }
-                        placeholder={channel.placeholder}
-                        testID={`${testIDPrefix}-contact-${channel.key}-input`}
-                        value={value}
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
+            {CHANNELS.map((channel) => (
+              <PublicContactChannelRow
+                expanded={expandedKey === channel.key}
+                icon={channel.icon}
+                invalidMessage={channel.invalidMessage}
+                key={channel.key}
+                keyboardType={channel.keyboardType}
+                label={channel.label}
+                normalize={channel.normalize}
+                onChangeValue={(next) =>
+                  patch({ [channel.key]: next } as Partial<ContactsForm>)
+                }
+                onToggleExpanded={() =>
+                  setExpandedKey(
+                    expandedKey === channel.key ? null : channel.key,
+                  )
+                }
+                onVisibilityChange={(visible) => {
+                  trackProfileEvent("public_contact_visibility_changed", {
+                    contactType: channel.key,
+                    profileType,
+                    section: "contacts",
+                    visible,
+                  });
+                  patch({
+                    visibility: {
+                      ...form.visibility,
+                      [channel.key]: visible,
+                    },
+                  });
+                }}
+                placeholder={channel.placeholder}
+                testID={`${testIDPrefix}-contact-${channel.key}`}
+                value={form[channel.key]}
+                visible={form.visibility[channel.key]}
+              />
+            ))}
           </View>
 
           <AppText color="muted" variant="meta">
@@ -443,31 +391,11 @@ export function ProfilePublicContactsScreen({
 }
 
 const styles = StyleSheet.create({
-  channel: {
-    borderBottomColor: colors.divider,
-    borderBottomWidth: 1,
-  },
-  editor: {
-    paddingBottom: spacing[12],
-    paddingHorizontal: spacing[16],
-  },
   list: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radius[16],
     borderWidth: 1,
     overflow: "hidden",
-  },
-  row: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[12],
-    minHeight: 64,
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[12],
-  },
-  rowText: {
-    flex: 1,
-    gap: spacing[4],
   },
 });

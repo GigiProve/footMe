@@ -23,6 +23,10 @@ export function DirectorProfileEditHubScreen() {
     <ProfileEditHubScreen
       buildSummary={buildDirectorSectionSummary}
       data={profileQuery.data}
+      getIdentity={(profile) => ({
+        avatarUrl: profile.profile.avatar_url,
+        name: profile.profile.full_name,
+      })}
       groups={DIRECTOR_EDIT_SECTION_GROUPS}
       isError={profileQuery.isError}
       isPending={profileQuery.isPending}

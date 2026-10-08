@@ -262,7 +262,13 @@ export default function ClubProfileScreen() {
               profileType: "society",
               viewerMode: "owner",
             });
-            router.push("/(tabs)/profile?edit=clubInfo" as never);
+            /*
+              REV-PROF-18: l'hub ha una rotta propria e accetta il club come
+              parametro, cosi' ci arriva anche un amministratore delegato —
+              che non e' `club_admin` e non ha un club in sessione. Il
+              permesso lo verifica comunque il backend.
+            */
+            router.push(`/profile/society-edit?clubId=${id}` as never);
           }}
           onFollowPress={() => void handleToggleFollow()}
           onManagePositions={() => {

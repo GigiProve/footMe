@@ -19,6 +19,10 @@ export function StaffProfileEditHubScreen() {
     <ProfileEditHubScreen
       buildSummary={buildStaffSectionSummary}
       data={profileQuery.data}
+      getIdentity={(profile) => ({
+        avatarUrl: profile.profile.avatar_url,
+        name: profile.profile.full_name,
+      })}
       groups={STAFF_EDIT_SECTION_GROUPS}
       isError={profileQuery.isError}
       isPending={profileQuery.isPending}

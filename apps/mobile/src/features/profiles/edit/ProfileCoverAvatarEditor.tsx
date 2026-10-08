@@ -24,6 +24,12 @@ import { AppText, Avatar } from "../../../ui";
 import { PROFILE_COVER_HEIGHT } from "../master/ProfileHeroHeader";
 
 type ProfileCoverAvatarEditorProps = {
+  /**
+   * Etichetta del comando sull avatar. Il Calciatore modifica una foto
+   * profilo, la Società un logo: la forma del controllo è la stessa, il nome
+   * della cosa no.
+   */
+  avatarActionLabel?: string;
   avatarUrl: string | null;
   coverUrl: string | null;
   fullName: string;
@@ -35,6 +41,7 @@ type ProfileCoverAvatarEditorProps = {
 };
 
 export function ProfileCoverAvatarEditor({
+  avatarActionLabel = "Modifica foto profilo",
   avatarUrl,
   coverUrl,
   fullName,
@@ -85,7 +92,7 @@ export function ProfileCoverAvatarEditor({
       </View>
 
       <Pressable
-        accessibilityLabel="Modifica foto profilo"
+        accessibilityLabel={avatarActionLabel}
         accessibilityRole="button"
         accessibilityState={{ busy: uploading === "avatar", disabled: isBusy }}
         disabled={isBusy}

@@ -40,7 +40,6 @@ import {
 import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
 import { EditAgentMediaModal } from "../../src/features/profiles/edit-modals/EditAgentMediaModal";
-import { EditClubInfoModal } from "../../src/features/profiles/edit-modals/EditClubInfoModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
 import { EditClubSportProfileModal } from "../../src/features/profiles/edit-modals/EditClubSportProfileModal";
 import { EditClubAffiliationsModal } from "../../src/features/profiles/edit-modals/EditClubAffiliationsModal";
@@ -125,9 +124,10 @@ export default function ProfileScreen() {
    * ospita un composer proprio, apre quello che già esiste in questa vista
    * (§2 della Home: implementare solo il punto di accesso).
    */
-  const { compose, edit } = useLocalSearchParams<{
+  const { compose, edit, tab } = useLocalSearchParams<{
     compose?: string;
     edit?: string;
+    tab?: string;
   }>();
   const composeIntent =
     compose === "fan" || compose === "media" || compose === "club" ? compose : null;
@@ -147,19 +147,15 @@ export default function ProfileScreen() {
   const [activeClubTab, setActiveClubTab] = useState<SocietyTab>(
     // Arrivando dal "+" della Home la scheda contenuti è quella che ospita il
     // composer già esistente, quindi si apre direttamente su quella.
-    compose === "club" ? "media" : "profile",
+    // REV-PROF-18 usa lo stesso ingresso per la riga "Media e contenuti"
+    // dell'hub, che apre il modulo Media condiviso invece di una galleria
+    // specifica della Societa'.
+    compose === "club" || tab === "media" ? "media" : "profile",
   );
   const [clubPositionFilter, setClubPositionFilter] =
     useState<PositionFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
-  /*
-    REV-PROF-17: "Modifica profilo" sulla route pubblica della propria Societa'
-    rimanda qui con `?edit=clubInfo`, e apre l'editor gia' esistente invece di
-    duplicarne uno dentro il Master Profile.
-  */
-  const [activeModal, setActiveModal] = useState<EditSection | null>(
-    edit === "clubInfo" ? "clubInfo" : null,
-  );
+  const [activeModal, setActiveModal] = useState<EditSection | null>(null);
   const [pendingMemberships, setPendingMemberships] = useState<PendingMembership[]>([]);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [respondingMembershipId, setRespondingMembershipId] = useState<string | null>(null);
@@ -332,6 +328,46 @@ export default function ProfileScreen() {
       viewerMode: "owner",
     });
   }, [profile?.role, userId]);
+
+  /*
+    REV-PROF-18: l'editor della Societa' non e' piu' un modale dentro questa
+    schermata, e' un hub con una rotta propria. Il deep link `?edit=clubInfo`
+    — usato da "Modifica profilo" sulla rotta pubblica del proprio club —
+    continua a funzionare: porta allo stesso hub invece di aprire un form che
+    non esiste piu'.
+  */
+  const handleOpenSocietyEditor = useCallback(() => {
+    router.push("/profile/society-edit" as never);
+  }, [router]);
+
+  /*
+    Il parametro resta nell URL anche dopo l'apertura: senza questo segnale
+    tornare indietro dall hub lo riaprirebbe in un ciclo.
+  */
+  const hasHandledEditParam = useRef(false);
+
+  useEffect(() => {
+    if (edit === "clubInfo" && !hasHandledEditParam.current) {
+      hasHandledEditParam.current = true;
+      handleOpenSocietyEditor();
+    }
+  }, [edit, handleOpenSocietyEditor]);
+
+  /*
+    La riga "Media e contenuti" dell hub torna su questa schermata, che di
+    solito e' gia' montata: il parametro iniziale non basta a spostare la
+    scheda, serve riallinearla a ogni focus.
+  */
+  const hasHandledTabParam = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (tab === "media" && !hasHandledTabParam.current) {
+        hasHandledTabParam.current = true;
+        setActiveClubTab("media");
+      }
+    }, [tab]),
+  );
 
   if (!userId || !profile) {
     return null;
@@ -719,7 +755,7 @@ export default function ProfileScreen() {
                   viewerMode: societyProfile.viewer.mode,
                 })
               }
-              onEditProfile={() => handleEdit("clubInfo")}
+              onEditProfile={handleOpenSocietyEditor}
               onFollowPress={() => undefined}
               onManagePositions={handleOpenClubPositions}
               onMessagePress={() => undefined}
@@ -1142,13 +1178,6 @@ export default function ProfileScreen() {
           ) : null}
           {role === "club_admin" ? (
             <>
-              <EditClubInfoModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "clubInfo"}
-              />
               <EditClubSeasonsModal
                 completeProfile={completeProfile}
                 onClose={handleCloseModal}

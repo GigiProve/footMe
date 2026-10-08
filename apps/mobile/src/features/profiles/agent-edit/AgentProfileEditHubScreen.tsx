@@ -43,6 +43,10 @@ export function AgentProfileEditHubScreen() {
     <ProfileEditHubScreen
       buildSummary={buildSummary}
       data={profileQuery.data}
+      getIdentity={(profile) => ({
+        avatarUrl: profile.profile.avatar_url,
+        name: profile.profile.full_name,
+      })}
       groups={AGENT_EDIT_SECTION_GROUPS}
       isError={profileQuery.isError}
       isPending={profileQuery.isPending}

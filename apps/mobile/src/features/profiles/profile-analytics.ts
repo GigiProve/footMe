@@ -36,6 +36,15 @@ export type ProfileAnalyticsEvent =
   | "society_team_squad_opened"
   | "society_affiliate_opened"
   | "society_manage_positions_tapped"
+  // Modifica profilo Società (REV-PROF-18). La sezione e la superficie, mai
+  // la denominazione, la categoria, la città o un recapito.
+  | "society_profile_edit_opened"
+  | "society_profile_structure_changed"
+  | "society_profile_category_changed"
+  | "society_profile_manage_teams_tapped"
+  | "society_profile_structure_blocked"
+  | "society_profile_venue_same_address_toggled"
+  | "society_profile_conflict"
   // Editor profilo (REV-PROF-02 §Z)
   | "player_profile_edit_opened"
   | "profile_edit_section_opened"
@@ -235,7 +244,15 @@ export type ProfileEditSectionKey =
   /** REV-PROF-16: "Attivita e mercati", solo Procuratore. */
   | "activities"
   /** REV-PROF-16: "Assistiti in evidenza", solo Procuratore. */
-  | "assistiti";
+  | "assistiti"
+  /** REV-PROF-18: i cinque moduli e i quattro entry point della Società. */
+  | "identity"
+  | "sport"
+  | "venue"
+  | "description"
+  | "teams"
+  | "affiliates"
+  | "positions";
 
 /** Modalità temporale scelta, mai la società, il ruolo o le date. */
 export type CoachExperienceMode =
