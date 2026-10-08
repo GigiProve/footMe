@@ -206,7 +206,16 @@ export type ProfileAnalyticsEvent =
   | "agent_featured_assistiti_reordered"
   | "agent_featured_assistiti_limit_reached"
   | "agent_featured_assistiti_manage_tapped"
-  | "agent_featured_assistiti_load_failed";
+  | "agent_featured_assistiti_load_failed"
+  // Master Profile Tifoso (REV-PROF-19). Il tipo di contenuto è un enum, mai
+  // il testo di un'opinione, la domanda di un sondaggio o il nome di una
+  // squadra: quei valori non hanno un campo dove finire.
+  | "fan_create_sheet_opened"
+  | "fan_create_sheet_closed"
+  | "fan_create_option_selected"
+  | "fan_composer_open_failed"
+  | "fan_content_opened"
+  | "fan_favorite_club_tapped";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -283,6 +292,11 @@ type ProfileAnalyticsProps = {
   /** Quanti ruoli sono selezionati, non quali. */
   roleCount?: number;
   contactType?: PublicContactType;
+  /**
+   * REV-PROF-19: tipo di contenuto del Tifoso. Un enum chiuso — mai il titolo,
+   * il testo, la domanda, le opzioni o i giocatori taggati.
+   */
+  contentType?: "formation" | "opinion" | "photo" | "poll" | "proposal";
   /** Modalita geografica scelta, mai i nomi dei territori. */
   geographicMode?: string;
   mediaFilter?: "all" | "photo" | "video";
@@ -330,6 +344,7 @@ export function trackProfileEvent(
       : {}),
     ...(typeof props.visible === "boolean" ? { visible: props.visible } : {}),
     ...(props.contactType ? { contact_type: props.contactType } : {}),
+    ...(props.contentType ? { content_type: props.contentType } : {}),
     ...(props.mediaFilter ? { media_filter: props.mediaFilter } : {}),
     ...(props.mediaType ? { media_type: props.mediaType } : {}),
     ...(props.profileType ? { profile_type: props.profileType } : {}),

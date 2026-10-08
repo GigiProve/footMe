@@ -4,7 +4,7 @@ import { Image, Pressable, StyleSheet, View } from "react-native";
 import { VideoPreview } from "../../components/ui/video-preview";
 import { colors, radius, spacing } from "../../theme/tokens";
 import { AppText } from "../../ui";
-import { FootballPitchPreview } from "./FanProfileView";
+import { FootballPitchPreview } from "./fan/FootballPitchPreview";
 import {
   voteFanTribunaPoll,
   type FanTribunaPollOption,

@@ -6,7 +6,7 @@
  * successive riusano questo header invece di riscriverne uno.
  */
 import { type ReactNode } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing } from "../../../theme/tokens";
@@ -57,6 +57,13 @@ type ProfileHeroHeaderProps = {
    */
   isVerified?: boolean;
   metaRows?: readonly ProfileHeroMetaRow[];
+  /**
+   * Rende il ruolo secondario un collegamento. Serve alla squadra del cuore
+   * del Tifoso (REV-PROF-19), che sta accanto alla label di ruolo e apre il
+   * Master Profile della società. Assente: resta testo, e non promette una
+   * navigazione che non esiste.
+   */
+  onSecondaryRolePress?: () => void;
   primaryRole?: string;
   secondaryRole?: string;
   testID?: string;
@@ -71,6 +78,7 @@ export function ProfileHeroHeader({
   fullName,
   isVerified = false,
   metaRows = [],
+  onSecondaryRolePress,
   primaryRole,
   secondaryRole,
   testID,
@@ -130,9 +138,24 @@ export function ProfileHeroHeader({
                 <AppText color="muted" variant="titleMd">
                   ·
                 </AppText>
-                <AppText color="primary" variant="titleMd">
-                  {secondaryRole}
-                </AppText>
+                {onSecondaryRolePress ? (
+                  <Pressable
+                    accessibilityLabel={secondaryRole}
+                    accessibilityRole="link"
+                    hitSlop={8}
+                    onPress={onSecondaryRolePress}
+                    style={({ pressed }) => (pressed ? styles.rolePressed : null)}
+                    testID={testID ? `${testID}-secondary-role` : undefined}
+                  >
+                    <AppText color="accent" variant="titleMd">
+                      {secondaryRole}
+                    </AppText>
+                  </Pressable>
+                ) : (
+                  <AppText color="primary" variant="titleMd">
+                    {secondaryRole}
+                  </AppText>
+                )}
               </>
             ) : null}
           </View>
@@ -283,6 +306,9 @@ const styles = StyleSheet.create({
   },
   metaText: {
     flexShrink: 1,
+  },
+  rolePressed: {
+    opacity: 0.6,
   },
   roleRow: {
     alignItems: "center",

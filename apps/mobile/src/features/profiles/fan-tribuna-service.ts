@@ -199,6 +199,13 @@ export const FAN_TRIBUNA_PAGE_SIZE = 30;
 
 /** Paging options for the fan tribuna feed loader. */
 export type FanTribunaFeedPageOptions = {
+  /**
+   * REV-PROF-19: il Master Profile Tifoso separa la Tribuna (opinioni,
+   * sondaggi, formazioni) dalla tab Media (foto e video). È una regola di
+   * lettura sul tipo reale del record: la stessa tabella, due query, nessuna
+   * copia del contenuto per assegnarlo a una tab. Omesso: tutti i tipi.
+   */
+  kinds?: readonly FanTribunaKind[];
   limit?: number;
   offset?: number;
 };
@@ -220,11 +227,17 @@ export async function fetchFanTribunaFeed(
   const limit = options.limit ?? FAN_TRIBUNA_PAGE_SIZE;
   const offset = options.offset ?? 0;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("fan_tribuna_posts")
     .select(POST_SELECT)
     .eq("profile_id", profileId)
-    .eq("status", "published")
+    .eq("status", "published");
+
+  if (options.kinds && options.kinds.length > 0) {
+    query = query.in("kind", [...options.kinds]);
+  }
+
+  const { data, error } = await query
     .order("published_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);

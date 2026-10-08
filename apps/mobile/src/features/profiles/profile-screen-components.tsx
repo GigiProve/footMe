@@ -11,6 +11,7 @@ import {
   ProfileQuickFacts,
   type ProfileQuickFact,
 } from "./master/ProfileQuickFacts";
+import { FAN_ROLE_LABEL } from "./fan/fan-master-profile";
 import { colors, radius, spacing, typography } from "../../theme/tokens";
 import { AppText, Button, Input } from "../../ui";
 
@@ -114,9 +115,19 @@ type MasterProfileHeaderProps = {
   /** "Messaggio", mai "Contatta": è la stessa azione, con un nome solo. */
   onMessagePress?: () => void;
   onMorePress?: () => void;
+  /**
+   * Rende il ruolo secondario un collegamento (REV-PROF-19: la squadra del
+   * cuore del Tifoso apre il Master Profile della società).
+   */
+  onSecondaryRolePress?: () => void;
   onSharePress?: () => void;
   primaryRole: string;
   quickFacts?: readonly ProfileQuickFact[];
+  /**
+   * Seconda metà della riga di ruolo: "Tifoso · ASD Casteltermini". Assente
+   * per le tipologie che mettono la società in una riga meta.
+   */
+  secondaryRole?: string;
   /** Prefisso dei testID: "coach-profile-header", "staff-quick-facts", ... */
   testIDPrefix: string;
 };
@@ -229,9 +240,11 @@ function MasterProfileHeader({
   onFollowPress,
   onMessagePress,
   onMorePress,
+  onSecondaryRolePress,
   onSharePress,
   primaryRole,
   quickFacts = [],
+  secondaryRole,
   testIDPrefix,
 }: MasterProfileHeaderProps) {
   const metaRows = [
@@ -301,7 +314,9 @@ function MasterProfileHeader({
         fullName={fullName}
         isVerified={isVerified}
         metaRows={metaRows}
+        onSecondaryRolePress={onSecondaryRolePress}
         primaryRole={primaryRole}
+        secondaryRole={secondaryRole}
         testID={`${testIDPrefix}-profile-header`}
       />
 
@@ -360,6 +375,27 @@ export function AgentProfileHeader(
   props: Omit<MasterProfileHeaderProps, "testIDPrefix">,
 ) {
   return <MasterProfileHeader {...props} testIDPrefix="agent" />;
+}
+
+/**
+ * Header del Master Profile Tifoso (REV-PROF-19, Screen 1 e 2).
+ *
+ * Lo stesso header degli altri Master Profile, con due sole particolarità del
+ * Tifoso: il ruolo principale è sempre la label "Tifoso", e il ruolo
+ * secondario è la squadra del cuore, che quando esiste è un collegamento alla
+ * società. Niente località, niente disponibilità, niente informazioni rapide:
+ * un Tifoso non ha un profilo professionale da riassumere.
+ */
+export function FanProfileHeader(
+  props: Omit<MasterProfileHeaderProps, "primaryRole" | "testIDPrefix">,
+) {
+  return (
+    <MasterProfileHeader
+      {...props}
+      primaryRole={FAN_ROLE_LABEL}
+      testIDPrefix="fan"
+    />
+  );
 }
 
 /** Azione secondaria a sola icona dell'action bar: 44x44 di area toccabile. */

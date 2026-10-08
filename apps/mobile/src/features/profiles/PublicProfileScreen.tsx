@@ -48,7 +48,7 @@ import { StaffProfileTabView } from "./career/StaffProfileTabView";
 import { AgentProfileTabView } from "./career/AgentProfileTabView";
 import { DirectorProfileTabView } from "./career/DirectorProfileTabView";
 import type { MediaLinkedTarget } from "./career/MediaTabContent";
-import { FanProfileView } from "./FanProfileView";
+import { FanProfileView, type FanProfileTab } from "./FanProfileView";
 import { MediaProfileView } from "./MediaProfileView";
 import { openDirectConversation } from "../messaging/messaging-service";
 import {
@@ -79,7 +79,11 @@ const noop = () => undefined;
 
 export function PublicProfileScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    id?: string | string[];
+    /** REV-PROF-19: deep link a una tab del Master Profile Tifoso. */
+    tab?: string | string[];
+  }>();
   const { isLoading: isSessionLoading, needsOnboarding, profile: viewerProfile, session } = useSession();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -116,6 +120,9 @@ export function PublicProfileScreen() {
   }>({ initialMode: "picker", open: false });
 
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const fanInitialTab = parseFanProfileTab(
+    Array.isArray(params.tab) ? params.tab[0] : params.tab,
+  );
   const currentUserId = session?.user.id ?? null;
   const viewerRole = (viewerProfile?.role ?? null) as AppRole | null;
   const viewedProfileId = completeProfile?.profile.id ?? null;
@@ -200,7 +207,11 @@ export function PublicProfileScreen() {
 
     if (
       !viewedProfileId ||
-      (role !== "coach" && role !== "staff" && role !== "director")
+      (role !== "coach" &&
+        role !== "staff" &&
+        role !== "director" &&
+        // REV-PROF-19: anche il Master Profile Tifoso conta un'apertura.
+        role !== "fan")
     ) {
       return;
     }
@@ -493,6 +504,11 @@ export function PublicProfileScreen() {
     router.push(`/profile/${playerProfileId}` as never);
   }
 
+  /** Dettaglio condiviso del contenuto: una rotta sola per ogni tipologia. */
+  function handleOpenContent(ref: { contentType: string; postId: string }) {
+    router.push(`/content/${ref.contentType}/${ref.postId}` as never);
+  }
+
   if (!isSessionLoading && !session?.user) {
     return <Redirect href="/(auth)/sign-in" />;
   }
@@ -643,18 +659,46 @@ export function PublicProfileScreen() {
             />
             <ProfileContentBlock
               completeProfile={completeProfile}
+              fanInitialTab={fanInitialTab}
               onOpenClub={handleOpenFavoriteClub}
+              isFollowed={isFollowed}
               isMessaging={
                 profileAction?.profileId === completeProfile.profile.id &&
                 profileAction.type === "message"
               }
               isRepresentationLoading={isRepresentationLoading}
+              onFollowPress={
+                canFollowOrSave
+                  ? () => {
+                      trackProfileEvent("profile_follow_tapped", {
+                        profileType: completeProfile.profile.role,
+                        viewerMode: "visitor",
+                      });
+                      void handleToggleFollow();
+                    }
+                  : undefined
+              }
               onMessage={() => handleMessageProfile(completeProfile)}
+              onMorePress={() => {
+                trackProfileEvent("profile_more_menu_opened", {
+                  profileType: completeProfile.profile.role,
+                  viewerMode: "visitor",
+                });
+                setProfileActionsVisible(true);
+              }}
+              onOpenContent={handleOpenContent}
               onOpenDirectorLinkedTarget={handleOpenDirectorLinkedTarget}
               onOpenFavoriteClub={handleOpenFavoriteClub}
               onOpenPlayerProfile={handleOpenPlayerProfile}
               onRequestRepresentation={handleRequestRepresentation}
               onRespondRepresentation={handleRespondRepresentation}
+              onSharePress={() => {
+                trackProfileEvent("profile_share_tapped", {
+                  profileType: completeProfile.profile.role,
+                  viewerMode: "visitor",
+                });
+                void handleShareProfile();
+              }}
               playerAgent={playerAgent}
               playerRepresentations={playerRepresentations}
               representationState={representationState}
@@ -917,15 +961,21 @@ function ProfileHeaderBlock({
 
 function ProfileContentBlock({
   completeProfile,
+  fanInitialTab,
+  isFollowed = false,
   isMessaging = false,
   isRepresentationLoading = false,
+  onFollowPress,
   onMessage,
+  onMorePress,
   onOpenClub,
+  onOpenContent,
   onOpenDirectorLinkedTarget,
   onOpenFavoriteClub,
   onOpenPlayerProfile,
   onRequestRepresentation,
   onRespondRepresentation,
+  onSharePress,
   playerAgent,
   playerRepresentations,
   representationState,
@@ -933,15 +983,22 @@ function ProfileContentBlock({
   viewerRole,
 }: {
   completeProfile: CompleteProfessionalProfile;
+  /** REV-PROF-19: deep link a una tab del Master Profile Tifoso. */
+  fanInitialTab?: FanProfileTab;
+  isFollowed?: boolean;
   isMessaging?: boolean;
   isRepresentationLoading?: boolean;
+  onFollowPress?: () => void;
   onMessage?: () => void;
+  onMorePress?: () => void;
   onOpenClub?: (clubId: string) => void;
+  onOpenContent?: (ref: { contentType: string; postId: string }) => void;
   onOpenDirectorLinkedTarget?: (target: MediaLinkedTarget) => void;
   onOpenFavoriteClub?: (clubId: string) => void;
   onOpenPlayerProfile?: (profileId: string) => void;
   onRequestRepresentation?: () => void;
   onRespondRepresentation?: (accept: boolean) => void;
+  onSharePress?: () => void;
   playerAgent?: { agent_full_name: string | null; agent_profile_id: string } | null;
   playerRepresentations?: Awaited<ReturnType<typeof fetchPlayerRepresentations>>;
   representationState?: AgentRepresentation | null;
@@ -1120,14 +1177,24 @@ function ProfileContentBlock({
   }
 
   if (role === "fan") {
+    /*
+      REV-PROF-19: il Master Profile Tifoso porta il proprio header condiviso
+      e le tre tab. Segui, Messaggio, Condividi e il menu azioni restano
+      quelli della schermata, non una seconda implementazione.
+    */
     return (
       <FanProfileView
         completeProfile={completeProfile}
+        initialTab={fanInitialTab}
+        isFollowed={isFollowed}
         isMessaging={isMessaging}
         mode="visitor"
         onContactPress={onMessage}
+        onFollowPress={onFollowPress}
+        onMorePress={onMorePress}
+        onOpenContent={onOpenContent}
         onOpenFavoriteClub={onOpenFavoriteClub}
-        onOpenPlayerProfile={onOpenPlayerProfile}
+        onSharePress={onSharePress}
         viewerProfileId={viewerProfileId}
       />
     );
@@ -1156,6 +1223,13 @@ function ProfileContentBlock({
   );
 }
 
+/** Tab valida o niente: un valore sconosciuto non apre una tab inesistente. */
+function parseFanProfileTab(value: string | undefined): FanProfileTab | undefined {
+  return value === "tribuna" || value === "media" || value === "info"
+    ? value
+    : undefined;
+}
+
 function getProfileViewerTitle(role: AppRole) {
   switch (role) {
     case "agent":
@@ -1168,8 +1242,9 @@ function getProfileViewerTitle(role: AppRole) {
       return "Profilo club";
     case "director":
       return "Profilo dirigente";
+    // REV-PROF-19: la denominazione pubblica è "Tifoso", ovunque.
     case "fan":
-      return "Profilo appassionato";
+      return "Profilo tifoso";
     case "media":
       return "Profilo media";
     case "player":

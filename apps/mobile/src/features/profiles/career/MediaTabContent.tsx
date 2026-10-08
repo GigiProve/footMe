@@ -14,6 +14,7 @@
  */
 import {
   type ComponentProps,
+  type ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -75,6 +76,11 @@ type MediaTabContentProps = {
   emptyTitle?: string;
   /** Filtri Tutti/Foto/Video sopra la griglia. */
   filtersEnabled?: boolean;
+  /**
+   * Riga sotto la griglia: serve alla paginazione, che è del chiamante perché
+   * dipende dalle sue sorgenti (REV-PROF-19). Nessun footer: nessuno spazio.
+   */
+  footer?: ReactNode;
   initialItems?: MediaContentItem[];
   mode: MediaViewerMode;
   onAddContentPress?: () => void;
@@ -135,7 +141,15 @@ export type MediaContentItem = {
   tag?: MediaContentTag;
   /** Durata del video in secondi, quando la sorgente la conosce (§23). */
   durationSeconds?: number;
-  taggedRef?: { contentType: "club_media" | "fan_tribuna" | "media_profile"; postId: string };
+  /**
+   * Contenuto che ha un dettaglio canonico proprio: il tap apre quello invece
+   * del viewer locale, così commenti, reazioni e Salva restano in un posto
+   * solo. REV-PROF-19 aggiunge `fan_media`, la bacheca storica del Tifoso.
+   */
+  taggedRef?: {
+    contentType: "club_media" | "fan_media" | "fan_tribuna" | "media_profile";
+    postId: string;
+  };
   thumbnailUrl: string;
   type: "image" | "video";
   videoUrl?: string;
@@ -147,6 +161,7 @@ export function MediaTabContent({
   emptyDescription,
   emptyTitle = "Nessun contenuto",
   filtersEnabled = false,
+  footer,
   initialItems = [],
   mode,
   onAddContentPress,
@@ -511,6 +526,8 @@ export function MediaTabContent({
         </View>
       )}
 
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
+
       <Modal
         animationType="slide"
         onRequestClose={handleCloseViewer}
@@ -816,6 +833,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing[14],
     paddingHorizontal: spacing[16],
     paddingTop: spacing[16],
+  },
+  footer: {
+    alignItems: "center",
+    paddingHorizontal: spacing[20],
+    paddingTop: spacing[12],
   },
   grid: {
     flexDirection: "row",

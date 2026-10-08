@@ -317,7 +317,8 @@ export default function ProfileScreen() {
   useEffect(() => {
     const role = profile?.role;
 
-    if (!userId || (role !== "coach" && role !== "director")) {
+    // REV-PROF-19: anche il Master Profile Tifoso conta un'apertura.
+    if (!userId || (role !== "coach" && role !== "director" && role !== "fan")) {
       return;
     }
 
@@ -452,6 +453,11 @@ export default function ProfileScreen() {
 
   function handleOpenProfile(profileId: string) {
     router.push(`/profile/${profileId}` as never);
+  }
+
+  /** Dettaglio condiviso del contenuto: una rotta sola per ogni tipologia. */
+  function handleOpenContent(ref: { contentType: string; postId: string }) {
+    router.push(`/content/${ref.contentType}/${ref.postId}` as never);
   }
 
   function handleOpenDirectorLinkedTarget(target: MediaLinkedTarget) {
@@ -1040,11 +1046,42 @@ export default function ProfileScreen() {
             onToggleMediaFeatured={handleToggleDirectorMediaFeatured}
           />
         ) : completeProfile && role === "fan" ? (
+          /*
+            REV-PROF-19: il Master Profile Tifoso porta header e tre tab. Le
+            azioni della testata — Condividi, menu azioni, Modifica profilo —
+            restano quelle della schermata.
+          */
           <FanProfileView
             completeProfile={completeProfile}
             mode="owner"
+            onEditProfilePress={() => {
+              trackProfileEvent("profile_edit_tapped", {
+                profileType: "fan",
+                viewerMode: "owner",
+              });
+              /*
+                REV-PROF-20 non esiste ancora: durante la transizione la CTA
+                apre la rotta corrente, cioè la modale anagrafica già usata
+                dal Tifoso. Nessun form nuovo è stato scritto qui.
+              */
+              handleEdit("personalInfo");
+            }}
+            onMorePress={() => {
+              trackProfileEvent("profile_more_menu_opened", {
+                profileType: "fan",
+                viewerMode: "owner",
+              });
+              setMoreMenuVisible(true);
+            }}
+            onOpenContent={handleOpenContent}
             onOpenFavoriteClub={handleOpenAffiliateClub}
-            onOpenPlayerProfile={handleOpenProfile}
+            onSharePress={() => {
+              trackProfileEvent("profile_share_tapped", {
+                profileType: "fan",
+                viewerMode: "owner",
+              });
+              void handleShareOwnProfile();
+            }}
             shouldOpenComposer={composeIntent === "fan"}
             viewerProfileId={userId}
           />

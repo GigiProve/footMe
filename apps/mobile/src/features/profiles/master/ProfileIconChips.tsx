@@ -17,7 +17,12 @@ import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 
 export type ProfileIconChip = {
-  icon: React.ComponentProps<typeof Ionicons>["name"];
+  /**
+   * Opzionale: gli interessi e le categorie seguite del Tifoso (REV-PROF-19)
+   * sono pill di solo testo. Quando l'icona manca il chip non lascia lo spazio
+   * vuoto, si stringe sul testo.
+   */
+  icon?: React.ComponentProps<typeof Ionicons>["name"];
   key: string;
   label: string;
 };
@@ -41,7 +46,9 @@ export function ProfileIconChips({ chips, testID }: ProfileIconChipsProps) {
           key={chip.key}
           style={styles.chip}
         >
-          <Ionicons color={colors.accent} name={chip.icon} size={14} />
+          {chip.icon ? (
+            <Ionicons color={colors.accent} name={chip.icon} size={14} />
+          ) : null}
           <AppText color="primary" style={styles.label} variant="meta">
             {chip.label}
           </AppText>

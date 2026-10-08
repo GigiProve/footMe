@@ -76,17 +76,31 @@ type ProfileRow = {
 const POST_SELECT =
   "id, profile_id, description, tag, visual_url, visual_type, thumbnail_url, status, published_at, created_at, updated_at";
 
+/** Dimensione di pagina della bacheca storica del Tifoso (REV-PROF-19). */
+export const FAN_MEDIA_PAGE_SIZE = 24;
+
+/** Paginazione della bacheca: la cronologia non arriva in una risposta sola. */
+export type FanMediaFeedPageOptions = {
+  limit?: number;
+  offset?: number;
+};
+
 export async function fetchFanMediaFeed(
   profileId: string,
   viewerProfileId?: string | null,
+  options: FanMediaFeedPageOptions = {},
 ): Promise<FanMediaPost[]> {
+  const limit = options.limit ?? FAN_MEDIA_PAGE_SIZE;
+  const offset = options.offset ?? 0;
+
   const { data, error } = await supabase
     .from("fan_media_posts")
     .select(POST_SELECT)
     .eq("profile_id", profileId)
     .eq("status", "published")
     .order("published_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     throw error;

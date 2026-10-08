@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => {
     orders: { column: string; options: unknown }[];
     options: unknown;
     payload: unknown;
+    range?: { from: number; to: number };
     selectArgs: unknown[];
     table: string;
   };
@@ -69,6 +70,11 @@ const mocks = vi.hoisted(() => {
       maybeSingle: vi.fn(async () => nextResponse()),
       order: vi.fn((column: string, options: unknown) => {
         operation.orders.push({ column, options });
+        return builder;
+      }),
+      // REV-PROF-19: la bacheca è paginata, non arriva tutta in una risposta.
+      range: vi.fn((from: number, to: number) => {
+        operation.range = { from, to };
         return builder;
       }),
       select: vi.fn((...args: unknown[]) => {
