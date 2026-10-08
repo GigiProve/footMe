@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Linking,
   Pressable,
   SafeAreaView,
   Share,
   StyleSheet,
   View,
-  type AlertButton,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -16,29 +14,28 @@ import { useQuery } from "@tanstack/react-query";
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../src/features/auth/use-session";
 import {
-  fetchPublicClubHeaderStats,
-  fetchPublicClubRoster,
   fetchPublicClubSquadraOverview,
-  type ClubHeaderStats,
-  type PublicClubMember,
   type PublicClubProfile,
   type PublicClubSquadraOverview,
 } from "../../src/features/clubs/club-service";
 import { getUnreadCount } from "../../src/features/clubs/notification-service";
 import {
-  PublicClubProfileView,
-} from "../../src/features/clubs/components/PublicClubProfileView";
-import type { ClubHeaderTab } from "../../src/features/clubs/components/PublicClubHeader";
+  SocietyMasterProfileView,
+  SocietyProfileSkeleton,
+  type SocietyTab,
+} from "../../src/features/clubs/society/SocietyMasterProfileView";
+import { fetchSocietyMasterProfile } from "../../src/features/clubs/society/society-profile-service";
+import { buildClubShareMessage } from "../../src/features/clubs/society/society-profile-model";
+import type { PositionFilter } from "../../src/features/clubs/society/society-profile-model";
+import type { SocietyMasterProfile } from "../../src/features/clubs/society/society-profile-types";
 import {
   fetchPendingMemberships,
   respondToMembership,
   type PendingMembership,
 } from "../../src/features/clubs/membership-service";
 import {
-  fetchClubTeamProfiles,
   fetchClubTeams,
   type ClubTeam,
-  type ClubTeamProfileDetails,
 } from "../../src/features/clubs/team-service";
 import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
@@ -105,12 +102,6 @@ import {
 import { colors, radius, spacing } from "../../src/theme/tokens";
 import { ActionSheet, AppText, Button, HeaderBell, SectionCard } from "../../src/ui";
 
-const emptyClubHeaderStats: ClubHeaderStats = {
-  activeTeamsCount: 0,
-  playersCount: 0,
-  staffCount: 0,
-};
-
 const emptyClubOverview: PublicClubSquadraOverview = {
   affiliations: [],
   parentAffiliation: null,
@@ -134,28 +125,41 @@ export default function ProfileScreen() {
    * ospita un composer proprio, apre quello che già esiste in questa vista
    * (§2 della Home: implementare solo il punto di accesso).
    */
-  const { compose } = useLocalSearchParams<{ compose?: string }>();
+  const { compose, edit } = useLocalSearchParams<{
+    compose?: string;
+    edit?: string;
+  }>();
   const composeIntent =
     compose === "fan" || compose === "media" || compose === "club" ? compose : null;
   const userId = session?.user.id ?? null;
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
   const [clubTeams, setClubTeams] = useState<ClubTeam[]>([]);
-  const [clubTeamProfiles, setClubTeamProfiles] = useState<
-    Record<string, ClubTeamProfileDetails>
-  >({});
-  const [clubHeaderStats, setClubHeaderStats] =
-    useState<ClubHeaderStats>(emptyClubHeaderStats);
   const [clubOverview, setClubOverview] =
     useState<PublicClubSquadraOverview>(emptyClubOverview);
-  const [clubMembers, setClubMembers] = useState<PublicClubMember[]>([]);
-  const [activeClubTab, setActiveClubTab] = useState<ClubHeaderTab>(
+  /*
+    REV-PROF-17: il profilo pubblico della Società arriva dalla stessa RPC che
+    serve la route /club/[id]. L'owner mode non viene dedotto dal fatto che
+    siamo nel tab Profilo: lo decide `viewer.canManage` lato backend.
+  */
+  const [societyProfile, setSocietyProfile] =
+    useState<SocietyMasterProfile | null>(null);
+  const [activeClubTab, setActiveClubTab] = useState<SocietyTab>(
     // Arrivando dal "+" della Home la scheda contenuti è quella che ospita il
     // composer già esistente, quindi si apre direttamente su quella.
-    compose === "club" ? "media" : "team",
+    compose === "club" ? "media" : "profile",
   );
+  const [clubPositionFilter, setClubPositionFilter] =
+    useState<PositionFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [activeModal, setActiveModal] = useState<EditSection | null>(null);
+  /*
+    REV-PROF-17: "Modifica profilo" sulla route pubblica della propria Societa'
+    rimanda qui con `?edit=clubInfo`, e apre l'editor gia' esistente invece di
+    duplicarne uno dentro il Master Profile.
+  */
+  const [activeModal, setActiveModal] = useState<EditSection | null>(
+    edit === "clubInfo" ? "clubInfo" : null,
+  );
   const [pendingMemberships, setPendingMemberships] = useState<PendingMembership[]>([]);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [respondingMembershipId, setRespondingMembershipId] = useState<string | null>(null);
@@ -193,38 +197,28 @@ export default function ProfileScreen() {
       setCompleteProfile(data);
 
       if (data.club?.id) {
-        const [teams, stats, overview, members] = await Promise.all([
+        // `teams` e `overview` restano: li consumano gli editor Squadre e
+        // Affiliate, che REV-PROF-17 non tocca.
+        const [teams, overview, society] = await Promise.all([
           fetchClubTeams(data.club.id),
-          fetchPublicClubHeaderStats(data.club.id).catch(
-            () => emptyClubHeaderStats,
-          ),
           fetchPublicClubSquadraOverview(data.club.id).catch(
             () => emptyClubOverview,
           ),
-          fetchPublicClubRoster(data.club.id).catch(() => []),
+          fetchSocietyMasterProfile(data.club.id).catch(() => null),
         ]);
-        const teamProfiles = await fetchClubTeamProfiles(
-          teams.map((team) => team.id),
-        ).catch(() => ({}));
 
         setClubTeams(teams);
-        setClubTeamProfiles(teamProfiles);
-        setClubHeaderStats(stats);
         setClubOverview(overview);
-        setClubMembers(members);
+        setSocietyProfile(society);
       } else {
         setClubTeams([]);
-        setClubTeamProfiles({});
-        setClubHeaderStats(emptyClubHeaderStats);
         setClubOverview(emptyClubOverview);
-        setClubMembers([]);
+        setSocietyProfile(null);
       }
     } catch {
       setClubTeams([]);
-      setClubTeamProfiles({});
-      setClubHeaderStats(emptyClubHeaderStats);
       setClubOverview(emptyClubOverview);
-      setClubMembers([]);
+      setSocietyProfile(null);
       // Copy leggibile: niente messaggi tecnici del backend (§36).
       Alert.alert(
         "Profilo non disponibile",
@@ -366,57 +360,6 @@ export default function ProfileScreen() {
     );
   }
 
-  function handleClubContactPress() {
-    if (!completeProfile?.club) {
-      return;
-    }
-
-    const club = completeProfile.club;
-    const contactOptions: AlertButton[] = [];
-
-    if (club.club_email) {
-      contactOptions.push({
-        onPress: () => Linking.openURL(`mailto:${club.club_email}`),
-        text: "Email",
-      });
-    }
-
-    if (club.club_phone) {
-      contactOptions.push({
-        onPress: () => Linking.openURL(`tel:${club.club_phone}`),
-        text: "Telefono",
-      });
-    }
-
-    if (club.website_url) {
-      contactOptions.push({
-        onPress: () => Linking.openURL(normalizeExternalUrl(club.website_url!)),
-        text: "Sito web",
-      });
-    }
-
-    if (contactOptions.length === 0) {
-      Alert.alert(
-        "Contatti non disponibili",
-        "Questa società non ha ancora condiviso contatti pubblici.",
-      );
-      return;
-    }
-
-    const contactSummary = [
-      club.club_email ? `Email: ${club.club_email}` : null,
-      club.club_phone ? `Telefono: ${club.club_phone}` : null,
-      club.website_url ? `Sito: ${club.website_url}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    Alert.alert("Contatta la società", contactSummary, [
-      { style: "cancel", text: "Annulla" },
-      ...contactOptions,
-    ]);
-  }
-
   function handleManageAgentMedia(itemId: string | null = null) {
     setAgentMediaEditingItemId(itemId);
     setActiveModal("agentMedia");
@@ -427,16 +370,44 @@ export default function ProfileScreen() {
     setActiveModal("directorMedia");
   }
 
+  /**
+   * "Gestisci posizioni" apre il modulo Annunci e candidature gia' esistente
+   * nella Dashboard: REV-PROF-17 fornisce il punto d'ingresso, non un secondo
+   * editor.
+   */
   function handleOpenClubPositions() {
-    if (!completeProfile?.club) {
-      return;
-    }
-
-    router.push(`/club/${completeProfile.club.id}/positions` as never);
+    trackProfileEvent("society_manage_positions_tapped", {
+      profileType: "society",
+      viewerMode: "owner",
+    });
+    router.push("/(tabs)/announcements" as never);
   }
 
   function handleOpenClubTeam(teamId: string) {
     router.push(`/club/team/${teamId}` as never);
+  }
+
+  /**
+   * Condivisione della propria Società: stesso payload della route pubblica —
+   * nome e deep link canonico, nessun dato gestionale.
+   */
+  async function handleShareClub() {
+    if (!societyProfile) {
+      return;
+    }
+
+    trackProfileEvent("profile_share_tapped", {
+      profileType: "society",
+      viewerMode: societyProfile.viewer.mode,
+    });
+
+    try {
+      await Share.share({
+        message: buildClubShareMessage(societyProfile.club),
+      });
+    } catch {
+      // Condivisione annullata dall'utente: non e' un errore da segnalare.
+    }
   }
 
   function handleOpenAffiliateClub(clubId: string) {
@@ -731,31 +702,49 @@ export default function ProfileScreen() {
           </SectionCard>
         ) : null}
         {completeProfile && role === "club_admin" && completeProfile.club ? (
-          <PublicClubProfileView
-            activeTab={activeClubTab}
-            club={toPublicClubProfile(completeProfile.club)}
-            isFollowed={false}
-            isFollowing={false}
-            isOwner
-            members={clubMembers}
-            onContactPress={handleClubContactPress}
-            onEditAffiliations={() => handleEdit("clubAffiliations")}
-            onEditSeasons={() => handleEdit("clubSeasons")}
-            onEditSportProfile={() => handleEdit("clubSportProfile")}
-            onEditTeams={() => handleEdit("clubTeams")}
-            onOpenAffiliate={handleOpenAffiliateClub}
-            onOpenPositions={handleOpenClubPositions}
-            onOpenProfile={handleOpenProfile}
-            onOpenTeam={handleOpenClubTeam}
-            onTabChange={setActiveClubTab}
-            onToggleFollow={() => handleEdit("clubInfo")}
-            overview={clubOverview}
-            shouldOpenMediaComposer={composeIntent === "club"}
-            stats={clubHeaderStats}
-            teamProfiles={clubTeamProfiles}
-            teams={clubTeams}
-            viewerProfileId={userId}
-          />
+          /*
+            Stessa vista della route pubblica: owner e visitor leggono gli
+            stessi dati, e le differenze stanno solo nelle azioni. Finché la
+            RPC non ha risposto si mostra lo scheletro, non una versione
+            diversa della pagina.
+          */
+          societyProfile ? (
+            <SocietyMasterProfileView
+              activeTab={activeClubTab}
+              mediaClub={toPublicClubProfile(completeProfile.club)}
+              onContactPress={(contactType) =>
+                trackProfileEvent("public_contact_tapped", {
+                  contactType,
+                  profileType: "society",
+                  viewerMode: societyProfile.viewer.mode,
+                })
+              }
+              onEditProfile={() => handleEdit("clubInfo")}
+              onFollowPress={() => undefined}
+              onManagePositions={handleOpenClubPositions}
+              onMessagePress={() => undefined}
+              onMorePress={() => setMoreMenuVisible(true)}
+              onOpenAffiliate={handleOpenAffiliateClub}
+              onOpenPosition={(positionId) =>
+                router.push(`/position/${positionId}` as never)
+              }
+              onOpenProfile={handleOpenProfile}
+              onOpenTeam={handleOpenClubTeam}
+              onPositionFilterChange={setClubPositionFilter}
+              onSeeAllTeams={() =>
+                router.push(
+                  `/club/${societyProfile.club.id}/teams` as never,
+                )
+              }
+              onSharePress={() => void handleShareClub()}
+              onTabChange={setActiveClubTab}
+              positionFilter={clubPositionFilter}
+              profile={societyProfile}
+              shouldOpenMediaComposer={composeIntent === "club"}
+            />
+          ) : (
+            <SocietyProfileSkeleton />
+          )
         ) : completeProfile && role === "player" && playerHeaderDetails ? (
           <PlayerProfileHeader
             availabilityLabel={playerHeaderDetails.availabilityLabel}
@@ -1230,16 +1219,6 @@ function toPublicClubProfile(
     verification_status: club.verification_status,
     website_url: club.website_url,
   };
-}
-
-function normalizeExternalUrl(url: string) {
-  const trimmedUrl = url.trim();
-
-  if (/^https?:\/\//i.test(trimmedUrl)) {
-    return trimmedUrl;
-  }
-
-  return `https://${trimmedUrl}`;
 }
 
 const styles = StyleSheet.create({

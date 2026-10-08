@@ -3,11 +3,19 @@ import { Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing, typography } from "../../../theme/tokens";
-import { AppText, Button } from "../../../ui";
+import { AppText, Button, EmptyState } from "../../../ui";
 import type { TargetType } from "../content-tag-service";
 import { useTaggedContentForTarget } from "../use-tagged-content";
 
 type TaggedContentGridProps = {
+  /**
+   * Copy dello stato vuoto. Senza queste prop la griglia resta invisibile
+   * quando non c'e' nulla da mostrare, com'era prima di REV-PROF-17: le
+   * passa solo chi — come la tab Media della squadra — deve dire
+   * esplicitamente che per quella squadra non esistono contenuti.
+   */
+  emptyDescription?: string;
+  emptyTitle?: string;
   targetId: string;
   targetType: Extract<TargetType, "club" | "team">;
 };
@@ -18,13 +26,34 @@ type TaggedContentGridProps = {
  * NOT content published directly by the club. Tapping a thumbnail opens the
  * content detail route.
  */
-export function TaggedContentGrid({ targetId, targetType }: TaggedContentGridProps) {
+export function TaggedContentGrid({
+  emptyDescription,
+  emptyTitle,
+  targetId,
+  targetType,
+}: TaggedContentGridProps) {
   const router = useRouter();
   const { hasMore, isLoading, isLoadingMore, loadMore, taggedItems } =
     useTaggedContentForTarget(targetType, targetId);
 
-  if (isLoading || taggedItems.length === 0) {
+  if (isLoading) {
     return null;
+  }
+
+  if (taggedItems.length === 0) {
+    if (!emptyTitle) {
+      return null;
+    }
+
+    return (
+      <View style={styles.section} testID="tagged-content-grid-empty">
+        <EmptyState
+          description={emptyDescription}
+          icon="images-outline"
+          title={emptyTitle}
+        />
+      </View>
+    );
   }
 
   return (

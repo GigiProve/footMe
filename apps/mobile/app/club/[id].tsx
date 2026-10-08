@@ -1,154 +1,111 @@
+/**
+ * Master Profile Società (REV-PROF-17).
+ *
+ * Una sola route per il club, aperta da Cerca, da un link, da un'affiliata o
+ * dal proprio tab Profilo. L'owner mode non dipende da dove si arriva: lo
+ * decide il permesso risolto dal backend dentro `fetch_society_master_profile`.
+ */
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  Pressable,
-  Share,
-  StyleSheet,
-  View,
-  type AlertButton,
-} from "react-native";
+import { Alert, Pressable, Share, StyleSheet, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { Screen } from "../../src/components/ui/screen";
 import { KeyboardAwareScrollView } from "../../src/components/ui/keyboard-aware-scroll-view";
 import { useSession } from "../../src/features/auth/use-session";
 import {
-  fetchClubFollowState,
-  fetchPublicClubRoster,
-  fetchPublicClubHeaderStats,
   fetchPublicClubProfile,
-  fetchPublicClubSquadraOverview,
   followClub,
+  submitClubReport,
   unfollowClub,
-  type ClubHeaderStats,
-  type PublicClubMember,
   type PublicClubProfile,
-  type PublicClubSquadraOverview,
 } from "../../src/features/clubs/club-service";
 import {
-  PublicClubProfileView,
-} from "../../src/features/clubs/components/PublicClubProfileView";
-import {
-  fetchClubSaveState,
-  saveClub,
-  unsaveClub,
-} from "../../src/features/saved/saved-service";
+  SocietyMasterProfileView,
+  SocietyProfileSkeleton,
+  type SocietyTab,
+} from "../../src/features/clubs/society/SocietyMasterProfileView";
+import { fetchSocietyMasterProfile } from "../../src/features/clubs/society/society-profile-service";
+import { buildClubShareMessage } from "../../src/features/clubs/society/society-profile-model";
+import type { PositionFilter } from "../../src/features/clubs/society/society-profile-model";
+import type { SocietyMasterProfile } from "../../src/features/clubs/society/society-profile-types";
 import { openDirectConversation } from "../../src/features/messaging/messaging-service";
-import type { ClubHeaderTab } from "../../src/features/clubs/components/PublicClubHeader";
-import {
-  fetchClubTeamProfiles,
-  fetchClubTeams,
-  type ClubTeam,
-  type ClubTeamProfileDetails,
-} from "../../src/features/clubs/team-service";
+import { trackProfileEvent } from "../../src/features/profiles/profile-analytics";
 import { colors, spacing } from "../../src/theme/tokens";
 import { ActionSheet, AppText, Button, useToast } from "../../src/ui";
 
-const emptyHeaderStats: ClubHeaderStats = {
-  activeTeamsCount: 0,
-  playersCount: 0,
-  staffCount: 0,
-};
-
-const emptyOverview: PublicClubSquadraOverview = {
-  affiliations: [],
-  parentAffiliation: null,
-  positionPreview: [],
-  positionsTotal: 0,
-  seasonSummaries: [],
-};
-
 export default function ClubProfileScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, source, tab } = useLocalSearchParams<{
+    id: string;
+    source?: string;
+    tab?: string;
+  }>();
   const { profile } = useSession();
   const router = useRouter();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
-  const [club, setClub] = useState<PublicClubProfile | null>(null);
-  const [teams, setTeams] = useState<ClubTeam[]>([]);
-  const [teamProfiles, setTeamProfiles] = useState<
-    Record<string, ClubTeamProfileDetails>
-  >({});
-  const [stats, setStats] = useState<ClubHeaderStats>(emptyHeaderStats);
-  const [overview, setOverview] =
-    useState<PublicClubSquadraOverview>(emptyOverview);
-  const [members, setMembers] = useState<PublicClubMember[]>([]);
-  const [isFollowed, setIsFollowed] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [clubActionsVisible, setClubActionsVisible] = useState(false);
-  const [isOpeningChat, setIsOpeningChat] = useState(false);
+  const [data, setData] = useState<SocietyMasterProfile | null>(null);
+  const [mediaClub, setMediaClub] = useState<PublicClubProfile | null>(null);
+  const [activeTab, setActiveTab] = useState<SocietyTab>(parseTab(tab));
+  const [positionFilter, setPositionFilter] = useState<PositionFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<ClubHeaderTab>("team");
+  const [hasError, setHasError] = useState(false);
+  const [isFollowPending, setFollowPending] = useState(false);
+  const [isOpeningChat, setOpeningChat] = useState(false);
+  const [isMenuVisible, setMenuVisible] = useState(false);
 
-  const loadClub = useCallback(async () => {
+  const loadProfile = useCallback(async () => {
     if (!id) {
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
+    setHasError(false);
 
     try {
-      const profileId = profile?.id ?? null;
-      const [
-        clubData,
-        teamsData,
-        statsData,
-        followState,
-        saveState,
-        overviewData,
-        membersData,
-      ] = await Promise.all([
+      /*
+        Il club per il modulo Media condiviso arriva dalla lettura già
+        esistente: REV-PROF-17 non riscrive quel dominio, gli passa la stessa
+        forma che riceveva prima.
+      */
+      const [societyProfile, clubRecord] = await Promise.all([
+        fetchSocietyMasterProfile(id),
         fetchPublicClubProfile(id),
-        fetchClubTeams(id),
-        fetchPublicClubHeaderStats(id).catch(() => emptyHeaderStats),
-        profileId
-          ? fetchClubFollowState(profileId, id).catch(() => false)
-          : Promise.resolve(false),
-        profileId
-          ? fetchClubSaveState(profileId, id).catch(() => false)
-          : Promise.resolve(false),
-        fetchPublicClubSquadraOverview(id).catch(() => emptyOverview),
-        fetchPublicClubRoster(id).catch(() => []),
       ]);
-      const teamProfilesData = await fetchClubTeamProfiles(
-        teamsData.map((team) => team.id),
-      ).catch(() => ({}));
 
-      setClub(clubData);
-      setTeams(teamsData);
-      setTeamProfiles(teamProfilesData);
-      setStats(statsData);
-      setIsFollowed(followState);
-      setIsSaved(saveState);
-      setOverview(overviewData);
-      setMembers(membersData);
+      setData(societyProfile);
+      setMediaClub(clubRecord);
+
+      if (societyProfile) {
+        trackProfileEvent("profile_viewed", {
+          profileType: "society",
+          source: typeof source === "string" ? source : undefined,
+          viewerMode: societyProfile.viewer.mode,
+        });
+      }
     } catch {
-      Alert.alert("Errore", "Impossibile caricare il profilo società.");
-      setClub(null);
-      setTeams([]);
-      setTeamProfiles({});
-      setStats(emptyHeaderStats);
-      setOverview(emptyOverview);
-      setMembers([]);
-      setIsFollowed(false);
-      setIsSaved(false);
+      setHasError(true);
+      trackProfileEvent("profile_load_failed", { profileType: "society" });
     } finally {
       setIsLoading(false);
     }
-  }, [id, profile?.id]);
+  }, [id, source]);
 
   useEffect(() => {
-    loadClub();
-  }, [loadClub]);
+    void loadProfile();
+  }, [loadProfile]);
+
+  function handleTabChange(next: SocietyTab) {
+    setActiveTab(next);
+    trackProfileEvent("profile_tab_changed", {
+      profileType: "society",
+      tab: next,
+      viewerMode: data?.viewer.mode,
+    });
+  }
 
   async function handleToggleFollow() {
     if (!profile) {
@@ -156,332 +113,267 @@ export default function ClubProfileScreen() {
       return;
     }
 
-    if (!club) {
-      return;
-    }
+    // Doppio tap: la seconda pressione non parte finché la prima non è chiusa.
+    if (!data || isFollowPending) return;
+
+    const wasFollowing = data.viewer.isFollowing;
+    setFollowPending(true);
+    setData(withFollowState(data, !wasFollowing));
+
+    trackProfileEvent(wasFollowing ? "profile_unfollow_tapped" : "profile_follow_tapped", {
+      profileType: "society",
+      viewerMode: data.viewer.mode,
+    });
 
     try {
-      setIsFollowing(true);
-
-      if (isFollowed) {
-        await unfollowClub(profile.id, club.id);
-        setIsFollowed(false);
-        return;
+      if (wasFollowing) {
+        await unfollowClub(profile.id, data.club.id);
+      } else {
+        await followClub(profile.id, data.club.id);
       }
-
-      await followClub(profile.id, club.id);
-      setIsFollowed(true);
     } catch {
-      Alert.alert("Errore", "Non siamo riusciti ad aggiornare il follow.");
+      // Rollback: lo stato ottimistico non sopravvive a una scrittura fallita.
+      setData((current) => (current ? withFollowState(current, wasFollowing) : current));
+      showToast({ message: "Non siamo riusciti ad aggiornare il follow.", tone: "neutral" });
     } finally {
-      setIsFollowing(false);
+      setFollowPending(false);
       queryClient.invalidateQueries({ queryKey: ["following-count"] });
       queryClient.invalidateQueries({ queryKey: ["followed"] });
     }
   }
 
-  async function handleToggleSave() {
-    if (!profile) {
-      Alert.alert("Accesso richiesto", "Accedi per salvare questa società.");
-      return;
-    }
+  async function handleMessagePress() {
+    if (!data || isOpeningChat) return;
 
-    if (!club || isSaving) {
-      return;
-    }
+    const ownerProfileId = data.club.ownerProfileId;
 
-    const next = !isSaved;
-    setIsSaving(true);
-    setIsSaved(next);
-    try {
-      if (next) {
-        await saveClub(profile.id, club.id);
-        showToast({ message: "Società salvata", tone: "success", icon: "bookmark" });
-      } else {
-        await unsaveClub(profile.id, club.id);
-        showToast({ message: "Elemento rimosso dai Salvati", tone: "neutral" });
-      }
-    } catch {
-      setIsSaved(!next);
-      showToast({ message: "Operazione non riuscita.", tone: "neutral" });
-    } finally {
-      setIsSaving(false);
-      queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
-      queryClient.invalidateQueries({ queryKey: ["saved-items"] });
-    }
-  }
-
-  async function handleShareClub() {
-    if (!club) {
-      return;
-    }
-    try {
-      await Share.share({
-        message: `Dai un'occhiata a ${club.name} su ProLink.`,
-      });
-    } catch {
-      // user cancelled or share unavailable — no-op
-    }
-  }
-
-  function handleReportClub() {
-    showToast({
-      message: "Segnalazione inviata. Grazie.",
-      tone: "success",
-      icon: "flag",
-    });
-  }
-
-  async function handleContactPress() {
-    if (!club) {
-      return;
-    }
-
-    if (club.owner_profile_id && club.owner_profile_id !== profile?.id) {
-      try {
-        setIsOpeningChat(true);
-        const conversationId = await openDirectConversation(club.owner_profile_id);
-        router.push({
-          pathname: "/messages/[conversationId]",
-          params: { conversationId, otherName: club.name },
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Errore durante l'apertura della conversazione.";
-        Alert.alert("Chat non disponibile", message);
-      } finally {
-        setIsOpeningChat(false);
-      }
-      return;
-    }
-
-    handleShowPublicContacts();
-  }
-
-  function handleShowPublicContacts() {
-    if (!club) {
-      return;
-    }
-
-    const contactOptions: AlertButton[] = [];
-
-    if (club.club_email) {
-      contactOptions.push({
-        onPress: () => Linking.openURL(`mailto:${club.club_email}`),
-        text: "Email",
-      });
-    }
-
-    if (club.club_phone) {
-      contactOptions.push({
-        onPress: () => Linking.openURL(`tel:${club.club_phone}`),
-        text: "Telefono",
-      });
-    }
-
-    if (club.website_url) {
-      contactOptions.push({
-        onPress: () => Linking.openURL(normalizeExternalUrl(club.website_url!)),
-        text: "Sito web",
-      });
-    }
-
-    if (contactOptions.length === 0) {
+    if (!ownerProfileId) {
       Alert.alert(
-        "Contatti non disponibili",
-        "Questa società non ha ancora condiviso contatti pubblici.",
+        "Chat non disponibile",
+        "Questa società non ha ancora un referente che possa ricevere messaggi.",
       );
       return;
     }
 
-    const contactSummary = [
-      club.club_email ? `Email: ${club.club_email}` : null,
-      club.club_phone ? `Telefono: ${club.club_phone}` : null,
-      club.website_url ? `Sito: ${club.website_url}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    trackProfileEvent("profile_message_tapped", {
+      profileType: "society",
+      viewerMode: data.viewer.mode,
+    });
 
-    Alert.alert("Contatta la società", contactSummary, [
-      { style: "cancel", text: "Annulla" },
-      ...contactOptions,
-    ]);
-  }
-
-  function handleOpenPositions() {
-    if (!club) {
-      return;
+    try {
+      setOpeningChat(true);
+      const conversationId = await openDirectConversation(ownerProfileId);
+      router.push({
+        params: { conversationId, otherName: data.club.name },
+        pathname: "/messages/[conversationId]",
+      });
+    } catch (error) {
+      Alert.alert(
+        "Chat non disponibile",
+        error instanceof Error ? error.message : "Errore durante l'apertura della conversazione.",
+      );
+    } finally {
+      setOpeningChat(false);
     }
-
-    router.push(`/club/${club.id}/positions` as never);
   }
 
-  function handleOpenTeam(teamId: string) {
-    router.push(`/club/team/${teamId}` as never);
+  async function handleShare() {
+    if (!data) return;
+
+    trackProfileEvent("profile_share_tapped", {
+      profileType: "society",
+      viewerMode: data.viewer.mode,
+    });
+
+    try {
+      await Share.share({
+        message: buildClubShareMessage(data.club),
+      });
+    } catch {
+      // Condivisione annullata dall'utente: non è un errore da segnalare.
+    }
   }
 
-  function handleOpenAffiliate(affiliateClubId: string) {
-    router.push(`/club/${affiliateClubId}` as never);
-  }
+  async function handleReport() {
+    if (!data || !profile) return;
 
-  function handleOpenProfile(profileId: string) {
-    router.push(`/profile/${profileId}` as never);
+    try {
+      await submitClubReport({
+        clubId: data.club.id,
+        reason: "profile_report",
+        reporterProfileId: profile.id,
+      });
+      showToast({ icon: "flag", message: "Segnalazione inviata. Grazie.", tone: "success" });
+    } catch {
+      showToast({ message: "Non siamo riusciti a inviare la segnalazione.", tone: "neutral" });
+    }
   }
 
   if (isLoading) {
     return (
       <Screen>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={colors.accent} size="large" />
+        <TopBar onBack={() => router.back()} />
+        <SocietyProfileSkeleton />
+      </Screen>
+    );
+  }
+
+  if (hasError || !data || !mediaClub) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <TopBar onBack={() => router.back()} />
+        <View style={styles.centerContainer}>
+          <AppText color="secondary" variant="bodyLg">
+            {hasError
+              ? "Non è stato possibile caricare il profilo. Riprova."
+              : "Società non trovata."}
+          </AppText>
+          {hasError ? (
+            <Button label="Riprova" onPress={() => void loadProfile()} variant="secondary" />
+          ) : (
+            <Button label="Torna indietro" onPress={() => router.back()} variant="secondary" />
+          )}
         </View>
       </Screen>
     );
   }
 
-  if (!club) {
-    return (
-      <Screen>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.centerContainer}>
-          <AppText variant="bodyLg" color="secondary">
-            Società non trovata.
-          </AppText>
-          <Button
-            label="Torna indietro"
-            onPress={() => router.back()}
-            variant="secondary"
-          />
-        </View>
-      </Screen>
-    );
-  }
+  const isOwner = data.viewer.mode === "owner";
 
   return (
     <Screen>
       <Stack.Screen options={{ headerShown: false }} />
+      <TopBar onBack={() => router.back()} />
       <KeyboardAwareScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityLabel="Torna indietro"
-            accessibilityRole="button"
-            onPress={() => router.back()}
-            style={styles.topBarButton}
-          >
-            <Ionicons color={colors.textPrimary} name="arrow-back" size={24} />
-          </Pressable>
-          <AppText align="center" style={styles.topBarTitle} variant="bodySm">
-            Profilo club
-          </AppText>
-          {profile ? (
-            <View style={styles.topBarActions}>
-              <Pressable
-                accessibilityLabel={
-                  isSaved ? "Rimuovi dai salvati" : "Salva società"
-                }
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={handleToggleSave}
-                style={({ pressed }) => [
-                  styles.topBarIcon,
-                  pressed ? styles.topBarIconPressed : null,
-                ]}
-              >
-                <Ionicons
-                  color={isSaved ? colors.accent : colors.textPrimary}
-                  name={isSaved ? "bookmark" : "bookmark-outline"}
-                  size={22}
-                />
-              </Pressable>
-              <Pressable
-                accessibilityLabel="Azioni società"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={() => setClubActionsVisible(true)}
-                style={({ pressed }) => [
-                  styles.topBarIcon,
-                  pressed ? styles.topBarIconPressed : null,
-                ]}
-              >
-                <Ionicons
-                  color={colors.textPrimary}
-                  name="ellipsis-horizontal"
-                  size={22}
-                />
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.topBarButton} />
-          )}
-        </View>
-
-        <View style={styles.publicProfileView}>
-          <PublicClubProfileView
-            activeTab={activeTab}
-            club={club}
-            isContacting={isOpeningChat}
-            isFollowed={isFollowed}
-            isFollowing={isFollowing}
-            isSaved={isSaved}
-            members={members}
-            onContactPress={handleContactPress}
-            onOpenAffiliate={handleOpenAffiliate}
-            onOpenPositions={handleOpenPositions}
-            onOpenProfile={handleOpenProfile}
-            onOpenTeam={handleOpenTeam}
-            onTabChange={setActiveTab}
-            onToggleFollow={handleToggleFollow}
-            overview={overview}
-            stats={stats}
-            teamProfiles={teamProfiles}
-            teams={teams}
-            viewerProfileId={profile?.id ?? null}
-          />
-        </View>
+        <SocietyMasterProfileView
+          activeTab={activeTab}
+          mediaClub={mediaClub}
+          onContactPress={(contactType) =>
+            trackProfileEvent("public_contact_tapped", {
+              contactType,
+              profileType: "society",
+              viewerMode: data.viewer.mode,
+            })
+          }
+          onEditProfile={() => {
+            trackProfileEvent("profile_edit_tapped", {
+              profileType: "society",
+              viewerMode: "owner",
+            });
+            router.push("/(tabs)/profile?edit=clubInfo" as never);
+          }}
+          onFollowPress={() => void handleToggleFollow()}
+          onManagePositions={() => {
+            trackProfileEvent("society_manage_positions_tapped", {
+              profileType: "society",
+              viewerMode: data.viewer.mode,
+            });
+            router.push("/(tabs)/announcements" as never);
+          }}
+          onMessagePress={() => void handleMessagePress()}
+          onMorePress={() => setMenuVisible(true)}
+          onOpenAffiliate={(affiliateId) => {
+            trackProfileEvent("society_affiliate_opened", { profileType: "society" });
+            router.push(`/club/${affiliateId}?source=affiliate` as never);
+          }}
+          onOpenPosition={(positionId) => router.push(`/position/${positionId}` as never)}
+          onOpenProfile={(profileId) => router.push(`/profile/${profileId}` as never)}
+          onOpenTeam={(teamId) => {
+            trackProfileEvent("society_team_opened", {
+              profileType: "society",
+              source: "team_row",
+            });
+            router.push(`/club/team/${teamId}` as never);
+          }}
+          onPositionFilterChange={(filter) => {
+            setPositionFilter(filter);
+            trackProfileEvent("profile_filter_changed", {
+              profileType: "society",
+              tab: "positions",
+            });
+          }}
+          onRetry={() => void loadProfile()}
+          onSeeAllTeams={() => {
+            trackProfileEvent("society_teams_see_all_tapped", { profileType: "society" });
+            router.push(`/club/${data.club.id}/teams` as never);
+          }}
+          onSharePress={() => void handleShare()}
+          onTabChange={handleTabChange}
+          positionFilter={positionFilter}
+          profile={data}
+        />
       </KeyboardAwareScrollView>
+
+      {/*
+        Overflow: al visitor le azioni di segnalazione, all'owner nessuna
+        azione verso sé stesso e nessuna scorciatoia a Salvati o Seguiti, che
+        vivono nelle loro pagine personali.
+      */}
       <ActionSheet
-        actions={[
-          {
-            icon: isSaved ? "bookmark" : "bookmark-outline",
-            label: isSaved ? "Rimuovi dai Salvati" : "Salva società",
-            subtitle: isSaved ? undefined : "Ritrovala nei tuoi Salvati.",
-            onPress: handleToggleSave,
-          },
-          {
-            icon: "call-outline",
-            label: "Contatti pubblici",
-            onPress: handleShowPublicContacts,
-          },
-          {
-            icon: "share-outline",
-            label: "Condividi società",
-            onPress: handleShareClub,
-          },
-          {
-            destructive: true,
-            icon: "flag-outline",
-            label: "Segnala società",
-            onPress: handleReportClub,
-          },
-        ]}
-        onClose={() => setClubActionsVisible(false)}
+        actions={
+          isOwner
+            ? [
+                {
+                  icon: "share-outline",
+                  label: "Condividi società",
+                  onPress: () => void handleShare(),
+                },
+              ]
+            : [
+                {
+                  icon: "share-outline",
+                  label: "Condividi società",
+                  onPress: () => void handleShare(),
+                },
+                {
+                  destructive: true,
+                  icon: "flag-outline",
+                  label: "Segnala società",
+                  onPress: () => void handleReport(),
+                },
+              ]
+        }
+        onClose={() => setMenuVisible(false)}
         title="Azioni società"
-        visible={clubActionsVisible}
+        visible={isMenuVisible}
       />
     </Screen>
   );
 }
 
-function normalizeExternalUrl(url: string) {
-  const trimmedUrl = url.trim();
+function TopBar({ onBack }: { onBack: () => void }) {
+  return (
+    <View style={styles.topBar}>
+      <Pressable
+        accessibilityLabel="Torna indietro"
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={onBack}
+        style={styles.topBarButton}
+      >
+        <Ionicons color={colors.textPrimary} name="arrow-back" size={24} />
+      </Pressable>
+      <AppText align="center" style={styles.topBarTitle} variant="bodySm">
+        PROLINK
+      </AppText>
+      <View style={styles.topBarButton} />
+    </View>
+  );
+}
 
-  if (/^https?:\/\//i.test(trimmedUrl)) {
-    return trimmedUrl;
-  }
+function parseTab(value: string | undefined): SocietyTab {
+  return value === "positions" || value === "media" || value === "info"
+    ? value
+    : "profile";
+}
 
-  return `https://${trimmedUrl}`;
+function withFollowState(
+  profile: SocietyMasterProfile,
+  isFollowing: boolean,
+): SocietyMasterProfile {
+  return { ...profile, viewer: { ...profile.viewer, isFollowing } };
 }
 
 const styles = StyleSheet.create({
@@ -490,17 +382,9 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing[16],
     justifyContent: "center",
-  },
-  loadingContainer: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-  },
-  publicProfileView: {
-    marginHorizontal: -spacing[20],
+    paddingHorizontal: spacing[20],
   },
   scrollContent: {
-    gap: spacing[12],
     paddingBottom: spacing[28],
   },
   topBar: {
@@ -508,26 +392,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 44,
+    paddingHorizontal: spacing[8],
   },
   topBarButton: {
     alignItems: "center",
     height: 44,
     justifyContent: "center",
     width: 44,
-  },
-  topBarActions: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[4],
-  },
-  topBarIcon: {
-    alignItems: "center",
-    height: 44,
-    justifyContent: "center",
-    width: 32,
-  },
-  topBarIconPressed: {
-    opacity: 0.6,
   },
   topBarTitle: {
     flex: 1,

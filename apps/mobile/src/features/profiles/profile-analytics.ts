@@ -26,6 +26,16 @@ export type ProfileAnalyticsEvent =
   | "profile_media_opened"
   | "profile_media_add_tapped"
   | "public_contact_tapped"
+  // Master Profile Società (REV-PROF-17). Nessun nome di società, squadra
+  // o persona entra in questi eventi: solo la superficie e la modalità.
+  | "profile_unfollow_tapped"
+  | "profile_filter_changed"
+  | "society_teams_see_all_tapped"
+  | "society_team_opened"
+  | "society_team_tab_changed"
+  | "society_team_squad_opened"
+  | "society_affiliate_opened"
+  | "society_manage_positions_tapped"
   // Editor profilo (REV-PROF-02 §Z)
   | "player_profile_edit_opened"
   | "profile_edit_section_opened"

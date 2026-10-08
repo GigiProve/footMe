@@ -1,423 +1,292 @@
+/**
+ * Profilo della singola squadra (REV-PROF-17).
+ *
+ * Route dedicata con deep link stabile, back verso il Master Profile della
+ * Società e stati propri. La squadra resta una sottoentità: il follow e la
+ * messaggistica usano l'identità della Società madre, perché una squadra non
+ * ha amministratori né permessi suoi.
+ */
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Alert, Pressable, Share, StyleSheet, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { Screen } from "../../../src/components/ui/screen";
 import { KeyboardAwareScrollView } from "../../../src/components/ui/keyboard-aware-scroll-view";
+import { useSession } from "../../../src/features/auth/use-session";
+import { followClub, unfollowClub } from "../../../src/features/clubs/club-service";
 import {
-  fetchPublicClubTeamProfile,
-  type PublicClubTeamProfile,
-} from "../../../src/features/clubs/club-service";
-import type { ClubHeaderTab } from "../../../src/features/clubs/components/PublicClubHeader";
-import { TaggedContentGrid } from "../../../src/features/content/components/TaggedContentGrid";
-import { colors, radius, spacing, typography } from "../../../src/theme/tokens";
-import { AppText, EmptyState } from "../../../src/ui";
+  SocietyTeamProfileView,
+  type SocietyTeamTab,
+} from "../../../src/features/clubs/society/SocietyTeamProfileView";
+import { SocietyProfileSkeleton } from "../../../src/features/clubs/society/SocietyMasterProfileView";
+import { fetchSocietyTeamProfile } from "../../../src/features/clubs/society/society-profile-service";
+import { buildTeamShareMessage } from "../../../src/features/clubs/society/society-profile-model";
+import type { SocietyTeamDetail } from "../../../src/features/clubs/society/society-profile-types";
+import { openDirectConversation } from "../../../src/features/messaging/messaging-service";
+import { trackProfileEvent } from "../../../src/features/profiles/profile-analytics";
+import { colors, spacing } from "../../../src/theme/tokens";
+import { ActionSheet, AppText, Button, useToast } from "../../../src/ui";
 
 export default function ClubTeamProfileScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
+  const { profile } = useSession();
   const router = useRouter();
-  const [data, setData] = useState<PublicClubTeamProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<ClubHeaderTab>("team");
-  const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
 
-  const loadTeam = useCallback(async () => {
+  const [detail, setDetail] = useState<SocietyTeamDetail | null>(null);
+  const [activeTab, setActiveTab] = useState<SocietyTeamTab>(
+    tab === "media" ? "media" : "squad",
+  );
+  const [isLoading, setLoading] = useState(true);
+  const [hasError, setError] = useState(false);
+  const [isFollowPending, setFollowPending] = useState(false);
+  const [isOpeningChat, setOpeningChat] = useState(false);
+  const [isMenuVisible, setMenuVisible] = useState(false);
+
+  const load = useCallback(async () => {
     if (!id) {
-      setIsLoading(false);
+      setLoading(false);
       return;
     }
 
+    setLoading(true);
+    setError(false);
+
     try {
-      setIsLoading(true);
-      setData(await fetchPublicClubTeamProfile(id));
+      const data = await fetchSocietyTeamProfile(id);
+      setDetail(data);
+
+      if (data) {
+        trackProfileEvent("society_team_opened", {
+          profileType: "society_team",
+          viewerMode: data.viewer.mode,
+        });
+      }
+    } catch {
+      setError(true);
+      trackProfileEvent("profile_load_failed", { profileType: "society_team" });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
-    void loadTeam();
-  }, [loadTeam]);
+    void load();
+  }, [load]);
+
+  async function handleToggleFollow() {
+    if (!profile) {
+      Alert.alert("Accesso richiesto", "Accedi per seguire questa società.");
+      return;
+    }
+
+    if (!detail || isFollowPending) return;
+
+    const wasFollowing = detail.viewer.isFollowing;
+    setFollowPending(true);
+    setDetail({ ...detail, viewer: { ...detail.viewer, isFollowing: !wasFollowing } });
+
+    try {
+      /*
+        Il modello follow non conosce la squadra: il target canonico è la
+        Società madre. Inventare qui una relazione parallela creerebbe un
+        secondo dominio da mantenere.
+      */
+      if (wasFollowing) {
+        await unfollowClub(profile.id, detail.club.id);
+      } else {
+        await followClub(profile.id, detail.club.id);
+      }
+    } catch {
+      setDetail((current) =>
+        current ? { ...current, viewer: { ...current.viewer, isFollowing: wasFollowing } } : current,
+      );
+      showToast({ message: "Non siamo riusciti ad aggiornare il follow.", tone: "neutral" });
+    } finally {
+      setFollowPending(false);
+      queryClient.invalidateQueries({ queryKey: ["following-count"] });
+      queryClient.invalidateQueries({ queryKey: ["followed"] });
+    }
+  }
+
+  async function handleMessage() {
+    if (!detail || isOpeningChat) return;
+
+    const ownerProfileId = detail.club.ownerProfileId;
+
+    if (!ownerProfileId) {
+      Alert.alert(
+        "Chat non disponibile",
+        "Questa società non ha ancora un referente che possa ricevere messaggi.",
+      );
+      return;
+    }
+
+    try {
+      setOpeningChat(true);
+      const conversationId = await openDirectConversation(ownerProfileId);
+      router.push({
+        params: { conversationId, otherName: detail.club.name },
+        pathname: "/messages/[conversationId]",
+      });
+    } catch (error) {
+      Alert.alert(
+        "Chat non disponibile",
+        error instanceof Error ? error.message : "Errore durante l'apertura della conversazione.",
+      );
+    } finally {
+      setOpeningChat(false);
+    }
+  }
+
+  async function handleShare() {
+    if (!detail) return;
+
+    try {
+      await Share.share({
+        message: buildTeamShareMessage(
+          detail.club.name,
+          detail.team.name,
+          detail.team.id,
+        ),
+      });
+    } catch {
+      // Condivisione annullata: nessun errore da mostrare.
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <TeamTopBar clubName={null} onBack={() => router.back()} />
+        <SocietyProfileSkeleton />
+      </Screen>
+    );
+  }
+
+  if (hasError || !detail) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <TeamTopBar clubName={null} onBack={() => router.back()} />
+        <View style={styles.center}>
+          <AppText color="secondary" variant="bodyLg">
+            {hasError
+              ? "Non è stato possibile caricare il profilo. Riprova."
+              : "Squadra non disponibile."}
+          </AppText>
+          {hasError ? (
+            <Button label="Riprova" onPress={() => void load()} variant="secondary" />
+          ) : (
+            <Button label="Torna indietro" onPress={() => router.back()} variant="secondary" />
+          )}
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
       <Stack.Screen options={{ headerShown: false }} />
+      <TeamTopBar clubName={detail.club.name} onBack={() => router.back()} />
       <KeyboardAwareScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityLabel="Torna indietro"
-            accessibilityRole="button"
-            onPress={() => router.back()}
-            style={styles.topBarButton}
-          >
-            <Ionicons color={colors.textPrimary} name="arrow-back" size={24} />
-          </Pressable>
-          <AppText align="center" style={styles.topBarTitle} variant="bodySm">
-            Profilo squadra
-          </AppText>
-          <View style={styles.topBarButton} />
-        </View>
-
-        {isLoading ? (
-          <View style={styles.loadingBlock}>
-            <ActivityIndicator color={colors.accent} />
-          </View>
-        ) : data ? (
-          <>
-            <TeamHeader data={data} />
-            <View style={styles.tabBar}>
-              {[
-                { label: "Squadra", value: "team" as const },
-                { label: "Organico", value: "roster" as const },
-                { label: "Media", value: "media" as const },
-              ].map((tab) => {
-                const isActive = tab.value === activeTab;
-
-                return (
-                  <Pressable
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: isActive }}
-                    key={tab.value}
-                    onPress={() => setActiveTab(tab.value)}
-                    style={styles.tab}
-                  >
-                    <AppText
-                      align="center"
-                      color={isActive ? "primary" : "secondary"}
-                      style={[styles.tabLabel, isActive ? styles.activeTabLabel : null]}
-                      variant="bodySm"
-                    >
-                      {tab.label}
-                    </AppText>
-                    {isActive ? <View style={styles.activeTabIndicator} /> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-            {activeTab === "team" ? (
-              <TeamInfoTab data={data} />
-            ) : activeTab === "roster" ? (
-              <TeamRosterTab data={data} />
-            ) : (
-              <TeamMediaTab data={data} />
-            )}
-          </>
-        ) : (
-          <EmptyState
-            description="Questa squadra non è disponibile."
-            icon="shield-outline"
-            title="Squadra non trovata"
-          />
-        )}
+        <SocietyTeamProfileView
+          activeTab={activeTab}
+          detail={detail}
+          onFollowPress={() => void handleToggleFollow()}
+          onMessagePress={() => void handleMessage()}
+          onMorePress={() => setMenuVisible(true)}
+          onOpenProfile={(profileId) => router.push(`/profile/${profileId}` as never)}
+          onOpenSquadList={() => {
+            trackProfileEvent("society_team_squad_opened", {
+              profileType: "society_team",
+            });
+            router.push(`/club/team/${detail.team.id}/squad` as never);
+          }}
+          onSharePress={() => void handleShare()}
+          onTabChange={(next) => {
+            setActiveTab(next);
+            trackProfileEvent("society_team_tab_changed", {
+              profileType: "society_team",
+              tab: next,
+            });
+          }}
+        />
       </KeyboardAwareScrollView>
+
+      <ActionSheet
+        actions={[
+          {
+            icon: "share-outline",
+            label: "Condividi squadra",
+            onPress: () => void handleShare(),
+          },
+          {
+            icon: "shield-outline",
+            label: "Vai al profilo della società",
+            onPress: () => router.push(`/club/${detail.club.id}` as never),
+          },
+        ]}
+        onClose={() => setMenuVisible(false)}
+        title="Azioni squadra"
+        visible={isMenuVisible}
+      />
     </Screen>
   );
 }
 
-function TeamHeader({ data }: { data: PublicClubTeamProfile }) {
-  const title = data.team.name || data.team.category;
-  const subtitle = data.profile?.competition_name ?? data.team.category;
-
+function TeamTopBar({
+  clubName,
+  onBack,
+}: {
+  clubName: string | null;
+  onBack: () => void;
+}) {
   return (
-    <View style={styles.header}>
-      <View style={styles.logo}>
-        {data.team.logo_url || data.club.logo_url ? (
-          <Image
-            source={{ uri: data.team.logo_url ?? data.club.logo_url! }}
-            style={styles.logoImage}
-          />
-        ) : (
-          <Ionicons color={colors.textMuted} name="shield-outline" size={32} />
-        )}
-      </View>
-      <View style={styles.headerCopy}>
-        <AppText align="center" style={styles.teamTitle} variant="headingLg">
-          {title}
-        </AppText>
-        <AppText align="center" color="accent" variant="titleSm">
-          {subtitle}
-        </AppText>
-        <AppText align="center" color="secondary" variant="bodySm">
-          {data.club.name}
-        </AppText>
-      </View>
-      <View style={styles.statsRow}>
-        <HeaderStat label="Organico" value={String(data.members.length)} />
-        <HeaderStat label="Ricerche" value={String(data.positionsTotal)} />
-        <HeaderStat
-          label="Promossi"
-          value={String(data.profile?.promoted_players_count ?? 0)}
-        />
-      </View>
-    </View>
-  );
-}
-
-function HeaderStat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.statItem}>
-      <AppText align="center" style={styles.statValue} variant="titleSm">
-        {value}
+    <View style={styles.topBar}>
+      <Pressable
+        accessibilityLabel="Torna indietro"
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={onBack}
+        style={styles.topBarButton}
+      >
+        <Ionicons color={colors.textPrimary} name="arrow-back" size={24} />
+      </Pressable>
+      <AppText
+        align="center"
+        numberOfLines={1}
+        style={styles.topBarTitle}
+        variant="bodySm"
+      >
+        {clubName ?? "PROLINK"}
       </AppText>
-      <AppText align="center" color="secondary" style={styles.statLabel} variant="caption">
-        {label}
-      </AppText>
-    </View>
-  );
-}
-
-function TeamInfoTab({ data }: { data: PublicClubTeamProfile }) {
-  return (
-    <View style={styles.section}>
-      <InfoRow label="Categoria" value={data.team.category} />
-      <InfoRow
-        label="Competizione"
-        value={data.profile?.competition_name ?? "Da completare"}
-      />
-      <InfoRow label="Girone" value={data.profile?.group_name ?? "Da completare"} />
-      <InfoRow
-        label="Posizioni aperte"
-        value={`${data.positionsTotal} ricerche attive`}
-      />
-    </View>
-  );
-}
-
-function TeamRosterTab({ data }: { data: PublicClubTeamProfile }) {
-  return (
-    <View style={styles.section}>
-      {data.members.length === 0 ? (
-        <EmptyState
-          description="Nessun membro associato a questa squadra."
-          icon="people-outline"
-          title="Organico da completare"
-        />
-      ) : (
-        data.members.map((member) => (
-          <View key={member.id} style={styles.memberRow}>
-            <View style={styles.memberAvatar}>
-              {member.avatar_url ? (
-                <Image source={{ uri: member.avatar_url }} style={styles.memberImage} />
-              ) : (
-                <AppText color="secondary" variant="caption">
-                  {(member.full_name ?? member.manual_name ?? "FM").slice(0, 2)}
-                </AppText>
-              )}
-            </View>
-            <View style={styles.memberText}>
-              <AppText style={styles.memberName} variant="bodySm">
-                {member.full_name ?? member.manual_name ?? "Membro squadra"}
-              </AppText>
-              <AppText color="secondary" variant="caption">
-                {member.staff_title ?? member.member_role}
-              </AppText>
-            </View>
-          </View>
-        ))
-      )}
-    </View>
-  );
-}
-
-function TeamMediaTab({ data }: { data: PublicClubTeamProfile }) {
-  const mediaUrls = data.profile?.media_urls ?? [];
-
-  return (
-    <>
-      <View style={styles.section}>
-        {mediaUrls.length === 0 ? (
-          <EmptyState
-            description="La squadra non ha ancora media pubblicati."
-            icon="images-outline"
-            title="Media da completare"
-          />
-        ) : (
-          <View style={styles.mediaGrid}>
-            {mediaUrls.slice(0, 6).map((url) => (
-              <Image key={url} source={{ uri: url }} style={styles.mediaItem} />
-            ))}
-          </View>
-        )}
-      </View>
-      <TaggedContentGrid targetId={data.team.id} targetType="team" />
-    </>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <AppText color="secondary" variant="bodySm">
-        {label}
-      </AppText>
-      <AppText style={styles.infoValue} variant="bodySm">
-        {value}
-      </AppText>
+      <View style={styles.topBarButton} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  activeTabIndicator: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: radius.full,
-    bottom: -1,
-    height: 2,
-    left: 0,
-    position: "absolute",
-    right: 0,
-  },
-  activeTabLabel: {
-    fontWeight: typography.fontWeight.bold,
-  },
-  header: {
+  center: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[8],
-    borderWidth: 1,
+    flex: 1,
     gap: spacing[16],
-    padding: spacing[18],
-  },
-  headerCopy: {
-    gap: spacing[6],
-  },
-  infoRow: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[8],
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing[12],
-    padding: spacing[14],
-  },
-  infoValue: {
-    flex: 1,
-    fontWeight: typography.fontWeight.bold,
-    textAlign: "right",
-  },
-  loadingBlock: {
-    alignItems: "center",
     justifyContent: "center",
-    minHeight: 240,
-  },
-  logo: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[12],
-    height: 88,
-    justifyContent: "center",
-    overflow: "hidden",
-    width: 88,
-  },
-  logoImage: {
-    height: "100%",
-    width: "100%",
-  },
-  mediaGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[8],
-  },
-  mediaItem: {
-    aspectRatio: 1,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    width: "31.8%",
-  },
-  memberAvatar: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.full,
-    height: 38,
-    justifyContent: "center",
-    overflow: "hidden",
-    width: 38,
-  },
-  memberImage: {
-    height: "100%",
-    width: "100%",
-  },
-  memberName: {
-    fontWeight: typography.fontWeight.semibold,
-  },
-  memberRow: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[8],
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing[12],
-    padding: spacing[14],
-  },
-  memberText: {
-    flex: 1,
-    gap: spacing[4],
+    paddingHorizontal: spacing[20],
   },
   scrollContent: {
-    gap: spacing[16],
     paddingBottom: spacing[28],
-  },
-  section: {
-    gap: spacing[10],
-  },
-  statItem: {
-    alignItems: "center",
-    flex: 1,
-    gap: spacing[4],
-  },
-  statLabel: {
-    fontWeight: typography.fontWeight.semibold,
-    textTransform: "uppercase",
-  },
-  statValue: {
-    fontWeight: typography.fontWeight.bold,
-  },
-  statsRow: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    flexDirection: "row",
-    gap: spacing[8],
-    padding: spacing[12],
-    width: "100%",
-  },
-  tab: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 52,
-    position: "relative",
-  },
-  tabBar: {
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    flexDirection: "row",
-    paddingHorizontal: spacing[16],
-  },
-  tabLabel: {
-    fontWeight: typography.fontWeight.semibold,
-  },
-  teamTitle: {
-    fontWeight: typography.fontWeight.heavy,
   },
   topBar: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 44,
+    paddingHorizontal: spacing[8],
   },
   topBarButton: {
     alignItems: "center",
@@ -427,6 +296,6 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     flex: 1,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: "600",
   },
 });
