@@ -24,6 +24,7 @@ import { spacing } from "../../../../theme/tokens";
 import { ActionSheet, AppText } from "../../../../ui";
 import {
   DateSelector,
+  InfoMessage,
   OnboardingSelectField,
   OnboardingTextField,
   ToggleRow,
@@ -85,9 +86,24 @@ const GENERIC_SAVE_ERROR =
 const GENERIC_UPLOAD_ERROR =
   "Non è stato possibile caricare l'immagine. Riprova.";
 
+/**
+ * Campi che un ruolo può non avere. Non si tolgono per gusto: si tolgono
+ * quando il modello approvato di quel ruolo non li prevede (REV-PROF-20
+ * §"Foto e dati personali" per il Tifoso). Il valore esistente non viene
+ * toccato — il patch lo rimanda indietro così com'era letto — quindi
+ * nascondere un campo non lo cancella.
+ */
+export type ProfilePersonalDataHiddenField = "domicile" | "gender";
+
 export type ProfilePersonalDataConfig = {
   /** Nota in fondo al form. Omessa quando il mockup non la prevede. */
   footerHint?: string;
+  hiddenFields?: readonly ProfilePersonalDataHiddenField[];
+  /**
+   * Avviso di privacy associato ai campi, reso con il riquadro informativo
+   * condiviso. Non sostituisce l'esclusione lato backend: la dice.
+   */
+  privacyNotice?: string;
   profileType: string;
   testIDPrefix: string;
 };
@@ -117,7 +133,10 @@ export function ProfilePersonalDataScreen({
   saving,
   userId,
 }: ProfilePersonalDataScreenProps) {
-  const { footerHint, profileType, testIDPrefix } = config;
+  const { footerHint, hiddenFields, privacyNotice, profileType, testIDPrefix } =
+    config;
+  const showsGender = !hiddenFields?.includes("gender");
+  const showsDomicile = !hiddenFields?.includes("domicile");
 
   const initialForm = useMemo<PersonalForm | null>(() => {
     if (!data) {
@@ -286,7 +305,11 @@ export function ProfilePersonalDataScreen({
       return;
     }
 
-    if (!form.useResidenceForDomicile && !form.domicile.trim()) {
+    if (
+      showsDomicile &&
+      !form.useResidenceForDomicile &&
+      !form.domicile.trim()
+    ) {
       setErrorMessage("Seleziona il domicilio.");
       return;
     }
@@ -414,15 +437,17 @@ export function ProfilePersonalDataScreen({
               value={parseBirthDateInput(form.birthDate)?.isoValue ?? ""}
             />
 
-            <OnboardingSelectField
-              label="Sesso"
-              onChange={(value) => patch({ gender: value as ProfileGender })}
-              options={[...GENDER_OPTIONS]}
-              placeholder="Seleziona"
-              sheetTitle="Sesso"
-              testID={`${testIDPrefix}-personal-gender`}
-              value={form.gender}
-            />
+            {showsGender ? (
+              <OnboardingSelectField
+                label="Sesso"
+                onChange={(value) => patch({ gender: value as ProfileGender })}
+                options={[...GENDER_OPTIONS]}
+                placeholder="Seleziona"
+                sheetTitle="Sesso"
+                testID={`${testIDPrefix}-personal-gender`}
+                value={form.gender}
+              />
+            ) : null}
 
             <NationalityAutocompleteInput
               label="Nazionalità"
@@ -443,23 +468,32 @@ export function ProfilePersonalDataScreen({
               Il domicilio non è la disponibilità geografica: vive qui, e le
               zone in cui si accetta un incarico restano in "Opportunità".
             */}
-            <ToggleRow
-              label="Domicilio diverso dalla residenza"
-              onValueChange={(value) =>
-                patch({ useResidenceForDomicile: !value })
-              }
-              testID={`${testIDPrefix}-personal-domicile-toggle`}
-              value={!form.useResidenceForDomicile}
-            >
-              <ResidenceCityInput
-                label="Domicilio"
-                onChangeText={(value) => patch({ domicile: value })}
-                onSelectCity={(city: ItalianCityOption) =>
-                  patch({ domicile: city.name })
+            {showsDomicile ? (
+              <ToggleRow
+                label="Domicilio diverso dalla residenza"
+                onValueChange={(value) =>
+                  patch({ useResidenceForDomicile: !value })
                 }
-                value={form.domicile}
+                testID={`${testIDPrefix}-personal-domicile-toggle`}
+                value={!form.useResidenceForDomicile}
+              >
+                <ResidenceCityInput
+                  label="Domicilio"
+                  onChangeText={(value) => patch({ domicile: value })}
+                  onSelectCity={(city: ItalianCityOption) =>
+                    patch({ domicile: city.name })
+                  }
+                  value={form.domicile}
+                />
+              </ToggleRow>
+            ) : null}
+
+            {privacyNotice ? (
+              <InfoMessage
+                message={privacyNotice}
+                testID={`${testIDPrefix}-personal-privacy-note`}
               />
-            </ToggleRow>
+            ) : null}
 
             {footerHint ? (
               <AppText color="muted" variant="meta">

@@ -1059,13 +1059,14 @@ export default function ProfileScreen() {
                 profileType: "fan",
                 viewerMode: "owner",
               });
-              /*
-                REV-PROF-20 non esiste ancora: durante la transizione la CTA
-                apre la rotta corrente, cioè la modale anagrafica già usata
-                dal Tifoso. Nessun form nuovo è stato scritto qui.
-              */
-              handleEdit("personalInfo");
+              // REV-PROF-20: l'hub modulare è l'unico punto di modifica del
+              // profilo Tifoso. La vecchia modale anagrafica non è più
+              // raggiungibile da qui.
+              router.push("/profile/fan-edit");
             }}
+            onManageFavoriteClub={() =>
+              router.push("/profile/fan-edit/favorite-club")
+            }
             onMorePress={() => {
               trackProfileEvent("profile_more_menu_opened", {
                 profileType: "fan",

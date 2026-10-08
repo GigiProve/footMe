@@ -35,7 +35,6 @@ import {
 import {
   searchTeams,
   searchAgentPlayerCandidates,
-  updateFanFavoriteTeam,
   type AgentPlayerCandidate,
 } from "../profile-service";
 import { TeamAutocompleteInput } from "../player-sports-section";
@@ -986,121 +985,6 @@ function LineupBuilder({
   );
 }
 
-export function FanFavoriteTeamModal({
-  favoriteClubId,
-  favoriteTeamName,
-  onClose,
-  onSaved,
-  profileId,
-  visible,
-}: {
-  favoriteClubId: string | null;
-  favoriteTeamName: string;
-  onClose: () => void;
-  onSaved: (nextFavorite: {
-    favoriteClubId: string | null;
-    favoriteTeamName: string;
-  }) => void;
-  profileId: string;
-  visible: boolean;
-}) {
-  const [draftTeamName, setDraftTeamName] = useState(favoriteTeamName);
-  const [draftClubId, setDraftClubId] = useState<string | null>(favoriteClubId);
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setDraftTeamName(favoriteTeamName);
-      setDraftClubId(favoriteClubId);
-      setIsSaving(false);
-    }
-  }, [favoriteClubId, favoriteTeamName, visible]);
-
-  async function handleSave() {
-    const trimmedTeamName = draftTeamName.trim();
-
-    if (!trimmedTeamName) {
-      Alert.alert("Squadra richiesta", "Inserisci la squadra per cui tifi.");
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      await updateFanFavoriteTeam({
-        favoriteClubId: draftClubId,
-        favoriteTeamName: trimmedTeamName,
-        profileId,
-      });
-      onSaved({
-        favoriteClubId: draftClubId,
-        favoriteTeamName: trimmedTeamName,
-      });
-    } catch {
-      Alert.alert("Errore", "Non siamo riusciti a salvare la squadra tifata.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  const canSave = Boolean(draftTeamName.trim()) && !isSaving;
-
-  return (
-    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
-      <SafeAreaView style={styles.createRoot} testID="fan-favorite-team-modal">
-        <View style={styles.createTopBar}>
-          <Pressable
-            accessibilityLabel="Annulla modifica squadra"
-            accessibilityRole="button"
-            onPress={onClose}
-            style={styles.createTextButton}
-          >
-            <AppText variant="bodySm">Annulla</AppText>
-          </Pressable>
-          <AppText style={styles.createTitle} variant="titleSm">
-            Squadra tifata
-          </AppText>
-          <Pressable
-            accessibilityLabel="Salva squadra tifata"
-            accessibilityRole="button"
-            disabled={!canSave}
-            onPress={() => {
-              void handleSave();
-            }}
-            style={[styles.createTextButton, !canSave ? styles.disabledAction : null]}
-            testID="fan-save-favorite-team-button"
-          >
-            {isSaving ? (
-              <ActivityIndicator color={colors.accent} size="small" />
-            ) : (
-              <AppText color="accent" style={styles.publishText} variant="bodySm">
-                Salva
-              </AppText>
-            )}
-          </Pressable>
-        </View>
-
-        <View style={styles.favoriteTeamContent}>
-          <TeamAutocompleteInput
-            label="Squadra"
-            onChangeText={(value) => {
-              setDraftTeamName(value);
-              setDraftClubId(null);
-            }}
-            onSelectTeam={(team) => {
-              setDraftTeamName(team.name);
-              setDraftClubId(team.id ?? null);
-            }}
-            placeholder="Es. AC Como"
-            searchTeams={searchTeams}
-            value={draftTeamName}
-          />
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
 function TaggedPlayersRow({
   onOpenPlayer,
   players,
@@ -1272,9 +1156,6 @@ const styles = StyleSheet.create({
   },
   disabledAction: {
     opacity: 0.4,
-  },
-  favoriteTeamContent: {
-    padding: spacing[16],
   },
   lineupBuilder: {
     gap: spacing[12],

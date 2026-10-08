@@ -15,26 +15,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { colors, spacing } from "../../theme/tokens";
-import { Button, TabBar, type TabBarItem } from "../../ui";
+import { TabBar, type TabBarItem } from "../../ui";
 import { FanProfileHeader } from "./profile-screen-components";
 import { trackProfileEvent } from "./profile-analytics";
 import type { CompleteProfessionalProfile } from "./profile-service";
-import { MediaTabContent } from "./career/MediaTabContent";
-import type { MediaContentItem } from "./career/MediaTabContent";
-import { ProfileSectionError } from "./master/ProfileSectionBlock";
 import {
   FAN_TRIBUNA_PAGE_SIZE,
   fetchFanTribunaFeed,
   type FanTribunaKind,
   type FanTribunaPost,
 } from "./fan-tribuna-service";
-import {
-  FanCreateTribunaModal,
-  FanFavoriteTeamModal,
-} from "./fan/fan-composers";
+import { FanCreateTribunaModal } from "./fan/fan-composers";
 import { FanCreateSheet, type FanCreateAction } from "./fan/FanCreateSheet";
 import { FanInfoTab } from "./fan/FanInfoTab";
+import { FanMediaTab } from "./fan/FanMediaTab";
 import { FanTribunaTab } from "./fan/FanTribunaTab";
 import {
   buildFanCapabilities,
@@ -43,11 +37,8 @@ import {
   dedupeFanContentById,
   sortFanTribunaPosts,
 } from "./fan/fan-master-profile";
-import {
-  FAN_MEDIA_INITIAL_CURSOR,
-  fetchFanMediaPage,
-  type FanMediaCursor,
-} from "./fan/fan-media-tab-service";
+import type { FanContentRef } from "./fan/fan-media-tab-service";
+import { useFanMediaFeed } from "./fan/use-fan-media-feed";
 import {
   fetchPublicFanProfile,
   type PublicFanProfile,
@@ -70,11 +61,12 @@ const TRIBUNA_QUERY_KINDS: readonly FanTribunaKind[] = [
   "proposal",
 ];
 
-/** Riferimento a un contenuto nel suo dettaglio canonico. */
-export type FanContentRef = {
-  contentType: string;
-  postId: string;
-};
+/**
+ * Riferimento a un contenuto nel suo dettaglio canonico. Vive accanto alla
+ * sorgente della tab Media, che REV-PROF-20 condivide con l'hub Modifica
+ * profilo; qui resta esportato perché è il tipo della prop `onOpenContent`.
+ */
+export type { FanContentRef };
 
 type FanProfileViewProps = {
   completeProfile: CompleteProfessionalProfile;
@@ -87,6 +79,12 @@ type FanProfileViewProps = {
   onContactPress?: () => void;
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
+  /**
+   * Gestione della squadra del cuore, solo Owner. Porta al modulo
+   * "Squadra del cuore" di REV-PROF-20: è l'unico punto in cui la relazione
+   * si modifica, e questa vista non ne apre un secondo.
+   */
+  onManageFavoriteClub?: () => void;
   onMorePress?: () => void;
   /** Apre il dettaglio condiviso del contenuto. */
   onOpenContent?: (ref: FanContentRef) => void;
@@ -109,6 +107,7 @@ export function FanProfileView({
   onContactPress,
   onEditProfilePress,
   onFollowPress,
+  onManageFavoriteClub,
   onMorePress,
   onOpenContent,
   onOpenFavoriteClub,
@@ -215,70 +214,19 @@ export function FanProfileView({
   ]);
 
   // ─── Media ───────────────────────────────────────────────────────────────
-  const [mediaItems, setMediaItems] = useState<MediaContentItem[]>([]);
-  const [mediaCursor, setMediaCursor] = useState<FanMediaCursor>(
-    FAN_MEDIA_INITIAL_CURSOR,
-  );
-  const [isLoadingMedia, setIsLoadingMedia] = useState(true);
-  const [isLoadingMoreMedia, setIsLoadingMoreMedia] = useState(false);
-  const [hasMoreMedia, setHasMoreMedia] = useState(false);
-  const [mediaError, setMediaError] = useState<string | null>(null);
+  const onMediaLoadFailed = useCallback(() => {
+    trackProfileEvent("profile_tab_load_failed", {
+      profileType: "fan",
+      tab: "media",
+      viewerMode: mode,
+    });
+  }, [mode]);
 
-  const loadMedia = useCallback(async () => {
-    setIsLoadingMedia(true);
-    setMediaError(null);
-
-    try {
-      const page = await fetchFanMediaPage(
-        profile.id,
-        viewerProfileId,
-        FAN_MEDIA_INITIAL_CURSOR,
-      );
-      setMediaItems(page.items);
-      setMediaCursor(page.cursor);
-      setHasMoreMedia(page.hasMore);
-    } catch {
-      setMediaError("Non è stato possibile caricare i contenuti. Riprova.");
-      trackProfileEvent("profile_tab_load_failed", {
-        profileType: "fan",
-        tab: "media",
-        viewerMode: mode,
-      });
-    } finally {
-      setIsLoadingMedia(false);
-    }
-  }, [mode, profile.id, viewerProfileId]);
-
-  const loadMoreMedia = useCallback(async () => {
-    if (isLoadingMoreMedia || !hasMoreMedia) {
-      return;
-    }
-
-    setIsLoadingMoreMedia(true);
-
-    try {
-      const page = await fetchFanMediaPage(
-        profile.id,
-        viewerProfileId,
-        mediaCursor,
-      );
-      setMediaItems((current) =>
-        dedupeFanContentById([...current, ...page.items]),
-      );
-      setMediaCursor(page.cursor);
-      setHasMoreMedia(page.hasMore);
-    } catch {
-      setMediaError("Non è stato possibile caricare i contenuti. Riprova.");
-    } finally {
-      setIsLoadingMoreMedia(false);
-    }
-  }, [
-    hasMoreMedia,
-    isLoadingMoreMedia,
-    mediaCursor,
-    profile.id,
+  const media = useFanMediaFeed({
+    onLoadFailed: onMediaLoadFailed,
+    profileId: profile.id,
     viewerProfileId,
-  ]);
+  });
 
   useEffect(() => {
     void loadPublicProfile();
@@ -288,14 +236,9 @@ export function FanProfileView({
     void loadTribuna();
   }, [loadTribuna]);
 
-  useEffect(() => {
-    void loadMedia();
-  }, [loadMedia]);
-
   // ─── Creazione ───────────────────────────────────────────────────────────
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
   const [composerKind, setComposerKind] = useState<FanTribunaKind | null>(null);
-  const [isFavoriteTeamModalOpen, setIsFavoriteTeamModalOpen] = useState(false);
   const hasHandledComposeIntent = useRef(false);
 
   useEffect(() => {
@@ -348,7 +291,7 @@ export function FanProfileView({
 
     if (post.kind === "photo") {
       setActiveTab("media");
-      void loadMedia();
+      media.reload();
       return;
     }
 
@@ -449,24 +392,20 @@ export function FanProfileView({
         />
       ) : activeTab === "media" ? (
         <FanMediaTab
-          errorMessage={mediaError}
-          hasMore={hasMoreMedia}
-          isLoading={isLoadingMedia}
-          isLoadingMore={isLoadingMoreMedia}
+          errorMessage={media.errorMessage}
+          hasMore={media.hasMore}
+          isLoading={media.isLoading}
+          isLoadingMore={media.isLoadingMore}
           isOwner={isOwner}
-          items={mediaItems}
+          items={media.items}
           onAddContentPress={
             capabilities.canCreateContent
               ? () => setComposerKind("photo")
               : undefined
           }
-          onLoadMore={() => {
-            void loadMoreMedia();
-          }}
+          onLoadMore={media.loadMore}
           onOpenContent={handleOpenContent}
-          onRetry={() => {
-            void loadMedia();
-          }}
+          onRetry={media.reload}
           profileName={profile.full_name}
           viewerMode={mode}
         />
@@ -482,9 +421,7 @@ export function FanProfileView({
             capabilities.canEditProfile ? onEditProfilePress : undefined
           }
           onManageFavoriteClub={
-            capabilities.canEditProfile
-              ? () => setIsFavoriteTeamModalOpen(true)
-              : undefined
+            capabilities.canEditProfile ? onManageFavoriteClub : undefined
           }
           onOpenFavoriteClub={
             onOpenFavoriteClub ? handleOpenFavoriteClub : undefined
@@ -509,154 +446,11 @@ export function FanProfileView({
         userId={viewerProfileId ?? profile.id}
         visible={composerKind !== null}
       />
-      {capabilities.canEditProfile ? (
-        <FanFavoriteTeamModal
-          favoriteClubId={favoriteClub?.id ?? null}
-          favoriteTeamName={
-            favoriteClub?.name ?? publicProfile?.legacyFavoriteTeamName ?? ""
-          }
-          onClose={() => setIsFavoriteTeamModalOpen(false)}
-          onSaved={() => {
-            setIsFavoriteTeamModalOpen(false);
-            void loadPublicProfile();
-          }}
-          profileId={profile.id}
-          visible={isFavoriteTeamModalOpen}
-        />
-      ) : null}
-    </View>
-  );
-}
-
-/**
- * Tab Media: il componente condiviso consolidato da REV-PROF-12, senza
- * nessuna griglia specifica per il Tifoso. Le thumbnail non portano l'icona
- * Salvati — quella vive nel dettaglio contenuto, dove è sempre stata.
- */
-function FanMediaTab({
-  errorMessage,
-  hasMore,
-  isLoading,
-  isLoadingMore,
-  isOwner,
-  items,
-  onAddContentPress,
-  onLoadMore,
-  onOpenContent,
-  onRetry,
-  profileName,
-  viewerMode,
-}: {
-  errorMessage: string | null;
-  hasMore: boolean;
-  isLoading: boolean;
-  isLoadingMore: boolean;
-  isOwner: boolean;
-  items: MediaContentItem[];
-  onAddContentPress?: () => void;
-  onLoadMore: () => void;
-  onOpenContent: (ref: FanContentRef) => void;
-  onRetry: () => void;
-  profileName: string;
-  viewerMode: "owner" | "visitor";
-}) {
-  if (isLoading) {
-    return <MediaGridSkeleton />;
-  }
-
-  if (errorMessage) {
-    return (
-      <View style={styles.mediaState}>
-        <ProfileSectionError
-          message={errorMessage}
-          onRetry={onRetry}
-          testID="fan-media-error"
-        />
-      </View>
-    );
-  }
-
-  return (
-    <MediaTabContent
-      authorName={profileName}
-      emptyCtaLabel="Pubblica foto o video"
-      emptyDescription={
-        isOwner
-          ? "Pubblica foto e video del calcio che vivi."
-          : "Questo Tifoso non ha ancora pubblicato foto o video."
-      }
-      emptyTitle="Nessun contenuto Media"
-      filtersEnabled
-      footer={
-        hasMore ? (
-          <Button
-            accessibilityLabel="Mostra altri contenuti Media"
-            disabled={isLoadingMore}
-            label={isLoadingMore ? "Caricamento…" : "Mostra altri"}
-            onPress={onLoadMore}
-            size="sm"
-            variant="secondary"
-          />
-        ) : null
-      }
-      initialItems={items}
-      mode={viewerMode}
-      onAddContentPress={onAddContentPress}
-      onFilterChange={(filter) =>
-        trackProfileEvent("media_filter_changed", {
-          mediaFilter: filter,
-          profileType: "fan",
-          viewerMode,
-        })
-      }
-      onItemOpened={(item) =>
-        trackProfileEvent("profile_media_opened", {
-          mediaType: item.type,
-          profileType: "fan",
-          viewerMode,
-        })
-      }
-      onOpenTaggedItem={onOpenContent}
-    />
-  );
-}
-
-const MEDIA_SKELETON_CELLS = [0, 1, 2, 3, 4, 5];
-
-/** Celle della stessa misura delle thumbnail: nessun salto all'arrivo. */
-function MediaGridSkeleton() {
-  return (
-    <View
-      accessible
-      accessibilityLabel="Caricamento dei contenuti in corso"
-      accessibilityRole="progressbar"
-      style={styles.mediaSkeletonGrid}
-      testID="fan-media-skeleton"
-    >
-      {MEDIA_SKELETON_CELLS.map((cell) => (
-        <View key={cell} style={styles.mediaSkeletonCell} />
-      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  mediaSkeletonCell: {
-    aspectRatio: 1,
-    backgroundColor: colors.surfaceMuted,
-    // Stessa geometria di `MediaTabContent`: tre colonne, 1px di gronda.
-    marginBottom: 2,
-    width: "33.3333%",
-  },
-  mediaSkeletonGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingTop: spacing[12],
-  },
-  mediaState: {
-    paddingHorizontal: spacing[20],
-    paddingTop: spacing[20],
-  },
   root: {
     flex: 1,
   },

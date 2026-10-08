@@ -73,6 +73,37 @@ describe("fetchPublicFanProfile", () => {
     );
   });
 
+  /*
+    REV-PROF-20: con i toggle spenti la RPC non proietta i valori — il client
+    riceve una riga senza squadra e con gli array vuoti, non un payload da
+    filtrare nel rendering.
+  */
+  it("resta vuoto quando il Tifoso ha messo tutto in privato", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [
+        rpcRow({
+          favorite_club_id: null,
+          favorite_club_logo_url: null,
+          favorite_club_name: null,
+          favorite_club_subtitle: null,
+          favorite_team_name: null,
+          football_types: [],
+          interest_categories: [],
+        }),
+      ],
+      error: null,
+    });
+
+    const result = await fetchPublicFanProfile("fan-1");
+
+    expect(result).toEqual({
+      favoriteClub: null,
+      followedCategories: [],
+      footballTypes: [],
+      legacyFavoriteTeamName: null,
+    });
+  });
+
   it("tiene il valore legacy testuale solo in assenza di società collegata", async () => {
     mocks.rpc.mockResolvedValue({
       data: [

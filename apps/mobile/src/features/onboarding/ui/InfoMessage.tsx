@@ -7,6 +7,7 @@ import { onboardingRadius, onboardingSpacing } from "./onboarding-tokens";
 
 type InfoMessageProps = {
   message: string;
+  testID?: string;
   tone?: "info" | "warning";
 };
 
@@ -14,11 +15,18 @@ type InfoMessageProps = {
  * Nota informativa discreta. Da usare solo quando aiuta davvero l'utente:
  * non è il posto per spiegare come funziona il salvataggio (§K).
  */
-export function InfoMessage({ message, tone = "info" }: InfoMessageProps) {
+export function InfoMessage({
+  message,
+  testID,
+  tone = "info",
+}: InfoMessageProps) {
   const isWarning = tone === "warning";
 
   return (
-    <View style={[styles.container, isWarning ? styles.warning : styles.info]}>
+    <View
+      style={[styles.container, isWarning ? styles.warning : styles.info]}
+      testID={testID}
+    >
       <Ionicons
         color={isWarning ? colors.warningForeground : colors.accent}
         name={isWarning ? "alert-circle-outline" : "information-circle-outline"}

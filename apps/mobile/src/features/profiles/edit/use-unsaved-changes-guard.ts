@@ -14,12 +14,19 @@ type UnsavedChangesGuardOptions = {
   isDirty: boolean;
   isSaving: boolean;
   onLeave: () => void;
+  /**
+   * Titolo del dialogo. Il default è quello con cui i primi ruoli sono stati
+   * approvati; REV-PROF-20 chiede la forma più breve, e cambiarla solo dove è
+   * richiesta evita di riscrivere la copy di sei editor già rilasciati.
+   */
+  title?: string;
 };
 
 export function useUnsavedChangesGuard({
   isDirty,
   isSaving,
   onLeave,
+  title = "Vuoi uscire senza salvare?",
 }: UnsavedChangesGuardOptions) {
   return useCallback(() => {
     if (isSaving) {
@@ -31,13 +38,9 @@ export function useUnsavedChangesGuard({
       return;
     }
 
-    Alert.alert(
-      "Vuoi uscire senza salvare?",
-      "Le modifiche effettuate andranno perse.",
-      [
-        { style: "cancel", text: "Continua a modificare" },
-        { onPress: onLeave, style: "destructive", text: "Esci senza salvare" },
-      ],
-    );
-  }, [isDirty, isSaving, onLeave]);
+    Alert.alert(title, "Le modifiche effettuate andranno perse.", [
+      { style: "cancel", text: "Continua a modificare" },
+      { onPress: onLeave, style: "destructive", text: "Esci senza salvare" },
+    ]);
+  }, [isDirty, isSaving, onLeave, title]);
 }

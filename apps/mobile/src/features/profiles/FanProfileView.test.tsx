@@ -42,8 +42,6 @@ vi.mock("../../components/ui/video-player-modal", () => ({
 vi.mock("./fan/fan-composers", () => ({
   FanCreateTribunaModal: (props: Record<string, unknown>) =>
     React.createElement("mock-fan-composer", props),
-  FanFavoriteTeamModal: (props: Record<string, unknown>) =>
-    React.createElement("mock-fan-favorite-team", props),
 }));
 
 vi.mock("./fan/fan-public-profile-service", () => ({

@@ -11,6 +11,7 @@
  * Opinioni, sondaggi e formazioni non passano di qui: la selezione avviene in
  * query sul tipo reale del record, non riclassificando contenuti.
  */
+import { supabase } from "../../../lib/supabase";
 import type { MediaContentItem } from "../career/MediaTabContent";
 import {
   FAN_MEDIA_PAGE_SIZE,
@@ -24,6 +25,15 @@ import {
 import { dedupeFanContentById } from "./fan-master-profile";
 
 export const FAN_MEDIA_TAB_PAGE_SIZE = FAN_MEDIA_PAGE_SIZE;
+
+/**
+ * Riferimento a un contenuto nel suo dettaglio canonico — quello condiviso
+ * con il feed e con la ricerca, non un viewer del profilo.
+ */
+export type FanContentRef = {
+  contentType: string;
+  postId: string;
+};
 
 /**
  * Offset indipendenti per sorgente: una pagina può esaurire la bacheca
@@ -82,6 +92,44 @@ export async function fetchFanMediaPage(
       tribunaPhotos.length === pageSize || legacyPosts.length === pageSize,
     items: items.map(({ sortKey: _sortKey, ...item }) => item),
   };
+}
+
+/**
+ * Quanti contenuti gestisce il modulo Media (REV-PROF-20, riepilogo della
+ * voce "Media e contenuti" nell'hub).
+ *
+ * È un conteggio, non una pagina: due `head` con `count: exact` sulle stesse
+ * due sorgenti della griglia, con lo stesso predicato di pubblicazione. Non
+ * si contano le pagine già caricate — il riepilogo direbbe "20 contenuti" a
+ * chi ne ha cinquanta — e non si contano opinioni, sondaggi e formazioni, che
+ * questo modulo non gestisce.
+ */
+export async function countFanMediaContents(
+  profileId: string,
+): Promise<number> {
+  const [tribuna, legacy] = await Promise.all([
+    supabase
+      .from("fan_tribuna_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", profileId)
+      .eq("status", "published")
+      .eq("kind", "photo"),
+    supabase
+      .from("fan_media_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", profileId)
+      .eq("status", "published"),
+  ]);
+
+  if (tribuna.error) {
+    throw tribuna.error;
+  }
+
+  if (legacy.error) {
+    throw legacy.error;
+  }
+
+  return (tribuna.count ?? 0) + (legacy.count ?? 0);
 }
 
 type SortableMediaItem = MediaContentItem & { sortKey: string };

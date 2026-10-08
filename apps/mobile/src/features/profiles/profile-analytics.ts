@@ -215,7 +215,22 @@ export type ProfileAnalyticsEvent =
   | "fan_create_option_selected"
   | "fan_composer_open_failed"
   | "fan_content_opened"
-  | "fan_favorite_club_tapped";
+  | "fan_favorite_club_tapped"
+  // Modifica profilo Tifoso (REV-PROF-20). Passano la sezione, l'esito e i
+  // conteggi: mai il nome della squadra, il suo identificativo, la query di
+  // ricerca, gli interessi, le categorie o i territori scelti.
+  | "fan_profile_edit_opened"
+  | "fan_favorite_club_search_opened"
+  | "fan_favorite_club_search_empty"
+  | "fan_favorite_club_selected"
+  | "fan_favorite_club_changed"
+  | "fan_favorite_club_removed"
+  | "fan_interest_toggled"
+  | "fan_category_search_started"
+  | "fan_category_toggled"
+  | "fan_areas_selector_opened"
+  | "fan_visibility_changed"
+  | "fan_profile_edit_conflict";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -254,6 +269,11 @@ export type ProfileEditSectionKey =
   | "activities"
   /** REV-PROF-16: "Assistiti in evidenza", solo Procuratore. */
   | "assistiti"
+  /** REV-PROF-20: i cinque moduli del Tifoso oltre a "personal" e "media". */
+  | "favoriteClub"
+  | "interests"
+  | "categories"
+  | "areas"
   /** REV-PROF-18: i cinque moduli e i quattro entry point della Società. */
   | "identity"
   | "sport"

@@ -364,12 +364,20 @@ export type DirectorProfileRecord = {
 
 export type FanProfileRecord = {
   favorite_club_id: string | null;
+  /**
+   * REV-PROF-20: "Mostra nel profilo" della squadra del cuore. Il backend la
+   * spegne da solo quando la relazione non c'è — una visibilità accesa senza
+   * valore non può esistere nel database.
+   */
+  favorite_club_is_public: boolean;
   favorite_team_name: string | null;
   /**
    * REV-ONB-08 §AF: macro-categorie di calcio seguite —
    * professional / amateur / women / youth.
    */
   football_types: string[];
+  /** REV-PROF-20: gli interessi calcistici compaiono nella tab Info. */
+  football_types_are_public: boolean;
   /** §R: ITALY, REGIONS o PROVINCES. Una sola modalità è attiva. */
   geo_scope: string;
   /**
@@ -377,9 +385,17 @@ export type FanProfileRecord = {
    * dall'onboarding: restano per i profili creati prima di REV-ONB-08.
    */
   interest_categories: string[];
+  /** REV-PROF-20: le categorie seguite compaiono nella tab Info. */
+  interest_categories_are_public: boolean;
   interest_provinces: string[];
   interest_regions: string[];
   profile_id: string;
+  /**
+   * REV-PROF-20: versione della riga per il salvataggio per sezione. Il patch
+   * la rimanda indietro e il backend scrive solo se nessun'altra sessione ha
+   * toccato la riga nel frattempo.
+   */
+  updated_at: string | null;
 };
 
 export type MediaProfileRecord = {
@@ -1318,13 +1334,18 @@ function normalizeFanProfileRecord(
       rawProfile.favorite_club_id.trim()
         ? rawProfile.favorite_club_id
         : null,
+    favorite_club_is_public: rawProfile.favorite_club_is_public === true,
     favorite_team_name: normalizeOptionalText(rawProfile.favorite_team_name),
     football_types: normalizeStringArray(rawProfile.football_types),
+    football_types_are_public: rawProfile.football_types_are_public === true,
     geo_scope: normalizeFanGeoScope(rawProfile.geo_scope),
     interest_categories: normalizeStringArray(rawProfile.interest_categories),
+    interest_categories_are_public:
+      rawProfile.interest_categories_are_public === true,
     interest_provinces: normalizeStringArray(rawProfile.interest_provinces),
     interest_regions: normalizeStringArray(rawProfile.interest_regions),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
+    updated_at: normalizeOptionalText(rawProfile.updated_at),
   } satisfies FanProfileRecord;
 }
 
@@ -1988,7 +2009,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("fan_profiles")
           .select(
-            "profile_id, interest_categories, interest_regions, interest_provinces, football_types, geo_scope, favorite_team_name, favorite_club_id",
+            "profile_id, interest_categories, interest_categories_are_public, interest_regions, interest_provinces, football_types, football_types_are_public, geo_scope, favorite_team_name, favorite_club_id, favorite_club_is_public, updated_at",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -2962,30 +2983,6 @@ export async function updateCompleteProfessionalProfile(
         }
       }
     }
-  }
-}
-
-export async function updateFanFavoriteTeam(input: {
-  favoriteClubId?: string | null;
-  favoriteTeamName: string;
-  profileId: string;
-}) {
-  const trimmedFavoriteTeamName = input.favoriteTeamName.trim();
-  const favoriteTeamName =
-    trimmedFavoriteTeamName.length > 0 ? trimmedFavoriteTeamName : null;
-  const favoriteClubId =
-    typeof input.favoriteClubId === "string" && input.favoriteClubId.trim()
-      ? input.favoriteClubId.trim()
-      : null;
-
-  const { error } = await supabase.from("fan_profiles").upsert({
-    favorite_club_id: favoriteClubId,
-    favorite_team_name: favoriteTeamName,
-    profile_id: input.profileId,
-  });
-
-  if (error) {
-    throw error;
   }
 }
 

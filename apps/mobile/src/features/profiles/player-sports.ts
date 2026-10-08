@@ -207,6 +207,52 @@ export const INTEREST_CATEGORY_OPTIONS: SportsSelectOption[] = [
   { label: "Esordienti", value: "Esordienti" },
 ];
 
+/**
+ * Raggruppamento ufficiale delle categorie (REV-PROF-20, schermata 5).
+ *
+ * Non è una seconda tassonomia: i valori restano quelli di
+ * `INTEREST_CATEGORY_OPTIONS`, qui si dichiara soltanto a quale livello
+ * appartiene ciascuno. Vive accanto alle opzioni perché il raggruppamento è
+ * una proprietà della categoria, non della schermata che la mostra: ricerca,
+ * filtri e feed possono leggerlo da qui invece di riscriverlo.
+ *
+ * Ogni categoria appartiene a un gruppo e a uno solo — e tutte ne hanno uno:
+ * è quello che verifica il test, così aggiungere una categoria senza
+ * assegnarla rompe la suite invece di farla sparire dall'elenco.
+ */
+export type InterestCategoryGroup = {
+  categories: readonly string[];
+  title: string;
+};
+
+export const INTEREST_CATEGORY_GROUPS: readonly InterestCategoryGroup[] = [
+  {
+    categories: ["Serie A", "Serie B", "Serie C"],
+    title: "Professionistico",
+  },
+  {
+    categories: [
+      "Serie D",
+      "Eccellenza",
+      "Promozione",
+      "Prima Categoria",
+      "Seconda Categoria",
+      "Terza Categoria",
+    ],
+    title: "Dilettantistico",
+  },
+  {
+    categories: [
+      "Primavera",
+      "Juniores",
+      "Allievi",
+      "Giovanissimi",
+      "Esordienti",
+    ],
+    title: "Giovanile",
+  },
+] as const;
+
 export const SEASON_PERIOD_OPTIONS: SportsSelectOption<SeasonPeriod>[] = [
   { label: "Intera stagione", value: "full" },
   { label: "Solo un periodo", value: "partial" },
