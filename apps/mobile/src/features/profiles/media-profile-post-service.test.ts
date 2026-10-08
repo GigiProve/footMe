@@ -67,6 +67,11 @@ const mocks = vi.hoisted(() => {
         return builder;
       }),
       limit: vi.fn(() => builder),
+      /** REV-PROF-21: esclusione dei contenuti programmati. */
+      lte: vi.fn((column: string, value: unknown) => {
+        operation.filters.push({ column, value });
+        return builder;
+      }),
       maybeSingle: vi.fn(async () => nextResponse()),
       neq: vi.fn((column: string, value: unknown) => {
         operation.filters.push({ column, value });
@@ -76,6 +81,8 @@ const mocks = vi.hoisted(() => {
         operation.orders.push({ column, options });
         return builder;
       }),
+      /** Pagination della tab Articoli e della tab Media (REV-PROF-21). */
+      range: vi.fn(async () => nextResponse()),
       select: vi.fn((...args: unknown[]) => {
         operation.action = "select";
         operation.selectArgs = args;

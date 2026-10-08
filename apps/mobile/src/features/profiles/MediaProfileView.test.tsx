@@ -1,3 +1,11 @@
+/**
+ * Master Profile Media/Creator (REV-PROF-21).
+ *
+ * Il test fissa le regole che non devono poter regredire: una sola struttura
+ * per Owner e Visitor, quattro tab in un ordine fisso con Articoli per prima,
+ * le differenze limitate alle azioni, e nessun dato personale del
+ * proprietario a schermo.
+ */
 import React from "react";
 import { Linking } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
@@ -7,56 +15,42 @@ import { MediaProfileView } from "./MediaProfileView";
 import type { MediaProfilePost } from "./media-profile-post-service";
 import type { MediaTribunaPost } from "./media-tribuna-service";
 import type { CompleteProfessionalProfile } from "./profile-service";
+import type { MediaPublicProfile } from "./media/media-public-profile-service";
 
-const followMocks = vi.hoisted(() => ({
-  fetchProfileFollowState: vi.fn(),
-  followProfile: vi.fn(),
-  unfollowProfile: vi.fn(),
+const publicProfileMocks = vi.hoisted(() => ({
+  fetchPublicMediaProfile: vi.fn(),
 }));
 
 const articleMocks = vi.hoisted(() => ({
-  addMediaProfilePostComment: vi.fn(),
-  createMediaProfilePost: vi.fn(),
-  fetchMediaProfilePostDetail: vi.fn(),
+  fetchMediaProfileArticleCategories: vi.fn(),
   fetchMediaProfilePostFeed: vi.fn(),
-  searchMediaProfilePostTargets: vi.fn(),
-  toggleSavedMediaProfilePost: vi.fn(),
 }));
 
 const tribunaMocks = vi.hoisted(() => ({
-  addMediaTribunaComment: vi.fn(),
-  createMediaArticleDebate: vi.fn(),
-  createMediaCommunityQa: vi.fn(),
-  createMediaPlayerVote: vi.fn(),
-  createMediaTribunaPoll: vi.fn(),
   fetchMediaTribunaFeed: vi.fn(),
-  submitMediaTribunaQuestion: vi.fn(),
-  toggleSavedMediaTribuna: vi.fn(),
   voteMediaTribunaOption: vi.fn(),
-  voteMediaTribunaQuestion: vi.fn(),
 }));
+
+const mediaTabProps = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
 
 vi.mock("@expo/vector-icons/Ionicons", () => {
   const MockIonicons = Object.assign(
     (props: Record<string, unknown>) => React.createElement("Ionicon", props),
     {
       glyphMap: {
+        "bar-chart-outline": 1,
         bookmark: 1,
         "bookmark-outline": 1,
-        "bar-chart-outline": 1,
-        "briefcase-outline": 1,
-        "call-outline": 1,
+        "chatbox-outline": 1,
         "chatbubble-outline": 1,
         "chatbubbles-outline": 1,
-        "chatbox-outline": 1,
         checkmark: 1,
         "checkmark-circle": 1,
-        "checkmark-circle-outline": 1,
+        "chevron-forward": 1,
         "chevron-up": 1,
-        "chevron-back": 1,
         close: 1,
-        "document-text-outline": 1,
-        "flash-outline": 1,
+        "create-outline": 1,
+        "ellipsis-horizontal": 1,
         "globe-outline": 1,
         "help-circle-outline": 1,
         "link-outline": 1,
@@ -67,99 +61,294 @@ vi.mock("@expo/vector-icons/Ionicons", () => {
         "logo-twitter": 1,
         "logo-youtube": 1,
         "mail-outline": 1,
+        "mic-outline": 1,
         "newspaper-outline": 1,
         "open-outline": 1,
         "people-outline": 1,
-        play: 1,
+        "person-add-outline": 1,
         "share-outline": 1,
-        "shield-checkmark-outline": 1,
         "star-outline": 1,
       },
     },
   );
 
-  return {
-    default: MockIonicons,
-  };
+  return { default: MockIonicons };
 });
 
-vi.mock("../../components/ui/video-preview", () => ({
-  VideoPreview: (props: Record<string, unknown>) =>
-    React.createElement("mock-video", props),
+vi.mock("./media/media-public-profile-service", () => ({
+  fetchPublicMediaProfile: publicProfileMocks.fetchPublicMediaProfile,
 }));
 
-vi.mock("../../components/ui/video-player-modal", () => ({
-  VideoPlayerModal: (props: Record<string, unknown>) =>
-    React.createElement("mock-video-player-modal", props),
-}));
-
-vi.mock("./fan-media-service", () => ({
-  fetchProfileFollowState: followMocks.fetchProfileFollowState,
-  followProfile: followMocks.followProfile,
-  unfollowProfile: followMocks.unfollowProfile,
-}));
-
-vi.mock("../saved/saved-service", () => ({
-  fetchProfileSaveState: vi.fn().mockResolvedValue(false),
-  saveProfile: vi.fn().mockResolvedValue(undefined),
-  unsaveProfile: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("../../ui/Toast/ToastProvider", () => ({
-  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
-  useToast: () => ({ showToast: vi.fn() }),
-}));
-
-vi.mock("@tanstack/react-query", async (importOriginal) => {
+vi.mock("./media-profile-post-service", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
+
   return {
     ...actual,
-    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+    fetchMediaProfileArticleCategories:
+      articleMocks.fetchMediaProfileArticleCategories,
+    fetchMediaProfilePostFeed: articleMocks.fetchMediaProfilePostFeed,
   };
 });
 
-vi.mock("./media-profile-post-service", () => ({
-  addMediaProfilePostComment: articleMocks.addMediaProfilePostComment,
-  createMediaProfilePost: articleMocks.createMediaProfilePost,
-  fetchMediaProfilePostDetail: articleMocks.fetchMediaProfilePostDetail,
-  fetchMediaProfilePostFeed: articleMocks.fetchMediaProfilePostFeed,
-  searchMediaProfilePostTargets: articleMocks.searchMediaProfilePostTargets,
-  toggleSavedMediaProfilePost: articleMocks.toggleSavedMediaProfilePost,
+vi.mock("./media-tribuna-service", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+
+  return {
+    ...actual,
+    fetchMediaTribunaFeed: tribunaMocks.fetchMediaTribunaFeed,
+    voteMediaTribunaOption: tribunaMocks.voteMediaTribunaOption,
+  };
+});
+
+/*
+  La griglia Media è il componente condiviso di REV-PROF-12, che ha già i suoi
+  test: qui interessa che sia quello e con quali props venga montato.
+*/
+vi.mock("./career/MediaTabContent", () => ({
+  MediaTabContent: (props: Record<string, unknown>) => {
+    mediaTabProps.last = props;
+    return React.createElement("mock-media-tab-content", { testID: "shared-media-tab" });
+  },
 }));
 
-vi.mock("./media-tribuna-service", () => ({
-  addMediaTribunaComment: tribunaMocks.addMediaTribunaComment,
-  createMediaArticleDebate: tribunaMocks.createMediaArticleDebate,
-  createMediaCommunityQa: tribunaMocks.createMediaCommunityQa,
-  createMediaPlayerVote: tribunaMocks.createMediaPlayerVote,
-  createMediaTribunaPoll: tribunaMocks.createMediaTribunaPoll,
-  fetchMediaTribunaFeed: tribunaMocks.fetchMediaTribunaFeed,
-  submitMediaTribunaQuestion: tribunaMocks.submitMediaTribunaQuestion,
-  toggleSavedMediaTribuna: tribunaMocks.toggleSavedMediaTribuna,
-  voteMediaTribunaOption: tribunaMocks.voteMediaTribunaOption,
-  voteMediaTribunaQuestion: tribunaMocks.voteMediaTribunaQuestion,
+vi.mock("./media-posts/MediaPostComposer", () => ({
+  MediaPostComposer: (props: Record<string, unknown>) =>
+    React.createElement("mock-editorial-composer", {
+      testID: "editorial-composer",
+      visible: props.visible,
+    }),
 }));
 
-vi.mock("./media-upload-service", () => ({
-  pickAndUploadMedia: vi.fn(),
-  ProfileMediaUploadError: class ProfileMediaUploadError extends Error {},
+vi.mock("./media/MediaContentComposer", () => ({
+  MediaContentComposer: (props: Record<string, unknown>) =>
+    React.createElement("mock-media-composer", {
+      testID: "media-composer",
+      visible: props.visible,
+    }),
 }));
 
-vi.mock("../content/content-tag-service", () => ({
-  hideTag: vi.fn().mockResolvedValue(undefined),
-  notifyTaggedProfiles: vi.fn().mockResolvedValue(undefined),
-  reportTag: vi.fn().mockResolvedValue(undefined),
+vi.mock("./media/media-tribuna-composers", () => ({
+  MediaTribunaComposerModal: (props: Record<string, unknown>) =>
+    React.createElement("mock-tribuna-composer", {
+      testID: "tribuna-composer",
+      visible: props.visible,
+    }),
+  MediaTribunaCreateSheet: (props: Record<string, unknown>) =>
+    React.createElement("mock-tribuna-sheet", {
+      testID: "tribuna-sheet",
+      visible: props.visible,
+    }),
 }));
 
-function render(element: React.ReactElement) {
-  let tree!: TestRenderer.ReactTestRenderer;
+// ---------------------------------------------------------------------------
+// Fixture
+// ---------------------------------------------------------------------------
 
-  act(() => {
-    tree = TestRenderer.create(element);
-  });
+function buildPublicProfile(
+  overrides: {
+    capabilities?: Partial<MediaPublicProfile["capabilities"]>;
+    entity?: Partial<MediaPublicProfile["entity"]>;
+    mode?: "owner" | "visitor";
+  } = {},
+): MediaPublicProfile {
+  const isOwner = overrides.mode === "owner";
 
-  return tree;
+  return {
+    capabilities: {
+      canAddMedia: isOwner,
+      canBlock: !isOwner,
+      canCreateTribunaContent: isOwner,
+      canEditProfile: isOwner,
+      canFollow: !isOwner,
+      canManageTribunaContent: isOwner,
+      canMessage: !isOwner,
+      canPublishArticle: isOwner,
+      canReport: !isOwner,
+      canShare: true,
+      canViewWebsite: true,
+      ...overrides.capabilities,
+    },
+    entity: {
+      affiliationType: null,
+      channels: [
+        { channelType: "website", label: null, url: "tuttodilettanti.it" },
+        { channelType: "instagram", label: null, url: "instagram.com/td" },
+      ],
+      contentTypes: ["Notizie", "Interviste", "Analisi"],
+      coverUrl: "https://cdn.test/cover.jpg",
+      coveredCompetitions: [],
+      coveredTeams: [],
+      coveredTerritories: ["Lombardia", "Piemonte", "Liguria"],
+      coveredTopics: [],
+      creatorType: "news_outlet",
+      creatorTypeOther: null,
+      editorialType: null,
+      entityName: "TuttoDilettanti",
+      focusAreas: ["Calcio dilettantistico", "Calcio locale"],
+      isVerified: false,
+      logoUrl: "https://cdn.test/logo.png",
+      profileId: "media-1",
+      shortDescription: "Notizie e storie del calcio dilettantistico.",
+      websiteUrl: "https://tuttodilettanti.it",
+      ...overrides.entity,
+    },
+    isFollowing: false,
+    mode: overrides.mode ?? "visitor",
+  };
 }
+
+function buildArticle(
+  overrides: Partial<MediaProfilePost> = {},
+): MediaProfilePost {
+  return {
+    author_id: "author-1",
+    author_name: "Marco Rossi",
+    body: "Le trattative si infiammano.",
+    category: "Mercato",
+    comment_count: 4,
+    comments: [],
+    cover_type: "image",
+    cover_url: "https://cdn.test/articolo.jpg",
+    created_at: "2026-06-19T08:00:00Z",
+    created_by_profile_id: "media-1",
+    display_mode: "full",
+    excerpt: "Ecco i movimenti più importanti del weekend.",
+    external_url: null,
+    id: "article-1",
+    is_saved: false,
+    kind: "article",
+    media_profile_id: "media-1",
+    published_at: "2026-06-19T08:00:00Z",
+    publisher_name: "TuttoDilettanti",
+    reading_time_minutes: 3,
+    source_name: null,
+    source_type: "platform",
+    status: "published",
+    subtitle: null,
+    tagged_targets: [],
+    title: "Promozione, il mercato entra nella fase decisiva",
+    updated_at: "2026-06-19T08:00:00Z",
+    ...overrides,
+  };
+}
+
+function buildTribunaPost(
+  overrides: Partial<MediaTribunaPost> = {},
+): MediaTribunaPost {
+  return {
+    body: null,
+    comment_count: 52,
+    comments: [],
+    created_at: "2026-06-19T08:00:00Z",
+    created_by_profile_id: "media-1",
+    id: "tribuna-1",
+    is_saved: false,
+    kind: "editorial_poll",
+    linked_article: null,
+    linked_article_id: null,
+    media_profile_id: "media-1",
+    options: [
+      {
+        id: "option-a",
+        is_voted: false,
+        label: "ASD Predappio",
+        percentage: 42,
+        player_avatar_url: null,
+        player_display_name: null,
+        player_profile_id: null,
+        sort_order: 0,
+        vote_count: 155,
+      },
+      {
+        id: "option-b",
+        is_voted: false,
+        label: "US Virtus",
+        percentage: 33,
+        player_avatar_url: null,
+        player_display_name: null,
+        player_profile_id: null,
+        sort_order: 1,
+        vote_count: 121,
+      },
+    ],
+    published_at: "2026-06-19T08:00:00Z",
+    question_count: 0,
+    questions: [],
+    status: "published",
+    title: "Chi vincerà il campionato?",
+    total_vote_count: 368,
+    updated_at: "2026-06-19T08:00:00Z",
+    ...overrides,
+  };
+}
+
+function buildCompleteProfile(): CompleteProfessionalProfile {
+  return {
+    agentCareerEntries: [],
+    agentManagedPlayerEntries: [],
+    agentProfile: null,
+    club: null,
+    clubSeasonEntries: [],
+    coachCareerEntries: [],
+    coachDirectorCareerEntries: [],
+    coachPlayerCareerEntries: [],
+    coachProfile: null,
+    directorProfile: null,
+    fanProfile: null,
+    mediaProfile: null,
+    mediaProfileAuthors: [],
+    mediaProfileChannels: [],
+    mediaProfileContacts: [],
+    mediaProfileVerifications: [],
+    playerCareerEntries: [],
+    playerPalmares: [],
+    playerProfile: null,
+    profile: {
+      age: null,
+      avatar_url: "https://cdn.test/owner-avatar.jpg",
+      bio: null,
+      birth_date: "1990-01-01",
+      city: "Milano",
+      current_location_city: null,
+      current_location_country: "IT",
+      domicile: null,
+      full_name: "Luigi Provenzano",
+      gender: null,
+      id: "media-1",
+      is_open_to_transfer: false,
+      legal_status: null,
+      languages: [],
+      nationality: "IT",
+      region: "Lombardia",
+      residence: null,
+      residence_country: null,
+      role: "media",
+    },
+    staffCareerEntries: [],
+    staffCoachCareerEntries: [],
+    staffPlayerCareerEntries: [],
+    staffProfile: null,
+    userContacts: {
+      email: "owner@example.com",
+      facebook: "",
+      instagram: "",
+      phone: "+39 333 1234567",
+      showEmail: false,
+      showFacebook: false,
+      showInstagram: false,
+      showTikTok: false,
+      showWebsite: false,
+      showYouTube: false,
+      tiktok: "",
+      website: "",
+      youtube: "",
+    },
+  } as unknown as CompleteProfessionalProfile;
+}
+
+// ---------------------------------------------------------------------------
+// Helper di rendering
+// ---------------------------------------------------------------------------
 
 async function renderAsync(element: React.ReactElement) {
   let tree!: TestRenderer.ReactTestRenderer;
@@ -177,14 +366,8 @@ async function flushPromises() {
   await act(async () => {
     await Promise.resolve();
     await Promise.resolve();
+    await Promise.resolve();
   });
-}
-
-function hasText(root: TestRenderer.ReactTestInstance, value: string) {
-  return root.findAll((node) => {
-    const text = collectText(node.props.children);
-    return text === value || text.includes(value);
-  }).length > 0;
 }
 
 function collectText(children: unknown): string {
@@ -196,18 +379,20 @@ function collectText(children: unknown): string {
     return children.map(collectText).join("");
   }
 
-  if (
-    children &&
-    typeof children === "object" &&
-    "props" in children &&
-    children.props &&
-    typeof children.props === "object" &&
-    "children" in children.props
-  ) {
-    return collectText(children.props.children);
+  if (children && typeof children === "object" && "props" in children) {
+    return collectText(
+      (children as { props?: { children?: unknown } }).props?.children,
+    );
   }
 
   return "";
+}
+
+function hasText(root: TestRenderer.ReactTestInstance, value: string) {
+  return (
+    root.findAll((node) => collectText(node.props.children).includes(value))
+      .length > 0
+  );
 }
 
 function findByTestId(root: TestRenderer.ReactTestInstance, testID: string) {
@@ -220,7 +405,11 @@ function findByTestId(root: TestRenderer.ReactTestInstance, testID: string) {
   return node;
 }
 
-function findPressableByTestId(root: TestRenderer.ReactTestInstance, testID: string) {
+function queryByTestId(root: TestRenderer.ReactTestInstance, testID: string) {
+  return root.findAll((entry) => entry.props.testID === testID)[0] ?? null;
+}
+
+function pressByTestId(root: TestRenderer.ReactTestInstance, testID: string) {
   const node = root.findAll(
     (entry) =>
       entry.props.testID === testID && typeof entry.props.onPress === "function",
@@ -230,786 +419,936 @@ function findPressableByTestId(root: TestRenderer.ReactTestInstance, testID: str
     throw new Error(`Pressable not found for ${testID}`);
   }
 
-  return node;
+  act(() => {
+    node.props.onPress();
+  });
 }
 
-function buildCompleteProfile(
-  overrides: Partial<CompleteProfessionalProfile> = {},
-): CompleteProfessionalProfile {
-  return {
-    agentCareerEntries: [],
-    agentManagedPlayerEntries: [],
-    agentProfile: null,
-    club: null,
-    clubSeasonEntries: [],
-    coachCareerEntries: [],
-    coachDirectorCareerEntries: [],
-    coachPlayerCareerEntries: [],
-    coachProfile: null,
-    directorProfile: null,
-    fanProfile: null,
-    mediaProfile: {
-      affiliation_name: "Gazzetta Network",
-      affiliation_type: "Testata o sito",
-      covered_competitions: ["Serie A", "Serie B", "Nazionale"],
-      covered_teams: ["Como", "Milan"],
-      covered_territories: ["Italia"],
-      covered_topics: ["Calciomercato", "Interviste", "Giovanili", "Opinioni"],
-      content_types: ["Calciomercato", "Nazionale"],
-      creator_type: null,
-      creator_type_other: null,
-      editorial_type: "Testata giornalistica / Media sportivo",
-      entity_name: "Gazzetta dello Sport",
-      focus_areas: ["Serie A", "Serie B"],
-      logo_url: "https://example.com/gazzetta-logo.png",
-      profile_id: "media-1",
-      short_description: "Notizie, analisi e storie sul calcio italiano.",
-      verification_status: "verified",
-    },
-    mediaProfileAuthors: [
-      {
-        avatar_url: "https://example.com/marco.jpg",
-        display_name: "Marco Bianchi",
-        id: "author-1",
-        is_public: true,
-        is_verified: true,
-        media_profile_id: "media-1",
-        profile_id: "profile-author-1",
-        role_label: "Giornalista",
-        sort_order: 0,
-      },
-      {
-        avatar_url: null,
-        display_name: "Sara Rossi",
-        id: "author-2",
-        is_public: true,
-        is_verified: false,
-        media_profile_id: "media-1",
-        profile_id: null,
-        role_label: "Settore giovanile",
-        sort_order: 1,
-      },
-    ],
-    mediaProfileChannels: [
-      {
-        channel_type: "x",
-        id: "channel-x",
-        is_public: true,
-        label: "X / Twitter",
-        media_profile_id: "media-1",
-        sort_order: 4,
-        url: "https://x.com/gazzetta",
-      },
-    ],
-    mediaProfileContacts: [
-      {
-        contact_type: "editorial",
-        href: null,
-        id: "contact-editorial",
-        is_public: true,
-        label: "Redazione",
-        media_profile_id: "media-1",
-        sort_order: 0,
-        value: "redazione@gazzetta.example",
-      },
-      {
-        contact_type: "press",
-        href: null,
-        id: "contact-press",
-        is_public: true,
-        label: "Comunicati stampa",
-        media_profile_id: "media-1",
-        sort_order: 1,
-        value: "comunicati@gazzetta.example",
-      },
-    ],
-    mediaProfileVerifications: [
-      {
-        id: "verification-publication",
-        is_public: true,
-        label: "Testata registrata",
-        media_profile_id: "media-1",
-        sort_order: 1,
-        status: "verified",
-        verification_type: "registered_publication",
-        verified_at: "2026-05-01T00:00:00Z",
-      },
-      {
-        id: "verification-authors",
-        is_public: true,
-        label: "Autori verificati",
-        media_profile_id: "media-1",
-        sort_order: 2,
-        status: "verified",
-        verification_type: "authors_verified",
-        verified_at: "2026-05-01T00:00:00Z",
-      },
-    ],
-    playerCareerEntries: [],
-    playerPalmares: [],
-    playerProfile: null,
-    profile: {
-      age: null,
-      avatar_url: null,
-      bio: null,
-      birth_date: null,
-      city: "Milano",
-      current_location_city: null,
-      current_location_country: "IT",
-      domicile: null,
-      full_name: "Redazione Gazzetta",
-      gender: null,
-      id: "media-1",
-      is_open_to_transfer: false,
-      legal_status: null,
-      languages: [],
-      nationality: "IT",
-      region: "Lombardia",
-      residence: null,
-      residence_country: null,
-      role: "media",
-    },
-    staffCareerEntries: [],
-    staffCoachCareerEntries: [],
-    staffPlayerCareerEntries: [],
-    staffProfile: null,
-    userContacts: {
-      email: "",
-      facebook: "https://facebook.com/gazzetta",
-      instagram: "@gazzetta",
-      phone: "",
-      showEmail: false,
-      showFacebook: false,
-      showInstagram: true,
-      showTikTok: false,
-      showWebsite: true,
-      showYouTube: true,
-      tiktok: "",
-      website: "gazzetta.example",
-      youtube: "https://youtube.com/@gazzetta",
-    },
-    ...overrides,
-  };
+/**
+ * `Pressable` propaga le props al `View` che rende, quindi ogni tab compare
+ * due volte nell'albero: si guardano solo i nodi host.
+ */
+function findTabNodes(root: TestRenderer.ReactTestInstance) {
+  return findByTestId(root, "media-profile-tabs").findAll(
+    (node) =>
+      node.props.accessibilityRole === "tab" && typeof node.type === "string",
+  );
 }
 
-function buildPost(overrides: Partial<MediaProfilePost> = {}): MediaProfilePost {
-  return {
-    author_id: "author-1",
-    author_name: "Marco Bianchi",
-    body:
-      "La societa valuta profili giovani per completare il reparto offensivo.\n> Un investimento mirato per il futuro.",
-    category: "Mercato",
-    comment_count: 24,
-    comments: [],
-    cover_type: "image",
-    cover_url: "https://example.com/cover.jpg",
-    created_at: "2026-05-19T08:00:00Z",
-    created_by_profile_id: "media-1",
-    display_mode: "full",
-    excerpt: "La societa valuta profili giovani per completare il reparto offensivo.",
-    external_url: null,
-    id: "post-1",
-    is_saved: false,
-    kind: "article",
-    media_profile_id: "media-1",
-    published_at: "2026-05-19T08:00:00Z",
-    publisher_name: "Gazzetta dello Sport",
-    reading_time_minutes: 3,
-    source_name: null,
-    source_type: "platform",
-    status: "published",
-    subtitle: "La redazione segue un profilo Under 19 per il mercato estivo.",
-    tagged_targets: [
-      {
-        avatar_url: null,
-        display_name: "AC Como",
-        role: "club",
-        subtitle: "Serie A - Como",
-        target_id: "club-1",
-        target_type: "club",
-      },
-      {
-        avatar_url: "https://example.com/player.jpg",
-        display_name: "Luca Rossi",
-        role: "player",
-        subtitle: "Calciatore - Como",
-        target_id: "player-1",
-        target_type: "profile",
-      },
-    ],
-    title: "Como, occhi su un attaccante Under 19",
-    updated_at: "2026-05-19T08:00:00Z",
-    ...overrides,
-  };
+function findTabLabels(root: TestRenderer.ReactTestInstance) {
+  return findTabNodes(root).map((node) => node.props.accessibilityLabel);
 }
 
-function buildTribunaPost(
-  overrides: Partial<MediaTribunaPost> = {},
-): MediaTribunaPost {
-  return {
-    body: null,
-    comment_count: 86,
-    comments: [],
-    created_at: "2026-05-19T08:30:00Z",
-    created_by_profile_id: "media-1",
-    id: "tribuna-poll-1",
-    is_saved: false,
-    kind: "editorial_poll",
-    linked_article: null,
-    linked_article_id: null,
-    media_profile_id: "media-1",
-    options: [
-      {
-        id: "option-defense",
-        is_voted: false,
-        label: "Difesa",
-        percentage: 24,
-        player_avatar_url: null,
-        player_display_name: null,
-        player_profile_id: null,
-        sort_order: 0,
-        vote_count: 300,
-      },
-      {
-        id: "option-attack",
-        is_voted: true,
-        label: "Attacco",
-        percentage: 76,
-        player_avatar_url: null,
-        player_display_name: null,
-        player_profile_id: null,
-        sort_order: 1,
-        vote_count: 948,
-      },
-    ],
-    published_at: "2026-05-19T08:30:00Z",
-    question_count: 0,
-    questions: [],
-    status: "published",
-    title: "Quale reparto deve rinforzare il Como?",
-    total_vote_count: 1248,
-    updated_at: "2026-05-19T08:30:00Z",
-    ...overrides,
-  };
+/** La `TabBar` condivisa identifica le tab dall'etichetta accessibile. */
+function pressTab(root: TestRenderer.ReactTestInstance, label: string) {
+  const node = findTabNodes(root).filter(
+    (entry) => entry.props.accessibilityLabel === label,
+  )[0];
+
+  if (!node) {
+    throw new Error(`Tab non trovata: ${label}`);
+  }
+
+  act(() => {
+    node.props.onPress();
+  });
 }
+
+// ---------------------------------------------------------------------------
 
 describe("MediaProfileView", () => {
   beforeEach(() => {
-    followMocks.fetchProfileFollowState.mockReset();
-    followMocks.followProfile.mockReset();
-    followMocks.unfollowProfile.mockReset();
-    articleMocks.addMediaProfilePostComment.mockReset();
-    articleMocks.createMediaProfilePost.mockReset();
-    articleMocks.fetchMediaProfilePostDetail.mockReset();
-    articleMocks.fetchMediaProfilePostFeed.mockReset();
-    articleMocks.searchMediaProfilePostTargets.mockReset();
-    articleMocks.toggleSavedMediaProfilePost.mockReset();
-    Object.values(tribunaMocks).forEach((mock) => mock.mockReset());
-    followMocks.fetchProfileFollowState.mockResolvedValue(false);
-    followMocks.followProfile.mockResolvedValue(undefined);
-    followMocks.unfollowProfile.mockResolvedValue(undefined);
+    vi.clearAllMocks();
+    mediaTabProps.last = null;
+    publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+      buildPublicProfile(),
+    );
     articleMocks.fetchMediaProfilePostFeed.mockResolvedValue([]);
-    articleMocks.fetchMediaProfilePostDetail.mockResolvedValue(null);
-    articleMocks.toggleSavedMediaProfilePost.mockResolvedValue(undefined);
-    articleMocks.searchMediaProfilePostTargets.mockResolvedValue([]);
+    articleMocks.fetchMediaProfileArticleCategories.mockResolvedValue([]);
     tribunaMocks.fetchMediaTribunaFeed.mockResolvedValue([]);
     tribunaMocks.voteMediaTribunaOption.mockResolvedValue(undefined);
-    tribunaMocks.toggleSavedMediaTribuna.mockResolvedValue(undefined);
-    tribunaMocks.voteMediaTribunaQuestion.mockResolvedValue(undefined);
-    articleMocks.addMediaProfilePostComment.mockResolvedValue({
-      author_avatar_url: null,
-      author_name: "Luigi",
-      body: "Commento",
-      created_at: "2026-05-19T09:00:00Z",
-      id: "comment-1",
-      profile_id: "viewer-1",
-    });
-    tribunaMocks.addMediaTribunaComment.mockResolvedValue({
-      author_avatar_url: null,
-      author_name: "Luigi",
-      body: "Serve qualita.",
-      created_at: "2026-05-19T09:00:00Z",
-      id: "tribuna-comment-1",
-      profile_id: "viewer-1",
-    });
-    tribunaMocks.submitMediaTribunaQuestion.mockResolvedValue({
-      author_avatar_url: null,
-      author_name: "Luigi",
-      body: "Qual e' l'obiettivo stagionale?",
-      created_at: "2026-05-19T09:10:00Z",
-      id: "question-new",
-      is_voted: false,
-      profile_id: "viewer-1",
-      vote_count: 0,
-    });
     vi.spyOn(Linking, "openURL").mockResolvedValue(undefined);
   });
 
-  it("renders the Banani-style visitor header with media identity, CTA and default articles tab", async () => {
-    const tree = await renderAsync(
-      <MediaProfileView
-        completeProfile={buildCompleteProfile()}
-        mode="visitor"
-        viewerProfileId="viewer-1"
-      />,
-    );
+  describe("struttura condivisa", () => {
+    it("mostra quattro tab, nell'ordine fisso, con Articoli attiva", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
 
-    expect(hasText(tree.root, "Gazzetta dello Sport")).toBe(true);
-    expect(hasText(tree.root, "Testata giornalistica / Media sportivo")).toBe(true);
-    expect(hasText(tree.root, "Serie A • Serie B • Nazionale")).toBe(true);
-    expect(hasText(tree.root, "Italia")).toBe(true);
-    expect(hasText(tree.root, "Sito web • Instagram • YouTube")).toBe(true);
-    expect(hasText(tree.root, "Segui")).toBe(true);
-    expect(hasText(tree.root, "Visita sito")).toBe(true);
-    expect(hasText(tree.root, "Nessun articolo")).toBe(true);
-    expect(findByTestId(tree.root, "media-tab-articles")).toBeTruthy();
-    expect(articleMocks.fetchMediaProfilePostFeed).toHaveBeenCalledWith(
-      "media-1",
-      "viewer-1",
-    );
-    expect(followMocks.fetchProfileFollowState).toHaveBeenCalledWith(
-      "viewer-1",
-      "media-1",
-    );
+      expect(findTabLabels(tree.root)).toEqual([
+        "Articoli",
+        "Tribuna",
+        "Media",
+        "Info",
+      ]);
+      expect(queryByTestId(tree.root, "media-articles-tab")).not.toBeNull();
+    });
+
+    it("non cambia l'ordine delle tab fra Owner e Visitor", async () => {
+      const visitor = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({ mode: "owner" }),
+      );
+
+      const owner = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          viewerProfileId="media-1"
+        />,
+      );
+
+      expect(findTabLabels(owner.root)).toEqual(findTabLabels(visitor.root));
+    });
+
+    it("apre la tab richiesta dal deep link", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          initialTab="info"
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(queryByTestId(tree.root, "media-info-tab")).not.toBeNull();
+      expect(queryByTestId(tree.root, "media-articles-tab")).toBeNull();
+    });
+
+    it("mostra l'identità editoriale e non quella del proprietario", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(hasText(tree.root, "TuttoDilettanti")).toBe(true);
+      expect(hasText(tree.root, "Testata giornalistica")).toBe(true);
+      expect(
+        hasText(tree.root, "Notizie e storie del calcio dilettantistico."),
+      ).toBe(true);
+      // Dati personali dell'owner: nessuno di questi deve comparire.
+      expect(hasText(tree.root, "Luigi Provenzano")).toBe(false);
+      expect(hasText(tree.root, "Milano")).toBe(false);
+      expect(hasText(tree.root, "owner@example.com")).toBe(false);
+      expect(hasText(tree.root, "333 1234567")).toBe(false);
+    });
+
+    it("non mostra blocchi Salvati o Seguiti nello scroll del profilo", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          viewerProfileId="media-1"
+        />,
+      );
+
+      expect(hasText(tree.root, "Salvati")).toBe(false);
+      expect(hasText(tree.root, "Seguiti")).toBe(false);
+      expect(hasText(tree.root, "Vedi tutti")).toBe(false);
+    });
   });
 
-  it("renders compact editorial rows, filters and tagged targets", async () => {
-    articleMocks.fetchMediaProfilePostFeed.mockResolvedValue([
-      buildPost(),
-      buildPost({
-        category: "Giovanili",
-        comment_count: 8,
-        id: "post-2",
-        kind: "news",
-        title: "Como U19, convocato un nuovo attaccante",
-      }),
-    ]);
+  describe("azioni", () => {
+    it("l'Owner vede Modifica profilo e non Segui o Messaggio", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({ mode: "owner" }),
+      );
 
-    const tree = await renderAsync(
-      <MediaProfileView
-        completeProfile={buildCompleteProfile()}
-        mode="visitor"
-        viewerProfileId="viewer-1"
-      />,
-    );
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          onContactPress={vi.fn()}
+          onEditProfilePress={vi.fn()}
+          onFollowPress={vi.fn()}
+          viewerProfileId="media-1"
+        />,
+      );
 
-    expect(hasText(tree.root, "Articoli")).toBe(true);
-    expect(hasText(tree.root, "Mercato")).toBe(true);
-    expect(hasText(tree.root, "Giovanili")).toBe(true);
-    expect(hasText(tree.root, "Como, occhi su un attaccante Under 19")).toBe(true);
-    expect(hasText(tree.root, "Como U19, convocato un nuovo attaccante")).toBe(true);
-    expect(hasText(tree.root, "Luca Rossi")).toBe(true);
-    expect(hasText(tree.root, "Leggi")).toBe(true);
-
-    act(() => {
-      findPressableByTestId(tree.root, "media-article-filter-Giovanili").props.onPress();
+      expect(hasText(tree.root, "Modifica profilo")).toBe(true);
+      expect(hasText(tree.root, "Segui")).toBe(false);
+      expect(hasText(tree.root, "Messaggio")).toBe(false);
     });
 
-    expect(hasText(tree.root, "Como, occhi su un attaccante Under 19")).toBe(false);
-    expect(hasText(tree.root, "Como U19, convocato un nuovo attaccante")).toBe(true);
+    it("il Visitor vede Segui e Messaggio e non Modifica profilo", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          onContactPress={vi.fn()}
+          onEditProfilePress={vi.fn()}
+          onFollowPress={vi.fn()}
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(hasText(tree.root, "Segui")).toBe(true);
+      expect(hasText(tree.root, "Messaggio")).toBe(true);
+      expect(hasText(tree.root, "Modifica profilo")).toBe(false);
+    });
+
+    it("mostra lo stato \"Seguito\" quando il viewer segue già", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          isFollowed
+          mode="visitor"
+          onFollowPress={vi.fn()}
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(hasText(tree.root, "Seguito")).toBe(true);
+    });
+
+    it("mostra Visita sito solo con un URL pubblico valido", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      pressByTestId(tree.root, "media-website-link");
+
+      expect(Linking.openURL).toHaveBeenCalledWith("https://tuttodilettanti.it");
+    });
+
+    it("non mostra Visita sito senza URL, nemmeno disabilitato", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({
+          capabilities: { canViewWebsite: false },
+          entity: { websiteUrl: null },
+        }),
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(queryByTestId(tree.root, "media-website-link")).toBeNull();
+      expect(hasText(tree.root, "Visita sito")).toBe(false);
+    });
+
+    it("non mostra Visita sito se l'URL non è apribile", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({ entity: { websiteUrl: "javascript:alert(1)" } }),
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(queryByTestId(tree.root, "media-website-link")).toBeNull();
+    });
   });
 
-  it("opens article detail with author line, actions, external link and target navigation", async () => {
-    const post = buildPost({ external_url: "https://gazzetta.example/articolo" });
-    const onOpenProfile = vi.fn();
-    const onOpenClub = vi.fn();
-    articleMocks.fetchMediaProfilePostFeed.mockResolvedValue([post]);
-    articleMocks.fetchMediaProfilePostDetail.mockResolvedValue(post);
+  describe("tab Articoli", () => {
+    it("chiede soltanto articoli e news, paginati", async () => {
+      await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
 
-    const tree = await renderAsync(
-      <MediaProfileView
-        completeProfile={buildCompleteProfile()}
-        mode="visitor"
-        onOpenClub={onOpenClub}
-        onOpenProfile={onOpenProfile}
-        viewerProfileId="viewer-1"
-      />,
-    );
-
-    await act(async () => {
-      findPressableByTestId(tree.root, "media-article-row-post-1").props.onPress();
-      await Promise.resolve();
-      await Promise.resolve();
+      expect(articleMocks.fetchMediaProfilePostFeed).toHaveBeenCalledWith(
+        "media-1",
+        "viewer-1",
+        { category: null, limit: 10, offset: 0 },
+      );
     });
 
-    expect(hasText(tree.root, "Gazzetta dello Sport")).toBe(true);
-    expect(hasText(tree.root, "di Marco Bianchi")).toBe(true);
-    expect(hasText(tree.root, "con AC Como")).toBe(true);
-    expect(hasText(tree.root, "Leggi anche sul sito")).toBe(true);
-    expect(hasText(tree.root, "Commenta")).toBe(true);
-    expect(hasText(tree.root, "Salva")).toBe(true);
-    expect(hasText(tree.root, "Condividi")).toBe(true);
+    it("mostra la card con categoria, titolo, estratto e metadati", async () => {
+      articleMocks.fetchMediaProfilePostFeed.mockImplementation(
+        async (_id: string, _viewer: unknown, options: { kinds?: string[] }) =>
+          options?.kinds?.[0] === "media" ? [] : [buildArticle()],
+      );
 
-    const playerChip = tree.root.findAll(
-      (node) =>
-        node.props.accessibilityLabel === "Apri Luca Rossi" &&
-        typeof node.props.onPress === "function",
-    )[0];
-    playerChip.props.onPress({ stopPropagation: vi.fn() });
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
 
-    expect(onOpenProfile).toHaveBeenCalledWith("player-1");
-  });
-
-  it("uses profile_follows services for visitor follow and opens the website CTA", async () => {
-    const tree = await renderAsync(
-      <MediaProfileView
-        completeProfile={buildCompleteProfile()}
-        mode="visitor"
-        viewerProfileId="viewer-1"
-      />,
-    );
-
-    await act(async () => {
-      findPressableByTestId(tree.root, "media-follow-button").props.onPress();
-      await Promise.resolve();
-      await Promise.resolve();
+      expect(hasText(tree.root, "MERCATO")).toBe(true);
+      expect(
+        hasText(tree.root, "Promozione, il mercato entra nella fase decisiva"),
+      ).toBe(true);
+      expect(
+        hasText(tree.root, "Ecco i movimenti più importanti del weekend."),
+      ).toBe(true);
+      expect(hasText(tree.root, "di Marco Rossi")).toBe(true);
+      expect(hasText(tree.root, "3 min")).toBe(true);
     });
 
-    expect(followMocks.followProfile).toHaveBeenCalledWith("viewer-1", "media-1");
-    expect(hasText(tree.root, "Seguito")).toBe(true);
+    it("firma un articolo collegato da un link senza attribuirlo a PROLINK", async () => {
+      articleMocks.fetchMediaProfilePostFeed.mockImplementation(
+        async (_id: string, _viewer: unknown, options: { kinds?: string[] }) =>
+          options?.kinds?.[0] === "media"
+            ? []
+            : [
+                buildArticle({
+                  display_mode: "preview",
+                  external_url: "https://www.dominio.it/articolo",
+                  source_type: "link",
+                }),
+              ],
+      );
 
-    await act(async () => {
-      findPressableByTestId(tree.root, "media-website-button").props.onPress();
-      await Promise.resolve();
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(hasText(tree.root, "Condiviso da TuttoDilettanti")).toBe(true);
+      expect(hasText(tree.root, "Fonte originale · dominio.it")).toBe(true);
     });
 
-    expect(Linking.openURL).toHaveBeenCalledWith("https://gazzetta.example");
-  });
+    it("costruisce i chip filtro dalle categorie del backend", async () => {
+      articleMocks.fetchMediaProfileArticleCategories.mockResolvedValue([
+        { articleCount: 4, category: "Mercato" },
+        { articleCount: 2, category: "Interviste" },
+      ]);
 
-  it("does not render the follow CTA for owners and shows article creation", async () => {
-    const tree = await renderAsync(
-      <MediaProfileView
-        completeProfile={buildCompleteProfile()}
-        mode="owner"
-        viewerProfileId="media-1"
-      />,
-    );
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
 
-    expect(tree.root.findAllByProps({ testID: "media-follow-button" })).toEqual([]);
-    expect(hasText(tree.root, "Visita sito")).toBe(true);
-    expect(findByTestId(tree.root, "media-article-new-button")).toBeTruthy();
-
-    act(() => {
-      findPressableByTestId(tree.root, "media-tab-info").props.onPress();
+      expect(queryByTestId(tree.root, "media-article-filter-all")).not.toBeNull();
+      expect(
+        queryByTestId(tree.root, "media-article-filter-Mercato"),
+      ).not.toBeNull();
+      expect(
+        queryByTestId(tree.root, "media-article-filter-Interviste"),
+      ).not.toBeNull();
+      // Una categoria non presente nei dati non diventa un chip.
+      expect(queryByTestId(tree.root, "media-article-filter-Opinioni")).toBeNull();
     });
 
-    expect(hasText(tree.root, "Identità editoriale")).toBe(true);
-    expect(hasText(tree.root, "Copertura")).toBe(true);
-    expect(hasText(tree.root, "Canali ufficiali")).toBe(true);
-    expect(hasText(tree.root, "Redazione")).toBe(true);
-    expect(hasText(tree.root, "Verifiche")).toBe(true);
-    expect(hasText(tree.root, "Contatti")).toBe(true);
-    expect(findByTestId(tree.root, "media-tab-info")).toBeTruthy();
-  });
+    it("rifà la query sul filtro scelto, ripartendo dalla prima pagina", async () => {
+      articleMocks.fetchMediaProfileArticleCategories.mockResolvedValue([
+        { articleCount: 2, category: "Interviste" },
+      ]);
 
-  it("renders complete media info sections and links authors back to their articles", async () => {
-    articleMocks.fetchMediaProfilePostFeed.mockResolvedValue([
-      buildPost(),
-      buildPost({
-        author_id: "author-2",
-        author_name: "Sara Rossi",
-        category: "Giovanili",
-        id: "post-sara",
-        title: "Como U19, focus sui nuovi profili",
-      }),
-    ]);
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
 
-    const tree = await renderAsync(
-      <MediaProfileView
-        completeProfile={buildCompleteProfile()}
-        mode="visitor"
-        viewerProfileId="viewer-1"
-      />,
-    );
+      pressByTestId(tree.root, "media-article-filter-Interviste");
+      await flushPromises();
 
-    act(() => {
-      findPressableByTestId(tree.root, "media-tab-info").props.onPress();
+      expect(articleMocks.fetchMediaProfilePostFeed).toHaveBeenCalledWith(
+        "media-1",
+        "viewer-1",
+        { category: "Interviste", limit: 10, offset: 0 },
+      );
     });
 
-    expect(hasText(tree.root, "Testata giornalistica / Media sportivo")).toBe(true);
-    expect(hasText(tree.root, "Competizioni")).toBe(true);
-    expect(hasText(tree.root, "Squadre")).toBe(true);
-    expect(hasText(tree.root, "Territori")).toBe(true);
-    expect(hasText(tree.root, "Temi")).toBe(true);
-    expect(hasText(tree.root, "X / Twitter")).toBe(true);
-    expect(hasText(tree.root, "Marco Bianchi")).toBe(true);
-    expect(hasText(tree.root, "Sara Rossi")).toBe(true);
-    expect(hasText(tree.root, "Profilo verificato")).toBe(true);
-    expect(hasText(tree.root, "Testata registrata")).toBe(true);
-    expect(hasText(tree.root, "Autori verificati")).toBe(true);
-    expect(hasText(tree.root, "redazione@gazzetta.example")).toBe(true);
+    it("mostra l'empty state del filtro quando la categoria è vuota", async () => {
+      articleMocks.fetchMediaProfileArticleCategories.mockResolvedValue([
+        { articleCount: 1, category: "Opinioni" },
+      ]);
 
-    await act(async () => {
-      findPressableByTestId(tree.root, "media-info-channel-channel-x").props.onPress();
-      await Promise.resolve();
-    });
-    expect(Linking.openURL).toHaveBeenCalledWith("https://x.com/gazzetta");
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
 
-    await act(async () => {
-      findPressableByTestId(tree.root, "media-info-contact-contact-editorial").props.onPress();
-      await Promise.resolve();
-    });
-    expect(Linking.openURL).toHaveBeenCalledWith(
-      "mailto:redazione@gazzetta.example",
-    );
+      pressByTestId(tree.root, "media-article-filter-Opinioni");
+      await flushPromises();
 
-    act(() => {
-      findPressableByTestId(tree.root, "media-info-author-author-2").props.onPress();
+      expect(
+        queryByTestId(tree.root, "media-articles-empty-filter"),
+      ).not.toBeNull();
+      expect(hasText(tree.root, "Nessun articolo in questa categoria")).toBe(
+        true,
+      );
     });
 
-    expect(hasText(tree.root, "Autore")).toBe(true);
-    expect(hasText(tree.root, "Como U19, focus sui nuovi profili")).toBe(true);
-    expect(hasText(tree.root, "Como, occhi su un attaccante Under 19")).toBe(false);
-  });
+    it("l'Owner autorizzato vede Nuovo articolo, il Visitor no", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({ mode: "owner" }),
+      );
 
-  it("renders Media Tribuna formats and handles voting, save, comments, Q&A and player links", async () => {
-    const onOpenProfile = vi.fn();
-    const linkedArticle = buildPost();
-    const tribunaPosts: MediaTribunaPost[] = [
-      buildTribunaPost(),
-      buildTribunaPost({
-        body: "Raccogliamo il parere della community dopo l'articolo.",
-        comment_count: 12,
-        id: "tribuna-debate-1",
-        kind: "article_debate",
-        linked_article: {
-          category: "Mercato",
-          cover_type: "image",
-          cover_url: "https://example.com/cover.jpg",
-          excerpt: linkedArticle.excerpt,
-          id: linkedArticle.id,
-          subtitle: linkedArticle.subtitle,
-          title: linkedArticle.title,
+      const owner = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          viewerProfileId="media-1"
+        />,
+      );
+
+      expect(queryByTestId(owner.root, "media-new-article-button")).not.toBeNull();
+
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile(),
+      );
+
+      const visitor = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(queryByTestId(visitor.root, "media-new-article-button")).toBeNull();
+    });
+
+    it("un Owner senza permesso di pubblicare non vede la CTA", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({
+          capabilities: { canPublishArticle: false },
+          mode: "owner",
+        }),
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          viewerProfileId="media-1"
+        />,
+      );
+
+      expect(queryByTestId(tree.root, "media-new-article-button")).toBeNull();
+    });
+
+    it("consegna la creazione al flusso editoriale esistente", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({ mode: "owner" }),
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          viewerProfileId="media-1"
+        />,
+      );
+
+      expect(findByTestId(tree.root, "editorial-composer").props.visible).toBe(
+        false,
+      );
+
+      pressByTestId(tree.root, "media-new-article-button");
+
+      expect(findByTestId(tree.root, "editorial-composer").props.visible).toBe(
+        true,
+      );
+    });
+
+    it("pagina gli articoli senza ricaricare la pagina precedente", async () => {
+      const page = Array.from({ length: 10 }, (_unused, index) =>
+        buildArticle({ id: `article-${index}` }),
+      );
+      articleMocks.fetchMediaProfilePostFeed.mockImplementation(
+        async (_id: string, _viewer: unknown, options: { kinds?: string[] }) =>
+          options?.kinds?.[0] === "media" ? [] : page,
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      pressByTestId(tree.root, "media-articles-load-more");
+      await flushPromises();
+
+      expect(articleMocks.fetchMediaProfilePostFeed).toHaveBeenCalledWith(
+        "media-1",
+        "viewer-1",
+        { category: null, limit: 10, offset: 10 },
+      );
+    });
+
+    it("mostra l'empty state dell'Owner con la CTA, quello del Visitor senza", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({ mode: "owner" }),
+      );
+
+      const owner = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          viewerProfileId="media-1"
+        />,
+      );
+
+      expect(hasText(owner.root, "Pubblica il tuo primo articolo")).toBe(true);
+      expect(queryByTestId(owner.root, "media-articles-empty-cta")).not.toBeNull();
+
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile(),
+      );
+
+      const visitor = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(hasText(visitor.root, "Nessun articolo")).toBe(true);
+      expect(queryByTestId(visitor.root, "media-articles-empty-cta")).toBeNull();
+    });
+
+    it("un errore sugli articoli non blocca le altre tab", async () => {
+      articleMocks.fetchMediaProfilePostFeed.mockImplementation(
+        async (_id: string, _viewer: unknown, options: { kinds?: string[] }) => {
+          if (options?.kinds?.[0] === "media") {
+            return [];
+          }
+
+          throw new Error("rete");
         },
-        linked_article_id: linkedArticle.id,
-        options: [],
-        title: "Che tipo di profilo servirebbe davvero?",
-        total_vote_count: 0,
-      }),
-      buildTribunaPost({
-        comment_count: 54,
-        id: "tribuna-player-vote-1",
-        kind: "player_vote",
-        options: [
-          {
-            id: "option-player-1",
-            is_voted: false,
-            label: "Marco Verdi",
-            percentage: 46,
-            player_avatar_url: "https://example.com/player.jpg",
-            player_display_name: "Marco Verdi",
-            player_profile_id: "player-1",
-            sort_order: 0,
-            vote_count: 430,
-          },
-          {
-            id: "option-player-2",
-            is_voted: false,
-            label: "Luca Neri",
-            percentage: 54,
-            player_avatar_url: null,
-            player_display_name: "Luca Neri",
-            player_profile_id: "player-2",
-            sort_order: 1,
-            vote_count: 504,
-          },
-        ],
-        title: "Migliore in campo - Como U19 vs Lecco U19",
-        total_vote_count: 934,
-      }),
-      buildTribunaPost({
-        body: "Le domande piu votate saranno usate nella prossima intervista.",
-        comment_count: 4,
-        id: "tribuna-qa-1",
-        kind: "community_qa",
-        options: [],
-        question_count: 1,
-        questions: [
-          {
-            author_avatar_url: null,
-            author_name: "Sara",
-            body: "Qual e' l'obiettivo della prossima stagione?",
-            created_at: "2026-05-19T09:00:00Z",
-            id: "question-1",
-            is_voted: false,
-            profile_id: "viewer-2",
-            vote_count: 124,
-          },
-        ],
-        title: "Fai una domanda al DS del Como",
-        total_vote_count: 0,
-      }),
-    ];
-    articleMocks.fetchMediaProfilePostFeed.mockResolvedValue([linkedArticle]);
-    articleMocks.fetchMediaProfilePostDetail.mockResolvedValue(linkedArticle);
-    tribunaMocks.fetchMediaTribunaFeed.mockResolvedValue(tribunaPosts);
+      );
 
-    const tree = await renderAsync(
-      <MediaProfileView
-        completeProfile={buildCompleteProfile()}
-        mode="visitor"
-        onOpenProfile={onOpenProfile}
-        viewerProfileId="viewer-1"
-      />,
-    );
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
 
-    act(() => {
-      findPressableByTestId(tree.root, "media-tab-tribuna").props.onPress();
+      expect(queryByTestId(tree.root, "media-articles-error")).not.toBeNull();
+      expect(
+        hasText(tree.root, "Non è stato possibile caricare gli articoli."),
+      ).toBe(true);
+      // La tab bar resta raggiungibile e le altre tab si aprono.
+      expect(findTabLabels(tree.root)).toHaveLength(4);
     });
 
-    expect(tree.root.findByProps({ testID: "media-tribuna-feed" })).toBeTruthy();
-    expect(tree.root.findByProps({ testID: "media-tribuna-card-editorial_poll" }))
-      .toBeTruthy();
-    expect(tree.root.findByProps({ testID: "media-tribuna-card-article_debate" }))
-      .toBeTruthy();
-    expect(tree.root.findByProps({ testID: "media-tribuna-card-player_vote" }))
-      .toBeTruthy();
-    expect(tree.root.findByProps({ testID: "media-tribuna-card-community_qa" }))
-      .toBeTruthy();
-    expect(hasText(tree.root, "Quale reparto deve rinforzare il Como?")).toBe(true);
-    expect(hasText(tree.root, "Che tipo di profilo servirebbe davvero?")).toBe(true);
-    expect(hasText(tree.root, "Marco Verdi")).toBe(true);
-    expect(hasText(tree.root, "Qual e' l'obiettivo della prossima stagione?")).toBe(true);
+    it("apre il dettaglio condiviso dell'articolo", async () => {
+      const onOpenContent = vi.fn();
+      articleMocks.fetchMediaProfilePostFeed.mockImplementation(
+        async (_id: string, _viewer: unknown, options: { kinds?: string[] }) =>
+          options?.kinds?.[0] === "media" ? [] : [buildArticle()],
+      );
 
-    await act(async () => {
-      findPressableByTestId(tree.root, "media-tribuna-option-option-defense").props.onPress();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      findPressableByTestId(tree.root, "media-tribuna-save-tribuna-poll-1").props.onPress();
-      await Promise.resolve();
-    });
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          onOpenContent={onOpenContent}
+          viewerProfileId="viewer-1"
+        />,
+      );
 
-    const commentInput = tree.root.findAllByProps({
-      placeholder: "Scrivi un commento",
-    })[0];
-    act(() => {
-      commentInput.props.onChangeText("Serve qualita.");
-    });
-    await act(async () => {
-      tree.root
-        .findAll((node) => node.props.label === "Invia" && typeof node.props.onPress === "function")[0]
-        .props.onPress();
-      await Promise.resolve();
-    });
+      const card = findByTestId(tree.root, "media-article-card-article-1");
 
-    const questionInput = tree.root.findByProps({
-      placeholder: "Scrivi una domanda per la community",
-    });
-    act(() => {
-      questionInput.props.onChangeText("Qual e' l'obiettivo stagionale?");
-    });
-    await act(async () => {
-      tree.root
-        .findByProps({ testID: "media-tribuna-question-vote-question-1" })
-        .props.onPress();
-      await Promise.resolve();
-    });
+      act(() => {
+        card
+          .findAll((node) => typeof node.props.onPress === "function")[0]
+          ?.props.onPress();
+      });
 
-    await act(async () => {
-      tree.root
-        .findAll((node) => node.props.label === "Invia" && typeof node.props.onPress === "function")[3]
-        .props.onPress();
-      await Promise.resolve();
+      expect(onOpenContent).toHaveBeenCalledWith({
+        contentType: "media_profile",
+        postId: "article-1",
+      });
     });
-
-    act(() => {
-      tree.root
-        .findByProps({ accessibilityLabel: "Apri profilo Marco Verdi" })
-        .props.onPress({ stopPropagation: vi.fn() });
-    });
-    await act(async () => {
-      findPressableByTestId(tree.root, "media-tribuna-linked-article-post-1").props.onPress();
-      await Promise.resolve();
-    });
-
-    expect(tribunaMocks.voteMediaTribunaOption).toHaveBeenCalledWith({
-      optionId: "option-defense",
-      postId: "tribuna-poll-1",
-      profileId: "viewer-1",
-    });
-    expect(tribunaMocks.toggleSavedMediaTribuna).toHaveBeenCalledWith(
-      "viewer-1",
-      "tribuna-poll-1",
-      true,
-    );
-    expect(tribunaMocks.addMediaTribunaComment).toHaveBeenCalledWith({
-      body: "Serve qualita.",
-      postId: "tribuna-poll-1",
-      profileId: "viewer-1",
-    });
-    expect(tribunaMocks.voteMediaTribunaQuestion).toHaveBeenCalledWith(
-      "question-1",
-      "viewer-1",
-      true,
-    );
-    expect(tribunaMocks.submitMediaTribunaQuestion).toHaveBeenCalledWith({
-      body: "Qual e' l'obiettivo stagionale?",
-      postId: "tribuna-qa-1",
-      profileId: "viewer-1",
-    });
-    expect(onOpenProfile).toHaveBeenCalledWith("player-1");
-    expect(articleMocks.fetchMediaProfilePostDetail).toHaveBeenCalledWith(
-      "post-1",
-      "viewer-1",
-    );
   });
 
-  it("opens the owner Tribuna create menu and publishes an editorial poll", async () => {
-    const createdPoll = buildTribunaPost({
-      id: "tribuna-poll-new",
-      title: "Confermeresti l'allenatore?",
-      total_vote_count: 0,
-    });
-    tribunaMocks.createMediaTribunaPoll.mockResolvedValue(createdPoll);
+  describe("tab Tribuna", () => {
+    it("mostra soltanto contenuti interattivi, con percentuali e conteggi", async () => {
+      tribunaMocks.fetchMediaTribunaFeed.mockResolvedValue([buildTribunaPost()]);
 
-    const tree = await renderAsync(
-      <MediaProfileView
-        completeProfile={buildCompleteProfile()}
-        mode="owner"
-        viewerProfileId="media-1"
-      />,
-    );
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
 
-    act(() => {
-      findPressableByTestId(tree.root, "media-tab-tribuna").props.onPress();
-    });
-    act(() => {
-      findPressableByTestId(tree.root, "media-tribuna-create-button").props.onPress();
-    });
+      pressTab(tree.root, "Tribuna");
+      await flushPromises();
 
-    expect(hasText(tree.root, "Sondaggio editoriale")).toBe(true);
-    expect(hasText(tree.root, "Dibattito da articolo")).toBe(true);
-    expect(hasText(tree.root, "Vota il migliore")).toBe(true);
-    expect(hasText(tree.root, "Q&A community")).toBe(true);
-
-    act(() => {
-      findPressableByTestId(tree.root, "media-tribuna-create-option-editorial_poll").props.onPress();
-    });
-    act(() => {
-      tree.root
-        .findByProps({ placeholder: "Quale reparto deve rinforzare il Como?" })
-        .props.onChangeText("Confermeresti l'allenatore?");
-    });
-    act(() => {
-      tree.root.findByProps({ placeholder: "Difesa" }).props.onChangeText("Si");
-    });
-    act(() => {
-      tree.root.findByProps({ placeholder: "Centrocampo" }).props.onChangeText("No");
+      expect(hasText(tree.root, "Chi vincerà il campionato?")).toBe(true);
+      expect(hasText(tree.root, "368 voti")).toBe(true);
+      expect(hasText(tree.root, "52 commenti")).toBe(true);
+      // Nessun articolo finisce nella Tribuna.
+      expect(
+        hasText(tree.root, "Promozione, il mercato entra nella fase decisiva"),
+      ).toBe(false);
     });
 
-    await act(async () => {
-      findPressableByTestId(tree.root, "media-tribuna-publish-button").props.onPress();
-      await Promise.resolve();
+    it("registra il voto e mostra il risultato", async () => {
+      tribunaMocks.fetchMediaTribunaFeed.mockResolvedValue([buildTribunaPost()]);
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      pressTab(tree.root, "Tribuna");
+      await flushPromises();
+
+      pressByTestId(tree.root, "media-tribuna-option-option-a");
+      await flushPromises();
+
+      expect(tribunaMocks.voteMediaTribunaOption).toHaveBeenCalledWith({
+        optionId: "option-a",
+        postId: "tribuna-1",
+        profileId: "viewer-1",
+      });
     });
 
-    expect(tribunaMocks.createMediaTribunaPoll).toHaveBeenCalledWith({
-      createdByProfileId: "media-1",
-      mediaProfileId: "media-1",
-      options: ["Si", "No"],
-      question: "Confermeresti l'allenatore?",
+    it("il Visitor non vede la CTA Crea", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      pressTab(tree.root, "Tribuna");
+      await flushPromises();
+
+      expect(queryByTestId(tree.root, "media-tribuna-create-button")).toBeNull();
+      expect(hasText(tree.root, "Tribuna vuota")).toBe(true);
     });
-    expect(tree.root.findAllByProps({ testID: "media-tribuna-card-editorial_poll" }).length)
-      .toBeGreaterThan(0);
+
+    it("l'Owner autorizzato apre il bottom sheet condiviso", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({ mode: "owner" }),
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          viewerProfileId="media-1"
+        />,
+      );
+
+      pressTab(tree.root, "Tribuna");
+      await flushPromises();
+
+      expect(hasText(tree.root, "La tua Tribuna è vuota")).toBe(true);
+      pressByTestId(tree.root, "media-tribuna-create-button");
+
+      expect(findByTestId(tree.root, "tribuna-sheet").props.visible).toBe(true);
+    });
+  });
+
+  describe("tab Media", () => {
+    it("riusa il modulo Media condiviso con i filtri Tutti/Foto/Video", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      pressTab(tree.root, "Media");
+      await flushPromises();
+
+      expect(queryByTestId(tree.root, "shared-media-tab")).not.toBeNull();
+      expect(mediaTabProps.last?.filtersEnabled).toBe(true);
+      expect(mediaTabProps.last?.mode).toBe("visitor");
+      // Il Visitor non riceve la CTA di pubblicazione.
+      expect(mediaTabProps.last?.onAddContentPress).toBeUndefined();
+    });
+
+    it("l'Owner autorizzato riceve la CTA di aggiunta", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({ mode: "owner" }),
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          viewerProfileId="media-1"
+        />,
+      );
+
+      pressTab(tree.root, "Media");
+      await flushPromises();
+
+      expect(typeof mediaTabProps.last?.onAddContentPress).toBe("function");
+      expect(mediaTabProps.last?.emptyCtaLabel).toBe("Aggiungi contenuto");
+    });
+
+    it("legge soltanto i contenuti visivi della redazione", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      pressTab(tree.root, "Media");
+      await flushPromises();
+
+      expect(articleMocks.fetchMediaProfilePostFeed).toHaveBeenCalledWith(
+        "media-1",
+        "viewer-1",
+        { kinds: ["media"], limit: 10, offset: 0 },
+      );
+    });
+
+    it("non interroga le altre tab finché non vengono aperte", async () => {
+      await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      // Si apre sugli Articoli: una sola richiesta, e nessuna per Tribuna o
+      // Media.
+      expect(articleMocks.fetchMediaProfilePostFeed).toHaveBeenCalledTimes(1);
+      expect(tribunaMocks.fetchMediaTribunaFeed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("tab Info", () => {
+    it("tiene copertura, contenuti, aree e canali in sezioni distinte", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          initialTab="info"
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(hasText(tree.root, "Identità editoriale")).toBe(true);
+      expect(hasText(tree.root, "Copertura")).toBe(true);
+      expect(hasText(tree.root, "Contenuti")).toBe(true);
+      expect(hasText(tree.root, "Aree coperte")).toBe(true);
+      expect(hasText(tree.root, "Canali ufficiali")).toBe(true);
+      expect(hasText(tree.root, "Lombardia · Piemonte · Liguria")).toBe(true);
+      expect(queryByTestId(tree.root, "media-info-channel-website")).not.toBeNull();
+      expect(
+        queryByTestId(tree.root, "media-info-channel-instagram"),
+      ).not.toBeNull();
+    });
+
+    it("al Visitor non mostra placeholder per i dati mancanti", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({
+          entity: {
+            channels: [],
+            contentTypes: [],
+            coveredTerritories: [],
+            focusAreas: [],
+            shortDescription: null,
+            websiteUrl: null,
+          },
+        }),
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          initialTab="info"
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(hasText(tree.root, "Da completare")).toBe(false);
+      expect(hasText(tree.root, "Aree coperte")).toBe(false);
+      expect(hasText(tree.root, "Canali ufficiali")).toBe(false);
+      expect(queryByTestId(tree.root, "media-info-empty-cta")).toBeNull();
+    });
+
+    it("all'Owner con Info vuota propone Modifica profilo", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({
+          entity: {
+            channels: [],
+            contentTypes: [],
+            coveredTerritories: [],
+            creatorType: null,
+            editorialType: null,
+            focusAreas: [],
+            shortDescription: null,
+            websiteUrl: null,
+          },
+          mode: "owner",
+        }),
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          initialTab="info"
+          mode="owner"
+          onEditProfilePress={vi.fn()}
+          viewerProfileId="media-1"
+        />,
+      );
+
+      expect(hasText(tree.root, "Completa le informazioni del profilo")).toBe(
+        true,
+      );
+      expect(queryByTestId(tree.root, "media-info-empty-cta")).not.toBeNull();
+    });
+
+    it("apre un canale solo con un URL normalizzato", async () => {
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          initialTab="info"
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      pressByTestId(tree.root, "media-info-channel-instagram");
+
+      expect(Linking.openURL).toHaveBeenCalledWith("https://instagram.com/td");
+    });
+  });
+
+  describe("stati globali", () => {
+    it("mostra lo scheletro finché l'identità non è arrivata", () => {
+      let resolved = false;
+      publicProfileMocks.fetchPublicMediaProfile.mockImplementation(
+        () =>
+          new Promise(() => {
+            resolved = true;
+          }),
+      );
+
+      let tree!: TestRenderer.ReactTestRenderer;
+
+      act(() => {
+        tree = TestRenderer.create(
+          <MediaProfileView
+            completeProfile={buildCompleteProfile()}
+            mode="visitor"
+            viewerProfileId="viewer-1"
+          />,
+        );
+      });
+
+      expect(resolved).toBe(true);
+      expect(queryByTestId(tree.root, "media-profile-skeleton")).not.toBeNull();
+      expect(queryByTestId(tree.root, "media-profile-tabs")).toBeNull();
+    });
+
+    it("distingue un profilo non disponibile da un errore di rete", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(null);
+
+      const missing = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(
+        queryByTestId(missing.root, "media-profile-unavailable"),
+      ).not.toBeNull();
+      expect(hasText(missing.root, "Profilo non disponibile")).toBe(true);
+
+      publicProfileMocks.fetchPublicMediaProfile.mockRejectedValue(
+        new Error("rete"),
+      );
+
+      const failed = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="visitor"
+          viewerProfileId="viewer-1"
+        />,
+      );
+
+      expect(queryByTestId(failed.root, "media-profile-error")).not.toBeNull();
+      expect(
+        hasText(failed.root, "Non è stato possibile caricare il profilo"),
+      ).toBe(true);
+      expect(queryByTestId(failed.root, "media-profile-retry")).not.toBeNull();
+    });
+
+    it("non disegna azioni prima che le capabilities siano arrivate", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({
+          capabilities: {
+            canEditProfile: false,
+            canFollow: false,
+            canMessage: false,
+            canPublishArticle: false,
+          },
+          mode: "owner",
+        }),
+      );
+
+      const tree = await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          onContactPress={vi.fn()}
+          onEditProfilePress={vi.fn()}
+          onFollowPress={vi.fn()}
+          viewerProfileId="media-1"
+        />,
+      );
+
+      expect(hasText(tree.root, "Modifica profilo")).toBe(false);
+      expect(hasText(tree.root, "Segui")).toBe(false);
+      expect(queryByTestId(tree.root, "media-new-article-button")).toBeNull();
+    });
   });
 });

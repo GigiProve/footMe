@@ -33,6 +33,8 @@ import {
   type FanMediaPost,
 } from "../../../src/features/profiles/fan-media-service";
 import { FanContentBody } from "../../../src/features/profiles/FanContentBody";
+import { MediaContentInteractions } from "../../../src/features/profiles/media/MediaContentInteractions";
+import { MediaTribunaBody } from "../../../src/features/profiles/media/MediaTribunaBody";
 import {
   fetchContentPublisher,
   type ContentPublisher,
@@ -272,6 +274,14 @@ export default function ContentDetailScreen() {
 
   const [content, setContent] = useState<ContentView | null>(null);
   const [fanPost, setFanPost] = useState<FanTribunaPostDetail | null>(null);
+  /*
+    REV-PROF-21: il dettaglio dei contenuti Media/Creator porta anche Salva,
+    commenti, voto e Q&A, che prima vivevano in una modale dentro il profilo.
+    Serve quindi il post, non solo la sua proiezione di lettura.
+  */
+  const [mediaPost, setMediaPost] = useState<MediaProfilePost | null>(null);
+  const [mediaTribunaPost, setMediaTribunaPost] =
+    useState<MediaTribunaPost | null>(null);
   const [isLoading, setLoading] = useState(true);
   const [isManageOpen, setManageOpen] = useState(false);
 
@@ -286,6 +296,9 @@ export default function ContentDetailScreen() {
     }
 
     setLoading(true);
+    setMediaPost(null);
+    setMediaTribunaPost(null);
+
     try {
       if (contentType === "club_media") {
         const post = await fetchClubMediaPostDetail(id, viewerId);
@@ -298,6 +311,7 @@ export default function ContentDetailScreen() {
       } else if (contentType === "media_tribuna") {
         const post = await fetchMediaTribunaDetail(id, viewerId);
         setFanPost(null);
+        setMediaTribunaPost(post);
         const publisher = post ? await fetchContentPublisher(post.media_profile_id) : null;
         setContent(post && publisher ? mapMediaTribuna(post, publisher) : null);
       } else if (contentType === "fan_media") {
@@ -308,11 +322,14 @@ export default function ContentDetailScreen() {
       } else {
         const post = await fetchMediaProfilePostDetail(id, viewerId);
         setFanPost(null);
+        setMediaPost(post);
         setContent(post ? mapMediaProfile(post, viewerId) : null);
       }
     } catch {
       setContent(null);
       setFanPost(null);
+      setMediaPost(null);
+      setMediaTribunaPost(null);
     } finally {
       setLoading(false);
     }
@@ -398,6 +415,16 @@ export default function ContentDetailScreen() {
 
           {contentType === "fan_tribuna" && fanPost ? (
             <FanContentBody post={fanPost} viewerProfileId={viewerId} />
+          ) : contentType === "media_tribuna" && mediaTribunaPost ? (
+            /*
+              REV-PROF-21: voto e Q&A della Tribuna editoriale vivono qui, nel
+              dettaglio condiviso, non in un composer inline su ogni card del
+              profilo.
+            */
+            <MediaTribunaBody
+              post={mediaTribunaPost}
+              viewerProfileId={viewerId}
+            />
           ) : content.displayMode === "preview" ? (
             <>
               {content.excerpt ? (
@@ -429,6 +456,32 @@ export default function ContentDetailScreen() {
               ) : null}
             </>
           )}
+
+          {/*
+            REV-PROF-21: Salva e commenti dei contenuti Media/Creator. Prima
+            stavano in una modale dentro il profilo — un secondo dettaglio —
+            e qui non esistevano: ora esiste un dettaglio solo, e non si è
+            perso niente.
+          */}
+          {mediaPost ? (
+            <MediaContentInteractions
+              contentType="media_profile"
+              initialComments={mediaPost.comments}
+              initialIsSaved={mediaPost.is_saved}
+              postId={mediaPost.id}
+              viewerProfileId={viewerId}
+            />
+          ) : null}
+
+          {mediaTribunaPost ? (
+            <MediaContentInteractions
+              contentType="media_tribuna"
+              initialComments={mediaTribunaPost.comments}
+              initialIsSaved={mediaTribunaPost.is_saved}
+              postId={mediaTribunaPost.id}
+              viewerProfileId={viewerId}
+            />
+          ) : null}
 
           {content.viewerTagged ? (
             <Button

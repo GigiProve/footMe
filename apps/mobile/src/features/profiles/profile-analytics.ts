@@ -230,7 +230,18 @@ export type ProfileAnalyticsEvent =
   | "fan_category_toggled"
   | "fan_areas_selector_opened"
   | "fan_visibility_changed"
-  | "fan_profile_edit_conflict";
+  | "fan_profile_edit_conflict"
+  // Master Profile Media/Creator (REV-PROF-21). Passano la superficie, la
+  // modalità, il tipo di canale e il tipo di contenuto Tribuna: mai il nome
+  // della realtà, il titolo di un articolo, l'URL di un canale o un ID.
+  | "media_article_opened"
+  | "media_articles_paginated"
+  | "media_channel_tapped"
+  | "media_new_article_tapped"
+  | "media_tribuna_created"
+  | "media_tribuna_opened"
+  | "media_tribuna_voted"
+  | "media_website_tapped";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
@@ -311,12 +322,26 @@ type ProfileAnalyticsProps = {
   seasonCount?: number;
   /** Quanti ruoli sono selezionati, non quali. */
   roleCount?: number;
+  /**
+   * REV-PROF-21: tipo di canale ufficiale aperto ("instagram", "website").
+   * Mai l'URL e mai lo username.
+   */
+  channelType?: string;
   contactType?: PublicContactType;
   /**
    * REV-PROF-19: tipo di contenuto del Tifoso. Un enum chiuso — mai il titolo,
    * il testo, la domanda, le opzioni o i giocatori taggati.
    */
   contentType?: "formation" | "opinion" | "photo" | "poll" | "proposal";
+  /**
+   * REV-PROF-21: content type della Tribuna editoriale. Un enum chiuso — mai
+   * la domanda del sondaggio, le opzioni o i giocatori votabili.
+   */
+  tribunaKind?:
+    | "article_debate"
+    | "community_qa"
+    | "editorial_poll"
+    | "player_vote";
   /** Modalita geografica scelta, mai i nomi dei territori. */
   geographicMode?: string;
   mediaFilter?: "all" | "photo" | "video";
@@ -363,8 +388,10 @@ export function trackProfileEvent(
       ? { territory_count: props.territoryCount }
       : {}),
     ...(typeof props.visible === "boolean" ? { visible: props.visible } : {}),
+    ...(props.channelType ? { channel_type: props.channelType } : {}),
     ...(props.contactType ? { contact_type: props.contactType } : {}),
     ...(props.contentType ? { content_type: props.contentType } : {}),
+    ...(props.tribunaKind ? { tribuna_kind: props.tribunaKind } : {}),
     ...(props.mediaFilter ? { media_filter: props.mediaFilter } : {}),
     ...(props.mediaType ? { media_type: props.mediaType } : {}),
     ...(props.profileType ? { profile_type: props.profileType } : {}),

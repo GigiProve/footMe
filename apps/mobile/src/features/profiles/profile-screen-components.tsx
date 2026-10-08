@@ -104,6 +104,18 @@ type MasterProfileHeaderProps = {
   /** "Torino FC · Prima Squadra", derivato dall'incarico in corso. */
   clubLabel?: string;
   coverImageUrl?: string | null;
+  /**
+   * Descrizione sintetica della realtà editoriale (REV-PROF-21). Assente per
+   * i profili personali, che non la passano e non cambiano di un pixel.
+   */
+  description?: string | null;
+  /**
+   * Identità di una realtà e non di una persona (REV-PROF-21): logo quadrato
+   * con monogramma di fallback, nessun avatar di default.
+   */
+  entityMode?: boolean;
+  /** Azione terziaria su una riga propria: "Visita sito" (REV-PROF-21). */
+  footerAction?: ReactNode;
   fullName: string;
   isFollowed?: boolean;
   isMessaging?: boolean;
@@ -121,6 +133,8 @@ type MasterProfileHeaderProps = {
    */
   onSecondaryRolePress?: () => void;
   onSharePress?: () => void;
+  /** Monogramma del logo quando manca l'immagine (solo `entityMode`). */
+  logoInitials?: string;
   primaryRole: string;
   quickFacts?: readonly ProfileQuickFact[];
   /**
@@ -230,11 +244,15 @@ function MasterProfileHeader({
   badges,
   clubLabel,
   coverImageUrl,
+  description,
+  entityMode = false,
+  footerAction,
   fullName,
   isFollowed,
   isMessaging,
   isVerified,
   locationLabel,
+  logoInitials,
   mode,
   onEditProfilePress,
   onFollowPress,
@@ -264,12 +282,21 @@ function MasterProfileHeader({
               Messaggio verso sé stesso, il Visitor non vede mai Modifica.
             */}
             {mode === "owner" ? (
-              <HeaderActionButton
-                icon="create-outline"
-                label="Modifica profilo"
-                onPress={onEditProfilePress}
-                variant="primary"
-              />
+              /*
+                REV-PROF-21: la CTA compare solo con il permesso di modifica.
+                Un Owner non autorizzato — un collaboratore senza quella
+                capability — non deve vedere un pulsante che non porta da
+                nessuna parte. Tutte le altre tipologie passano sempre
+                l'handler in modalità Owner, quindi per loro non cambia nulla.
+              */
+              onEditProfilePress ? (
+                <HeaderActionButton
+                  icon="create-outline"
+                  label="Modifica profilo"
+                  onPress={onEditProfilePress}
+                  variant="primary"
+                />
+              ) : null
             ) : (
               <>
                 {onFollowPress ? (
@@ -308,11 +335,19 @@ function MasterProfileHeader({
           </>
         }
         availabilityLabel={availabilityLabel}
-        avatarUrl={withDefaultProfileAvatar(avatarUrl)}
+        /*
+          Un profilo editoriale senza logo non prende l'avatar di default di
+          una persona: prende il monogramma del proprio nome.
+        */
+        avatarUrl={entityMode ? avatarUrl : withDefaultProfileAvatar(avatarUrl)}
         badges={badges}
         coverImageUrl={coverImageUrl}
+        description={description}
+        entityMode={entityMode}
+        footerAction={footerAction}
         fullName={fullName}
         isVerified={isVerified}
+        logoInitials={logoInitials}
         metaRows={metaRows}
         onSecondaryRolePress={onSecondaryRolePress}
         primaryRole={primaryRole}
@@ -396,6 +431,25 @@ export function FanProfileHeader(
       testIDPrefix="fan"
     />
   );
+}
+
+/**
+ * Header del Master Profile Media/Creator (REV-PROF-21, Screen 1 e 2).
+ *
+ * Lo stesso header degli altri Master Profile, in modalità realtà: il logo
+ * prende il posto dell'avatar, il ruolo principale è il descrittore
+ * editoriale costruito dalla tassonomia di REV-ONB-09 — mai un'etichetta
+ * fissa — e la descrizione breve vive sotto. "Visita sito" è l'azione
+ * terziaria su una riga propria, perché non ha lo stesso peso di Segui e
+ * Messaggio.
+ *
+ * Nessun dato del proprietario entra qui: non il nome, non la residenza, non
+ * l'avatar personale. Un campo editoriale vuoto resta vuoto.
+ */
+export function MediaProfileHeader(
+  props: Omit<MasterProfileHeaderProps, "testIDPrefix">,
+) {
+  return <MasterProfileHeader {...props} entityMode testIDPrefix="media" />;
 }
 
 /** Azione secondaria a sola icona dell'action bar: 44x44 di area toccabile. */

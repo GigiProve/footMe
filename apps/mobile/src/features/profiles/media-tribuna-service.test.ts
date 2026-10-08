@@ -68,11 +68,18 @@ const mocks = vi.hoisted(() => {
         operation.payload = payload;
         return builder;
       }),
+      /** REV-PROF-21: esclusione dei contenuti programmati. */
+      lte: vi.fn((column: string, value: unknown) => {
+        operation.filters.push({ column, value });
+        return builder;
+      }),
       maybeSingle: vi.fn(async () => nextResponse()),
       order: vi.fn((column: string, options: unknown) => {
         operation.orders.push({ column, options });
         return builder;
       }),
+      /** Pagination della tab Tribuna (REV-PROF-21). */
+      range: vi.fn(async () => nextResponse()),
       select: vi.fn((...args: unknown[]) => {
         operation.action = "select";
         operation.selectArgs = args;

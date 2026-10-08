@@ -169,17 +169,41 @@ const POST_SELECT =
 const LINKED_ARTICLE_SELECT =
   "id, category, title, subtitle, excerpt, cover_url, cover_type";
 
+/** Quanti contenuti Tribuna per pagina (REV-PROF-21). */
+export const MEDIA_TRIBUNA_PAGE_SIZE = 10;
+
+export type MediaTribunaFeedOptions = {
+  /** Solo alcuni content type. Assente: tutti e quattro. */
+  kinds?: readonly MediaTribunaKind[];
+  limit?: number;
+  offset?: number;
+};
+
 export async function fetchMediaTribunaFeed(
   mediaProfileId: string,
   viewerProfileId?: string | null,
+  options: MediaTribunaFeedOptions = {},
 ): Promise<MediaTribunaPost[]> {
-  const { data, error } = await supabase
+  const limit = options.limit ?? MEDIA_TRIBUNA_PAGE_SIZE;
+  const offset = options.offset ?? 0;
+
+  let query = supabase
     .from("media_tribuna_posts")
     .select(POST_SELECT)
     .eq("media_profile_id", mediaProfileId)
     .eq("status", "published")
+    // Un sondaggio programmato non è ancora aperto: il predicato vive anche
+    // nella policy di lettura, qui serve all'Owner (REV-PROF-21).
+    .lte("published_at", new Date().toISOString());
+
+  if (options.kinds && options.kinds.length > 0) {
+    query = query.in("kind", options.kinds as string[]);
+  }
+
+  const { data, error } = await query
     .order("published_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     throw error;

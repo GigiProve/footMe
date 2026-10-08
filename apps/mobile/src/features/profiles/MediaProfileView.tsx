@@ -1,625 +1,599 @@
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  Alert,
-  Image,
-  Linking,
-  Modal,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  Share,
-  StyleSheet,
-  View,
-} from "react-native";
+/**
+ * Master Profile Media/Creator (REV-PROF-21).
+ *
+ * Una sola superficie per Owner e Visitor: stessa route, stessi componenti,
+ * stesso serializer pubblico, stesse query. Le differenze sono tre e solo tre
+ * — quali azioni compaiono, che cosa si può creare, quali dati privati
+ * restano fuori dal payload — e arrivano tutte da `capabilities`, che il
+ * backend calcola e il client non deduce.
+ *
+ * Il profilo rappresenta la realtà editoriale, non la persona che la
+ * amministra: nome, residenza e avatar del proprietario non sono un fallback
+ * pubblico e non compaiono da nessuna parte in questa vista.
+ *
+ * Quattro tab — Articoli, Tribuna, Media, Info — e nient'altro: niente
+ * ingranaggio flottante, niente hamburger sopra la cover, nessun blocco
+ * "Salvati" o "Seguiti" in coda allo scroll. Quelle sono aree personali con
+ * una schermata propria, raggiungibili dal menu azioni, e i loro dati non
+ * sono stati toccati.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Linking, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useQueryClient } from "@tanstack/react-query";
 
-import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
-import { VideoPlayerModal } from "../../components/ui/video-player-modal";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
-import { AppText, Avatar, Button, Input } from "../../ui";
+import { colors, spacing } from "../../theme/tokens";
+import { AppText, TabBar, type TabBarItem } from "../../ui";
+import { MediaProfileHeader } from "./profile-screen-components";
+import { trackProfileEvent } from "./profile-analytics";
+import type { CompleteProfessionalProfile } from "./profile-service";
+import { ProfileSectionError } from "./master/ProfileSectionBlock";
+import { ProfileSkeleton } from "./master/ProfileSkeleton";
+import { MediaPostComposer } from "./media-posts/MediaPostComposer";
 import {
-  fetchProfileFollowState,
-  followProfile,
-  unfollowProfile,
-} from "./fan-media-service";
-import {
-  addMediaProfilePostComment,
-  fetchMediaProfilePostDetail,
+  MEDIA_PROFILE_POST_PAGE_SIZE,
+  fetchMediaProfileArticleCategories,
   fetchMediaProfilePostFeed,
-  searchMediaProfilePostTargets,
-  toggleSavedMediaProfilePost,
   type MediaProfilePost,
-  type MediaProfilePostKind,
   type MediaProfilePostTaggedTarget,
 } from "./media-profile-post-service";
 import {
-  addMediaTribunaComment,
-  createMediaArticleDebate,
-  createMediaCommunityQa,
-  createMediaPlayerVote,
-  createMediaTribunaPoll,
+  MEDIA_TRIBUNA_PAGE_SIZE,
   fetchMediaTribunaFeed,
-  submitMediaTribunaQuestion,
-  toggleSavedMediaTribuna,
   voteMediaTribunaOption,
-  voteMediaTribunaQuestion,
   type MediaTribunaKind,
-  type MediaTribunaOption,
   type MediaTribunaPost,
-  type MediaTribunaQuestion,
-  type MediaTribunaPlayerOptionInput,
 } from "./media-tribuna-service";
+import type { MediaContentItem } from "./career/MediaTabContent";
+import { MediaArticlesTab, MEDIA_ARTICLE_FILTER_ALL } from "./media/MediaArticlesTab";
+import { MediaContentComposer } from "./media/MediaContentComposer";
+import { MediaInfoTab } from "./media/MediaInfoTab";
+import { MediaMediaTab } from "./media/MediaMediaTab";
+import { MediaTribunaTab } from "./media/MediaTribunaTab";
 import {
-  normalizeFacebookInput,
-  normalizeInstagramInput,
-} from "./profile-form-utils";
+  MediaTribunaComposerModal,
+  MediaTribunaCreateSheet,
+} from "./media/media-tribuna-composers";
 import {
-  formatMediaCreatorType,
-  type MediaCreatorType,
-} from "../onboarding/community/media-taxonomy";
-import { ContentTaggedHeader } from "../../features/content/components/ContentTaggedHeader";
-import { TagManageSheet } from "../../features/content/components/TagManageSheet";
-import { MediaPostComposer } from "./media-posts/MediaPostComposer";
-import type {
-  CompleteProfessionalProfile,
-  MediaProfileAuthorRecord,
-  MediaProfileChannelRecord,
-  MediaProfileContactRecord,
-  MediaProfileVerificationRecord,
-} from "./profile-service";
+  buildMediaArticleViewModel,
+  type MediaArticleViewModel,
+} from "./media/media-article-view-model";
+import { buildMediaChannelRows } from "./media/media-channel-view";
+import { buildMediaEditorialHandoff } from "./media/media-editorial-handoff";
+import {
+  MEDIA_PROFILE_INITIAL_TAB,
+  MEDIA_PROFILE_NO_CAPABILITIES,
+  buildMediaCoverageTopics,
+  buildMediaEntityInitials,
+  buildMediaInfoChips,
+  dedupeMediaContentById,
+  formatMediaCoverageAreas,
+  formatMediaEntityName,
+  formatMediaEntityQualifier,
+  formatMediaEntityType,
+  normalizeExternalUrl,
+  type MediaProfileTab,
+} from "./media/media-master-profile";
+import {
+  fetchPublicMediaProfile,
+  type MediaPublicProfile,
+} from "./media/media-public-profile-service";
+import {
+  buildVotedMediaTribunaState,
+  sortMediaTribunaPosts,
+} from "./media/media-tribuna-model";
+import {
+  MEDIA_TAB_PAGE_SIZE,
+  fetchMediaProfileMediaPage,
+  type MediaContentRef,
+} from "./media/media-media-tab-service";
 
-const DEFAULT_MEDIA_COVER_URI =
-  "https://storage.googleapis.com/banani-generated-images/generated-images/b4de0b61-da83-47dc-b416-c759eaabd930.jpg";
+export type { MediaProfileTab };
+export type { MediaContentRef };
 
-type MediaProfileTab = "articles" | "tribuna" | "info";
-type ArticleFilter = "all" | "Mercato" | "Interviste" | "Giovanili" | "Opinioni";
+/** Quattro tab, in quest'ordine. L'ordine non cambia fra Owner e Visitor. */
+const MEDIA_TABS: readonly TabBarItem<MediaProfileTab>[] = [
+  { label: "Articoli", value: "articles" },
+  { label: "Tribuna", value: "tribuna" },
+  { label: "Media", value: "media" },
+  { label: "Info", value: "info" },
+];
 
 type MediaProfileViewProps = {
   completeProfile: CompleteProfessionalProfile;
+  /** Deep link a una tab specifica. Senza, si aprono gli Articoli. */
+  initialTab?: MediaProfileTab;
+  isFollowed?: boolean;
   isMessaging?: boolean;
   mode: "owner" | "visitor";
+  /** "Messaggio": la stessa conversazione del dominio Messaggi. */
   onContactPress?: () => void;
+  /** Apre REV-PROF-22, o l'editor corrente durante la transizione. */
+  onEditProfilePress?: () => void;
+  onFollowPress?: () => void;
+  onMorePress?: () => void;
   onOpenClub?: (clubId: string) => void;
+  /** Apre il dettaglio contenuto condiviso. */
+  onOpenContent?: (ref: MediaContentRef) => void;
   onOpenProfile?: (profileId: string) => void;
+  onSharePress?: () => void;
   /**
-   * Apre una volta il composer editoriale già esistente. Serve al pulsante "+"
-   * della Home, che è solo un punto di accesso e non ha un composer proprio.
+   * Il "+" della Home apre una volta il composer editoriale: è un punto di
+   * accesso, non un composer proprio.
    */
   shouldOpenComposer?: boolean;
   viewerProfileId?: string | null;
 };
 
-type ChannelItem = {
-  channelType: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  key: string;
-  label: string;
-  url: string;
-};
-
-type MediaAuthorFilter = {
-  id: string;
-  name: string;
-};
-
-type ContactItem = {
-  contactType: string;
-  href: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  key: string;
-  label: string;
-  value: string;
-};
-
-type VerificationItem = {
-  icon: keyof typeof Ionicons.glyphMap;
-  key: string;
-  label: string;
-};
-
-type TribunaDraftKind = MediaTribunaKind | null;
-
-const MEDIA_TABS: { label: string; value: MediaProfileTab }[] = [
-  { label: "Articoli", value: "articles" },
-  { label: "Tribuna", value: "tribuna" },
-  { label: "Info", value: "info" },
-];
-
-const ARTICLE_FILTERS: { label: string; value: ArticleFilter }[] = [
-  { label: "Tutti", value: "all" },
-  { label: "Mercato", value: "Mercato" },
-  { label: "Interviste", value: "Interviste" },
-  { label: "Giovanili", value: "Giovanili" },
-  { label: "Opinioni", value: "Opinioni" },
-];
-
-
-const TRIBUNA_CREATE_OPTIONS: {
-  description: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  kind: MediaTribunaKind;
-  title: string;
-}[] = [
-  {
-    description: "Crea una domanda con opzioni e risultati",
-    icon: "bar-chart-outline",
-    kind: "editorial_poll",
-    title: "Sondaggio editoriale",
-  },
-  {
-    description: "Collega una discussione a un articolo pubblicato",
-    icon: "chatbox-outline",
-    kind: "article_debate",
-    title: "Dibattito da articolo",
-  },
-  {
-    description: "Crea una votazione post-partita sui protagonisti",
-    icon: "star-outline",
-    kind: "player_vote",
-    title: "Vota il migliore",
-  },
-  {
-    description: "Raccogli domande dalla community",
-    icon: "help-circle-outline",
-    kind: "community_qa",
-    title: "Q&A community",
-  },
-];
-
-const SEARCH_DEBOUNCE_MS = 250;
-
 export function MediaProfileView({
   completeProfile,
+  initialTab = MEDIA_PROFILE_INITIAL_TAB,
+  isFollowed = false,
   isMessaging = false,
   mode,
   onContactPress,
+  onEditProfilePress,
+  onFollowPress,
+  onMorePress,
   onOpenClub,
+  onOpenContent,
   onOpenProfile,
+  onSharePress,
   shouldOpenComposer = false,
   viewerProfileId,
 }: MediaProfileViewProps) {
-  const [activeTab, setActiveTab] = useState<MediaProfileTab>("articles");
-  const [isFollowed, setIsFollowed] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const queryClient = useQueryClient();
-  const [activeFilter, setActiveFilter] = useState<ArticleFilter>("all");
-  const [activeAuthorFilter, setActiveAuthorFilter] =
-    useState<MediaAuthorFilter | null>(null);
-  const [posts, setPosts] = useState<MediaProfilePost[]>([]);
-  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
-  const [selectedPost, setSelectedPost] = useState<MediaProfilePost | null>(null);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-  const [isComposerOpen, setIsComposerOpen] = useState(false);
-  const hasHandledComposeIntent = useRef(false);
-  const [tribunaPosts, setTribunaPosts] = useState<MediaTribunaPost[]>([]);
-  const [isLoadingTribuna, setIsLoadingTribuna] = useState(false);
-  const [isTribunaCreateMenuOpen, setIsTribunaCreateMenuOpen] = useState(false);
-  const [tribunaComposerKind, setTribunaComposerKind] =
-    useState<TribunaDraftKind>(null);
-  const [tribunaCommentDrafts, setTribunaCommentDrafts] = useState<
-    Record<string, string>
-  >({});
-  const [tribunaQuestionDrafts, setTribunaQuestionDrafts] = useState<
-    Record<string, string>
-  >({});
-
-  const profile = completeProfile.profile;
-  const mediaProfile = completeProfile.mediaProfile ?? null;
-  const mediaProfileId = mediaProfile?.profile_id ?? profile.id;
-  const displayName = mediaProfile?.entity_name?.trim() || profile.full_name;
-  const logoUrl = mediaProfile?.logo_url?.trim() || profile.avatar_url || null;
-  const websiteUrl = normalizeWebsiteInput(completeProfile.userContacts.website);
-  const channels = useMemo(
-    () =>
-      buildChannelItems(
-        completeProfile.mediaProfileChannels ?? [],
-        completeProfile.userContacts,
-      ),
-    [completeProfile.mediaProfileChannels, completeProfile.userContacts],
+  const mediaProfileId = completeProfile.profile.id;
+  const [activeTab, setActiveTab] = useState<MediaProfileTab>(initialTab);
+  /*
+    Si carica l'identità, le capabilities e la tab selezionata; le altre
+    arrivano quando vengono aperte. Una tab già visitata resta caricata, così
+    tornare indietro non rifà la richiesta.
+  */
+  const [visitedTabs, setVisitedTabs] = useState<ReadonlySet<MediaProfileTab>>(
+    () => new Set<MediaProfileTab>([initialTab]),
   );
-  const channelLabels = channels.map((channel) => channel.label).join(" • ");
-  const coverageItems = useMemo(
-    () =>
-      normalizeUniqueValues([
-        ...(mediaProfile?.covered_competitions ?? []),
-        ...(mediaProfile?.covered_teams ?? []),
-        ...(mediaProfile?.covered_topics ?? []),
-        ...(mediaProfile?.focus_areas ?? []),
-        ...(mediaProfile?.content_types ?? []),
-      ]),
-    [
-      mediaProfile?.content_types,
-      mediaProfile?.covered_competitions,
-      mediaProfile?.covered_teams,
-      mediaProfile?.covered_topics,
-      mediaProfile?.focus_areas,
-    ],
+
+  // ─── Identità pubblica e capabilities ───────────────────────────────────
+  const [publicProfile, setPublicProfile] = useState<MediaPublicProfile | null>(
+    null,
   );
-  const coverageLabel =
-    coverageItems.length > 0
-      ? coverageItems.join(" • ")
-      : "Copertura da completare";
-  const areaLabel =
-    (mediaProfile?.covered_territories ?? []).length > 0
-      ? mediaProfile!.covered_territories.join(" • ")
-      : buildAreaLabel(completeProfile);
-  /**
-   * REV-ONB-09 §13, §30: la tipologia strutturata, quando c'è, si legge così
-   * com'è stata scelta — "Altro" con il testo scritto dall'utente. I profili
-   * precedenti restano sull'euristica del vecchio testo libero.
-   */
-  const profileTypeLabel =
-    (mediaProfile?.creator_type === "other"
-      ? mediaProfile.creator_type_other?.trim()
-      : formatMediaCreatorType(
-          mediaProfile?.creator_type as MediaCreatorType | undefined,
-        )) ||
-    buildMediaProfileTypeLabel(
-      mediaProfile?.editorial_type ?? mediaProfile?.affiliation_type,
-    );
-  const verificationStatus = mediaProfile
-    ? (mediaProfile as { verification_status?: string; is_verified?: boolean })
-        .verification_status
-    : null;
-  const isVerified =
-    verificationStatus === "verified" ||
-    Boolean(
-      mediaProfile &&
-        (mediaProfile as { verification_status?: string; is_verified?: boolean })
-          .is_verified,
-    );
-  const filteredPosts = useMemo(() => {
-    let nextPosts = posts;
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [isMissing, setIsMissing] = useState(false);
 
-    if (activeFilter !== "all") {
-      nextPosts = nextPosts.filter(
-        (post) => post.category.trim().toLowerCase() === activeFilter.toLowerCase(),
-      );
-    }
+  const loadPublicProfile = useCallback(async () => {
+    setIsLoadingProfile(true);
+    setProfileError(null);
 
-    if (activeAuthorFilter) {
-      const normalizedAuthorName = activeAuthorFilter.name.trim().toLowerCase();
-      nextPosts = nextPosts.filter(
-        (post) =>
-          post.author_id === activeAuthorFilter.id ||
-          post.author_name.trim().toLowerCase() === normalizedAuthorName,
-      );
-    }
-
-    return nextPosts;
-  }, [activeAuthorFilter, activeFilter, posts]);
-
-  const loadPosts = useCallback(async () => {
     try {
-      setIsLoadingPosts(true);
-      const result = await fetchMediaProfilePostFeed(mediaProfileId, viewerProfileId);
-      setPosts(result);
+      const result = await fetchPublicMediaProfile(mediaProfileId);
+
+      // Nessun payload: il profilo non esiste, non è un Media/Creator, o c'è
+      // un blocco. È un caso diverso da un errore di rete e si dice così.
+      setIsMissing(result === null);
+      setPublicProfile(result);
     } catch {
-      setPosts([]);
-      Alert.alert("Errore", "Impossibile caricare gli articoli.");
+      setProfileError("Controlla la connessione e riprova.");
+      trackProfileEvent("profile_load_failed", {
+        profileType: "media",
+        viewerMode: mode,
+      });
     } finally {
-      setIsLoadingPosts(false);
+      setIsLoadingProfile(false);
     }
-  }, [mediaProfileId, viewerProfileId]);
+  }, [mediaProfileId, mode]);
 
-  const loadTribunaPosts = useCallback(async () => {
+  useEffect(() => {
+    void loadPublicProfile();
+  }, [loadPublicProfile]);
+
+  /*
+    Finché il backend non ha risposto nessuna azione è disponibile: una CTA
+    che compare e poi scompare è peggio di una CTA che arriva un istante più
+    tardi.
+  */
+  const capabilities =
+    publicProfile?.capabilities ?? MEDIA_PROFILE_NO_CAPABILITIES;
+  const isOwner = publicProfile ? publicProfile.mode === "owner" : mode === "owner";
+  const entity = publicProfile?.entity ?? null;
+  const entityName = formatMediaEntityName(entity?.entityName);
+
+  // ─── Articoli ────────────────────────────────────────────────────────────
+  const [articles, setArticles] = useState<MediaProfilePost[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [activeCategory, setActiveCategory] = useState(MEDIA_ARTICLE_FILTER_ALL);
+  const [isLoadingArticles, setIsLoadingArticles] = useState(true);
+  const [isLoadingMoreArticles, setIsLoadingMoreArticles] = useState(false);
+  const [hasMoreArticles, setHasMoreArticles] = useState(false);
+  const [articlesError, setArticlesError] = useState<string | null>(null);
+  /*
+    Una richiesta più vecchia non deve sovrascrivere il risultato di un filtro
+    scelto dopo: ogni caricamento porta il suo numero e solo l'ultimo scrive.
+  */
+  const articlesRequestRef = useRef(0);
+
+  const loadArticles = useCallback(
+    async (category: string) => {
+      const requestId = articlesRequestRef.current + 1;
+      articlesRequestRef.current = requestId;
+
+      setIsLoadingArticles(true);
+      setArticlesError(null);
+
+      try {
+        const page = await fetchMediaProfilePostFeed(
+          mediaProfileId,
+          viewerProfileId,
+          {
+            category: category === MEDIA_ARTICLE_FILTER_ALL ? null : category,
+            limit: MEDIA_PROFILE_POST_PAGE_SIZE,
+            offset: 0,
+          },
+        );
+
+        if (articlesRequestRef.current !== requestId) {
+          return;
+        }
+
+        setArticles(dedupeMediaContentById(page));
+        setHasMoreArticles(page.length === MEDIA_PROFILE_POST_PAGE_SIZE);
+      } catch {
+        if (articlesRequestRef.current !== requestId) {
+          return;
+        }
+
+        setArticlesError(
+          "Non è stato possibile caricare gli articoli. Riprova.",
+        );
+        trackProfileEvent("profile_tab_load_failed", {
+          profileType: "media",
+          tab: "articles",
+          viewerMode: mode,
+        });
+      } finally {
+        if (articlesRequestRef.current === requestId) {
+          setIsLoadingArticles(false);
+        }
+      }
+    },
+    [mediaProfileId, mode, viewerProfileId],
+  );
+
+  const loadCategories = useCallback(async () => {
     try {
-      setIsLoadingTribuna(true);
-      const result = await fetchMediaTribunaFeed(mediaProfileId, viewerProfileId);
-      setTribunaPosts(result);
+      const rows = await fetchMediaProfileArticleCategories(mediaProfileId);
+      setCategories(rows.map((row) => row.category));
     } catch {
-      setTribunaPosts([]);
-      Alert.alert("Errore", "Impossibile caricare la Tribuna.");
+      // I chip sono un affinamento della lista, non la lista: se la loro
+      // sorgente non risponde, gli articoli si vedono comunque.
+      setCategories([]);
+    }
+  }, [mediaProfileId]);
+
+  const loadMoreArticles = useCallback(async () => {
+    if (isLoadingMoreArticles || !hasMoreArticles) {
+      return;
+    }
+
+    setIsLoadingMoreArticles(true);
+
+    try {
+      const page = await fetchMediaProfilePostFeed(
+        mediaProfileId,
+        viewerProfileId,
+        {
+          category:
+            activeCategory === MEDIA_ARTICLE_FILTER_ALL ? null : activeCategory,
+          limit: MEDIA_PROFILE_POST_PAGE_SIZE,
+          offset: articles.length,
+        },
+      );
+
+      // Dedup per id: una pubblicazione durante lo scroll può far ricomparire
+      // la coda della pagina precedente.
+      setArticles((current) => dedupeMediaContentById([...current, ...page]));
+      setHasMoreArticles(page.length === MEDIA_PROFILE_POST_PAGE_SIZE);
+      trackProfileEvent("media_articles_paginated", {
+        profileType: "media",
+        viewerMode: mode,
+      });
+    } catch {
+      setArticlesError("Non è stato possibile caricare gli articoli. Riprova.");
+    } finally {
+      setIsLoadingMoreArticles(false);
+    }
+  }, [
+    activeCategory,
+    articles.length,
+    hasMoreArticles,
+    isLoadingMoreArticles,
+    mediaProfileId,
+    mode,
+    viewerProfileId,
+  ]);
+
+  useEffect(() => {
+    if (!visitedTabs.has("articles")) {
+      return;
+    }
+
+    void loadArticles(activeCategory);
+  }, [activeCategory, loadArticles, visitedTabs]);
+
+  useEffect(() => {
+    if (!visitedTabs.has("articles")) {
+      return;
+    }
+
+    void loadCategories();
+  }, [loadCategories, visitedTabs]);
+
+  const articleViewModels = useMemo<MediaArticleViewModel[]>(
+    () =>
+      articles.map((article) =>
+        buildMediaArticleViewModel(article, entityName),
+      ),
+    [articles, entityName],
+  );
+
+  // ─── Tribuna ─────────────────────────────────────────────────────────────
+  const [tribunaPosts, setTribunaPosts] = useState<MediaTribunaPost[]>([]);
+  const [isLoadingTribuna, setIsLoadingTribuna] = useState(true);
+  const [isLoadingMoreTribuna, setIsLoadingMoreTribuna] = useState(false);
+  const [hasMoreTribuna, setHasMoreTribuna] = useState(false);
+  const [tribunaError, setTribunaError] = useState<string | null>(null);
+
+  const loadTribuna = useCallback(async () => {
+    setIsLoadingTribuna(true);
+    setTribunaError(null);
+
+    try {
+      const page = await fetchMediaTribunaFeed(mediaProfileId, viewerProfileId, {
+        limit: MEDIA_TRIBUNA_PAGE_SIZE,
+        offset: 0,
+      });
+      setTribunaPosts(sortMediaTribunaPosts(dedupeMediaContentById(page)));
+      setHasMoreTribuna(page.length === MEDIA_TRIBUNA_PAGE_SIZE);
+    } catch {
+      setTribunaError("Non è stato possibile caricare la Tribuna. Riprova.");
+      trackProfileEvent("profile_tab_load_failed", {
+        profileType: "media",
+        tab: "tribuna",
+        viewerMode: mode,
+      });
     } finally {
       setIsLoadingTribuna(false);
     }
-  }, [mediaProfileId, viewerProfileId]);
+  }, [mediaProfileId, mode, viewerProfileId]);
+
+  const loadMoreTribuna = useCallback(async () => {
+    if (isLoadingMoreTribuna || !hasMoreTribuna) {
+      return;
+    }
+
+    setIsLoadingMoreTribuna(true);
+
+    try {
+      const page = await fetchMediaTribunaFeed(mediaProfileId, viewerProfileId, {
+        limit: MEDIA_TRIBUNA_PAGE_SIZE,
+        offset: tribunaPosts.length,
+      });
+      setTribunaPosts((current) =>
+        sortMediaTribunaPosts(dedupeMediaContentById([...current, ...page])),
+      );
+      setHasMoreTribuna(page.length === MEDIA_TRIBUNA_PAGE_SIZE);
+    } catch {
+      setTribunaError("Non è stato possibile caricare la Tribuna. Riprova.");
+    } finally {
+      setIsLoadingMoreTribuna(false);
+    }
+  }, [
+    hasMoreTribuna,
+    isLoadingMoreTribuna,
+    mediaProfileId,
+    tribunaPosts.length,
+    viewerProfileId,
+  ]);
 
   useEffect(() => {
-    void loadPosts();
-  }, [loadPosts]);
+    if (!visitedTabs.has("tribuna")) {
+      return;
+    }
+
+    void loadTribuna();
+  }, [loadTribuna, visitedTabs]);
+
+  // ─── Media ───────────────────────────────────────────────────────────────
+  const [mediaItems, setMediaItems] = useState<MediaContentItem[]>([]);
+  const [mediaOffset, setMediaOffset] = useState(0);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(true);
+  const [isLoadingMoreMedia, setIsLoadingMoreMedia] = useState(false);
+  const [hasMoreMedia, setHasMoreMedia] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+
+  const loadMedia = useCallback(async () => {
+    setIsLoadingMedia(true);
+    setMediaError(null);
+
+    try {
+      const page = await fetchMediaProfileMediaPage(
+        mediaProfileId,
+        viewerProfileId,
+        0,
+        MEDIA_TAB_PAGE_SIZE,
+      );
+      setMediaItems(page.items);
+      setMediaOffset(page.nextOffset);
+      setHasMoreMedia(page.hasMore);
+    } catch {
+      setMediaError("Non è stato possibile caricare i contenuti. Riprova.");
+      trackProfileEvent("profile_tab_load_failed", {
+        profileType: "media",
+        tab: "media",
+        viewerMode: mode,
+      });
+    } finally {
+      setIsLoadingMedia(false);
+    }
+  }, [mediaProfileId, mode, viewerProfileId]);
+
+  const loadMoreMedia = useCallback(async () => {
+    if (isLoadingMoreMedia || !hasMoreMedia) {
+      return;
+    }
+
+    setIsLoadingMoreMedia(true);
+
+    try {
+      const page = await fetchMediaProfileMediaPage(
+        mediaProfileId,
+        viewerProfileId,
+        mediaOffset,
+        MEDIA_TAB_PAGE_SIZE,
+      );
+      setMediaItems((current) =>
+        dedupeMediaContentById([...current, ...page.items]),
+      );
+      setMediaOffset(page.nextOffset);
+      setHasMoreMedia(page.hasMore);
+    } catch {
+      setMediaError("Non è stato possibile caricare i contenuti. Riprova.");
+    } finally {
+      setIsLoadingMoreMedia(false);
+    }
+  }, [
+    hasMoreMedia,
+    isLoadingMoreMedia,
+    mediaOffset,
+    mediaProfileId,
+    viewerProfileId,
+  ]);
 
   useEffect(() => {
-    void loadTribunaPosts();
-  }, [loadTribunaPosts]);
+    if (!visitedTabs.has("media")) {
+      return;
+    }
 
-  // Il "+" della Home apre il composer editoriale già esistente, sulla scheda
-  // che lo ospita. Il ref evita che si riapra finché il parametro resta nell'URL.
+    void loadMedia();
+  }, [loadMedia, visitedTabs]);
+
+  /**
+   * Cambio di tab, da qualunque origine — la tab bar, un deep link, il
+   * ritorno da una pubblicazione. Passa da qui anche la registrazione della
+   * tab come visitata, così il caricamento on demand non viene aggirato.
+   */
+  const goToTab = useCallback((tab: MediaProfileTab) => {
+    setActiveTab(tab);
+    setVisitedTabs((current) =>
+      current.has(tab) ? current : new Set([...current, tab]),
+    );
+  }, []);
+
+  // ─── Creazione ───────────────────────────────────────────────────────────
+  const [isTribunaSheetOpen, setIsTribunaSheetOpen] = useState(false);
+  const [tribunaComposerKind, setTribunaComposerKind] =
+    useState<MediaTribunaKind | null>(null);
+  const [isEditorialComposerOpen, setIsEditorialComposerOpen] = useState(false);
+  const [isMediaComposerOpen, setIsMediaComposerOpen] = useState(false);
+  const hasHandledComposeIntent = useRef(false);
+
   useEffect(() => {
-    if (!shouldOpenComposer || mode !== "owner" || hasHandledComposeIntent.current) {
+    if (
+      !shouldOpenComposer ||
+      !capabilities.canPublishArticle ||
+      hasHandledComposeIntent.current
+    ) {
       return;
     }
 
     hasHandledComposeIntent.current = true;
-    setActiveTab("articles");
-    setIsComposerOpen(true);
-  }, [mode, shouldOpenComposer]);
+    goToTab("articles");
+    setIsEditorialComposerOpen(true);
+  }, [capabilities.canPublishArticle, goToTab, shouldOpenComposer]);
 
-  useEffect(() => {
-    if (mode !== "visitor" || !viewerProfileId) {
-      setIsFollowed(false);
+  /**
+   * "Nuovo articolo" consegna il contesto a HOM-06.2 — origine, realtà
+   * editoriale, destinazione di ritorno — e non scegli la modalità di
+   * creazione: quella la risolve il flusso editoriale.
+   */
+  function handleNewArticlePress() {
+    if (!capabilities.canPublishArticle) {
+      /*
+        L'identità editoriale non è più autorizzata: non si apre un composer
+        destinato a fallire e non la si sostituisce in silenzio con un'altra.
+      */
+      Alert.alert(
+        "Pubblicazione non disponibile",
+        "Non hai i permessi per pubblicare con questa identità editoriale.",
+      );
       return;
     }
 
-    let isMounted = true;
+    const handoff = buildMediaEditorialHandoff(mediaProfileId);
 
-    fetchProfileFollowState(viewerProfileId, profile.id)
-      .then((result) => {
-        if (isMounted) {
-          setIsFollowed(result);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setIsFollowed(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [mode, profile.id, viewerProfileId]);
-
-  const handleToggleFollow = useCallback(async () => {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per seguire questo profilo media.");
-      return;
-    }
-
-    const nextFollowState = !isFollowed;
-    setIsFollowing(true);
-    setIsFollowed(nextFollowState);
-
-    try {
-      if (nextFollowState) {
-        await followProfile(viewerProfileId, profile.id);
-      } else {
-        await unfollowProfile(viewerProfileId, profile.id);
-      }
-    } catch {
-      setIsFollowed(isFollowed);
-      Alert.alert("Errore", "Impossibile aggiornare il follow.");
-    } finally {
-      setIsFollowing(false);
-      queryClient.invalidateQueries({ queryKey: ["following-count"] });
-      queryClient.invalidateQueries({ queryKey: ["followed"] });
-    }
-  }, [isFollowed, profile.id, queryClient, viewerProfileId]);
-
-  const handleVisitWebsite = useCallback(() => {
-    if (!websiteUrl) {
-      return;
-    }
-
-    void Linking.openURL(websiteUrl);
-  }, [websiteUrl]);
-
-  async function handleOpenPost(post: MediaProfilePost) {
-    setSelectedPost(post);
-    setIsLoadingDetail(true);
-
-    try {
-      const detail = await fetchMediaProfilePostDetail(post.id, viewerProfileId);
-      if (detail) {
-        setSelectedPost(detail);
-      }
-    } catch {
-      Alert.alert("Errore", "Impossibile aprire questo contenuto.");
-    } finally {
-      setIsLoadingDetail(false);
-    }
+    trackProfileEvent("media_new_article_tapped", {
+      profileType: "media",
+      source: handoff.origin,
+      viewerMode: isOwner ? "owner" : "visitor",
+    });
+    setIsEditorialComposerOpen(true);
   }
 
-  function handleClosePost() {
-    setSelectedPost(null);
-    setIsLoadingDetail(false);
+  /**
+   * Dopo una pubblicazione riuscita si resta sulla tab Articoli, il filtro
+   * torna a "Tutti" perché il nuovo articolo potrebbe non appartenere alla
+   * categoria selezionata, e la lista viene ricaricata dal backend: la
+   * posizione segue l'ordinamento reale invece di un'ipotesi del client.
+   */
+  function handleArticleCreated() {
+    setIsEditorialComposerOpen(false);
+    goToTab("articles");
+    setActiveCategory(MEDIA_ARTICLE_FILTER_ALL);
+    void loadCategories();
+    void loadArticles(MEDIA_ARTICLE_FILTER_ALL);
   }
 
-  function handlePatchPost(postId: string, patch: Partial<MediaProfilePost>) {
-    setPosts((current) =>
-      current.map((post) => (post.id === postId ? { ...post, ...patch } : post)),
-    );
-    setSelectedPost((current) =>
-      current?.id === postId ? { ...current, ...patch } : current,
-    );
-  }
-
-  function handlePatchTribunaPost(
-    postId: string,
-    patch: Partial<MediaTribunaPost>,
-  ) {
-    setTribunaPosts((current) =>
-      current.map((post) => (post.id === postId ? { ...post, ...patch } : post)),
-    );
-  }
-
-  async function handleToggleSave(post: MediaProfilePost) {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per salvare questo contenuto.");
-      return;
-    }
-
-    const nextSaved = !post.is_saved;
-    handlePatchPost(post.id, { is_saved: nextSaved });
-
-    try {
-      await toggleSavedMediaProfilePost(viewerProfileId, post.id, nextSaved);
-    } catch {
-      handlePatchPost(post.id, { is_saved: post.is_saved });
-      Alert.alert("Errore", "Impossibile aggiornare il salvataggio.");
-    }
-  }
-
-  async function handleCreated(post: MediaProfilePost) {
-    setPosts((current) => [post, ...current]);
-    setActiveFilter("all");
-    setIsComposerOpen(false);
-  }
-
-  async function handleCreatedTribuna(post: MediaTribunaPost) {
-    setTribunaPosts((current) => [post, ...current]);
+  function handleTribunaCreated(post: MediaTribunaPost) {
     setTribunaComposerKind(null);
+    goToTab("tribuna");
+    void loadTribuna();
+    trackProfileEvent("media_tribuna_created", {
+      profileType: "media",
+      tribunaKind: post.kind,
+      viewerMode: "owner",
+    });
   }
 
-  async function handleOpenLinkedArticle(articleId: string) {
-    setIsLoadingDetail(true);
-
-    try {
-      const detail = await fetchMediaProfilePostDetail(articleId, viewerProfileId);
-      if (detail) {
-        setSelectedPost(detail);
-      } else {
-        Alert.alert("Articolo non disponibile", "Questo articolo non e' piu' disponibile.");
-      }
-    } catch {
-      Alert.alert("Errore", "Impossibile aprire l'articolo collegato.");
-    } finally {
-      setIsLoadingDetail(false);
-    }
+  function handleMediaCreated() {
+    setIsMediaComposerOpen(false);
+    goToTab("media");
+    void loadMedia();
   }
 
-  async function handleVoteTribunaOption(
-    post: MediaTribunaPost,
-    optionId: string,
-  ) {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per votare nella Tribuna.");
-      return;
-    }
-
-    const nextState = buildVotedTribunaState(post, optionId);
-    handlePatchTribunaPost(post.id, nextState);
-
-    try {
-      await voteMediaTribunaOption({
-        optionId,
-        postId: post.id,
-        profileId: viewerProfileId,
-      });
-    } catch {
-      handlePatchTribunaPost(post.id, {
-        options: post.options,
-        total_vote_count: post.total_vote_count,
-      });
-      Alert.alert("Errore", "Impossibile registrare il voto.");
-    }
+  // ─── Interazioni ─────────────────────────────────────────────────────────
+  function handleTabChange(tab: MediaProfileTab) {
+    goToTab(tab);
+    trackProfileEvent("profile_tab_changed", {
+      profileType: "media",
+      tab,
+      viewerMode: isOwner ? "owner" : "visitor",
+    });
   }
 
-  async function handleToggleTribunaSave(post: MediaTribunaPost) {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per salvare questo contenuto.");
-      return;
-    }
-
-    const nextSaved = !post.is_saved;
-    handlePatchTribunaPost(post.id, { is_saved: nextSaved });
-
-    try {
-      await toggleSavedMediaTribuna(viewerProfileId, post.id, nextSaved);
-    } catch {
-      handlePatchTribunaPost(post.id, { is_saved: post.is_saved });
-      Alert.alert("Errore", "Impossibile aggiornare il salvataggio.");
-    }
+  function handleOpenArticle(articleId: string) {
+    trackProfileEvent("media_article_opened", {
+      profileType: "media",
+      viewerMode: isOwner ? "owner" : "visitor",
+    });
+    onOpenContent?.({ contentType: "media_profile", postId: articleId });
   }
 
-  async function handleAddTribunaComment(post: MediaTribunaPost) {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per commentare.");
-      return;
-    }
-
-    const body = tribunaCommentDrafts[post.id]?.trim() ?? "";
-    if (!body) {
-      Alert.alert("Commento vuoto", "Scrivi un commento prima di pubblicare.");
-      return;
-    }
-
-    try {
-      const comment = await addMediaTribunaComment({
-        body,
-        postId: post.id,
-        profileId: viewerProfileId,
-      });
-      handlePatchTribunaPost(post.id, {
-        comment_count: post.comment_count + 1,
-        comments: [...post.comments, comment],
-      });
-      setTribunaCommentDrafts((current) => ({ ...current, [post.id]: "" }));
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Commento non pubblicato.";
-      Alert.alert("Errore", message);
-    }
-  }
-
-  async function handleSubmitTribunaQuestion(post: MediaTribunaPost) {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per inviare una domanda.");
-      return;
-    }
-
-    const body = tribunaQuestionDrafts[post.id]?.trim() ?? "";
-    if (!body) {
-      Alert.alert("Domanda vuota", "Scrivi una domanda prima di pubblicare.");
-      return;
-    }
-
-    try {
-      const question = await submitMediaTribunaQuestion({
-        body,
-        postId: post.id,
-        profileId: viewerProfileId,
-      });
-      const questions = sortTribunaQuestions([...post.questions, question]);
-      handlePatchTribunaPost(post.id, {
-        question_count: post.question_count + 1,
-        questions,
-      });
-      setTribunaQuestionDrafts((current) => ({ ...current, [post.id]: "" }));
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Domanda non pubblicata.";
-      Alert.alert("Errore", message);
-    }
-  }
-
-  async function handleToggleTribunaQuestionVote(
-    post: MediaTribunaPost,
-    question: MediaTribunaQuestion,
-  ) {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per votare una domanda.");
-      return;
-    }
-
-    const nextVoted = !question.is_voted;
-    const nextQuestions = sortTribunaQuestions(
-      post.questions.map((entry) =>
-        entry.id === question.id
-          ? {
-              ...entry,
-              is_voted: nextVoted,
-              vote_count: entry.vote_count + (nextVoted ? 1 : -1),
-            }
-          : entry,
-      ),
-    );
-    handlePatchTribunaPost(post.id, { questions: nextQuestions });
-
-    try {
-      await voteMediaTribunaQuestion(question.id, viewerProfileId, nextVoted);
-    } catch {
-      handlePatchTribunaPost(post.id, { questions: post.questions });
-      Alert.alert("Errore", "Impossibile aggiornare il voto.");
-    }
+  function handleOpenTribunaPost(post: MediaTribunaPost) {
+    trackProfileEvent("media_tribuna_opened", {
+      profileType: "media",
+      tribunaKind: post.kind,
+      viewerMode: isOwner ? "owner" : "visitor",
+    });
+    onOpenContent?.({ contentType: "media_tribuna", postId: post.id });
   }
 
   function handleOpenTarget(target: MediaProfilePostTaggedTarget) {
@@ -631,3714 +605,347 @@ export function MediaProfileView({
     onOpenProfile?.(target.target_id);
   }
 
+  async function handleVoteTribuna(post: MediaTribunaPost, optionId: string) {
+    if (!viewerProfileId) {
+      Alert.alert("Accesso richiesto", "Accedi per votare nella Tribuna.");
+      return;
+    }
+
+    const nextState = buildVotedMediaTribunaState(post, optionId);
+    patchTribunaPost(post.id, nextState);
+    trackProfileEvent("media_tribuna_voted", {
+      profileType: "media",
+      tribunaKind: post.kind,
+      viewerMode: isOwner ? "owner" : "visitor",
+    });
+
+    try {
+      await voteMediaTribunaOption({
+        optionId,
+        postId: post.id,
+        profileId: viewerProfileId,
+      });
+    } catch {
+      // Rollback allo stato precedente: un voto non registrato non deve
+      // restare a schermo come se lo fosse.
+      patchTribunaPost(post.id, {
+        options: post.options,
+        total_vote_count: post.total_vote_count,
+      });
+      Alert.alert("Errore", "Impossibile registrare il voto.");
+    }
+  }
+
+  function patchTribunaPost(postId: string, patch: Partial<MediaTribunaPost>) {
+    setTribunaPosts((current) =>
+      current.map((post) => (post.id === postId ? { ...post, ...patch } : post)),
+    );
+  }
+
+  function handleVisitWebsite() {
+    const url = normalizeExternalUrl(entity?.websiteUrl);
+
+    if (!url) {
+      return;
+    }
+
+    trackProfileEvent("media_website_tapped", {
+      profileType: "media",
+      viewerMode: isOwner ? "owner" : "visitor",
+    });
+    void Linking.openURL(url);
+  }
+
+  // ─── Info ────────────────────────────────────────────────────────────────
+  const entityTypeLabel = useMemo(
+    () => (entity ? formatMediaEntityType(entity) : null),
+    [entity],
+  );
+  const entityQualifier = useMemo(
+    () => (entity ? formatMediaEntityQualifier(entity, entityTypeLabel) : null),
+    [entity, entityTypeLabel],
+  );
+  const coverageChips = useMemo(
+    () =>
+      entity
+        ? [
+            ...buildMediaInfoChips(entity.focusAreas),
+            ...buildMediaCoverageTopics(entity),
+          ]
+        : [],
+    [entity],
+  );
+  const contentTypeChips = useMemo(
+    () => buildMediaInfoChips(entity?.contentTypes),
+    [entity?.contentTypes],
+  );
+  const areasLabel = useMemo(
+    () => formatMediaCoverageAreas(entity?.coveredTerritories),
+    [entity?.coveredTerritories],
+  );
+  const channelRows = useMemo(
+    () => buildMediaChannelRows(entity?.channels ?? []),
+    [entity?.channels],
+  );
+  const websiteUrl = normalizeExternalUrl(entity?.websiteUrl);
+
+  // ─── Stati globali ───────────────────────────────────────────────────────
+  if (isLoadingProfile) {
+    return <ProfileSkeleton testID="media-profile-skeleton" />;
+  }
+
+  if (isMissing) {
+    return (
+      <View style={styles.state} testID="media-profile-unavailable">
+        <AppText variant="titleSm">Profilo non disponibile</AppText>
+        <AppText align="center" color="secondary" variant="bodySm">
+          Il profilo potrebbe essere stato rimosso o non essere più visibile.
+        </AppText>
+      </View>
+    );
+  }
+
+  if (profileError || !entity) {
+    return (
+      <View style={styles.state} testID="media-profile-error">
+        <AppText variant="titleSm">
+          Non è stato possibile caricare il profilo
+        </AppText>
+        <ProfileSectionError
+          message={profileError ?? "Controlla la connessione e riprova."}
+          onRetry={() => {
+            void loadPublicProfile();
+          }}
+          testID="media-profile-retry"
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root} testID="media-profile-view">
-      <View style={styles.headerSurface}>
-        <View style={styles.heroSection}>
-          <Image
-            accessibilityLabel="Copertina profilo media"
-            source={{ uri: DEFAULT_MEDIA_COVER_URI }}
-            style={styles.heroImage}
-          />
-          <View pointerEvents="none" style={styles.heroOverlay} />
-        </View>
-
-        <View style={styles.headerBody}>
-          <View style={styles.logoWrapper}>
-            {logoUrl ? (
-              <Image
-                accessibilityLabel="Logo profilo media"
-                source={{ uri: logoUrl }}
-                style={styles.logoImage}
-              />
-            ) : (
-              <View style={[styles.logoImage, styles.logoPlaceholder]}>
-                <Ionicons
-                  color={colors.accent}
-                  name="newspaper-outline"
-                  size={34}
-                />
-              </View>
-            )}
-          </View>
-
-          <View style={styles.identityBlock}>
-            <View style={styles.nameRow}>
-              <AppText style={styles.profileName} variant="headingLg">
-                {displayName}
-              </AppText>
-              {isVerified ? (
-                <Ionicons color="#007AFF" name="checkmark-circle" size={20} />
-              ) : null}
-            </View>
-            <AppText color="secondary" style={styles.profileType} variant="bodySm">
-              {profileTypeLabel}
-            </AppText>
-          </View>
-
-          <View style={styles.infoBlock}>
-            <AppText style={styles.coverageText} variant="bodySm">
-              {coverageLabel}
-            </AppText>
-            <MediaMetaLine icon="location-outline" text={areaLabel} />
-            <MediaMetaLine
-              accent
-              icon="link-outline"
-              text={channelLabels || "Canali da completare"}
-            />
-          </View>
-
-          <View
-            style={[
-              styles.actionsRow,
-              mode === "owner" ? styles.ownerActionsRow : null,
-            ]}
-          >
-            {mode === "visitor" ? (
-              <Button
-                label={isFollowed ? "Seguito" : "Segui"}
-                loading={isFollowing}
-                onPress={() => {
-                  void handleToggleFollow();
-                }}
-                size="md"
-                style={styles.followButton}
-                testID="media-follow-button"
-                variant={isFollowed ? "secondary" : "primary"}
-              />
-            ) : null}
-            {mode === "visitor" && onContactPress ? (
-              <Button
-                label="Contatta"
-                loading={isMessaging}
-                onPress={onContactPress}
-                size="md"
-                style={styles.followButton}
-                testID="media-contact-button"
-                variant="secondary"
-              />
-            ) : null}
-            <Button
-              disabled={!websiteUrl}
-              label="Visita sito"
+      <MediaProfileHeader
+        avatarUrl={entity.logoUrl}
+        coverImageUrl={entity.coverUrl}
+        description={entity.shortDescription}
+        footerAction={
+          /*
+            "Visita sito" compare solo con un URL pubblico e valido: al
+            Visitor non si mostra un pulsante disabilitato.
+          */
+          capabilities.canViewWebsite && websiteUrl ? (
+            <Pressable
+              accessibilityHint="Apre il sito in una scheda esterna"
+              accessibilityLabel="Visita sito, link esterno"
+              accessibilityRole="link"
+              hitSlop={8}
               onPress={handleVisitWebsite}
-              size="md"
-              style={mode === "visitor" ? styles.websiteButton : styles.ownerWebsiteButton}
-              testID="media-website-button"
-              variant="secondary"
-            />
-          </View>
-        </View>
+              style={({ pressed }) => [
+                styles.websiteAction,
+                pressed ? styles.pressed : null,
+              ]}
+              testID="media-website-link"
+            >
+              <AppText color="accent" variant="actionLabel">
+                Visita sito
+              </AppText>
+              <Ionicons color={colors.accent} name="open-outline" size={14} />
+            </Pressable>
+          ) : null
+        }
+        fullName={entityName ?? "Profilo media"}
+        /*
+          Lo stato follow ha una sola sorgente: la schermata, che lo carica e
+          lo aggiorna. Il valore della RPC servirebbe solo a mostrare
+          "Seguito" dopo che l'utente ha già premuto "Non seguire più".
+        */
+        isFollowed={isFollowed}
+        isMessaging={isMessaging}
+        isVerified={entity.isVerified}
+        logoInitials={buildMediaEntityInitials(entityName)}
+        mode={isOwner ? "owner" : "visitor"}
+        onEditProfilePress={
+          capabilities.canEditProfile ? onEditProfilePress : undefined
+        }
+        onFollowPress={capabilities.canFollow ? onFollowPress : undefined}
+        onMessagePress={capabilities.canMessage ? onContactPress : undefined}
+        onMorePress={onMorePress}
+        onSharePress={capabilities.canShare ? onSharePress : undefined}
+        primaryRole={entityTypeLabel ?? ""}
+        secondaryRole={entityQualifier ?? undefined}
+      />
 
-        <View style={styles.tabsContainer} testID="media-profile-tabs">
-          {MEDIA_TABS.map((tab) => (
-            <MediaTabButton
-              active={activeTab === tab.value}
-              key={tab.value}
-              label={tab.label}
-              onPress={() => setActiveTab(tab.value)}
-              testID={`media-tab-${tab.value}`}
-            />
-          ))}
-        </View>
-      </View>
+      <TabBar
+        active={activeTab}
+        fill
+        items={MEDIA_TABS}
+        onChange={handleTabChange}
+        testID="media-profile-tabs"
+      />
 
       {activeTab === "articles" ? (
-        <ArticlesTab
-          activeAuthorFilter={activeAuthorFilter}
-          activeFilter={activeFilter}
-          displayName={displayName}
-          isLoading={isLoadingPosts}
-          mode={mode}
-          onAddPress={() => setIsComposerOpen(true)}
-          onClearAuthorFilter={() => setActiveAuthorFilter(null)}
-          onFilterChange={setActiveFilter}
-          onOpenPost={(post) => {
-            void handleOpenPost(post);
+        <MediaArticlesTab
+          activeCategory={activeCategory}
+          articles={articleViewModels}
+          canPublishArticle={capabilities.canPublishArticle}
+          categories={categories}
+          entityName={entityName}
+          errorMessage={articlesError}
+          hasMore={hasMoreArticles}
+          isLoading={isLoadingArticles}
+          isLoadingMore={isLoadingMoreArticles}
+          isOwner={isOwner}
+          onCategoryChange={(category) => {
+            setActiveCategory(category);
+            trackProfileEvent("profile_filter_changed", {
+              profileType: "media",
+              tab: "articles",
+              viewerMode: isOwner ? "owner" : "visitor",
+            });
           }}
+          onLoadMore={() => {
+            void loadMoreArticles();
+          }}
+          onNewArticlePress={handleNewArticlePress}
+          onOpenArticle={handleOpenArticle}
           onOpenTarget={handleOpenTarget}
-          posts={filteredPosts}
+          onRetry={() => {
+            void loadArticles(activeCategory);
+          }}
         />
       ) : activeTab === "tribuna" ? (
-        <TribunaTab
-          commentDrafts={tribunaCommentDrafts}
+        <MediaTribunaTab
+          canCreateContent={capabilities.canCreateTribunaContent}
+          canVote={Boolean(viewerProfileId)}
+          errorMessage={tribunaError}
+          hasMore={hasMoreTribuna}
           isLoading={isLoadingTribuna}
-          mode={mode}
-          onChangeCommentDraft={(postId, value) =>
-            setTribunaCommentDrafts((current) => ({ ...current, [postId]: value }))
-          }
-          onChangeQuestionDraft={(postId, value) =>
-            setTribunaQuestionDrafts((current) => ({ ...current, [postId]: value }))
-          }
-          onComment={(post) => {
-            void handleAddTribunaComment(post);
+          isLoadingMore={isLoadingMoreTribuna}
+          isOwner={isOwner}
+          onCreatePress={() => setIsTribunaSheetOpen(true)}
+          onLoadMore={() => {
+            void loadMoreTribuna();
           }}
-          onCreatePress={() => setIsTribunaCreateMenuOpen(true)}
-          onOpenArticle={(articleId) => {
-            void handleOpenLinkedArticle(articleId);
-          }}
-          onOpenPlayer={onOpenProfile}
-          onQuestionVote={(post, question) => {
-            void handleToggleTribunaQuestionVote(post, question);
-          }}
-          onSave={(post) => {
-            void handleToggleTribunaSave(post);
-          }}
-          onSubmitQuestion={(post) => {
-            void handleSubmitTribunaQuestion(post);
+          onOpenLinkedArticle={handleOpenArticle}
+          onOpenPost={handleOpenTribunaPost}
+          onRetry={() => {
+            void loadTribuna();
           }}
           onVote={(post, optionId) => {
-            void handleVoteTribunaOption(post, optionId);
+            void handleVoteTribuna(post, optionId);
           }}
           posts={tribunaPosts}
-          questionDrafts={tribunaQuestionDrafts}
+        />
+      ) : activeTab === "media" ? (
+        <MediaMediaTab
+          entityName={entityName}
+          errorMessage={mediaError}
+          hasMore={hasMoreMedia}
+          isLoading={isLoadingMedia}
+          isLoadingMore={isLoadingMoreMedia}
+          isOwner={isOwner}
+          items={mediaItems}
+          onAddContentPress={
+            capabilities.canAddMedia
+              ? () => setIsMediaComposerOpen(true)
+              : undefined
+          }
+          onLoadMore={() => {
+            void loadMoreMedia();
+          }}
+          onOpenContent={(ref) => onOpenContent?.(ref)}
+          onRetry={loadMedia}
+          viewerMode={isOwner ? "owner" : "visitor"}
         />
       ) : (
-        <MediaInfoPanel
-          areaLabel={areaLabel}
-          channels={channels}
-          contacts={buildContactItems(
-            completeProfile.mediaProfileContacts ?? [],
-            completeProfile.userContacts,
-          )}
-          coverageLabel={coverageLabel}
-          displayName={displayName}
-          isVerified={isVerified}
-          mediaProfile={mediaProfile}
-          mediaProfileAuthors={completeProfile.mediaProfileAuthors ?? []}
-          onAuthorPress={(author) => {
-            setActiveAuthorFilter({
-              id: author.id,
-              name: author.display_name,
-            });
-            setActiveTab("articles");
+        <MediaInfoTab
+          areasLabel={areasLabel}
+          channels={channelRows}
+          contentTypes={contentTypeChips}
+          coverage={coverageChips}
+          description={entity.shortDescription}
+          entityTypeLabel={entityTypeLabel}
+          isLoading={false}
+          isOwner={isOwner}
+          onChannelPress={(channel) =>
+            /* Il tipo di canale, mai l'URL e mai lo username. */
+            trackProfileEvent("media_channel_tapped", {
+              channelType: channel.key,
+              profileType: "media",
+              viewerMode: isOwner ? "owner" : "visitor",
+            })
+          }
+          onEditProfilePress={
+            capabilities.canEditProfile ? onEditProfilePress : undefined
+          }
+          onRetry={() => {
+            void loadPublicProfile();
           }}
-          onOpenExternal={(url) => {
-            void Linking.openURL(url);
-          }}
-          profileTypeLabel={profileTypeLabel}
-          verifications={buildVerificationItems(
-            mediaProfile?.verification_status ?? null,
-            completeProfile.mediaProfileVerifications ?? [],
-          )}
         />
       )}
 
-      <MediaPostDetailModal
-        displayName={displayName}
-        isLoading={isLoadingDetail}
-        onAddComment={async (body) => {
-          if (!selectedPost || !viewerProfileId) {
-            Alert.alert("Accesso richiesto", "Accedi per commentare.");
-            return;
-          }
-
-          const comment = await addMediaProfilePostComment({
-            body,
-            postId: selectedPost.id,
-            profileId: viewerProfileId,
-          });
-          const nextComments = [...selectedPost.comments, comment];
-          handlePatchPost(selectedPost.id, {
-            comment_count: selectedPost.comment_count + 1,
-            comments: nextComments,
-          });
-        }}
-        onClose={handleClosePost}
-        onOpenTarget={handleOpenTarget}
-        onShare={(post) => {
-          void sharePost(post);
-        }}
-        onTagActionDone={() => {
-          void loadPosts();
-          handleClosePost();
-        }}
-        onToggleSave={(post) => {
-          void handleToggleSave(post);
-        }}
-        post={selectedPost}
-        viewerProfileId={viewerProfileId}
-      />
-
-      <MediaPostComposer
-        defaultAuthorName={profile.full_name}
-        mediaProfileId={mediaProfileId}
-        onClose={() => setIsComposerOpen(false)}
-        onCreated={(post) => {
-          void handleCreated(post);
-        }}
-        publisherName={displayName}
-        userId={viewerProfileId ?? null}
-        visible={isComposerOpen}
-      />
-      <MediaTribunaCreateMenuModal
-        onClose={() => setIsTribunaCreateMenuOpen(false)}
+      <MediaTribunaCreateSheet
+        onClose={() => setIsTribunaSheetOpen(false)}
         onSelect={(kind) => {
-          setIsTribunaCreateMenuOpen(false);
+          setIsTribunaSheetOpen(false);
           setTribunaComposerKind(kind);
         }}
-        visible={isTribunaCreateMenuOpen}
+        visible={isTribunaSheetOpen}
       />
       <MediaTribunaComposerModal
-        articles={posts.filter((post) => post.kind === "article")}
+        articles={articles.filter((article) => article.kind === "article")}
         kind={tribunaComposerKind}
         mediaProfileId={mediaProfileId}
         onClose={() => setTribunaComposerKind(null)}
-        onCreated={(post) => {
-          void handleCreatedTribuna(post);
-        }}
+        onCreated={handleTribunaCreated}
         userId={viewerProfileId ?? null}
         visible={tribunaComposerKind !== null}
       />
-    </View>
-  );
-}
-
-function ArticlesTab({
-  activeAuthorFilter,
-  activeFilter,
-  displayName,
-  isLoading,
-  mode,
-  onAddPress,
-  onClearAuthorFilter,
-  onFilterChange,
-  onOpenPost,
-  onOpenTarget,
-  posts,
-}: {
-  activeAuthorFilter: MediaAuthorFilter | null;
-  activeFilter: ArticleFilter;
-  displayName: string;
-  isLoading: boolean;
-  mode: "owner" | "visitor";
-  onAddPress: () => void;
-  onClearAuthorFilter: () => void;
-  onFilterChange: (filter: ArticleFilter) => void;
-  onOpenPost: (post: MediaProfilePost) => void;
-  onOpenTarget: (target: MediaProfilePostTaggedTarget) => void;
-  posts: MediaProfilePost[];
-}) {
-  return (
-    <View style={styles.articlesRoot} testID="media-articles-tab">
-      <View style={styles.articlesHeader}>
-        <View style={styles.articlesHeaderText}>
-          <AppText variant="titleSm">Articoli</AppText>
-          <AppText color="secondary" numberOfLines={1} variant="bodySm">
-            Letture rapide da {displayName}
-          </AppText>
-        </View>
-        {mode === "owner" ? (
-          <Button
-            accessibilityLabel="Crea nuovo articolo media"
-            label="+ Nuovo"
-            onPress={onAddPress}
-            size="sm"
-            testID="media-article-new-button"
-            variant="primary"
-          />
-        ) : null}
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.filterContent}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterScroll}
-      >
-        {ARTICLE_FILTERS.map((filter) => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeFilter === filter.value }}
-            key={filter.value}
-            onPress={() => onFilterChange(filter.value)}
-            style={[
-              styles.filterChip,
-              activeFilter === filter.value ? styles.filterChipActive : null,
-            ]}
-            testID={`media-article-filter-${filter.value}`}
-          >
-            <AppText
-              style={[
-                styles.filterChipText,
-                activeFilter === filter.value ? styles.filterChipTextActive : null,
-              ]}
-              variant="caption"
-            >
-              {filter.label}
-            </AppText>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {activeAuthorFilter ? (
-        <View style={styles.authorFilterBar}>
-          <View style={styles.authorFilterText}>
-            <AppText color="secondary" variant="caption">
-              Autore
-            </AppText>
-            <AppText numberOfLines={1} style={styles.authorFilterName} variant="bodySm">
-              {activeAuthorFilter.name}
-            </AppText>
-          </View>
-          <Pressable
-            accessibilityLabel="Rimuovi filtro autore"
-            accessibilityRole="button"
-            onPress={onClearAuthorFilter}
-            style={({ pressed }) => [
-              styles.authorFilterClear,
-              pressed ? styles.pressedRow : null,
-            ]}
-            testID="media-author-filter-clear"
-          >
-            <Ionicons color={colors.accent} name="close" size={16} />
-            <AppText color="accent" variant="caption">
-              Rimuovi
-            </AppText>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {isLoading ? (
-        <View style={styles.loadingState}>
-          <AppText color="secondary" variant="bodySm">
-            Caricamento articoli...
-          </AppText>
-        </View>
-      ) : posts.length > 0 ? (
-        <View style={styles.feedList}>
-          {posts.map((post) => (
-            <ArticleListRow
-              key={post.id}
-              onOpen={onOpenPost}
-              onOpenTarget={onOpenTarget}
-              post={post}
-            />
-          ))}
-        </View>
-      ) : (
-        <MediaEmptyState
-          icon="newspaper-outline"
-          text={
-            mode === "owner"
-              ? "Pubblica articoli e news per rendere il profilo una testata viva dentro ProLink."
-              : "Questo profilo media non ha ancora pubblicato articoli."
-          }
-          title="Nessun articolo"
-        />
-      )}
-    </View>
-  );
-}
-
-function TribunaTab({
-  commentDrafts,
-  isLoading,
-  mode,
-  onChangeCommentDraft,
-  onChangeQuestionDraft,
-  onComment,
-  onCreatePress,
-  onOpenArticle,
-  onOpenPlayer,
-  onQuestionVote,
-  onSave,
-  onSubmitQuestion,
-  onVote,
-  posts,
-  questionDrafts,
-}: {
-  commentDrafts: Record<string, string>;
-  isLoading: boolean;
-  mode: "owner" | "visitor";
-  onChangeCommentDraft: (postId: string, value: string) => void;
-  onChangeQuestionDraft: (postId: string, value: string) => void;
-  onComment: (post: MediaTribunaPost) => void;
-  onCreatePress: () => void;
-  onOpenArticle: (articleId: string) => void;
-  onOpenPlayer?: (profileId: string) => void;
-  onQuestionVote: (post: MediaTribunaPost, question: MediaTribunaQuestion) => void;
-  onSave: (post: MediaTribunaPost) => void;
-  onSubmitQuestion: (post: MediaTribunaPost) => void;
-  onVote: (post: MediaTribunaPost, optionId: string) => void;
-  posts: MediaTribunaPost[];
-  questionDrafts: Record<string, string>;
-}) {
-  return (
-    <View style={styles.tribunaRoot} testID="media-tribuna-tab">
-      <View style={styles.tribunaIntroBlock}>
-        <View style={styles.tribunaIntroText}>
-          <AppText variant="titleSm">Tribuna</AppText>
-          <AppText color="secondary" style={styles.tribunaIntroCopy} variant="bodySm">
-            Dibattiti, sondaggi e domande per coinvolgere la community.
-          </AppText>
-        </View>
-        {mode === "owner" ? (
-          <Button
-            accessibilityLabel="Crea contenuto Tribuna"
-            label="+ Crea"
-            onPress={onCreatePress}
-            size="sm"
-            testID="media-tribuna-create-button"
-            variant="primary"
-          />
-        ) : null}
-      </View>
-
-      {isLoading ? (
-        <View style={styles.loadingState}>
-          <AppText color="secondary" variant="bodySm">
-            Caricamento Tribuna...
-          </AppText>
-        </View>
-      ) : posts.length > 0 ? (
-        <View style={styles.tribunaFeed} testID="media-tribuna-feed">
-          {posts.map((post) => (
-            <MediaTribunaCard
-              commentDraft={commentDrafts[post.id] ?? ""}
-              key={post.id}
-              onChangeCommentDraft={(value) => onChangeCommentDraft(post.id, value)}
-              onChangeQuestionDraft={(value) => onChangeQuestionDraft(post.id, value)}
-              onComment={() => onComment(post)}
-              onOpenArticle={onOpenArticle}
-              onOpenPlayer={onOpenPlayer}
-              onQuestionVote={(question) => onQuestionVote(post, question)}
-              onSave={() => onSave(post)}
-              onSubmitQuestion={() => onSubmitQuestion(post)}
-              onVote={(optionId) => onVote(post, optionId)}
-              post={post}
-              questionDraft={questionDrafts[post.id] ?? ""}
-            />
-          ))}
-        </View>
-      ) : (
-        <MediaEmptyState
-          icon="chatbubbles-outline"
-          text={
-            mode === "owner"
-              ? "Apri un sondaggio, un dibattito o un Q&A per coinvolgere la community."
-              : "Questo profilo media non ha ancora aperto discussioni."
-          }
-          title="Tribuna vuota"
-        />
-      )}
-    </View>
-  );
-}
-
-function MediaTribunaCard({
-  commentDraft,
-  onChangeCommentDraft,
-  onChangeQuestionDraft,
-  onComment,
-  onOpenArticle,
-  onOpenPlayer,
-  onQuestionVote,
-  onSave,
-  onSubmitQuestion,
-  onVote,
-  post,
-  questionDraft,
-}: {
-  commentDraft: string;
-  onChangeCommentDraft: (value: string) => void;
-  onChangeQuestionDraft: (value: string) => void;
-  onComment: () => void;
-  onOpenArticle: (articleId: string) => void;
-  onOpenPlayer?: (profileId: string) => void;
-  onQuestionVote: (question: MediaTribunaQuestion) => void;
-  onSave: () => void;
-  onSubmitQuestion: () => void;
-  onVote: (optionId: string) => void;
-  post: MediaTribunaPost;
-  questionDraft: string;
-}) {
-  return (
-    <View style={styles.tribunaItem} testID={`media-tribuna-card-${post.kind}`}>
-      <View style={styles.tribunaItemHeader}>
-        <View style={styles.tribunaTypeLabel}>
-          <Ionicons color="#0A56B8" name={getTribunaIcon(post.kind)} size={14} />
-          <AppText style={styles.tribunaTypeText} variant="caption">
-            {getTribunaLabel(post.kind)}
-          </AppText>
-        </View>
-        <AppText color="secondary" variant="caption">
-          {formatPostDate(post.published_at ?? post.created_at)}
-        </AppText>
-      </View>
-
-      <AppText style={styles.tribunaQuestion} variant="titleSm">
-        {post.title}
-      </AppText>
-
-      {post.body ? (
-        <AppText color="secondary" style={styles.tribunaBody} variant="bodySm">
-          {post.body}
-        </AppText>
-      ) : null}
-
-      {post.linked_article ? (
-        <Pressable
-          accessibilityLabel={`Apri articolo ${post.linked_article.title}`}
-          accessibilityRole="button"
-          onPress={() => onOpenArticle(post.linked_article!.id)}
-          style={({ pressed }) => [
-            styles.linkedArticleCard,
-            pressed ? styles.pressedRow : null,
-          ]}
-          testID={`media-tribuna-linked-article-${post.linked_article.id}`}
-        >
-          {post.linked_article.cover_url ? (
-            <Image
-              accessibilityLabel={`Copertina ${post.linked_article.title}`}
-              source={{ uri: post.linked_article.cover_url }}
-              style={styles.linkedArticleImage}
-            />
-          ) : (
-            <View style={[styles.linkedArticleImage, styles.linkedArticlePlaceholder]}>
-              <Ionicons color={colors.accent} name="newspaper-outline" size={18} />
-            </View>
-          )}
-          <View style={styles.linkedArticleText}>
-            <AppText color="accent" style={styles.linkedArticleTag} variant="caption">
-              {post.linked_article.category}
-            </AppText>
-            <AppText numberOfLines={2} style={styles.linkedArticleTitle} variant="bodySm">
-              {post.linked_article.title}
-            </AppText>
-            <AppText color="accent" variant="caption">
-              Leggi articolo
-            </AppText>
-          </View>
-        </Pressable>
-      ) : null}
-
-      {post.options.length > 0 ? (
-        <View style={styles.tribunaPollOptions}>
-          {post.options.map((option) => (
-            <TribunaOptionRow
-              key={option.id}
-              onOpenPlayer={onOpenPlayer}
-              onVote={() => onVote(option.id)}
-              option={option}
-              showPlayer={post.kind === "player_vote"}
-              totalVoteCount={post.total_vote_count}
-            />
-          ))}
-          <AppText color="secondary" variant="caption">
-            {formatCount(post.total_vote_count)} voti • {formatCount(post.comment_count)} commenti
-          </AppText>
-        </View>
-      ) : null}
-
-      {post.kind === "community_qa" ? (
-        <View style={styles.qaBlock}>
-          <AppText color="secondary" variant="caption">
-            {formatCount(post.question_count)} domande • {formatCount(post.comment_count)} commenti
-          </AppText>
-          {post.questions.slice(0, 3).map((question) => (
-            <View key={question.id} style={styles.qaItem}>
-              <Pressable
-                accessibilityLabel={`Vota domanda ${question.body}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: question.is_voted }}
-                onPress={() => onQuestionVote(question)}
-                style={[
-                  styles.qaVoteButton,
-                  question.is_voted ? styles.qaVoteButtonActive : null,
-                ]}
-                testID={`media-tribuna-question-vote-${question.id}`}
-              >
-                <Ionicons
-                  color={question.is_voted ? colors.inkInvert : colors.accent}
-                  name="chevron-up"
-                  size={18}
-                />
-                <AppText
-                  color={question.is_voted ? "inverse" : "accent"}
-                  variant="caption"
-                >
-                  {formatCount(question.vote_count)}
-                </AppText>
-              </Pressable>
-              <View style={styles.qaTextBlock}>
-                <AppText style={styles.qaText} variant="bodySm">
-                  {question.body}
-                </AppText>
-                <AppText color="secondary" variant="caption">
-                  {question.author_name}
-                </AppText>
-              </View>
-            </View>
-          ))}
-          <View style={styles.inlineComposer}>
-            <Input
-              onChangeText={onChangeQuestionDraft}
-              placeholder="Scrivi una domanda per la community"
-              style={styles.inlineInput}
-              value={questionDraft}
-            />
-            <Button
-              label="Invia"
-              onPress={onSubmitQuestion}
-              size="sm"
-              variant="secondary"
-            />
-          </View>
-        </View>
-      ) : post.options.length === 0 ? (
-        <AppText color="secondary" style={styles.tribunaStatsOnly} variant="caption">
-          {formatCount(post.comment_count)} commenti
-        </AppText>
-      ) : null}
-
-      <View style={styles.tribunaActionsRow}>
-        <TribunaMiniActionButton
-          icon={post.kind === "article_debate" ? "chatbox-outline" : "checkmark-circle-outline"}
-          label={post.kind === "article_debate" ? "Partecipa" : "Vota"}
-          onPress={() => undefined}
-        />
-        <TribunaMiniActionButton
-          icon="chatbubble-outline"
-          label="Commenta"
-          onPress={() => undefined}
-        />
-        <TribunaMiniActionButton
-          icon={post.is_saved ? "bookmark" : "bookmark-outline"}
-          label="Salva"
-          onPress={onSave}
-          testID={`media-tribuna-save-${post.id}`}
-        />
-      </View>
-
-      {post.comments.length > 0 ? (
-        <View style={styles.tribunaCommentsPreview}>
-          {post.comments.slice(0, 2).map((comment) => (
-            <View key={comment.id} style={styles.commentRow}>
-              <Avatar
-                name={comment.author_name}
-                size="sm"
-                uri={comment.author_avatar_url}
-              />
-              <View style={styles.commentText}>
-                <AppText numberOfLines={1} style={styles.commentAuthor} variant="caption">
-                  {comment.author_name}
-                </AppText>
-                <AppText color="secondary" variant="bodySm">
-                  {comment.body}
-                </AppText>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      <View style={styles.inlineComposer}>
-        <Input
-          onChangeText={onChangeCommentDraft}
-          placeholder="Scrivi un commento"
-          style={styles.inlineInput}
-          value={commentDraft}
-        />
-        <Button label="Invia" onPress={onComment} size="sm" variant="secondary" />
-      </View>
-    </View>
-  );
-}
-
-function TribunaOptionRow({
-  onOpenPlayer,
-  onVote,
-  option,
-  showPlayer,
-  totalVoteCount,
-}: {
-  onOpenPlayer?: (profileId: string) => void;
-  onVote: () => void;
-  option: MediaTribunaOption;
-  showPlayer: boolean;
-  totalVoteCount: number;
-}) {
-  const playerLabel = option.player_display_name ?? option.label;
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: option.is_voted }}
-      onPress={onVote}
-      style={({ pressed }) => [
-        styles.tribunaPollOption,
-        option.is_voted ? styles.tribunaPollOptionSelected : null,
-        pressed ? styles.pressedRow : null,
-      ]}
-      testID={`media-tribuna-option-${option.id}`}
-    >
-      <View
-        pointerEvents="none"
-        style={[styles.tribunaPollFill, { width: `${option.percentage}%` }]}
+      {/*
+        Il composer editoriale è quello che esiste già nel prodotto: REV-PROF-21
+        gli consegna origine e identità, non lo ridisegna e non anticipa
+        HOM-06.2.
+      */}
+      <MediaPostComposer
+        defaultAuthorName={entityName ?? ""}
+        mediaProfileId={mediaProfileId}
+        onClose={() => setIsEditorialComposerOpen(false)}
+        onCreated={handleArticleCreated}
+        publisherName={entityName ?? ""}
+        userId={viewerProfileId ?? null}
+        visible={isEditorialComposerOpen}
       />
-      <View style={styles.tribunaPollContent}>
-        {showPlayer ? (
-          <Pressable
-            accessibilityLabel={`Apri profilo ${playerLabel}`}
-            accessibilityRole="button"
-            disabled={!option.player_profile_id}
-            onPress={(event) => {
-              event.stopPropagation();
-              if (option.player_profile_id) {
-                onOpenPlayer?.(option.player_profile_id);
-              }
-            }}
-            style={styles.playerOptionButton}
-          >
-            <Avatar
-              name={playerLabel}
-              size="sm"
-              uri={option.player_avatar_url}
-            />
-            <AppText color="accent" numberOfLines={1} style={styles.playerOptionName} variant="bodySm">
-              {playerLabel}
-            </AppText>
-          </Pressable>
-        ) : (
-          <AppText numberOfLines={1} style={styles.pollOptionLabel} variant="bodySm">
-            {option.label}
-          </AppText>
-        )}
-        <AppText color="secondary" style={styles.pollOptionPercent} variant="caption">
-          {totalVoteCount > 0 ? `${option.percentage}%` : "Vota"}
-        </AppText>
-      </View>
-    </Pressable>
-  );
-}
-
-function TribunaMiniActionButton({
-  icon,
-  label,
-  onPress,
-  testID,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  testID?: string;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.tribunaMiniAction,
-        pressed ? styles.pressedRow : null,
-      ]}
-      testID={testID}
-    >
-      <Ionicons color={colors.textSecondary} name={icon} size={17} />
-      <AppText color="secondary" variant="caption">
-        {label}
-      </AppText>
-    </Pressable>
-  );
-}
-
-function ArticleListRow({
-  onOpen,
-  onOpenTarget,
-  post,
-}: {
-  onOpen: (post: MediaProfilePost) => void;
-  onOpenTarget: (target: MediaProfilePostTaggedTarget) => void;
-  post: MediaProfilePost;
-}) {
-  const meta = buildFeedMeta(post);
-  const previewUrl = post.cover_url || DEFAULT_MEDIA_COVER_URI;
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => onOpen(post)}
-      style={({ pressed }) => [styles.articleRow, pressed ? styles.pressedRow : null]}
-      testID={`media-article-row-${post.id}`}
-    >
-      <View style={styles.thumbnailFrame}>
-        <Image
-          accessibilityLabel={`Copertina ${post.title}`}
-          source={{ uri: previewUrl }}
-          style={styles.thumbnailImage}
-        />
-        {post.cover_type === "video" ? (
-          <View style={styles.thumbVideoOverlay}>
-            <Ionicons color={colors.inkInvert} name="play" size={13} />
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.articleTextColumn}>
-        <View style={styles.typeRow}>
-          <ArticleTypeBadge kind={post.kind} />
-          <AppText color="secondary" numberOfLines={1} style={styles.categoryText} variant="caption">
-            {post.category}
-          </AppText>
-        </View>
-        <AppText numberOfLines={2} style={styles.articleTitle} variant="bodySm">
-          {post.title}
-        </AppText>
-        {post.excerpt || post.subtitle ? (
-          <AppText color="secondary" numberOfLines={2} style={styles.articleExcerpt} variant="bodySm">
-            {post.excerpt ?? post.subtitle}
-          </AppText>
-        ) : null}
-        <AppText color="secondary" numberOfLines={1} style={styles.articleMeta} variant="caption">
-          {meta}
-        </AppText>
-        {post.tagged_targets.length > 0 ? (
-          <TaggedTargetsInline
-            compact
-            onOpenTarget={onOpenTarget}
-            targets={post.tagged_targets}
-          />
-        ) : null}
-        <AppText color="accent" style={styles.readCta} variant="caption">
-          Leggi
-        </AppText>
-      </View>
-    </Pressable>
-  );
-}
-
-function MediaPostDetailModal({
-  displayName,
-  isLoading,
-  onAddComment,
-  onClose,
-  onOpenTarget,
-  onShare,
-  onTagActionDone,
-  onToggleSave,
-  post,
-  viewerProfileId,
-}: {
-  displayName: string;
-  isLoading: boolean;
-  onAddComment: (body: string) => Promise<void>;
-  onClose: () => void;
-  onOpenTarget: (target: MediaProfilePostTaggedTarget) => void;
-  onShare: (post: MediaProfilePost) => void;
-  onTagActionDone?: () => void;
-  onToggleSave: (post: MediaProfilePost) => void;
-  post: MediaProfilePost | null;
-  viewerProfileId?: string | null;
-}) {
-  const [commentDraft, setCommentDraft] = useState("");
-  const [isCommenting, setIsCommenting] = useState(false);
-  const [isVideoOpen, setIsVideoOpen] = useState(false);
-  const [isManageOpen, setManageOpen] = useState(false);
-  const postId = post?.id ?? null;
-
-  useEffect(() => {
-    if (postId) {
-      setCommentDraft("");
-      setIsCommenting(false);
-      setIsVideoOpen(false);
-      setManageOpen(false);
-    }
-  }, [postId]);
-
-  if (!post) {
-    return null;
-  }
-
-  const showHero = post.kind === "article" || Boolean(post.cover_url);
-  const heroUrl = post.cover_url || DEFAULT_MEDIA_COVER_URI;
-  const viewerTagged =
-    !!viewerProfileId &&
-    post.tagged_targets.some(
-      (target) =>
-        target.target_type === "profile" &&
-        target.target_id === viewerProfileId,
-    );
-
-  async function handleComment() {
-    if (!commentDraft.trim()) {
-      Alert.alert("Commento vuoto", "Scrivi un commento prima di pubblicare.");
-      return;
-    }
-
-    setIsCommenting(true);
-
-    try {
-      await onAddComment(commentDraft);
-      setCommentDraft("");
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Commento non pubblicato.";
-      Alert.alert("Errore", message);
-    } finally {
-      setIsCommenting(false);
-    }
-  }
-
-  return (
-    <Modal animationType="slide" onRequestClose={onClose} visible>
-      <SafeAreaView style={styles.detailRoot}>
-        <View style={styles.detailTopBar}>
-          <Pressable
-            accessibilityLabel="Chiudi articolo"
-            accessibilityRole="button"
-            onPress={onClose}
-            style={styles.detailIconButton}
-          >
-            <Ionicons color={colors.textPrimary} name="chevron-back" size={23} />
-          </Pressable>
-          <AppText numberOfLines={1} style={styles.detailTopTitle} variant="titleSm">
-            {post.kind === "article" ? "Articolo" : "News"}
-          </AppText>
-          <Pressable
-            accessibilityLabel="Condividi articolo"
-            accessibilityRole="button"
-            onPress={() => onShare(post)}
-            style={styles.detailIconButton}
-          >
-            <Ionicons color={colors.textPrimary} name="share-outline" size={21} />
-          </Pressable>
-        </View>
-
-        <ScrollView contentContainerStyle={styles.detailScrollContent}>
-          {showHero ? (
-            post.cover_type === "video" && post.cover_url ? (
-              <Pressable
-                accessibilityLabel="Riproduci video di copertina"
-                accessibilityRole="button"
-                onPress={() => setIsVideoOpen(true)}
-                style={styles.detailHero}
-              >
-                <Image source={{ uri: heroUrl }} style={styles.detailHeroImage} />
-                <View style={styles.detailVideoOverlay}>
-                  <Ionicons color={colors.textPrimary} name="play" size={20} />
-                </View>
-              </Pressable>
-            ) : (
-              <Image
-                accessibilityLabel={`Copertina ${post.title}`}
-                source={{ uri: heroUrl }}
-                style={styles.detailHero}
-              />
-            )
-          ) : null}
-
-          <View style={styles.detailBody}>
-            {isLoading ? (
-              <AppText color="secondary" style={styles.detailLoading} variant="bodySm">
-                Aggiornamento articolo...
-              </AppText>
-            ) : null}
-            <View style={styles.detailTypeBlock}>
-              <ArticleTypeBadge kind={post.kind} />
-              <AppText color="secondary" style={styles.detailCategory} variant="overline">
-                {post.category}
-              </AppText>
-            </View>
-            <AppText style={styles.detailTitle} variant="headingLg">
-              {post.title}
-            </AppText>
-            {post.subtitle || post.excerpt ? (
-              <AppText color="secondary" style={styles.detailSubtitle} variant="bodyLg">
-                {post.subtitle ?? post.excerpt}
-              </AppText>
-            ) : null}
-            <ContentTaggedHeader
-              authorName={post.author_name}
-              onOpenTarget={(target) =>
-                onOpenTarget({
-                  avatar_url: target.avatar_url,
-                  display_name: target.display_name,
-                  role: null,
-                  subtitle: target.subtitle ?? null,
-                  target_id: target.target_id,
-                  target_type: target.target_type,
-                })
-              }
-              publishedAt={post.published_at ?? post.created_at}
-              publisherName={displayName}
-              readingLabel={
-                post.kind === "news" ? null : `${post.reading_time_minutes} min`
-              }
-              tagged={post.tagged_targets.map((target) => ({
-                avatar_url: target.avatar_url,
-                display_name: target.display_name,
-                subtitle: target.subtitle,
-                target_id: target.target_id,
-                target_type: target.target_type,
-              }))}
-            />
-
-            {post.display_mode !== "preview" && post.body ? (
-              <ArticleBodyText body={post.body} />
-            ) : null}
-
-            <View style={styles.detailActions}>
-              <ActionButton
-                icon="chatbubble-outline"
-                label="Commenta"
-                onPress={() => undefined}
-              />
-              <ActionButton
-                icon={post.is_saved ? "bookmark" : "bookmark-outline"}
-                label="Salva"
-                onPress={() => onToggleSave(post)}
-              />
-              <ActionButton
-                icon="share-outline"
-                label="Condividi"
-                onPress={() => onShare(post)}
-              />
-            </View>
-
-            {post.external_url ? (
-              <Pressable
-                accessibilityRole="link"
-                onPress={() => {
-                  void Linking.openURL(post.external_url!);
-                }}
-                style={styles.externalLinkCard}
-                testID="media-article-external-link"
-              >
-                <View style={styles.externalLinkText}>
-                  <AppText color="accent" style={styles.externalLinkTitle} variant="bodySm">
-                    {post.display_mode === "preview"
-                      ? "Leggi l'articolo completo sul sito"
-                      : "Leggi anche sul sito"}
-                  </AppText>
-                  <AppText color="secondary" numberOfLines={1} variant="caption">
-                    {post.source_name ? `Fonte: ${post.source_name}` : "Fonte originale"}
-                  </AppText>
-                </View>
-                <Ionicons color={colors.accent} name="open-outline" size={19} />
-              </Pressable>
-            ) : null}
-
-            {viewerTagged ? (
-              <Button
-                label="Gestisci tag"
-                leftIcon={
-                  <Ionicons
-                    color={colors.textPrimary}
-                    name="pricetag-outline"
-                    size={18}
-                  />
-                }
-                onPress={() => setManageOpen(true)}
-                variant="secondary"
-              />
-            ) : null}
-
-            <View style={styles.commentBox}>
-              <Input
-                label="Commenta"
-                multiline
-                onChangeText={setCommentDraft}
-                placeholder="Scrivi un commento..."
-                style={styles.commentInput}
-                value={commentDraft}
-              />
-              <Button
-                disabled={isCommenting}
-                label={isCommenting ? "Invio..." : "Pubblica commento"}
-                onPress={() => {
-                  void handleComment();
-                }}
-                size="sm"
-                variant="secondary"
-              />
-            </View>
-
-            {post.comments.length > 0 ? (
-              <View style={styles.commentsPreview}>
-                {post.comments.slice(0, 3).map((comment) => (
-                  <View key={comment.id} style={styles.commentRow}>
-                    <Avatar
-                      name={comment.author_name}
-                      size="sm"
-                      uri={comment.author_avatar_url}
-                    />
-                    <View style={styles.commentText}>
-                      <AppText numberOfLines={1} style={styles.commentAuthor} variant="caption">
-                        {comment.author_name}
-                      </AppText>
-                      <AppText variant="bodySm">{comment.body}</AppText>
-                    </View>
-                  </View>
-                ))}
-                {post.comment_count > 3 ? (
-                  <AppText color="secondary" variant="caption">
-                    Vedi tutti i {post.comment_count} commenti
-                  </AppText>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-        </ScrollView>
-
-        {post.cover_type === "video" && post.cover_url ? (
-          <VideoPlayerModal
-            onClose={() => setIsVideoOpen(false)}
-            title={post.title}
-            url={post.cover_url}
-            visible={isVideoOpen}
-          />
-        ) : null}
-
-        {isManageOpen && viewerProfileId ? (
-          <TagManageSheet
-            content={{
-              thumbnailUrl: post.cover_url,
-              title: post.title,
-              typeLabel: post.kind === "news" ? "News" : "Articolo",
-            }}
-            contentType="media_profile"
-            onActionDone={() => {
-              setManageOpen(false);
-              onTagActionDone?.();
-            }}
-            onClose={() => setManageOpen(false)}
-            postId={post.id}
-            taggedId={viewerProfileId}
-            targetType="profile"
-            visible
-          />
-        ) : null}
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
-function MediaTribunaCreateMenuModal({
-  onClose,
-  onSelect,
-  visible,
-}: {
-  onClose: () => void;
-  onSelect: (kind: MediaTribunaKind) => void;
-  visible: boolean;
-}) {
-  if (!visible) {
-    return null;
-  }
-
-  return (
-    <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
-      <View style={styles.sheetOverlay}>
-        <Pressable
-          accessibilityLabel="Chiudi menu Tribuna"
-          accessibilityRole="button"
-          onPress={onClose}
-          style={styles.sheetBackdrop}
-        />
-        <View style={styles.sheetPanel}>
-          <AppText align="center" style={styles.sheetTitle} variant="titleSm">
-            Crea contenuto Tribuna
-          </AppText>
-          {TRIBUNA_CREATE_OPTIONS.map((option) => (
-            <Pressable
-              accessibilityRole="button"
-              key={option.kind}
-              onPress={() => onSelect(option.kind)}
-              style={({ pressed }) => [
-                styles.sheetOption,
-                pressed ? styles.pressedRow : null,
-              ]}
-              testID={`media-tribuna-create-option-${option.kind}`}
-            >
-              <View style={styles.sheetIcon}>
-                <Ionicons color={colors.accent} name={option.icon} size={21} />
-              </View>
-              <View style={styles.sheetOptionText}>
-                <AppText variant="bodySm">{option.title}</AppText>
-                <AppText color="secondary" variant="caption">
-                  {option.description}
-                </AppText>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-function MediaTribunaComposerModal({
-  articles,
-  kind,
-  mediaProfileId,
-  onClose,
-  onCreated,
-  userId,
-  visible,
-}: {
-  articles: MediaProfilePost[];
-  kind: TribunaDraftKind;
-  mediaProfileId: string;
-  onClose: () => void;
-  onCreated: (post: MediaTribunaPost) => void;
-  userId: string | null;
-  visible: boolean;
-}) {
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [options, setOptions] = useState(["", ""]);
-  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
-  const [playerQuery, setPlayerQuery] = useState("");
-  const [playerSuggestions, setPlayerSuggestions] = useState<
-    MediaTribunaPlayerOptionInput[]
-  >([]);
-  const [selectedPlayers, setSelectedPlayers] = useState<
-    MediaTribunaPlayerOptionInput[]
-  >([]);
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setTitle("");
-      setBody("");
-      setOptions(["", ""]);
-      setSelectedArticleId(articles[0]?.id ?? null);
-      setPlayerQuery("");
-      setPlayerSuggestions([]);
-      setSelectedPlayers([]);
-      setIsSaving(false);
-    }
-  }, [articles, visible]);
-
-  useEffect(() => {
-    if (!visible || kind !== "player_vote") {
-      return;
-    }
-
-    let isMounted = true;
-    const timeout = setTimeout(() => {
-      async function loadPlayers() {
-        if (playerQuery.trim().length < 2) {
-          if (isMounted) {
-            setPlayerSuggestions([]);
-          }
-          return;
-        }
-
-        try {
-          const results = await searchMediaProfilePostTargets(playerQuery.trim());
-          if (isMounted) {
-            setPlayerSuggestions(
-              results
-                .filter(
-                  (target) =>
-                    target.target_type === "profile" && target.role === "player",
-                )
-                .map((target) => ({
-                  avatarUrl: target.avatar_url,
-                  displayName: target.display_name,
-                  playerProfileId: target.target_id,
-                })),
-            );
-          }
-        } catch {
-          if (isMounted) {
-            setPlayerSuggestions([]);
-          }
-        }
-      }
-
-      void loadPlayers();
-    }, SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeout);
-    };
-  }, [kind, playerQuery, visible]);
-
-  if (!visible || !kind) {
-    return null;
-  }
-
-  const canPublish =
-    kind === "editorial_poll"
-      ? title.trim().length > 0 && options.filter((option) => option.trim()).length >= 2
-      : kind === "article_debate"
-        ? title.trim().length > 0 && Boolean(selectedArticleId)
-        : kind === "player_vote"
-          ? title.trim().length > 0 && selectedPlayers.length >= 2
-          : title.trim().length > 0;
-
-  function addPlayer(player: MediaTribunaPlayerOptionInput) {
-    if (
-      selectedPlayers.some(
-        (entry) => entry.playerProfileId === player.playerProfileId,
-      )
-    ) {
-      return;
-    }
-
-    setSelectedPlayers((current) => [...current, player]);
-    setPlayerQuery("");
-    setPlayerSuggestions([]);
-  }
-
-  async function handleSave() {
-    if (!userId) {
-      Alert.alert("Accesso richiesto", "Accedi per pubblicare in Tribuna.");
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      const createdPost =
-        kind === "editorial_poll"
-          ? await createMediaTribunaPoll({
-              createdByProfileId: userId,
-              mediaProfileId,
-              options,
-              question: title,
-            })
-          : kind === "article_debate"
-            ? await createMediaArticleDebate({
-                articleId: selectedArticleId ?? "",
-                body,
-                createdByProfileId: userId,
-                mediaProfileId,
-                question: title,
-              })
-            : kind === "player_vote"
-              ? await createMediaPlayerVote({
-                  body,
-                  createdByProfileId: userId,
-                  mediaProfileId,
-                  options: selectedPlayers,
-                  title,
-                })
-              : await createMediaCommunityQa({
-                  body,
-                  createdByProfileId: userId,
-                  mediaProfileId,
-                  title,
-                });
-
-      onCreated(createdPost);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Pubblicazione non riuscita.";
-      Alert.alert("Errore", message);
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  return (
-    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
-      <SafeAreaView style={styles.formRoot}>
-        <View style={styles.formHeader}>
-          <Pressable
-            accessibilityLabel="Chiudi creazione Tribuna"
-            accessibilityRole="button"
-            onPress={onClose}
-            style={styles.detailIconButton}
-          >
-            <Ionicons color={colors.textPrimary} name="close" size={22} />
-          </Pressable>
-          <AppText numberOfLines={1} style={styles.createModalTitle} variant="titleSm">
-            {getTribunaCreateTitle(kind)}
-          </AppText>
-          <View style={styles.detailIconButton} />
-        </View>
-
-        <KeyboardAwareForm contentContainerStyle={styles.formContent}>
-          {kind === "article_debate" ? (
-            <View style={styles.articleSelectBlock}>
-              <AppText color="secondary" style={styles.formLabel} variant="caption">
-                Seleziona articolo
-              </AppText>
-              {articles.length > 0 ? (
-                articles.map((article) => {
-                  const isSelected = selectedArticleId === article.id;
-
-                  return (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                      key={article.id}
-                      onPress={() => setSelectedArticleId(article.id)}
-                      style={[
-                        styles.articleSelectRow,
-                        isSelected ? styles.articleSelectRowActive : null,
-                      ]}
-                      testID={`media-tribuna-article-select-${article.id}`}
-                    >
-                      <AppText numberOfLines={2} style={styles.articleSelectTitle} variant="bodySm">
-                        {article.title}
-                      </AppText>
-                      {isSelected ? (
-                        <Ionicons color={colors.accent} name="checkmark" size={18} />
-                      ) : null}
-                    </Pressable>
-                  );
-                })
-              ) : (
-                <AppText color="secondary" variant="bodySm">
-                  Pubblica un articolo prima di aprire un dibattito collegato.
-                </AppText>
-              )}
-            </View>
-          ) : null}
-
-          <Input
-            label={kind === "community_qa" || kind === "player_vote" ? "Titolo" : "Domanda"}
-            onChangeText={setTitle}
-            placeholder={getTribunaTitlePlaceholder(kind)}
-            value={title}
-          />
-
-          {kind === "editorial_poll" ? (
-            <>
-              {options.map((option, index) => (
-                <Input
-                  key={`tribuna-option-${index}`}
-                  label={`Opzione ${index + 1}`}
-                  onChangeText={(value) =>
-                    setOptions((current) =>
-                      current.map((entry, entryIndex) =>
-                        entryIndex === index ? value : entry,
-                      ),
-                    )
-                  }
-                  placeholder={
-                    index === 0
-                      ? "Difesa"
-                      : index === 1
-                        ? "Centrocampo"
-                        : "Altra opzione"
-                  }
-                  value={option}
-                />
-              ))}
-              {options.length < 6 ? (
-                <Button
-                  label="Aggiungi opzione"
-                  onPress={() => setOptions((current) => [...current, ""])}
-                  variant="outline"
-                />
-              ) : null}
-            </>
-          ) : null}
-
-          {kind === "player_vote" ? (
-            <View style={styles.playerPickerBlock}>
-              <Input
-                label="Giocatori votabili"
-                onChangeText={setPlayerQuery}
-                placeholder="Cerca giocatore..."
-                value={playerQuery}
-              />
-              {selectedPlayers.length > 0 ? (
-                <View style={styles.selectedPlayers}>
-                  {selectedPlayers.map((player) => (
-                    <Pressable
-                      accessibilityLabel={`Rimuovi ${player.displayName}`}
-                      accessibilityRole="button"
-                      key={player.playerProfileId}
-                      onPress={() =>
-                        setSelectedPlayers((current) =>
-                          current.filter(
-                            (entry) =>
-                              entry.playerProfileId !== player.playerProfileId,
-                          ),
-                        )
-                      }
-                      style={styles.selectedPlayerChip}
-                    >
-                      <Avatar
-                        name={player.displayName}
-                        size="sm"
-                        uri={player.avatarUrl ?? null}
-                      />
-                      <AppText numberOfLines={1} style={styles.selectedPlayerText} variant="caption">
-                        {player.displayName}
-                      </AppText>
-                      <Ionicons color={colors.accent} name="close" size={14} />
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-              {playerSuggestions.length > 0 ? (
-                <View style={styles.suggestions}>
-                  {playerSuggestions.map((player) => (
-                    <Pressable
-                      accessibilityRole="button"
-                      key={player.playerProfileId}
-                      onPress={() => addPlayer(player)}
-                      style={styles.suggestionRow}
-                    >
-                      <Avatar
-                        name={player.displayName}
-                        size="sm"
-                        uri={player.avatarUrl ?? null}
-                      />
-                      <View style={styles.suggestionText}>
-                        <AppText numberOfLines={1} variant="bodySm">
-                          {player.displayName}
-                        </AppText>
-                        <AppText color="secondary" variant="caption">
-                          Calciatore
-                        </AppText>
-                      </View>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
-          {kind !== "editorial_poll" ? (
-            <Input
-              label={kind === "community_qa" ? "Descrizione breve" : "Contesto breve"}
-              multiline
-              onChangeText={setBody}
-              placeholder={getTribunaBodyPlaceholder(kind)}
-              value={body}
-            />
-          ) : null}
-        </KeyboardAwareForm>
-
-        <View style={styles.formFooter}>
-          <Button
-            disabled={!canPublish || isSaving}
-            label={isSaving ? "Pubblicazione..." : "Pubblica"}
-            loading={isSaving}
-            onPress={() => {
-              void handleSave();
-            }}
-            testID="media-tribuna-publish-button"
-          />
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
-function MediaMetaLine({
-  accent = false,
-  icon,
-  text,
-}: {
-  accent?: boolean;
-  icon: keyof typeof Ionicons.glyphMap;
-  text: string;
-}) {
-  return (
-    <View style={styles.metaLine}>
-      <Ionicons
-        color={accent ? colors.accent : colors.textSecondary}
-        name={icon}
-        size={14}
+      <MediaContentComposer
+        entityName={entityName ?? "Redazione"}
+        mediaProfileId={mediaProfileId}
+        onClose={() => setIsMediaComposerOpen(false)}
+        onCreated={handleMediaCreated}
+        userId={viewerProfileId ?? null}
+        visible={isMediaComposerOpen}
       />
-      <AppText
-        color={accent ? "accent" : "secondary"}
-        numberOfLines={1}
-        style={styles.metaText}
-        variant="caption"
-      >
-        {text}
-      </AppText>
     </View>
   );
-}
-
-function MediaTabButton({
-  active,
-  label,
-  onPress,
-  testID,
-}: {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-  testID: string;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.tab}
-      testID={testID}
-    >
-      <AppText
-        style={[styles.tabText, active ? styles.tabTextActive : styles.tabTextInactive]}
-        variant="titleSm"
-      >
-        {label}
-      </AppText>
-      <View style={[styles.tabIndicator, active ? styles.tabIndicatorActive : null]} />
-    </Pressable>
-  );
-}
-
-function MediaEmptyState({
-  icon,
-  text,
-  title,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  text: string;
-  title: string;
-}) {
-  return (
-    <View style={styles.emptyState}>
-      <Ionicons color={colors.textMuted} name={icon} size={28} />
-      <AppText style={styles.emptyTitle} variant="titleSm">
-        {title}
-      </AppText>
-      <AppText align="center" color="secondary" style={styles.emptyText} variant="bodySm">
-        {text}
-      </AppText>
-    </View>
-  );
-}
-
-function MediaInfoPanel({
-  areaLabel,
-  channels,
-  contacts,
-  coverageLabel,
-  displayName,
-  isVerified,
-  mediaProfile,
-  mediaProfileAuthors,
-  onAuthorPress,
-  onOpenExternal,
-  profileTypeLabel,
-  verifications,
-}: {
-  areaLabel: string;
-  channels: ChannelItem[];
-  contacts: ContactItem[];
-  coverageLabel: string;
-  displayName: string;
-  isVerified: boolean;
-  mediaProfile: CompleteProfessionalProfile["mediaProfile"];
-  mediaProfileAuthors: MediaProfileAuthorRecord[];
-  onAuthorPress: (author: MediaProfileAuthorRecord) => void;
-  onOpenExternal: (url: string) => void;
-  profileTypeLabel: string;
-  verifications: VerificationItem[];
-}) {
-  const description = mediaProfile?.short_description?.trim();
-  const coverageGroups = buildCoverageGroups(mediaProfile, areaLabel);
-  const visibleAuthors = mediaProfileAuthors.slice(0, 5);
-
-  return (
-    <View style={styles.infoPanel} testID="media-info-tab">
-      <InfoSection title="Identità editoriale">
-        <View style={styles.editorialIdentity}>
-          <View style={styles.nameRow}>
-            <AppText style={styles.identityName} variant="titleSm">
-              {displayName}
-            </AppText>
-            {isVerified ? (
-              <Ionicons color="#007AFF" name="checkmark-circle" size={16} />
-            ) : null}
-          </View>
-          <AppText color="secondary" style={styles.identityRole} variant="bodySm">
-            {profileTypeLabel}
-          </AppText>
-          {description ? (
-            <AppText
-              numberOfLines={2}
-              style={styles.identityDescription}
-              variant="bodySm"
-            >
-              {description}
-            </AppText>
-          ) : null}
-        </View>
-      </InfoSection>
-
-      <InfoSection title="Copertura">
-        {coverageGroups.length > 0 ? (
-          <View style={styles.coverageGroups}>
-            {coverageGroups.map((group) => (
-              <View key={group.label} style={styles.coverageGroup}>
-                <AppText color="secondary" variant="caption">
-                  {group.label}
-                </AppText>
-                <View style={styles.infoTagsRow}>
-                  {group.values.map((value) => (
-                    <View key={`${group.label}-${value}`} style={styles.infoTag}>
-                      <AppText style={styles.infoTagText} variant="caption">
-                        {value}
-                      </AppText>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <AppText color="secondary" variant="bodySm">
-            {coverageLabel}
-          </AppText>
-        )}
-      </InfoSection>
-
-      {channels.length > 0 ? (
-        <InfoSection title="Canali ufficiali">
-          <View style={styles.infoItemList}>
-            {channels.map((channel) => (
-              <InfoActionRow
-                icon={channel.icon}
-                key={channel.key}
-                label={channel.label}
-                onPress={() => onOpenExternal(channel.url)}
-                testID={`media-info-channel-${channel.key}`}
-              />
-            ))}
-          </View>
-        </InfoSection>
-      ) : null}
-
-      {visibleAuthors.length > 0 ? (
-        <InfoSection title="Redazione">
-          <View style={styles.authorsList}>
-            {visibleAuthors.map((author) => (
-              <Pressable
-                accessibilityLabel={`Mostra articoli di ${author.display_name}`}
-                accessibilityRole="button"
-                key={author.id}
-                onPress={() => onAuthorPress(author)}
-                style={({ pressed }) => [
-                  styles.authorRow,
-                  pressed ? styles.pressedRow : null,
-                ]}
-                testID={`media-info-author-${author.id}`}
-              >
-                <Avatar
-                  name={author.display_name}
-                  size="md"
-                  uri={author.avatar_url}
-                />
-                <View style={styles.authorInfo}>
-                  <View style={styles.authorNameRow}>
-                    <AppText
-                      numberOfLines={1}
-                      style={styles.authorName}
-                      variant="bodySm"
-                    >
-                      {author.display_name}
-                    </AppText>
-                    {author.is_verified ? (
-                      <Ionicons color="#007AFF" name="checkmark-circle" size={14} />
-                    ) : null}
-                  </View>
-                  {author.role_label ? (
-                    <AppText color="secondary" numberOfLines={1} variant="caption">
-                      {author.role_label}
-                    </AppText>
-                  ) : null}
-                </View>
-              </Pressable>
-            ))}
-            {mediaProfileAuthors.length > visibleAuthors.length ? (
-              <AppText color="secondary" variant="caption">
-                +{mediaProfileAuthors.length - visibleAuthors.length} altri autori
-              </AppText>
-            ) : null}
-          </View>
-        </InfoSection>
-      ) : null}
-
-      {verifications.length > 0 ? (
-        <InfoSection title="Verifiche">
-          <View style={styles.trustBadges}>
-            {verifications.map((verification) => (
-              <View key={verification.key} style={styles.trustBadge}>
-                <Ionicons color="#007AFF" name={verification.icon} size={20} />
-                <AppText style={styles.trustBadgeText} variant="bodySm">
-                  {verification.label}
-                </AppText>
-              </View>
-            ))}
-          </View>
-        </InfoSection>
-      ) : null}
-
-      {contacts.length > 0 ? (
-        <InfoSection title="Contatti">
-          <View style={styles.infoItemList}>
-            {contacts.map((contact) => (
-              <InfoActionRow
-                icon={contact.icon}
-                key={contact.key}
-                label={contact.label}
-                onPress={() => onOpenExternal(contact.href)}
-                supportingText={contact.value}
-                testID={`media-info-contact-${contact.key}`}
-              />
-            ))}
-          </View>
-        </InfoSection>
-      ) : null}
-    </View>
-  );
-}
-
-function InfoSection({
-  children,
-  title,
-}: {
-  children: ReactNode;
-  title: string;
-}) {
-  return (
-    <View style={styles.infoSection}>
-      <AppText style={styles.infoSectionTitle} variant="titleSm">
-        {title}
-      </AppText>
-      {children}
-    </View>
-  );
-}
-
-function InfoActionRow({
-  icon,
-  label,
-  onPress,
-  supportingText,
-  testID,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  supportingText?: string;
-  testID: string;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={supportingText ? `${label}: ${supportingText}` : label}
-      accessibilityRole="link"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.infoActionRow,
-        pressed ? styles.pressedRow : null,
-      ]}
-      testID={testID}
-    >
-      <Ionicons color={colors.textMuted} name={icon} size={18} />
-      <View style={styles.infoActionText}>
-        <AppText numberOfLines={1} style={styles.infoActionLabel} variant="bodySm">
-          {label}
-        </AppText>
-        {supportingText ? (
-          <AppText color="secondary" numberOfLines={1} variant="caption">
-            {supportingText}
-          </AppText>
-        ) : null}
-      </View>
-      <Ionicons color={colors.textMuted} name="open-outline" size={16} />
-    </Pressable>
-  );
-}
-
-function ArticleTypeBadge({ kind }: { kind: MediaProfilePostKind }) {
-  return (
-    <View style={styles.typeBadge}>
-      <Ionicons
-        color="#0A56B8"
-        name={kind === "article" ? "document-text-outline" : "flash-outline"}
-        size={12}
-      />
-      <AppText style={styles.typeBadgeText} variant="caption">
-        {kind === "article" ? "Articolo" : "News"}
-      </AppText>
-    </View>
-  );
-}
-
-function getTribunaLabel(kind: MediaTribunaKind) {
-  if (kind === "article_debate") {
-    return "Dibattito da articolo";
-  }
-
-  if (kind === "player_vote") {
-    return "Vota il migliore";
-  }
-
-  if (kind === "community_qa") {
-    return "Q&A community";
-  }
-
-  return "Sondaggio editoriale";
-}
-
-function getTribunaIcon(kind: MediaTribunaKind): keyof typeof Ionicons.glyphMap {
-  if (kind === "article_debate") {
-    return "chatbox-outline";
-  }
-
-  if (kind === "player_vote") {
-    return "star-outline";
-  }
-
-  if (kind === "community_qa") {
-    return "help-circle-outline";
-  }
-
-  return "bar-chart-outline";
-}
-
-function TaggedTargetsInline({
-  compact = false,
-  onOpenTarget,
-  onTagActionDone,
-  postId,
-  removable = false,
-  targets,
-  viewerProfileId,
-}: {
-  compact?: boolean;
-  onOpenTarget: (target: MediaProfilePostTaggedTarget) => void;
-  onTagActionDone?: () => void;
-  postId?: string;
-  removable?: boolean;
-  targets: MediaProfilePostTaggedTarget[];
-  viewerProfileId?: string | null;
-}) {
-  const visibleTargets = compact ? targets.slice(0, 2) : targets;
-  const [manageOpen, setManageOpen] = useState(false);
-
-  return (
-    <View style={[styles.taggedTargets, compact ? styles.taggedTargetsCompact : null]}>
-      {visibleTargets.map((target) => {
-        const isViewerTag =
-          !removable &&
-          !!postId &&
-          !!viewerProfileId &&
-          target.target_type === "profile" &&
-          target.target_id === viewerProfileId;
-
-        return (
-          <Pressable
-            accessibilityLabel={`${removable ? "Rimuovi" : "Apri"} ${target.display_name}`}
-            accessibilityRole="button"
-            key={getTargetKey(target)}
-            onLongPress={isViewerTag ? () => setManageOpen(true) : undefined}
-            onPress={(event) => {
-              event.stopPropagation();
-              onOpenTarget(target);
-            }}
-            style={[styles.targetChip, compact ? styles.targetChipCompact : null]}
-          >
-          {!compact ? (
-            <Avatar name={target.display_name} size="sm" uri={target.avatar_url} />
-          ) : null}
-          <AppText numberOfLines={1} style={styles.targetChipText} variant="caption">
-            {target.display_name}
-          </AppText>
-            {removable ? (
-              <Ionicons color={colors.accent} name="close" size={14} />
-            ) : null}
-          </Pressable>
-        );
-      })}
-      {compact && targets.length > visibleTargets.length ? (
-        <View style={styles.targetChipCompact}>
-          <AppText color="secondary" variant="caption">
-            +{targets.length - visibleTargets.length}
-          </AppText>
-        </View>
-      ) : null}
-      {manageOpen && postId && viewerProfileId ? (
-        <TagManageSheet
-          contentType="media_profile"
-          onActionDone={onTagActionDone}
-          onClose={() => setManageOpen(false)}
-          postId={postId}
-          taggedId={viewerProfileId}
-          targetType="profile"
-          visible
-        />
-      ) : null}
-    </View>
-  );
-}
-
-function ActionButton({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.actionButton, pressed ? styles.pressedRow : null]}
-    >
-      <Ionicons color={colors.textPrimary} name={icon} size={18} />
-      <AppText style={styles.actionLabel} variant="caption">
-        {label}
-      </AppText>
-    </Pressable>
-  );
-}
-
-function ArticleBodyText({ body }: { body: string }) {
-  const paragraphs = body
-    .split(/\n+/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
-
-  return (
-    <View style={styles.articleBody}>
-      {paragraphs.map((paragraph, index) => {
-        const isQuote = paragraph.startsWith(">");
-        const text = isQuote ? paragraph.replace(/^>\s*/, "") : paragraph;
-
-        return (
-          <AppText
-            key={`${index}-${text.slice(0, 12)}`}
-            style={isQuote ? styles.articleQuote : styles.articleParagraph}
-            variant={isQuote ? "titleSm" : "bodyLg"}
-          >
-            {text}
-          </AppText>
-        );
-      })}
-    </View>
-  );
-}
-
-async function sharePost(post: MediaProfilePost) {
-  await Share.share({
-    message: post.external_url
-      ? `${post.title}\n${post.external_url}`
-      : post.subtitle || post.excerpt || post.title,
-    title: post.title,
-  });
-}
-
-function buildVotedTribunaState(post: MediaTribunaPost, optionId: string) {
-  const previousVotedOption = post.options.find((option) => option.is_voted);
-  const hasPreviousVote = Boolean(previousVotedOption);
-  const totalVoteCount = post.total_vote_count + (hasPreviousVote ? 0 : 1);
-  const options = post.options.map((option) => {
-    const wasVoted = option.is_voted;
-    const isVoted = option.id === optionId;
-    const voteCount =
-      option.vote_count + (isVoted && !wasVoted ? 1 : 0) - (!isVoted && wasVoted ? 1 : 0);
-
-    return {
-      ...option,
-      is_voted: isVoted,
-      percentage:
-        totalVoteCount > 0 ? Math.round((Math.max(0, voteCount) / totalVoteCount) * 100) : 0,
-      vote_count: Math.max(0, voteCount),
-    };
-  });
-
-  return { options, total_vote_count: totalVoteCount };
-}
-
-function sortTribunaQuestions(questions: MediaTribunaQuestion[]) {
-  return [...questions].sort((left, right) => {
-    if (left.vote_count !== right.vote_count) {
-      return right.vote_count - left.vote_count;
-    }
-
-    return left.created_at.localeCompare(right.created_at);
-  });
-}
-
-function getTribunaCreateTitle(kind: MediaTribunaKind) {
-  if (kind === "article_debate") {
-    return "Crea dibattito da articolo";
-  }
-
-  if (kind === "player_vote") {
-    return "Crea vota il migliore";
-  }
-
-  if (kind === "community_qa") {
-    return "Crea Q&A community";
-  }
-
-  return "Crea sondaggio editoriale";
-}
-
-function getTribunaTitlePlaceholder(kind: MediaTribunaKind) {
-  if (kind === "article_debate") {
-    return "Che tipo di profilo servirebbe davvero?";
-  }
-
-  if (kind === "player_vote") {
-    return "Migliore in campo - Como U19 vs Lecco U19";
-  }
-
-  if (kind === "community_qa") {
-    return "Fai una domanda al DS del Como";
-  }
-
-  return "Quale reparto deve rinforzare il Como?";
-}
-
-function getTribunaBodyPlaceholder(kind: MediaTribunaKind) {
-  if (kind === "article_debate") {
-    return "Raccogliamo il parere della community dopo l'articolo.";
-  }
-
-  if (kind === "player_vote") {
-    return "Aggiungi un contesto breve sulla gara.";
-  }
-
-  return "Le domande piu votate saranno usate nella prossima intervista.";
-}
-
-function buildFeedMeta(post: MediaProfilePost) {
-  return [
-    `di ${post.author_name}`,
-    formatPostDate(post.published_at ?? post.created_at),
-    post.kind === "article" ? `${post.reading_time_minutes} min` : null,
-    formatCommentCount(post.comment_count),
-  ]
-    .filter(Boolean)
-    .join(" • ");
-}
-
-function formatCommentCount(count: number) {
-  return count === 1 ? "1 commento" : `${count} commenti`;
-}
-
-function formatCount(count: number) {
-  if (count >= 1000) {
-    const rounded = Math.round((count / 1000) * 10) / 10;
-    return `${String(rounded).replace(".", ",")}k`;
-  }
-
-  return String(count);
-}
-
-function formatPostDate(value: string | null) {
-  if (!value) {
-    return "Oggi";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Oggi";
-  }
-
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffHours = Math.floor(diffMs / 3_600_000);
-
-  if (diffHours < 1) {
-    return "Ora";
-  }
-
-  if (diffHours < 24) {
-    return `${diffHours} ore fa`;
-  }
-
-  if (diffHours < 48) {
-    return "Ieri";
-  }
-
-  return date.toLocaleDateString("it-IT", {
-    day: "2-digit",
-    month: "short",
-  });
-}
-
-function getTargetKey(target: MediaProfilePostTaggedTarget) {
-  return `${target.target_type}:${target.target_id}`;
-}
-
-function buildMediaProfileTypeLabel(affiliationType: string | null | undefined) {
-  const normalized = affiliationType?.trim().toLowerCase() ?? "";
-
-  if (normalized.includes("testata") || normalized.includes("sito")) {
-    return "Testata giornalistica / Media sportivo";
-  }
-
-  if (
-    normalized.includes("creator") ||
-    normalized.includes("pagina") ||
-    normalized.includes("progetto")
-  ) {
-    return "Creator sportivo / Pagina tifosi";
-  }
-
-  if (normalized.includes("societa") || normalized.includes("società")) {
-    return "Canale ufficiale / Comunicazione sportiva";
-  }
-
-  if (normalized === "nessuna") {
-    return "Creator sportivo / Pagina tifosi";
-  }
-
-  return "Media sportivo / Fonte editoriale";
-}
-
-function buildAreaLabel(completeProfile: CompleteProfessionalProfile) {
-  const profile = completeProfile.profile;
-  const country =
-    profile.current_location_country ||
-    profile.residence_country ||
-    profile.nationality ||
-    "";
-  const formattedCountry = formatCountryLabel(country);
-
-  if (formattedCountry) {
-    return formattedCountry;
-  }
-
-  return (
-    [profile.city, profile.region].filter(Boolean).join(" • ") ||
-    "Area da completare"
-  );
-}
-
-function buildCoverageGroups(
-  mediaProfile: CompleteProfessionalProfile["mediaProfile"],
-  areaLabel: string,
-) {
-  if (!mediaProfile) {
-    return [];
-  }
-
-  return [
-    {
-      label: "Competizioni",
-      values: normalizeUniqueValues([
-        ...mediaProfile.covered_competitions,
-        ...(mediaProfile.covered_competitions.length === 0
-          ? mediaProfile.focus_areas
-          : []),
-      ]),
-    },
-    {
-      label: "Squadre",
-      values: normalizeUniqueValues(mediaProfile.covered_teams),
-    },
-    {
-      label: "Territori",
-      values: normalizeUniqueValues([
-        ...mediaProfile.covered_territories,
-        ...(mediaProfile.covered_territories.length === 0 &&
-        areaLabel !== "Area da completare"
-          ? [areaLabel]
-          : []),
-      ]),
-    },
-    {
-      label: "Temi",
-      values: normalizeUniqueValues([
-        ...mediaProfile.covered_topics,
-        ...(mediaProfile.covered_topics.length === 0
-          ? mediaProfile.content_types
-          : []),
-      ]),
-    },
-  ].filter((group) => group.values.length > 0);
-}
-
-function buildChannelItems(
-  mediaChannels: MediaProfileChannelRecord[],
-  contacts: CompleteProfessionalProfile["userContacts"],
-): ChannelItem[] {
-  const website = normalizeWebsiteInput(contacts.website);
-  const instagram = normalizeInstagramInput(contacts.instagram);
-  const youtube = normalizeExternalUrl(contacts.youtube ?? "");
-  const tiktok = normalizeExternalUrl(contacts.tiktok ?? "");
-  const facebook = normalizeFacebookInput(contacts.facebook);
-
-  const explicitChannels = mediaChannels
-    .map((channel) => {
-      const url = normalizeExternalUrl(channel.url);
-
-      if (!channel.is_public || !url) {
-        return null;
-      }
-
-      return {
-        channelType: channel.channel_type,
-        icon: getChannelIcon(channel.channel_type),
-        key: channel.id,
-        label: channel.label.trim() || formatChannelLabel(channel.channel_type),
-        url,
-      };
-    })
-    .filter(Boolean) as ChannelItem[];
-  const legacyChannels = [
-    contacts.showWebsite && website
-      ? {
-          channelType: "website",
-          icon: getChannelIcon("website"),
-          key: "legacy-website",
-          label: "Sito web",
-          url: website,
-        }
-      : null,
-    contacts.showInstagram && instagram
-      ? {
-          channelType: "instagram",
-          icon: getChannelIcon("instagram"),
-          key: "legacy-instagram",
-          label: "Instagram",
-          url: instagram,
-        }
-      : null,
-    contacts.showYouTube && youtube
-      ? {
-          channelType: "youtube",
-          icon: getChannelIcon("youtube"),
-          key: "legacy-youtube",
-          label: "YouTube",
-          url: youtube,
-        }
-      : null,
-    contacts.showTikTok && tiktok
-      ? {
-          channelType: "tiktok",
-          icon: getChannelIcon("tiktok"),
-          key: "legacy-tiktok",
-          label: "TikTok",
-          url: tiktok,
-        }
-      : null,
-    contacts.showFacebook && facebook
-      ? {
-          channelType: "facebook",
-          icon: getChannelIcon("facebook"),
-          key: "legacy-facebook",
-          label: "Facebook",
-          url: facebook,
-        }
-      : null,
-  ].filter(Boolean) as ChannelItem[];
-
-  return uniqueChannelItems([...explicitChannels, ...legacyChannels]);
-}
-
-function buildContactItems(
-  mediaContacts: MediaProfileContactRecord[],
-  contacts: CompleteProfessionalProfile["userContacts"],
-): ContactItem[] {
-  const explicitContacts = mediaContacts
-    .map((contact) => {
-      const href = normalizeContactHref(contact.href || contact.value, contact.contact_type);
-
-      if (!contact.is_public || !href) {
-        return null;
-      }
-
-      return {
-        contactType: contact.contact_type,
-        href,
-        icon: getContactIcon(contact.contact_type, contact.value),
-        key: contact.id,
-        label: contact.label.trim() || formatContactLabel(contact.contact_type),
-        value: contact.value.trim(),
-      };
-    })
-    .filter(Boolean) as ContactItem[];
-
-  const email = contacts.email.trim();
-  const fallbackEmail =
-    contacts.showEmail && email
-      ? [
-          {
-            contactType: "editorial",
-            href: `mailto:${email}`,
-            icon: getContactIcon("email", email),
-            key: "legacy-email",
-            label: "Redazione",
-            value: email,
-          },
-        ]
-      : [];
-
-  return uniqueContactItems([...explicitContacts, ...fallbackEmail]);
-}
-
-function buildVerificationItems(
-  verificationStatus: string | null,
-  verifications: MediaProfileVerificationRecord[],
-): VerificationItem[] {
-  const items = verifications
-    .filter((verification) => verification.is_public && verification.status === "verified")
-    .map((verification) => ({
-      icon: getVerificationIcon(verification.verification_type),
-      key: verification.id,
-      label:
-        verification.label.trim() ||
-        formatVerificationLabel(verification.verification_type),
-    }));
-
-  if (verificationStatus === "verified") {
-    items.unshift({
-      icon: getVerificationIcon("profile_verified"),
-      key: "profile-status-verified",
-      label: "Profilo verificato",
-    });
-  }
-
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const key = item.label.trim().toLowerCase();
-
-    if (seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
-}
-
-function uniqueChannelItems(items: ChannelItem[]) {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const key = item.url.trim().toLowerCase();
-
-    if (!key || seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
-}
-
-function uniqueContactItems(items: ContactItem[]) {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const key = item.href.trim().toLowerCase();
-
-    if (!key || seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
-}
-
-function formatChannelLabel(channelType: string) {
-  const normalized = channelType.trim().toLowerCase();
-
-  if (normalized === "website") {
-    return "Sito web";
-  }
-
-  if (normalized === "x" || normalized === "twitter") {
-    return "X / Twitter";
-  }
-
-  if (normalized === "youtube") {
-    return "YouTube";
-  }
-
-  if (normalized === "tiktok") {
-    return "TikTok";
-  }
-
-  return normalized ? normalized[0].toUpperCase() + normalized.slice(1) : "Canale";
-}
-
-function getChannelIcon(channelType: string): keyof typeof Ionicons.glyphMap {
-  const normalized = channelType.trim().toLowerCase();
-
-  if (normalized === "instagram") {
-    return "logo-instagram";
-  }
-
-  if (normalized === "youtube") {
-    return "logo-youtube";
-  }
-
-  if (normalized === "tiktok") {
-    return "logo-tiktok";
-  }
-
-  if (normalized === "x" || normalized === "twitter") {
-    return "logo-twitter";
-  }
-
-  if (normalized === "facebook") {
-    return "logo-facebook";
-  }
-
-  if (normalized === "website") {
-    return "globe-outline";
-  }
-
-  return "link-outline";
-}
-
-function formatContactLabel(contactType: string) {
-  const normalized = contactType.trim().toLowerCase();
-
-  if (normalized === "press") {
-    return "Comunicati stampa";
-  }
-
-  if (normalized === "commercial" || normalized === "sponsor") {
-    return "Commerciale / sponsor";
-  }
-
-  if (normalized === "phone") {
-    return "Telefono";
-  }
-
-  return "Redazione";
-}
-
-function getContactIcon(
-  contactType: string,
-  value: string,
-): keyof typeof Ionicons.glyphMap {
-  const normalized = contactType.trim().toLowerCase();
-
-  if (normalized === "phone" || /^tel:/i.test(value)) {
-    return "call-outline";
-  }
-
-  if (normalized === "commercial" || normalized === "sponsor") {
-    return "briefcase-outline";
-  }
-
-  return "mail-outline";
-}
-
-function formatVerificationLabel(verificationType: string) {
-  const normalized = verificationType.trim().toLowerCase();
-
-  if (normalized === "registered_publication") {
-    return "Testata registrata";
-  }
-
-  if (normalized === "authors_verified") {
-    return "Autori verificati";
-  }
-
-  if (normalized === "identity_checked") {
-    return "Identità verificata";
-  }
-
-  return "Profilo verificato";
-}
-
-function getVerificationIcon(
-  verificationType: string,
-): keyof typeof Ionicons.glyphMap {
-  const normalized = verificationType.trim().toLowerCase();
-
-  if (normalized === "registered_publication") {
-    return "document-text-outline";
-  }
-
-  if (normalized === "authors_verified") {
-    return "people-outline";
-  }
-
-  return "shield-checkmark-outline";
-}
-
-function normalizeUniqueValues(values: (string | null | undefined)[]) {
-  const seen = new Set<string>();
-  const normalizedValues: string[] = [];
-
-  values.forEach((value) => {
-    const normalized = value?.trim();
-
-    if (!normalized) {
-      return;
-    }
-
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) {
-      return;
-    }
-
-    seen.add(key);
-    normalizedValues.push(normalized);
-  });
-
-  return normalizedValues;
-}
-
-function normalizeWebsiteInput(value: string | null | undefined) {
-  const normalized = normalizeExternalUrl(value ?? "");
-  return normalized && !normalized.includes("instagram.com") ? normalized : "";
-}
-
-function normalizeContactHref(value: string, contactType: string) {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return "";
-  }
-
-  if (/^(mailto|tel|https?):/i.test(trimmed)) {
-    return trimmed;
-  }
-
-  if (trimmed.includes("@") && !trimmed.includes(" ")) {
-    return `mailto:${trimmed}`;
-  }
-
-  if (
-    contactType.trim().toLowerCase() === "phone" ||
-    /^\+?[0-9][0-9\s().-]{5,}$/.test(trimmed)
-  ) {
-    return `tel:${trimmed.replace(/[\s().-]/g, "")}`;
-  }
-
-  return normalizeExternalUrl(trimmed);
-}
-
-function normalizeExternalUrl(value: string) {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return "";
-  }
-
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
-
-  if (/^www\./i.test(trimmed) || trimmed.includes(".")) {
-    return `https://${trimmed}`;
-  }
-
-  return "";
-}
-
-function formatCountryLabel(value: string) {
-  const normalized = value.trim();
-
-  if (!normalized) {
-    return "";
-  }
-
-  if (normalized.toUpperCase() === "IT") {
-    return "Italia";
-  }
-
-  return normalized;
 }
 
 const styles = StyleSheet.create({
-  actionButton: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[6],
-    minHeight: 44,
-  },
-  actionLabel: {
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[12],
-    marginBottom: spacing[24],
-  },
-  articleBody: {
-    gap: spacing[14],
-    marginTop: spacing[8],
-  },
-  articleExcerpt: {
-    lineHeight: 19,
-  },
-  articleMeta: {
-    lineHeight: 17,
-  },
-  articleParagraph: {
-    color: colors.textPrimary,
-    lineHeight: 25,
-  },
-  articleQuote: {
-    borderLeftColor: "#0A56B8",
-    borderLeftWidth: 3,
-    color: "#061223",
-    lineHeight: 23,
-    marginVertical: spacing[8],
-    paddingLeft: spacing[14],
-  },
-  articleRow: {
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[12],
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[14],
-  },
-  articleTextColumn: {
-    flex: 1,
-    gap: spacing[4],
-    minWidth: 0,
-  },
-  articleTitle: {
-    color: "#061223",
-    fontWeight: typography.fontWeight.semibold,
-    lineHeight: 20,
-  },
-  articlesHeader: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    flexDirection: "row",
-    gap: spacing[12],
-    justifyContent: "space-between",
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[16],
-  },
-  articlesHeaderText: {
-    flex: 1,
-    gap: spacing[4],
-    minWidth: 0,
-  },
-  articlesRoot: {
-    backgroundColor: colors.surface,
-  },
-  authorLine: {
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    lineHeight: 20,
-    marginBottom: spacing[18],
-    paddingBottom: spacing[18],
-  },
-  authorFilterBar: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[12],
-    justifyContent: "space-between",
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[10],
-  },
-  authorFilterClear: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[4],
-    minHeight: 44,
-    paddingHorizontal: spacing[8],
-  },
-  authorFilterName: {
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  authorFilterText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  authorInfo: {
-    flex: 1,
-    gap: spacing[4],
-    minWidth: 0,
-  },
-  authorName: {
-    color: colors.textPrimary,
-    flex: 1,
-    fontWeight: typography.fontWeight.medium,
-  },
-  authorNameRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[6],
-  },
-  authorRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[12],
-    minHeight: 44,
-  },
-  authorsList: {
-    gap: spacing[14],
-  },
-  bodyInput: {
-    minHeight: 150,
-  },
-  categoryOption: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[6],
-    minHeight: 36,
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[8],
-  },
-  categoryOptionActive: {
-    backgroundColor: "#061223",
-  },
-  categoryOptions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[8],
-  },
-  categoryPicker: {
-    gap: spacing[8],
-  },
-  categoryText: {
-    flex: 1,
-    textTransform: "uppercase",
-  },
-  commentAuthor: {
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  commentBox: {
-    gap: spacing[10],
-    marginTop: spacing[18],
-  },
-  commentInput: {
-    minHeight: 80,
-  },
-  commentRow: {
-    flexDirection: "row",
-    gap: spacing[10],
-  },
-  commentText: {
-    flex: 1,
-    gap: spacing[4],
-  },
-  commentsPreview: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    gap: spacing[12],
-    marginTop: spacing[16],
-    padding: spacing[12],
-  },
-  coverageText: {
-    lineHeight: 20,
-  },
-  detailActions: {
-    borderTopColor: colors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: spacing[22],
-    paddingTop: spacing[12],
-  },
-  detailBody: {
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[20],
-  },
-  detailCategory: {
-    letterSpacing: 0,
-  },
-  detailHero: {
-    aspectRatio: 4 / 3,
-    backgroundColor: colors.surfaceMuted,
-    width: "100%",
-  },
-  detailHeroImage: {
-    height: "100%",
-    width: "100%",
-  },
-  detailIconButton: {
-    alignItems: "center",
-    height: 40,
-    justifyContent: "center",
-    width: 40,
-  },
-  detailLoading: {
-    marginBottom: spacing[8],
-  },
-  detailRoot: {
-    backgroundColor: colors.surface,
-    flex: 1,
-  },
-  detailScrollContent: {
-    paddingBottom: spacing[40],
-  },
-  detailSection: {
-    gap: spacing[10],
-    marginTop: spacing[22],
-  },
-  detailSectionTitle: {
-    color: colors.textPrimary,
-  },
-  detailSubtitle: {
-    lineHeight: 23,
-    marginBottom: spacing[16],
-  },
-  detailTitle: {
-    color: "#061223",
-    fontWeight: typography.fontWeight.bold,
-    lineHeight: 30,
-    marginBottom: spacing[10],
-  },
-  detailTopBar: {
-    alignItems: "center",
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    height: 54,
-    justifyContent: "space-between",
-    paddingHorizontal: spacing[8],
-  },
-  detailTopTitle: {
-    flex: 1,
-    textAlign: "center",
-  },
-  detailTypeBlock: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[8],
-    marginBottom: spacing[12],
-  },
-  detailVideoOverlay: {
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.88)",
-    borderRadius: 24,
-    height: 48,
-    justifyContent: "center",
-    left: "50%",
-    marginLeft: -24,
-    marginTop: -24,
-    position: "absolute",
-    top: "50%",
-    width: 48,
-  },
-  emptyState: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    gap: spacing[8],
-    paddingHorizontal: spacing[24],
-    paddingVertical: spacing[36],
-  },
-  emptyText: {
-    maxWidth: 280,
-  },
-  emptyTitle: {
-    marginTop: spacing[4],
-  },
-  externalLinkCard: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    flexDirection: "row",
-    gap: spacing[12],
-    justifyContent: "space-between",
-    marginTop: spacing[22],
-    padding: spacing[14],
-  },
-  externalLinkText: {
-    flex: 1,
-  },
-  externalLinkTitle: {
-    fontWeight: typography.fontWeight.semibold,
-  },
-  feedList: {
-    backgroundColor: colors.surface,
-  },
-  filterChip: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 20,
-    minHeight: 34,
-    paddingHorizontal: spacing[14],
-    paddingVertical: spacing[8],
-  },
-  filterChipActive: {
-    backgroundColor: "#061223",
-  },
-  filterChipText: {
-    color: "#061223",
-    fontWeight: typography.fontWeight.semibold,
-  },
-  filterChipTextActive: {
-    color: colors.inkInvert,
-  },
-  filterContent: {
-    gap: spacing[8],
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[12],
-  },
-  filterScroll: {
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  followButton: {
-    flex: 1.2,
-  },
-  formContent: {
-    gap: spacing[18],
-    padding: spacing[16],
-    paddingBottom: spacing[32],
-  },
-  formFooter: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    padding: spacing[16],
-  },
-  formHeader: {
-    alignItems: "center",
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 54,
-    paddingHorizontal: spacing[8],
-  },
-  formLabel: {
-    fontWeight: typography.fontWeight.semibold,
-  },
-  formRoot: {
-    backgroundColor: colors.surface,
-    flex: 1,
-  },
-  headerBody: {
-    paddingHorizontal: spacing[16],
-  },
-  headerSurface: {
-    backgroundColor: colors.surface,
-  },
-  heroImage: {
-    height: "100%",
-    width: "100%",
-  },
-  heroOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(16, 20, 28, 0.38)",
-  },
-  heroSection: {
-    backgroundColor: "#1E1720",
-    height: 140,
-    overflow: "hidden",
-    width: "100%",
-  },
-  identityBlock: {
-    gap: spacing[4],
-    marginBottom: spacing[18],
-  },
-  identityDescription: {
-    color: colors.textPrimary,
-    lineHeight: 20,
-    marginTop: spacing[8],
-  },
-  identityName: {
-    color: "#061223",
-    flexShrink: 1,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  identityRole: {
-    marginTop: spacing[4],
-  },
-  infoBlock: {
-    gap: spacing[8],
-    marginBottom: spacing[20],
-  },
-  editorialIdentity: {
-    gap: spacing[4],
-  },
-  coverageGroup: {
-    gap: spacing[8],
-  },
-  coverageGroups: {
-    gap: spacing[16],
-  },
-  infoPanel: {
-    backgroundColor: colors.surface,
-    gap: spacing[32],
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[24],
-  },
-  infoActionLabel: {
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.medium,
-  },
-  infoActionRow: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[8],
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[12],
-    minHeight: 48,
-    paddingHorizontal: spacing[14],
-    paddingVertical: spacing[12],
-  },
-  infoActionText: {
-    flex: 1,
-    gap: spacing[4],
-    minWidth: 0,
-  },
-  infoItemList: {
-    gap: spacing[10],
-  },
-  infoSection: {
-    gap: spacing[14],
-  },
-  infoSectionTitle: {
-    color: "#061223",
-    fontWeight: typography.fontWeight.semibold,
-  },
-  infoTag: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 18,
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[6],
-  },
-  infoTagText: {
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.medium,
-  },
-  infoTagsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[8],
-  },
-  kindButton: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    flex: 1,
-    flexDirection: "row",
-    gap: spacing[8],
-    justifyContent: "center",
-    minHeight: 42,
-  },
-  kindButtonActive: {
-    backgroundColor: "#061223",
-  },
-  kindButtonText: {
-    fontWeight: typography.fontWeight.semibold,
-  },
-  kindSwitch: {
-    flexDirection: "row",
-    gap: spacing[8],
-  },
-  loadingState: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[28],
-  },
-  logoImage: {
-    backgroundColor: colors.surface,
-    borderColor: colors.surface,
-    borderRadius: 20,
-    borderWidth: 4,
-    height: 80,
-    width: 80,
-  },
-  logoPlaceholder: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoWrapper: {
-    marginBottom: spacing[12],
-    marginTop: -40,
-  },
-  metaLine: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[6],
-  },
-  metaText: {
-    flex: 1,
-  },
-  nameRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[6],
-  },
-  ownerActionsRow: {
-    justifyContent: "flex-start",
-  },
-  ownerWebsiteButton: {
-    minWidth: 148,
-  },
-  pressedRow: {
-    opacity: 0.78,
-  },
-  profileName: {
-    color: "#061223",
-    flexShrink: 1,
-    fontWeight: typography.fontWeight.bold,
-  },
-  profileType: {
-    fontWeight: typography.fontWeight.medium,
-  },
-  readCta: {
-    fontWeight: typography.fontWeight.semibold,
-    marginTop: spacing[4],
+  pressed: {
+    opacity: 0.7,
   },
   root: {
-    backgroundColor: colors.background,
-  },
-  suggestionRow: {
-    alignItems: "center",
-    borderTopColor: colors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[10],
-    minHeight: 52,
-    paddingVertical: spacing[10],
-  },
-  suggestionText: {
     flex: 1,
-    minWidth: 0,
   },
-  suggestions: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[8],
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: spacing[12],
-  },
-  tab: {
+  state: {
     alignItems: "center",
-    flex: 1,
-    height: 52,
-    justifyContent: "center",
-    position: "relative",
-  },
-  tabIndicator: {
-    backgroundColor: "transparent",
-    borderTopLeftRadius: radius[4],
-    borderTopRightRadius: radius[4],
-    bottom: 0,
-    height: 3,
-    left: spacing[16],
-    position: "absolute",
-    right: spacing[16],
-  },
-  tabIndicatorActive: {
-    backgroundColor: "#0A56B8",
-  },
-  tabText: {
-    fontWeight: typography.fontWeight.medium,
-  },
-  tabTextActive: {
-    color: "#061223",
-    fontWeight: typography.fontWeight.semibold,
-    opacity: 1,
-  },
-  tabTextInactive: {
-    color: "#061223",
-    opacity: 0.6,
-  },
-  tabsContainer: {
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-  },
-  tagPicker: {
-    gap: spacing[10],
-  },
-  taggedTargets: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: spacing[8],
+    paddingHorizontal: spacing[20],
+    paddingVertical: spacing[32],
   },
-  taggedTargetsCompact: {
-    gap: spacing[6],
-  },
-  targetChip: {
+  websiteAction: {
     alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[6],
     flexDirection: "row",
     gap: spacing[6],
-    minHeight: 36,
-    paddingHorizontal: spacing[10],
-    paddingVertical: spacing[6],
-  },
-  targetChipCompact: {
-    minHeight: 26,
+    // 44 pt di area toccabile su una riga di testo.
+    minHeight: 44,
     paddingHorizontal: spacing[8],
-    paddingVertical: spacing[4],
-  },
-  targetChipText: {
-    color: colors.textPrimary,
-    maxWidth: 150,
-  },
-  trustBadge: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[10],
-    minHeight: 32,
-  },
-  trustBadgeText: {
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.medium,
-  },
-  trustBadges: {
-    gap: spacing[14],
-  },
-  thumbVideoOverlay: {
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.48)",
-    borderRadius: 16,
-    height: 32,
-    justifyContent: "center",
-    left: "50%",
-    marginLeft: -16,
-    marginTop: -16,
-    position: "absolute",
-    top: "50%",
-    width: 32,
-  },
-  thumbnailFrame: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    height: 86,
-    overflow: "hidden",
-    width: 86,
-  },
-  thumbnailImage: {
-    height: "100%",
-    width: "100%",
-  },
-  articleSelectBlock: {
-    gap: spacing[8],
-  },
-  articleSelectRow: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: radius[8],
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[10],
-    justifyContent: "space-between",
-    minHeight: 54,
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[10],
-  },
-  articleSelectRowActive: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-  articleSelectTitle: {
-    flex: 1,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  createModalTitle: {
-    flex: 1,
-    textAlign: "center",
-  },
-  inlineComposer: {
-    gap: spacing[8],
-    marginTop: spacing[12],
-  },
-  inlineInput: {
-    minHeight: 44,
-    paddingVertical: spacing[10],
-  },
-  linkedArticleCard: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[8],
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[12],
-    marginBottom: spacing[14],
-    padding: spacing[10],
-  },
-  linkedArticleImage: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[6],
-    height: 64,
-    width: 64,
-  },
-  linkedArticlePlaceholder: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  linkedArticleTag: {
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
-  },
-  linkedArticleText: {
-    flex: 1,
-    gap: spacing[4],
-    minWidth: 0,
-  },
-  linkedArticleTitle: {
-    color: "#061223",
-    fontWeight: typography.fontWeight.semibold,
-    lineHeight: 19,
-  },
-  playerOptionButton: {
-    alignItems: "center",
-    flex: 1,
-    flexDirection: "row",
-    gap: spacing[8],
-    minHeight: 36,
-    minWidth: 0,
-  },
-  playerOptionName: {
-    flex: 1,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  playerPickerBlock: {
-    gap: spacing[10],
-  },
-  pollOptionLabel: {
-    flex: 1,
-    fontWeight: typography.fontWeight.semibold,
-    minWidth: 0,
-  },
-  pollOptionPercent: {
-    fontWeight: typography.fontWeight.bold,
-  },
-  qaBlock: {
-    gap: spacing[10],
-    marginTop: spacing[4],
-  },
-  qaItem: {
-    alignItems: "flex-start",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    flexDirection: "row",
-    gap: spacing[10],
-    padding: spacing[10],
-  },
-  qaText: {
-    color: colors.textPrimary,
-    fontWeight: typography.fontWeight.medium,
-    lineHeight: 20,
-  },
-  qaTextBlock: {
-    flex: 1,
-    gap: spacing[4],
-    minWidth: 0,
-  },
-  qaVoteButton: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[6],
-    borderWidth: StyleSheet.hairlineWidth,
-    minHeight: 44,
-    minWidth: 44,
-    paddingVertical: spacing[4],
-  },
-  qaVoteButtonActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  selectedPlayerChip: {
-    alignItems: "center",
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius[8],
-    flexDirection: "row",
-    gap: spacing[6],
-    minHeight: 40,
-    paddingHorizontal: spacing[8],
-    paddingVertical: spacing[6],
-  },
-  selectedPlayerText: {
-    color: colors.accentStrong,
-    maxWidth: 140,
-  },
-  selectedPlayers: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[8],
-  },
-  sheetBackdrop: {
-    ...StyleSheet.absoluteFill,
-  },
-  sheetIcon: {
-    alignItems: "center",
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius[8],
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  sheetOption: {
-    alignItems: "center",
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[14],
-    minHeight: 74,
-    paddingVertical: spacing[12],
-  },
-  sheetOptionText: {
-    flex: 1,
-    gap: spacing[4],
-  },
-  sheetOverlay: {
-    backgroundColor: "rgba(15, 23, 42, 0.55)",
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  sheetPanel: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: spacing[32],
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[20],
-  },
-  sheetTitle: {
-    marginBottom: spacing[8],
-  },
-  tribunaActionsRow: {
-    borderTopColor: colors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[18],
-    marginTop: spacing[14],
-    paddingTop: spacing[12],
-  },
-  tribunaBody: {
-    lineHeight: 20,
-    marginBottom: spacing[12],
-  },
-  tribunaCommentsPreview: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    gap: spacing[10],
-    marginTop: spacing[12],
-    padding: spacing[10],
-  },
-  tribunaFeed: {
-    backgroundColor: colors.surfaceMuted,
-    gap: spacing[10],
-    paddingVertical: spacing[10],
-  },
-  tribunaIntroBlock: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[12],
-    justifyContent: "space-between",
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[16],
-  },
-  tribunaIntroCopy: {
-    lineHeight: 19,
-  },
-  tribunaIntroText: {
-    flex: 1,
-    gap: spacing[4],
-    minWidth: 0,
-  },
-  tribunaItem: {
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    padding: spacing[16],
-  },
-  tribunaItemHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: spacing[8],
-  },
-  tribunaMiniAction: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[6],
-    minHeight: 44,
-  },
-  tribunaPollContent: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[8],
-    minWidth: 0,
-    width: "100%",
-  },
-  tribunaPollFill: {
-    backgroundColor: "rgba(10, 86, 184, 0.14)",
-    bottom: 0,
-    left: 0,
-    position: "absolute",
-    top: 0,
-  },
-  tribunaPollOption: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    minHeight: 44,
-    overflow: "hidden",
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[10],
-  },
-  tribunaPollOptionSelected: {
-    backgroundColor: colors.accentSoft,
-  },
-  tribunaPollOptions: {
-    gap: spacing[8],
-    marginTop: spacing[4],
-  },
-  tribunaQuestion: {
-    color: "#061223",
-    fontWeight: typography.fontWeight.semibold,
-    lineHeight: 22,
-    marginBottom: spacing[10],
-  },
-  tribunaRoot: {
-    backgroundColor: colors.surface,
-  },
-  tribunaStatsOnly: {
-    marginTop: spacing[4],
-  },
-  tribunaTypeLabel: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[6],
-  },
-  tribunaTypeText: {
-    color: "#0A56B8",
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
-  },
-  typeBadge: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(10, 86, 184, 0.1)",
-    borderRadius: radius[4],
-    flexDirection: "row",
-    gap: spacing[4],
-    paddingHorizontal: spacing[8],
-    paddingVertical: spacing[4],
-  },
-  typeBadgeText: {
-    color: "#0A56B8",
-    fontWeight: typography.fontWeight.bold,
-    textTransform: "uppercase",
-  },
-  typeRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[8],
-  },
-  websiteButton: {
-    flex: 1,
   },
 });

@@ -20,6 +20,13 @@ export const PROFILE_COVER_HEIGHT = 150;
 /** `Avatar size="xl"` misura 104: l'overlap è calcolato su quella misura. */
 const AVATAR_SIZE = 104;
 const AVATAR_OVERLAP = 46;
+/**
+ * Logo di una realtà (REV-PROF-21). Più piccolo dell'avatar personale, come
+ * lo stemma della Società: un marchio non è un ritratto, non va riempito a
+ * forza in un cerchio e non deve dominare il nome.
+ */
+const LOGO_SIZE = 84;
+const LOGO_OVERLAP = 42;
 
 export type ProfileHeroMetaRow = {
   icon?: React.ComponentProps<typeof Ionicons>["name"];
@@ -49,6 +56,24 @@ type ProfileHeroHeaderProps = {
    */
   availabilityLabel?: string;
   coverImageUrl?: string | null;
+  /**
+   * Descrizione sintetica sotto la riga di ruolo (REV-PROF-21): una sola
+   * frase, due righe al massimo, il testo completo vive nella tab Info.
+   * Assente, la riga non esiste e al Visitor non compare nessun placeholder.
+   */
+  description?: string | null;
+  /**
+   * Identità di una realtà e non di una persona (REV-PROF-21): il logo è un
+   * marchio, quindi quadrato con angoli morbidi e `contain`, con un
+   * monogramma come fallback al posto dell'avatar di default.
+   */
+  entityMode?: boolean;
+  /**
+   * Azione terziaria su una riga propria sotto le azioni principali — "Visita
+   * sito". Fuori dalla gerarchia dei due pulsanti, perché non è la stessa
+   * cosa di Segui e Messaggio.
+   */
+  footerAction?: ReactNode;
   fullName: string;
   /**
    * Badge di verifica accanto al nome. Compare solo su un profilo verificato
@@ -56,6 +81,8 @@ type ProfileHeroHeaderProps = {
    * verifica che non c'è.
    */
   isVerified?: boolean;
+  /** Monogramma del logo quando manca l'immagine (solo `entityMode`). */
+  logoInitials?: string;
   metaRows?: readonly ProfileHeroMetaRow[];
   /**
    * Rende il ruolo secondario un collegamento. Serve alla squadra del cuore
@@ -75,8 +102,12 @@ export function ProfileHeroHeader({
   availabilityLabel,
   badges = [],
   coverImageUrl,
+  description,
+  entityMode = false,
+  footerAction,
   fullName,
   isVerified = false,
+  logoInitials,
   metaRows = [],
   onSecondaryRolePress,
   primaryRole,
@@ -99,14 +130,42 @@ export function ProfileHeroHeader({
         ) : null}
       </View>
 
-      <View
-        accessible
-        accessibilityLabel={`Foto profilo di ${fullName}`}
-        accessibilityRole="image"
-        style={styles.avatarShell}
-      >
-        <Avatar name={fullName} size="xl" uri={avatarUrl ?? undefined} />
-      </View>
+      {entityMode ? (
+        <View
+          accessible
+          accessibilityLabel={`Logo di ${fullName}`}
+          accessibilityRole="image"
+          style={styles.logoShell}
+        >
+          {avatarUrl ? (
+            <Image
+              // `contain`: un logo verticale o orizzontale non va riempito a
+              // forza in un quadrato, altrimenti si deforma.
+              resizeMode="contain"
+              source={{ uri: avatarUrl }}
+              style={styles.logoImage}
+            />
+          ) : (
+            <View
+              style={styles.logoFallback}
+              testID={testID ? `${testID}-logo-fallback` : undefined}
+            >
+              <AppText color="inverse" variant="headingMd">
+                {logoInitials || "·"}
+              </AppText>
+            </View>
+          )}
+        </View>
+      ) : (
+        <View
+          accessible
+          accessibilityLabel={`Foto profilo di ${fullName}`}
+          accessibilityRole="image"
+          style={styles.avatarShell}
+        >
+          <Avatar name={fullName} size="xl" uri={avatarUrl ?? undefined} />
+        </View>
+      )}
 
       <View style={styles.body}>
         <View style={styles.nameRow}>
@@ -159,6 +218,17 @@ export function ProfileHeroHeader({
               </>
             ) : null}
           </View>
+        ) : null}
+
+        {description ? (
+          <AppText
+            color="primary"
+            numberOfLines={2}
+            style={styles.description}
+            variant="metaStrong"
+          >
+            {description}
+          </AppText>
         ) : null}
 
         {metaRows.length > 0 ? (
@@ -214,6 +284,10 @@ export function ProfileHeroHeader({
         ) : null}
 
         {actions ? <View style={styles.actionsRow}>{actions}</View> : null}
+
+        {footerAction ? (
+          <View style={styles.footerActionRow}>{footerAction}</View>
+        ) : null}
       </View>
     </View>
   );
@@ -282,6 +356,38 @@ const styles = StyleSheet.create({
   coverImage: {
     height: "100%",
     width: "100%",
+  },
+  description: {
+    paddingTop: spacing[4],
+  },
+  footerActionRow: {
+    alignItems: "center",
+    paddingTop: spacing[8],
+  },
+  logoFallback: {
+    alignItems: "center",
+    backgroundColor: colors.hero,
+    borderRadius: radius[12],
+    flex: 1,
+    justifyContent: "center",
+  },
+  logoImage: {
+    borderRadius: radius[12],
+    flex: 1,
+    width: "100%",
+  },
+  logoShell: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius[16],
+    borderWidth: StyleSheet.hairlineWidth,
+    // Misura fissa: il logo non sposta il testo quando l'immagine finisce di
+    // caricare, perché lo spazio è già riservato.
+    height: LOGO_SIZE,
+    marginLeft: spacing[16],
+    marginTop: -LOGO_OVERLAP,
+    padding: 4,
+    width: LOGO_SIZE,
   },
   metaIcon: {
     marginTop: 1,

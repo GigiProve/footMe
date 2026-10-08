@@ -41,7 +41,14 @@ async function notifyMediaFollowers(input: {
   );
 }
 
-export type MediaProfilePostKind = "article" | "news";
+/**
+ * `media` (REV-PROF-21) è il contenuto visivo autonomo della redazione: una
+ * foto o un video senza corpo editoriale. Vive nella stessa tabella di
+ * articoli e news — stesso dettaglio, stessi commenti, stessi salvataggi,
+ * stessi tag — e la tab Media lo legge filtrando su questo campo, senza che
+ * nessun articolo esistente venga riclassificato.
+ */
+export type MediaProfilePostKind = "article" | "news" | "media";
 export type MediaProfilePostCoverType = "image" | "video";
 export type MediaProfilePostStatus = "draft" | "published" | "archived";
 export type MediaProfilePostTargetType = "profile" | "club" | "team";
@@ -174,17 +181,55 @@ type TeamTargetRow = {
 const POST_SELECT =
   "id, media_profile_id, created_by_profile_id, kind, category, title, subtitle, excerpt, body, cover_url, cover_type, external_url, author_id, author_name, source_type, display_mode, source_name, status, published_at, created_at, updated_at";
 
+/** Quanti contenuti per pagina nelle tab Articoli e Media (REV-PROF-21). */
+export const MEDIA_PROFILE_POST_PAGE_SIZE = 10;
+
+/** I `kind` che la tab Articoli mostra. La tab Media legge `media`. */
+export const MEDIA_ARTICLE_KINDS: readonly MediaProfilePostKind[] = [
+  "article",
+  "news",
+];
+
+export type MediaProfilePostFeedOptions = {
+  /** Filtro categoria della tab Articoli. Assente: nessun filtro. */
+  category?: string | null;
+  /** Famiglia di contenuti letta. Default: articoli e news. */
+  kinds?: readonly MediaProfilePostKind[];
+  limit?: number;
+  offset?: number;
+};
+
 export async function fetchMediaProfilePostFeed(
   mediaProfileId: string,
   viewerProfileId?: string | null,
+  options: MediaProfilePostFeedOptions = {},
 ): Promise<MediaProfilePost[]> {
-  const { data, error } = await supabase
+  const kinds = options.kinds ?? MEDIA_ARTICLE_KINDS;
+  const limit = options.limit ?? MEDIA_PROFILE_POST_PAGE_SIZE;
+  const offset = options.offset ?? 0;
+
+  let query = supabase
     .from("media_profile_posts")
     .select(POST_SELECT)
     .eq("media_profile_id", mediaProfileId)
+    .in("kind", kinds as string[])
     .eq("status", "published")
+    /*
+      La programmazione di HOM-06.2 scrive un `published_at` nel futuro. Il
+      predicato vive anche nella policy di lettura (REV-PROF-21), quindi al
+      Visitor la riga non arriva comunque: qui serve all'Owner, la cui policy
+      di gestione gli lascia vedere anche ciò che non è ancora pubblico.
+    */
+    .lte("published_at", new Date().toISOString());
+
+  if (options.category) {
+    query = query.eq("category", options.category);
+  }
+
+  const { data, error } = await query
     .order("published_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     throw error;
@@ -194,6 +239,51 @@ export async function fetchMediaProfilePostFeed(
     (data ?? []) as MediaProfilePostRow[],
     viewerProfileId,
   );
+}
+
+export type MediaArticleCategoryCount = {
+  articleCount: number;
+  category: string;
+};
+
+/**
+ * Categorie realmente presenti fra gli articoli pubblicati di una realtà
+ * editoriale, dalla più usata alla meno usata.
+ *
+ * I chip della tab Articoli non possono essere una lista scritta nel client:
+ * la task vieta i filtri hardcodati, e non esiste una tabella di
+ * configurazione delle categorie editoriali. L'unica tassonomia reale è
+ * quindi quella dei contenuti pubblicati, che è anche la sola che non mostra
+ * mai un filtro senza articoli dietro.
+ */
+export async function fetchMediaProfileArticleCategories(
+  mediaProfileId: string,
+): Promise<MediaArticleCategoryCount[]> {
+  const { data, error } = await supabase.rpc(
+    "fetch_media_profile_article_categories",
+    { p_profile_id: mediaProfileId },
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
+
+  return rows
+    .map((row) => {
+      const category =
+        typeof row.category === "string" ? row.category.trim() : "";
+
+      return category
+        ? {
+            articleCount:
+              typeof row.article_count === "number" ? row.article_count : 0,
+            category,
+          }
+        : null;
+    })
+    .filter((row): row is MediaArticleCategoryCount => row !== null);
 }
 
 export async function fetchMediaProfilePostDetail(
@@ -266,7 +356,12 @@ export async function createMediaProfilePost(
     // Notifications are best-effort: a delivery failure must not fail the post.
     try {
       await notifyTaggedProfiles({
-        contentLabel: input.kind === "news" ? "una news" : "un articolo",
+        contentLabel:
+          input.kind === "news"
+            ? "una news"
+            : input.kind === "media"
+              ? "un contenuto"
+              : "un articolo",
         contentType: "media_profile",
         postId,
         publisherId: input.mediaProfileId,
@@ -817,6 +912,16 @@ function validateCreateInput(input: {
     throw new Error("Inserisci l'autore del contenuto.");
   }
 
+  /*
+    Un contenuto Media è la sua copertina: non ha un corpo editoriale da
+    validare. Il titolo, già obbligatorio qui sopra, fa da caption e da nome
+    accessibile della thumbnail; la presenza della copertina è garantita dal
+    vincolo `media_profile_posts_media_cover_check`.
+  */
+  if (input.kind === "media") {
+    return;
+  }
+
   // Link imported as preview-only: the body is intentionally not brought in-app,
   // so only a description/excerpt (shown next to the source link) is required.
   if (input.sourceType === "link" && input.displayMode === "preview") {
@@ -868,7 +973,7 @@ function buildExcerpt(body: string | null) {
 }
 
 function normalizeKind(value: string): MediaProfilePostKind {
-  return value === "news" ? "news" : "article";
+  return value === "news" || value === "media" ? value : "article";
 }
 
 function normalizeStatus(value: string): MediaProfilePostStatus {

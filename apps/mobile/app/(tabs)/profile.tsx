@@ -317,8 +317,17 @@ export default function ProfileScreen() {
   useEffect(() => {
     const role = profile?.role;
 
-    // REV-PROF-19: anche il Master Profile Tifoso conta un'apertura.
-    if (!userId || (role !== "coach" && role !== "director" && role !== "fan")) {
+    /*
+      REV-PROF-19: anche il Master Profile Tifoso conta un'apertura.
+      REV-PROF-21: e il Master Profile Media/Creator.
+    */
+    if (
+      !userId ||
+      (role !== "coach" &&
+        role !== "director" &&
+        role !== "fan" &&
+        role !== "media")
+    ) {
       return;
     }
 
@@ -458,6 +467,27 @@ export default function ProfileScreen() {
   /** Dettaglio condiviso del contenuto: una rotta sola per ogni tipologia. */
   function handleOpenContent(ref: { contentType: string; postId: string }) {
     router.push(`/content/${ref.contentType}/${ref.postId}` as never);
+  }
+
+  /**
+   * "Modifica profilo" del Media/Creator (REV-PROF-21).
+   *
+   * La destinazione è REV-PROF-22, che non esiste ancora, e il profilo
+   * editoriale non ha un editor corrente da aprire nel frattempo: l'unico
+   * posto in cui `media_profiles` si scrive oggi è l'onboarding. La CTA resta
+   * quindi al suo posto — l'Owner deve vederla, e il punto d'ingresso è uno
+   * solo — e dice la verità invece di aprire una schermata che non c'è o di
+   * anticipare l'hub della task successiva.
+   */
+  function handleEditMediaProfile() {
+    trackProfileEvent("profile_edit_tapped", {
+      profileType: "media",
+      viewerMode: "owner",
+    });
+    Alert.alert(
+      "Modifica profilo",
+      "La modifica del profilo editoriale arriva con il prossimo aggiornamento.",
+    );
   }
 
   function handleOpenDirectorLinkedTarget(target: MediaLinkedTarget) {
@@ -1087,11 +1117,32 @@ export default function ProfileScreen() {
             viewerProfileId={userId}
           />
         ) : completeProfile && role === "media" ? (
+          /*
+            REV-PROF-21: il Master Profile Media/Creator porta header e quattro
+            tab. Condividi, menu azioni e Modifica profilo restano azioni della
+            schermata, non una seconda implementazione dentro la vista.
+          */
           <MediaProfileView
             completeProfile={completeProfile}
             mode="owner"
+            onEditProfilePress={handleEditMediaProfile}
+            onMorePress={() => {
+              trackProfileEvent("profile_more_menu_opened", {
+                profileType: "media",
+                viewerMode: "owner",
+              });
+              setMoreMenuVisible(true);
+            }}
             onOpenClub={handleOpenAffiliateClub}
+            onOpenContent={handleOpenContent}
             onOpenProfile={handleOpenProfile}
+            onSharePress={() => {
+              trackProfileEvent("profile_share_tapped", {
+                profileType: "media",
+                viewerMode: "owner",
+              });
+              void handleShareOwnProfile();
+            }}
             shouldOpenComposer={composeIntent === "media"}
             viewerProfileId={userId}
           />

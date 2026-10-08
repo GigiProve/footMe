@@ -50,6 +50,10 @@ import { DirectorProfileTabView } from "./career/DirectorProfileTabView";
 import type { MediaLinkedTarget } from "./career/MediaTabContent";
 import { FanProfileView, type FanProfileTab } from "./FanProfileView";
 import { MediaProfileView } from "./MediaProfileView";
+import {
+  parseMediaProfileTab,
+  type MediaProfileTab,
+} from "./media/media-master-profile";
 import { openDirectConversation } from "../messaging/messaging-service";
 import {
   fetchPlayerAgent,
@@ -120,9 +124,10 @@ export function PublicProfileScreen() {
   }>({ initialMode: "picker", open: false });
 
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const fanInitialTab = parseFanProfileTab(
-    Array.isArray(params.tab) ? params.tab[0] : params.tab,
-  );
+  const requestedTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const fanInitialTab = parseFanProfileTab(requestedTab);
+  /** REV-PROF-21: deep link a una tab del Master Profile Media/Creator. */
+  const mediaInitialTab = parseMediaProfileTab(requestedTab);
   const currentUserId = session?.user.id ?? null;
   const viewerRole = (viewerProfile?.role ?? null) as AppRole | null;
   const viewedProfileId = completeProfile?.profile.id ?? null;
@@ -211,7 +216,9 @@ export function PublicProfileScreen() {
         role !== "staff" &&
         role !== "director" &&
         // REV-PROF-19: anche il Master Profile Tifoso conta un'apertura.
-        role !== "fan")
+        role !== "fan" &&
+        // REV-PROF-21: e il Master Profile Media/Creator.
+        role !== "media")
     ) {
       return;
     }
@@ -660,6 +667,7 @@ export function PublicProfileScreen() {
             <ProfileContentBlock
               completeProfile={completeProfile}
               fanInitialTab={fanInitialTab}
+              mediaInitialTab={mediaInitialTab}
               onOpenClub={handleOpenFavoriteClub}
               isFollowed={isFollowed}
               isMessaging={
@@ -962,6 +970,7 @@ function ProfileHeaderBlock({
 function ProfileContentBlock({
   completeProfile,
   fanInitialTab,
+  mediaInitialTab,
   isFollowed = false,
   isMessaging = false,
   isRepresentationLoading = false,
@@ -985,6 +994,8 @@ function ProfileContentBlock({
   completeProfile: CompleteProfessionalProfile;
   /** REV-PROF-19: deep link a una tab del Master Profile Tifoso. */
   fanInitialTab?: FanProfileTab;
+  /** REV-PROF-21: deep link a una tab del Master Profile Media/Creator. */
+  mediaInitialTab?: MediaProfileTab;
   isFollowed?: boolean;
   isMessaging?: boolean;
   isRepresentationLoading?: boolean;
@@ -1201,14 +1212,25 @@ function ProfileContentBlock({
   }
 
   if (role === "media") {
+    /*
+      REV-PROF-21: il Master Profile Media/Creator porta il proprio header
+      condiviso e le quattro tab. Segui, Messaggio, Condividi e il menu azioni
+      restano quelli della schermata, non una seconda implementazione.
+    */
     return (
       <MediaProfileView
         completeProfile={completeProfile}
+        initialTab={mediaInitialTab}
+        isFollowed={isFollowed}
         isMessaging={isMessaging}
         mode="visitor"
         onContactPress={onMessage}
+        onFollowPress={onFollowPress}
+        onMorePress={onMorePress}
         onOpenClub={onOpenFavoriteClub}
+        onOpenContent={onOpenContent}
         onOpenProfile={onOpenPlayerProfile}
+        onSharePress={onSharePress}
         viewerProfileId={viewerProfileId}
       />
     );
