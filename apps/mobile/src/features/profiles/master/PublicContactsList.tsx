@@ -22,6 +22,7 @@ import {
   normalizeContactEmail,
   normalizeFacebookInput,
   normalizeInstagramInput,
+  normalizeLinkedInInput,
 } from "../profile-form-utils";
 import type { UserContactsRecord } from "../profile-service";
 
@@ -75,6 +76,7 @@ export function hasPrivateContacts(contacts: UserContactsRecord): boolean {
     contacts.email,
     contacts.instagram,
     contacts.facebook,
+    contacts.linkedin,
     contacts.tiktok,
     contacts.youtube,
     contacts.website,
@@ -98,6 +100,9 @@ export function buildPublicContacts(
     : "";
   const youtubeUrl = contacts.showYouTube
     ? normalizeHandleUrl(contacts.youtube ?? "", "https://www.youtube.com/@")
+    : "";
+  const linkedinUrl = contacts.showLinkedIn
+    ? normalizeLinkedInInput(contacts.linkedin ?? "")
     : "";
   const websiteUrl = contacts.showWebsite
     ? normalizeUrl(contacts.website ?? "")
@@ -130,6 +135,17 @@ export function buildPublicContacts(
           label: "Instagram",
           type: "instagram" as const,
           value: getSocialDisplayValue("instagram", instagramUrl),
+        }
+      : null,
+    linkedinUrl
+      ? {
+          href: linkedinUrl,
+          icon: "logo-linkedin" as const,
+          label: "LinkedIn",
+          type: "linkedin" as const,
+          // "/in/luca-rinaldi": il percorso dice gia di che profilo si tratta,
+          // il dominio no — e il mockup mostra proprio quello.
+          value: linkedinUrl.replace(/^https?:\/\/(?:www\.)?linkedin\.com/i, ""),
         }
       : null,
     tiktokUrl

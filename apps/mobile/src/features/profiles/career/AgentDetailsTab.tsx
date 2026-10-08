@@ -146,7 +146,17 @@ export function AgentDetailsTab({
   );
 
   // ---- Attività principali -----------------------------------------------
-  const activityChips = (agentProfile?.operational_focuses ?? [])
+  /*
+    REV-PROF-16: le attività principali sono al massimo tre e vivono in
+    `primary_activities`. `operational_focuses` resta il fallback dei profili
+    che non hanno ancora riaperto il modulo: conserva le voci storiche, e
+    mostrarne più di tre qui sarebbe mostrarle come se fossero una scelta.
+  */
+  const activitySource =
+    (agentProfile?.primary_activities?.length ?? 0) > 0
+      ? (agentProfile?.primary_activities ?? [])
+      : (agentProfile?.operational_focuses ?? []).slice(0, 3);
+  const activityChips = activitySource
     .map((value) => value.trim())
     .filter(Boolean)
     .map((activity) => ({

@@ -767,7 +767,7 @@ describe("Bio e lingue", () => {
     });
 
     expect(texts(tree)).toContain(
-      "La bio può contenere al massimo 300 caratteri.",
+      "La bio non può superare 300 caratteri.",
     );
     expect(
       serviceMocks.updateCompleteProfessionalProfile,

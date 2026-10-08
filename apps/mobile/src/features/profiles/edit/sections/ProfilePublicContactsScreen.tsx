@@ -17,6 +17,12 @@
  * Il valore si modifica sul posto: non esiste un'altra schermata in cui
  * "configurare" un contatto, e un canale vuoto mostra il suo campo invece di
  * un valore finto.
+ *
+ * I canali sono otto e gli stessi per tutti i ruoli — `profile_contacts` è
+ * dell'utente, non del profilo professionale. L'ordine è quello del mockup
+ * REV-PROF-16 (telefono, email, Instagram, LinkedIn, sito web) seguito dagli
+ * altri tre: nasconderli al Procuratore avrebbe reso irraggiungibile un
+ * contatto già salvato da un altro flusso.
  */
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -36,6 +42,7 @@ import {
   normalizeContactEmail,
   normalizeFacebookInput,
   normalizeInstagramInput,
+  normalizeLinkedInInput,
   normalizeTikTokInput,
   normalizeWebsiteInput,
   normalizeYouTubeInput,
@@ -102,6 +109,24 @@ const CHANNELS: readonly ChannelDefinition[] = [
     placeholder: "@username",
   },
   {
+    icon: "logo-linkedin",
+    invalidMessage: "Inserisci un collegamento LinkedIn valido.",
+    key: "linkedin",
+    label: "LinkedIn",
+    normalize: normalizeLinkedInInput,
+    placeholder: "/in/nome-cognome",
+  },
+  {
+    icon: "globe-outline",
+    invalidMessage: "Inserisci un indirizzo web valido.",
+    key: "website",
+    keyboardType: "url",
+    label: "Sito web",
+    normalize: (value) =>
+      isWebsiteValid(value) ? normalizeWebsiteInput(value) : "",
+    placeholder: "www.esempio.it",
+  },
+  {
     icon: "logo-tiktok",
     invalidMessage: "Inserisci un username o un link TikTok valido.",
     key: "tiktok",
@@ -124,16 +149,6 @@ const CHANNELS: readonly ChannelDefinition[] = [
     label: "YouTube",
     normalize: normalizeYouTubeInput,
     placeholder: "@canale",
-  },
-  {
-    icon: "globe-outline",
-    invalidMessage: "Inserisci un indirizzo web valido.",
-    key: "website",
-    keyboardType: "url",
-    label: "Sito web",
-    normalize: (value) =>
-      isWebsiteValid(value) ? normalizeWebsiteInput(value) : "",
-    placeholder: "www.esempio.it",
   },
 ] as const;
 
@@ -176,12 +191,14 @@ export function ProfilePublicContactsScreen({
       email: contacts.email ?? "",
       facebook: contacts.facebook ?? "",
       instagram: contacts.instagram ?? "",
+      linkedin: contacts.linkedin ?? "",
       phone: contacts.phone ?? "",
       tiktok: contacts.tiktok ?? "",
       visibility: {
         email: contacts.showEmail,
         facebook: contacts.showFacebook,
         instagram: contacts.showInstagram,
+        linkedin: contacts.showLinkedIn ?? false,
         phone: contacts.showPhone ?? false,
         tiktok: contacts.showTikTok ?? false,
         website: contacts.showWebsite ?? false,
@@ -253,6 +270,7 @@ export function ProfilePublicContactsScreen({
         contactEmail: form.email,
         contactFacebook: form.facebook,
         contactInstagram: form.instagram,
+        contactLinkedIn: form.linkedin,
         contactPhone: form.phone,
         contactTikTok: form.tiktok,
         contactWebsite: form.website,
@@ -260,6 +278,7 @@ export function ProfilePublicContactsScreen({
         showContactEmail: form.visibility.email,
         showContactFacebook: form.visibility.facebook,
         showContactInstagram: form.visibility.instagram,
+        showContactLinkedIn: form.visibility.linkedin,
         showContactPhone: form.visibility.phone,
         showContactTikTok: form.visibility.tiktok,
         showContactWebsite: form.visibility.website,

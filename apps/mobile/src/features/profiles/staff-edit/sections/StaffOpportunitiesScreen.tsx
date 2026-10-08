@@ -34,6 +34,7 @@ const CONFIG: ProfileOpportunitiesConfig = {
       regions: data.staffProfile?.preferred_regions ?? [],
     },
     availableFrom: data.staffProfile?.available_from ?? "",
+    preferences: [],
     isAvailable: data.staffProfile?.open_to_work ?? false,
   }),
   testIDPrefix: "staff",

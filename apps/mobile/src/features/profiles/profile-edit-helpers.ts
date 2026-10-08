@@ -148,6 +148,8 @@ export type ProfileFormState = {
   contactEmail: string;
   contactFacebook: string;
   contactInstagram: string;
+  /** REV-PROF-16: ottavo canale pubblico. */
+  contactLinkedIn: string;
   contactPhone: string;
   contactTikTok: string;
   contactWebsite: string;
@@ -202,6 +204,7 @@ export type ProfileFormState = {
   showContactPhone: boolean;
   showContactFacebook: boolean;
   showContactInstagram: boolean;
+  showContactLinkedIn: boolean;
   showContactTikTok: boolean;
   showContactWebsite: boolean;
   showContactYouTube: boolean;
@@ -260,6 +263,7 @@ export function buildInitialState(
     contactEmail: data.userContacts.email,
     contactFacebook: data.userContacts.facebook,
     contactInstagram: data.userContacts.instagram,
+    contactLinkedIn: data.userContacts.linkedin ?? "",
     contactPhone: data.userContacts.phone,
     contactTikTok: data.userContacts.tiktok ?? "",
     contactWebsite: data.userContacts.website ?? "",
@@ -321,6 +325,7 @@ export function buildInitialState(
     showContactPhone: data.userContacts.showPhone ?? false,
     showContactFacebook: data.userContacts.showFacebook,
     showContactInstagram: data.userContacts.showInstagram,
+    showContactLinkedIn: data.userContacts.showLinkedIn ?? false,
     showContactTikTok: data.userContacts.showTikTok ?? false,
     showContactWebsite: data.userContacts.showWebsite ?? false,
     showContactYouTube: data.userContacts.showYouTube ?? false,
@@ -575,6 +580,7 @@ export function buildFullUpdatePayload(
       email: formState.contactEmail.trim().toLowerCase(),
       facebook: formState.contactFacebook.trim(),
       instagram: formState.contactInstagram.trim(),
+      linkedin: formState.contactLinkedIn.trim(),
       phone: formState.contactPhone.trim(),
       tiktok: formState.contactTikTok.trim(),
       website: formState.contactWebsite.trim(),
@@ -583,6 +589,7 @@ export function buildFullUpdatePayload(
       showPhone: formState.showContactPhone,
       showFacebook: formState.showContactFacebook,
       showInstagram: formState.showContactInstagram,
+      showLinkedIn: formState.showContactLinkedIn,
       showTikTok: formState.showContactTikTok,
       showWebsite: formState.showContactWebsite,
       showYouTube: formState.showContactYouTube,

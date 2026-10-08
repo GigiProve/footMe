@@ -62,6 +62,7 @@ const CONFIG: ProfileOpportunitiesConfig<DirectorSectionPatch> = {
       regions: data.directorProfile?.preferred_regions ?? [],
     },
     availableFrom: "",
+    preferences: [],
     isAvailable: data.directorProfile?.open_to_work ?? false,
   }),
   recapActionLabel: "Modifica aree",

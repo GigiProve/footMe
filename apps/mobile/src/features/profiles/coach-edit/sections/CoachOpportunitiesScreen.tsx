@@ -31,6 +31,7 @@ const CONFIG: ProfileOpportunitiesConfig = {
       regions: data.coachProfile?.preferred_regions ?? [],
     },
     availableFrom: data.coachProfile?.available_from ?? "",
+    preferences: [],
     isAvailable: data.coachProfile?.open_to_new_role ?? false,
   }),
   testIDPrefix: "coach",

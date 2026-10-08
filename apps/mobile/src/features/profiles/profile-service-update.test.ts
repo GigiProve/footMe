@@ -13,12 +13,14 @@ const mocks = vi.hoisted(() => {
   const privateContactsUpsertMock = vi.fn();
   const rpcMock = vi.fn();
   const agentProfilesUpsertMock = vi.fn();
+  const agentLicenseUpsertMock = vi.fn();
   const directorProfilesUpsertMock = vi.fn();
   const fanProfilesUpsertMock = vi.fn();
   const mediaProfilesUpsertMock = vi.fn();
   const staffProfilesUpsertMock = vi.fn();
 
   return {
+    agentLicenseUpsertMock,
     agentProfilesUpsertMock,
     directorProfilesUpsertMock,
     fanProfilesUpsertMock,
@@ -71,6 +73,12 @@ const mocks = vi.hoisted(() => {
       if (table === "agent_profiles") {
         return {
           upsert: agentProfilesUpsertMock,
+        };
+      }
+
+      if (table === "agent_license_credentials") {
+        return {
+          upsert: agentLicenseUpsertMock,
         };
       }
 
@@ -167,6 +175,7 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     mocks.profileContactsUpsertMock.mockReset();
     mocks.privateContactsUpsertMock.mockReset();
     mocks.rpcMock.mockReset();
+    mocks.agentLicenseUpsertMock.mockReset();
     mocks.agentProfilesUpsertMock.mockReset();
     mocks.directorProfilesUpsertMock.mockReset();
     mocks.fanProfilesUpsertMock.mockReset();
@@ -180,6 +189,7 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
     mocks.profileContactsUpsertMock.mockResolvedValue({ error: null });
     mocks.privateContactsUpsertMock.mockResolvedValue({ error: null });
     mocks.rpcMock.mockResolvedValue({ error: null });
+    mocks.agentLicenseUpsertMock.mockResolvedValue({ error: null });
     mocks.agentProfilesUpsertMock.mockResolvedValue({ error: null });
     mocks.directorProfilesUpsertMock.mockResolvedValue({ error: null });
     mocks.fanProfilesUpsertMock.mockResolvedValue({ error: null });
@@ -957,7 +967,6 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         has_other_football_experience: true,
         has_played_football: true,
         is_federation_licensed: true,
-        license_number: null,
         main_player_roles: ["defender", "midfielder"],
         managed_players_count: "5-15 calciatori",
         open_to_clubs: true,
@@ -1032,6 +1041,16 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         },
       ],
       p_profile_id: "profile-1",
+    });
+
+    /*
+      REV-PROF-16: il numero di licenza non entra in `agent_profiles`, che
+      qualunque utente autenticato può leggere. Esce dal payload della RPC e
+      finisce nella tabella owner-only.
+    */
+    expect(mocks.agentLicenseUpsertMock).toHaveBeenCalledWith({
+      license_number: null,
+      profile_id: "profile-1",
     });
   });
 

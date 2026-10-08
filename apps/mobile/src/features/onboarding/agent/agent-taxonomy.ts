@@ -96,6 +96,80 @@ export const AGENT_ACTIVITY_SCOPE_OPTIONS: {
   { label: "Mercato internazionale", value: "international" },
 ];
 
+/**
+ * Attività principali del Procuratore (REV-PROF-16, schermata 4).
+ *
+ * Non sono i mercati: un mercato dice *dove* si lavora (professionistico,
+ * giovanile, estero), un'attività dice *cosa si fa*. Il profilo ne mostra al
+ * massimo tre, ed è questa la tassonomia che le elenca — non un array di
+ * stringhe dentro la schermata.
+ *
+ * Il `value` coincide con l'etichetta italiana perché la colonna che le
+ * precedeva (`operational_focuses`) salvava proprio quelle stringhe: due voci
+ * storiche — "Valorizzazione giovani" e "Gestione svincolati" — restano quindi
+ * riconosciute senza bisogno di una tabella di conversione. Le altre voci
+ * legacy non sono qui: la schermata le mostra solo al profilo che le ha già
+ * selezionate, così può toglierle senza che diventino scelte nuove per tutti.
+ */
+export const AGENT_PRIMARY_ACTIVITY_OPTIONS: {
+  icon: string;
+  label: string;
+  value: string;
+}[] = [
+  {
+    icon: "person-outline",
+    label: "Valorizzazione giovani",
+    value: "Valorizzazione giovani",
+  },
+  { icon: "search-outline", label: "Scouting", value: "Scouting" },
+  {
+    icon: "swap-horizontal-outline",
+    label: "Intermediazione",
+    value: "Intermediazione",
+  },
+  {
+    icon: "person-remove-outline",
+    label: "Gestione svincolati",
+    value: "Gestione svincolati",
+  },
+  {
+    icon: "business-outline",
+    label: "Relazioni con club",
+    value: "Relazioni con club",
+  },
+  {
+    icon: "globe-outline",
+    label: "Mercato internazionale",
+    value: "Mercato internazionale",
+  },
+];
+
+/** REV-PROF-16: "Seleziona fino a 3 attività in evidenza." */
+export const AGENT_PRIMARY_ACTIVITY_LIMIT = 3;
+
+/**
+ * Le attività selezionabili per un profilo: quelle canoniche più le voci
+ * storiche che quel profilo ha già addosso.
+ *
+ * Una scelta fatta prima di questa tassonomia non deve diventare invisibile —
+ * sarebbe un dato che risulta salvato e che nessuno può più togliere. Compare
+ * in fondo, deselezionabile, e sparisce quando viene tolta.
+ */
+export function buildAgentActivityOptions(selected: readonly string[]): {
+  icon: string;
+  label: string;
+  value: string;
+}[] {
+  const known = new Set(
+    AGENT_PRIMARY_ACTIVITY_OPTIONS.map((option) => option.value),
+  );
+  const legacy = [...new Set(selected.map((value) => value.trim()))]
+    .filter((value) => value.length > 0 && !known.has(value))
+    .map((value) => ({ icon: "ellipse-outline", label: value, value }));
+
+  return [...AGENT_PRIMARY_ACTIVITY_OPTIONS, ...legacy];
+}
+
 /** §AF: i paesi esteri riusano la tassonomia già condivisa dal profilo. */
 export const AGENT_COUNTRY_OPTIONS = COUNTRY_OPTIONS.map((country) => ({
   label: country.name,

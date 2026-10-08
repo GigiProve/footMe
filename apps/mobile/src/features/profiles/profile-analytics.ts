@@ -174,13 +174,28 @@ export type ProfileAnalyticsEvent =
   | "agent_career_save_failed"
   | "agent_career_update_failed"
   | "agent_career_end_failed"
-  | "agent_career_delete_failed";
+  | "agent_career_delete_failed"
+  // Modifica profilo Procuratore (REV-PROF-16)
+  | "agent_profile_edit_opened"
+  | "agent_license_toggled"
+  | "agent_federation_changed"
+  | "agent_federation_visibility_changed"
+  | "agent_career_manage_tapped"
+  | "agent_primary_activities_limit_reached"
+  | "agent_featured_assistiti_opened"
+  | "agent_featured_assistito_changed"
+  | "agent_featured_assistiti_reordered"
+  | "agent_featured_assistiti_limit_reached"
+  | "agent_featured_assistiti_manage_tapped"
+  | "agent_featured_assistiti_load_failed";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =
   | "email"
   | "facebook"
   | "instagram"
+  /** REV-PROF-16: ottavo canale, aggiunto con la Modifica profilo Procuratore. */
+  | "linkedin"
   | "phone"
   | "tiktok"
   | "website"
@@ -206,7 +221,11 @@ export type ProfileEditSectionKey =
   /** REV-PROF-11: "Responsabilità e focus", solo Dirigente. */
   | "responsibilities"
   /** REV-PROF-11: "Bio e lingue", solo Dirigente. */
-  | "bio";
+  | "bio"
+  /** REV-PROF-16: "Attivita e mercati", solo Procuratore. */
+  | "activities"
+  /** REV-PROF-16: "Assistiti in evidenza", solo Procuratore. */
+  | "assistiti";
 
 /** Modalità temporale scelta, mai la società, il ruolo o le date. */
 export type CoachExperienceMode =
@@ -245,6 +264,8 @@ type ProfileAnalyticsProps = {
   section?: ProfileEditSectionKey;
   /** Da dove arriva la visita: un identificatore di superficie, mai un url. */
   source?: string;
+  /** Quanti elementi sono selezionati, non quali (REV-PROF-16). */
+  selectionCount?: number;
   /** Quanti territori sono selezionati, non quali. */
   territoryCount?: number;
   /** Esito di un salvataggio: nessun messaggio di errore, nessun payload. */
@@ -274,6 +295,9 @@ export function trackProfileEvent(
     ...(props.geographicMode ? { geographic_mode: props.geographicMode } : {}),
     ...(props.section ? { section: props.section } : {}),
     ...(typeof props.success === "boolean" ? { success: props.success } : {}),
+    ...(typeof props.selectionCount === "number"
+      ? { selection_count: props.selectionCount }
+      : {}),
     ...(typeof props.territoryCount === "number"
       ? { territory_count: props.territoryCount }
       : {}),

@@ -325,7 +325,7 @@ function usePublicAssistiti(
  * REV-PROF-12 vale di conseguenza: la griglia condivisa non ha bookmark sulle
  * thumbnail, e il "Salva" resta nel dettaglio contenuto.
  */
-function AgentMediaTab({
+export function AgentMediaTab({
   completeProfile,
   isOwner,
   onDeleteMedia,

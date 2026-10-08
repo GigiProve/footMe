@@ -82,6 +82,8 @@ export type UserContactsRecord = {
   email: string;
   facebook: string;
   instagram: string;
+  /** REV-PROF-16: ottavo canale, nello stesso modello degli altri social. */
+  linkedin?: string;
   phone: string;
   tiktok?: string;
   website?: string;
@@ -89,6 +91,7 @@ export type UserContactsRecord = {
   showEmail: boolean;
   showFacebook: boolean;
   showInstagram: boolean;
+  showLinkedIn?: boolean;
   showTikTok?: boolean;
   showWebsite?: boolean;
   showYouTube?: boolean;
@@ -1115,7 +1118,6 @@ function normalizeAgentProfileRecord(
     ),
     has_played_football: normalizeBoolean(rawProfile.has_played_football),
     is_federation_licensed: normalizeBoolean(rawProfile.is_federation_licensed),
-    license_number: normalizeOptionalText(rawProfile.license_number),
     main_player_roles: normalizePlayerPositions(rawProfile.main_player_roles),
     managed_players_count: normalizeOptionalText(rawProfile.managed_players_count),
     media_items: normalizeAgentMediaItems(rawProfile.media_items),
@@ -1138,6 +1140,7 @@ function normalizeAgentProfileRecord(
       : [],
     player_types: normalizeStringArray(rawProfile.player_types),
     portfolio_range: normalizeOptionalText(rawProfile.portfolio_range),
+    primary_activities: normalizeStringArray(rawProfile.primary_activities),
     previous_roles: normalizeStringArray(rawProfile.previous_roles),
     professional_mode: normalizeOptionalText(rawProfile.professional_mode),
     profile_id: normalizeRequiredText(rawProfile.profile_id, profileId),
@@ -1741,12 +1744,14 @@ export function normalizeUserProfile(input: {
     email?: string | null;
     facebook?: string | null;
     instagram?: string | null;
+    linkedin?: string | null;
     tiktok?: string | null;
     website?: string | null;
     youtube?: string | null;
     show_email?: boolean | null;
     show_facebook?: boolean | null;
     show_instagram?: boolean | null;
+    show_linkedin?: boolean | null;
     show_tiktok?: boolean | null;
     show_website?: boolean | null;
     show_youtube?: boolean | null;
@@ -1821,6 +1826,7 @@ export function normalizeUserProfile(input: {
       email: input.profileContacts?.email ?? "",
       facebook: input.profileContacts?.facebook ?? "",
       instagram: input.profileContacts?.instagram ?? "",
+      linkedin: input.profileContacts?.linkedin ?? "",
       phone: input.privateContacts?.phone ?? "",
       showPhone: normalizeBoolean(input.privateContacts?.show_phone),
       tiktok: input.profileContacts?.tiktok ?? "",
@@ -1829,6 +1835,7 @@ export function normalizeUserProfile(input: {
       showEmail: normalizeBoolean(input.profileContacts?.show_email),
       showFacebook: normalizeBoolean(input.profileContacts?.show_facebook),
       showInstagram: normalizeBoolean(input.profileContacts?.show_instagram),
+      showLinkedIn: normalizeBoolean(input.profileContacts?.show_linkedin),
       showTikTok: normalizeBoolean(input.profileContacts?.show_tiktok),
       showWebsite: normalizeBoolean(input.profileContacts?.show_website),
       showYouTube: normalizeBoolean(input.profileContacts?.show_youtube),
@@ -1882,9 +1889,11 @@ async function fetchPublicProfileContacts(profileId: string) {
       email: row.email ?? null,
       facebook: row.facebook ?? null,
       instagram: row.instagram ?? null,
+      linkedin: row.linkedin ?? null,
       show_email: Boolean(row.email),
       show_facebook: Boolean(row.facebook),
       show_instagram: Boolean(row.instagram),
+      show_linkedin: Boolean(row.linkedin),
       show_tiktok: Boolean(row.tiktok),
       show_website: Boolean(row.website),
       show_youtube: Boolean(row.youtube),
@@ -1961,7 +1970,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("agent_profiles")
           .select(
-            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, coach_career_entries, staff_career_entries, director_career_entries, career_migrated_at, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, license_number, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions, operating_provinces, operating_area_type, operating_countries, works_abroad, activity_scopes, portfolio_range, professional_mode, previous_roles, has_no_previous_experience",
+            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, coach_career_entries, staff_career_entries, director_career_entries, career_migrated_at, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions, operating_provinces, operating_area_type, operating_countries, works_abroad, activity_scopes, primary_activities, portfolio_range, professional_mode, previous_roles, has_no_previous_experience",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -2046,7 +2055,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
     supabase
       .from("profile_contacts")
       .select(
-        "instagram, facebook, email, tiktok, youtube, website, show_instagram, show_facebook, show_email, show_tiktok, show_youtube, show_website",
+        "instagram, facebook, email, tiktok, youtube, website, linkedin, show_instagram, show_facebook, show_email, show_tiktok, show_youtube, show_website, show_linkedin",
       )
       .eq("profile_id", profileId)
       .maybeSingle(),
@@ -2467,6 +2476,7 @@ export async function updateCompleteProfessionalProfile(
       email: input.userContacts.email || null,
       facebook: input.userContacts.facebook || null,
       instagram: input.userContacts.instagram || null,
+      linkedin: input.userContacts.linkedin || null,
       tiktok: input.userContacts.tiktok || null,
       website: input.userContacts.website || null,
       youtube: input.userContacts.youtube || null,
@@ -2474,6 +2484,7 @@ export async function updateCompleteProfessionalProfile(
       show_email: input.userContacts.showEmail,
       show_facebook: input.userContacts.showFacebook,
       show_instagram: input.userContacts.showInstagram,
+      show_linkedin: input.userContacts.showLinkedIn ?? false,
       show_tiktok: input.userContacts.showTikTok ?? false,
       show_website: input.userContacts.showWebsite ?? false,
       show_youtube: input.userContacts.showYouTube ?? false,
@@ -2677,8 +2688,22 @@ export async function updateCompleteProfessionalProfile(
   }
 
   if (input.role === "agent" && input.agentProfile) {
+    /*
+      REV-PROF-16: il numero di licenza non entra in `agent_profiles`, che è
+      leggibile da chiunque. Viene estratto dal payload e scritto nella
+      tabella owner-only prima della RPC, così nessun chiamante — onboarding
+      compreso — deve ricordarsene.
+    */
+    const { license_number: licenseNumber, ...agentProfilePayload } =
+      input.agentProfile;
+
+    await saveAgentLicenseNumber({
+      licenseNumber: licenseNumber ?? null,
+      profileId: input.profileId,
+    });
+
     const { error } = await supabase.rpc("save_agent_profile_details", {
-      p_agent_profile: input.agentProfile,
+      p_agent_profile: agentProfilePayload,
       /*
         REV-PROF-15: la carriera appartiene alla Gestione carriera, non
         all'editor di profilo. `null` dice alla RPC di non toccarla: senza,
@@ -3048,6 +3073,114 @@ export async function saveStaffProfileMedia(input: {
   }
 }
 
+/**
+ * Campi che un modulo della Modifica profilo Procuratore puo riscrivere da
+ * solo (REV-PROF-16 §"Architettura del salvataggio").
+ *
+ * Nessuna colonna della carriera, del portfolio o dei media: quei dati hanno
+ * i loro moduli, e un campo assente da questo tipo non puo finire nel patch
+ * per distrazione.
+ *
+ * `license_number` e l'unico che non sta su `agent_profiles`: viaggia qui
+ * perche per chi scrive e un campo della stessa schermata, ma
+ * `saveAgentProfilePatch` lo dirotta sulla tabella owner-only.
+ */
+export type AgentProfilePatchInput = {
+  activity_scopes?: string[];
+  federation?: string | null;
+  is_federation_licensed?: boolean;
+  license_number?: string | null;
+  open_to_clubs?: boolean;
+  open_to_players?: boolean;
+  operating_area_type?: string | null;
+  operating_countries?: string[];
+  operating_provinces?: string[];
+  operating_regions?: string[];
+  primary_activities?: string[];
+  works_abroad?: boolean;
+};
+
+/**
+ * Patch parziale di `agent_profiles` (REV-PROF-16).
+ *
+ * `save_agent_profile_details` riscrive la riga intera e ricostruisce il
+ * portfolio: va bene per l'onboarding, che quei dati li possiede tutti, ma un
+ * modulo che cambia due colonne non deve rimandare indietro le altre trenta —
+ * e soprattutto non deve passare dalla RPC che cancella e reinserisce
+ * `agent_managed_player_entries`. Un `update` mirato tocca solo ciò che il
+ * modulo governa; la RLS `agents can manage own profile` resta la stessa
+ * autorizzazione di sempre.
+ */
+export async function saveAgentProfilePatch(input: {
+  patch: AgentProfilePatchInput;
+  profileId: string;
+}) {
+  /*
+    Il numero di licenza non sta su `agent_profiles`: quella tabella è
+    leggibile da chiunque sia autenticato. Viaggia nello stesso patch perché
+    per chi scrive è un campo della stessa schermata, ma finisce nella tabella
+    owner-only, e la rotta è decisa qui una volta sola.
+  */
+  const { license_number: licenseNumber, ...agentPatch } = input.patch;
+
+  if (licenseNumber !== undefined) {
+    await saveAgentLicenseNumber({
+      licenseNumber,
+      profileId: input.profileId,
+    });
+  }
+
+  if (Object.keys(agentPatch).length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("agent_profiles")
+    .update(agentPatch)
+    .eq("profile_id", input.profileId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+/**
+ * Numero di licenza del Procuratore (REV-PROF-16 §"Numero di licenza").
+ *
+ * Vive in `agent_license_credentials`, che ha una RLS owner-only: non esce
+ * mai nella proiezione pubblica del profilo, e un visitor che provasse a
+ * leggerlo riceverebbe zero righe — non il valore.
+ */
+export async function fetchAgentLicenseNumber(
+  profileId: string,
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("agent_license_credentials")
+    .select("license_number")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data?.license_number as string | null) ?? "";
+}
+
+export async function saveAgentLicenseNumber(input: {
+  licenseNumber: string | null;
+  profileId: string;
+}) {
+  const { error } = await supabase.from("agent_license_credentials").upsert({
+    license_number: input.licenseNumber || null,
+    profile_id: input.profileId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function saveAgentProfileMedia(input: {
   agentProfile: NonNullable<CompleteProfessionalProfile["agentProfile"]>;
   mediaItems: AgentMediaItemRecord[];
@@ -3063,7 +3196,6 @@ export async function saveAgentProfileMedia(input: {
     has_other_football_experience: input.agentProfile.has_other_football_experience,
     has_played_football: input.agentProfile.has_played_football,
     is_federation_licensed: input.agentProfile.is_federation_licensed,
-    license_number: input.agentProfile.license_number,
     main_player_roles: input.agentProfile.main_player_roles,
     managed_players_count: input.agentProfile.managed_players_count,
     media_items: input.mediaItems,
@@ -3084,6 +3216,7 @@ export async function saveAgentProfileMedia(input: {
     player_career_entries: input.agentProfile.player_career_entries,
     player_types: input.agentProfile.player_types,
     portfolio_range: input.agentProfile.portfolio_range,
+    primary_activities: input.agentProfile.primary_activities,
     previous_roles: input.agentProfile.previous_roles,
     professional_mode: input.agentProfile.professional_mode,
     profile_id: input.profileId,

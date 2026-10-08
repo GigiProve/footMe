@@ -17,6 +17,13 @@
  *
  * Quello che cambia fra Allenatore e Staff tecnico è la copy del toggle e le
  * colonne su cui la disponibilità viene scritta: entrambe arrivano dal config.
+ *
+ * Il Procuratore (REV-PROF-16) non ha un interruttore generale: ha due
+ * preferenze autonome — richieste di rappresentanza e collaborazioni con club
+ * — che non si governano a vicenda, e un'area operativa che resta visibile
+ * anche quando sono entrambe spente. Per questo `preferences` sostituisce il
+ * toggle unico invece di affiancarglisi: due gate sovrapposti avrebbero
+ * significato spegnere un profilo da due posti diversi.
  */
 import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -52,6 +59,11 @@ type InternalScreen = "main" | "regions" | "provinces";
 
 export type OpportunitiesDraft = {
   /**
+   * REV-PROF-16: preferenze autonome selezionate. Vuoto per i ruoli che non
+   * ne hanno: senza `preferences` nel config il campo non viene mostrato.
+   */
+  preferences: string[];
+  /**
    * Destinatari selezionati (REV-PROF-11). Vuoto per i ruoli che non li
    * raccolgono: senza `audienceOptions` il campo non viene né mostrato né
    * validato.
@@ -66,6 +78,17 @@ export type OpportunitiesDraft = {
 /** Una riga di "Disponibile per". L'elenco arriva dalla tassonomia del ruolo. */
 export type ProfileOpportunitiesAudience = {
   description?: string;
+  label: string;
+  value: string;
+};
+
+/**
+ * Una preferenza autonoma (REV-PROF-16): un interruttore che vale per sé e
+ * non abilita né disabilita gli altri.
+ */
+export type ProfileOpportunityPreference = {
+  description?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
 };
@@ -121,6 +144,12 @@ export type ProfileOpportunitiesConfig<TPatch = Partial<ProfileFormState>> = {
   availabilityDescription: string;
   /** Etichetta del toggle: "nuova squadra" per l'Allenatore, "nuove collaborazioni" per lo Staff. */
   availabilityLabel: string;
+  /**
+   * REV-PROF-16: preferenze autonome al posto del toggle unico. Quando sono
+   * presenti la disponibilità non fa più da gate e l'area operativa resta
+   * sempre visibile.
+   */
+  preferences?: readonly ProfileOpportunityPreference[];
   /** Legge la disponibilità corrente dal profilo canonico. */
   read: (data: CompleteProfessionalProfile) => OpportunitiesDraft;
   profileType: string;
@@ -170,6 +199,7 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
     audienceTitle = "Disponibile per",
     availabilityDescription,
     availabilityLabel,
+    preferences,
     profileType,
     read,
     recapActionLabel = "Modifica zone",
@@ -180,6 +210,8 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
     write,
     zonesTitle = "Disponibilità geografica",
   } = config;
+
+  const usesPreferences = Boolean(preferences);
 
   const initialForm = useMemo<OpportunitiesDraft | null>(
     () => (data ? read(data) : null),
@@ -254,7 +286,18 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
       return;
     }
 
-    if (form.isAvailable) {
+    if (usesPreferences) {
+      /*
+        Senza gate l'area operativa è sempre un dato del profilo: va validata
+        anche a preferenze spente, perché resta pubblicata.
+      */
+      const availabilityError = getAvailabilityErrorMessage(form.availability);
+
+      if (availabilityError) {
+        setErrorMessage(availabilityError);
+        return;
+      }
+    } else if (form.isAvailable) {
       /*
         Una disponibilità accesa senza destinatari non dice niente a nessuno:
         il profilo risulterebbe disponibile e invisibile insieme.
@@ -342,6 +385,13 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
     );
   }
 
+  /*
+    Senza gate l'area operativa è sempre parte del profilo: con le preferenze
+    autonome resta a schermo anche quando sono tutte spente, perché non è la
+    disponibilità a renderla valida.
+  */
+  const showsDependentFields = usesPreferences || Boolean(form?.isAvailable);
+
   const zonesLabel = form
     ? buildAvailabilityZonesLabel(
         form.availability.mode,
@@ -375,19 +425,46 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
 
       {form ? (
         <>
-          <ToggleRow
-            description={availabilityDescription}
-            label={availabilityLabel}
-            onValueChange={(value) => patch({ isAvailable: value })}
-            testID={`${testIDPrefix}-opportunities-toggle`}
-            value={form.isAvailable}
-          />
+          {/*
+            Due forme alternative, mai insieme: o un interruttore generale che
+            fa da gate, o preferenze che valgono ciascuna per sé.
+          */}
+          {usesPreferences ? (
+            <View style={styles.zones}>
+              {preferences?.map((preference) => (
+                <ToggleRow
+                  description={preference.description}
+                  key={preference.value}
+                  label={preference.label}
+                  onValueChange={(value) =>
+                    patch({
+                      preferences: value
+                        ? [...form.preferences, preference.value]
+                        : form.preferences.filter(
+                            (entry) => entry !== preference.value,
+                          ),
+                    })
+                  }
+                  testID={`${testIDPrefix}-opportunities-preference-${preference.value}`}
+                  value={form.preferences.includes(preference.value)}
+                />
+              ))}
+            </View>
+          ) : (
+            <ToggleRow
+              description={availabilityDescription}
+              label={availabilityLabel}
+              onValueChange={(value) => patch({ isAvailable: value })}
+              testID={`${testIDPrefix}-opportunities-toggle`}
+              value={form.isAvailable}
+            />
+          )}
 
           {/*
             Con la disponibilità spenta i campi dipendenti spariscono: mostrarli
             disabilitati suggerirebbe che contino comunque qualcosa.
           */}
-          {form.isAvailable ? (
+          {showsDependentFields ? (
             <>
               {showAvailableFrom ? (
                 <OnboardingSelectField

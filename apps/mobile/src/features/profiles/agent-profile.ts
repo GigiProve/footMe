@@ -22,7 +22,6 @@ export type AgentProfileRecord = {
   has_other_football_experience: boolean;
   has_played_football: boolean;
   is_federation_licensed: boolean;
-  license_number: string | null;
   main_player_roles: PlayerPosition[];
   managed_players_count: string | null;
   media_items: AgentMediaItemRecord[];
@@ -49,6 +48,12 @@ export type AgentProfileRecord = {
   period_start_year: number | null;
   player_career_entries: unknown[];
   player_types: string[];
+  /**
+   * REV-PROF-16: le attivita principali dichiarate nel profilo, al massimo
+   * tre. `operational_focuses` resta la colonna che le precedeva — conserva
+   * le voci legacy oltre la terza e non viene piu scritta da qui.
+   */
+  primary_activities: string[];
   /** REV-ONB-06 §S: fascia dichiarata, indipendente dai collegamenti. */
   portfolio_range: string | null;
   previous_roles: string[];

@@ -42,7 +42,6 @@ import {
 } from "../../src/features/clubs/team-service";
 import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
 import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
-import { EditAgentProfileModal } from "../../src/features/profiles/edit-modals/EditAgentProfileModal";
 import { EditAgentMediaModal } from "../../src/features/profiles/edit-modals/EditAgentMediaModal";
 import { EditClubInfoModal } from "../../src/features/profiles/edit-modals/EditClubInfoModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
@@ -868,7 +867,8 @@ export default function ProfileScreen() {
                 profileType: "agent",
                 viewerMode: "owner",
               });
-              handleEdit("agentProfile");
+              // REV-PROF-16: hub modulare, non più la modale anagrafica.
+              router.push("/profile/agent-edit");
             }}
             onMorePress={() => {
               trackProfileEvent("profile_more_menu_opened", {
@@ -985,11 +985,12 @@ export default function ProfileScreen() {
             onAddExperience={() => router.push("/profile/agent-career" as never)}
             onDeleteMedia={handleDeleteAgentMedia}
             onEditMedia={(itemId) => handleManageAgentMedia(itemId)}
-            onEditProfile={() => handleEdit("agentProfile")}
+            // REV-PROF-16: stesso hub della CTA nell'header.
+            onEditProfile={() => router.push("/profile/agent-edit")}
             onManageAssistiti={() =>
               router.push("/representation/hub?source=profile" as never)
             }
-            onManageMedia={() => handleManageAgentMedia()}
+            onManageMedia={() => router.push("/profile/agent-edit/media")}
             onOpenAllAssistiti={() =>
               router.push(`/representation/portfolio/${profileId}` as never)
             }
@@ -1125,23 +1126,20 @@ export default function ProfileScreen() {
             </>
           ) : null}
           {role === "agent" ? (
-            <>
-              <EditAgentMediaModal
-                completeProfile={completeProfile}
-                editingItemId={agentMediaEditingItemId}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "agentMedia"}
-              />
-              <EditAgentProfileModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "agentProfile"}
-              />
-            </>
+            /*
+              REV-PROF-16: la modale anagrafica del Procuratore non esiste
+              piu'. Scriveva agenzia, ruolo e attivita' a mano, cioe' proprio
+              i campi che ora derivano dalla carriera e dal modulo "Attivita'
+              e mercati". Resta solo l'editor di contenuto.
+            */
+            <EditAgentMediaModal
+              completeProfile={completeProfile}
+              editingItemId={agentMediaEditingItemId}
+              onClose={handleCloseModal}
+              onSaved={handleSaved}
+              userId={userId}
+              visible={activeModal === "agentMedia"}
+            />
           ) : null}
           {role === "director" ? (
             <EditDirectorMediaModal

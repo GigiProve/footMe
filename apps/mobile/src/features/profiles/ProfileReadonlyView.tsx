@@ -39,7 +39,6 @@ import { searchTeams, type CompleteProfessionalProfile } from "./profile-service
 import type { AppRole } from "../onboarding/create-initial-profile";
 
 type EditSection =
-  | "agentProfile"
   | "agentMedia"
   | "editPlayerProfile"
   | "editCoachProfile"
@@ -386,8 +385,11 @@ const readonlyStyles = StyleSheet.create({
 
 function getEditTarget(role: AppRole): EditSection | null {
   switch (role) {
-    case "agent":
-      return "agentProfile";
+    /*
+      REV-PROF-16: il Procuratore non ha più una modale anagrafica — ha l'hub
+      `/profile/agent-edit`. Restituire qui una sezione che nessuno monta
+      avrebbe mostrato una CTA che non apre niente.
+    */
     case "player":
       return "playerSports";
     case "coach":

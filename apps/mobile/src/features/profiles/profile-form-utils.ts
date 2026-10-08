@@ -1073,6 +1073,57 @@ export function normalizeFacebookInput(value: string) {
 }
 
 /**
+ * Profilo LinkedIn verso un URL canonico (REV-PROF-16 §"Social e sito web").
+ *
+ * LinkedIn non ha un "handle" unico come Instagram: `/in/persona`,
+ * `/company/azienda` e `/school/istituto` sono tutti profili legittimi, e il
+ * mockup mostra proprio la forma `/in/...`. Si accettano quindi sia l'URL
+ * completo sia il solo identificativo — che viene letto come profilo
+ * personale, il caso di gran lunga più frequente per un procuratore.
+ *
+ * I parametri di tracking vengono tolti: un link condiviso da LinkedIn porta
+ * con sé l'origine di chi lo ha copiato, e quella non è parte del contatto.
+ */
+export function normalizeLinkedInInput(value: string) {
+  const trimmed = value.trim().replace(/^@+/, "");
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    const match = trimmed.match(
+      /^https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/(in|company|school)\/([A-Za-z0-9\-_%À-ÿ.]+)\/?(?:[?#].*)?$/i,
+    );
+
+    return match?.[2]
+      ? `https://www.linkedin.com/${match[1].toLowerCase()}/${match[2]}`
+      : "";
+  }
+
+  // Uno schema diverso da http/https non è un input da correggere.
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(trimmed)) {
+    return "";
+  }
+
+  // "/in/nome-cognome" è la forma che il mockup suggerisce nel placeholder:
+  // le barre ai bordi e il dominio scritto a mano non sono errori.
+  const bare = trimmed
+    .replace(/^\/+/, "")
+    .replace(/^(?:www\.)?linkedin\.com\//i, "")
+    .replace(/\/+$/, "");
+  const scoped = bare.match(/^(in|company|school)\/([A-Za-z0-9\-_%À-ÿ.]+)$/i);
+
+  if (scoped?.[2]) {
+    return `https://www.linkedin.com/${scoped[1].toLowerCase()}/${scoped[2]}`;
+  }
+
+  return /^[A-Za-z0-9\-_%À-ÿ.]+$/.test(bare)
+    ? `https://www.linkedin.com/in/${bare}`
+    : "";
+}
+
+/**
  * Handle o URL di TikTok/YouTube verso un URL canonico.
  *
  * Accetta entrambe le forme perche il prodotto le ha sempre accettate

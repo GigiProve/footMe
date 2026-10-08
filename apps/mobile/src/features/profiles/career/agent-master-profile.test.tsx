@@ -189,6 +189,7 @@ function buildCareer(entries: AgentCareerEntryRecord[] = [buildCareerEntry(), PR
 const ASSISTITI: AgentPublicAssistito[] = [
   {
     created_at: "2026-01-01T00:00:00Z",
+    featured_rank: null,
     current_team: "Serie A",
     id: "rel-1",
     player_avatar_url: null,
@@ -199,6 +200,7 @@ const ASSISTITI: AgentPublicAssistito[] = [
   },
   {
     created_at: "2026-01-02T00:00:00Z",
+    featured_rank: null,
     current_team: "Serie B",
     id: "rel-2",
     player_avatar_url: null,

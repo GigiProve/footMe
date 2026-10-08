@@ -39,6 +39,29 @@ import {
 /** Quanti assistiti stanno in evidenza prima di rimandare al portfolio. */
 const HIGHLIGHTED_ASSISTITI = 3;
 
+/**
+ * Gli assistiti da mostrare in evidenza (REV-PROF-16).
+ *
+ * Quando il procuratore ne ha scelti esplicitamente, sono quelli e nel suo
+ * ordine — la RPC li restituisce già davanti. Chi non ha ancora aperto il
+ * modulo non si ritrova il profilo vuoto: valgono i primi tre del portfolio,
+ * esattamente come prima di questa review.
+ *
+ * Un assistito scelto e poi diventato privato, concluso o sospeso non arriva
+ * nemmeno qui — la proiezione pubblica lo filtra — e non viene sostituito
+ * automaticamente da un altro: l'evidenza è una scelta, non una quota da
+ * riempire.
+ */
+export function selectHighlightedAssistiti(
+  assistiti: readonly AgentPublicAssistito[],
+): AgentPublicAssistito[] {
+  const featured = assistiti.filter((item) => item.featured_rank != null);
+
+  return featured.length > 0
+    ? featured.slice(0, HIGHLIGHTED_ASSISTITI)
+    : assistiti.slice(0, HIGHLIGHTED_ASSISTITI);
+}
+
 const PATH_LABELS: Record<AgentCareerPath, string> = {
   agent: "Procuratore",
   coach: "Allenatore",
@@ -407,7 +430,7 @@ function AssistitiHighlights({
     );
   }
 
-  const highlighted = assistiti.slice(0, HIGHLIGHTED_ASSISTITI);
+  const highlighted = selectHighlightedAssistiti(assistiti);
 
   return (
     <View style={styles.assistiti} testID="agent-assistiti">

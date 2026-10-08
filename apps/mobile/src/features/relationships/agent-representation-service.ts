@@ -436,6 +436,12 @@ export async function fetchPlayerAgent(
 export type AgentPublicAssistito = {
   created_at: string;
   current_team: string | null;
+  /**
+   * REV-PROF-16: posizione scelta nel profilo pubblico (1, 2 o 3). `null`
+   * quando l'assistito non è in evidenza. L'ordinamento arriva già applicato
+   * dalla RPC: il client non riordina niente.
+   */
+  featured_rank: number | null;
   id: string;
   player_avatar_url: string | null;
   player_full_name: string | null;
@@ -465,5 +471,38 @@ export async function fetchAgentPublicAssistiti(
     throw error;
   }
 
-  return (data ?? []) as AgentPublicAssistito[];
+  /*
+    `featured_rank` arriva dalla RPC aggiornata dalla 20261003090000, che è un
+    prerequisito di questo client: la normalizzazione a `null` serve solo a
+    non far dipendere il resto del codice da come PostgREST rappresenta una
+    colonna vuota, non a sopravvivere a un backend vecchio.
+  */
+  return ((data ?? []) as Partial<AgentPublicAssistito>[]).map((row) => ({
+    ...row,
+    featured_rank: row.featured_rank ?? null,
+  })) as AgentPublicAssistito[];
+}
+
+/**
+ * Assistiti da mostrare in evidenza nel Master Profile (REV-PROF-16,
+ * schermata 7).
+ *
+ * Scrive **solo** la posizione: stato, visibilità e tipologia del rapporto
+ * restano quelli decisi dalla Gestione assistiti, e un id non più eleggibile
+ * viene scartato dal backend invece di far fallire tutta la selezione.
+ *
+ * L'ordine dell'array è l'ordine mostrato nel profilo.
+ */
+export async function setAgentFeaturedAssistiti(
+  agentProfileId: string,
+  relationshipIds: readonly string[],
+): Promise<void> {
+  const { error } = await supabase.rpc("set_agent_featured_assistiti", {
+    p_profile_id: agentProfileId,
+    p_relationship_ids: [...relationshipIds],
+  });
+
+  if (error) {
+    throw error;
+  }
 }
