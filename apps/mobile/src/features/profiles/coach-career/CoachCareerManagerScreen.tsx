@@ -79,8 +79,10 @@ const PATHS: CareerPathCopy[] = [
   {
     appBarTitle: "Carriera da calciatore",
     emptyCtaLabel: "Aggiungi carriera da calciatore",
-    emptyText: "Puoi aggiungere questo percorso anche in seguito.",
-    emptyTitle: "Nessuna esperienza da calciatore",
+    // Allineata ai default di CoachPlayerCareerStep (REV-PROF-04): questa copy
+    // sovrascriveva quella corretta con un testo fuori spec.
+    emptyText: "Puoi aggiungere il tuo percorso da calciatore anche in seguito.",
+    emptyTitle: "Nessuna esperienza aggiunta",
     icon: "walk-outline",
     key: "player",
     title: "Calciatore",

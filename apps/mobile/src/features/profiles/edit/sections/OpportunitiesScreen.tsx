@@ -8,7 +8,7 @@
  * scarta comunque, ma chi cambia idea due volte non deve riselezionare tutto.
  */
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
@@ -32,6 +32,7 @@ import { INTEREST_CATEGORY_OPTIONS } from "../../player-sports";
 import { toDelimitedString } from "../../profile-edit-helpers";
 import { PROVINCE_OPTIONS, REGION_OPTIONS } from "../../profile-form-utils";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
+import { ProfileEditFieldsSkeleton } from "../ProfileEditStates";
 import {
   useCompleteProfileQuery,
   usePlayerSectionSave,
@@ -245,9 +246,7 @@ export function OpportunitiesScreen() {
       title="Opportunità"
     >
       {profileQuery.isPending ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
+        <ProfileEditFieldsSkeleton />
       ) : null}
 
       {profileQuery.isError ? (

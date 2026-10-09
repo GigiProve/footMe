@@ -12,6 +12,14 @@ const backMock = vi.fn();
 const localSearchParamsMock = vi.fn();
 
 vi.mock("expo-router", () => ({
+  /*
+    Il guard delle modifiche non salvate si aggancia a "beforeRemove" del
+    navigatore: senza questo stub le schermate di modifica non montano.
+  */
+  useNavigation: () => ({
+    addListener: () => () => {},
+    dispatch: () => {},
+  }),
   Redirect: (props: Record<string, unknown>) =>
     React.createElement("Redirect", props),
   useLocalSearchParams: () => localSearchParamsMock(),
@@ -266,6 +274,7 @@ function buildAgentProfile(): CompleteProfessionalProfile {
     agentProfile: {
       activity_scopes: [],
       agency_logo_url: null,
+      show_federation: true,
       agency_name: "MB Football Management",
       career_migrated_at: null,
     coach_career_entries: [],

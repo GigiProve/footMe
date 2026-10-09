@@ -148,11 +148,13 @@ const KIND_META: Record<
   }
 > = {
   event: {
-    color: "#DB2777",
+    // Colore identificativo della categoria "Evento": nessun token semantico
+    // esistente corrisponde, da qui il token dedicato in styles/tokens/colors.
+    color: colors.contentCategoryEvent,
     detailLabel: "Evento",
     icon: "calendar-outline",
     label: "Eventi",
-    softColor: "#FCE7F3",
+    softColor: colors.contentCategoryEventSoft,
   },
   highlights: {
     color: colors.accent,
@@ -176,14 +178,17 @@ const KIND_META: Record<
     softColor: colors.successSoft,
   },
   statement: {
-    color: "#4F46E5",
+    // Colore identificativo della categoria "Comunicato": idem, token dedicato.
+    color: colors.contentCategoryStatement,
     detailLabel: "Comunicato",
     icon: "document-text-outline",
     label: "Comunicati",
-    softColor: "#EEF2FF",
+    softColor: colors.contentCategoryStatementSoft,
   },
   training: {
-    color: "#D97706",
+    // Colore identificativo della categoria "Allenamento": il soft invece
+    // riusa `warningSoft`, già coerente con questo tono ambra.
+    color: colors.contentCategoryTraining,
     detailLabel: "Allenamento",
     icon: "images-outline",
     label: "Allenamenti",

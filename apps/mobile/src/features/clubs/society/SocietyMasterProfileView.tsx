@@ -13,7 +13,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, spacing } from "../../../theme/tokens";
+import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button, TabBar, type TabBarItem } from "../../../ui";
 import { ClubMediaTabContent } from "../components/ClubMediaTabContent";
 import type { PublicClubProfile } from "../club-service";
@@ -49,6 +49,8 @@ type SocietyMasterProfileViewProps = {
   onEditProfile: () => void;
   onFollowPress: () => void;
   onManagePositions: () => void;
+  /** Dall'empty state delle squadre, per chi può gestire il club. */
+  onOpenDashboard?: () => void;
   onMessagePress: () => void;
   onMorePress: () => void;
   onOpenAffiliate: (clubId: string) => void;
@@ -72,6 +74,7 @@ export function SocietyMasterProfileView({
   onEditProfile,
   onFollowPress,
   onManagePositions,
+  onOpenDashboard,
   onMessagePress,
   onMorePress,
   onOpenAffiliate,
@@ -144,6 +147,7 @@ export function SocietyMasterProfileView({
           <SocietyProfileTab
             affiliates={affiliates}
             onOpenAffiliate={onOpenAffiliate}
+            onOpenDashboard={onOpenDashboard}
             onOpenTeam={onOpenTeam}
             onRetry={onRetry}
             onSeeAllTeams={onSeeAllTeams}
@@ -326,7 +330,7 @@ const styles = StyleSheet.create({
   iconAction: {
     alignItems: "center",
     borderColor: colors.border,
-    borderRadius: 999,
+    borderRadius: radius.full,
     borderWidth: StyleSheet.hairlineWidth,
     height: 36,
     justifyContent: "center",
@@ -337,7 +341,7 @@ const styles = StyleSheet.create({
   },
   skeletonActions: {
     backgroundColor: colors.backgroundStrong,
-    borderRadius: 999,
+    borderRadius: radius.full,
     height: 36,
     marginTop: spacing[8],
     width: "70%",
@@ -354,26 +358,26 @@ const styles = StyleSheet.create({
   },
   skeletonLogo: {
     backgroundColor: colors.backgroundStrong,
-    borderRadius: 16,
+    borderRadius: radius[16],
     height: 84,
     marginTop: -58,
     width: 84,
   },
   skeletonMeta: {
     backgroundColor: colors.backgroundStrong,
-    borderRadius: 4,
+    borderRadius: radius[4],
     height: 12,
     width: "60%",
   },
   skeletonMetaShort: {
     backgroundColor: colors.backgroundStrong,
-    borderRadius: 4,
+    borderRadius: radius[4],
     height: 12,
     width: "40%",
   },
   skeletonRow: {
     backgroundColor: colors.backgroundStrong,
-    borderRadius: 10,
+    borderRadius: radius[10],
     height: 60,
   },
   skeletonSection: {
@@ -390,7 +394,7 @@ const styles = StyleSheet.create({
   },
   skeletonTitle: {
     backgroundColor: colors.backgroundStrong,
-    borderRadius: 6,
+    borderRadius: radius[6],
     height: 24,
     width: "65%",
   },

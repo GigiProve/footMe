@@ -6,12 +6,12 @@
  * ciclo di vita tutto loro, e mescolarli a nome e residenza rendeva la
  * schermata due cose insieme.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
-import { colors, spacing } from "../../../../theme/tokens";
+import { colors, radius, spacing } from "../../../../theme/tokens";
 import { AppText, Button } from "../../../../ui";
 import { PhotoPicker } from "../../../onboarding/ui";
 import {
@@ -21,6 +21,7 @@ import {
 } from "../../media-upload-service";
 import { trackProfileEvent } from "../../profile-analytics";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
+import { ProfileEditFieldsSkeleton } from "../ProfileEditStates";
 import {
   useCompleteProfileQuery,
   usePlayerSectionSave,
@@ -43,6 +44,13 @@ export function PhotoIdentityScreen() {
   const profileQuery = useCompleteProfileQuery(userId);
   const save = usePlayerSectionSave(userId);
   const data = profileQuery.data;
+
+  /*
+    File sostituiti durante la sessione di modifica. Restano nello storage
+    finché il salvataggio non è andato a buon fine: prima di allora sono
+    ancora il contenuto pubblicato del profilo.
+  */
+  const supersededUrlsRef = useRef<Set<string>>(new Set());
 
   const initialForm = useMemo<PhotoForm | null>(
     () =>
@@ -125,8 +133,16 @@ export function PhotoIdentityScreen() {
 
         patch(target === "avatar" ? { avatarUrl: next } : { coverUrl: next });
 
+        /*
+          Il file vecchio NON si cancella qui: finché l'utente non salva,
+          `profiles.avatar_url` punta ancora a quell'oggetto. Cancellarlo
+          subito e poi uscire con "Esci senza salvare" lasciava il profilo con
+          un avatar rotto ovunque nell'app. Lo mettiamo in lista e lo
+          eliminiamo solo dopo un salvataggio riuscito, come fa
+          `ProfileMediaEditor`.
+        */
         if (previousUrl && previousUrl !== next) {
-          void removeMediaFromStorage(previousUrl);
+          supersededUrlsRef.current.add(previousUrl);
         }
       } catch (error) {
         setUploadError(
@@ -168,6 +184,22 @@ export function PhotoIdentityScreen() {
             section: "photo",
             success: true,
           });
+
+          /*
+            Ora che il nuovo elenco è stato accettato possiamo liberare i file
+            sostituiti. Escludiamo quelli ancora referenziati: un'immagine
+            rimessa com'era durante la stessa sessione non va cancellata.
+          */
+          const stillInUse = new Set(
+            [form.avatarUrl, form.coverUrl].filter(Boolean),
+          );
+          const orphans = [...supersededUrlsRef.current].filter(
+            (url) => !stillInUse.has(url),
+          );
+
+          supersededUrlsRef.current.clear();
+          void Promise.allSettled(orphans.map(removeMediaFromStorage));
+
           setDraft(null);
           router.back();
         },
@@ -185,11 +217,11 @@ export function PhotoIdentityScreen() {
       testID="profile-edit-photo"
       title="Foto e identità"
     >
-      {profileQuery.isPending ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
-      ) : null}
+      {/*
+        Scheletro invece dello spinner, come nelle altre sezioni: l'ingombro
+        è già quello finale e il contenuto non salta all'arrivo dei dati.
+      */}
+      {profileQuery.isPending ? <ProfileEditFieldsSkeleton rows={2} /> : null}
 
       {profileQuery.isError ? (
         <View style={styles.centered}>
@@ -250,7 +282,16 @@ export function PhotoIdentityScreen() {
               errorMessage={uploadError ?? undefined}
               onPickFromLibrary={() => void uploadImage("avatar", "library")}
               onRemove={
-                form.avatarUrl ? () => patch({ avatarUrl: "" }) : undefined
+                form.avatarUrl
+                  ? () => {
+                      /*
+                        Come per la sostituzione: il file resta finché il
+                        salvataggio non conferma la rimozione.
+                      */
+                      supersededUrlsRef.current.add(form.avatarUrl);
+                      patch({ avatarUrl: "" });
+                    }
+                  : undefined
               }
               onRetry={() => void uploadImage("avatar", "library")}
               onTakePhoto={() => void uploadImage("avatar", "camera")}
@@ -279,7 +320,7 @@ const styles = StyleSheet.create({
   },
   cover: {
     aspectRatio: 16 / 9,
-    borderRadius: 16,
+    borderRadius: radius[16],
     overflow: "hidden",
     backgroundColor: colors.surfacePlaceholder,
   },

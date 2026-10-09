@@ -150,7 +150,12 @@ export type MediaContentItem = {
     contentType: "club_media" | "fan_media" | "fan_tribuna" | "media_profile";
     postId: string;
   };
-  thumbnailUrl: string;
+  /*
+    Opzionale: un video senza copertina non deve ereditare l'avatar del
+    profilo (sarebbe un dato inventato). Griglia e viewer mostrano il
+    placeholder quando manca.
+  */
+  thumbnailUrl?: string;
   type: "image" | "video";
   videoUrl?: string;
 };
@@ -639,7 +644,7 @@ export function MediaTabContent({
                   </View>
 
                   <View style={styles.viewerBottomSheet}>
-                    <AppText color="inverse" style={styles.viewerAuthor} variant="bodySm">
+                    <AppText color="inverse" variant="metaStrong">
                       {authorName}
                     </AppText>
                     {item.description ? (
@@ -691,7 +696,7 @@ export function MediaTabContent({
                       {item.comments.length > 0 ? (
                         item.comments.slice(0, 2).map((comment) => (
                           <AppText key={comment.id} color="inverse" variant="bodySm">
-                            <AppText color="inverse" style={styles.commentAuthor} variant="bodySm">
+                            <AppText color="inverse" variant="metaStrong">
                               {comment.author}
                             </AppText>{" "}
                             {comment.text}
@@ -767,7 +772,7 @@ function ViewerAction({
         />
       </View>
       {count ? (
-        <AppText color="inverse" style={styles.viewerActionCount} variant="caption">
+        <AppText color="inverse" variant="chipLabel">
           {count}
         </AppText>
       ) : null}
@@ -780,9 +785,6 @@ function formatCount(value: number) {
 }
 
 const styles = StyleSheet.create({
-  commentAuthor: {
-    fontWeight: "700",
-  },
   commentsPreview: {
     gap: spacing[6],
     marginTop: spacing[8],
@@ -812,7 +814,7 @@ const styles = StyleSheet.create({
   },
   featuredBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(10,102,194,0.92)",
+    backgroundColor: colors.featuredBadgeSurface,
     borderRadius: radius.full,
     height: 22,
     justifyContent: "center",
@@ -868,7 +870,7 @@ const styles = StyleSheet.create({
   },
   gridShade: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(11,43,64,0.08)",
+    backgroundColor: colors.mediaScrim,
   },
   header: {
     alignItems: "center",
@@ -890,9 +892,9 @@ const styles = StyleSheet.create({
   },
   tagBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(11, 43, 64, 0.74)",
-    borderColor: "rgba(255,255,255,0.18)",
-    borderRadius: radius[6],
+    backgroundColor: colors.mediaBadgeSurface,
+    borderColor: colors.mediaHairlineOnMedia,
+    borderRadius: radius.full,
     borderWidth: 1,
     flexDirection: "row",
     flexShrink: 1,
@@ -907,12 +909,10 @@ const styles = StyleSheet.create({
   },
   tagText: {
     flexShrink: 1,
-    fontSize: 11,
-    lineHeight: 14,
   },
   videoBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(11, 43, 64, 0.74)",
+    backgroundColor: colors.mediaBadgeSurface,
     borderRadius: radius.full,
     bottom: spacing[6],
     flexDirection: "row",
@@ -930,7 +930,7 @@ const styles = StyleSheet.create({
   videoPlayButton: {
     alignItems: "center",
     alignSelf: "center",
-    backgroundColor: "rgba(11,43,64,0.46)",
+    backgroundColor: colors.mediaControlSurface,
     borderRadius: radius.full,
     height: 70,
     justifyContent: "center",
@@ -946,19 +946,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing[6],
   },
-  viewerActionCount: {
-    fontWeight: "700",
-  },
   viewerActionIconWrap: {
     alignItems: "center",
-    backgroundColor: "rgba(11,43,64,0.46)",
+    backgroundColor: colors.mediaControlSurface,
     borderRadius: radius.full,
     height: 44,
     justifyContent: "center",
     width: 44,
-  },
-  viewerAuthor: {
-    fontWeight: "700",
   },
   viewerBackButton: {
     left: spacing[12],
@@ -968,7 +962,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   viewerBottomSheet: {
-    backgroundColor: "rgba(11,43,64,0.32)",
+    backgroundColor: colors.mediaSheetSurface,
     bottom: spacing[18],
     left: spacing[12],
     paddingBottom: spacing[12],
@@ -979,7 +973,7 @@ const styles = StyleSheet.create({
     borderRadius: radius[16],
   },
   viewerDangerAction: {
-    backgroundColor: "rgba(220,38,38,0.45)",
+    backgroundColor: colors.mediaDangerSurface,
   },
   viewerDescription: {
     marginTop: spacing[6],
@@ -989,7 +983,7 @@ const styles = StyleSheet.create({
   },
   viewerLinkedItem: {
     alignItems: "center",
-    borderColor: "rgba(255,255,255,0.45)",
+    borderColor: colors.mediaBorderOnMedia,
     borderRadius: radius.full,
     borderWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
@@ -1010,7 +1004,7 @@ const styles = StyleSheet.create({
   },
   viewerOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.28)",
+    backgroundColor: colors.mediaViewerOverlay,
   },
   viewerPage: {
     backgroundColor: colors.hero,
@@ -1018,7 +1012,7 @@ const styles = StyleSheet.create({
   },
   viewerPinnedBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(10,102,194,0.92)",
+    backgroundColor: colors.featuredBadgeSurface,
     borderRadius: radius.full,
     height: 28,
     justifyContent: "center",

@@ -6,12 +6,12 @@
  * punto di verità.
  */
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 
 import { NationalityAutocompleteInput } from "../../../../components/ui/nationality-autocomplete-input";
 import { ResidenceCityInput } from "../../../../components/ui/residence-city-input";
-import { colors, spacing } from "../../../../theme/tokens";
+import { spacing } from "../../../../theme/tokens";
 import { AppText, Button } from "../../../../ui";
 import {
   DateSelector,
@@ -33,6 +33,7 @@ import {
   type ItalianCityOption,
 } from "../../profile-form-utils";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
+import { ProfileEditFieldsSkeleton } from "../ProfileEditStates";
 import {
   useCompleteProfileQuery,
   usePlayerSectionSave,
@@ -209,9 +210,7 @@ export function PersonalDataScreen() {
       title="Dati personali"
     >
       {profileQuery.isPending ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
+        <ProfileEditFieldsSkeleton />
       ) : null}
 
       {profileQuery.isError ? (

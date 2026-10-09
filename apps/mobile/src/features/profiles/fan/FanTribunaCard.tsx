@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   excerpt: {
-    lineHeight: 19,
+    lineHeight: typography.lineHeight[19],
   },
   footer: {
     alignItems: "center",

@@ -908,6 +908,7 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
       agentProfile: {
         activity_scopes: ["professional", "youth"],
         agency_logo_url: "https://example.com/agency.png",
+        show_federation: true,
         agency_name: "MB Football Management",
         agency_role: "Founder",
         federation: "FIGC (Italia)",
@@ -964,6 +965,7 @@ describe("updateCompleteProfessionalProfile player experiences", () => {
         has_other_football_experience: true,
         has_played_football: true,
         is_federation_licensed: true,
+        show_federation: true,
         main_player_roles: ["defender", "midfielder"],
         managed_players_count: "5-15 calciatori",
         open_to_clubs: true,

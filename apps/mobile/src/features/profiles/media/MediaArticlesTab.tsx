@@ -10,7 +10,7 @@
  * I chip dei filtri arrivano dal backend — le categorie realmente presenti
  * fra gli articoli di questa realtà — e non da una lista scritta nel client.
  */
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button } from "../../../ui";
@@ -87,11 +87,11 @@ export function MediaArticlesTab({
         {canPublishArticle && onNewArticlePress ? (
           <Button
             accessibilityLabel="Nuovo articolo"
-            label="+ Nuovo articolo"
+            label="Nuovo articolo"
             onPress={onNewArticlePress}
             size="sm"
             testID="media-new-article-button"
-            variant="chipAction"
+            variant="outline"
           />
         ) : null}
       </View>
@@ -114,26 +114,15 @@ export function MediaArticlesTab({
               filter === MEDIA_ARTICLE_FILTER_ALL ? "Tutti" : filter;
 
             return (
-              <Pressable
-                accessibilityLabel={label}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: isActive }}
+              <Button
                 key={filter}
+                label={label}
                 onPress={() => onCategoryChange(filter)}
-                style={({ pressed }) => [
-                  styles.chip,
-                  isActive ? styles.chipActive : null,
-                  pressed ? styles.pressed : null,
-                ]}
+                selected={isActive}
+                size="sm"
                 testID={`media-article-filter-${filter}`}
-              >
-                <AppText
-                  color={isActive ? "inverse" : "primary"}
-                  variant="chipLabel"
-                >
-                  {label}
-                </AppText>
-              </Pressable>
+                variant="chipAction"
+              />
             );
           })}
         </ScrollView>
@@ -228,7 +217,7 @@ function ArticlesEmptyState({
             onPress={onNewArticlePress}
             size="sm"
             testID="media-articles-empty-cta"
-            variant="primary"
+            variant="outline"
           />
         ) : null}
       </View>

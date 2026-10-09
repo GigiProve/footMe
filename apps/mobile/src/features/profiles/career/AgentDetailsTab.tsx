@@ -33,7 +33,6 @@ import {
 } from "../../onboarding/agent/agent-taxonomy";
 import {
   buildAvailabilityZonesLabel,
-  buildOperatingAreaLabel,
   summarizeList,
 } from "../profile-display-helpers";
 import type { CompleteProfessionalProfile } from "../profile-service";
@@ -85,22 +84,16 @@ export function AgentDetailsTab({
   const isOpenToPlayers = agentProfile?.open_to_players ?? false;
   const isOpenToClubs = agentProfile?.open_to_clubs ?? false;
   /*
-    L'area operativa è un dato dichiarato dall'onboarding (REV-ONB-06 §AA).
-    Finché un profilo non l'ha scelta resta la derivazione storica da regione e
-    località: cambiare schermata non deve far sparire una riga che c'era.
+    L'area operativa è un dato dichiarato dall'onboarding (REV-ONB-06 §AA) e
+    non si deduce dalla residenza: la derivazione storica da regione e città
+    presentava come zona di lavoro un luogo che il procuratore non aveva mai
+    indicato. Senza scelta vale il default dichiarato, cioè tutta Italia.
   */
-  const operatingAreaLabel =
-    (agentProfile?.operating_area_type
-      ? buildAvailabilityZonesLabel(
-          agentProfile.operating_area_type,
-          agentProfile.operating_regions ?? [],
-          agentProfile.operating_provinces ?? [],
-        )
-      : null) ??
-    buildOperatingAreaLabel(
-      profile.region,
-      profile.city ?? profile.residence ?? profile.current_location_city,
-    );
+  const operatingAreaLabel = buildAvailabilityZonesLabel(
+    agentProfile?.operating_area_type ?? "ITALY",
+    agentProfile?.operating_regions ?? [],
+    agentProfile?.operating_provinces ?? [],
+  );
   const hasOpportunities = isOpenToPlayers || isOpenToClubs || Boolean(operatingAreaLabel);
 
   // ---- Profilo professionale ---------------------------------------------
@@ -112,6 +105,7 @@ export function AgentDetailsTab({
   const licenseLabel = buildAgentLicenseLabel({
     federation: agentProfile?.federation,
     isLicensed: agentProfile?.is_federation_licensed,
+    showFederation: agentProfile?.show_federation,
   });
 
   /*
@@ -175,7 +169,28 @@ export function AgentDetailsTab({
     tipo, mai mescolate in un'unica timeline.
   */
   const previousCount = career.previousExperiences.length;
+  /*
+    Tutti i percorsi che la Carriera sa raccontare, non il solo Calciatore: il
+    selettore della tab Carriera prevede anche dirigente, allenatore e staff,
+    e ometterli qui faceva sparire dai Dettagli esperienze che il profilo ha
+    davvero dichiarato. Stesso ordine del Dirigente, per coerenza fra ruoli.
+  */
   const additionalPaths = [
+    {
+      count: career.directorExperienceCount,
+      key: "director" as const,
+      label: "Dirigente",
+    },
+    {
+      count: career.coachExperienceCount,
+      key: "coach" as const,
+      label: "Allenatore",
+    },
+    {
+      count: career.staffExperienceCount,
+      key: "staff" as const,
+      label: "Staff tecnico",
+    },
     {
       count: career.playerExperienceCount,
       key: "player" as const,

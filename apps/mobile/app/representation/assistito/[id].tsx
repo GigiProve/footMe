@@ -30,6 +30,7 @@ import {
   useToast,
 } from "../../../src/ui";
 import { useSession } from "../../../src/features/auth/use-session";
+import { useUnsavedChangesGuard } from "../../../src/features/profiles/edit/use-unsaved-changes-guard";
 import {
   fetchRepresentationDetail,
   proposeVisibility,
@@ -272,6 +273,26 @@ export default function AssistitoDetailScreen() {
     }
   }
 
+  /*
+    Tipo di rappresentanza, visibilità, data e nota privata si modificano qui
+    e si salvano con una CTA: uscire con il chevron, il back di sistema o la
+    gesture li perdeva in silenzio. Confrontiamo con il record caricato, così
+    un'uscita senza modifiche resta immediata.
+  */
+  const isDirty = Boolean(
+    detail &&
+      (relationshipType !== detail.relationship_type ||
+        visibility !== detail.visibility ||
+        startedOn !== formatIsoDate(detail.started_on ?? null) ||
+        note !== (detail.private_note ?? "")),
+  );
+
+  const handleBack = useUnsavedChangesGuard({
+    isDirty,
+    isSaving: isSaving || isSavingNote,
+    onLeave: () => router.back(),
+  });
+
   const playerName = player.full_name ?? "Calciatore";
   const isAccepted = detail?.status === "accepted";
   const isPending = detail?.status === "pending";
@@ -279,7 +300,7 @@ export default function AssistitoDetailScreen() {
   return (
     <Screen>
       <ScreenHeader
-        leading={<BackButton onPress={() => router.back()} />}
+        leading={<BackButton onPress={handleBack} />}
         title="Gestisci rapporto"
       />
 

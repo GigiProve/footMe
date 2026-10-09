@@ -44,29 +44,20 @@ import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/Ed
 import { EditClubSportProfileModal } from "../../src/features/profiles/edit-modals/EditClubSportProfileModal";
 import { EditClubAffiliationsModal } from "../../src/features/profiles/edit-modals/EditClubAffiliationsModal";
 import { EditTeamsModal } from "../../src/features/profiles/edit-modals/EditTeamsModal";
-import { EditCoachAchievementsModal } from "../../src/features/profiles/edit-modals/EditCoachAchievementsModal";
-import { EditCoachInfoModal } from "../../src/features/profiles/edit-modals/EditCoachInfoModal";
-import { EditCoachProfileModal } from "../../src/features/profiles/edit-modals/EditCoachProfileModal";
-import { EditCoachMediaModal } from "../../src/features/profiles/edit-modals/EditCoachMediaModal";
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditDirectorMediaModal } from "../../src/features/profiles/edit-modals/EditDirectorMediaModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
-import { EditStaffInfoModal } from "../../src/features/profiles/edit-modals/EditStaffInfoModal";
-import { EditStaffMediaModal } from "../../src/features/profiles/edit-modals/EditStaffMediaModal";
 import { StaffProfileTabView } from "../../src/features/profiles/career/StaffProfileTabView";
 import { AgentProfileTabView } from "../../src/features/profiles/career/AgentProfileTabView";
 import { DirectorProfileTabView } from "../../src/features/profiles/career/DirectorProfileTabView";
 import {
-  buildFullUpdatePayload,
   buildAgentProfileHeaderDetails,
   buildHeaderDetails,
-  buildInitialState,
   buildCoachProfileHeaderDetails,
   buildDirectorProfileHeaderDetails,
   buildPlayerProfileHeaderDetails,
   buildStaffProfileHeaderDetails,
 } from "../../src/features/profiles/profile-edit-helpers";
-import { validateBirthDateInput } from "../../src/features/profiles/profile-form-utils";
 import {
   ProfileReadonlyView,
   type EditSection,
@@ -85,13 +76,19 @@ import {
   getCompleteProfessionalProfile,
   saveAgentProfileMedia,
   saveDirectorProfileMedia,
-  updateCompleteProfessionalProfile,
+  savePlayerProfileMedia,
   type CompleteProfessionalProfile,
 } from "../../src/features/profiles/profile-service";
+import {
+  normalizePlayerMediaItems,
+  type PlayerMediaItemRecord,
+} from "../../src/features/profiles/player-media";
 import { removeMediaFromStorage } from "../../src/features/profiles/media-upload-service";
+import { fetchAgentPublicAssistiti } from "../../src/features/relationships/agent-representation-service";
 import type { MediaLinkedTarget } from "../../src/features/profiles/career/MediaTabContent";
 import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
 import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
+import { ProfileSectionError } from "../../src/features/profiles/master/ProfileSectionBlock";
 import { ProfileSkeleton } from "../../src/features/profiles/master/ProfileSkeleton";
 import {
   trackPlayerProfileViewed,
@@ -144,6 +141,13 @@ export default function ProfileScreen() {
   */
   const [societyProfile, setSocietyProfile] =
     useState<SocietyMasterProfile | null>(null);
+  /*
+    Senza questo flag un errore della RPC società era indistinguibile da "non
+    ho ancora risposto": `societyProfile` restava null e il ramo club mostrava
+    lo scheletro per sempre, senza errore né modo di riprovare. Qui teniamo
+    separato "sto caricando" da "ho fallito" (§36).
+  */
+  const [societyLoadFailed, setSocietyLoadFailed] = useState(false);
   const [activeClubTab, setActiveClubTab] = useState<SocietyTab>(
     // Arrivando dal "+" della Home la scheda contenuti è quella che ospita il
     // composer già esistente, quindi si apre direttamente su quella.
@@ -200,21 +204,29 @@ export default function ProfileScreen() {
           fetchPublicClubSquadraOverview(data.club.id).catch(
             () => emptyClubOverview,
           ),
+          /*
+            L'errore non viene più inghiottito: lo registriamo, così il ramo
+            club può mostrare un errore con "Riprova" invece di restare in
+            caricamento all'infinito.
+          */
           fetchSocietyMasterProfile(data.club.id).catch(() => null),
         ]);
 
         setClubTeams(teams);
         setClubOverview(overview);
         setSocietyProfile(society);
+        setSocietyLoadFailed(society === null);
       } else {
         setClubTeams([]);
         setClubOverview(emptyClubOverview);
         setSocietyProfile(null);
+        setSocietyLoadFailed(false);
       }
     } catch {
       setClubTeams([]);
       setClubOverview(emptyClubOverview);
       setSocietyProfile(null);
+      setSocietyLoadFailed(true);
       // Copy leggibile: niente messaggi tecnici del backend (§36).
       Alert.alert(
         "Profilo non disponibile",
@@ -287,10 +299,26 @@ export default function ProfileScreen() {
       completeProfile ? buildCoachProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
+  /*
+    REV-PROF-13: "Assistiti" è una delle informazioni rapide dell'header del
+    Procuratore, ma il conteggio viveva solo dentro la tab Carriera: l'header
+    riceveva `null` e la colonna non compariva mai. Lo leggiamo qui, dalla
+    stessa proiezione pubblica usata dalla tab, e lo passiamo al costruttore.
+  */
+  const agentAssistitiQuery = useQuery({
+    enabled: completeProfile?.profile.role === "agent",
+    queryFn: () => fetchAgentPublicAssistiti(completeProfile!.profile.id),
+    queryKey: ["agent-public-assistiti", completeProfile?.profile.id ?? ""],
+  });
   const agentHeaderDetails = useMemo(
     () =>
-      completeProfile ? buildAgentProfileHeaderDetails(completeProfile) : null,
-    [completeProfile],
+      completeProfile
+        ? buildAgentProfileHeaderDetails(
+            completeProfile,
+            agentAssistitiQuery.data?.length ?? null,
+          )
+        : null,
+    [agentAssistitiQuery.data, completeProfile],
   );
   const staffHeaderDetails = useMemo(
     () =>
@@ -556,6 +584,98 @@ export default function ProfileScreen() {
     );
   }
 
+  /*
+    REV-PROF-02 §O.9 + REV-PROF-12: elimina e "metti in evidenza" devono
+    persistere anche per il Calciatore. Senza queste due funzioni
+    MediaTabContent ricadeva sul proprio stato locale e la modifica spariva al
+    cambio tab. Stesso contratto gia' usato dal Dirigente qui sotto.
+  */
+  function readPlayerMediaItems(): PlayerMediaItemRecord[] {
+    return normalizePlayerMediaItems(
+      completeProfile?.playerProfile?.media_items,
+      completeProfile?.playerProfile?.media_urls,
+    ) as PlayerMediaItemRecord[];
+  }
+
+  function handleDeletePlayerMedia(itemId: string) {
+    if (!completeProfile?.playerProfile || !userId) {
+      return;
+    }
+
+    const currentItems = readPlayerMediaItems();
+    const itemToDelete = currentItems.find((item) => item.id === itemId) ?? null;
+
+    if (!itemToDelete) {
+      return;
+    }
+
+    Alert.alert(
+      "Elimina contenuto",
+      "Rimuovere questo contenuto dalla tab Media del tuo profilo?",
+      [
+        { style: "cancel", text: "Annulla" },
+        {
+          onPress: async () => {
+            try {
+              await savePlayerProfileMedia({
+                mediaItems: currentItems.filter((item) => item.id !== itemId),
+                playerProfile: completeProfile.playerProfile!,
+                profileId: userId,
+              });
+
+              /*
+                Il file si cancella solo dopo che il nuovo elenco e' stato
+                accettato: eliminarlo prima lascerebbe un riferimento rotto se
+                il salvataggio fallisse.
+              */
+              await Promise.allSettled([
+                removeMediaFromStorage(itemToDelete.url),
+              ]);
+              await loadProfile();
+              Alert.alert(
+                "Contenuto eliminato",
+                "La tab Media e' stata aggiornata.",
+              );
+            } catch (error) {
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "Impossibile eliminare il contenuto.";
+              Alert.alert("Errore", message);
+            }
+          },
+          style: "destructive",
+          text: "Elimina",
+        },
+      ],
+    );
+  }
+
+  async function handleTogglePlayerMediaFeatured(itemId: string) {
+    if (!completeProfile?.playerProfile || !userId) {
+      return;
+    }
+
+    try {
+      await savePlayerProfileMedia({
+        mediaItems: readPlayerMediaItems().map((item) =>
+          item.id === itemId
+            ? { ...item, is_featured: !item.is_featured }
+            : item,
+        ),
+        playerProfile: completeProfile.playerProfile,
+        profileId: userId,
+      });
+      await loadProfile();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Impossibile aggiornare l'evidenza.";
+      Alert.alert("Errore", message);
+    }
+  }
+
   function handleDeleteDirectorMedia(itemId: string) {
     if (!completeProfile?.directorProfile || !userId) {
       return;
@@ -671,16 +791,18 @@ export default function ProfileScreen() {
                       ),
                   },
                   /*
-                    Il palmares non ha una sezione dentro "Modifica profilo" e
-                    le matite nelle sezioni pubbliche sono state rimosse: il suo
-                    editor esistente resta raggiungibile da qui finche' la
-                    revisione del flusso di modifica non lo assorbe.
+                    REV-PROF-05 ha dato al palmares una sezione vera dentro
+                    "Modifica profilo". La vecchia modale scriveva solo
+                    `label` e non `competition_name`/`season_label`: una voce
+                    creata da li' si riapriva vuota nel nuovo editor e non era
+                    salvabile. Questa voce di menu porta quindi alla sezione,
+                    non piu' alla modale.
                   */
                   {
                     icon: "trophy-outline" as const,
                     label: "Gestisci palmares",
                     subtitle: "Titoli e riconoscimenti del tuo profilo.",
-                    onPress: () => handleEdit("coachAchievements"),
+                    onPress: () => router.push("/profile/coach-edit/awards"),
                   },
                 ]
               : []),
@@ -789,6 +911,7 @@ export default function ProfileScreen() {
               onEditProfile={handleOpenSocietyEditor}
               onFollowPress={() => undefined}
               onManagePositions={handleOpenClubPositions}
+              onOpenDashboard={() => router.push("/dashboard")}
               onMessagePress={() => undefined}
               onMorePress={() => setMoreMenuVisible(true)}
               onOpenAffiliate={handleOpenAffiliateClub}
@@ -808,6 +931,17 @@ export default function ProfileScreen() {
               positionFilter={clubPositionFilter}
               profile={societyProfile}
               shouldOpenMediaComposer={composeIntent === "club"}
+            />
+          ) : societyLoadFailed ? (
+            /*
+              La RPC ha fallito: mostrare lo scheletro qui significherebbe
+              lasciare il club in caricamento per sempre. Errore leggibile e
+              "Riprova" che rilancia la stessa lettura (§36).
+            */
+            <ProfileSectionError
+              message="Non è stato possibile caricare il profilo della società."
+              onRetry={() => void loadProfile()}
+              testID="society-profile-error"
             />
           ) : (
             <SocietyProfileSkeleton />
@@ -1000,15 +1134,20 @@ export default function ProfileScreen() {
             */
             <ProfileSkeleton testID={`${role}-profile-loading-skeleton`} />
           ) : (
-            <AppText variant="bodySm" color="secondary">
-              Sto recuperando i dati professionali del tuo account...
-            </AppText>
+            /*
+              Anche gli altri ruoli usano lo scheletro: il testo di attesa
+              cambiava l'ingombro della pagina e faceva saltare il contenuto
+              all'arrivo dei dati (§35).
+            */
+            <ProfileSkeleton testID={`${role}-profile-loading-skeleton`} />
           )
         ) : completeProfile && role === "player" ? (
           <ProfileTabView
             completeProfile={completeProfile}
             isOwner
+            onDeleteMedia={handleDeletePlayerMedia}
             onManageMedia={() => router.push("/profile/edit/media")}
+            onToggleMediaFeatured={handleTogglePlayerMediaFeatured}
           />
         ) : completeProfile && role === "coach" ? (
           <CoachProfileTabView
@@ -1026,7 +1165,12 @@ export default function ProfileScreen() {
             onManageAdditionalPaths={() =>
               router.push("/profile/staff-career?section=paths")
             }
-            onManageMedia={() => handleEdit("staffMedia")}
+            /*
+              REV-PROF-08: i Media dello Staff vivono nell'hub, con lo stesso
+              editor condiviso degli altri ruoli. La vecchia modale restava un
+              secondo editor in parallelo per lo stesso dato.
+            */
+            onManageMedia={() => router.push("/profile/staff-edit/media")}
             onOpenClub={handleOpenAffiliateClub}
           />
         ) : completeProfile && role === "agent" ? (
@@ -1191,56 +1335,16 @@ export default function ProfileScreen() {
             sezioni vivono sotto /profile/edit, una rotta per sezione, e il
             vecchio form unico e stato rimosso invece di restare in parallelo.
           */}
-          {role === "coach" ? (
-            <>
-              <EditCoachProfileModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "editCoachProfile"}
-              />
-              <EditCoachInfoModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "coachInfo"}
-              />
-              <EditCoachMediaModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "coachMedia"}
-              />
-              <EditCoachAchievementsModal
-                achievements={completeProfile.coachProfile?.achievements ?? []}
-                coachProfileId={completeProfile.coachProfile?.profile_id ?? ""}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                visible={activeModal === "coachAchievements"}
-              />
-            </>
-          ) : null}
-          {role === "staff" ? (
-            <>
-              <EditStaffInfoModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "staffInfo"}
-              />
-              <EditStaffMediaModal
-                completeProfile={completeProfile}
-                onClose={handleCloseModal}
-                onSaved={handleSaved}
-                userId={userId}
-                visible={activeModal === "staffMedia"}
-              />
-            </>
-          ) : null}
+          {/*
+            REV-PROF-05/08: Allenatore e Staff non hanno piu' editor a modal.
+            Anagrafica, informazioni tecniche, Media e palmares vivono sotto
+            /profile/coach-edit e /profile/staff-edit, una rotta per sezione.
+            Le sei modali che stavano qui erano gia' irraggiungibili (nessuno
+            impostava piu' quei valori di `activeModal`) tranne palmares e
+            Media Staff, che ora puntano all'hub: tenerle montate significava
+            due editor paralleli sullo stesso dato, con formati di scrittura
+            diversi.
+          */}
           {role === "agent" ? (
             /*
               REV-PROF-16: la modale anagrafica del Procuratore non esiste

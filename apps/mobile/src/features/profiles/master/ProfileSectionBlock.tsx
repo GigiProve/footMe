@@ -194,7 +194,9 @@ const styles = StyleSheet.create({
   error: {
     alignItems: "flex-start",
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[12],
+    // Cornice di un modulo: radius 16, non 12 (§ design system, "cards are
+    // radius 16").
+    borderRadius: radius[16],
     gap: spacing[10],
     padding: spacing[16],
   },

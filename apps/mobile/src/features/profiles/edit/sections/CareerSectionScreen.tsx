@@ -11,11 +11,11 @@
  * caso di errore non resta una carriera modificata solo a schermo.
  */
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
-import { colors, spacing } from "../../../../theme/tokens";
+import { colors, radius, spacing } from "../../../../theme/tokens";
 import { AppText, Button, ConfirmModal } from "../../../../ui";
 import { PlayerCareerExperienceCard } from "../../../onboarding/career/PlayerCareerExperienceCard";
 import { PlayerExperienceForm as PlayerExperienceFormComponent } from "../../../onboarding/career/PlayerExperienceForm";
@@ -32,6 +32,7 @@ import { sortPlayerExperiencesBySeason } from "../../player-sports";
 import { buildInitialState } from "../../profile-edit-helpers";
 import { searchTeams } from "../../profile-service";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
+import { ProfileEditFieldsSkeleton } from "../ProfileEditStates";
 import {
   useCompleteProfileQuery,
   usePlayerSectionSave,
@@ -172,9 +173,7 @@ export function CareerSectionScreen() {
       title={title}
     >
       {profileQuery.isPending ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
+        <ProfileEditFieldsSkeleton />
       ) : null}
 
       {profileQuery.isError ? (
@@ -296,13 +295,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: radius[16],
   },
   typeBadge: {
     alignSelf: "flex-start",
     paddingHorizontal: spacing[12],
     paddingVertical: spacing[6],
     backgroundColor: colors.surfaceMuted,
-    borderRadius: 16,
+    borderRadius: radius[16],
   },
 });

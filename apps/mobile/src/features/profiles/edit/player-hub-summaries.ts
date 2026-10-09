@@ -13,6 +13,7 @@ import { buildPublicContacts } from "../master/PublicContactsList";
 import { normalizePlayerMediaItems } from "../player-media";
 import {
   getPlayerPositionLabel,
+  getPlayerPositionLabels,
   toPlayerExperienceForm,
 } from "../player-sports";
 import {
@@ -90,12 +91,16 @@ export function buildTechnicalSummary(
     return MISSING;
   }
 
-  const secondary = data.playerProfile?.secondary_positions?.[0];
   const primaryLabel = getPlayerPositionLabel(primary, MISSING);
+  // §F.2 / header (profile-edit-helpers.ts:805-807): sui dati storici il
+  // ruolo secondario può coincidere col principale (es. entrambi "striker").
+  // Si confronta sull'etichetta tradotta, non sul codice, per restare
+  // coerente con l'header che usa la stessa regola.
+  const secondaryLabel = getPlayerPositionLabels(
+    data.playerProfile?.secondary_positions,
+  ).find((label) => label !== primaryLabel);
 
-  return secondary
-    ? `${primaryLabel} · ${getPlayerPositionLabel(secondary, "")}`
-    : primaryLabel;
+  return secondaryLabel ? `${primaryLabel} · ${secondaryLabel}` : primaryLabel;
 }
 
 /**
@@ -109,8 +114,15 @@ export function buildOpportunitiesSummary(
   data: CompleteProfessionalProfile,
 ): string {
   const player = data.playerProfile;
+  // Allineato al Master Profile (career/PlayerDetailsTab.tsx:52-53): i
+  // profili storici possono avere solo `is_open_to_transfer` valorizzato,
+  // senza il campo più recente `willing_to_change_club`. Guardare un solo
+  // campo faceva dire "Non disponibile" nell'hub mentre il profilo pubblico
+  // mostrava "Disponibile".
+  const isOpenToTransfer =
+    data.profile.is_open_to_transfer || player?.willing_to_change_club;
 
-  if (!player?.willing_to_change_club) {
+  if (!isOpenToTransfer || !player) {
     return "Non disponibile al trasferimento";
   }
 

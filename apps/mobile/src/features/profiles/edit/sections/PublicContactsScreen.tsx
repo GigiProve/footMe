@@ -15,11 +15,11 @@
  * non appartiene a questa schermata, quindi qui è dichiarato privato.
  */
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
-import { colors, spacing } from "../../../../theme/tokens";
+import { colors, radius, spacing } from "../../../../theme/tokens";
 import { AppText, Button } from "../../../../ui";
 import { OnboardingTextField, ToggleRow } from "../../../onboarding/ui";
 import { trackProfileEvent, type PublicContactType } from "../../profile-analytics";
@@ -34,6 +34,7 @@ import {
   normalizeYouTubeInput,
 } from "../../profile-form-utils";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
+import { ProfileEditFieldsSkeleton } from "../ProfileEditStates";
 import {
   useCompleteProfileQuery,
   usePlayerSectionSave,
@@ -258,9 +259,7 @@ export function PublicContactsScreen() {
       title="Contatti pubblici"
     >
       {profileQuery.isPending ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
+        <ProfileEditFieldsSkeleton />
       ) : null}
 
       {profileQuery.isError ? (
@@ -385,7 +384,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: radius[16],
   },
   channelHeader: {
     flexDirection: "row",

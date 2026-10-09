@@ -61,7 +61,7 @@ export function FanTribunaTab({
             onPress={onCreatePress}
             size="sm"
             testID="fan-create-button"
-            variant="primary"
+            variant="outline"
           />
         </View>
       ) : null}
@@ -109,7 +109,12 @@ export function FanTribunaTab({
               : "Questo Tifoso non ha ancora pubblicato opinioni, sondaggi o formazioni."}
           </AppText>
           {canCreateContent ? (
-            <Button label="Crea" onPress={onCreatePress} size="sm" />
+            <Button
+              label="Crea"
+              onPress={onCreatePress}
+              size="sm"
+              variant="outline"
+            />
           ) : null}
         </View>
       )}

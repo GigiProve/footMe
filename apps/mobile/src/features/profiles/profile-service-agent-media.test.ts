@@ -143,6 +143,7 @@ describe("agent media profile service", () => {
     mocks.agentMaybeSingleMock.mockResolvedValue({
       data: {
         agency_logo_url: null,
+        show_federation: true,
         agency_name: "MB Football Management",
         career_migrated_at: null,
     coach_career_entries: [],
@@ -229,6 +230,7 @@ describe("agent media profile service", () => {
       agentProfile: {
         activity_scopes: [],
         agency_logo_url: null,
+        show_federation: true,
         agency_name: "MB Football Management",
         agency_role: "Founder",
         career_migrated_at: null,
@@ -298,6 +300,7 @@ describe("agent media profile service", () => {
       has_other_football_experience: true,
       has_played_football: true,
       is_federation_licensed: true,
+      show_federation: true,
       main_player_roles: ["defender"],
       managed_players_count: "4 giocatori",
       media_items: [

@@ -9,11 +9,11 @@
  * dall'editor.
  */
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
-import { colors, spacing } from "../../../../theme/tokens";
+import { colors, radius, spacing } from "../../../../theme/tokens";
 import { AppText, Button, ConfirmModal, Divider } from "../../../../ui";
 import { getPlayerSeasonSelectOptions } from "../../../onboarding/career/player-career-utils";
 import {
@@ -31,6 +31,7 @@ import {
   type PlayerAwardType,
 } from "../player-awards";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
+import { ProfileEditFieldsSkeleton } from "../ProfileEditStates";
 import {
   useCompleteProfileQuery,
   usePlayerSectionSave,
@@ -291,9 +292,7 @@ export function AwardsScreen() {
       title="Palmarès"
     >
       {profileQuery.isPending ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
+        <ProfileEditFieldsSkeleton />
       ) : null}
 
       {profileQuery.isError ? (
@@ -406,13 +405,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: radius[16],
   },
   list: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: radius[16],
     overflow: "hidden",
   },
   row: {
@@ -431,6 +430,6 @@ const styles = StyleSheet.create({
     gap: spacing[4],
     padding: spacing[16],
     backgroundColor: colors.accentSoft,
-    borderRadius: 16,
+    borderRadius: radius[16],
   },
 });

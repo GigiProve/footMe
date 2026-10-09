@@ -315,12 +315,25 @@ const AGENT_FEDERATION_COUNTRIES: Record<string, string> = {
 export function buildAgentLicenseLabel({
   federation,
   isLicensed,
+  showFederation = true,
 }: {
   federation: string | null | undefined;
   isLicensed: boolean | null | undefined;
+  /**
+   * Visibilità dell'ente, non dell'abilitazione: spegnerla lascia la pill
+   * "Licenza federale" e nasconde solo il nome della federazione. Prima i
+   * due concetti condividevano `is_federation_licensed`, quindi nascondere
+   * l'ente faceva sparire del tutto la licenza e il profilo usciva dal
+   * filtro di ricerca "con licenza".
+   */
+  showFederation?: boolean | null;
 }): string | null {
   if (!isLicensed) {
     return null;
+  }
+
+  if (showFederation === false) {
+    return "Licenza federale";
   }
 
   const code = federation?.trim();

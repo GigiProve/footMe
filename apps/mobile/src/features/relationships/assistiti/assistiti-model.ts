@@ -168,15 +168,34 @@ export function isPendingRepresentation(row: AssistitoRow): boolean {
 }
 
 /**
- * Un record manuale è "concluso" solo quando il suo invito è scaduto o
- * revocato: finché il link è vivo resta lavoro in corso, non storia.
+ * Un record manuale è "concluso" quando il suo invito è scaduto o revocato,
+ * finché il link è vivo resta lavoro in corso, non storia.
+ *
+ * Il database non scrive mai lo stato "expired" (la scadenza è derivata),
+ * quindi un invito con `invite_expires_at` nel passato resterebbe per sempre
+ * fra gli attivi se guardassimo solo lo stato memorizzato. Trattiamo quindi
+ * come concluse anche le righe "created"/"shared" già scadute, escludendo le
+ * righe senza scadenza (`invite_expires_at` nullo), che non sono mai chiuse
+ * per questo motivo.
  */
-export function isClosedRow(row: AssistitoRow): boolean {
+export function isClosedRow(row: AssistitoRow, now: Date = new Date()): boolean {
   if (row.kind === "representation") {
     return ["rejected", "removed", "revoked", "terminated"].includes(row.status);
   }
 
-  return row.invite_status === "expired" || row.invite_status === "revoked";
+  if (row.invite_status === "expired" || row.invite_status === "revoked") {
+    return true;
+  }
+
+  if (row.invite_expires_at) {
+    const expiresAt = new Date(row.invite_expires_at);
+
+    if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() <= now.getTime()) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function filterAssistiti(
@@ -211,7 +230,9 @@ const INVITE_STATUS_LABELS: Record<InviteStatus, string> = {
   opened: "Link aperto",
   registered: "Registrazione avviata",
   revoked: "Invito revocato",
-  shared: "Invito inviato",
+  // Lo stato "shared" dice solo che l'app ha tentato la condivisione: non sa
+  // se il link è stato davvero recapitato, quindi la label resta neutra.
+  shared: "Condivisione completata",
 };
 
 export function getInviteStatusLabel(status: InviteStatus | null): string {

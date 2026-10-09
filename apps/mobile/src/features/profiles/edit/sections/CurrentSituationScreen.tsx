@@ -9,7 +9,7 @@
  * contrattuale.
  */
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Image, StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 
 import { colors, radius, spacing } from "../../../../theme/tokens";
@@ -18,6 +18,7 @@ import { buildPlayerCareerView } from "../../career/player-career-model";
 import { trackProfileEvent } from "../../profile-analytics";
 import { toPlayerExperienceForm } from "../../player-sports";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
+import { ProfileEditFieldsSkeleton } from "../ProfileEditStates";
 import {
   CONTRACT_STATUS_OPTIONS,
   PLAYER_CONDITION_OPTIONS,
@@ -136,9 +137,7 @@ export function CurrentSituationScreen() {
       title="Situazione attuale"
     >
       {profileQuery.isPending ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
+        <ProfileEditFieldsSkeleton />
       ) : null}
 
       {profileQuery.isError ? (
@@ -250,7 +249,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: radius[16],
   },
   clubRow: {
     flexDirection: "row",

@@ -40,6 +40,14 @@ const routerMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("expo-router", () => ({
+  /*
+    Il guard delle modifiche non salvate si aggancia a "beforeRemove" del
+    navigatore: senza questo stub le schermate di modifica non montano.
+  */
+  useNavigation: () => ({
+    addListener: () => () => {},
+    dispatch: () => {},
+  }),
   router: routerMocks,
   useFocusEffect: (effect: () => void) => {
     React.useEffect(effect, [effect]);
@@ -464,9 +472,15 @@ describe("Profilo professionale", () => {
       "federation",
       "is_federation_licensed",
       "license_number",
+      "show_federation",
     ]);
-    // Spegnere l'ente nasconde la pill, non cancella il dato.
-    expect(patch.is_federation_licensed).toBe(false);
+    /*
+      Spegnere l'ente nasconde il suo nome, non l'abilitazione: la licenza
+      resta dichiarata (e quindi il profilo resta nel filtro "con licenza"),
+      e il dato della federazione non viene cancellato.
+    */
+    expect(patch.is_federation_licensed).toBe(true);
+    expect(patch.show_federation).toBe(false);
     expect(patch.federation).toBe("FIGC");
   });
 

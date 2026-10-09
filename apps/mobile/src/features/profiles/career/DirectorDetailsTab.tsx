@@ -33,7 +33,6 @@ import {
 } from "../master/ProfileSectionBlock";
 import {
   buildAvailabilityZonesLabel,
-  buildOperatingAreaLabel,
   summarizeList,
 } from "../profile-display-helpers";
 import type { CompleteProfessionalProfile } from "../profile-service";
@@ -105,22 +104,17 @@ export function DirectorDetailsTab({
       : [];
   const audiencesLabel = summarizeList(audiences.map((option) => option.label));
   /*
-    L'area operativa è ora un dato dichiarato (REV-PROF-11). Finché un profilo
-    non l'ha mai scelta resta la derivazione storica da regione e località:
-    cambiare schermata non deve far sparire una riga che c'era.
+    L'area operativa non si deduce dalla residenza: la spec lo vieta
+    esplicitamente, e un dirigente che non ha mai aperto "Opportunità" si
+    vedeva presentare la propria città come zona di lavoro, cioè un dato che
+    non ha mai dichiarato. Quando `availability_type` è nullo vale il default
+    dichiarato dalla migrazione 20261002090000, cioè tutta Italia.
   */
-  const operatingAreaLabel =
-    (directorProfile?.availability_type
-      ? buildAvailabilityZonesLabel(
-          directorProfile.availability_type,
-          directorProfile.preferred_regions ?? [],
-          directorProfile.preferred_provinces ?? [],
-        )
-      : null) ??
-    buildOperatingAreaLabel(
-      profile.region,
-      profile.city ?? profile.residence ?? profile.current_location_city,
-    );
+  const operatingAreaLabel = buildAvailabilityZonesLabel(
+    directorProfile?.availability_type ?? "ITALY",
+    directorProfile?.preferred_regions ?? [],
+    directorProfile?.preferred_provinces ?? [],
+  );
 
   // ---- Profilo professionale ---------------------------------------------
   const primaryRole = resolveDirectorPrimaryRole(directorProfile);

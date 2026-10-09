@@ -212,6 +212,12 @@ export function MediaProfileView({
   const isOwner = publicProfile ? publicProfile.mode === "owner" : mode === "owner";
   const entity = publicProfile?.entity ?? null;
   const entityName = formatMediaEntityName(entity?.entityName);
+  /*
+    Senza nome l'hero resta senza nome. "Profilo media" era un'etichetta che
+    la testata non ha mai scritto e che, messa dov'è il nome, si leggeva come
+    il nome scelto (REV-PROF-21).
+  */
+  const heroName = entityName ?? "";
 
   // ─── Articoli ────────────────────────────────────────────────────────────
   const [articles, setArticles] = useState<MediaProfilePost[]>([]);
@@ -757,10 +763,12 @@ export function MediaProfileView({
         description={entity.shortDescription}
         footerAction={
           /*
-            "Visita sito" compare solo con un URL pubblico e valido: al
-            Visitor non si mostra un pulsante disabilitato.
+            "Visita sito" compare solo con un URL pubblico e valido, e solo al
+            Visitor: `can_view_website` guarda l'esistenza dell'URL, non chi
+            sta guardando, quindi l'owner si ritrovava fra le proprie azioni
+            un collegamento al proprio sito (REV-PROF-21 §Azioni owner).
           */
-          capabilities.canViewWebsite && websiteUrl ? (
+          !isOwner && capabilities.canViewWebsite && websiteUrl ? (
             <Pressable
               accessibilityHint="Apre il sito in una scheda esterna"
               accessibilityLabel="Visita sito, link esterno"
@@ -780,7 +788,7 @@ export function MediaProfileView({
             </Pressable>
           ) : null
         }
-        fullName={entityName ?? "Profilo media"}
+        fullName={heroName}
         /*
           Lo stato follow ha una sola sorgente: la schermata, che lo carica e
           lo aggiorna. Il valore della RPC servirebbe solo a mostrare

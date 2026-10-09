@@ -290,7 +290,7 @@ describe("stato e card", () => {
       describeRowState(
         makeRow({ invite_status: "shared", kind: "manual" }),
       ).label,
-    ).toBe("Invito inviato");
+    ).toBe("Condivisione completata");
   });
 
   it("non mette nessuna icona cestino sulla card", () => {

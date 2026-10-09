@@ -222,6 +222,19 @@ async function saveMediaProfileColumns(
  * sessione autorizzata che possa riscriverla in parallelo. Il giorno in cui
  * esisteranno collaboratori, i canali resteranno comunque dell'owner.
  */
+/**
+ * I cinque canali che questa schermata governa. La tabella storica può
+ * contenerne altri (etichette libere scritte prima del modulo): quelli non li
+ * tocchiamo, perché nessuna schermata saprebbe più rimetterli.
+ */
+const LEGACY_CHANNEL_TYPES = [
+  "instagram",
+  "tiktok",
+  "youtube",
+  "facebook",
+  "website",
+] as const;
+
 async function saveMediaChannels(
   profileId: string,
   patch: Extract<MediaSectionPatch, { kind: "channels" }>,
@@ -242,6 +255,23 @@ async function saveMediaChannels(
 
   if (error) {
     throw error;
+  }
+
+  /*
+    I canali storici di `media_profile_channels` continuavano a comparire ai
+    visitatori anche dopo che l'owner li aveva spenti qui: la RPC pubblica
+    unisce le due sorgenti, e `profile_contacts` vince solo quando ha un
+    valore. Spegnere la riga storica rende questa schermata l'unica sorgente
+    di verità, che è la regola di REV-PROF-22.
+  */
+  const { error: legacyError } = await supabase
+    .from("media_profile_channels")
+    .update({ is_public: false })
+    .eq("media_profile_id", profileId)
+    .in("channel_type", LEGACY_CHANNEL_TYPES);
+
+  if (legacyError) {
+    throw legacyError;
   }
 }
 
@@ -306,19 +336,57 @@ export function readMediaChannelForm(data: CompleteProfessionalProfile): {
 } {
   const contacts = data.userContacts;
 
+  /*
+    I canali storici di `media_profile_channels` sono pubblici per i
+    visitatori ma non erano mai arrivati in questa schermata: l'owner vedeva
+    "Aggiungi canale" su un canale che il suo profilo stava già mostrando, e
+    non aveva modo di spegnerlo. Li usiamo come valore iniziale dove
+    `profile_contacts` è vuoto, così il canale diventa modificabile; al
+    salvataggio la riga storica viene spenta e resta una sorgente sola.
+  */
+  const legacy = new Map(
+    (data.mediaProfileChannels ?? [])
+      .filter((channel) => channel.channel_type && channel.url?.trim())
+      .map((channel) => [channel.channel_type as string, channel.url!.trim()]),
+  );
+
+  const read = (key: string, value: string | null | undefined) =>
+    value?.trim() || legacy.get(key) || "";
+
+  const facebook = read("facebook", contacts.facebook);
+  const instagram = read("instagram", contacts.instagram);
+  const tiktok = read("tiktok", contacts.tiktok);
+  const website = read("website", contacts.website);
+  const youtube = read("youtube", contacts.youtube);
+
+  /*
+    Un canale che arriva solo dal legacy era visibile al visitatore, quindi
+    parte acceso: spegnerlo deve essere una scelta dell'owner, non un effetto
+    collaterale dell'apertura della schermata.
+  */
+  const visible = (
+    key: string,
+    value: string | null | undefined,
+    flag: boolean | null | undefined,
+  ) => (value?.trim() ? Boolean(flag) : legacy.has(key) || Boolean(flag));
+
   return {
-    facebook: contacts.facebook ?? "",
-    instagram: contacts.instagram ?? "",
-    tiktok: contacts.tiktok ?? "",
+    facebook,
+    instagram,
+    tiktok,
     visibility: {
-      facebook: contacts.showFacebook,
-      instagram: contacts.showInstagram,
-      tiktok: contacts.showTikTok ?? false,
-      website: contacts.showWebsite ?? false,
-      youtube: contacts.showYouTube ?? false,
+      facebook: visible("facebook", contacts.facebook, contacts.showFacebook),
+      instagram: visible(
+        "instagram",
+        contacts.instagram,
+        contacts.showInstagram,
+      ),
+      tiktok: visible("tiktok", contacts.tiktok, contacts.showTikTok),
+      website: visible("website", contacts.website, contacts.showWebsite),
+      youtube: visible("youtube", contacts.youtube, contacts.showYouTube),
     },
-    website: contacts.website ?? "",
-    youtube: contacts.youtube ?? "",
+    website,
+    youtube,
   };
 }
 

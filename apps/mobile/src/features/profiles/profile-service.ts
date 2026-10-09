@@ -606,6 +606,8 @@ export type CompleteProfessionalProfileUpdate = {
     has_played_football: boolean;
     is_federation_licensed: boolean;
     license_number: string | null;
+    /** Visibilità pubblica dell'ente, indipendente dall'avere la licenza. */
+    show_federation: boolean;
     main_player_roles: PlayerPosition[];
     managed_players_count: string | null;
     open_to_clubs: boolean;
@@ -1150,6 +1152,9 @@ function normalizeAgentProfileRecord(
     ),
     has_played_football: normalizeBoolean(rawProfile.has_played_football),
     is_federation_licensed: normalizeBoolean(rawProfile.is_federation_licensed),
+    show_federation: rawProfile.show_federation == null
+      ? true
+      : normalizeBoolean(rawProfile.show_federation),
     main_player_roles: normalizePlayerPositions(rawProfile.main_player_roles),
     managed_players_count: normalizeOptionalText(rawProfile.managed_players_count),
     media_items: normalizeAgentMediaItems(rawProfile.media_items),
@@ -2015,7 +2020,7 @@ export async function getCompleteProfessionalProfile(profileId: string) {
       ? supabase
           .from("agent_profiles")
           .select(
-            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, coach_career_entries, staff_career_entries, director_career_entries, career_migrated_at, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, federation, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions, operating_provinces, operating_area_type, operating_countries, works_abroad, activity_scopes, primary_activities, portfolio_range, professional_mode, previous_roles, has_no_previous_experience",
+            "profile_id, agency_name, agency_logo_url, agency_role, managed_players_count, media_items, has_other_football_experience, other_football_roles, has_played_football, player_career_entries, coach_career_entries, staff_career_entries, director_career_entries, career_migrated_at, player_types, main_player_roles, open_to_clubs, open_to_players, is_federation_licensed, show_federation, federation, period_start_month, period_start_year, period_end_month, period_end_year, operational_focuses, operational_note, operating_macro_areas, operating_regions, operating_provinces, operating_area_type, operating_countries, works_abroad, activity_scopes, primary_activities, portfolio_range, professional_mode, previous_roles, has_no_previous_experience",
           )
           .eq("profile_id", profileId)
           .maybeSingle()
@@ -3111,6 +3116,7 @@ export type AgentProfilePatchInput = {
   federation?: string | null;
   is_federation_licensed?: boolean;
   license_number?: string | null;
+  show_federation?: boolean;
   open_to_clubs?: boolean;
   open_to_players?: boolean;
   operating_area_type?: string | null;
@@ -3217,6 +3223,7 @@ export async function saveAgentProfileMedia(input: {
     has_other_football_experience: input.agentProfile.has_other_football_experience,
     has_played_football: input.agentProfile.has_played_football,
     is_federation_licensed: input.agentProfile.is_federation_licensed,
+    show_federation: input.agentProfile.show_federation,
     main_player_roles: input.agentProfile.main_player_roles,
     managed_players_count: input.agentProfile.managed_players_count,
     media_items: input.mediaItems,

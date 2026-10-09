@@ -32,6 +32,14 @@ const routerMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("expo-router", () => ({
+  /*
+    Il guard delle modifiche non salvate si aggancia a "beforeRemove" del
+    navigatore: senza questo stub le schermate di modifica non montano.
+  */
+  useNavigation: () => ({
+    addListener: () => () => {},
+    dispatch: () => {},
+  }),
   router: routerMocks,
   useFocusEffect: (effect: () => void) => {
     React.useEffect(effect, [effect]);

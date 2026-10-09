@@ -23,7 +23,9 @@ export const COACH_EDIT_SECTION_GROUPS: readonly ProfileEditHubGroup[] = [
         icon: "camera-outline",
         id: "personal",
         route: "/profile/coach-edit/personal",
-        subtitle: "Foto, copertine e informazioni personali",
+        // Refuso: "copertine" al plurale non ha senso per un solo profilo
+        // (allineato alla versione Staff, che usa il singolare corretto).
+        subtitle: "Foto, copertina e informazioni personali",
         title: "Foto e dati personali",
       },
       {

@@ -41,7 +41,9 @@ import { ProfileEditScaffold } from "../edit/ProfileEditScaffold";
 import { trackProfileEvent } from "../profile-analytics";
 import {
   AGENT_CAREER_MESSAGES,
+  absoluteMonthsFromDateValue,
   agentPeriodFromDateValue,
+  assignmentStartMonths,
   createAgentAssignment,
   currentMonthValue,
   groupAgentAssignments,
@@ -49,6 +51,7 @@ import {
   hasOverlappingAssignment,
   isExactDuplicate,
   isSameAssignment,
+  manualOrganizationNameChanged,
   recordsToAssignments,
   shouldDefaultToPrimary,
   validateAgentAssignment,
@@ -389,10 +392,28 @@ export function AgentCareerManagerScreen() {
       incarichi svolti nello stesso posto. Un'organizzazione manuale non viene
       mai ricollegata a una pagina canonica per somiglianza di nome.
     */
+    /*
+      Se il nome dell'organizzazione manuale è cambiato davvero, l'incarico si
+      sposta su un'organizzazione diversa e deve avere un identificativo
+      nuovo. Riusare il vecchio id lo lasciava nel gruppo dell'agenzia
+      precedente, e `groupAgentAssignments` rinominava l'intero gruppo con il
+      nome dell'incarico più recente. Quando il nome è rimasto lo stesso l'id
+      si conserva, altrimenti due incarichi nella stessa agenzia si
+      spezzerebbero in due gruppi.
+    */
+    const organizationChanged = manualOrganizationNameChanged(
+      step.initialDraft.organizationName,
+      name,
+    );
+    const manualOrganizationId =
+      organizationChanged || !step.draft.manualOrganizationId
+        ? createLocalUuid()
+        : step.draft.manualOrganizationId;
+
     openForm({
       draft: {
         ...step.draft,
-        manualOrganizationId: step.draft.manualOrganizationId ?? createLocalUuid(),
+        manualOrganizationId,
         organizationCity: step.manual.city.trim(),
         organizationClubId: null,
         organizationCountry: step.manual.country.trim(),
@@ -545,6 +566,34 @@ export function AgentCareerManagerScreen() {
 
     if (!Number.isFinite(parsedYear)) {
       setErrorMessage(AGENT_CAREER_MESSAGES.endError);
+      return;
+    }
+
+    /*
+      Finora si controllava solo che l'anno fosse un numero: si poteva
+      concludere nel 2020 un incarico iniziato nel 2024, o metterne la fine
+      nel futuro. Confrontiamo in mesi assoluti, l'unità in cui inizio, fine e
+      mese corrente sono paragonabili.
+    */
+    const endMonths = absoluteMonthsFromDateValue(endMonthValue);
+    const assignmentToEnd =
+      assignments.find((item) => item.id === assignmentId) ?? null;
+    const startMonths = assignmentToEnd
+      ? assignmentStartMonths(assignmentToEnd)
+      : null;
+    const currentMonths = absoluteMonthsFromDateValue(currentMonthValue());
+
+    if (endMonths !== null && startMonths !== null && endMonths < startMonths) {
+      setErrorMessage(AGENT_CAREER_MESSAGES.endBeforeStart);
+      return;
+    }
+
+    if (
+      endMonths !== null &&
+      currentMonths !== null &&
+      endMonths > currentMonths
+    ) {
+      setErrorMessage(AGENT_CAREER_MESSAGES.endInFuture);
       return;
     }
 

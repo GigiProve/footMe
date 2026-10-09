@@ -48,7 +48,10 @@ export function AdditionalPathsStep({
           showOptionalBadge={false}
           summary={formatPathSummary(count)}
           testID={`${testIDPrefix}-career-paths-${copy.key}`}
-          title={copy.title}
+          // Titolo esteso ("Carriera da allenatore" / "Carriera da
+          // calciatore") come da spec REV-PROF-07: `copy.title` resta la
+          // label breve usata altrove (hub, selettore tipo).
+          title={copy.appBarTitle}
         />
       ))}
 

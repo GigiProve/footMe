@@ -590,19 +590,25 @@ describe("Master Profile Dirigente — Dettagli", () => {
         accessibilityLabel: "Disponibile per, Società e club, Staff tecnico",
       }).length,
     ).toBeGreaterThan(0);
+    /*
+      Senza una scelta esplicita vale il default dichiarato dalla migrazione
+      20261002090000, cioè tutta Italia. Prima qui si leggeva "Sicilia,
+      Isole", derivato dalla residenza: un'area operativa che il dirigente non
+      aveva mai indicato, e che la spec REV-PROF-11 vieta di dedurre.
+    */
     expect(
       tree.root.findAllByProps({
-        accessibilityLabel: "Area operativa, Sicilia, Isole",
+        accessibilityLabel: "Area operativa, Ovunque in Italia",
       }).length,
     ).toBeGreaterThan(0);
   });
 
   it("mostra l'area operativa dichiarata al posto di quella derivata", () => {
     /*
-      REV-PROF-11: finché il profilo non l'ha mai scelta, l'area operativa
-      resta derivata da regione e località. Appena viene dichiarata, è quella
-      a comparire — altrimenti salvare le Opportunità non cambierebbe niente
-      nel Master Profile.
+      REV-PROF-11: senza una scelta vale il default "tutta Italia", mai la
+      residenza. Appena l'area viene dichiarata è quella a comparire,
+      altrimenti salvare le Opportunità non cambierebbe niente nel Master
+      Profile.
     */
     const tree = renderDetails({
       directorProfile: buildDirectorProfileRecord({

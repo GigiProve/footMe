@@ -63,11 +63,11 @@ export function MediaTribunaTab({
         {canCreateContent && onCreatePress ? (
           <Button
             accessibilityLabel="Crea un contenuto Tribuna"
-            label="+ Crea"
+            label="Crea"
             onPress={onCreatePress}
             size="sm"
             testID="media-tribuna-create-button"
-            variant="chipAction"
+            variant="outline"
           />
         ) : null}
       </View>
@@ -98,7 +98,7 @@ export function MediaTribunaTab({
               onPress={onCreatePress}
               size="sm"
               testID="media-tribuna-empty-cta"
-              variant="primary"
+              variant="outline"
             />
           ) : null}
         </View>

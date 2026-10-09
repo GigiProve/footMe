@@ -21,8 +21,9 @@
  *    analytics non lo toccano e nessun messaggio di errore lo riporta.
  *
  * Il toggle "Mostra l'ente nel profilo" governa soltanto la visibilità della
- * federazione: è `is_federation_licensed` a decidere se la pill compare, e
- * quindi spegnerlo nasconde l'ente senza cancellarne il dato.
+ * federazione (`show_federation`): spegnerlo nasconde il nome dell'ente ma
+ * lascia la pill "Licenza federale" e non tocca `is_federation_licensed`,
+ * che resta il fatto di avere l'abilitazione.
  */
 import { useCallback, useMemo, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
@@ -59,7 +60,7 @@ type ProfessionalForm = {
   federation: string;
   isLicensed: boolean;
   licenseNumber: string;
-  /** `is_federation_licensed`: decide se l'ente compare nel profilo. */
+  /** `show_federation`: decide se il nome dell'ente compare nel profilo. */
   showFederation: boolean;
 };
 
@@ -98,7 +99,7 @@ export function AgentProfessionalProfileScreen() {
       */
       isLicensed: Boolean(agentProfile?.is_federation_licensed) || hasLicenseData,
       licenseNumber: savedLicenseNumber,
-      showFederation: Boolean(agentProfile?.is_federation_licensed),
+      showFederation: agentProfile?.show_federation ?? true,
     };
   }, [data, savedLicenseNumber]);
 
@@ -241,11 +242,13 @@ export function AgentProfessionalProfileScreen() {
         patch: {
           federation: form.isLicensed ? form.federation.trim() || null : null,
           /*
-            `is_federation_licensed` è la visibilità pubblica dell'ente, non
-            l'esistenza dell'abilitazione: senza abilitazione è
-            necessariamente spenta.
+            Due campi distinti: `is_federation_licensed` dice che la licenza
+            esiste, `show_federation` se il nome dell'ente è pubblico.
+            Tenerli insieme faceva sparire la licenza quando si nascondeva
+            l'ente, ed escludeva il profilo dal filtro "con licenza".
           */
-          is_federation_licensed: form.isLicensed && form.showFederation,
+          is_federation_licensed: form.isLicensed,
+          show_federation: form.showFederation,
           license_number: form.isLicensed
             ? normalizeAgentLicenseNumber(form.licenseNumber) || null
             : null,

@@ -22,6 +22,13 @@ export type AgentProfileRecord = {
   has_other_football_experience: boolean;
   has_played_football: boolean;
   is_federation_licensed: boolean;
+  /**
+   * Visibilità pubblica del nome dell'ente, separata dall'avere la licenza.
+   * Prima i due concetti condividevano `is_federation_licensed`: nascondere
+   * l'ente cancellava anche la licenza e toglieva il profilo dal filtro di
+   * ricerca "con licenza".
+   */
+  show_federation: boolean;
   main_player_roles: PlayerPosition[];
   managed_players_count: string | null;
   media_items: AgentMediaItemRecord[];

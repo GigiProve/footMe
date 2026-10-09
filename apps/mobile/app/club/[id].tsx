@@ -5,9 +5,9 @@
  * dal proprio tab Profilo. L'owner mode non dipende da dove si arriva: lo
  * decide il permesso risolto dal backend dentro `fetch_society_master_profile`.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert, Pressable, Share, StyleSheet, View } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -94,9 +94,22 @@ export default function ClubProfileScreen() {
     }
   }, [id, source]);
 
-  useEffect(() => {
-    void loadProfile();
-  }, [loadProfile]);
+  /*
+    [BUG FIX] Il salvataggio arriva dall'hub di modifica società
+    (/profile/society-edit), schermata separata che invalida chiavi
+    react-query non usate qui: questa route tiene i dati in stato locale,
+    caricati finora solo al mount. Al "torna indietro" la schermata restava
+    con i dati vecchi. useFocusEffect (gia' usato altrove, es.
+    (tabs)/profile.tsx) e' la via piu' coerente col resto del file: non
+    introduce react-query dove non c'e' e ricarica ad ogni ritorno in
+    primo piano, incluso il mount iniziale, senza bisogno di un useEffect
+    separato.
+  */
+  useFocusEffect(
+    useCallback(() => {
+      void loadProfile();
+    }, [loadProfile]),
+  );
 
   function handleTabChange(next: SocietyTab) {
     setActiveTab(next);
@@ -280,6 +293,7 @@ export default function ClubProfileScreen() {
           }}
           onMessagePress={() => void handleMessagePress()}
           onMorePress={() => setMenuVisible(true)}
+          onOpenDashboard={() => router.push("/(tabs)/dashboard" as never)}
           onOpenAffiliate={(affiliateId) => {
             trackProfileEvent("society_affiliate_opened", { profileType: "society" });
             router.push(`/club/${affiliateId}?source=affiliate` as never);

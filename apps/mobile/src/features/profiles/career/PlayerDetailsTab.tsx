@@ -30,8 +30,22 @@ import {
   buildAvailabilityZonesLabel,
   formatContractStatus,
 } from "../profile-display-helpers";
+import { buildAwardTitle } from "../edit/player-awards";
 import type { CompleteProfessionalProfile } from "../profile-service";
 import type { PlayerCareerView } from "./player-career-model";
+
+/**
+ * Un'icona per tipo di riconoscimento: un trofeo su una medaglia o su un
+ * titolo personale racconta la cosa sbagliata.
+ */
+const PALMARES_ICONS: Record<
+  string,
+  React.ComponentProps<typeof Ionicons>["name"]
+> = {
+  medal: "medal-outline",
+  top_scorer: "football-outline",
+  trophy: "trophy-outline",
+};
 import { PlayerTechnicalPitch } from "./PlayerTechnicalPitch";
 
 type PlayerDetailsTabProps = {
@@ -193,23 +207,38 @@ export function PlayerDetailsTab({
 
       {playerPalmares.length > 0 ? (
         <ProfileSectionBlock testID="details-palmares" title="Palmarès">
-          {playerPalmares.map((item) => (
-            <View
-              accessible
-              accessibilityLabel={[item.competition_name, item.season_label]
-                .filter(Boolean)
-                .join(" ")}
-              key={item.id}
-              style={styles.palmaresRow}
-            >
-              <Ionicons color={colors.accent} name="trophy-outline" size={16} />
-              <AppText style={styles.palmaresText} variant="bodyLg">
-                {[item.competition_name, item.season_label]
-                  .filter(Boolean)
-                  .join(" ")}
-              </AppText>
-            </View>
-          ))}
+          {playerPalmares.map((item) => {
+            /*
+              Lo stesso titolo che l'editor mostra in anteprima: prima qui si
+              concatenavano competizione e stagione ("Serie B 2023/2024"),
+              quindi il Master Profile raccontava il riconoscimento in modo
+              diverso dalla schermata in cui l'utente l'aveva scritto, e il
+              tipo (vittoria, medaglia, capocannoniere) spariva del tutto.
+            */
+            const title = buildAwardTitle({
+              competition_name: item.competition_name ?? "",
+              palmares_type: item.palmares_type ?? "",
+              season_label: item.season_label ?? "",
+            });
+
+            return (
+              <View
+                accessible
+                accessibilityLabel={title}
+                key={item.id}
+                style={styles.palmaresRow}
+              >
+                <Ionicons
+                  color={colors.accent}
+                  name={PALMARES_ICONS[item.palmares_type] ?? "trophy-outline"}
+                  size={16}
+                />
+                <AppText style={styles.palmaresText} variant="bodyLg">
+                  {title}
+                </AppText>
+              </View>
+            );
+          })}
         </ProfileSectionBlock>
       ) : null}
 

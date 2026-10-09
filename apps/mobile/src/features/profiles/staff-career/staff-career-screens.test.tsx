@@ -198,9 +198,14 @@ describe("AdditionalPathsStep", () => {
     const rendered = texts(tree);
 
     expect(rendered).toContain("Facoltativi");
-    expect(rendered).toContain("Allenatore");
+    /*
+      REV-PROF-07 chiede il titolo esteso sulle card ("Carriera da
+      allenatore"), non l'etichetta breve usata nella app bar del
+      sotto-flusso.
+    */
+    expect(rendered).toContain("Carriera da allenatore");
     expect(rendered).toContain("1 esperienza aggiunta");
-    expect(rendered).toContain("Calciatore");
+    expect(rendered).toContain("Carriera da calciatore");
     expect(rendered).toContain("Nessuna esperienza aggiunta");
     expect(rendered).toContain("Puoi completarle anche in seguito.");
   });

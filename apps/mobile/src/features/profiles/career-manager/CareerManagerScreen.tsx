@@ -441,13 +441,29 @@ export function CareerManagerScreen({
     );
   }
 
+  /**
+   * Deselezionare una stagione già persistita cancellerebbe quella riga al
+   * salvataggio: qui, e solo qui, serve una conferma. Una stagione appena
+   * aggiunta nella bozza corrente (nessun id persistito) si toglie invece
+   * subito, senza chiedere nulla.
+   */
   function toggleSeason(seasonKey: string) {
+    if (step.type !== "seasons") {
+      return;
+    }
+
+    const isSelected = step.draft.seasons.includes(seasonKey);
+
+    if (isSelected && step.draft.persistedIdBySeason[seasonKey]) {
+      setPendingConfirm({ kind: "remove-season", seasonKey });
+      return;
+    }
+
     setStep((current) => {
       if (current.type !== "seasons") {
         return current;
       }
 
-      const isSelected = current.draft.seasons.includes(seasonKey);
       const seasons = isSelected
         ? current.draft.seasons.filter((season) => season !== seasonKey)
         : [...current.draft.seasons, seasonKey];
@@ -744,6 +760,10 @@ export function CareerManagerScreen({
 
       trackProfileEvent(events.unsavedExit, { profileType });
       setPendingConfirm(null);
+      // Un avviso o un errore mostrato durante la bozza riguarda solo quella
+      // bozza: non deve restare a schermo una volta tornati all'hub.
+      setWarning(null);
+      setErrorMessage(null);
       // Uscire da una bozza riporta dove si stava: l'hub per la carriera del
       // profilo, il riepilogo del percorso per un percorso aggiuntivo.
       setStep(lane === "primary" ? { type: "hub" } : { lane, type: "summary" });
@@ -754,7 +774,7 @@ export function CareerManagerScreen({
       const seasonKey = pendingConfirm.seasonKey;
 
       setStep((current) => {
-        if (current.type !== "season-roles") {
+        if (current.type !== "season-roles" && current.type !== "seasons") {
           return current;
         }
 
@@ -897,6 +917,10 @@ export function CareerManagerScreen({
         experienceMode: activeDraft.mode,
         profileType,
       });
+      // Come per il ramo "leave" di confirmPending: un avviso o un errore
+      // della bozza non deve restare a schermo una volta usciti da essa.
+      setWarning(null);
+      setErrorMessage(null);
       setStep(lane === "primary" ? { type: "hub" } : { lane, type: "summary" });
       return;
     }
@@ -1375,7 +1399,7 @@ function DeleteAction({
 function resolveConfirmTitle(pending: PendingConfirm | null): string {
   switch (pending?.kind) {
     case "change-club":
-      return "Cambiare società?";
+      return "Modificare la società per tutte le stagioni?";
     case "delete-group":
       return "Eliminare tutte le esperienze?";
     case "delete-assignment":

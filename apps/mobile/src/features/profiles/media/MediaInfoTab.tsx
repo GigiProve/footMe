@@ -93,7 +93,7 @@ export function MediaInfoTab({
             onPress={onEditProfilePress}
             size="sm"
             testID="media-info-empty-cta"
-            variant="primary"
+            variant="outline"
           />
         ) : null}
       </View>

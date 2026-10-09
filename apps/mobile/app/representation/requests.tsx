@@ -19,6 +19,7 @@ import {
   ConfirmModal,
   EmptyState,
   ScreenHeader,
+  TabBar,
   useToast,
 } from "../../src/ui";
 import { useSession } from "../../src/features/auth/use-session";
@@ -55,7 +56,8 @@ import { colors, radius, spacing } from "../../src/theme/tokens";
 
 type PendingConfirm =
   | { kind: "cancelRequest"; row: AssistitoRow }
-  | { kind: "revokeInvite"; row: AssistitoRow };
+  | { kind: "revokeInvite"; row: AssistitoRow }
+  | { kind: "rotateInvite"; row: AssistitoRow };
 
 export default function RequestsAndInvitesScreen() {
   const router = useRouter();
@@ -88,7 +90,12 @@ export default function RequestsAndInvitesScreen() {
       return rows.filter((row) => row.kind === "manual" && !isClosedRow(row));
     }
 
-    return rows.filter(isClosedRow);
+    /*
+      Lambda esplicita: `isClosedRow` ha un secondo parametro opzionale
+      (`now`), e passarla direttamente a `filter` le farebbe arrivare l'indice
+      dell'elemento al posto della data.
+    */
+    return rows.filter((row) => isClosedRow(row));
   }, [overviewQuery.data, tab]);
 
   async function refresh() {
@@ -106,6 +113,15 @@ export default function RequestsAndInvitesScreen() {
 
   async function handleConfirm() {
     if (!confirm) {
+      return;
+    }
+
+    if (confirm.kind === "rotateInvite") {
+      const { row } = confirm;
+
+      setConfirm(null);
+      await handleCopyLink(row);
+
       return;
     }
 
@@ -137,7 +153,17 @@ export default function RequestsAndInvitesScreen() {
     }
   }
 
-  /** "Copia link": stesso invito, segreto ruotato solo perché non è rileggibile. */
+  /**
+   * "Copia link" rigenera il segreto, perché il token è salvato con hash e non
+   * è più rileggibile dopo l'emissione. Rigenerarlo invalida però il link già
+   * mandato su WhatsApp, quindi non può succedere in silenzio: chiediamo
+   * conferma e lo diciamo esplicitamente (REV-PROF-14, "non generare un nuovo
+   * token senza necessità").
+   */
+  function handleCopyLinkPress(row: AssistitoRow) {
+    setConfirm({ kind: "rotateInvite", row });
+  }
+
   async function handleCopyLink(row: AssistitoRow) {
     setBusyRowId(row.id);
 
@@ -225,23 +251,22 @@ export default function RequestsAndInvitesScreen() {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <View style={styles.chipRow}>
-              {REQUESTS_TABS.map((item) => (
-                <Button
-                  key={item.value}
-                  label={item.label}
-                  onPress={() => {
-                    setTab(item.value);
-                    trackAssistitiEvent("assistiti_requests_tab_changed", {
-                      tab: item.value,
-                    });
-                  }}
-                  selected={tab === item.value}
-                  testID={`assistiti-requests-tab-${item.value}`}
-                  variant="chipAction"
-                />
-              ))}
-            </View>
+            {/*
+              Richieste/Inviti/Conclusi sono tab, non chip: cambiano la
+              superficie sotto, non filtrano una lista. La regola del design
+              system è netta — "Tabs are never buttons: TabBar only".
+            */}
+            <TabBar
+              active={tab}
+              items={REQUESTS_TABS}
+              onChange={(value) => {
+                setTab(value);
+                trackAssistitiEvent("assistiti_requests_tab_changed", {
+                  tab: value,
+                });
+              }}
+              testID="assistiti-requests-tabs"
+            />
 
             <AppText color="muted" variant="eyebrow">
               {tab === "requests"
@@ -290,15 +315,22 @@ export default function RequestsAndInvitesScreen() {
                 />
               ) : (
                 <View style={styles.actions}>
+                  {/*
+                    Azione di riga, non la CTA della schermata: la primaria
+                    qui è "Fine" nel footer, e averne una per ogni riga
+                    toglieva all'utente il riferimento di cosa stia facendo
+                    la pagina (§ design system, una primaria per schermata).
+                  */}
                   <Button
                     label="Invia di nuovo"
                     onPress={() => handleResend(item)}
                     size="sm"
+                    variant="outline"
                   />
                   <Button
                     label="Copia link"
                     loading={busyRowId === item.id}
-                    onPress={() => void handleCopyLink(item)}
+                    onPress={() => handleCopyLinkPress(item)}
                     size="sm"
                     variant="outline"
                   />
@@ -321,24 +353,34 @@ export default function RequestsAndInvitesScreen() {
 
       <ConfirmModal
         cancelLabel={
-          confirm?.kind === "cancelRequest" ? "Continua ad attendere" : "Annulla"
+          confirm?.kind === "cancelRequest"
+            ? "Continua ad attendere"
+            : "Annulla"
         }
         confirmLabel={
-          confirm?.kind === "cancelRequest" ? "Annulla richiesta" : "Revoca invito"
+          confirm?.kind === "cancelRequest"
+            ? "Annulla richiesta"
+            : confirm?.kind === "rotateInvite"
+              ? "Genera e copia"
+              : "Revoca invito"
         }
-        destructive
+        destructive={confirm?.kind !== "rotateInvite"}
         isBusy={isBusy}
         message={
           confirm?.kind === "cancelRequest"
             ? "Il Calciatore non potrà più accettare questa richiesta."
-            : "Il link non potrà più essere utilizzato."
+            : confirm?.kind === "rotateInvite"
+              ? "Per motivi di sicurezza il link non è rileggibile: ne verrà generato uno nuovo e quello già condiviso smetterà di funzionare."
+              : "Il link non potrà più essere utilizzato."
         }
         onCancel={() => setConfirm(null)}
         onConfirm={() => void handleConfirm()}
         title={
           confirm?.kind === "cancelRequest"
             ? "Annullare la richiesta?"
-            : "Revocare questo invito?"
+            : confirm?.kind === "rotateInvite"
+              ? "Generare un nuovo link?"
+              : "Revocare questo invito?"
         }
         visible={confirm != null}
       />
@@ -364,10 +406,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing[8],
     minWidth: 0,
-  },
-  chipRow: {
-    flexDirection: "row",
-    gap: spacing[8],
   },
   footer: {
     borderTopColor: colors.border,

@@ -123,7 +123,9 @@ const styles = StyleSheet.create({
     aspectRatio: PITCH_ASPECT_RATIO,
     backgroundColor: PITCH_LIGHT_SURFACE,
     borderColor: colors.border,
-    borderRadius: radius[8],
+    // Non è una chip né una card: l'unico altro raggio ammesso dal design
+    // system per un rettangolo arrotondato è quello del modulo (16).
+    borderRadius: radius[16],
     borderWidth: StyleSheet.hairlineWidth,
     marginRight: spacing[16],
     overflow: "hidden",

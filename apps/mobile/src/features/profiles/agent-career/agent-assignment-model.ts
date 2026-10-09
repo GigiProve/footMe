@@ -117,7 +117,11 @@ export type AgentAssignmentErrors = {
 export const AGENT_CAREER_MESSAGES = {
   deleteError: "Non è stato possibile eliminare. Riprova.",
   duplicate: "Questa esperienza è già presente.",
+  endBeforeStart:
+    "La data di conclusione non può precedere l'inizio dell'incarico.",
   endError: "Non è stato possibile concludere l'incarico. Riprova.",
+  endInFuture:
+    "La data di conclusione non può essere successiva al mese corrente.",
   genericError: "Non è stato possibile completare l'operazione. Riprova.",
   loadError: "Non è stato possibile caricare le organizzazioni. Riprova.",
   overlap:
@@ -354,6 +358,30 @@ export function agentPeriodFromDateValue(value: string): {
 /** Mese corrente nel formato del selettore: precompila "Concludi incarico". */
 export function currentMonthValue(now: Date = new Date()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Mesi assoluti di un valore "AAAA-MM" del selettore: il formato comune a cui
+ * confrontare l'inizio di un incarico, la sua fine e il mese corrente
+ * (§Bug "Concludi incarico senza validazione del mese").
+ */
+export function absoluteMonthsFromDateValue(value: string): number | null {
+  const { month, year } = agentPeriodFromDateValue(value);
+
+  return toAbsoluteMonths(year, month, 1);
+}
+
+/**
+ * Il nome con cui un'organizzazione manuale è stata inserita è cambiato
+ * davvero, non solo di spaziatura (§Bug "Cambiare l'agenzia manuale mantiene
+ * il vecchio id"). Confronto esatto, mai per somiglianza: è la stessa regola
+ * del raggruppamento, che vive per identificativo e non per nome.
+ */
+export function manualOrganizationNameChanged(
+  previousName: string,
+  nextName: string,
+): boolean {
+  return previousName.trim() !== nextName.trim();
 }
 
 // ---------------------------------------------------------------------------

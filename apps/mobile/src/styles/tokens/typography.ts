@@ -16,6 +16,8 @@ export const typography = {
     displaySoft: "Mulish_800ExtraBold",
   },
   fontSize: {
+    /** Solo per l'etichetta nei marker minuscoli del campo tattico (Tifoso). */
+    9: 9,
     10: 10,
     10.5: 10.5,
     11: 11,

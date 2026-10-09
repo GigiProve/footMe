@@ -26,6 +26,11 @@ import type {
 type SocietyProfileTabProps = {
   affiliates: readonly SocietyAffiliate[];
   onOpenAffiliate: (clubId: string) => void;
+  /**
+   * Porta alla Dashboard dall'empty state delle squadre. Opzionale: senza
+   * handler l'empty state resta solo descrittivo, come per il Visitor.
+   */
+  onOpenDashboard?: () => void;
   onOpenTeam: (teamId: string) => void;
   onRetry?: () => void;
   onSeeAllTeams: () => void;
@@ -37,6 +42,7 @@ type SocietyProfileTabProps = {
 export function SocietyProfileTab({
   affiliates,
   onOpenAffiliate,
+  onOpenDashboard,
   onOpenTeam,
   onRetry,
   onSeeAllTeams,
@@ -98,9 +104,24 @@ export function SocietyProfileTab({
           </View>
         ) : (
           <EmptyState
+            /*
+              "Gestiscile dalla Dashboard" era solo testo: diceva dove
+              andare senza portarci. Per chi può gestire il club diventa
+              un'azione vera.
+            */
+            action={
+              viewer.canManage && onOpenDashboard ? (
+                <Button
+                  label="Vai alla Dashboard"
+                  onPress={onOpenDashboard}
+                  size="sm"
+                  variant="outline"
+                />
+              ) : undefined
+            }
             description={
               viewer.canManage
-                ? "Le squadre che pubblichi compaiono qui. Gestiscile dalla Dashboard."
+                ? "Le squadre che pubblichi compaiono qui."
                 : "Il club non ha ancora pubblicato le proprie squadre."
             }
             icon="shield-outline"

@@ -179,4 +179,97 @@ describe("buildPlayerSectionPayload", () => {
       }).playerPalmares,
     ).toHaveLength(1);
   });
+
+  /*
+    Le colonne `competition_name` e `season_label` sono nullable in database,
+    quindi i profili storici hanno righe che la validazione del form
+    rifiuterebbe. Prima di questa correzione quelle righe facevano fallire il
+    salvataggio di OGNI sezione: cambiare la foto rispondeva "Seleziona la
+    categoria per l'esperienza 2.".
+  */
+  describe("carriera storica incompleta", () => {
+    function buildProfileWithLegacyRow(): CompleteProfessionalProfile {
+      const base = buildProfile();
+
+      return {
+        ...base,
+        playerCareerEntries: [
+          ...base.playerCareerEntries,
+          {
+            appearances: null,
+            assists: null,
+            awards: "",
+            career_type: null,
+            club_id: null,
+            club_name: "Vecchia Squadra",
+            // Il dato che rompeva tutto: categoria mai compilata.
+            competition_name: null,
+            experience_group_id: null,
+            goals: null,
+            id: "row-legacy",
+            minutes_played: null,
+            period_end_month: null,
+            period_start_month: null,
+            player_profile_id: base.profile.id,
+            season_label: "2016/2017",
+            season_period: "full",
+            sort_order: 1,
+            team_logo_url: null,
+          },
+        ],
+      };
+    }
+
+    it("salva una sezione che non è la carriera senza rivalidarla", () => {
+      expect(() =>
+        buildPlayerSectionPayload(buildProfileWithLegacyRow(), {
+          avatarUrl: "https://example.com/nuovo-avatar.jpg",
+        }),
+      ).not.toThrow();
+    });
+
+    it("ripassa la riga storica intatta invece di cancellarla", () => {
+      const payload = buildPlayerSectionPayload(buildProfileWithLegacyRow(), {
+        avatarUrl: "https://example.com/nuovo-avatar.jpg",
+      });
+
+      expect(payload.playerCareerEntries).toHaveLength(2);
+
+      const legacy = payload.playerCareerEntries.find(
+        (entry) => entry.id === "row-legacy",
+      );
+
+      expect(legacy).toBeDefined();
+      expect(legacy?.competition_name).toBeNull();
+      expect(legacy?.club_name).toBe("Vecchia Squadra");
+      expect(legacy?.season_label).toBe("2016/2017");
+    });
+
+    it("continua a validare quando è la sezione Carriera a salvare", () => {
+      expect(() =>
+        buildPlayerSectionPayload(buildProfileWithLegacyRow(), {
+          careerEntries: [
+            {
+              appearances: "",
+              assists: "",
+              awards: "",
+              careerType: "SINGLE_SEASON",
+              category: "",
+              clubId: null,
+              clubName: "Vecchia Squadra",
+              goals: "",
+              id: "row-legacy",
+              minutesPlayed: "",
+              periodEndMonth: "",
+              periodStartMonth: "",
+              seasonLabel: "2016/2017",
+              seasonPeriod: "full",
+              teamCity: "",
+              teamLogoUrl: "",
+            },
+          ],
+        }),
+      ).toThrow(/categoria/i);
+    });
+  });
 });

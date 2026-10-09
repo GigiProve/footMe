@@ -1016,6 +1016,7 @@ export function buildAgentProfileHeaderDetails(
   const licenseLabel = buildAgentLicenseLabel({
     federation: data.agentProfile?.federation,
     isLicensed: data.agentProfile?.is_federation_licensed,
+    showFederation: data.agentProfile?.show_federation,
   });
 
   /*

@@ -50,9 +50,14 @@ export function ProfileFilterChips<T extends string>({
             key={option.value}
             label={option.label}
             onPress={() => onChange(option.value)}
+            // Una chip resta una pill anche attiva: "primary" è riservato
+            // alla CTA unica della schermata (§ design system, "one primary
+            // CTA per screen"). `chipAction` + `selected` dà lo stesso
+            // riscontro visivo senza impersonare un bottone.
+            selected={isSelected}
             size="sm"
             testID={testID ? `${testID}-${option.value}` : undefined}
-            variant={isSelected ? "primary" : "chipAction"}
+            variant="chipAction"
           />
         );
       })}

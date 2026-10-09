@@ -1713,6 +1713,7 @@ export default function OnboardingProfileScreen() {
         agentProfile: {
           activity_scopes: agentActivityScopes,
           agency_logo_url: parseOptionalText(agentAgencyLogoUrl),
+          show_federation: true,
           agency_name: parseOptionalText(agentAgencyName),
           agency_role: parseOptionalText(agentAgencyRole),
           federation: agentIsFederationLicensed

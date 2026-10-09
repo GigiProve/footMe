@@ -26,12 +26,20 @@ type ProfileTabViewProps = {
   completeProfile: CompleteProfessionalProfile;
   isOwner: boolean;
   onManageMedia: () => void;
+  // Azioni del viewer Media (elimina/metti in evidenza): senza di queste
+  // MediaTabContent ricade sul suo stato locale e le modifiche non
+  // persistono al cambio tab. Opzionali: la route le passa solo se il
+  // profilo è dell'utente corrente.
+  onDeleteMedia?: (itemId: string) => void;
+  onToggleMediaFeatured?: (itemId: string) => void;
 };
 
 export function ProfileTabView({
   completeProfile,
   isOwner,
   onManageMedia,
+  onDeleteMedia,
+  onToggleMediaFeatured,
 }: ProfileTabViewProps) {
   // Carriera è la tab iniziale (§5).
   const [activeTab, setActiveTab] = useState<ProfileTab>("career");
@@ -92,7 +100,9 @@ export function ProfileTabView({
         <MediaTab
           completeProfile={completeProfile}
           isOwner={isOwner}
+          onDeleteMedia={onDeleteMedia}
           onManageMedia={onManageMedia}
+          onToggleMediaFeatured={onToggleMediaFeatured}
         />
       ) : (
         <PlayerDetailsTab
@@ -113,11 +123,15 @@ export function ProfileTabView({
 function MediaTab({
   completeProfile,
   isOwner,
+  onDeleteMedia,
   onManageMedia,
+  onToggleMediaFeatured,
 }: {
   completeProfile: CompleteProfessionalProfile;
   isOwner: boolean;
+  onDeleteMedia?: (itemId: string) => void;
   onManageMedia: () => void;
+  onToggleMediaFeatured?: (itemId: string) => void;
 }) {
   const { onOpenTaggedItem, taggedItems } = useTaggedMediaItems(
     completeProfile.profile.id,
@@ -140,9 +154,16 @@ function MediaTab({
           isSaved: false,
           likeCount: 0,
           ...(tagMeta ? { tag: { icon: tagMeta.icon, label: tagMeta.label } } : {}),
+          // Per i video senza thumbnail non mettiamo l'avatar del giocatore:
+          // sarebbe un dato inventato (il volto del profilo come copertina
+          // del video). Lasciamo undefined così MediaTabContent mostra il
+          // suo placeholder video. Per le immagini l'avatar resta il
+          // fallback previsto.
           thumbnailUrl:
             item.thumbnail_url ??
-            withDefaultProfileAvatar(completeProfile.profile.avatar_url),
+            (item.type === "video"
+              ? undefined
+              : withDefaultProfileAvatar(completeProfile.profile.avatar_url)),
           type: item.type,
           videoUrl: item.type === "video" ? item.url : undefined,
         } satisfies MediaContentItem;
@@ -163,7 +184,8 @@ function MediaTab({
             isSaved: false,
             likeCount: 0,
             tag: { icon: "play-circle-outline", label: "Highlights" },
-            thumbnailUrl: withDefaultProfileAvatar(completeProfile.profile.avatar_url),
+            // Stesso motivo di sopra: niente avatar come copertina video.
+            thumbnailUrl: undefined,
             type: "video",
             videoUrl: highlightVideoUrl,
           },
@@ -174,6 +196,16 @@ function MediaTab({
     completeProfile.playerProfile?.highlight_video_url,
     completeProfile.profile.avatar_url,
   ]);
+
+  // MediaTabContent inizializza il suo stato locale da initialItems e lo
+  // azzera ogni volta che il riferimento cambia (vedi righe 187-189 di
+  // MediaTabContent): senza useMemo qui l'array veniva ricreato a ogni
+  // render di ProfileTabView, cancellando le modifiche locali del viewer
+  // (es. elimina/metti in evidenza) al minimo re-render.
+  const combinedMediaItems = useMemo(
+    () => [...mediaItems, ...taggedItems],
+    [mediaItems, taggedItems],
+  );
 
   return (
     <MediaTabContent
@@ -186,7 +218,7 @@ function MediaTab({
       }
       emptyTitle="Nessun contenuto ancora"
       filtersEnabled
-      initialItems={[...mediaItems, ...taggedItems]}
+      initialItems={combinedMediaItems}
       mode={isOwner ? "owner" : "visitor"}
       onAddContentPress={
         isOwner
@@ -199,6 +231,11 @@ function MediaTab({
             }
           : undefined
       }
+      // Senza queste due prop MediaTabContent ricade sul suo stato locale
+      // (useState(initialItems)) e elimina/metti in evidenza non
+      // sopravvivono al cambio tab: inoltriamo le callback ricevute dalla
+      // route, che le passa solo quando il visitatore è il proprietario.
+      onDeleteContentPress={onDeleteMedia}
       onEditContentPress={isOwner ? onManageMedia : undefined}
       onFilterChange={(filter) =>
         trackProfileEvent("media_filter_changed", {
@@ -215,6 +252,7 @@ function MediaTab({
         })
       }
       onOpenTaggedItem={onOpenTaggedItem}
+      onToggleFeaturedPress={onToggleMediaFeatured}
     />
   );
 }

@@ -88,4 +88,33 @@ export const colors = {
   noticeSuccessSurface: "rgba(15,163,107,0.10)",
   noticeSuccessBorder: "rgba(15,163,107,0.30)",
   noticeSuccessText: "#0A7D51",
+
+  // ── Categorie contenuto Media Società (ClubMediaTabContent) ─────────────
+  // Non sono stati di sistema (successo/attenzione/errore): sono colori
+  // identificativi per categoria di contenuto, nessuno dei token esistenti
+  // corrisponde esattamente — da qui nomi dedicati invece di riusare quelli
+  // semantici.
+  contentCategoryEvent: "#DB2777",
+  contentCategoryEventSoft: "#FCE7F3",
+  contentCategoryStatement: "#4F46E5",
+  contentCategoryStatementSoft: "#EEF2FF",
+  contentCategoryTraining: "#D97706",
+
+  // ── Campo tattico (anteprima formazione Tifoso) ──────────────────────────
+  pitchSurface: "#238A55",
+
+  // ── Viewer dei contenuti Media (MediaTabContent) ─────────────────────────
+  // Velature di `hero` (#0C1B2A) e di bianco sopra foto e video: servono a
+  // tenere leggibili badge e controlli qualunque sia l'immagine sotto. Il
+  // badge "in evidenza" usava il blu del vecchio design system (#0A66C2):
+  // ora è una velatura del blu ProLink.
+  featuredBadgeSurface: "rgba(27,79,216,0.92)",
+  mediaScrim: "rgba(12,27,42,0.08)",
+  mediaBadgeSurface: "rgba(12,27,42,0.74)",
+  mediaControlSurface: "rgba(12,27,42,0.46)",
+  mediaSheetSurface: "rgba(12,27,42,0.32)",
+  mediaViewerOverlay: "rgba(0,0,0,0.28)",
+  mediaDangerSurface: "rgba(226,61,61,0.45)",
+  mediaHairlineOnMedia: "rgba(255,255,255,0.18)",
+  mediaBorderOnMedia: "rgba(255,255,255,0.45)",
 } as const;

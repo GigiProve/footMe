@@ -17,6 +17,7 @@ import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button, EmptyState } from "../../../ui";
 import { ProfileFilterChips } from "../../profiles/master/ProfileFilterChips";
 import { ProfileSectionError } from "../../profiles/master/ProfileSectionBlock";
+import { formatPosition } from "../../profiles/profile-display-helpers";
 import {
   POSITION_FILTERS,
   filterPositions,
@@ -119,6 +120,12 @@ function PositionCard({
   const metaLines = [
     position.teamName,
     position.category,
+    /*
+      Il ruolo ricercato è il dato per cui si apre un annuncio: era già
+      mappato dal servizio ma non arrivava mai a schermo, quindi la card
+      diceva dove e in che categoria, non chi si cerca.
+    */
+    position.roleRequired ? formatPosition(position.roleRequired) : null,
     [position.city, position.region].filter(Boolean).join(", ") || null,
   ].filter((line): line is string => Boolean(line && line.trim()));
 

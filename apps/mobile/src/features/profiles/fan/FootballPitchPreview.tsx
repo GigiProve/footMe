@@ -7,7 +7,7 @@
  */
 import { StyleSheet, View } from "react-native";
 
-import { radius, spacing, typography } from "../../../theme/tokens";
+import { colors, radius, spacing, typography } from "../../../theme/tokens";
 import { AppText, Avatar } from "../../../ui";
 import type {
   FanTribunaFormation,
@@ -143,7 +143,7 @@ export function FootballPitchPreview({
 const styles = StyleSheet.create({
   pitch: {
     aspectRatio: 0.72,
-    backgroundColor: "#238A55",
+    backgroundColor: colors.pitchSurface,
     borderColor: "rgba(255,255,255,0.45)",
     borderRadius: radius[8],
     borderWidth: 1,
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     width: 70,
   },
   pitchMarkerName: {
-    fontSize: 10,
+    fontSize: typography.fontSize[10],
     fontWeight: typography.fontWeight.bold,
     lineHeight: 12,
     textShadowColor: "rgba(0,0,0,0.42)",
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     width: 34,
   },
   pitchPlaceholderText: {
-    fontSize: 9,
+    fontSize: typography.fontSize[9],
     fontWeight: typography.fontWeight.bold,
     lineHeight: 11,
   },

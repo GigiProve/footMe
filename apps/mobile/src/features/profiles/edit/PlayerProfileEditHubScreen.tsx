@@ -6,7 +6,7 @@
  * Per questo qui non esiste — e non deve esistere — un pulsante "Salva".
  */
 import { useCallback } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 
 import { colors, spacing } from "../../../theme/tokens";
@@ -15,6 +15,7 @@ import { usePlayerEditorGuard } from "./use-player-editor-guard";
 import { trackProfileEvent } from "../profile-analytics";
 import { ProfileEditIdentityHeader } from "./ProfileEditIdentityHeader";
 import { ProfileEditScaffold } from "./ProfileEditScaffold";
+import { ProfileEditHubSkeleton } from "./ProfileEditStates";
 import { ProfileEditSectionRow } from "./ProfileEditSectionRow";
 import { PLAYER_EDIT_SECTION_GROUPS } from "./player-edit-sections";
 import { buildSectionSummary } from "./player-hub-summaries";
@@ -36,11 +37,12 @@ export function PlayerProfileEditHubScreen() {
       testID="player-profile-edit-hub"
       title="Modifica profilo"
     >
-      {profileQuery.isPending ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
-      ) : null}
+      {/*
+        Scheletro invece dello spinner: l'ingombro è già quello dell'hub
+        finale, quindi l'arrivo dei dati non sposta le righe sotto le dita
+        dell'utente (§35).
+      */}
+      {profileQuery.isPending ? <ProfileEditHubSkeleton /> : null}
 
       {profileQuery.isError ? (
         <View style={styles.centered}>

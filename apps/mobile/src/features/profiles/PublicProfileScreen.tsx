@@ -56,6 +56,7 @@ import {
 } from "./media/media-master-profile";
 import { openDirectConversation } from "../messaging/messaging-service";
 import {
+  fetchAgentPublicAssistiti,
   fetchPlayerAgent,
   fetchPlayerRepresentations,
   fetchRepresentationState,
@@ -175,10 +176,26 @@ export function PublicProfileScreen() {
       completeProfile ? buildCoachProfileHeaderDetails(completeProfile) : null,
     [completeProfile],
   );
+  /*
+    REV-PROF-13: "Assistiti" fa parte delle informazioni rapide dell'header,
+    ma il conteggio veniva calcolato solo dentro la tab Carriera e l'header
+    riceveva `null`, quindi la colonna non compariva mai. Stessa proiezione
+    pubblica usata dalla tab.
+  */
+  const agentAssistitiQuery = useQuery({
+    enabled: completeProfile?.profile.role === "agent",
+    queryFn: () => fetchAgentPublicAssistiti(completeProfile!.profile.id),
+    queryKey: ["agent-public-assistiti", completeProfile?.profile.id ?? ""],
+  });
   const agentHeaderDetails = useMemo(
     () =>
-      completeProfile ? buildAgentProfileHeaderDetails(completeProfile) : null,
-    [completeProfile],
+      completeProfile
+        ? buildAgentProfileHeaderDetails(
+            completeProfile,
+            agentAssistitiQuery.data?.length ?? null,
+          )
+        : null,
+    [agentAssistitiQuery.data, completeProfile],
   );
   const staffHeaderDetails = useMemo(
     () =>
