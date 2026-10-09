@@ -13,6 +13,7 @@ import { GeoSelectorModal } from "./GeoSelectorModal";
 import { PositionFiltersModal } from "./PositionFiltersModal";
 import { PositionsSortSheet } from "./PositionsSortSheet";
 import { SalvateTab } from "./SalvateTab";
+import type { SavedGroup } from "./saved-positions-service";
 import type { DiscoveryTab } from "./positions-search-types";
 
 const TAB_OPTIONS: { label: string; value: DiscoveryTab }[] = [
@@ -31,9 +32,25 @@ function resolveInitialTab(params: { saved?: string; tab?: string }): DiscoveryT
   return "perte";
 }
 
+/**
+ * Filtro interno della tab Salvate (DAS-REV-05 §15).
+ *
+ * «Disponibili è il default per Vedi tutte e per l'accesso ordinario. Non più
+ * disponibili viene selezionato dagli accessi contestuali.» Un parametro
+ * sconosciuto ricade quindi sul default, non su uno stato inventato.
+ */
+function resolveInitialGroup(params: { group?: string }): SavedGroup {
+  return params.group === "unavailable" ? "unavailable" : "available";
+}
+
 export function PositionsDiscoveryScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ saved?: string; tab?: string }>();
+  const params = useLocalSearchParams<{
+    focus?: string;
+    group?: string;
+    saved?: string;
+    tab?: string;
+  }>();
 
   const [tab, setTab] = useState<DiscoveryTab>(() => resolveInitialTab(params));
   const [editVisible, setEditVisible] = useState(false);
@@ -78,7 +95,15 @@ export function PositionsDiscoveryScreen() {
             onOpenSort={() => setSortVisible(true)}
           />
         ) : null}
-        {tab === "salvate" ? <SalvateTab /> : null}
+        {tab === "salvate" ? (
+          <SalvateTab
+            focusAdId={params.focus ?? null}
+            initialGroup={resolveInitialGroup(params)}
+            // §20: da questa superficie la CTA porta alla ricerca di
+            // posizioni, non ricorsivamente allo stesso filtro Salvate.
+            onSearchPositions={() => setTab("esplora")}
+          />
+        ) : null}
       </View>
 
       <EditSearchModal

@@ -30,10 +30,10 @@ import {
   fetchPersonalSavedPositions,
   isPersonalApplicationsData,
   isPersonalDashboardData,
-  isPersonalSavedPositions,
+  isPersonalSavedPositionsData,
   type PersonalApplicationsData,
   type PersonalDashboardData,
-  type PersonalSavedPosition,
+  type PersonalSavedPositionsData,
   type PersonalUpdate,
 } from "./adapters/personal-adapter";
 import {
@@ -104,13 +104,22 @@ import { composeDashboard, type QuickActionId } from "./modules/composition";
 import type { DashboardModuleId } from "./modules/module-registry";
 import {
   aggregateRequirements,
-  dedupePreview,
   formatDeadlineRowLabel,
   formatUpdateLabel,
   hasSignificantUpdate,
   recentUpdatesBudget,
   selectApplicationPreviews,
 } from "./personal/personal-presentation";
+import {
+  aggregatedUpdateLabel,
+  buildSavedUpdateRows,
+  formatSavedAtLabel,
+  SAVED_AVAILABLE_HREF,
+  SAVED_UNAVAILABLE_HREF,
+  selectSavedPreviews,
+  SINGLE_UPDATE_NOTE,
+  type SavedUpdateRow,
+} from "./personal/saved-positions-presentation";
 import { useToggleDashboardSavedAd } from "./personal/use-toggle-saved-ad";
 import { applyPromotion } from "./priority/module-order";
 import { rankPriorities } from "./priority/priority-ranking";
@@ -215,10 +224,10 @@ export function DashboardFoundation() {
   // Terzo record per la stessa identità: le Posizioni salvate hanno un
   // provider proprio perché §22 chiede che il loro errore resti locale, e
   // senza uno `scope` distinto il secondo payload sovrascriverebbe il primo.
-  const savedPositionsCache = useDashboardCache<PersonalSavedPosition[]>({
+  const savedPositionsCache = useDashboardCache<PersonalSavedPositionsData>({
     actorId,
     identity: current && !isSociety ? current : null,
-    isPayload: isPersonalSavedPositions,
+    isPayload: isPersonalSavedPositionsData,
     provider: "operational",
     scope: "saved_positions",
   });
@@ -435,7 +444,7 @@ export function DashboardFoundation() {
   const personalData = personalQuery.data ?? personalCache.payload;
   const applicationsData: PersonalApplicationsData | null | undefined =
     applicationsQuery.data ?? applicationsCache.payload;
-  const savedPositionsData: PersonalSavedPosition[] | null =
+  const savedPositionsData: PersonalSavedPositionsData | null | undefined =
     savedPositionsQuery.data ?? savedPositionsCache.payload;
   const positionsData: SocietyPositionPreview[] | null = accessWindow.isValid
     ? (positionsQuery.data ?? null)
@@ -939,15 +948,17 @@ export function DashboardFoundation() {
    * §16: con più elementi eleggibili delle due preview mostrate, un accesso
    * contestuale alla lista pertinente. La destinazione è l'area canonica dei
    * Salvati — §16 vieta di creare una pagina "Tutte le scadenze", e il
-   * contesto "ordinamento per scadenza" non esiste in quella lista, quindi si
-   * apre la lista Salvate ordinaria sul filtro Posizioni.
+   * contesto "ordinamento per scadenza" non esiste in quella lista.
+   *
+   * DAS-REV-05 §15 riallinea quel link: la lista canonica delle posizioni
+   * salvate è CER → Posizioni aperte → Salvate, sul filtro Disponibili, che
+   * è anche il perimetro delle scadenze promosse.
    */
   const deadlineOverflow =
     !isSociety && (personalData?.deadlinesTotalCount ?? 0) > 2
       ? {
           label: "Vedi tutte le opportunità salvate",
-          onPress: () =>
-            go("personal_deadlines", "/saved?filter=position"),
+          onPress: () => go("personal_deadlines", SAVED_AVAILABLE_HREF),
         }
       : null;
 
@@ -976,6 +987,21 @@ export function DashboardFoundation() {
   );
   const updatedApplicationIds = new Set(
     visibleUpdates.map((update) => update.applicationId),
+  );
+
+  /**
+   * DAS-REV-05 §13: gli aggiornamenti di indisponibilità condividono il
+   * budget di DAS-REV-03, non ne aprono uno secondo.
+   *
+   * Gli aggiornamenti delle candidature vengono prima perché riguardano un
+   * percorso professionale in corso; i Salvati usano i posti residui. Con
+   * più posizioni diventate indisponibili la funzione restituisce una sola
+   * row aggregata, quindi un posto basta: §13 vieta di moltiplicare gli
+   * alert.
+   */
+  const savedUpdateRows = buildSavedUpdateRows(
+    savedPositionsData?.recentUpdates ?? [],
+    updatesLimit - visibleUpdates.length,
   );
 
   // Offline con dati ancora utilizzabili: indicatore compatto, nessun
@@ -1043,6 +1069,7 @@ export function DashboardFoundation() {
             saved={savedPositionsData}
             savedError={!!savedPositionsQuery.error}
             savedRetrying={savedPositionsQuery.isFetching}
+            savedUpdates={savedUpdateRows}
             society={societyData}
             societyError={!!societyQuery.error}
             title={module.title}
@@ -1111,7 +1138,7 @@ function moduleRowCounts(input: {
   personal: PersonalDashboardData | null | undefined;
   positions: SocietyPositionPreview[] | null;
   positionsFailed: boolean;
-  saved: PersonalSavedPosition[] | null;
+  saved: PersonalSavedPositionsData | null | undefined;
   savedFailed: boolean;
   society: SocietyOverview | null | undefined;
 }): Partial<Record<DashboardModuleId, number | null>> {
@@ -1121,6 +1148,12 @@ function moduleRowCounts(input: {
   // una lista vuota, altrimenti l'errore dello screen 06 si travestirebbe da
   // "nessuna candidatura" (DAS-REV-04 §17).
   const applications = input.applicationsFailed ? null : input.applications;
+
+  // DAS-REV-05 §13: aggregati in una row sola, quindi il modulo "esiste" o
+  // non esiste. Il budget effettivo è un'altra cosa e vive nel render, dove
+  // si conosce il numero di priorità già visibili.
+  const savedUpdates =
+    !input.savedFailed && (input.saved?.recentUpdates.length ?? 0) > 0 ? 1 : 0;
 
   return {
     // DAS-REV-04 §16: zero attive **con storico** non è "nessuna attività".
@@ -1136,15 +1169,26 @@ function moduleRowCounts(input: {
         ? 1
         : 0
       : null,
+    // DAS-REV-05 §13: il modulo esiste anche quando l'unica informazione
+    // recente riguarda i Salvati. Un aggiornamento di indisponibilità è una
+    // row informativa come le altre e occupa lo stesso budget.
     personal_recent_updates: applications
-      ? applications.recentUpdates.length
-      : null,
+      ? applications.recentUpdates.length + savedUpdates
+      : input.savedFailed
+        ? null
+        : savedUpdates || null,
     // Provider separato: un fallimento resta `null` (non noto) e non diventa
     // una lista vuota, altrimenti un errore si travestirebbe da "nessuna
     // posizione salvata" (§22).
+    // DAS-REV-05 §20: zero disponibili **con storico** non è "nessun
+    // salvataggio". Il modulo resta a schermo con l'accesso compatto allo
+    // storico, quindi conta come riga utile.
     personal_saved_positions: input.savedFailed
       ? null
-      : (input.saved?.length ?? null),
+      : input.saved
+        ? input.saved.preview.length ||
+          (input.saved.unavailableCount > 0 ? 1 : 0)
+        : null,
     society_applications: society
       ? (society.applicationsPreview?.length ?? 0)
       : null,
@@ -1259,8 +1303,14 @@ function emptyAction(
  *
  * Entrambe sono tappabili perché entrambe hanno una destinazione con lo
  * stesso perimetro del conteggio: le candidature attive aprono Le mie
- * candidature sul filtro attive, le posizioni salvate aprono i Salvati sul
- * filtro Posizioni — che è esattamente ciò che il numero conta.
+ * candidature sul filtro attive, le Salvate disponibili aprono CER →
+ * Posizioni aperte → Salvate sul filtro Disponibili — che è esattamente ciò
+ * che il numero conta.
+ *
+ * DAS-REV-05 §8 rinomina la seconda metrica: "Salvate disponibili", non
+ * "Posizioni salvate". La label dichiara il perimetro, e il perimetro è
+ * quello: le non più disponibili restano consultabili nell'altro filtro
+ * senza entrare nel conteggio e senza diventare un terzo KPI.
  */
 function buildPersonalSummary(
   data: PersonalDashboardData | undefined,
@@ -1289,16 +1339,16 @@ function buildPersonalSummary(
     {
       accessibilityLabel: `${data.savedPositionsCount} ${plural(
         data.savedPositionsCount,
-        "posizione salvata",
-        "posizioni salvate",
+        "posizione salvata disponibile",
+        "posizioni salvate disponibili",
       )}`,
       id: "saved_positions",
       label: plural(
         data.savedPositionsCount,
-        "Posizione salvata",
-        "Posizioni salvate",
+        "Salvata disponibile",
+        "Salvate disponibili",
       ),
-      onPress: () => go("personal_summary", "/saved?filter=position"),
+      onPress: () => go("personal_summary", SAVED_AVAILABLE_HREF),
       value: data.savedPositionsCount,
     },
   ];
@@ -1449,9 +1499,11 @@ type ModuleRendererProps = {
   positionsRetrying: boolean;
   /** Ad già mostrati come scadenza promossa in "Da gestire" (§12). */
   promotedAdIds: ReadonlySet<string>;
-  saved: PersonalSavedPosition[] | null;
+  saved: PersonalSavedPositionsData | null | undefined;
   savedError: boolean;
   savedRetrying: boolean;
+  /** Row informative dei Salvati, già aggregate e dentro il budget (§13). */
+  savedUpdates: SavedUpdateRow[];
   society: SocietyOverview | null | undefined;
   societyError: boolean;
   title: string;
@@ -1487,6 +1539,7 @@ function ModuleRenderer({
   saved,
   savedError,
   savedRetrying,
+  savedUpdates,
   society,
   societyError,
   title,
@@ -1505,10 +1558,13 @@ function ModuleRenderer({
         <DataModule
           emptyMessage=""
           errorMessage="Non siamo riusciti a caricare gli aggiornamenti."
-          hasData={!!applications}
+          // DAS-REV-05 §13: la presentazione è condivisa, i provider no. Il
+          // modulo ha qualcosa da dire anche quando risponde solo quello dei
+          // Salvati, e l'errore dell'altro resta locale al suo modulo.
+          hasData={!!applications || savedUpdates.length > 0}
           hideWhenEmpty
-          isEmpty={updates.length === 0}
-          isError={applicationsError}
+          isEmpty={updates.length === 0 && savedUpdates.length === 0}
+          isError={applicationsError && savedUpdates.length === 0}
           title={title}
         >
           {updates.map((item, index) => (
@@ -1551,6 +1607,46 @@ function ModuleRenderer({
               }
             />
           ))}
+
+          {savedUpdates.map((row, index) =>
+            row.kind === "single" ? (
+              <DashboardEntityRow
+                avatarName={row.update.clubName}
+                avatarUrl={row.update.clubLogoUrl}
+                key={row.key}
+                meta={metaLine(
+                  row.update.clubName,
+                  row.update.teamName,
+                  row.update.category,
+                )}
+                // §13: informazione, non azione. Nessun "Vedi posizione",
+                // nessun "Gestisci salvati", nessun "Trova alternative".
+                note={SINGLE_UPDATE_NOTE}
+                // §13, §23: apre Salvate → Non più disponibili con il focus
+                // sulla risorsa. Il bookmark non viene toccato.
+                onPress={() =>
+                  onNavigate(
+                    moduleId,
+                    `${SAVED_UNAVAILABLE_HREF}&focus=${row.update.adId}`,
+                  )
+                }
+                showDivider={updates.length > 0 || index > 0}
+                title={getPlayerPositionLabel(row.update.role, row.update.role)}
+                trailingMeta={formatUpdateLabel(row.update.occurredAt, now)}
+              />
+            ) : (
+              <DashboardEntityRow
+                icon="bookmark-outline"
+                key={row.key}
+                // §13: l'aggregazione conta le transizioni pertinenti del
+                // gruppo e apre lo stesso filtro canonico. Nessun elenco di
+                // club, nessuna serie di alert equivalenti.
+                onPress={() => onNavigate(moduleId, SAVED_UNAVAILABLE_HREF)}
+                showDivider={updates.length > 0 || index > 0}
+                title={aggregatedUpdateLabel(row.count)}
+              />
+            ),
+          )}
         </DataModule>
       );
 
@@ -1644,20 +1740,44 @@ function ModuleRenderer({
       );
     }
 
+    /**
+     * Posizioni salvate (DAS-REV-05 §9, §20).
+     *
+     * Il widget mostra le sole posizioni **disponibili**: una chiusa resta
+     * nei Salvati — §6 vieta l'automatismo "indisponibile → unsave" — ma
+     * vive nel filtro storico della lista CER, non in una preview che
+     * promette un'opportunità ormai chiusa.
+     */
     case "personal_saved_positions": {
-      const preview = dedupePreview(
-        saved ?? [],
-        (item) => item.adId,
-        promotedAdIds,
-      );
+      const preview = selectSavedPreviews(saved?.preview ?? [], promotedAdIds);
+      const hasHistory = (saved?.unavailableCount ?? 0) > 0;
+
+      // §20: zero disponibili **con storico** è un empty di dominio, non il
+      // generico "non c'è nulla" e non un Global Empty: porta la propria
+      // spiegazione e un solo accesso, che sostituisce "Vedi tutte".
+      const historyEmpty =
+        preview.items.length === 0 && !preview.collapsed && hasHistory;
 
       return (
         <DataModule
-          action={{
-            label: "Vedi tutte",
-            onPress: () => onNavigate(moduleId, "/saved?filter=position"),
-          }}
+          action={
+            historyEmpty
+              ? undefined
+              : {
+                  label: "Vedi tutte",
+                  // §23: la lista completa è dentro Cerca, sul filtro
+                  // Disponibili. Nessuna pagina Dashboard parallela.
+                  onPress: () => onNavigate(moduleId, SAVED_AVAILABLE_HREF),
+                }
+          }
           collapsedToAction={preview.collapsed}
+          emptyContent={
+            historyEmpty ? (
+              <SavedHistoryEmpty
+                onPress={() => onNavigate(moduleId, SAVED_UNAVAILABLE_HREF)}
+              />
+            ) : undefined
+          }
           emptyMessage="Non hai posizioni salvate."
           errorMessage="Non siamo riusciti a caricare le posizioni salvate."
           hasData={!!saved}
@@ -1672,24 +1792,23 @@ function ModuleRenderer({
             <DashboardEntityRow
               avatarName={item.clubName}
               avatarUrl={item.clubLogoUrl}
-              // §10: bookmark come azione distinta. Nessuna scadenza, nessuna
-              // descrizione, nessun "Candidati", nessun punteggio.
+              // §10: bookmark come azione distinta, già nello stato salvato.
+              // Il suo tap rimuove il salvataggio e **non** apre il
+              // dettaglio. Nessuna conferma, nessun menu, nessun pulsante
+              // "Rimuovi dai salvati" grande quanto la row.
               bookmark={{
                 isSaved: true,
                 onToggle: () => onToggleSaved(item.adId),
               }}
               key={item.adId}
               meta={metaLine(item.clubName, item.teamName, item.category)}
+              // §10: località pubblica pertinente, terza riga come nel
+              // master. Niente indirizzi: città e regione canoniche della
+              // posizione, mai dedotte dal nome del club (§3).
+              note={item.location}
               onPress={() => onNavigate(moduleId, `/position/${item.adId}`)}
               showDivider={index > 0}
-              // Una posizione chiusa resta nei Salvati: §10 vieta di
-              // cancellarne silenziosamente il bookmark per "ripulire" la
-              // Dashboard. Lo dice invece di nasconderlo.
-              status={item.isAvailable ? null : "Non più disponibile"}
               title={getPlayerPositionLabel(item.role, item.role)}
-              // §10: località pubblica pertinente, sulla terza riga come nel
-              // master. Niente indirizzi: città e regione della Società.
-              trailingMeta={item.location}
             />
           ))}
         </DataModule>
@@ -2024,6 +2143,45 @@ function ApplicationsHistoryEmpty({ onPress }: { onPress: () => void }) {
       >
         <AppText color="accent" variant="actionLabel">
           Vedi concluse
+        </AppText>
+        <Ionicons color={colors.accent} name="arrow-forward" size={14} />
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * Empty del modulo Posizioni salvate con storico esistente (DAS-REV-05 §20).
+ *
+ * «Zero disponibili, salvataggi non più disponibili presenti» non è il
+ * generico "non c'è nulla": §20 chiede di dirlo, di spiegare che le posizioni
+ * chiuse restano nei salvati e di offrire **un solo** accesso — "Vedi non più
+ * disponibili →" sostituisce la "Vedi tutte" dell'intestazione.
+ *
+ * Il widget resta compatto e la Dashboard non diventa Global Empty: le
+ * candidature e l'azione rapida restano al loro posto.
+ */
+function SavedHistoryEmpty({ onPress }: { onPress: () => void }) {
+  return (
+    <View style={styles.historyEmpty}>
+      <AppText variant="titleMd">Nessuna posizione disponibile</AppText>
+
+      <AppText color="secondary" variant="bodySm">
+        Le posizioni non più disponibili restano nei tuoi salvati.
+      </AppText>
+
+      <Pressable
+        accessibilityLabel="Vedi le posizioni non più disponibili"
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.historyLink,
+          pressed ? styles.historyLinkPressed : null,
+        ]}
+      >
+        <AppText color="accent" variant="actionLabel">
+          Vedi non più disponibili
         </AppText>
         <Ionicons color={colors.accent} name="arrow-forward" size={14} />
       </Pressable>

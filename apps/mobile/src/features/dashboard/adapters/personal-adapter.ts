@@ -92,18 +92,73 @@ export type PersonalUpdate = {
   teamName: string | null;
 };
 
+/**
+ * Riga della preview "Posizioni salvate" (DAS-REV-05 §9).
+ *
+ * Le preview contengono **solo** posizioni disponibili: le altre restano nei
+ * Salvati ma vivono nel filtro "Non più disponibili" della lista CER (§12).
+ * Il gruppo non è quindi un campo di questa riga — è la sua precondizione.
+ */
 export type PersonalSavedPosition = {
   adId: string;
   category: string | null;
   clubId: string | null;
   clubLogoUrl: string | null;
   clubName: string;
-  /** La posizione è ancora pubblicata. Una chiusa resta nei Salvati (§10). */
-  isAvailable: boolean;
+  /**
+   * L'utente ha già inviato la propria candidatura (§11).
+   *
+   * Metadato secondario: non è uno stato della posizione, non la rende
+   * indisponibile e non rimuove il bookmark. Qui serve soltanto a riconoscere
+   * l'ordine deciso dal backend.
+   */
+  hasApplied: boolean;
+  /** Il dettaglio è leggibile (§16). Una preview disponibile lo è sempre. */
+  isNavigable: boolean;
   location: string | null;
   role: string;
   savedAt: string;
   teamName: string | null;
+};
+
+/** Motivazioni canoniche e autorizzate di indisponibilità (§7). */
+export type SavedUnavailableReason =
+  | "closed"
+  | "deadline_passed"
+  | "withdrawn";
+
+/**
+ * Aggiornamento informativo di indisponibilità (§13).
+ *
+ * È un evento, non uno stato: ha un id proprio perché §14 chiede di
+ * riconoscerlo stabilmente, e lo stesso evento consegnato due volte deve
+ * restare un solo aggiornamento.
+ */
+export type PersonalSavedUpdate = {
+  adId: string;
+  category: string | null;
+  clubLogoUrl: string | null;
+  clubName: string;
+  eventId: string;
+  occurredAt: string;
+  reason: SavedUnavailableReason | null;
+  role: string;
+  teamName: string | null;
+};
+
+/**
+ * Payload del modulo Posizioni salvate (§8, §9, §13).
+ *
+ * I conteggi stanno accanto alle preview ma non ne dipendono: §8 vieta
+ * l'equivalenza fra totale e righe mostrate, e `unavailableCount` esiste
+ * perché l'empty di §20 deve sapere che lo storico esiste **senza**
+ * scaricarlo.
+ */
+export type PersonalSavedPositionsData = {
+  availableCount: number;
+  preview: PersonalSavedPosition[];
+  recentUpdates: PersonalSavedUpdate[];
+  unavailableCount: number;
 };
 
 /** Requisito canonico mancante, già risolto in copy e destinazione (§13). */
@@ -177,10 +232,20 @@ export function isPersonalApplicationsData(
   );
 }
 
-export function isPersonalSavedPositions(
+export function isPersonalSavedPositionsData(
   value: unknown,
-): value is PersonalSavedPosition[] {
-  return Array.isArray(value);
+): value is PersonalSavedPositionsData {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<PersonalSavedPositionsData>;
+
+  return (
+    Array.isArray(candidate.preview) &&
+    Array.isArray(candidate.recentUpdates) &&
+    typeof candidate.availableCount === "number"
+  );
 }
 
 type OverviewRow = {
@@ -400,34 +465,94 @@ type RawSavedPosition = {
   club_id: string | null;
   club_logo_url: string | null;
   club_name: string | null;
-  is_available: boolean;
+  has_applied: boolean | null;
+  is_navigable: boolean | null;
   location: string | null;
   role: string;
   saved_at: string;
   team_name: string | null;
 };
 
-export async function fetchPersonalSavedPositions(): Promise<
-  PersonalSavedPosition[]
-> {
-  const { data, error } = await supabase.rpc(
-    "fetch_dashboard_personal_saved_positions",
-  );
+type RawSavedUpdate = {
+  ad_id: string;
+  category: string | null;
+  club_logo_url: string | null;
+  club_name: string | null;
+  event_id: string;
+  occurred_at: string;
+  reason: string | null;
+  role: string;
+  team_name: string | null;
+};
+
+type SavedPositionsRow = {
+  available_count: number | null;
+  recent_updates: unknown;
+  saved_preview: unknown;
+  unavailable_count: number | null;
+};
+
+const UNAVAILABLE_REASONS: SavedUnavailableReason[] = [
+  "closed",
+  "deadline_passed",
+  "withdrawn",
+];
+
+/**
+ * Una reason sconosciuta non diventa testo a schermo (§7): resta `null` e la
+ * row mostra il solo "Non più disponibile". Esporre un valore non enumerato
+ * significherebbe rivelare una motivazione interna non autorizzata.
+ */
+function toReason(value: string | null): SavedUnavailableReason | null {
+  return UNAVAILABLE_REASONS.find((reason) => reason === value) ?? null;
+}
+
+/**
+ * Conteggi, preview e aggiornamenti delle Posizioni salvate (§8, §9, §13).
+ *
+ * Provider separato dal riepilogo: §21 chiede che il suo errore resti locale
+ * al modulo — nello screen 06 i conteggi sono già a schermo e fallisce la
+ * sola richiesta delle preview.
+ */
+export async function fetchPersonalSavedPositions(): Promise<PersonalSavedPositionsData> {
+  const { data, error } = await supabase
+    .rpc("fetch_dashboard_personal_saved_positions")
+    .maybeSingle();
 
   if (error) {
     throw error;
   }
 
-  return asArray<RawSavedPosition>(data).map((item) => ({
-    adId: item.ad_id,
-    category: item.category,
-    clubId: item.club_id,
-    clubLogoUrl: item.club_logo_url,
-    clubName: item.club_name ?? "",
-    isAvailable: item.is_available,
-    location: item.location,
-    role: item.role,
-    savedAt: item.saved_at,
-    teamName: item.team_name,
-  }));
+  const row = (data ?? {}) as SavedPositionsRow;
+
+  return {
+    availableCount: row.available_count ?? 0,
+    preview: asArray<RawSavedPosition>(row.saved_preview).map((item) => ({
+      adId: item.ad_id,
+      category: item.category,
+      clubId: item.club_id,
+      clubLogoUrl: item.club_logo_url,
+      clubName: item.club_name ?? "",
+      hasApplied: item.has_applied ?? false,
+      // In dubbio la row **non** è un link: §16 vieta di mostrare una
+      // navigazione che sappiamo già condurre a un errore.
+      isNavigable: item.is_navigable ?? false,
+      location: item.location,
+      role: item.role,
+      savedAt: item.saved_at,
+      teamName: item.team_name,
+    })),
+    recentUpdates: asArray<RawSavedUpdate>(row.recent_updates).map((item) => ({
+      adId: item.ad_id,
+      category: item.category,
+      clubLogoUrl: item.club_logo_url,
+      clubName: item.club_name ?? "",
+      eventId: item.event_id,
+      occurredAt: item.occurred_at,
+      reason: toReason(item.reason),
+      role: item.role,
+      teamName: item.team_name,
+    })),
+    unavailableCount: row.unavailable_count ?? 0,
+  };
 }

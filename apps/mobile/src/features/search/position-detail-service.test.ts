@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => {
     };
 
     const builder: Record<string, unknown> = {};
-    for (const method of ["select", "eq"]) {
+    for (const method of ["select", "eq", "in"]) {
       builder[method] = vi.fn((...args: unknown[]) => {
         call.steps.push([method, args]);
         return builder;
@@ -103,11 +103,28 @@ describe("fetchPositionDetail", () => {
     });
 
     const adCall = mocks.calls.find((call) => call.table === "recruiting_ads");
-    expect(adCall?.steps).toContainEqual(["eq", ["status", "published"]]);
     expect(adCall?.steps).toContainEqual(["eq", ["id", "ad1"]]);
   });
 
-  it("returns null for missing or unpublished ads", async () => {
+  /**
+   * DAS-REV-05 §16: il dettaglio storico di una posizione chiusa deve
+   * aprirsi, quindi il filtro passa da "published" a "published | closed".
+   * Una bozza o una posizione ritirata resta esclusa: è ciò che rende non
+   * navigabile la row storica.
+   */
+  it("reads the historical detail too, draft excluded", async () => {
+    enqueue("recruiting_ads", { data: null, error: null });
+    enqueue("saved_ads", { data: null, error: null });
+
+    await fetchPositionDetail("u1", "ad1");
+
+    const adCall = mocks.calls.find((call) => call.table === "recruiting_ads");
+    const statusStep = adCall?.steps.find(([method]) => method === "in");
+
+    expect(statusStep?.[1]).toEqual(["status", ["published", "closed"]]);
+  });
+
+  it("returns null for missing or unreadable ads", async () => {
     enqueue("recruiting_ads", { data: null, error: null });
     enqueue("saved_ads", { data: null, error: null });
 

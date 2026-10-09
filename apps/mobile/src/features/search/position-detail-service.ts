@@ -69,7 +69,16 @@ export async function fetchPositionDetail(
           "id, title, description, category, region, compensation_summary, deadline, published_at, club_id, clubs(id, name, logo_url), club_teams(name)",
         )
         .eq("id", adId)
-        .eq("status", "published")
+        // DAS-REV-05 §16: «Dettaglio storico disponibile e autorizzato — la
+        // row è tappabile e apre il dettaglio Position esistente nella
+        // modalità prevista.» Una posizione chiusa resta quindi leggibile;
+        // l'eligibility dell'azione la decide comunque
+        // `dashboard_position_action_state`, che per una non pubblicata
+        // risponde già `action_type: none`, `is_open: false`.
+        //
+        // Una bozza o una posizione ritirata resta esclusa: è la condizione
+        // che rende non navigabile la row storica (`is_navigable`).
+        .in("status", ["published", "closed"])
         .maybeSingle(),
       supabase
         .from("saved_ads")

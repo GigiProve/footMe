@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../../ui";
 import { toggleSavedAd } from "../../recruiting/recruiting-service";
 import { DASHBOARD_QK } from "../dashboard-keys";
-import type { PersonalSavedPosition } from "../adapters/personal-adapter";
+import type { PersonalSavedPositionsData } from "../adapters/personal-adapter";
 
 /**
  * Bookmark della preview "Posizioni salvate" (DAS-REV-03 §10, §18).
@@ -20,6 +20,11 @@ import type { PersonalSavedPosition } from "../adapters/personal-adapter";
  *     riga torna dov'era, nella posizione in cui era;
  *   · dopo una mutazione confermata il segnale temporale va ricalcolato
  *     (§18), perché una posizione non più salvata non può restare promossa.
+ *
+ * DAS-REV-05 §19 aggiunge una regola al rollback ottimistico: la row esce
+ * dalla preview **e** il conteggio delle disponibili scende, perché quella
+ * posizione contribuiva al conteggio. Le due cose devono muoversi insieme,
+ * altrimenti il riepilogo contraddice la lista fino al prossimo refetch.
  */
 export function useToggleDashboardSavedAd(input: {
   actorId: string;
@@ -47,13 +52,27 @@ export function useToggleDashboardSavedAd(input: {
       await queryClient.cancelQueries({ queryKey });
 
       const previous =
-        queryClient.getQueryData<PersonalSavedPosition[]>(queryKey);
+        queryClient.getQueryData<PersonalSavedPositionsData>(queryKey);
 
       if (previous) {
-        queryClient.setQueryData<PersonalSavedPosition[]>(
-          queryKey,
-          previous.filter((item) => item.adId !== adId),
-        );
+        const removed = previous.preview.some((item) => item.adId === adId);
+
+        queryClient.setQueryData<PersonalSavedPositionsData>(queryKey, {
+          ...previous,
+          // §19: la risorsa rimossa non contribuisce più al conteggio delle
+          // disponibili. Un unsave **dallo storico** non lo tocca, perché
+          // quella posizione non vi contribuiva: qui si decrementa solo se la
+          // row era davvero fra le disponibili.
+          availableCount: removed
+            ? Math.max(0, previous.availableCount - 1)
+            : previous.availableCount,
+          preview: previous.preview.filter((item) => item.adId !== adId),
+          // L'aggiornamento informativo riguarda la disponibilità, non il
+          // bookmark: senza la risorsa salvata non ha più destinazione (§14).
+          recentUpdates: previous.recentUpdates.filter(
+            (update) => update.adId !== adId,
+          ),
+        });
       }
 
       return { previous };

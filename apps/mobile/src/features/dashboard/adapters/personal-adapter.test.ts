@@ -213,33 +213,116 @@ describe("fetchPersonalApplications", () => {
 });
 
 describe("fetchPersonalSavedPositions", () => {
-  it("maps the saved preview, availability included", async () => {
-    mocks.rpc.mockResolvedValue({
-      data: [
+  function mockSavedRow(row: Record<string, unknown>) {
+    mocks.rpc.mockReturnValue({
+      maybeSingle: () => Promise.resolve({ data: row, error: null }),
+    });
+  }
+
+  it("keeps counts independent from the preview length", async () => {
+    mockSavedRow({
+      available_count: 5,
+      recent_updates: [],
+      saved_preview: [
         {
           ad_id: "ad1",
-          category: "Under 17",
+          category: "Prima squadra",
           club_id: "c1",
           club_logo_url: "logo.png",
           club_name: "AC Como",
-          is_available: false,
-          location: "Como, Lombardia",
+          has_applied: false,
+          is_navigable: true,
+          // §3: la località canonica della posizione. Il PNG riportava
+          // "Lecco · Lombardia" su questa row per errore.
+          location: "Como · Lombardia",
           role: "forward",
           saved_at: "2026-09-01T10:00:00Z",
-          team_name: "Under 17",
+          team_name: "Prima squadra",
         },
       ],
-      error: null,
+      unavailable_count: 4,
     });
 
-    const [item] = await fetchPersonalSavedPositions();
+    const data = await fetchPersonalSavedPositions();
 
-    expect(item).toMatchObject({
+    // §8: cinque disponibili e quattro non più disponibili producono 5
+    // Salvate disponibili, con due sole preview.
+    expect(data.availableCount).toBe(5);
+    expect(data.unavailableCount).toBe(4);
+    expect(data.preview).toHaveLength(1);
+    expect(data.preview[0]).toMatchObject({
       adId: "ad1",
-      // §10: una posizione non più disponibile resta nei Salvati e lo dice.
-      isAvailable: false,
-      location: "Como, Lombardia",
+      hasApplied: false,
+      isNavigable: true,
+      location: "Como · Lombardia",
     });
+  });
+
+  it("drops an unauthorised reason instead of showing it", async () => {
+    mockSavedRow({
+      available_count: 0,
+      recent_updates: [
+        {
+          ad_id: "ad1",
+          category: null,
+          club_logo_url: null,
+          club_name: "AC Como",
+          event_id: "ev1",
+          occurred_at: "2026-09-11T08:00:00Z",
+          // §7: le ragioni esposte devono essere autorizzate. Un valore non
+          // enumerato non diventa testo a schermo.
+          reason: "club_blocked_you",
+          role: "forward",
+          team_name: "Prima squadra",
+        },
+      ],
+      saved_preview: [],
+      unavailable_count: 1,
+    });
+
+    const data = await fetchPersonalSavedPositions();
+
+    expect(data.recentUpdates).toHaveLength(1);
+    expect(data.recentUpdates[0].reason).toBeNull();
+    expect(data.recentUpdates[0].eventId).toBe("ev1");
+  });
+
+  it("does not turn a missing navigability into a link", async () => {
+    mockSavedRow({
+      available_count: 1,
+      recent_updates: [],
+      saved_preview: [
+        {
+          ad_id: "ad1",
+          category: null,
+          club_id: null,
+          club_logo_url: null,
+          club_name: null,
+          has_applied: null,
+          is_navigable: null,
+          location: null,
+          role: "forward",
+          saved_at: "2026-09-01T10:00:00Z",
+          team_name: null,
+        },
+      ],
+      unavailable_count: 0,
+    });
+
+    const data = await fetchPersonalSavedPositions();
+
+    // §16: «Non mostrare una navigazione che sappiamo già condurre a un
+    // errore.» In dubbio la row non è un link.
+    expect(data.preview[0].isNavigable).toBe(false);
+  });
+
+  it("propagates the source error instead of showing an empty widget", async () => {
+    mocks.rpc.mockReturnValue({
+      maybeSingle: () =>
+        Promise.resolve({ data: null, error: new Error("boom") }),
+    });
+
+    await expect(fetchPersonalSavedPositions()).rejects.toThrow("boom");
   });
 });
 
