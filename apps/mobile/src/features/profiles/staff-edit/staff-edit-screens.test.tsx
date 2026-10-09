@@ -452,11 +452,17 @@ describe("Opportunità", () => {
     expect(labels).not.toContain("Disponibile per una nuova squadra");
   });
 
-  it("riepiloga le zone correnti senza valori fissi", async () => {
+  it("mostra le zone correnti come chip, senza valori fissi", async () => {
+    // DAS-REV-06 §12: il riepilogo "Zone selezionate" con "Modifica zone"
+    // non esiste più. Serviva a rendere leggibili scelte fatte in una
+    // schermata separata; ora le selezioni sono a schermo, come chip
+    // rimovibili dentro la modalità attiva.
     const labels = texts(await render(<StaffOpportunitiesScreen />));
 
-    expect(labels).toContain("Zone selezionate");
-    expect(labels).toContain("Lombardia, Piemonte");
+    expect(labels).toContain("Una o più regioni");
+    expect(labels).toContain("Lombardia");
+    expect(labels).toContain("Piemonte");
+    expect(labels).not.toContain("Zone selezionate");
   });
 
   it("scrive disponibilità e zone sulle colonne dello Staff tecnico", async () => {

@@ -6,13 +6,21 @@ import { AppText } from "../../../ui";
 
 export type DashboardSuggestionProps = {
   actionLabel: string;
+  /**
+   * Il beneficio concreto — «Aiuta le società a trovarti nelle zone che hai
+   * scelto» (DAS-REV-06 §8). È la riga che distingue un consiglio da una
+   * richiesta: dice cosa si guadagna, non cosa manca.
+   */
   body: string;
+  /** Cosa fare, in una frase: «Indica le aree in cui sei disponibile.» (§8) */
+  description: string;
+  icon?: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   title: string;
 };
 
 /**
- * Suggerimento facoltativo del profilo (DAS-REV-03 §19).
+ * Suggerimento facoltativo del profilo (DAS-REV-03 §19, DAS-REV-06 §8).
  *
  * Non è "Da gestire" e non è "Informazioni richieste": §19 vieta entrambi i
  * nomi quando il dato non è obbligatorio, e chiede che siano gerarchia,
@@ -30,21 +38,29 @@ export type DashboardSuggestionProps = {
  *
  * Il titolo è volutamente al positivo ("Migliora la tua visibilità"): è un
  * miglioramento possibile, non una mancanza da sanare.
+ *
+ * DAS-REV-06 §8 separa indicazione e beneficio in due righe distinte, com'è
+ * nello screen 02: la prima dice cosa fare, la seconda perché conviene. Una
+ * riga sola le faceva collassare e il "perché" spariva.
  */
 export function DashboardSuggestion({
   actionLabel,
   body,
+  description,
+  icon = "location-outline",
   onPress,
   title,
 }: DashboardSuggestionProps) {
   return (
     <View style={styles.surface}>
       <View style={styles.header}>
-        <Ionicons color={colors.accent} name="people-outline" size={18} />
+        <Ionicons color={colors.accent} name={icon} size={18} />
         <AppText style={styles.title} variant="titleMd">
           {title}
         </AppText>
       </View>
+
+      <AppText variant="bodySm">{description}</AppText>
 
       <AppText color="secondary" variant="bodySm">
         {body}

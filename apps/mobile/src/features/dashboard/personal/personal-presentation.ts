@@ -138,7 +138,9 @@ export function formatDeadlineRowLabel(
   }
 
   const prefix =
-    options.actionType === "register" ? "Iscrizioni entro il" : "Candidature entro il";
+    options.actionType === "register"
+      ? "Iscrizioni entro il"
+      : "Candidature entro il";
 
   return `${prefix} ${day} ${monthLabel}`;
 }
@@ -170,7 +172,9 @@ export function formatDeadlineDetailLabel(
   }
 
   const prefix =
-    options.actionType === "register" ? "Iscrizioni entro il" : "Candidature entro il";
+    options.actionType === "register"
+      ? "Iscrizioni entro il"
+      : "Candidature entro il";
 
   const base = `${prefix} ${day} ${monthLabel} ${year}`;
 
@@ -180,7 +184,9 @@ export function formatDeadlineDetailLabel(
 
   const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 
-  return timeZone ? `${base}, ore ${time} (${timeZone})` : `${base}, ore ${time}`;
+  return timeZone
+    ? `${base}, ore ${time} (${timeZone})`
+    : `${base}, ore ${time}`;
 }
 
 /**
@@ -191,7 +197,10 @@ export function formatDeadlineDetailLabel(
  * 24 ore: un evento delle 23:50 di ieri non è "oggi" perché sono passate
  * meno di 24 ore.
  */
-export function formatUpdateLabel(occurredAt: string, now: number): string | null {
+export function formatUpdateLabel(
+  occurredAt: string,
+  now: number,
+): string | null {
   const date = new Date(occurredAt);
 
   if (Number.isNaN(date.getTime())) {
@@ -355,3 +364,33 @@ export function selectApplicationPreviews<T>(
     items: deduped.items.slice(0, MAX_APPLICATION_PREVIEWS),
   };
 }
+
+/**
+ * Copy dei suggerimenti facoltativi, per chiave stabile (DAS-REV-06 §8, §22).
+ *
+ * Il backend emette classificazione, chiave e destinazione; il testo vive qui.
+ * È la stessa divisione delle priorità — `priority-registry.ts` tiene la copy
+ * dei tipi e il dominio ne decide la pertinenza — e tiene le frasi di prodotto
+ * fuori da una migrazione SQL, dove cambiarle costerebbe un rilascio di
+ * database.
+ *
+ * Una chiave sconosciuta non viene inventata né mostrata vuota: il modulo non
+ * si compone. §23 vieta di «inventare un requisito per riempire lo spazio».
+ */
+export type SuggestionCopy = {
+  actionLabel: string;
+  /** Il beneficio: perché conviene, non cosa manca. */
+  body: string;
+  /** L'indicazione: cosa fare. */
+  description: string;
+  icon: "location-outline";
+};
+
+export const SUGGESTION_COPY: Record<string, SuggestionCopy> = {
+  availability_areas: {
+    actionLabel: "Imposta aree",
+    body: "Aiuta le società a trovarti nelle zone che hai scelto.",
+    description: "Indica le aree in cui sei disponibile.",
+    icon: "location-outline",
+  },
+};

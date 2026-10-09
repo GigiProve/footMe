@@ -109,6 +109,7 @@ import {
   hasSignificantUpdate,
   recentUpdatesBudget,
   selectApplicationPreviews,
+  SUGGESTION_COPY,
 } from "./personal/personal-presentation";
 import {
   aggregatedUpdateLabel,
@@ -1822,17 +1823,32 @@ function ModuleRenderer({
      * raddoppierebbe il messaggio.
      */
     case "personal_profile_suggestion": {
-      if (!personal?.optionalSuggestion) {
+      const suggestion = personal?.optionalSuggestion;
+
+      if (!suggestion) {
+        return null;
+      }
+
+      /*
+        DAS-REV-06 §8: la copy è del client, la classificazione è del
+        backend. La chiave stabile — oggi solo `availability_areas` — sceglie
+        il testo; il backend decide *se* e *dove*, non *come si chiama*. È lo
+        stesso contratto dei requisiti: lì la descrizione arriva dal dominio
+        perché cambia per ruolo, qui è una sola frase per tutti.
+      */
+      const copy = SUGGESTION_COPY[suggestion.key] ?? null;
+
+      if (!copy) {
         return null;
       }
 
       return (
         <DashboardSuggestion
-          actionLabel="Imposta aree"
-          body="Indica le aree in cui sei disponibile."
-          onPress={() =>
-            onNavigate(moduleId, personal.optionalSuggestion?.href ?? "/profile/edit")
-          }
+          actionLabel={copy.actionLabel}
+          body={copy.body}
+          description={copy.description}
+          icon={copy.icon}
+          onPress={() => onNavigate(moduleId, suggestion.href)}
           title={title}
         />
       );

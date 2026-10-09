@@ -30,23 +30,23 @@ import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
-import { colors, radius, spacing } from "../../../../theme/tokens";
-import { AppText, Button } from "../../../../ui";
+import { colors, spacing } from "../../../../theme/tokens";
+import { AppText } from "../../../../ui";
 import { OnboardingSelectField, ToggleRow } from "../../../onboarding/ui";
 import { MONTH_NAMES } from "../../../onboarding/ui/date-selector-utils";
-import { AvailabilityModeCard } from "../../../onboarding/player/AvailabilityModeCard";
-import { GeographicPickerScreen } from "../../../onboarding/player/GeographicPickerScreen";
 import {
-  buildAvailabilitySummary,
-  getAvailabilityErrorMessage,
   resolveActiveAvailability,
   type GeographicAvailabilityDraft,
 } from "../../../onboarding/player/geographic-availability";
 import type { AvailabilityType } from "../../../onboarding/onboarding-form";
+import { AvailabilityAreasSelector } from "../../availability-areas/AvailabilityAreasSelector";
+import {
+  validateAvailabilityAreas,
+  type AvailabilityAreasMode,
+  type AvailabilityAreasValidationError,
+} from "../../availability-areas/availability-areas-model";
 import { trackProfileEvent } from "../../profile-analytics";
-import { buildAvailabilityZonesLabel } from "../../profile-display-helpers";
 import type { ProfileFormState } from "../../profile-edit-helpers";
-import { PROVINCE_OPTIONS, REGION_OPTIONS } from "../../profile-form-utils";
 import type { CompleteProfessionalProfile } from "../../profile-service";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
 import {
@@ -54,8 +54,6 @@ import {
   ProfileEditFieldsSkeleton,
 } from "../ProfileEditStates";
 import { useUnsavedChangesGuard } from "../use-unsaved-changes-guard";
-
-type InternalScreen = "main" | "regions" | "provinces";
 
 export type OpportunitiesDraft = {
   /**
@@ -153,12 +151,6 @@ export type ProfileOpportunitiesConfig<TPatch = Partial<ProfileFormState>> = {
   /** Legge la disponibilità corrente dal profilo canonico. */
   read: (data: CompleteProfessionalProfile) => OpportunitiesDraft;
   profileType: string;
-  /** Azione del riepilogo territoriale. */
-  recapActionLabel?: string;
-  /** Titolo del riepilogo territoriale. */
-  recapTitle?: string;
-  /** Titolo della modalità a regioni: il Dirigente parla di "aree". */
-  regionsModeTitle?: string;
   /** Alcuni ruoli non raccolgono "Disponibile da". */
   showAvailableFrom?: boolean;
   testIDPrefix: string;
@@ -202,9 +194,6 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
     preferences,
     profileType,
     read,
-    recapActionLabel = "Modifica zone",
-    recapTitle = "Zone selezionate",
-    regionsModeTitle = "In una o più regioni",
     showAvailableFrom = true,
     testIDPrefix,
     write,
@@ -224,8 +213,10 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
   );
 
   const [draft, setDraft] = useState<OpportunitiesDraft | null>(null);
-  const [screen, setScreen] = useState<InternalScreen>("main");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /** Errore geografico mostrato accanto al controllo, non solo in fondo (§17). */
+  const [areasError, setAreasError] =
+    useState<AvailabilityAreasValidationError | null>(null);
   const form = draft ?? initialForm;
 
   const isDirty = Boolean(
@@ -250,6 +241,7 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
   const patch = useCallback(
     (changes: Partial<OpportunitiesDraft>) => {
       setErrorMessage(null);
+      setAreasError(null);
       setDraft((current) => {
         const base = current ?? initialForm;
 
@@ -259,26 +251,32 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
     [initialForm],
   );
 
-  const selectMode = useCallback(
-    (mode: AvailabilityType) => {
+  const handleAreasChange = useCallback(
+    (next: {
+      mode: AvailabilityAreasMode | null;
+      provinces: string[];
+      regions: string[];
+    }) => {
       if (!form) {
         return;
       }
 
-      trackProfileEvent("profile_area_mode_changed", {
-        geographicMode: mode,
-        profileType,
-        section: "opportunities",
+      /*
+        Il selector condiviso ammette "nessuna modalità" perché l'editor
+        focalizzato di DAS-REV-06 deve poterla rappresentare. Qui la modalità
+        esiste sempre — `normalizeAvailabilityType` la coerce — e il selector
+        non la riporta mai a null: il fallback è una guardia di tipo, non un
+        comportamento.
+      */
+      patch({
+        availability: {
+          mode: next.mode ?? form.availability.mode,
+          provinces: next.provinces,
+          regions: next.regions,
+        },
       });
-      patch({ availability: { ...form.availability, mode } });
-
-      if (mode === "REGIONS") {
-        setScreen("regions");
-      } else if (mode === "PROVINCES") {
-        setScreen("provinces");
-      }
     },
-    [form, patch, profileType],
+    [form, patch],
   );
 
   function handleSave() {
@@ -291,10 +289,11 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
         Senza gate l'area operativa è sempre un dato del profilo: va validata
         anche a preferenze spente, perché resta pubblicata.
       */
-      const availabilityError = getAvailabilityErrorMessage(form.availability);
+      const availabilityError = validateAvailabilityAreas(form.availability);
 
       if (availabilityError) {
-        setErrorMessage(availabilityError);
+        setAreasError(availabilityError);
+        setErrorMessage(availabilityError.message);
         return;
       }
     } else if (form.isAvailable) {
@@ -307,10 +306,11 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
         return;
       }
 
-      const availabilityError = getAvailabilityErrorMessage(form.availability);
+      const availabilityError = validateAvailabilityAreas(form.availability);
 
       if (availabilityError) {
-        setErrorMessage(availabilityError);
+        setAreasError(availabilityError);
+        setErrorMessage(availabilityError.message);
         return;
       }
     }
@@ -345,60 +345,12 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
     });
   }
 
-  if (form && screen !== "main") {
-    const isRegions = screen === "regions";
-
-    return (
-      <GeographicPickerScreen
-        emptyStateMessage={
-          isRegions ? "Nessuna regione trovata." : "Nessuna provincia trovata."
-        }
-        onBack={() => setScreen("main")}
-        onChange={(values) =>
-          patch({
-            availability: isRegions
-              ? { ...form.availability, regions: values }
-              : { ...form.availability, provinces: values },
-          })
-        }
-        onConfirm={() => setScreen("main")}
-        options={isRegions ? [...REGION_OPTIONS] : [...PROVINCE_OPTIONS]}
-        searchPlaceholder={
-          isRegions ? "Cerca una regione" : "Cerca una provincia"
-        }
-        subtitle={
-          isRegions
-            ? "Puoi selezionare più regioni."
-            : "Puoi selezionare più province."
-        }
-        testID={
-          isRegions
-            ? `${testIDPrefix}-opportunities-regions-picker`
-            : `${testIDPrefix}-opportunities-provinces-picker`
-        }
-        title={isRegions ? "In quali regioni?" : "In quali province?"}
-        unit={isRegions ? "regione" : "provincia"}
-        values={
-          isRegions ? form.availability.regions : form.availability.provinces
-        }
-      />
-    );
-  }
-
   /*
     Senza gate l'area operativa è sempre parte del profilo: con le preferenze
     autonome resta a schermo anche quando sono tutte spente, perché non è la
     disponibilità a renderla valida.
   */
   const showsDependentFields = usesPreferences || Boolean(form?.isAvailable);
-
-  const zonesLabel = form
-    ? buildAvailabilityZonesLabel(
-        form.availability.mode,
-        resolveActiveAvailability(form.availability).regions,
-        resolveActiveAvailability(form.availability).provinces,
-      )
-    : null;
 
   return (
     <ProfileEditScaffold
@@ -507,75 +459,31 @@ export function ProfileOpportunitiesScreen<TPatch = Partial<ProfileFormState>>({
               <View style={styles.zones}>
                 <AppText variant="titleSm">{zonesTitle}</AppText>
 
-                <AvailabilityModeCard
-                  affordance="direct"
-                  description="Sei disponibile ovunque, senza limitazioni territoriali."
-                  icon="globe-outline"
-                  onPress={() => selectMode("ITALY")}
-                  selected={form.availability.mode === "ITALY"}
-                  testID={`${testIDPrefix}-opportunities-mode-italy`}
-                  title="Tutta Italia"
-                />
-                <AvailabilityModeCard
-                  affordance="drilldown"
-                  description="Scegli le regioni che ti interessano."
-                  icon="map-outline"
-                  onPress={() => selectMode("REGIONS")}
-                  selected={form.availability.mode === "REGIONS"}
-                  summary={buildAvailabilitySummary(
-                    form.availability.regions.length,
-                    "regione",
-                  )}
-                  testID={`${testIDPrefix}-opportunities-mode-regions`}
-                  title={regionsModeTitle}
-                />
-                <AvailabilityModeCard
-                  affordance="drilldown"
-                  description="Scegli le province che ti interessano."
-                  icon="location-outline"
-                  onPress={() => selectMode("PROVINCES")}
-                  selected={form.availability.mode === "PROVINCES"}
-                  summary={buildAvailabilitySummary(
-                    form.availability.provinces.length,
-                    "provincia",
-                  )}
-                  testID={`${testIDPrefix}-opportunities-mode-provinces`}
-                  title="Zone specifiche"
+                {/*
+                  DAS-REV-06 §12: lo stesso selector dell'editor focalizzato e
+                  dell'onboarding, non una seconda variante. Qui il punto di
+                  conferma resta del modulo — §19: «il selector aggiorna quel
+                  draft e il salvataggio finale resta al modulo» — quindi non
+                  compare un secondo "Salva modifiche".
+
+                  Sparisce con lui il riepilogo "Zone selezionate" con
+                  "Modifica zone": serviva a rendere leggibili scelte fatte in
+                  una schermata diversa, e ora le scelte sono qui, a schermo.
+                */}
+                <AvailabilityAreasSelector
+                  draft={form.availability}
+                  error={areasError}
+                  onChange={handleAreasChange}
+                  onModeChange={(mode) =>
+                    trackProfileEvent("profile_area_mode_changed", {
+                      geographicMode: mode,
+                      profileType,
+                      section: "opportunities",
+                    })
+                  }
+                  testIDPrefix={`${testIDPrefix}-opportunities-areas`}
                 />
               </View>
-
-              {/*
-                Riepilogo compatto dei territori scelti. "Tutta Italia" non ha
-                zone da elencare e non mostra l'azione di modifica.
-              */}
-              {form.availability.mode !== "ITALY" ? (
-                <View
-                  style={styles.recap}
-                  testID={`${testIDPrefix}-opportunities-recap`}
-                >
-                  <View style={styles.recapText}>
-                    <AppText color="secondary" variant="eyebrow">
-                      {recapTitle}
-                    </AppText>
-                    <AppText variant="bodySm">
-                      {zonesLabel ?? "Nessuna zona selezionata"}
-                    </AppText>
-                  </View>
-                  <Button
-                    label={recapActionLabel}
-                    onPress={() =>
-                      setScreen(
-                        form.availability.mode === "REGIONS"
-                          ? "regions"
-                          : "provinces",
-                      )
-                    }
-                    size="sm"
-                    testID={`${testIDPrefix}-opportunities-edit-zones`}
-                    variant="ghost"
-                  />
-                </View>
-              ) : null}
             </>
           ) : (
             <View style={styles.notice}>
@@ -604,20 +512,6 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     flex: 1,
-  },
-  recap: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[16],
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing[12],
-    padding: spacing[16],
-  },
-  recapText: {
-    flex: 1,
-    gap: spacing[4],
   },
   zones: {
     gap: spacing[8],

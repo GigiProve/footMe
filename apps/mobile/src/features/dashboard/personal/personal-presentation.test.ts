@@ -11,6 +11,7 @@ import {
   formatUpdateLabel,
   hasSignificantUpdate,
   recentUpdatesBudget,
+  SUGGESTION_COPY,
 } from "./personal-presentation";
 
 /**
@@ -294,5 +295,39 @@ describe("selectApplicationPreviews", () => {
     );
 
     expect(outcome.collapsed).toBe(false);
+  });
+});
+
+/**
+ * Copy dei suggerimenti facoltativi (DAS-REV-06 §8).
+ *
+ * Sono le quattro stringhe letterali della task: titolo a parte — lo porta il
+ * registro dei moduli — indicazione, beneficio e CTA stanno qui.
+ */
+describe("SUGGESTION_COPY", () => {
+  it("usa la copy letterale del master per le aree", () => {
+    expect(SUGGESTION_COPY.availability_areas).toEqual({
+      actionLabel: "Imposta aree",
+      body: "Aiuta le società a trovarti nelle zone che hai scelto.",
+      description: "Indica le aree in cui sei disponibile.",
+      icon: "location-outline",
+    });
+  });
+
+  it("non ha copy per una chiave che il dominio non emette", () => {
+    // §23: «Non inventare un requisito per riempire lo spazio.» Una chiave
+    // sconosciuta fa sparire il modulo, non comparire una card vuota.
+    expect(SUGGESTION_COPY.profilo_completo).toBeUndefined();
+  });
+
+  it("non promette un completamento né lo misura", () => {
+    const copy = Object.values(SUGGESTION_COPY)
+      .flatMap((entry) => [entry.actionLabel, entry.body, entry.description])
+      .join(" ")
+      .toLowerCase();
+
+    for (const forbidden of ["profilo completo", "%", "punteggio", "ottimo lavoro"]) {
+      expect(copy).not.toContain(forbidden);
+    }
   });
 });

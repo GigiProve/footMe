@@ -45,7 +45,12 @@ type ProfileEditScaffoldProps = {
   /** Indicatore di passo, es. "1 di 2". Prende il posto dello spaziatore. */
   stepLabel?: string;
   testID?: string;
-  title: string;
+  /**
+   * Titolo nella navigation bar. Può mancare: l'editor delle aree
+   * (DAS-REV-06 §12) porta il titolo dentro il contenuto, come il master, e
+   * in testa resta il solo back.
+   */
+  title?: string;
 };
 
 export function ProfileEditScaffold({
@@ -78,9 +83,13 @@ export function ProfileEditScaffold({
         >
           <Ionicons color={colors.textPrimary} name="chevron-back" size={24} />
         </Pressable>
-        <AppText numberOfLines={1} style={styles.navTitle} variant="titleMd">
-          {title}
-        </AppText>
+        {title ? (
+          <AppText numberOfLines={1} style={styles.navTitle} variant="titleMd">
+            {title}
+          </AppText>
+        ) : (
+          <View style={styles.navTitle} />
+        )}
         {/* Speculare al back: tiene il titolo centrato senza una seconda azione. */}
         <View style={styles.backButton}>
           {stepLabel ? (

@@ -65,9 +65,6 @@ const CONFIG: ProfileOpportunitiesConfig<DirectorSectionPatch> = {
     preferences: [],
     isAvailable: data.directorProfile?.open_to_work ?? false,
   }),
-  recapActionLabel: "Modifica aree",
-  recapTitle: "Aree selezionate",
-  regionsModeTitle: "In una o più aree",
   showAvailableFrom: false,
   testIDPrefix: "director",
   write: (draft, active) => ({

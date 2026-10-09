@@ -552,7 +552,11 @@ describe("Opportunità", () => {
     expect(labels).toContain("Disponibile a collaborare con club");
     expect(labels).toContain("I club possono proporti collaborazioni.");
     expect(labels).toContain("Area operativa");
-    expect(labels).toContain("Aree selezionate");
+    // DAS-REV-06 §12: le tre modalità hanno una copy sola per tutti i ruoli,
+    // e il riepilogo separato non esiste più.
+    expect(labels).toContain("Province specifiche");
+    expect(labels).toContain("Una o più regioni");
+    expect(labels).toContain("Tutta Italia");
     // Il Procuratore non dichiara una data di inizio disponibilità.
     expect(labels).not.toContain("Disponibile da");
   });

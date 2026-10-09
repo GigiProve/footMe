@@ -250,7 +250,13 @@ export type ProfileAnalyticsEvent =
   | "media_channel_added"
   | "media_channel_removed"
   | "media_channel_visibility_changed"
-  | "media_profile_edit_conflict";
+  | "media_profile_edit_conflict"
+  // Disponibilità geografica (DAS-REV-06 §25). Passano la modalità scelta, la
+  // superficie di origine e quante aree sono selezionate: mai quali province o
+  // regioni, mai coordinate, mai la residenza.
+  | "profile_area_editor_opened"
+  | "profile_area_saved"
+  | "profile_area_save_failed";
 
 /** Tipo del contatto, mai il suo valore. */
 export type PublicContactType =

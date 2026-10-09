@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 
-import { colors, spacing } from "../../styles";
+import { colors, sizes, spacing } from "../../styles";
 import { AppText } from "../AppText/AppText";
 
 type RadioProps = {
@@ -8,6 +8,7 @@ type RadioProps = {
   disabled?: boolean;
   label: string;
   onPress: () => void;
+  testID?: string;
 };
 
 export function Radio({
@@ -15,6 +16,7 @@ export function Radio({
   disabled = false,
   label,
   onPress,
+  testID,
 }: RadioProps) {
   return (
     <Pressable
@@ -23,6 +25,7 @@ export function Radio({
       disabled={disabled}
       onPress={onPress}
       style={[styles.container, disabled ? styles.disabled : null]}
+      testID={testID}
     >
       <View style={[styles.circle, checked ? styles.circleChecked : null]} />
       <AppText variant="bodyLg" style={styles.label}>
@@ -37,6 +40,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing[12],
+    // WCAG: la riga è il bersaglio, non il solo cerchio da 22px.
+    minHeight: sizes.touchTarget,
     paddingVertical: spacing[6],
   },
   disabled: {

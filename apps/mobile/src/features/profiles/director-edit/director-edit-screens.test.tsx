@@ -646,8 +646,11 @@ describe("Opportunità", () => {
     expect(labels).toContain("Disponibile per nuove opportunità");
     expect(labels).toContain("Disponibile per");
     expect(labels).toContain("Area operativa");
-    expect(labels).toContain("In una o più aree");
-    expect(labels).toContain("Aree selezionate");
+    // DAS-REV-06 §12: la copy delle tre modalità è fissa e condivisa, quindi
+    // il Dirigente non ha più una variante "In una o più aree".
+    expect(labels).toContain("Province specifiche");
+    expect(labels).toContain("Una o più regioni");
+    expect(labels).toContain("Tutta Italia");
     expect(
       tree.root.findAllByProps({
         testID: "director-opportunities-available-from",
@@ -718,7 +721,7 @@ describe("Opportunità", () => {
 
     await act(async () => {
       tree.root
-        .findByProps({ testID: "director-opportunities-mode-italy" })
+        .findByProps({ testID: "director-opportunities-areas-mode-ITALY" })
         .props.onPress();
     });
 

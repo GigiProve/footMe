@@ -14,23 +14,21 @@ import { router } from "expo-router";
 
 import { colors, spacing } from "../../../../theme/tokens";
 import { AppText, Button } from "../../../../ui";
+import { OnboardingChipMultiSelect, ToggleRow } from "../../../onboarding/ui";
 import {
-  OnboardingChipMultiSelect,
-  ToggleRow,
-} from "../../../onboarding/ui";
-import { AvailabilityModeCard } from "../../../onboarding/player/AvailabilityModeCard";
-import { GeographicPickerScreen } from "../../../onboarding/player/GeographicPickerScreen";
-import {
-  buildAvailabilitySummary,
-  getAvailabilityErrorMessage,
   resolveActiveAvailability,
   type GeographicAvailabilityDraft,
 } from "../../../onboarding/player/geographic-availability";
 import type { AvailabilityType } from "../../../onboarding/onboarding-form";
+import { AvailabilityAreasSelector } from "../../availability-areas/AvailabilityAreasSelector";
+import {
+  validateAvailabilityAreas,
+  type AvailabilityAreasMode,
+  type AvailabilityAreasValidationError,
+} from "../../availability-areas/availability-areas-model";
 import { trackProfileEvent } from "../../profile-analytics";
 import { INTEREST_CATEGORY_OPTIONS } from "../../player-sports";
 import { toDelimitedString } from "../../profile-edit-helpers";
-import { PROVINCE_OPTIONS, REGION_OPTIONS } from "../../profile-form-utils";
 import { ProfileEditScaffold } from "../ProfileEditScaffold";
 import { ProfileEditFieldsSkeleton } from "../ProfileEditStates";
 import {
@@ -39,8 +37,6 @@ import {
 } from "../player-profile-edit-service";
 import { usePlayerEditorGuard } from "../use-player-editor-guard";
 import { useUnsavedChangesGuard } from "../use-unsaved-changes-guard";
-
-type InternalScreen = "main" | "regions" | "provinces";
 
 type OpportunitiesForm = {
   availability: GeographicAvailabilityDraft;
@@ -53,7 +49,9 @@ const GENERIC_SAVE_ERROR =
   "Non è stato possibile salvare le modifiche. Riprova.";
 
 /** `ALL_ITALY` è un valore legacy: in lettura vale quanto `ITALY`. */
-function normalizeAvailabilityType(value: string | undefined): AvailabilityType {
+function normalizeAvailabilityType(
+  value: string | undefined,
+): AvailabilityType {
   if (value === "REGIONS" || value === "PROVINCES") {
     return value;
   }
@@ -87,8 +85,10 @@ export function OpportunitiesScreen() {
   }, [data]);
 
   const [draft, setDraft] = useState<OpportunitiesForm | null>(null);
-  const [screen, setScreen] = useState<InternalScreen>("main");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /** Errore geografico mostrato accanto al controllo, non solo in fondo (§17). */
+  const [areasError, setAreasError] =
+    useState<AvailabilityAreasValidationError | null>(null);
   const form = draft ?? initialForm;
 
   const isDirty = Boolean(
@@ -104,6 +104,7 @@ export function OpportunitiesScreen() {
   const patch = useCallback(
     (changes: Partial<OpportunitiesForm>) => {
       setErrorMessage(null);
+      setAreasError(null);
       setDraft((current) => {
         const base = current ?? initialForm;
 
@@ -113,24 +114,29 @@ export function OpportunitiesScreen() {
     [initialForm],
   );
 
-  const selectMode = useCallback(
-    (mode: AvailabilityType) => {
+  const handleAreasChange = useCallback(
+    (next: {
+      mode: AvailabilityAreasMode | null;
+      provinces: string[];
+      regions: string[];
+    }) => {
       if (!form) {
         return;
       }
 
-      trackProfileEvent("profile_area_mode_changed", {
-        geographicMode: mode,
-        profileType: "player",
-        section: "opportunities",
+      /*
+        Il selector condiviso ammette "nessuna modalità" perché l'editor
+        focalizzato di DAS-REV-06 deve poterla rappresentare. Qui la modalità
+        esiste sempre e il selector non la riporta mai a null: il fallback è
+        una guardia di tipo, non un comportamento.
+      */
+      patch({
+        availability: {
+          mode: next.mode ?? form.availability.mode,
+          provinces: next.provinces,
+          regions: next.regions,
+        },
       });
-      patch({ availability: { ...form.availability, mode } });
-
-      if (mode === "REGIONS") {
-        setScreen("regions");
-      } else if (mode === "PROVINCES") {
-        setScreen("provinces");
-      }
     },
     [form, patch],
   );
@@ -141,11 +147,12 @@ export function OpportunitiesScreen() {
     }
 
     const availabilityError = form.willingToChangeClub
-      ? getAvailabilityErrorMessage(form.availability)
-      : undefined;
+      ? validateAvailabilityAreas(form.availability)
+      : null;
 
     if (availabilityError) {
-      setErrorMessage(availabilityError);
+      setAreasError(availabilityError);
+      setErrorMessage(availabilityError.message);
       return;
     }
 
@@ -196,46 +203,6 @@ export function OpportunitiesScreen() {
     );
   }
 
-  if (form && screen === "regions") {
-    return (
-      <GeographicPickerScreen
-        emptyStateMessage="Nessuna regione trovata."
-        onBack={() => setScreen("main")}
-        onChange={(regions) =>
-          patch({ availability: { ...form.availability, regions } })
-        }
-        onConfirm={() => setScreen("main")}
-        options={[...REGION_OPTIONS]}
-        searchPlaceholder="Cerca una regione"
-        subtitle="Puoi selezionare più regioni."
-        testID="opportunities-regions-picker"
-        title="In quali regioni?"
-        unit="regione"
-        values={form.availability.regions}
-      />
-    );
-  }
-
-  if (form && screen === "provinces") {
-    return (
-      <GeographicPickerScreen
-        emptyStateMessage="Nessuna provincia trovata."
-        onBack={() => setScreen("main")}
-        onChange={(provinces) =>
-          patch({ availability: { ...form.availability, provinces } })
-        }
-        onConfirm={() => setScreen("main")}
-        options={[...PROVINCE_OPTIONS]}
-        searchPlaceholder="Cerca una provincia"
-        subtitle="Puoi selezionare più province."
-        testID="opportunities-provinces-picker"
-        title="In quali province?"
-        unit="provincia"
-        values={form.availability.provinces}
-      />
-    );
-  }
-
   return (
     <ProfileEditScaffold
       errorMessage={errorMessage}
@@ -245,9 +212,7 @@ export function OpportunitiesScreen() {
       testID="profile-edit-opportunities"
       title="Opportunità"
     >
-      {profileQuery.isPending ? (
-        <ProfileEditFieldsSkeleton />
-      ) : null}
+      {profileQuery.isPending ? <ProfileEditFieldsSkeleton /> : null}
 
       {profileQuery.isError ? (
         <View style={styles.centered}>
@@ -281,40 +246,25 @@ export function OpportunitiesScreen() {
           {form.willingToChangeClub ? (
             <View style={styles.field}>
               <AppText variant="titleSm">Zone disponibili</AppText>
-              <AvailabilityModeCard
-                affordance="direct"
-                description="Sei disponibile a trasferirti ovunque."
-                icon="globe-outline"
-                onPress={() => selectMode("ITALY")}
-                selected={form.availability.mode === "ITALY"}
-                testID="opportunities-mode-italy"
-                title="Tutta Italia"
-              />
-              <AvailabilityModeCard
-                affordance="drilldown"
-                description="Scegli le regioni che ti interessano."
-                icon="map-outline"
-                onPress={() => selectMode("REGIONS")}
-                selected={form.availability.mode === "REGIONS"}
-                summary={buildAvailabilitySummary(
-                  form.availability.regions.length,
-                  "regione",
-                )}
-                testID="opportunities-mode-regions"
-                title="Una o più regioni"
-              />
-              <AvailabilityModeCard
-                affordance="drilldown"
-                description="Scegli le province che ti interessano."
-                icon="location-outline"
-                onPress={() => selectMode("PROVINCES")}
-                selected={form.availability.mode === "PROVINCES"}
-                summary={buildAvailabilitySummary(
-                  form.availability.provinces.length,
-                  "provincia",
-                )}
-                testID="opportunities-mode-provinces"
-                title="Una o più province"
+
+              {/*
+                DAS-REV-06 §12: lo stesso selector dell'editor focalizzato
+                aperto dalla Dashboard. Il punto di conferma resta di questa
+                schermata (§19), che salva anche categorie, provini e il
+                toggle di trasferimento.
+              */}
+              <AvailabilityAreasSelector
+                draft={form.availability}
+                error={areasError}
+                onChange={handleAreasChange}
+                onModeChange={(mode) =>
+                  trackProfileEvent("profile_area_mode_changed", {
+                    geographicMode: mode,
+                    profileType: "player",
+                    section: "opportunities",
+                  })
+                }
+                testIDPrefix="opportunities-areas"
               />
             </View>
           ) : null}

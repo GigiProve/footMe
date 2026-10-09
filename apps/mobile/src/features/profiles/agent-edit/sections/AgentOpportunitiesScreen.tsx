@@ -78,9 +78,6 @@ const CONFIG: ProfileOpportunitiesConfig<AgentProfilePatchInput> = {
       .filter(([, column]) => data.agentProfile?.[column])
       .map(([value]) => value),
   }),
-  recapActionLabel: "Modifica aree",
-  recapTitle: "Aree selezionate",
-  regionsModeTitle: "In una o più aree",
   showAvailableFrom: false,
   testIDPrefix: "agent",
   write: (draft, active) => ({
