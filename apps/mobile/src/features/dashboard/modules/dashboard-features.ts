@@ -26,10 +26,13 @@ export type DashboardFeatureKey =
   | "society_applications"
   | "society_content_create"
   | "society_drafts"
+  | "society_article_composer"
   | "society_invites"
+  | "society_management_areas"
   | "society_positions"
   | "society_recent_content"
   | "society_scheduled_content"
+  | "society_team_detail"
   | "society_teams";
 
 type FeatureConfig = {
@@ -52,6 +55,17 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
   society_drafts: { available: true },
   society_recent_content: { available: true },
   society_content_create: { available: true },
+  society_management_areas: { available: true },
+  /**
+   * DAS-REV-07 §14: il centro "Inviti e richieste" esiste
+   * (`app/club-admin/invites.tsx`) e il modulo ne mostra il riepilogo.
+   *
+   * Resta `requiresOwner` nel registry, non bloccato qui: la funzione c'è,
+   * ma la sua route è ancora gated sul ruolo `club_admin`. Distinguere le due
+   * cose conta — "non esiste" e "esiste per il solo proprietario" non si
+   * risolvono con lo stesso lavoro.
+   */
+  society_invites: { available: true },
 
   // ── Non disponibili: contratto pronto, dominio assente ─────────────────
   /**
@@ -82,14 +96,25 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
       "La colonna scheduled_count della RPC resta null finché non esiste.",
     owner: "Pack editoriale Società (HOM)",
   },
-  society_invites: {
+  society_team_detail: {
     available: false,
     blockedReason:
-      "Il flusso Inviti canonico della Società vive in /club-admin/invites ed " +
-      "è gated su role === 'club_admin', non su capability. Esporlo come " +
-      "azione rapida con capability invites_create aprirebbe una destinazione " +
-      "che rifiuta un membro autorizzato.",
-    owner: "DAS-REV — pack Inviti",
+      "DAS-REV-07 §15 chiede che la riga Squadra apra il dettaglio operativo " +
+      "con Society ID, Team ID e stagione. Esiste solo /club/team/[id], che è " +
+      "il profilo pubblico della squadra, e §15 vieta di sostituire la " +
+      "destinazione gestionale con quello. Le righe della preview restano " +
+      "informative finché il centro Squadre non espone un dettaglio proprio.",
+    owner: "DAS-REV-08/09 — pack Squadre",
+  },
+  society_article_composer: {
+    available: false,
+    blockedReason:
+      "club_media_posts.kind ammette highlights/interview/market/statement/" +
+      "training/event: il dominio editoriale della Società non distingue POST " +
+      "da ARTICLE e ha un solo composer. Due pulsanti porterebbero alla stessa " +
+      "destinazione, quindi §11 ne mostra uno finché HOM-06.1/06.2 non " +
+      "introducono le due tipologie.",
+    owner: "HOM-06.1 / HOM-06.2 — pack editoriale",
   },
 };
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
-import { useRouter } from "expo-router";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { Screen } from "../../src/components/ui/screen";
@@ -75,6 +75,24 @@ export default function AnnouncementsScreen() {
   const router = useRouter();
   const { profile, session } = useSession();
   const userId = session?.user?.id;
+  /**
+   * Contesto di apertura dalla Dashboard Società (DAS-REV-07 §20).
+   *
+   * Questo schermo è il centro Posizioni **e** il centro Candidature: senza
+   * un riferimento, "Valuta candidature" e "Vedi tutte" aprirebbero la stessa
+   * pagina indistinta, e §13 vieta di «aprire una lista vuota o estranea al
+   * gruppo mostrato».
+   *
+   * `adId` è un riferimento strutturato, mai un titolo o un indice di riga.
+   * Quando è assente o non corrisponde a nulla, la pagina resta quella di
+   * sempre: il filtro non può far sparire il contenuto che l'actor ha già.
+   */
+  const { adId, focus } = useLocalSearchParams<{
+    adId?: string;
+    focus?: string;
+  }>();
+  const focusedAdId = typeof adId === "string" && adId.length > 0 ? adId : null;
+  const isApplicationsFocus = focus === "applications";
   const [ads, setAds] = useState<RecruitingAdSummary[]>([]);
   const [publicAds, setPublicAds] = useState<DiscoverableRecruitingAd[]>([]);
   const [applications, setApplications] = useState<ClubApplicationSummary[]>(
@@ -426,18 +444,38 @@ export default function AnnouncementsScreen() {
     );
   }
 
+  // Il riferimento arriva per id, mai per titolo o indice (§20). Un `adId`
+  // che non corrisponde a nessun annuncio di questa Società non filtra nulla:
+  // il centro resta quello completo invece di mostrarsi vuoto.
+  const focusedAd = focusedAdId
+    ? (ads.find((ad) => ad.id === focusedAdId) ?? null)
+    : null;
+  const visibleApplications = focusedAd
+    ? applications.filter((application) => application.ad.id === focusedAd.id)
+    : applications;
+
   return (
     <Screen>
       <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
         <ScreenHeader
-          title="Annunci societa'"
+          title={isApplicationsFocus ? "Candidature ricevute" : "Annunci societa'"}
           subtitle={
             clubName
-              ? `Stai pubblicando per ${clubName}.`
+              ? isApplicationsFocus
+                ? `Candidature ricevute da ${clubName}.`
+                : `Stai pubblicando per ${clubName}.`
               : "Completa l'onboarding societa' per pubblicare annunci."
           }
         />
 
+        {/*
+          §20: aperto come **centro Candidature**, lo schermo mostra quel
+          gruppo e non il composer di una nuova posizione. È lo stesso centro
+          di sempre, non una seconda schermata: senza il parametro tutto resta
+          dov'era, e "Mostra tutte le candidature" riporta alla vista piena.
+        */}
+        {!isApplicationsFocus ? (
+          <>
         <Card>
           <AppText variant="headingSm">Nuovo annuncio</AppText>
           <Input
@@ -537,17 +575,41 @@ export default function AnnouncementsScreen() {
             </Card>
           ))}
         </View>
+          </>
+        ) : null}
 
         <View style={styles.sectionGap}>
-          <AppText variant="headingSm">Candidature ricevute</AppText>
-          {applications.length === 0 && !isLoading ? (
+          <AppText variant="headingSm">
+            {focusedAd
+              ? `Candidature · ${focusedAd.title}`
+              : "Candidature ricevute"}
+          </AppText>
+
+          {focusedAd ? (
+            <Pressable
+              accessibilityLabel="Mostra tutte le candidature ricevute"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => router.setParams({ adId: undefined })}
+            >
+              <AppText color="accent" variant="actionLabel">
+                Mostra tutte le candidature
+              </AppText>
+            </Pressable>
+          ) : null}
+
+          {visibleApplications.length === 0 && !isLoading ? (
             <EmptyState
               icon="people-outline"
               title="Nessuna candidatura"
-              description="Nessuna candidatura ricevuta finora."
+              description={
+                focusedAd
+                  ? "Nessuna candidatura per questa posizione."
+                  : "Nessuna candidatura ricevuta finora."
+              }
             />
           ) : null}
-          {applications.map((application) => (
+          {visibleApplications.map((application) => (
             <Card key={application.id}>
               <AppText variant="titleSm">
                 {application.applicant?.full_name ?? "Profilo candidato"}

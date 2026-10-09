@@ -16,12 +16,13 @@ import { DASHBOARD_FEATURES } from "./dashboard-features";
 function identity(
   kind: DashboardIdentityKind,
   capabilities: DashboardCapability[] = [],
+  isOwner = false,
 ): DashboardIdentity {
   return {
     avatarUrl: null,
     capabilities,
     id: `${kind}-1`,
-    isOwner: false,
+    isOwner,
     isVerified: false,
     kind,
     name: kind,
@@ -38,6 +39,8 @@ const FULL_SOCIETY: DashboardCapability[] = [
   "content_view",
   "content_create",
   "invites_create",
+  "invites_view",
+  "shortlist_view",
 ];
 
 describe("isModuleEligible", () => {
@@ -82,11 +85,33 @@ describe("isModuleEligible", () => {
   });
 
   it("rejects capabilitiesAny when none of the entries match", () => {
-    const neither = identity("society", ["dashboard_view", "content_view"]);
+    // Nessun modulo del registry usa oggi la valutazione ANY — DAS-REV-07 §16
+    // ha tolto le capability a "Aree di gestione", che le applica riga per
+    // riga. La semantica resta però parte del contratto di composizione, e un
+    // modulo futuro deve poterci contare.
+    const anyOfTwo = {
+      ...MODULE_REGISTRY.society_areas,
+      capabilitiesAny: ["positions_view", "teams_view"] as const,
+    };
 
-    expect(isModuleEligible(MODULE_REGISTRY.society_areas, neither)).toBe(
+    const neither = identity("society", ["dashboard_view", "content_view"]);
+    const one = identity("society", ["dashboard_view", "teams_view"]);
+
+    expect(isModuleEligible(anyOfTwo, neither)).toBe(false);
+    expect(isModuleEligible(anyOfTwo, one)).toBe(true);
+  });
+
+  it("hides a module whose destination is still gated on the owner role", () => {
+    // DAS-REV-07 §16: applicare i permessi a ogni voce. `/club-admin/invites`
+    // redirige chi non ha `profile.role === 'club_admin'`, quindi il modulo
+    // sarebbe una promessa che la route rimanda indietro.
+    const member = identity("society", ["dashboard_view", "invites_view"]);
+    const owner: DashboardIdentity = { ...member, isOwner: true };
+
+    expect(isModuleEligible(MODULE_REGISTRY.society_invites, member)).toBe(
       false,
     );
+    expect(isModuleEligible(MODULE_REGISTRY.society_invites, owner)).toBe(true);
   });
 });
 
@@ -113,14 +138,19 @@ describe("composeDashboard", () => {
 
   it("orders modules by their base order", () => {
     const modules = composeDashboard(
-      identity("society", FULL_SOCIETY),
+      identity("society", FULL_SOCIETY, true),
     ).modules.map((module) => module.id);
 
     // DAS-REV-02 §11: senza priorità, Posizioni aperte precede Candidature
     // ricevute. È l'ordine base che la promozione deve poter ripristinare.
+    //
+    // DAS-REV-07 §7: moduli operativi (Posizioni, Candidature, Inviti,
+    // Squadre), poi editoriali, poi gli accessi gestionali secondari.
     expect(modules).toEqual([
       "society_positions",
       "society_applications",
+      "society_invites",
+      "society_teams",
       "society_drafts",
       "society_recent_content",
       "society_areas",
@@ -146,9 +176,17 @@ describe("composeDashboard", () => {
     expect(sport).toEqual([
       "society_positions",
       "society_applications",
+      "society_teams",
       "society_areas",
     ]);
-    expect(editorial).toEqual(["society_drafts", "society_recent_content"]);
+    // DAS-REV-07 §6: «Un utente con soli permessi editoriali non riceve
+    // aggregati sportivi non autorizzati». "Aree di gestione" resta, perché
+    // "Profilo della società" è raggiungibile da chiunque apra la Dashboard.
+    expect(editorial).toEqual([
+      "society_drafts",
+      "society_recent_content",
+      "society_areas",
+    ]);
   });
 });
 
@@ -173,18 +211,37 @@ describe("composeQuickActions", () => {
   });
 
   it("withholds an action whose destination is not available yet", () => {
-    // `invites_create` è concessa, ma la feature è spenta: il contratto
-    // esiste, la CTA no. Una CTA senza destinazione è vietata da §4.
-    expect(DASHBOARD_FEATURES.society_invites.available).toBe(false);
+    // `content_create` è concessa, ma il composer Articolo non esiste: il
+    // contratto c'è, la CTA no. Una CTA senza destinazione è vietata da §4.
+    expect(DASHBOARD_FEATURES.society_article_composer.available).toBe(false);
 
-    const invited = identity("society", [
-      "dashboard_view",
-      "invites_create",
-    ]);
+    const editor = identity("society", ["dashboard_view", "content_create"]);
 
-    expect(composeQuickActions(invited)).not.toContain(
+    expect(composeQuickActions(editor)).not.toContain("society_new_article");
+  });
+
+  it("withholds the invite action from a member whose route rejects them", () => {
+    // DAS-REV-07 §11: l'azione apre «il flusso canonico di invito
+    // nell'organico». Per un membro autorizzato ma non proprietario quel
+    // flusso rimbalza, quindi l'azione non compare.
+    const member = identity("society", ["dashboard_view", "invites_create"]);
+
+    expect(composeQuickActions(member)).not.toContain("society_invite_person");
+    expect(
+      composeQuickActions({ ...member, isOwner: true }),
+    ).toContain("society_invite_person");
+  });
+
+  it("keeps at most two quick actions with mixed responsibilities", () => {
+    // §11: «mantenere al massimo due azioni principali anche con
+    // responsabilità miste, selezionate con una regola stabile». La regola è
+    // sportive prima di editoriali, non la quantità di dati di ciascun dominio.
+    const mixed = identity("society", FULL_SOCIETY, true);
+
+    expect(composeQuickActions(mixed)).toEqual([
+      "society_new_position",
       "society_invite_person",
-    );
+    ]);
   });
 
   it("gives a personal identity the search action", () => {

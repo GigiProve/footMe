@@ -63,7 +63,15 @@ export const PRIORITY_REGISTRY: Record<
     presentation: "card",
     resolution: "canonical_count_zero",
     source: "recruiting_applications.status = 'submitted'",
-    targetHref: (signal) => `/position/${signal.targetId}`,
+    // DAS-REV-07 §20: «Valuta candidature → Centro Candidature filtrato sul
+    // gruppo operativo indicato». `/position/[id]` è la scheda pubblica con
+    // la CTA "Candidati": da qui proporrebbe al club di candidarsi alla
+    // propria posizione. Il filtro è esplicito nel link, come §13 richiede,
+    // ed è volutamente diverso dalla "Vedi tutte" del modulo.
+    targetHref: (signal) =>
+      `/(tabs)/announcements?focus=applications&adId=${encodeURIComponent(
+        signal.targetId,
+      )}`,
     title: (signal) =>
       `${signal.count} ${plural(
         signal.count,

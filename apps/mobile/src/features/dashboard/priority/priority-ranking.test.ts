@@ -262,10 +262,15 @@ describe("rankPriorities", () => {
     expect(result.totalEligible).toBe(0);
   });
 
-  it("apre la destinazione canonica della Posizione, non una lista Dashboard", () => {
+  it("apre il centro Candidature filtrato sul gruppo, non una lista Dashboard", () => {
+    // DAS-REV-07 §20: «Valuta candidature → Centro Candidature filtrato sul
+    // gruppo operativo indicato». Il filtro è esplicito nel link e il
+    // riferimento è l'id della Posizione, mai il suo titolo.
     const result = rankPriorities({ ...base, signals: [signal()] });
 
-    expect(result.visible[0].href).toBe("/position/ad-1");
+    expect(result.visible[0].href).toBe(
+      "/(tabs)/announcements?focus=applications&adId=ad-1",
+    );
     expect(result.visible[0].actionLabel).toBe("Valuta candidature");
   });
 });

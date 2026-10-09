@@ -41,6 +41,20 @@ export type SocietyContentPreview = {
   title: string;
 };
 
+/**
+ * Riga di "Squadre del club" (DAS-REV-07 §15).
+ *
+ * Nome canonico e contesto leggero, niente altro: §15 vieta esplicitamente
+ * conteggi di giocatori o staff nella preview, e un campo restituito è un
+ * campo che prima o poi qualcuno disegna.
+ */
+export type SocietyTeamPreview = {
+  category: string | null;
+  id: string;
+  logoUrl: string | null;
+  name: string;
+};
+
 export type SocietyOverview = {
   /** Istante della verifica server-side di accesso e scope (§15). */
   accessVerifiedAt: string | null;
@@ -53,6 +67,17 @@ export type SocietyOverview = {
   dataRevision: number;
   draftsCount: number | null;
   draftsPreview: SocietyContentPreview[] | null;
+  /**
+   * Richieste in ingresso ancora da gestire (DAS-REV-07 §14).
+   *
+   * Oggi sempre `null`: il dominio non modella una richiesta di adesione in
+   * attesa — l'unico scrittore di `added_by = 'self_request'` inserisce una
+   * membership già `active`. §14 chiede di omettere l'aggregato non
+   * consultabile, non di mostrarlo a zero.
+   */
+  invitesIncomingCount: number | null;
+  /** Inviti in uscita ancora pendenti: `club_members.status = 'pending'`. */
+  invitesPendingCount: number | null;
   positionsOpenCount: number | null;
   /** Segnali normalizzati, già filtrati server-side per capability e scope. */
   prioritySignals: PrioritySignal[];
@@ -61,6 +86,8 @@ export type SocietyOverview = {
   recentContentPreview: SocietyContentPreview[] | null;
   scheduledCount: number | null;
   teamsCount: number | null;
+  /** null = non autorizzato; [] = autorizzato e nessuna squadra corrente. */
+  teamsPreview: SocietyTeamPreview[] | null;
 };
 
 type RawRecord = Record<string, unknown>;
@@ -73,12 +100,15 @@ type OverviewRow = {
   data_revision: number | string | null;
   drafts_count: number | null;
   drafts_preview: RawRecord[] | null;
+  invites_incoming_count: number | null;
+  invites_pending_count: number | null;
   positions_open_count: number | null;
   priority_signals: RawRecord[] | null;
   priority_total_count: number | null;
   recent_content_preview: RawRecord[] | null;
   scheduled_count: number | null;
   teams_count: number | null;
+  teams_preview: RawRecord[] | null;
 };
 
 function text(value: unknown, fallback = ""): string {
@@ -226,6 +256,29 @@ function mapApplications(
   });
 }
 
+function mapTeams(rows: RawRecord[] | null): SocietyTeamPreview[] | null {
+  if (rows === null) {
+    return null;
+  }
+
+  return rows.flatMap((row) => {
+    const id = nullableText(row.id);
+
+    if (!id) {
+      return [];
+    }
+
+    return [
+      {
+        category: nullableText(row.category),
+        id,
+        logoUrl: nullableText(row.logo_url),
+        name: text(row.name, "Squadra"),
+      },
+    ];
+  });
+}
+
 function mapContent(rows: RawRecord[] | null): SocietyContentPreview[] | null {
   if (rows === null) {
     return null;
@@ -304,11 +357,14 @@ export async function fetchSocietyOverview(
     dataRevision: revision,
     draftsCount: row?.drafts_count ?? null,
     draftsPreview: mapContent(row?.drafts_preview ?? null),
+    invitesIncomingCount: row?.invites_incoming_count ?? null,
+    invitesPendingCount: row?.invites_pending_count ?? null,
     positionsOpenCount: row?.positions_open_count ?? null,
     prioritySignals: mapSignals(row?.priority_signals ?? null, revision, roleLabel),
     priorityTotalCount: wholeNumber(row?.priority_total_count, 0),
     recentContentPreview: mapContent(row?.recent_content_preview ?? null),
     scheduledCount: row?.scheduled_count ?? null,
     teamsCount: row?.teams_count ?? null,
+    teamsPreview: mapTeams(row?.teams_preview ?? null),
   };
 }

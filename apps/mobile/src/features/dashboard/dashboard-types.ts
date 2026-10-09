@@ -15,9 +15,10 @@
 export type DashboardIdentityKind = "person" | "society" | "media";
 
 /**
- * Chiavi di capability del gruppo `dashboard_*`. Devono restare allineate al
- * CHECK di `club_member_permissions` (20261012090000_dashboard_foundation.sql):
- * una chiave che il database non accetta non potrà mai essere concessa.
+ * Chiavi di capability leggibili dalla Dashboard. Devono restare allineate al
+ * CHECK di `club_member_permissions` (20261012090000_dashboard_foundation.sql,
+ * esteso da 20261018090000_dashboard_society_overview.sql): una chiave che il
+ * database non accetta non potrà mai essere concessa.
  */
 export const DASHBOARD_CAPABILITIES = [
   "dashboard_view",
@@ -28,6 +29,13 @@ export const DASHBOARD_CAPABILITIES = [
   "content_view",
   "content_create",
   "invites_create",
+  // DAS-REV-07 §14: leggere lo stato degli inviti non è spedirne. Un
+  // amministratore può sapere a che punto è l'organico senza poter invitare.
+  "invites_view",
+  // DAS-REV-07 §16: la riga "Shortlist" di Aree di gestione si decide con la
+  // chiave del dominio Shortlist, che esiste dal 20260717090000, non con una
+  // regola nuova inventata nella Dashboard.
+  "shortlist_view",
 ] as const;
 
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];

@@ -72,6 +72,11 @@ export function isModuleEligible(
     return false;
   }
 
+  // 3-bis. la destinazione è ancora gated sul ruolo e non sulle capability
+  if (definition.requiresOwner && !identity.isOwner) {
+    return false;
+  }
+
   // 4. disponibilità reale della destinazione
   return isFeatureAvailable(definition.feature);
 }
@@ -106,8 +111,12 @@ export function composeQuickActions(
 
   if (
     identity.capabilities.includes("invites_create") &&
+    identity.isOwner &&
     isFeatureAvailable("society_invites")
   ) {
+    // `isOwner`: il flusso Inviti canonico vive in /club-admin/invites, che
+    // redirige chi non ha `profile.role === 'club_admin'`. §11 vuole che
+    // l'azione apra il flusso reale, non che rimbalzi un membro autorizzato.
     actions.push("society_invite_person");
   }
 
@@ -116,13 +125,21 @@ export function composeQuickActions(
     isFeatureAvailable("society_content_create")
   ) {
     // Il composer Società è uno solo: non si inventa una distinzione
-    // POST/ARTICLE che il dominio non ha. Il master mostra due pulsanti
-    // perché presuppone HOM-06.1 e HOM-06.2; qui ne esiste uno, e mostrarne
-    // due porterebbe alla stessa destinazione due volte.
+    // POST/ARTICLE che il dominio non ha. §17 mostra due pulsanti perché
+    // presuppone HOM-06.1 e HOM-06.2; qui ne esiste uno, e mostrarne due
+    // porterebbe alla stessa destinazione due volte.
     actions.push("society_new_post");
+
+    if (isFeatureAvailable("society_article_composer")) {
+      actions.push("society_new_article");
+    }
   }
 
-  return actions;
+  // §11: «Per questa panoramica mantenere al massimo due azioni principali
+  // anche con responsabilità miste, selezionate con una regola stabile.»
+  // La regola è l'ordine di costruzione qui sopra — sportive prima di
+  // editoriali — non il caso o la quantità di dati di ciascun dominio.
+  return actions.slice(0, 2);
 }
 
 export function composeDashboard(

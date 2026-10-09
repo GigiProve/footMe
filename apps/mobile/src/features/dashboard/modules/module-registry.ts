@@ -23,7 +23,9 @@ export const DASHBOARD_MODULE_IDS = [
   "personal_profile_suggestion",
   "society_applications",
   "society_areas",
+  "society_invites",
   "society_positions",
+  "society_teams",
   "society_drafts",
   "society_recent_content",
 ] as const;
@@ -64,6 +66,16 @@ export type ModuleDefinition = {
    * DAS-REV-02 non lo riscrive, lo sovrascrive temporaneamente.
    */
   order: number;
+  /**
+   * La destinazione del modulo è raggiungibile solo dal proprietario.
+   *
+   * Non è un permesso nuovo: è la constatazione che `app/club-admin/_layout`
+   * redirige chiunque non abbia `profile.role === 'club_admin'`. Esporre un
+   * modulo la cui CTA rimbalza un membro autorizzato violerebbe §16
+   * («Applicare i permessi a ogni voce») con l'aggravante di prometterlo.
+   * Quando quei centri passeranno alle capability, il flag sparisce.
+   */
+  requiresOwner?: boolean;
   /** Versione dello schema dati del modulo, per cache e rollout. */
   schemaVersion: number;
   title: string;
@@ -170,6 +182,48 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
     schemaVersion: 1,
     title: "Candidature ricevute",
   },
+  /**
+   * DAS-REV-07 §14. Riepilogo compatto di inviti e richieste, **non** un
+   * secondo centro Inviti: due quantità distinte e un accesso.
+   *
+   * `countsAsContent: false`: un riepilogo di inviti pendenti non dimostra
+   * che la Società abbia attività operativa da mostrare, e contarlo renderebbe
+   * irraggiungibile il primo utilizzo di §18 per qualunque club con un invito
+   * aperto.
+   */
+  society_invites: {
+    capabilitiesAll: ["invites_view"],
+    capabilitiesAny: [],
+    countsAsContent: false,
+    emptyPolicy: "hide",
+    feature: "society_invites",
+    id: "society_invites",
+    kinds: ["society"],
+    order: 30,
+    requiresOwner: true,
+    schemaVersion: 1,
+    title: "Inviti e richieste",
+  },
+  /**
+   * DAS-REV-07 §15. Titolo, conteggio reale, "Vedi tutte" e al massimo tre
+   * squadre in ordine sportivo.
+   *
+   * Prima di questa task le Squadre esistevano solo come riga dentro "Aree di
+   * gestione": §7 vieta di mostrare entrambe le forme nella stessa
+   * composizione, quindi la riga lascia il posto al modulo.
+   */
+  society_teams: {
+    capabilitiesAll: ["teams_view"],
+    capabilitiesAny: [],
+    countsAsContent: true,
+    emptyPolicy: "hide",
+    feature: "society_teams",
+    id: "society_teams",
+    kinds: ["society"],
+    order: 40,
+    schemaVersion: 1,
+    title: "Squadre del club",
+  },
   society_drafts: {
     capabilitiesAll: ["content_view"],
     capabilitiesAny: [],
@@ -178,7 +232,7 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
     feature: "society_drafts",
     id: "society_drafts",
     kinds: ["society"],
-    order: 30,
+    order: 50,
     schemaVersion: 1,
     title: "Bozze e programmati",
   },
@@ -190,22 +244,29 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
     feature: "society_recent_content",
     id: "society_recent_content",
     kinds: ["society"],
-    order: 40,
+    order: 60,
     schemaVersion: 1,
     title: "Contenuti recenti",
   },
+  /**
+   * DAS-REV-07 §16: accessi gestionali secondari, in fondo alla pagina.
+   *
+   * Non ha più niente a che vedere con Posizioni e Squadre, che ora sono
+   * moduli propri: le quattro righe sono Shortlist, Amministratori e
+   * permessi, Società collegate e Profilo della società. "Profilo della
+   * società" è sempre disponibile a chi ha accesso alla Dashboard, quindi il
+   * modulo non ha capability proprie — le ha ciascuna riga.
+   */
   society_areas: {
     capabilitiesAll: [],
-    // Il modulo "Aree di gestione" esiste se almeno una delle due righe è
-    // autorizzata: ciascuna riga viene poi filtrata separatamente.
-    capabilitiesAny: ["positions_view", "teams_view"],
+    capabilitiesAny: [],
     countsAsContent: false,
     emptyPolicy: "hide",
-    feature: "society_positions",
+    feature: "society_management_areas",
     id: "society_areas",
     kinds: ["society"],
-    order: 50,
-    schemaVersion: 1,
+    order: 70,
+    schemaVersion: 2,
     title: "Aree di gestione",
   },
 };

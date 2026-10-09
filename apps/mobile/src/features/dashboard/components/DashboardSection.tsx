@@ -12,6 +12,12 @@ type Props = {
    * alla lista quando tutte le preview sono già mostrate più in alto.
    */
   children?: ReactNode;
+  /**
+   * Conteggio o contesto accanto al titolo ("8 squadre"), grigio e non
+   * tappabile: DAS-REV-07 §15 lo vuole fra il titolo e la CTA. Non è una
+   * seconda azione e non compete con "Vedi tutte".
+   */
+  meta?: string | null;
   title: string;
 };
 
@@ -22,13 +28,19 @@ type Props = {
  * reader annuncia un'intestazione e un pulsante invece di un unico blocco
  * ambiguo.
  */
-export function DashboardSection({ action, children, title }: Props) {
+export function DashboardSection({ action, children, meta, title }: Props) {
   return (
     <View style={styles.block}>
       <View style={styles.header}>
         <AppText accessibilityRole="header" style={styles.title} variant="headingSm">
           {title}
         </AppText>
+
+        {meta ? (
+          <AppText color="secondary" numberOfLines={1} variant="meta">
+            {meta}
+          </AppText>
+        ) : null}
 
         {action ? (
           <Pressable
@@ -142,8 +154,10 @@ const styles = StyleSheet.create({
     gap: spacing[12],
     justifyContent: "space-between",
   },
+  // `flex: 1` e non `flexShrink`: il titolo assorbe lo spazio libero, così
+  // conteggio e CTA restano appaiati a destra invece di distribuirsi.
   title: {
-    flexShrink: 1,
+    flex: 1,
   },
   pressed: {
     opacity: 0.6,

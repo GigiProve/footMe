@@ -8,7 +8,7 @@ import {
 } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Screen } from "../../components/ui/screen";
@@ -50,7 +50,9 @@ import {
   type AreaRowItem,
 } from "./components/DashboardAreaRow";
 import { DashboardEntityRow } from "./components/DashboardEntityRow";
+import { DashboardFirstRun } from "./components/DashboardFirstRun";
 import { DashboardIdentityRow } from "./components/DashboardIdentityRow";
+import { DashboardInvitesRow } from "./components/DashboardInvitesRow";
 import { DashboardIdentitySheet } from "./components/DashboardIdentitySheet";
 import {
   DashboardPriority,
@@ -96,6 +98,7 @@ import {
   trackPriorityTap,
   trackSelectorOpened,
 } from "./dashboard-analytics";
+import type { DashboardIdentity } from "./dashboard-types";
 import { DASHBOARD_QK } from "./dashboard-keys";
 import { useDashboardCache } from "./cache/use-dashboard-cache";
 import { STALE_MS } from "./cache/freshness-policy";
@@ -122,6 +125,14 @@ import {
   type SavedUpdateRow,
 } from "./personal/saved-positions-presentation";
 import { useToggleDashboardSavedAd } from "./personal/use-toggle-saved-ad";
+import {
+  buildManagementAreas,
+  societyApplicationStatusLabel,
+  societyFirstRunProposals,
+  societyInviteLines,
+  SOCIETY_HREFS,
+  teamContextLabel,
+} from "./society/society-presentation";
 import { applyPromotion } from "./priority/module-order";
 import { rankPriorities } from "./priority/priority-ranking";
 import type {
@@ -756,6 +767,63 @@ export function DashboardFoundation() {
     societyQuery,
   ]);
 
+  // ── Riconciliazione al ritorno dai flussi (§22) ─────────────────────────
+  //
+  // La Dashboard manda l'actor dentro flussi che **mutano** il dominio: una
+  // Posizione pubblicata o chiusa, una candidatura valutata, un invito
+  // accettato. Tornare indietro su totali, priorità e preview della
+  // schermata precedente mostrerebbe un lavoro che non esiste più.
+  //
+  // Non è un ricaricamento incondizionato: §22 chiede di «verificare
+  // freshness e accesso» e vieta di «forzare un caricamento completo se la
+  // cache è ancora utilizzabile». Si aggiorna solo ciò che è davvero stale,
+  // e il primo focus — che è il montaggio — non aggiorna niente.
+
+  const hasFocusedRef = useRef(false);
+
+  useEffect(() => {
+    hasFocusedRef.current = false;
+  }, [contextToken]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedRef.current) {
+        hasFocusedRef.current = true;
+        return;
+      }
+
+      const now = Date.now();
+      const refetchIfStale = (query: {
+        dataUpdatedAt: number;
+        refetch: () => unknown;
+      }) => {
+        if (now - query.dataUpdatedAt >= STALE_MS.operational) {
+          query.refetch();
+        }
+      };
+
+      if (isSociety) {
+        refetchIfStale(societyQuery);
+        refetchIfStale(positionsQuery);
+      } else {
+        refetchIfStale(personalQuery);
+        refetchIfStale(applicationsQuery);
+        refetchIfStale(savedPositionsQuery);
+      }
+
+      // Il ritorno da un'azione è un momento sicuro: l'ordine proposto può
+      // essere applicato senza spostare la pagina sotto le dita (§7).
+      setSafePoint((value) => value + 1);
+    }, [
+      applicationsQuery,
+      isSociety,
+      personalQuery,
+      positionsQuery,
+      savedPositionsQuery,
+      societyQuery,
+    ]),
+  );
+
   function openSelector() {
     trackSelectorOpened(identities.length);
     setSheetOpen(true);
@@ -869,6 +937,17 @@ export function DashboardFoundation() {
   if (pageState === "empty") {
     const copy = emptyCopy(composition.quickActions, isSociety);
     const action = emptyAction(composition.quickActions, go);
+    /**
+     * §18, master 04: una Società appena attivata non riceve il Global Empty
+     * generico ma "Inizia da qui" con al massimo due proposte autorizzate.
+     *
+     * Le proposte **sono** le azioni rapide di questo stato: §11 vieta di
+     * duplicarle in una sezione "Azioni rapide" accanto, e §18 vieta il
+     * riepilogo pieno di zeri sopra di esse.
+     */
+    const firstRun = isSociety
+      ? societyFirstRunProposals(composition.quickActions)
+      : [];
 
     return (
       <Screen>
@@ -883,6 +962,25 @@ export function DashboardFoundation() {
             />
           ) : null}
 
+          {firstRun.length > 0 ? (
+            <DashboardFirstRun
+              proposals={firstRun.map((proposal) => ({
+                actionLabel: proposal.actionLabel,
+                body: proposal.body,
+                icon: proposal.icon,
+                id: proposal.id,
+                onPress: () => {
+                  trackDashboardEmpty({
+                    hasAction: true,
+                    identityKind: current.kind,
+                    interaction: "cta",
+                  });
+                  go(`society_first_run_${proposal.id}`, proposal.href);
+                },
+                title: proposal.title,
+              }))}
+            />
+          ) : (
           <DashboardGlobalEmpty
             copy={copy}
             onAction={
@@ -898,6 +996,7 @@ export function DashboardFoundation() {
                 : null
             }
           />
+          )}
         </ScrollView>
 
         <DashboardIdentitySheet
@@ -964,6 +1063,19 @@ export function DashboardFoundation() {
       : null;
 
   const quickActions = buildQuickActions(composition.quickActions, go);
+
+  /**
+   * §7 e §12: quando le candidature da gestire promuovono il proprio modulo a
+   * principale, le Posizioni non ripetono anche un'anteprima completa e si
+   * riducono all'accesso compatto con conteggio dei master 01 e 05.
+   *
+   * Dipende dalla promozione, non da una variante di schermata: è lo stesso
+   * container in una condizione diversa.
+   */
+  const isPositionsCompact =
+    isSociety && order.modules.some((module) => module.id === "society_positions")
+      ? ranking.promotedModuleId === "society_applications"
+      : false;
 
   /**
    * Deduplicazione della presentazione (§12).
@@ -1049,6 +1161,8 @@ export function DashboardFoundation() {
         {order.modules.map((module) => (
           <ModuleRenderer
             key={module.id}
+            identity={current}
+            isPositionsCompact={isPositionsCompact}
             moduleId={module.id}
             now={rankedAt}
             onNavigate={go}
@@ -1195,12 +1309,16 @@ function moduleRowCounts(input: {
       : null,
     society_areas: society ? 1 : null,
     society_drafts: society ? (society.draftsPreview?.length ?? 0) : null,
+    // DAS-REV-07 §14: il modulo esiste quando almeno un aggregato è
+    // consultabile. Un aggregato `null` non è uno zero da disegnare.
+    society_invites: society ? societyInviteLines(society).length : null,
     society_positions: input.positionsFailed
       ? null
       : (input.positions?.length ?? null),
     society_recent_content: society
       ? (society.recentContentPreview?.length ?? 0)
       : null,
+    society_teams: society ? (society.teamsPreview?.length ?? 0) : null,
   };
 }
 
@@ -1248,6 +1366,18 @@ function emptyCopy(
   isSociety: boolean,
 ): DashboardEmptyCopy {
   if (isSociety) {
+    // DAS-REV-07 §18: «Con soli permessi di consultazione usare un empty
+    // state informativo senza azioni non consentite.» Con le azioni invece
+    // disponibili non si arriva qui: lo stato è "Inizia da qui" (master 04).
+    if (quickActions.length === 0) {
+      return {
+        actionLabel: "",
+        body: "Qui compariranno posizioni, candidature e attività del club.",
+        icon: "business-outline",
+        title: "Nessuna attività da mostrare",
+      };
+    }
+
     return {
       actionLabel: "Nuova posizione",
       body: "Pubblica una posizione per iniziare a ricevere candidature.",
@@ -1286,7 +1416,7 @@ function emptyAction(
   go: (moduleId: string, href: string) => void,
 ): (() => void) | null {
   if (quickActions.includes("society_new_position")) {
-    return () => go("society_empty_cta", "/(tabs)/announcements");
+    return () => go("society_empty_cta", SOCIETY_HREFS.positions());
   }
 
   if (quickActions.includes("personal_search_positions")) {
@@ -1457,23 +1587,34 @@ function buildQuickActions(
           icon: "add-outline" as const,
           id,
           label: "Nuova posizione",
-          onPress: () => go(id, "/(tabs)/announcements"),
+          onPress: () => go(id, SOCIETY_HREFS.positions()),
         };
       case "society_invite_person":
         return {
           icon: "person-add-outline" as const,
           id,
           label: "Invita persona",
-          onPress: () => go(id, "/club-admin/invites"),
+          onPress: () => go(id, SOCIETY_HREFS.invites),
+        };
+      case "society_new_article":
+        return {
+          icon: "document-text-outline" as const,
+          id,
+          label: "Nuovo articolo",
+          onPress: () => go(id, SOCIETY_HREFS.contentComposer),
         };
       case "society_new_post":
-      case "society_new_article":
       default:
+        // §17 chiede "Nuovo post" e "Nuovo articolo" con capability proprie.
+        // Il dominio editoriale della Società ha un composer solo e nessuna
+        // distinzione POST/ARTICLE (`club_media_posts.kind` è highlights,
+        // interview, market, …), quindi la label resta quella onesta finché
+        // HOM-06.1/06.2 non introducono le due tipologie.
         return {
           icon: "create-outline" as const,
           id,
           label: "Nuovo contenuto",
-          onPress: () => go(id, "/(tabs)/profile?compose=club"),
+          onPress: () => go(id, SOCIETY_HREFS.contentComposer),
         };
     }
   });
@@ -1485,6 +1626,14 @@ type ModuleRendererProps = {
   applications: PersonalApplicationsData | null | undefined;
   applicationsError: boolean;
   applicationsRetrying: boolean;
+  /**
+   * Identità corrente: serve alle righe di "Aree di gestione", che §16 vuole
+   * filtrate una per una. Il renderer non ricava permessi dai dati — un
+   * elenco non è una prova di autorizzazione.
+   */
+  identity: DashboardIdentity | null;
+  /** §12: le Posizioni si riducono all'accesso compatto dei master 01 e 05. */
+  isPositionsCompact: boolean;
   moduleId: DashboardModuleId;
   /** Istante congelato del render, per le etichette relative (§28). */
   now: number;
@@ -1524,6 +1673,8 @@ function ModuleRenderer({
   applications,
   applicationsError,
   applicationsRetrying,
+  identity,
+  isPositionsCompact,
   moduleId,
   now,
   onNavigate,
@@ -1855,11 +2006,42 @@ function ModuleRenderer({
     }
 
     case "society_positions":
+      /**
+       * DAS-REV-07 §12: nei master 01 e 05 le Posizioni sono rappresentate
+       * «dal solo accesso compatto Posizioni aperte · {numero} ›», senza
+       * ripetere anche un'anteprima completa — e §16 vieta di anteporvi
+       * l'intestazione "Aree di gestione".
+       *
+       * La condizione non è il ruolo né una variante di schermata: è la
+       * promozione di DAS-REV-02. Quando le candidature da gestire diventano
+       * il modulo principale, le Posizioni si riducono all'accesso.
+       */
+      if (isPositionsCompact) {
+        if (!society || society.positionsOpenCount === null) {
+          return null;
+        }
+
+        return (
+          <DashboardAreaRows
+            items={[
+              {
+                count: society.positionsOpenCount,
+                icon: "briefcase-outline",
+                id: "positions",
+                onPress: () =>
+                  onNavigate(moduleId, SOCIETY_HREFS.positions()),
+                title: "Posizioni aperte",
+              },
+            ]}
+          />
+        );
+      }
+
       return (
         <DataModule
           action={{
             label: "Gestisci",
-            onPress: () => onNavigate(moduleId, "/(tabs)/announcements"),
+            onPress: () => onNavigate(moduleId, SOCIETY_HREFS.positions()),
           }}
           emptyMessage="Nessuna posizione aperta."
           // Copy specifica richiesta da §18 per questo modulo.
@@ -1873,10 +2055,15 @@ function ModuleRenderer({
         >
           {(positions ?? []).map((item, index) => (
             <DashboardEntityRow
-              icon="shirt-outline"
+              icon="briefcase-outline"
               key={item.id}
               meta={[item.teamName, item.category].filter(Boolean).join(" · ")}
-              onPress={() => onNavigate(moduleId, `/position/${item.id}`)}
+              // §12: il dettaglio **gestionale** della Position. `/position/[id]`
+              // è la scheda pubblica con la CTA "Candidati": aprirla da qui
+              // offrirebbe al club di candidarsi alla propria posizione.
+              onPress={() =>
+                onNavigate(moduleId, SOCIETY_HREFS.positions(item.id))
+              }
               showDivider={index > 0}
               title={getPlayerPositionLabel(item.role, item.role)}
             />
@@ -1889,7 +2076,7 @@ function ModuleRenderer({
         <DataModule
           action={{
             label: "Vedi tutte",
-            onPress: () => onNavigate(moduleId, "/(tabs)/announcements"),
+            onPress: () => onNavigate(moduleId, SOCIETY_HREFS.applications()),
           }}
           emptyMessage="Nessuna candidatura ricevuta."
           errorMessage="Non siamo riusciti a caricare le candidature."
@@ -1903,19 +2090,97 @@ function ModuleRenderer({
               avatarName={item.name}
               avatarUrl={item.avatarUrl}
               key={item.id}
+              // §13: il contesto identifica **la posizione e la squadra
+              // oggetto della candidatura**, non un ruolo personale del
+              // candidato.
               meta={[
                 getPlayerPositionLabel(item.role, item.role),
                 item.teamName,
               ]
                 .filter(Boolean)
                 .join(" · ")}
-              onPress={() => onNavigate(moduleId, `/position/${item.adId}`)}
-              showDivider={index > 0}
-              status={
-                APPLICATION_STATUS_LABELS[
-                  item.status as keyof typeof APPLICATION_STATUS_LABELS
-                ] ?? null
+              // §13: il tap apre la candidatura nel suo gruppo, non il profilo
+              // pubblico della persona. Due candidature della stessa persona
+              // restano due righe con contesti distinti.
+              onPress={() =>
+                onNavigate(moduleId, SOCIETY_HREFS.applications(item.adId))
               }
+              showDivider={index > 0}
+              // §10: lo stesso lifecycle letto dal lato Società — "Nuova" al
+              // posto di "Inviata". Non è uno stato in più: è chi guarda che
+              // cambia.
+              status={societyApplicationStatusLabel(item.status)}
+              title={item.name}
+            />
+          ))}
+        </DataModule>
+      );
+
+    case "society_invites": {
+      if (!society) {
+        return null;
+      }
+
+      const lines = societyInviteLines(society);
+
+      if (lines.length === 0) {
+        return null;
+      }
+
+      return (
+        <DashboardSection
+          action={{
+            label: "Gestisci",
+            onPress: () => onNavigate(moduleId, SOCIETY_HREFS.invites),
+          }}
+          title={title}
+        >
+          <DashboardInvitesRow
+            lines={lines}
+            onPress={() => onNavigate(moduleId, SOCIETY_HREFS.invites)}
+          />
+        </DashboardSection>
+      );
+    }
+
+    case "society_teams":
+      return (
+        <DataModule
+          action={{
+            label: "Vedi tutte",
+            onPress: () => onNavigate(moduleId, SOCIETY_HREFS.teams),
+          }}
+          emptyMessage="Nessuna squadra."
+          errorMessage="Non siamo riusciti a caricare le squadre."
+          hasData={!!society}
+          hideWhenEmpty
+          isEmpty={(society?.teamsPreview ?? []).length === 0}
+          isError={societyError}
+          // §15: il conteggio è quello del centro di destinazione, non le tre
+          // righe della preview. Una squadra privata resta visibile a chi la
+          // amministra, quindi può differire dal totale del profilo pubblico.
+          titleMeta={
+            society?.teamsCount !== null && society?.teamsCount !== undefined
+              ? `${society.teamsCount} ${plural(
+                  society.teamsCount,
+                  "squadra",
+                  "squadre",
+                )}`
+              : null
+          }
+          title={title}
+        >
+          {(society?.teamsPreview ?? []).map((item, index) => (
+            <DashboardEntityRow
+              icon="shield-outline"
+              key={item.id}
+              meta={teamContextLabel(item.name, item.category)}
+              // §15 vieta di sostituire la destinazione gestionale con il
+              // profilo pubblico del Team. Il dettaglio operativo non esiste
+              // ancora (`society_team_detail` è bloccata), quindi la riga
+              // apre il centro Squadre invece di un percorso sbagliato.
+              onPress={() => onNavigate(moduleId, SOCIETY_HREFS.teams)}
+              showDivider={index > 0}
               title={item.name}
             />
           ))}
@@ -1983,31 +2248,26 @@ function ModuleRenderer({
       );
 
     case "society_areas": {
-      if (!society) {
+      /**
+       * DAS-REV-07 §16: accessi gestionali, non un riepilogo bis.
+       *
+       * Niente conteggi su queste righe: Posizioni e Squadre hanno moduli
+       * propri, e §7 vieta che lo stesso dominio compaia due volte nella
+       * stessa composizione.
+       */
+      if (!identity) {
         return null;
       }
 
-      const items: AreaRowItem[] = [];
-
-      if (society.positionsOpenCount !== null) {
-        items.push({
-          count: society.positionsOpenCount,
-          icon: "briefcase-outline",
-          id: "positions",
-          onPress: () => onNavigate(moduleId, "/(tabs)/announcements"),
-          title: "Posizioni aperte",
-        });
-      }
-
-      if (society.teamsCount !== null) {
-        items.push({
-          count: society.teamsCount,
-          icon: "people-circle-outline",
-          id: "teams",
-          onPress: () => onNavigate(moduleId, "/club-admin/teams"),
-          title: "Squadre del club",
-        });
-      }
+      const items: AreaRowItem[] = buildManagementAreas(identity).map(
+        (area) => ({
+          count: null,
+          icon: area.icon,
+          id: area.id,
+          onPress: () => onNavigate(moduleId, area.href),
+          title: area.title,
+        }),
+      );
 
       if (items.length === 0) {
         return null;
@@ -2054,6 +2314,11 @@ type DataModuleProps = {
   isRetrying?: boolean;
   onRetry?: () => void;
   title: string;
+  /**
+   * Conteggio reale accanto al titolo (§15: «Mostrare titolo, conteggio reale
+   * e Vedi tutte»). Non è il numero di righe della preview.
+   */
+  titleMeta?: string | null;
 };
 
 /**
@@ -2082,6 +2347,7 @@ function DataModule({
   isRetrying = false,
   onRetry,
   title,
+  titleMeta = null,
 }: DataModuleProps) {
   if (!hasData && isError) {
     return (
@@ -2121,7 +2387,7 @@ function DataModule({
   }
 
   return (
-    <DashboardSection action={action} title={title}>
+    <DashboardSection action={action} meta={titleMeta} title={title}>
       <View>{children}</View>
     </DashboardSection>
   );

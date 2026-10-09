@@ -14,6 +14,7 @@ type IdentityRow = {
   is_owner: boolean;
   is_verified: boolean;
   name: string;
+  scope_label: string | null;
 };
 
 const KINDS: readonly DashboardIdentityKind[] = ["person", "society", "media"];
@@ -60,10 +61,14 @@ export async function fetchDashboardIdentities(): Promise<DashboardIdentity[]> {
       isVerified: row.is_verified,
       kind: row.identity_kind,
       name: row.name,
-      // Lo scope multiplo non è ancora modellato nel backend: la colonna
-      // esiste nel tipo client perché §10 la richiede, e resta null finché
-      // il pack competente non introduce l'assegnazione per Squadra.
-      scopeLabel: null,
+      // DAS-REV-07 §5: l'ambito arriva dal server insieme alle capability.
+      // Il client non lo deduce guardando quali squadre compaiono nelle
+      // preview — sarebbe inferire un'autorizzazione dal contenuto di un
+      // elenco, che DAS-REV-01 §15 vieta.
+      scopeLabel:
+        typeof row.scope_label === "string" && row.scope_label.length > 0
+          ? row.scope_label
+          : null,
     });
 
     return identities;
