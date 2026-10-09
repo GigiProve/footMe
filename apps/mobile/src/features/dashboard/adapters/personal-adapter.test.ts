@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  fetchPersonalApplications,
   fetchPersonalDashboard,
   fetchPersonalSavedPositions,
+  isPersonalApplicationsData,
   isPersonalDashboardData,
 } from "./personal-adapter";
 
@@ -34,24 +36,9 @@ function overviewResponse(row: Record<string, unknown>) {
 }
 
 describe("fetchPersonalDashboard", () => {
-  it("maps counts, previews, updates and signals", async () => {
+  it("maps counts and signals", async () => {
     overviewResponse({
       active_applications_count: 3,
-      applications_preview: [
-        {
-          ad_id: "ad1",
-          category: "Eccellenza",
-          club_logo_url: "logo.png",
-          club_name: "Varese Calcio",
-          created_at: "2026-09-01T10:00:00Z",
-          id: "app1",
-          last_event_at: "2026-09-05T10:00:00Z",
-          last_event_to: "reviewing",
-          role: "forward",
-          status: "reviewing",
-          team_name: "Prima squadra",
-        },
-      ],
       deadlines_total_count: 5,
       optional_suggestion: {
         href: "/profile/edit/opportunities",
@@ -79,19 +66,6 @@ describe("fetchPersonalDashboard", () => {
       ],
       priority_total_count: 6,
       profile_requirements: [],
-      recent_updates: [
-        {
-          ad_id: "ad1",
-          application_id: "app1",
-          club_logo_url: "logo.png",
-          club_name: "AC Como",
-          event_status: "reviewing",
-          occurred_at: "2026-09-05T10:00:00Z",
-          role: "forward",
-          status: "reviewing",
-          team_name: "Prima squadra",
-        },
-      ],
       saved_positions_count: 6,
     });
 
@@ -99,13 +73,6 @@ describe("fetchPersonalDashboard", () => {
 
     expect(data.activeApplicationsCount).toBe(3);
     expect(data.savedPositionsCount).toBe(6);
-    expect(data.applications[0]).toMatchObject({
-      category: "Eccellenza",
-      id: "app1",
-      lastEventTo: "reviewing",
-      teamName: "Prima squadra",
-    });
-    expect(data.recentUpdates[0].applicationId).toBe("app1");
     expect(data.deadlinesTotalCount).toBe(5);
     expect(data.optionalSuggestion?.href).toBe("/profile/edit/opportunities");
     expect(data.policy).toEqual({ promotionWindowDays: 7, recencyDays: 7 });
@@ -128,8 +95,7 @@ describe("fetchPersonalDashboard", () => {
 
     const data = await fetchPersonalDashboard();
 
-    expect(data.applications).toEqual([]);
-    expect(data.recentUpdates).toEqual([]);
+    expect(data.activeApplicationsCount).toBe(0);
     expect(data.prioritySignals).toEqual([]);
     expect(data.requirements).toEqual([]);
     expect(data.optionalSuggestion).toBeNull();
@@ -142,6 +108,107 @@ describe("fetchPersonalDashboard", () => {
     });
 
     await expect(fetchPersonalDashboard()).rejects.toThrow("boom");
+  });
+});
+
+describe("fetchPersonalApplications", () => {
+  it("maps previews, updates and the history indicator", async () => {
+    overviewResponse({
+      applications_preview: [
+        {
+          ad_id: "ad1",
+          category: "Eccellenza",
+          club_logo_url: "logo.png",
+          club_name: "Varese Calcio",
+          created_at: "2026-09-01T10:00:00Z",
+          has_unread_update: true,
+          id: "app1",
+          last_event_at: "2026-09-05T10:00:00Z",
+          last_event_id: "ev1",
+          last_event_kind: "status_change",
+          last_event_to: "reviewing",
+          position_accepting: false,
+          role: "forward",
+          status: "reviewing",
+          team_name: "Prima squadra",
+        },
+      ],
+      has_completed: true,
+      recent_updates: [
+        {
+          acknowledged: false,
+          ad_id: "ad2",
+          application_id: "app2",
+          club_logo_url: "logo.png",
+          club_name: "AC Como",
+          event_id: "ev2",
+          event_kind: "selection_completed",
+          event_status: null,
+          is_completed: true,
+          occurred_at: "2026-09-05T10:00:00Z",
+          role: "forward",
+          status: "reviewing",
+          team_name: "Prima squadra",
+        },
+      ],
+    });
+
+    const data = await fetchPersonalApplications();
+
+    expect(data.applications[0]).toMatchObject({
+      hasUnreadUpdate: true,
+      id: "app1",
+      lastEventId: "ev1",
+      // §7: la posizione non accetta più, ma la candidatura resta "reviewing".
+      positionAccepting: false,
+      status: "reviewing",
+    });
+    expect(data.recentUpdates[0]).toMatchObject({
+      applicationId: "app2",
+      eventId: "ev2",
+      eventKind: "selection_completed",
+      isCompleted: true,
+      // §7: lo stato reale non viene riscritto dalla conclusione.
+      status: "reviewing",
+    });
+    expect(data.hasCompleted).toBe(true);
+  });
+
+  /**
+   * §7: «In dubbio la posizione accetta». Dichiararla chiusa è
+   * un'affermazione sul dominio, e un campo assente non la autorizza.
+   */
+  it("does not infer a closed position from a missing field", async () => {
+    overviewResponse({
+      applications_preview: [
+        {
+          ad_id: "ad1",
+          category: null,
+          club_logo_url: null,
+          club_name: "Varese Calcio",
+          created_at: "2026-09-01T10:00:00Z",
+          id: "app1",
+          role: "forward",
+          status: "submitted",
+          team_name: null,
+        },
+      ],
+    });
+
+    const data = await fetchPersonalApplications();
+
+    expect(data.applications[0].positionAccepting).toBe(true);
+    expect(data.applications[0].hasUnreadUpdate).toBe(false);
+    expect(data.hasCompleted).toBe(false);
+  });
+
+  it("propagates the source error instead of showing no applications", async () => {
+    mocks.rpc.mockReturnValue({
+      maybeSingle: () =>
+        Promise.resolve({ data: null, error: new Error("boom") }),
+    });
+
+    await expect(fetchPersonalApplications()).rejects.toThrow("boom");
   });
 });
 
@@ -177,9 +244,13 @@ describe("fetchPersonalSavedPositions", () => {
 });
 
 describe("isPersonalDashboardData", () => {
+  /**
+   * DAS-REV-04 ha tolto preview e aggiornamenti dal riepilogo. Un record di
+   * cache della forma precedente non deve essere riusato come se contenesse
+   * un conteggio: §19 vieta che una response obsoleta riporti dati
+   * inconsistenti nella Dashboard.
+   */
   it("rejects a cache record written by an older schema", () => {
-    expect(isPersonalDashboardData({ applications: [] })).toBe(false);
-    expect(isPersonalDashboardData(null)).toBe(false);
     expect(
       isPersonalDashboardData({
         applications: [],
@@ -187,6 +258,24 @@ describe("isPersonalDashboardData", () => {
         recentUpdates: [],
         requirements: [],
       }),
+    ).toBe(false);
+    expect(isPersonalDashboardData(null)).toBe(false);
+    expect(
+      isPersonalDashboardData({
+        activeApplicationsCount: 0,
+        prioritySignals: [],
+        requirements: [],
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("isPersonalApplicationsData", () => {
+  it("accepts only a record with both collections", () => {
+    expect(isPersonalApplicationsData({ applications: [] })).toBe(false);
+    expect(isPersonalApplicationsData(null)).toBe(false);
+    expect(
+      isPersonalApplicationsData({ applications: [], recentUpdates: [] }),
     ).toBe(true);
   });
 });

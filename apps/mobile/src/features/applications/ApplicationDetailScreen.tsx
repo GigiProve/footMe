@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -6,10 +6,17 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { useSession } from "../auth/use-session";
 import { getPlayerPositionLabel } from "../profiles/player-sports";
-import { APPLICATION_STATUS_LABELS } from "../recruiting/recruiting-service";
 import { formatUpdateLabel } from "../dashboard/personal/personal-presentation";
+import { acknowledgeApplicationEvent } from "../dashboard/adapters/personal-adapter";
 import { colors, radius, spacing } from "../../theme/tokens";
 import { AppText, Avatar, Badge, Button, EmptyState, Skeleton } from "../../ui";
+import {
+  applicationStatusLabel,
+  formatOutcomeLine,
+  POSITION_CLOSED_A11Y,
+  POSITION_CLOSED_NOTE,
+  SELECTION_COMPLETED_LABEL,
+} from "./application-presentation";
 import { fetchApplicationDetail } from "./applications-service";
 
 /**
@@ -30,6 +37,11 @@ import { fetchApplicationDetail } from "./applications-service";
  * esplicito nel vietare che una scrittura qualsiasi diventi la data di un
  * aggiornamento professionale. Una candidatura senza eventi non ne ha avuti,
  * e lo dice.
+ *
+ * DAS-REV-04 aggiunge qui tre cose e nessuna UX nuova: il metadato della
+ * posizione chiusa (§7), l'esito reale di una candidatura conclusa (§14) e
+ * l'acknowledgement dell'ultimo evento (§12), inviato solo dopo che il
+ * dettaglio si è davvero caricato.
  */
 export function ApplicationDetailScreen() {
   const router = useRouter();
@@ -47,6 +59,12 @@ export function ApplicationDetailScreen() {
   // Istante congelato all'apertura: le etichette relative (oggi, ieri)
   // non devono cambiare durante la permanenza sulla schermata.
   const [now] = useState(() => Date.now());
+
+  // §12: «inviarlo dopo il caricamento riuscito della destinazione
+  // pertinente», riferito all'evento effettivamente consultato — qui il più
+  // recente, che è quello mostrato in cima al percorso. Un evento arrivato
+  // dopo avrà un id diverso e non viene coperto da questo ack.
+  useLatestEventAck(detail?.events[0]?.id ?? null);
 
   return (
     <>
@@ -101,17 +119,34 @@ export function ApplicationDetailScreen() {
           </View>
 
           <View style={styles.statusRow}>
-            <Badge
-              label={
-                APPLICATION_STATUS_LABELS[
-                  detail.status as keyof typeof APPLICATION_STATUS_LABELS
-                ] ?? detail.status
-              }
-            />
+            {/* §7: lo stato reale resta quello che è. Una selezione conclusa
+                non lo riscrive in "Rifiutata". */}
+            <Badge label={applicationStatusLabel(detail.status)} />
             <AppText color="muted" variant="caption">
               {`Inviata il ${new Date(detail.createdAt).toLocaleDateString("it-IT")}`}
             </AppText>
           </View>
+
+          {detail.group === "completed" ? (
+            <AppText color="secondary" style={styles.contextLine} variant="bodySm">
+              {formatOutcomeLine({
+                concludedAt: detail.concludedAt,
+                outcome: detail.outcome,
+                status: detail.status,
+              })}
+            </AppText>
+          ) : !detail.positionAccepting ? (
+            // §7: la posizione non accetta più candidature, la selezione
+            // prosegue. Metadato, non stato terminale.
+            <AppText
+              accessibilityLabel={POSITION_CLOSED_A11Y}
+              color="secondary"
+              style={styles.contextLine}
+              variant="bodySm"
+            >
+              {POSITION_CLOSED_NOTE}
+            </AppText>
+          ) : null}
 
           <AppText accessibilityRole="header" style={styles.sectionTitle} variant="headingSm">
             Percorso
@@ -126,9 +161,9 @@ export function ApplicationDetailScreen() {
               {detail.events.map((event) => (
                 <View key={event.id} style={styles.timelineRow}>
                   <AppText variant="titleSm">
-                    {APPLICATION_STATUS_LABELS[
-                      event.toStatus as keyof typeof APPLICATION_STATUS_LABELS
-                    ] ?? event.toStatus}
+                    {event.kind === "selection_completed" || !event.toStatus
+                      ? SELECTION_COMPLETED_LABEL
+                      : applicationStatusLabel(event.toStatus)}
                   </AppText>
                   <AppText color="muted" variant="caption">
                     {formatUpdateLabel(event.occurredAt, now)}
@@ -163,6 +198,28 @@ export function ApplicationDetailScreen() {
       )}
     </>
   );
+}
+
+/**
+ * Acknowledgement dell'ultimo evento consultato (§12).
+ *
+ * Idempotente server-side: una seconda chiamata non produce effetti doppi, e
+ * un fallimento non viene ritentato in loop — la consultazione non è
+ * dichiarata e la prossima apertura riproverà.
+ */
+function useLatestEventAck(eventId: string | null) {
+  const sentRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!eventId || sentRef.current === eventId) {
+      return;
+    }
+
+    sentRef.current = eventId;
+    void acknowledgeApplicationEvent(eventId).catch(() => {
+      sentRef.current = null;
+    });
+  }, [eventId]);
 }
 
 const styles = StyleSheet.create({
@@ -203,6 +260,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: spacing[12],
+    marginBottom: spacing[8],
+  },
+  contextLine: {
     marginBottom: spacing[8],
   },
   sectionTitle: {

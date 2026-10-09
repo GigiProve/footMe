@@ -296,6 +296,64 @@ describe("DashboardEntityRow", () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onPress).not.toHaveBeenCalled();
   });
+
+  /**
+   * DAS-REV-04 §7, §9: «Posizione chiusa alle nuove candidature» è un
+   * metadato su riga propria, non uno stato. Lo stato reale della
+   * candidatura resta quello che è.
+   */
+  it("shows the closed-position metadata without replacing the status", () => {
+    const renderer = render(
+      <DashboardEntityRow
+        avatarName="AC Como"
+        meta="AC Como · Prima squadra"
+        note="Posizione chiusa alle nuove candidature"
+        onPress={vi.fn()}
+        status="In valutazione"
+        statusPlacement="trailing"
+        title="Attaccante"
+      />,
+    );
+
+    const rendered = texts(renderer);
+
+    expect(rendered).toContain("Posizione chiusa alle nuove candidature");
+    expect(rendered).toContain("In valutazione");
+  });
+
+  /**
+   * §22: lo screen reader deve dire che cosa è chiuso e che cosa no —
+   * «La posizione non accetta più nuove candidature. La tua candidatura è
+   * ancora in valutazione.»
+   */
+  it("reads the closed position with the explicit accessibility sentence", () => {
+    const renderer = render(
+      <DashboardEntityRow
+        avatarName="AC Como"
+        meta="AC Como · Prima squadra"
+        note="Posizione chiusa alle nuove candidature"
+        noteAccessibilityLabel="La posizione non accetta più nuove candidature. La tua candidatura è ancora in valutazione."
+        onPress={vi.fn()}
+        status="In valutazione"
+        statusPlacement="trailing"
+        title="Attaccante"
+      />,
+    );
+
+    const pressable = renderer.root.find(
+      (node) =>
+        typeof node.props.accessibilityLabel === "string" &&
+        node.props.accessibilityLabel.startsWith("Attaccante"),
+    );
+
+    expect(pressable.props.accessibilityLabel).toContain(
+      "La posizione non accetta più nuove candidature.",
+    );
+    // La frase estesa sostituisce il testo breve, non lo affianca.
+    expect(pressable.props.accessibilityLabel).not.toContain(
+      "Posizione chiusa alle nuove candidature",
+    );
+  });
 });
 
 describe("DashboardAreaRows", () => {

@@ -5,6 +5,7 @@ import {
   aggregateRequirements,
   dedupeById,
   dedupePreview,
+  selectApplicationPreviews,
   formatDeadlineDetailLabel,
   formatDeadlineRowLabel,
   formatUpdateLabel,
@@ -225,5 +226,73 @@ describe("aggregateRequirements", () => {
     );
 
     expect(aggregated?.description).not.toContain("ruolo principale");
+  });
+});
+
+describe("selectApplicationPreviews", () => {
+  const app = (id: string) => ({ id });
+
+  /**
+   * §8: «normalmente si mostrano due preview, anche con sette candidature
+   * attive; il massimo di preview è tre». La fonte ne manda tre, il widget ne
+   * mostra due — e il conteggio resta affare del dominio (§8).
+   */
+  it("shows two previews even when the source sends three", () => {
+    const outcome = selectApplicationPreviews(
+      [app("a"), app("b"), app("c")],
+      (item) => item.id,
+      new Set<string>(),
+    );
+
+    expect(outcome.items.map((item) => item.id)).toEqual(["a", "b"]);
+    expect(outcome.collapsed).toBe(false);
+  });
+
+  /**
+   * §10: «Quando una candidatura è già presentata in Aggiornamenti recenti
+   * […] evitare di ripeterne inutilmente la row nelle preview ordinarie. Se
+   * possibile mostrare altre candidature eleggibili entro il limite.»
+   *
+   * È lo screen 03: AC Como è in alto come conclusione, e il modulo mostra
+   * Varese e Pro Sesto invece di lasciare un posto vuoto.
+   */
+  it("fills the freed slot with another eligible application", () => {
+    const outcome = selectApplicationPreviews(
+      [app("como"), app("varese"), app("prosesto")],
+      (item) => item.id,
+      new Set(["como"]),
+    );
+
+    expect(outcome.items.map((item) => item.id)).toEqual([
+      "varese",
+      "prosesto",
+    ]);
+    expect(outcome.collapsed).toBe(false);
+  });
+
+  /**
+   * §10: tutte già promosse non è un empty del dominio — «non mostrare un
+   * falso empty», il modulo si riduce all'accesso alla lista completa.
+   */
+  it("collapses instead of faking an empty module", () => {
+    const outcome = selectApplicationPreviews(
+      [app("a"), app("b")],
+      (item) => item.id,
+      new Set(["a", "b"]),
+    );
+
+    expect(outcome.items).toEqual([]);
+    expect(outcome.collapsed).toBe(true);
+  });
+
+  /** Nessuna candidatura non è "collapsed": è un empty vero. */
+  it("does not collapse an actually empty list", () => {
+    const outcome = selectApplicationPreviews(
+      [] as { id: string }[],
+      (item) => item.id,
+      new Set<string>(),
+    );
+
+    expect(outcome.collapsed).toBe(false);
   });
 });

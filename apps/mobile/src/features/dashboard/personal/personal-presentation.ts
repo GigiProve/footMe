@@ -11,6 +11,7 @@
  * un orologio letto dentro la funzione lo renderebbe impossibile.
  */
 
+import { MAX_APPLICATION_PREVIEWS } from "../../applications/application-presentation";
 import { MAX_VISIBLE_PRIORITIES } from "../priority/priority-ranking";
 import type { PersonalRequirement } from "../adapters/personal-adapter";
 
@@ -320,5 +321,37 @@ export function aggregateRequirements(
     // Stessa regola del registry: con più requisiti la destinazione è l'hub
     // del ruolo, che li contiene tutti. Due regole diverse divergerebbero.
     href: hubHref ?? requirements[0].href,
+  };
+}
+
+/**
+ * Preview del modulo Candidature (DAS-REV-04 §8, §10).
+ *
+ * Due passaggi, in quest'ordine:
+ *
+ *   1. si tolgono le candidature già presentate in "Aggiornamenti recenti" —
+ *      §10 vieta di ripetere la stessa situazione due volte nello stesso
+ *      widget;
+ *   2. si taglia a due. La fonte ne manda tre proprio perché la terza possa
+ *      prendere il posto di quella tolta: §10 chiede di «mostrare altre
+ *      candidature eleggibili entro il limite».
+ *
+ * `collapsed` resta la condizione di §10 — **tutte** erano già mostrate in
+ * alto — e non diventa vera per effetto del taglio: in quel caso il modulo si
+ * riduce all'accesso alla lista, e un falso "Nessuna candidatura" sarebbe
+ * un'altra cosa.
+ *
+ * Non tocca il conteggio: §8 lo vuole indipendente dalle righe scaricate.
+ */
+export function selectApplicationPreviews<T>(
+  items: T[],
+  idOf: (item: T) => string,
+  alreadyShown: ReadonlySet<string>,
+): PreviewOutcome<T> {
+  const deduped = dedupePreview(items, idOf, alreadyShown);
+
+  return {
+    collapsed: deduped.collapsed,
+    items: deduped.items.slice(0, MAX_APPLICATION_PREVIEWS),
   };
 }

@@ -1,67 +1,87 @@
-import { useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { useSession } from "../auth/use-session";
 import { getPlayerPositionLabel } from "../profiles/player-sports";
-import { APPLICATION_STATUS_LABELS } from "../recruiting/recruiting-service";
 import { DashboardEntityRow } from "../dashboard/components/DashboardEntityRow";
+import { acknowledgeApplicationEvent } from "../dashboard/adapters/personal-adapter";
 import { colors, radius, spacing } from "../../theme/tokens";
 import { AppText, EmptyState, ScreenHeader, TabBar } from "../../ui";
 import {
-  APPLICATIONS_PAGE_SIZE,
-  fetchMyApplications,
-  type ApplicationFilter,
+  applicationStatusLabel,
+  formatOutcomeLine,
+  POSITION_CLOSED_A11Y,
+  POSITION_CLOSED_NOTE,
+} from "./application-presentation";
+import {
+  fetchMyApplicationsPage,
+  type ApplicationGroup,
   type ApplicationListItem,
+  type ApplicationPage,
 } from "./applications-service";
 
-const FILTERS = [
+/**
+ * §14: due tab e due sole. «Non aggiungere tab separate Rifiutate, Ritirate,
+ * Scadute o Chiuse»: sono esiti, non gruppi, e vivono dentro la row.
+ */
+const TABS = [
   { label: "Attive", value: "active" as const },
-  { label: "Tutte", value: "all" as const },
+  { label: "Concluse", value: "completed" as const },
 ];
 
-function resolveFilter(value: string | undefined): ApplicationFilter {
-  return value === "all" || value === "active" ? value : "active";
+function resolveGroup(value: string | undefined): ApplicationGroup {
+  // "Concluse è selezionata quando richiesta dal collegamento contestuale";
+  // ogni altro accesso, incluso quello ordinario, apre Attive (§14).
+  return value === "completed" ? "completed" : "active";
 }
 
 /**
- * "Le mie candidature" (DAS-REV-03 §9, §20).
+ * "Le mie candidature" (DAS-REV-03 §9, DAS-REV-04 §14).
  *
- * Destinazione di "Vedi tutte" e della metrica "Candidature attive". Il
- * filtro di default segue il parametro: la metrica apre `?filter=active`, così
- * il numero e la lista che si apre hanno lo stesso perimetro — §7 è esplicito
- * su questo, ed è il modo più comune di rendere un conteggio inspiegabile.
+ * La pagina esiste da DAS-REV-03 con tab Attive / Tutte. DAS-REV-04 la
+ * riallinea sulla classificazione canonica — Attive / Concluse — e non ne
+ * crea una seconda riservata alla Dashboard: §14 lo vieta esplicitamente.
  *
- * È il **minimo funzionante** richiesto da §4: lista, stato canonico, accesso
- * al dettaglio. Ritiro, storico, valutazione e filtri avanzati sono di
- * DAS-REV-04 e non vengono anticipati qui.
+ * Il parametro `focus` serve al collegamento che arriva da una conclusione
+ * mostrata in Dashboard: evidenzia la row e, **solo quando quella row è
+ * davvero caricata e consultabile**, segna come consultato il suo evento
+ * (§13). Aprire la tab non marca nulla.
  */
 export function MyApplicationsScreen() {
   const router = useRouter();
   const { profile } = useSession();
   const profileId = profile?.id ?? null;
-  const params = useLocalSearchParams<{ filter?: string }>();
-  const [filter, setFilter] = useState<ApplicationFilter>(
-    resolveFilter(typeof params.filter === "string" ? params.filter : undefined),
+  const params = useLocalSearchParams<{ filter?: string; focus?: string }>();
+  const focusId = typeof params.focus === "string" ? params.focus : null;
+  const [group, setGroup] = useState<ApplicationGroup>(
+    resolveGroup(typeof params.filter === "string" ? params.filter : undefined),
   );
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useInfiniteQuery({
       enabled: !!profileId,
-      initialPageParam: 0,
-      queryFn: ({ pageParam }: { pageParam: number }) =>
-        fetchMyApplications(profileId as string, filter, pageParam),
-      queryKey: ["my-applications", profileId, filter],
-      getNextPageParam: (
-        lastPage: ApplicationListItem[],
-        allPages: ApplicationListItem[][],
-      ) =>
-        lastPage.length === APPLICATIONS_PAGE_SIZE ? allPages.length : undefined,
+      initialPageParam: null as string | null,
+      queryFn: ({ pageParam }: { pageParam: string | null }) =>
+        fetchMyApplicationsPage(group, pageParam),
+      queryKey: ["my-applications", profileId, group],
+      getNextPageParam: (lastPage: ApplicationPage) => lastPage.nextCursor,
     });
 
-  const items = data?.pages.flat() ?? [];
+  const items = data?.pages.flatMap((page) => page.items) ?? [];
+  const focused = focusId
+    ? (items.find((item) => item.id === focusId) ?? null)
+    : null;
+
+  useApplicationEventAck(focused);
 
   return (
     <>
@@ -86,9 +106,9 @@ export function MyApplicationsScreen() {
       </View>
 
       <TabBar
-        active={filter}
-        items={FILTERS}
-        onChange={setFilter}
+        active={group}
+        items={TABS}
+        onChange={setGroup}
         style={styles.tabs}
       />
 
@@ -98,9 +118,17 @@ export function MyApplicationsScreen() {
         </View>
       ) : items.length === 0 ? (
         <EmptyState
-          description="Le candidature che invii compaiono qui con il loro stato."
+          description={
+            group === "completed"
+              ? "Le candidature concluse restano qui, con il loro esito."
+              : "Le candidature che invii compaiono qui con il loro stato."
+          }
           icon="document-text-outline"
-          title="Nessuna candidatura"
+          title={
+            group === "completed"
+              ? "Nessuna candidatura conclusa"
+              : "Nessuna candidatura attiva"
+          }
         />
       ) : (
         <FlatList
@@ -119,19 +147,11 @@ export function MyApplicationsScreen() {
             ) : null
           }
           renderItem={({ index, item }) => (
-            <DashboardEntityRow
-              avatarName={item.clubName}
-              avatarUrl={item.clubLogoUrl}
-              meta={[item.clubName, item.teamName].filter(Boolean).join(" · ")}
+            <ApplicationRow
+              index={index}
+              isFocused={item.id === focusId}
+              item={item}
               onPress={() => router.push(`/applications/${item.id}` as never)}
-              showDivider={index > 0}
-              status={
-                APPLICATION_STATUS_LABELS[
-                  item.status as keyof typeof APPLICATION_STATUS_LABELS
-                ] ?? null
-              }
-              statusPlacement="trailing"
-              title={getPlayerPositionLabel(item.role, item.role)}
             />
           )}
         />
@@ -142,6 +162,87 @@ export function MyApplicationsScreen() {
       </AppText>
     </>
   );
+}
+
+/**
+ * Row della lista: stessa riga visuale della Dashboard, contenuto diverso a
+ * seconda del gruppo (§14).
+ *
+ * Una conclusa mostra esito e data reale; una attiva mostra lo stato e, se
+ * serve, il metadato della posizione chiusa. §22: lo storico resta a
+ * contrasto normale, senza aspetto disabled.
+ */
+function ApplicationRow({
+  index,
+  isFocused,
+  item,
+  onPress,
+}: {
+  index: number;
+  isFocused: boolean;
+  item: ApplicationListItem;
+  onPress: () => void;
+}) {
+  const isCompleted = item.group === "completed";
+
+  const row = (
+    <DashboardEntityRow
+      avatarName={item.clubName}
+      avatarUrl={item.clubLogoUrl}
+      meta={[item.clubName, item.teamName ?? item.category]
+        .filter(Boolean)
+        .join(" · ")}
+      note={
+        isCompleted
+          ? formatOutcomeLine({
+              concludedAt: item.concludedAt,
+              outcome: item.outcome,
+              status: item.status,
+            })
+          : item.positionAccepting
+            ? null
+            : POSITION_CLOSED_NOTE
+      }
+      noteAccessibilityLabel={
+        !isCompleted && !item.positionAccepting ? POSITION_CLOSED_A11Y : null
+      }
+      onPress={onPress}
+      showDivider={index > 0}
+      status={isCompleted ? null : applicationStatusLabel(item.status)}
+      statusPlacement="trailing"
+      title={getPlayerPositionLabel(item.role, item.role)}
+    />
+  );
+
+  // Evidenza del collegamento contestuale: un fondo tenue, non un bordo
+  // colorato né un badge. Serve a ritrovare la row, non a classificarla.
+  return isFocused ? <View style={styles.focused}>{row}</View> : row;
+}
+
+/**
+ * Consultazione persistente dell'aggiornamento (§12, §13).
+ *
+ * Si invia una volta sola, e **solo** quando la row pertinente è realmente
+ * caricata: l'impression nella Dashboard non basta, e il tap nemmeno se la
+ * lista non si carica. Il fallimento non si ritenta in loop — la RPC è
+ * idempotente e il prossimo ingresso riproverà.
+ */
+function useApplicationEventAck(item: ApplicationListItem | null) {
+  const sentRef = useRef<string | null>(null);
+  const eventId = item?.lastEventId ?? null;
+
+  useEffect(() => {
+    if (!eventId || sentRef.current === eventId) {
+      return;
+    }
+
+    sentRef.current = eventId;
+    void acknowledgeApplicationEvent(eventId).catch(() => {
+      // Un ack non riuscito non è un errore per chi legge: la row resta
+      // consultabile e la prossima apertura riproverà.
+      sentRef.current = null;
+    });
+  }, [eventId]);
 }
 
 const styles = StyleSheet.create({
@@ -167,6 +268,11 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingVertical: spacing[16],
+  },
+  focused: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius[12],
+    paddingHorizontal: spacing[8],
   },
   note: {
     paddingVertical: spacing[8],

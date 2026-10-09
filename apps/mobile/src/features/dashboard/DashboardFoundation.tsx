@@ -4,8 +4,10 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -13,14 +15,23 @@ import { Screen } from "../../components/ui/screen";
 import { useSession } from "../auth/use-session";
 import { getPlayerPositionLabel } from "../profiles/player-sports";
 import { APPLICATION_STATUS_LABELS } from "../recruiting/recruiting-service";
-import { spacing } from "../../theme/tokens";
+import {
+  applicationStatusLabel,
+  POSITION_CLOSED_A11Y,
+  POSITION_CLOSED_NOTE,
+  SELECTION_COMPLETED_LABEL,
+} from "../applications/application-presentation";
+import { colors, sizes, spacing } from "../../theme/tokens";
 import { AppText, useToast } from "../../ui";
 
 import {
+  fetchPersonalApplications,
   fetchPersonalDashboard,
   fetchPersonalSavedPositions,
+  isPersonalApplicationsData,
   isPersonalDashboardData,
   isPersonalSavedPositions,
+  type PersonalApplicationsData,
   type PersonalDashboardData,
   type PersonalSavedPosition,
   type PersonalUpdate,
@@ -98,6 +109,7 @@ import {
   formatUpdateLabel,
   hasSignificantUpdate,
   recentUpdatesBudget,
+  selectApplicationPreviews,
 } from "./personal/personal-presentation";
 import { useToggleDashboardSavedAd } from "./personal/use-toggle-saved-ad";
 import { applyPromotion } from "./priority/module-order";
@@ -189,7 +201,18 @@ export function DashboardFoundation() {
     provider: "operational",
   });
 
-  // Secondo record per la stessa identità: le Posizioni salvate hanno un
+  // Record separato per le candidature: DAS-REV-04 §17 chiede che il loro
+  // errore resti locale al modulo mentre il riepilogo resta visibile (screen
+  // 06), e senza uno `scope` distinto i payload si sovrascriverebbero.
+  const applicationsCache = useDashboardCache<PersonalApplicationsData>({
+    actorId,
+    identity: current && !isSociety ? current : null,
+    isPayload: isPersonalApplicationsData,
+    provider: "operational",
+    scope: "applications",
+  });
+
+  // Terzo record per la stessa identità: le Posizioni salvate hanno un
   // provider proprio perché §22 chiede che il loro errore resti locale, e
   // senza uno `scope` distinto il secondo payload sovrascriverebbe il primo.
   const savedPositionsCache = useDashboardCache<PersonalSavedPosition[]>({
@@ -241,6 +264,18 @@ export function DashboardFoundation() {
     enabled: !!actorId && !!current && !isSociety,
     queryFn: () => fetchPersonalDashboard(),
     queryKey: DASHBOARD_QK.module(actorId, current?.id ?? "none", "personal"),
+    staleTime: STALE_MS.operational,
+    ...retryOptions,
+  });
+
+  const applicationsQuery = useQuery({
+    enabled: !!actorId && !!current && !isSociety,
+    queryFn: () => fetchPersonalApplications(),
+    queryKey: DASHBOARD_QK.module(
+      actorId,
+      current?.id ?? "none",
+      "personal_applications",
+    ),
     staleTime: STALE_MS.operational,
     ...retryOptions,
   });
@@ -311,6 +346,17 @@ export function DashboardFoundation() {
   }, [current, personalQuery.data]);
 
   useEffect(() => {
+    const data = applicationsQuery.data;
+
+    if (!data || !current) {
+      return;
+    }
+
+    applicationsCache.store(data, Date.now(), Date.now());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, applicationsQuery.data]);
+
+  useEffect(() => {
     const data = savedPositionsQuery.data;
 
     if (!data || !current) {
@@ -350,6 +396,19 @@ export function DashboardFoundation() {
   }, [current, positionsQuery.error]);
 
   useEffect(() => {
+    if (!applicationsQuery.error || !current) {
+      return;
+    }
+
+    // §25: l'errore locale del modulo è un evento diagnostico proprio, non
+    // un fallimento della Dashboard. Nessun identificativo di risorsa.
+    trackDashboardModuleError({
+      category: classifyDashboardError(applicationsQuery.error),
+      moduleId: "personal_applications",
+    });
+  }, [current, applicationsQuery.error]);
+
+  useEffect(() => {
     if (!savedPositionsQuery.error || !current) {
       return;
     }
@@ -374,6 +433,8 @@ export function DashboardFoundation() {
     ? (societyQuery.data ?? societyCache.payload)
     : null;
   const personalData = personalQuery.data ?? personalCache.payload;
+  const applicationsData: PersonalApplicationsData | null | undefined =
+    applicationsQuery.data ?? applicationsCache.payload;
   const savedPositionsData: PersonalSavedPosition[] | null =
     savedPositionsQuery.data ?? savedPositionsCache.payload;
   const positionsData: SocietyPositionPreview[] | null = accessWindow.isValid
@@ -394,6 +455,8 @@ export function DashboardFoundation() {
   // da esso possono vivere in un effetto invece che nel corpo del render.
 
   const rows = moduleRowCounts({
+    applications: applicationsData,
+    applicationsFailed: applicationsQuery.isError,
     personal: personalData,
     positions: positionsData,
     positionsFailed: positionsQuery.isError,
@@ -624,7 +687,11 @@ export function DashboardFoundation() {
       const results = await Promise.all(
         isSociety
           ? [societyQuery.refetch(), positionsQuery.refetch()]
-          : [personalQuery.refetch(), savedPositionsQuery.refetch()],
+          : [
+              personalQuery.refetch(),
+              applicationsQuery.refetch(),
+              savedPositionsQuery.refetch(),
+            ],
       );
 
       // Il completamento non richiede che ogni dominio abbia avuto successo,
@@ -667,6 +734,7 @@ export function DashboardFoundation() {
       setRefreshing(false);
     }
   }, [
+    applicationsQuery,
     connection,
     current,
     isSociety,
@@ -718,7 +786,9 @@ export function DashboardFoundation() {
   // Salvati comparirebbe dopo gli altri anche quando ha dati in cache.
   const isHydrated = isSociety
     ? societyCache.isHydrated
-    : personalCache.isHydrated && savedPositionsCache.isHydrated;
+    : personalCache.isHydrated &&
+      applicationsCache.isHydrated &&
+      savedPositionsCache.isHydrated;
 
   // Il primo caricamento mostra subito shell, identità nota e skeleton: la
   // composizione non è nota finché l'elenco identità non è risolto.
@@ -900,7 +970,7 @@ export function DashboardFoundation() {
   );
 
   const updatesLimit = recentUpdatesBudget(ranking.visible.length);
-  const visibleUpdates = (personalData?.recentUpdates ?? []).slice(
+  const visibleUpdates = (applicationsData?.recentUpdates ?? []).slice(
     0,
     updatesLimit,
   );
@@ -955,6 +1025,10 @@ export function DashboardFoundation() {
             moduleId={module.id}
             now={rankedAt}
             onNavigate={go}
+            applications={applicationsData}
+            applicationsError={!!applicationsQuery.error}
+            applicationsRetrying={applicationsQuery.isFetching}
+            onRetryApplications={() => void applicationsQuery.refetch()}
             onRetryPositions={() => void positionsQuery.refetch()}
             onRetrySaved={() => void savedPositionsQuery.refetch()}
             onToggleSaved={(adId) =>
@@ -1032,6 +1106,8 @@ function metaLine(
  * (§13) — uno 0 dichiara che il modulo ha risposto e non ha nulla.
  */
 function moduleRowCounts(input: {
+  applications: PersonalApplicationsData | null | undefined;
+  applicationsFailed: boolean;
   personal: PersonalDashboardData | null | undefined;
   positions: SocietyPositionPreview[] | null;
   positionsFailed: boolean;
@@ -1041,15 +1117,28 @@ function moduleRowCounts(input: {
 }): Partial<Record<DashboardModuleId, number | null>> {
   const society = input.society;
   const personal = input.personal;
+  // Provider separato: un fallimento resta `null` (non noto) e non diventa
+  // una lista vuota, altrimenti l'errore dello screen 06 si travestirebbe da
+  // "nessuna candidatura" (DAS-REV-04 §17).
+  const applications = input.applicationsFailed ? null : input.applications;
 
   return {
-    personal_applications: personal ? personal.applications.length : null,
+    // DAS-REV-04 §16: zero attive **con storico** non è "nessuna attività".
+    // Il modulo mostra comunque un blocco reale con l'accesso alle Concluse,
+    // e il Global Empty lo renderebbe irraggiungibile: «uno storico esistente
+    // deve restare raggiungibile».
+    personal_applications: applications
+      ? applications.applications.length ||
+        (applications.hasCompleted ? 1 : 0)
+      : null,
     personal_profile_suggestion: personal
       ? personal.optionalSuggestion
         ? 1
         : 0
       : null,
-    personal_recent_updates: personal ? personal.recentUpdates.length : null,
+    personal_recent_updates: applications
+      ? applications.recentUpdates.length
+      : null,
     // Provider separato: un fallimento resta `null` (non noto) e non diventa
     // una lista vuota, altrimenti un errore si travestirebbe da "nessuna
     // posizione salvata" (§22).
@@ -1342,10 +1431,14 @@ function buildQuickActions(
 // ── Moduli ────────────────────────────────────────────────────────────────
 
 type ModuleRendererProps = {
+  applications: PersonalApplicationsData | null | undefined;
+  applicationsError: boolean;
+  applicationsRetrying: boolean;
   moduleId: DashboardModuleId;
   /** Istante congelato del render, per le etichette relative (§28). */
   now: number;
   onNavigate: (moduleId: string, href: string) => void;
+  onRetryApplications: () => void;
   onRetryPositions: () => void;
   onRetrySaved: () => void;
   onToggleSaved: (adId: string) => void;
@@ -1375,9 +1468,13 @@ type ModuleRendererProps = {
  * pagina.
  */
 function ModuleRenderer({
+  applications,
+  applicationsError,
+  applicationsRetrying,
   moduleId,
   now,
   onNavigate,
+  onRetryApplications,
   onRetryPositions,
   onRetrySaved,
   onToggleSaved,
@@ -1408,10 +1505,10 @@ function ModuleRenderer({
         <DataModule
           emptyMessage=""
           errorMessage="Non siamo riusciti a caricare gli aggiornamenti."
-          hasData={!!personal}
+          hasData={!!applications}
           hideWhenEmpty
           isEmpty={updates.length === 0}
-          isError={personalError}
+          isError={applicationsError}
           title={title}
         >
           {updates.map((item, index) => (
@@ -1420,74 +1517,122 @@ function ModuleRenderer({
               avatarUrl={item.clubLogoUrl}
               key={item.applicationId}
               meta={[item.clubName, item.teamName].filter(Boolean).join(" · ")}
+              // DAS-REV-04 §15: una conclusione porta allo storico, dove la
+              // candidatura è ora reperibile; una candidatura ancora
+              // operativa porta al proprio dettaglio. Il focus permette alla
+              // lista di evidenziare la row giusta e di consultarne l'evento.
+              noteAccessibilityLabel={
+                item.isCompleted
+                  ? "Apri le candidature concluse."
+                  : null
+              }
               onPress={() =>
-                onNavigate(moduleId, `/applications/${item.applicationId}`)
+                onNavigate(
+                  moduleId,
+                  item.isCompleted
+                    ? `/applications?filter=completed&focus=${item.applicationId}`
+                    : `/applications/${item.applicationId}`,
+                )
               }
               showDivider={index > 0}
               // Stato corrente e data dell'evento restano due informazioni
-              // separate (§11): "Aggiornata" non è uno stato.
+              // separate (§11): "Aggiornata" non è uno stato. Per una
+              // selezione conclusa senza esito per candidato vale il generico
+              // di §7, mai un esito inventato.
               status={
-                APPLICATION_STATUS_LABELS[
-                  item.status as keyof typeof APPLICATION_STATUS_LABELS
-                ] ?? null
+                item.eventKind === "selection_completed"
+                  ? SELECTION_COMPLETED_LABEL
+                  : applicationStatusLabel(item.status)
               }
               statusPlacement="trailing"
               title={getPlayerPositionLabel(item.role, item.role)}
-              trailingMeta={formatUpdateLabel(item.occurredAt, now)}
+              trailingMeta={
+                item.isCompleted ? null : formatUpdateLabel(item.occurredAt, now)
+              }
             />
           ))}
         </DataModule>
       );
 
     case "personal_applications": {
-      const preview = dedupePreview(
-        personal?.applications ?? [],
+      // §10: la deduplicazione toglie dalla preview ciò che è già promosso in
+      // "Aggiornamenti recenti". La fonte ne manda tre proprio perché la
+      // terza possa prendere il posto della row tolta (§8).
+      const preview = selectApplicationPreviews(
+        applications?.applications ?? [],
         (item) => item.id,
         updatedApplicationIds,
       );
+      const visible = preview.items;
+      // §16: zero attive con storico non è "nessuna candidatura". Il modulo
+      // lo dice e porta alle Concluse, e quel link **sostituisce** la "Vedi
+      // tutte" dell'intestazione: una sola azione verso la lista pertinente.
+      const hasHistoryOnly =
+        visible.length === 0 && !preview.collapsed && !!applications?.hasCompleted;
 
       return (
         <DataModule
-          action={{
-            label: "Vedi tutte",
-            onPress: () => onNavigate(moduleId, "/applications"),
-          }}
-          // §12: tutte le preview già mostrate in alto non producono un falso
+          action={
+            hasHistoryOnly
+              ? undefined
+              : {
+                  label: "Vedi tutte",
+                  onPress: () =>
+                    onNavigate(moduleId, "/applications?filter=active"),
+                }
+          }
+          // §10: tutte le preview già mostrate in alto non producono un falso
           // "Nessuna candidatura" — il modulo si riduce al solo accesso alla
           // lista completa.
           collapsedToAction={preview.collapsed}
-          // §23: con Salvate presenti e nessuna candidatura, un empty
-          // locale leggero — senza ripetere la CTA "Cerca posizioni", che è
-          // già fra le azioni rapide.
+          // §16: nessuna candidatura mai inviata. La CTA "Cerca posizioni"
+          // non si ripete qui: è già fra le azioni rapide.
           emptyMessage="Nessuna candidatura ancora"
+          emptyContent={
+            hasHistoryOnly ? (
+              <ApplicationsHistoryEmpty
+                onPress={() =>
+                  onNavigate(moduleId, "/applications?filter=completed")
+                }
+              />
+            ) : undefined
+          }
           errorMessage="Non siamo riusciti a caricare le candidature."
-          hasData={!!personal}
-          isEmpty={preview.items.length === 0}
-          isError={personalError}
+          hasData={!!applications}
+          isEmpty={visible.length === 0}
+          isError={applicationsError}
+          isRetrying={applicationsRetrying}
+          onRetry={onRetryApplications}
           title={title}
         >
-          {preview.items.map((item, index) => (
+          {visible.map((item, index) => (
             <DashboardEntityRow
               avatarName={item.clubName}
               avatarUrl={item.clubLogoUrl}
               key={item.id}
               // §9: ruolo come titolo, poi società e squadra, categoria
-              // «quando utile e disponibile» — e non è utile quando ripete il
-              // nome della squadra, che nel dominio è spesso la categoria
-              // stessa ("Primavera", "Under 17").
+              // «se aggiunge un'informazione utile» — e non la aggiunge
+              // quando ripete il nome della squadra, che nel dominio è spesso
+              // la categoria stessa ("Primavera", "Under 17").
               meta={metaLine(item.clubName, item.teamName, item.category)}
+              // §7: metadato secondario, su riga propria e libero di andare a
+              // capo. Non sposta la candidatura fra le Concluse e non
+              // sostituisce lo stato reale.
+              note={item.positionAccepting ? null : POSITION_CLOSED_NOTE}
+              noteAccessibilityLabel={
+                item.positionAccepting ? null : POSITION_CLOSED_A11Y
+              }
               // §9: la row apre il **dettaglio della candidatura** tramite il
               // suo ID. Aprire la posizione mostrerebbe l'annuncio, non lo
               // stato e il percorso della candidatura.
               onPress={() => onNavigate(moduleId, `/applications/${item.id}`)}
               showDivider={index > 0}
-              status={
-                APPLICATION_STATUS_LABELS[
-                  item.status as keyof typeof APPLICATION_STATUS_LABELS
-                ] ?? null
-              }
+              status={applicationStatusLabel(item.status)}
               statusPlacement="trailing"
               title={getPlayerPositionLabel(item.role, item.role)}
+              // §11: l'aggiornamento è un metadato dell'evento, non uno
+              // stato, e compare solo se l'evento è reale e successivo
+              // all'invio.
               trailingMeta={
                 hasSignificantUpdate(item) && item.lastEventAt
                   ? formatUpdateLabel(item.lastEventAt, now)
@@ -1757,6 +1902,14 @@ type DataModuleProps = {
    */
   collapsedToAction?: boolean;
   emptyMessage: string;
+  /**
+   * Empty di dominio con un contenuto proprio (DAS-REV-04 §16).
+   *
+   * «Zero attive, storico esistente» non è il generico "non c'è nulla": porta
+   * una spiegazione e un accesso alle Concluse, e quel link **sostituisce**
+   * l'azione dell'intestazione invece di affiancarla.
+   */
+  emptyContent?: ReactNode;
   errorMessage: string;
   /** Esiste un payload utilizzabile — da rete o da cache. */
   hasData: boolean;
@@ -1785,6 +1938,7 @@ function DataModule({
   children,
   collapsedToAction = false,
   emptyMessage,
+  emptyContent,
   errorMessage,
   hasData,
   hideWhenEmpty = false,
@@ -1820,6 +1974,10 @@ function DataModule({
       return <DashboardSection action={action} title={title} />;
     }
 
+    if (emptyContent) {
+      return <DashboardSection title={title}>{emptyContent}</DashboardSection>;
+    }
+
     return hideWhenEmpty ? null : (
       <DashboardSection title={title}>
         <DashboardModuleEmpty message={emptyMessage} />
@@ -1834,9 +1992,61 @@ function DataModule({
   );
 }
 
+/**
+ * Empty del modulo Candidature con storico esistente (DAS-REV-04 §16).
+ *
+ * «Zero attive, storico esistente» non è il generico "non c'è nulla": §16
+ * chiede di dirlo, di spiegare che le concluse restano consultabili e di
+ * offrire **un solo** accesso — "Vedi concluse →" sostituisce la "Vedi tutte"
+ * dell'intestazione invece di affiancarla.
+ *
+ * Non è un errore e non è un Global Empty: la Dashboard resta utilizzabile e
+ * le Posizioni salvate restano al loro posto.
+ */
+function ApplicationsHistoryEmpty({ onPress }: { onPress: () => void }) {
+  return (
+    <View style={styles.historyEmpty}>
+      <AppText variant="titleMd">Nessuna candidatura attiva</AppText>
+
+      <AppText color="secondary" variant="bodySm">
+        Le candidature concluse restano consultabili.
+      </AppText>
+
+      <Pressable
+        accessibilityLabel="Vedi le candidature concluse"
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.historyLink,
+          pressed ? styles.historyLinkPressed : null,
+        ]}
+      >
+        <AppText color="accent" variant="actionLabel">
+          Vedi concluse
+        </AppText>
+        <Ionicons color={colors.accent} name="arrow-forward" size={14} />
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   content: {
     gap: spacing[20],
     paddingBottom: spacing[40],
+  },
+  historyEmpty: {
+    gap: spacing[6],
+  },
+  historyLink: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    gap: spacing[6],
+    minHeight: sizes.touchTarget - spacing[14],
+  },
+  historyLinkPressed: {
+    opacity: 0.6,
   },
 });

@@ -23,6 +23,17 @@ export type DashboardEntityRowProps = {
   /** Thumbnail rettangolare dei contenuti editoriali. */
   thumbnailUrl?: string | null;
   meta?: string | null;
+  /**
+   * Metadato secondario che chiarisce il percorso in corso, su riga propria e
+   * libero di andare a capo (DAS-REV-04 §7, §9).
+   *
+   * Nasce per "Posizione chiusa alle nuove candidature": §7 vieta di
+   * presentarlo come stato terminale o badge dominante, quindi non è uno
+   * `status` e non entra nella colonna destra.
+   */
+  note?: string | null;
+  /** Lettura estesa del `note` per lo screen reader (§22). */
+  noteAccessibilityLabel?: string | null;
   onPress: () => void;
   showDivider?: boolean;
   /** Label canonica del dominio: "Nuova", "In valutazione", "Bozza". */
@@ -61,6 +72,8 @@ export function DashboardEntityRow({
   icon,
   thumbnailUrl,
   meta,
+  note,
+  noteAccessibilityLabel,
   onPress,
   showDivider = false,
   status,
@@ -77,7 +90,12 @@ export function DashboardEntityRow({
 
       <View style={styles.row}>
         <Pressable
-          accessibilityLabel={[title, meta, statusLine]
+          accessibilityLabel={[
+            title,
+            meta,
+            statusLine,
+            noteAccessibilityLabel ?? note,
+          ]
             .filter(Boolean)
             .join(", ")}
           accessibilityRole="button"
@@ -110,6 +128,12 @@ export function DashboardEntityRow({
             {meta ? (
               <AppText color="secondary" numberOfLines={1} variant="meta">
                 {meta}
+              </AppText>
+            ) : null}
+
+            {note ? (
+              <AppText color="muted" numberOfLines={2} variant="caption">
+                {note}
               </AppText>
             ) : null}
 
