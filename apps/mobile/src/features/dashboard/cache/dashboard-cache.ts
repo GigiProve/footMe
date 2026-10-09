@@ -73,15 +73,25 @@ export function capabilitiesFingerprint(identity: DashboardIdentity): string {
   return [...identity.capabilities].sort().join(",");
 }
 
+/**
+ * `scope` distingue due provider della **stessa** identità.
+ *
+ * DAS-REV-01 ne aveva uno solo per identità, perché Società e personale si
+ * escludono a vicenda. DAS-REV-03 §22 chiede invece un errore locale per le
+ * Posizioni salvate, quindi la Dashboard personale ha due provider e due
+ * record: senza questo segmento il secondo sovrascriverebbe il primo.
+ */
 export function dashboardCacheKey(input: {
   actorId: string;
   identity: DashboardIdentity;
+  scope?: string;
 }): string {
   return [
     PREFIX + input.actorId,
     input.identity.id,
     input.identity.kind,
     capabilitiesFingerprint(input.identity),
+    input.scope ?? "overview",
     `s${DASHBOARD_CACHE_SCHEMA_VERSION}`,
     `r${PRIORITY_RULES_VERSION}`,
   ].join("|");
@@ -141,8 +151,13 @@ export async function readDashboardCache<TPayload>(input: {
   isPayload: (value: unknown) => value is TPayload;
   now: number;
   provider: FreshnessProvider;
+  scope?: string;
 }): Promise<CacheReadResult<TPayload>> {
-  const key = dashboardCacheKey({ actorId: input.actorId, identity: input.identity });
+  const key = dashboardCacheKey({
+    actorId: input.actorId,
+    identity: input.identity,
+    scope: input.scope,
+  });
 
   let record: DashboardCacheRecord<TPayload> | null = null;
 
@@ -210,6 +225,7 @@ export async function writeDashboardCache<TPayload>(input: {
   now: number;
   payload: TPayload;
   revision: number;
+  scope?: string;
 }): Promise<void> {
   const record: DashboardCacheRecord<TPayload> = {
     accessVerifiedAt: input.accessVerifiedAt,
@@ -226,7 +242,11 @@ export async function writeDashboardCache<TPayload>(input: {
 
   try {
     await AsyncStorage.setItem(
-      dashboardCacheKey({ actorId: input.actorId, identity: input.identity }),
+      dashboardCacheKey({
+        actorId: input.actorId,
+        identity: input.identity,
+        scope: input.scope,
+      }),
       JSON.stringify(record),
     );
   } catch {

@@ -18,8 +18,12 @@ import { AppText, useToast } from "../../ui";
 
 import {
   fetchPersonalDashboard,
+  fetchPersonalSavedPositions,
   isPersonalDashboardData,
+  isPersonalSavedPositions,
   type PersonalDashboardData,
+  type PersonalSavedPosition,
+  type PersonalUpdate,
 } from "./adapters/personal-adapter";
 import {
   fetchSocietyPositions,
@@ -54,6 +58,7 @@ import {
   DashboardSummary,
   type SummaryMetric,
 } from "./components/DashboardSummary";
+import { DashboardSuggestion } from "./components/DashboardSuggestion";
 import {
   DashboardGlobalEmpty,
   DashboardGlobalError,
@@ -86,9 +91,21 @@ import { STALE_MS } from "./cache/freshness-policy";
 import { useDashboardIdentity } from "./identity/use-dashboard-identity";
 import { composeDashboard, type QuickActionId } from "./modules/composition";
 import type { DashboardModuleId } from "./modules/module-registry";
+import {
+  aggregateRequirements,
+  dedupePreview,
+  formatDeadlineRowLabel,
+  formatUpdateLabel,
+  hasSignificantUpdate,
+  recentUpdatesBudget,
+} from "./personal/personal-presentation";
+import { useToggleDashboardSavedAd } from "./personal/use-toggle-saved-ad";
 import { applyPromotion } from "./priority/module-order";
 import { rankPriorities } from "./priority/priority-ranking";
-import type { PrioritySignal } from "./priority/priority-types";
+import type {
+  PrioritySignal,
+  ResolvedPriority,
+} from "./priority/priority-types";
 import { useDashboardOrder } from "./priority/use-dashboard-order";
 import { derivePageState, isOfflineWithoutData } from "./state/dashboard-state";
 import { classifyDashboardError } from "./state/error-classification";
@@ -143,6 +160,10 @@ export function DashboardFoundation() {
   const isOrganizational = !!current && current.kind !== "person";
   const composition = composeDashboard(current);
   const connection = useDashboardConnection();
+  const toggleSaved = useToggleDashboardSavedAd({
+    actorId,
+    identityId: current?.id ?? "none",
+  });
 
   // Lo scroll torna in alto a ogni cambio di contesto. Dipende dal token, non
   // dall'id: riaprire la stessa identità dopo una revoca è un contesto nuovo.
@@ -166,6 +187,17 @@ export function DashboardFoundation() {
     identity: current && !isSociety ? current : null,
     isPayload: isPersonalDashboardData,
     provider: "operational",
+  });
+
+  // Secondo record per la stessa identità: le Posizioni salvate hanno un
+  // provider proprio perché §22 chiede che il loro errore resti locale, e
+  // senza uno `scope` distinto il secondo payload sovrascriverebbe il primo.
+  const savedPositionsCache = useDashboardCache<PersonalSavedPosition[]>({
+    actorId,
+    identity: current && !isSociety ? current : null,
+    isPayload: isPersonalSavedPositions,
+    provider: "operational",
+    scope: "saved_positions",
   });
 
   // ── Richieste ───────────────────────────────────────────────────────────
@@ -207,8 +239,20 @@ export function DashboardFoundation() {
 
   const personalQuery = useQuery({
     enabled: !!actorId && !!current && !isSociety,
-    queryFn: () => fetchPersonalDashboard(actorId),
+    queryFn: () => fetchPersonalDashboard(),
     queryKey: DASHBOARD_QK.module(actorId, current?.id ?? "none", "personal"),
+    staleTime: STALE_MS.operational,
+    ...retryOptions,
+  });
+
+  const savedPositionsQuery = useQuery({
+    enabled: !!actorId && !!current && !isSociety,
+    queryFn: () => fetchPersonalSavedPositions(),
+    queryKey: DASHBOARD_QK.module(
+      actorId,
+      current?.id ?? "none",
+      "personal_saved_positions",
+    ),
     staleTime: STALE_MS.operational,
     ...retryOptions,
   });
@@ -266,6 +310,17 @@ export function DashboardFoundation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, personalQuery.data]);
 
+  useEffect(() => {
+    const data = savedPositionsQuery.data;
+
+    if (!data || !current) {
+      return;
+    }
+
+    savedPositionsCache.store(data, Date.now(), Date.now());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, savedPositionsQuery.data]);
+
   const primaryError = isSociety ? societyQuery.error : personalQuery.error;
 
   useEffect(() => {
@@ -294,6 +349,17 @@ export function DashboardFoundation() {
     });
   }, [current, positionsQuery.error]);
 
+  useEffect(() => {
+    if (!savedPositionsQuery.error || !current) {
+      return;
+    }
+
+    trackDashboardModuleError({
+      category: classifyDashboardError(savedPositionsQuery.error),
+      moduleId: "personal_saved_positions",
+    });
+  }, [current, savedPositionsQuery.error]);
+
   // ── Finestra di accesso organizzativa (§15) ─────────────────────────────
   // Alla scadenza i contenuti privati diventano inaccessibili **anche nella
   // pagina già aperta**: è il tick di `useAccessWindow` a imporlo, non un
@@ -308,6 +374,8 @@ export function DashboardFoundation() {
     ? (societyQuery.data ?? societyCache.payload)
     : null;
   const personalData = personalQuery.data ?? personalCache.payload;
+  const savedPositionsData: PersonalSavedPosition[] | null =
+    savedPositionsQuery.data ?? savedPositionsCache.payload;
   const positionsData: SocietyPositionPreview[] | null = accessWindow.isValid
     ? (positionsQuery.data ?? null)
     : null;
@@ -329,6 +397,8 @@ export function DashboardFoundation() {
     personal: personalData,
     positions: positionsData,
     positionsFailed: positionsQuery.isError,
+    saved: savedPositionsData,
+    savedFailed: savedPositionsQuery.isError,
     society: societyData,
   });
 
@@ -355,9 +425,12 @@ export function DashboardFoundation() {
 
   // ── Priorità ────────────────────────────────────────────────────────────
 
+  // I segnali personali arrivano già normalizzati dalla fonte autorevole:
+  // §15 vieta che il client decida eligibility o confronti il cutoff con
+  // l'orologio del dispositivo.
   const signals: PrioritySignal[] = isSociety
     ? (societyData?.prioritySignals ?? [])
-    : buildPersonalSignals(actorId, personalData);
+    : (personalData?.prioritySignals ?? []);
 
   const signalsKey = signals
     .map((signal) => `${signal.aggregationKey}:${signal.count}`)
@@ -464,6 +537,7 @@ export function DashboardFoundation() {
 
   const hasPayload = isSociety ? !!societyData : !!personalData;
 
+
   useEffect(() => {
     if (!current || !hasPayload || firstRenderReportedRef.current) {
       return;
@@ -550,7 +624,7 @@ export function DashboardFoundation() {
       const results = await Promise.all(
         isSociety
           ? [societyQuery.refetch(), positionsQuery.refetch()]
-          : [personalQuery.refetch()],
+          : [personalQuery.refetch(), savedPositionsQuery.refetch()],
       );
 
       // Il completamento non richiede che ogni dominio abbia avuto successo,
@@ -599,6 +673,7 @@ export function DashboardFoundation() {
     personalQuery,
     positionsQuery,
     refresh,
+    savedPositionsQuery,
     showToast,
     societyQuery,
   ]);
@@ -638,7 +713,12 @@ export function DashboardFoundation() {
     </AppText>
   );
 
-  const isHydrated = isSociety ? societyCache.isHydrated : personalCache.isHydrated;
+  // Il personale ha due provider: la shell resta in skeleton finché
+  // entrambi i record di cache sono stati letti, altrimenti il modulo
+  // Salvati comparirebbe dopo gli altri anche quando ha dati in cache.
+  const isHydrated = isSociety
+    ? societyCache.isHydrated
+    : personalCache.isHydrated && savedPositionsCache.isHydrated;
 
   // Il primo caricamento mostra subito shell, identità nota e skeleton: la
   // composizione non è nota finché l'elenco identità non è risolto.
@@ -752,36 +832,81 @@ export function DashboardFoundation() {
   }
 
   const summary = isSociety
-    ? buildSocietySummary(societyData ?? undefined)
-    : buildPersonalSummary(personalData ?? undefined);
+    ? buildSocietySummary(societyData ?? undefined, go)
+    : buildPersonalSummary(personalData ?? undefined, go);
 
-  const priorities = ranking.visible.map((priority, index) => ({
-    accessibilityLabel: [
-      priority.actionLabel,
-      priority.title,
-      priority.contextLabel,
-    ]
-      .filter(Boolean)
-      .join(", "),
-    actionLabel: priority.actionLabel,
-    description: priority.contextLabel,
-    icon: PRIORITY_ICONS[priority.definition.id],
-    id: priority.key,
-    onPress: () => {
-      trackPriorityTap({
-        identityKind: current.kind,
-        position: index,
-        typeId: priority.definition.id,
-      });
+  const priorities = ranking.visible.map((priority, index) => {
+    const description = isSociety
+      ? priority.contextLabel
+      : describePersonalPriority(priority);
 
-      // Aprire la destinazione canonica **non** risolve la priorità: la
-      // risoluzione arriva dal dominio (§10, QA-05).
-      router.push(priority.href as never);
-    },
-    title: priority.title,
-  })) satisfies DashboardPriorityItem[];
+    return {
+      // §25: lo screen reader annuncia la scadenza **e** la destinazione.
+      accessibilityLabel: [priority.title, description, priority.actionLabel]
+        .filter(Boolean)
+        .join(". "),
+      actionLabel: priority.actionLabel,
+      description,
+      icon: PRIORITY_ICONS[priority.definition.id],
+      id: priority.key,
+      onPress: () => {
+        trackPriorityTap({
+          identityKind: current.kind,
+          position: index,
+          typeId: priority.definition.id,
+        });
+
+        // Aprire la destinazione canonica **non** risolve la priorità: la
+        // risoluzione arriva dal dominio (§10, QA-05).
+        router.push(priority.href as never);
+      },
+      presentation: priority.definition.presentation,
+      title: priority.title,
+    };
+  }) satisfies DashboardPriorityItem[];
+
+  /**
+   * §16: con più elementi eleggibili delle due preview mostrate, un accesso
+   * contestuale alla lista pertinente. La destinazione è l'area canonica dei
+   * Salvati — §16 vieta di creare una pagina "Tutte le scadenze", e il
+   * contesto "ordinamento per scadenza" non esiste in quella lista, quindi si
+   * apre la lista Salvate ordinaria sul filtro Posizioni.
+   */
+  const deadlineOverflow =
+    !isSociety && (personalData?.deadlinesTotalCount ?? 0) > 2
+      ? {
+          label: "Vedi tutte le opportunità salvate",
+          onPress: () =>
+            go("personal_deadlines", "/saved?filter=position"),
+        }
+      : null;
 
   const quickActions = buildQuickActions(composition.quickActions, go);
+
+  /**
+   * Deduplicazione della presentazione (§12).
+   *
+   * Due regole, entrambe su riferimenti canonici e non su titoli: una
+   * scadenza promossa non si ripete nella preview dei Salvati, e un
+   * aggiornamento recente non si ripete nella preview delle candidature.
+   *
+   * Non tocca i conteggi, i bookmark, le candidature o le liste complete: è
+   * una regola di presentazione.
+   */
+  const promotedAdIds = new Set(
+    ranking.visible
+      .filter((priority) => priority.definition.id === "saved_deadline")
+      .map((priority) => priority.signal.targetId),
+  );
+
+  const updatesLimit = recentUpdatesBudget(ranking.visible.length);
+  const visibleUpdates = (personalData?.recentUpdates ?? []).slice(
+    0,
+    updatesLimit,
+  );
+  const updatedApplicationIds = new Set(
+    visibleUpdates.map((update) => update.applicationId),
+  );
 
   // Offline con dati ancora utilizzabili: indicatore compatto, nessun
   // overlay disabilitante (master 05).
@@ -817,7 +942,10 @@ export function DashboardFoundation() {
 
         {summary.length > 0 ? <DashboardSummary metrics={summary} /> : null}
 
-        <DashboardPriority items={priorities} />
+        <DashboardPriority
+          items={priorities}
+          overflowAction={deadlineOverflow}
+        />
 
         <DashboardQuickActions actions={quickActions} />
 
@@ -825,16 +953,27 @@ export function DashboardFoundation() {
           <ModuleRenderer
             key={module.id}
             moduleId={module.id}
+            now={rankedAt}
             onNavigate={go}
             onRetryPositions={() => void positionsQuery.refetch()}
+            onRetrySaved={() => void savedPositionsQuery.refetch()}
+            onToggleSaved={(adId) =>
+              toggleSaved.mutate({ adId, isSaved: true })
+            }
             personal={personalData}
             personalError={!!personalQuery.error}
             positions={positionsData}
             positionsError={!!positionsQuery.error}
             positionsRetrying={positionsQuery.isFetching}
+            promotedAdIds={promotedAdIds}
+            saved={savedPositionsData}
+            savedError={!!savedPositionsQuery.error}
+            savedRetrying={savedPositionsQuery.isFetching}
             society={societyData}
             societyError={!!societyQuery.error}
             title={module.title}
+            updatedApplicationIds={updatedApplicationIds}
+            updates={visibleUpdates}
           />
         ))}
       </ScrollView>
@@ -858,6 +997,34 @@ function plural(count: number, one: string, many: string): string {
 }
 
 /**
+ * Riga di contesto "Società · Squadra · Categoria" (§9, §10).
+ *
+ * La categoria entra solo quando **aggiunge** qualcosa: nel dominio il nome
+ * della squadra coincide spesso con la categoria ("Primavera", "Under 17"), e
+ * ripeterla produrrebbe "Varese Calcio · Primavera · Primavera". §9 chiede la
+ * categoria «quando utile e disponibile», non sempre.
+ */
+function metaLine(
+  clubName: string | null,
+  teamName: string | null,
+  category: string | null,
+): string {
+  const normalized = (value: string | null) =>
+    value?.trim().toLocaleLowerCase("it-IT") ?? "";
+
+  const parts = [clubName, teamName];
+
+  if (category && normalized(category) !== normalized(teamName)) {
+    parts.push(category);
+  }
+
+  return parts
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
  * Righe utili per modulo.
  *
  * `null` significa **non ancora noto**: in errore o in caricamento. È la
@@ -868,6 +1035,8 @@ function moduleRowCounts(input: {
   personal: PersonalDashboardData | null | undefined;
   positions: SocietyPositionPreview[] | null;
   positionsFailed: boolean;
+  saved: PersonalSavedPosition[] | null;
+  savedFailed: boolean;
   society: SocietyOverview | null | undefined;
 }): Partial<Record<DashboardModuleId, number | null>> {
   const society = input.society;
@@ -875,7 +1044,18 @@ function moduleRowCounts(input: {
 
   return {
     personal_applications: personal ? personal.applications.length : null,
-    personal_saved_positions: personal ? personal.savedPositions.length : null,
+    personal_profile_suggestion: personal
+      ? personal.optionalSuggestion
+        ? 1
+        : 0
+      : null,
+    personal_recent_updates: personal ? personal.recentUpdates.length : null,
+    // Provider separato: un fallimento resta `null` (non noto) e non diventa
+    // una lista vuota, altrimenti un errore si travestirebbe da "nessuna
+    // posizione salvata" (§22).
+    personal_saved_positions: input.savedFailed
+      ? null
+      : (input.saved?.length ?? null),
     society_applications: society
       ? (society.applicationsPreview?.length ?? 0)
       : null,
@@ -891,36 +1071,35 @@ function moduleRowCounts(input: {
 }
 
 /**
- * Segnali di priorità dell'identità personale.
+ * Contesto e descrizione di una priorità personale (§13, §16).
  *
- * La condizione è di **stato** e non di evento: l'actor si è dichiarato
- * disponibile al trasferimento senza indicare dove. Non esiste un istante da
- * usare come recency, e inventarne uno (per esempio `Date.now()`) la
- * porterebbe sistematicamente in cima: resta l'epoch, cioè l'ultimo posto a
- * parità di tutto il resto.
+ * Il backend manda i pezzi, non la frase: qui si compone con le stesse
+ * tabelle di localizzazione usate altrove. Una scadenza illeggibile non
+ * produce una frase inventata — resta senza descrizione, e la promozione era
+ * comunque già stata decisa server-side.
  */
-function buildPersonalSignals(
-  actorId: string,
-  data: PersonalDashboardData | null | undefined,
-): PrioritySignal[] {
-  if (!data?.needsAvailability || !actorId) {
-    return [];
+function describePersonalPriority(priority: ResolvedPriority): string | null {
+  const { payload } = priority.signal;
+
+  if (priority.definition.id === "saved_deadline") {
+    return priority.signal.deadlineAt
+      ? formatDeadlineRowLabel(priority.signal.deadlineAt, {
+          actionType: "apply",
+          timeZone: payload?.deadlineTimezone ?? null,
+        })
+      : null;
   }
 
-  return [
-    {
-      aggregationKey: `availability_required:${actorId}`,
-      contextLabel: "Indica le aree in cui cerchi squadra.",
-      count: 1,
-      deadlineAt: null,
-      impact: null,
-      occurredAt: new Date(0).toISOString(),
-      revision: 0,
-      targetId: actorId,
-      targetKind: "profile_section",
-      typeId: "availability_required",
-    },
-  ];
+  if (priority.definition.id === "profile_requirements_missing") {
+    return (
+      aggregateRequirements(
+        payload?.requirements ?? [],
+        payload?.hubHref ?? null,
+      )?.description ?? null
+    );
+  }
+
+  return priority.contextLabel;
 }
 
 /**
@@ -944,11 +1123,13 @@ function emptyCopy(
   }
 
   if (quickActions.includes("personal_search_positions")) {
+    // Copy letterale di §23 (master 06). Una sola CTA: §8 vieta di ripeterla
+    // anche in Azioni rapide quando il Global Empty la porta già.
     return {
       actionLabel: "Cerca posizioni",
-      body: "Non hai ancora candidature o posizioni salvate. Cerca nuove opportunità su PROLINK.",
+      body: "Esplora le posizioni aperte e candidati con il tuo profilo.",
       icon: "search-outline",
-      title: "Inizia da qui",
+      title: "Trova la tua prossima opportunità",
     };
   }
 
@@ -975,14 +1156,26 @@ function emptyAction(
   }
 
   if (quickActions.includes("personal_search_positions")) {
-    return () => go("personal_empty_cta", "/(tabs)/cerca");
+    return () => go("personal_empty_cta", "/search/positions");
   }
 
   return null;
 }
 
+/**
+ * Riepilogo personale: **due** metriche (§7).
+ *
+ * Niente follower, visite, like, notifiche, messaggi, compatibilità o
+ * completezza; nessun KPI fisso "Aggiornamenti" o "In scadenza".
+ *
+ * Entrambe sono tappabili perché entrambe hanno una destinazione con lo
+ * stesso perimetro del conteggio: le candidature attive aprono Le mie
+ * candidature sul filtro attive, le posizioni salvate aprono i Salvati sul
+ * filtro Posizioni — che è esattamente ciò che il numero conta.
+ */
 function buildPersonalSummary(
   data: PersonalDashboardData | undefined,
+  go: (moduleId: string, href: string) => void,
 ): SummaryMetric[] {
   if (!data) {
     return [];
@@ -1001,6 +1194,7 @@ function buildPersonalSummary(
         "Candidatura attiva",
         "Candidature attive",
       ),
+      onPress: () => go("personal_summary", "/applications?filter=active"),
       value: data.activeApplicationsCount,
     },
     {
@@ -1015,6 +1209,7 @@ function buildPersonalSummary(
         "Posizione salvata",
         "Posizioni salvate",
       ),
+      onPress: () => go("personal_summary", "/saved?filter=position"),
       value: data.savedPositionsCount,
     },
   ];
@@ -1031,6 +1226,10 @@ function buildPersonalSummary(
  */
 function buildSocietySummary(
   data: SocietyOverview | undefined,
+  // Nessuna destinazione con lo stesso perimetro dei conteggi Società oggi:
+  // il parametro esiste per simmetria con il riepilogo personale e per non
+  // costringere a cambiare firma quando quelle destinazioni arriveranno.
+  _go: (moduleId: string, href: string) => void,
 ): SummaryMetric[] {
   if (!data) {
     return [];
@@ -1104,11 +1303,14 @@ function buildQuickActions(
   return ids.map((id) => {
     switch (id) {
       case "personal_search_positions":
+        // §20: «Cerca posizioni → CER-04». La home di Cerca è un'altra
+        // destinazione: costringerebbe a un passaggio in più proprio
+        // nell'unica azione rapida personale.
         return {
           icon: "search-outline" as const,
           id,
           label: "Cerca posizioni",
-          onPress: () => go(id, "/(tabs)/cerca"),
+          onPress: () => go(id, "/search/positions"),
         };
       case "society_new_position":
         return {
@@ -1141,16 +1343,28 @@ function buildQuickActions(
 
 type ModuleRendererProps = {
   moduleId: DashboardModuleId;
+  /** Istante congelato del render, per le etichette relative (§28). */
+  now: number;
   onNavigate: (moduleId: string, href: string) => void;
   onRetryPositions: () => void;
+  onRetrySaved: () => void;
+  onToggleSaved: (adId: string) => void;
   personal: PersonalDashboardData | null | undefined;
   personalError: boolean;
   positions: SocietyPositionPreview[] | null;
   positionsError: boolean;
   positionsRetrying: boolean;
+  /** Ad già mostrati come scadenza promossa in "Da gestire" (§12). */
+  promotedAdIds: ReadonlySet<string>;
+  saved: PersonalSavedPosition[] | null;
+  savedError: boolean;
+  savedRetrying: boolean;
   society: SocietyOverview | null | undefined;
   societyError: boolean;
   title: string;
+  /** Candidature già mostrate in "Aggiornamenti recenti" (§12). */
+  updatedApplicationIds: ReadonlySet<string>;
+  updates: PersonalUpdate[];
 };
 
 /**
@@ -1162,80 +1376,203 @@ type ModuleRendererProps = {
  */
 function ModuleRenderer({
   moduleId,
+  now,
   onNavigate,
   onRetryPositions,
+  onRetrySaved,
+  onToggleSaved,
   personal,
   personalError,
   positions,
   positionsError,
   positionsRetrying,
+  promotedAdIds,
+  saved,
+  savedError,
+  savedRetrying,
   society,
   societyError,
   title,
+  updatedApplicationIds,
+  updates,
 }: ModuleRendererProps) {
   switch (moduleId) {
-    case "personal_applications":
+    /**
+     * §11: presentazione informativa, distinta dalle azioni obbligatorie.
+     * Nessuna CTA di sezione: aprire la row porta già al dettaglio della
+     * candidatura, e una "Vedi tutti" qui duplicherebbe quella del modulo
+     * Candidature verso la stessa lista.
+     */
+    case "personal_recent_updates":
+      return (
+        <DataModule
+          emptyMessage=""
+          errorMessage="Non siamo riusciti a caricare gli aggiornamenti."
+          hasData={!!personal}
+          hideWhenEmpty
+          isEmpty={updates.length === 0}
+          isError={personalError}
+          title={title}
+        >
+          {updates.map((item, index) => (
+            <DashboardEntityRow
+              avatarName={item.clubName}
+              avatarUrl={item.clubLogoUrl}
+              key={item.applicationId}
+              meta={[item.clubName, item.teamName].filter(Boolean).join(" · ")}
+              onPress={() =>
+                onNavigate(moduleId, `/applications/${item.applicationId}`)
+              }
+              showDivider={index > 0}
+              // Stato corrente e data dell'evento restano due informazioni
+              // separate (§11): "Aggiornata" non è uno stato.
+              status={
+                APPLICATION_STATUS_LABELS[
+                  item.status as keyof typeof APPLICATION_STATUS_LABELS
+                ] ?? null
+              }
+              statusPlacement="trailing"
+              title={getPlayerPositionLabel(item.role, item.role)}
+              trailingMeta={formatUpdateLabel(item.occurredAt, now)}
+            />
+          ))}
+        </DataModule>
+      );
+
+    case "personal_applications": {
+      const preview = dedupePreview(
+        personal?.applications ?? [],
+        (item) => item.id,
+        updatedApplicationIds,
+      );
+
       return (
         <DataModule
           action={{
             label: "Vedi tutte",
-            onPress: () => onNavigate(moduleId, "/(tabs)/announcements"),
+            onPress: () => onNavigate(moduleId, "/applications"),
           }}
-          emptyMessage="Non hai candidature attive."
+          // §12: tutte le preview già mostrate in alto non producono un falso
+          // "Nessuna candidatura" — il modulo si riduce al solo accesso alla
+          // lista completa.
+          collapsedToAction={preview.collapsed}
+          // §23: con Salvate presenti e nessuna candidatura, un empty
+          // locale leggero — senza ripetere la CTA "Cerca posizioni", che è
+          // già fra le azioni rapide.
+          emptyMessage="Nessuna candidatura ancora"
           errorMessage="Non siamo riusciti a caricare le candidature."
           hasData={!!personal}
-          hideWhenEmpty
-          isEmpty={(personal?.applications ?? []).length === 0}
+          isEmpty={preview.items.length === 0}
           isError={personalError}
           title={title}
         >
-          {(personal?.applications ?? []).map((item, index) => (
+          {preview.items.map((item, index) => (
             <DashboardEntityRow
               avatarName={item.clubName}
               avatarUrl={item.clubLogoUrl}
               key={item.id}
-              meta={item.clubName}
-              onPress={() => onNavigate(moduleId, `/position/${item.adId}`)}
+              // §9: ruolo come titolo, poi società e squadra, categoria
+              // «quando utile e disponibile» — e non è utile quando ripete il
+              // nome della squadra, che nel dominio è spesso la categoria
+              // stessa ("Primavera", "Under 17").
+              meta={metaLine(item.clubName, item.teamName, item.category)}
+              // §9: la row apre il **dettaglio della candidatura** tramite il
+              // suo ID. Aprire la posizione mostrerebbe l'annuncio, non lo
+              // stato e il percorso della candidatura.
+              onPress={() => onNavigate(moduleId, `/applications/${item.id}`)}
               showDivider={index > 0}
               status={
                 APPLICATION_STATUS_LABELS[
                   item.status as keyof typeof APPLICATION_STATUS_LABELS
                 ] ?? null
               }
+              statusPlacement="trailing"
               title={getPlayerPositionLabel(item.role, item.role)}
+              trailingMeta={
+                hasSignificantUpdate(item) && item.lastEventAt
+                  ? formatUpdateLabel(item.lastEventAt, now)
+                  : null
+              }
             />
           ))}
         </DataModule>
       );
+    }
 
-    case "personal_saved_positions":
+    case "personal_saved_positions": {
+      const preview = dedupePreview(
+        saved ?? [],
+        (item) => item.adId,
+        promotedAdIds,
+      );
+
       return (
         <DataModule
           action={{
             label: "Vedi tutte",
-            onPress: () => onNavigate(moduleId, "/saved"),
+            onPress: () => onNavigate(moduleId, "/saved?filter=position"),
           }}
+          collapsedToAction={preview.collapsed}
           emptyMessage="Non hai posizioni salvate."
-          errorMessage="Non siamo riusciti a caricare le posizioni."
-          hasData={!!personal}
+          errorMessage="Non siamo riusciti a caricare le posizioni salvate."
+          hasData={!!saved}
           hideWhenEmpty
-          isEmpty={(personal?.savedPositions ?? []).length === 0}
-          isError={personalError}
+          isEmpty={preview.items.length === 0}
+          isError={savedError}
+          isRetrying={savedRetrying}
+          onRetry={onRetrySaved}
           title={title}
         >
-          {(personal?.savedPositions ?? []).map((item, index) => (
+          {preview.items.map((item, index) => (
             <DashboardEntityRow
               avatarName={item.clubName}
               avatarUrl={item.clubLogoUrl}
+              // §10: bookmark come azione distinta. Nessuna scadenza, nessuna
+              // descrizione, nessun "Candidati", nessun punteggio.
+              bookmark={{
+                isSaved: true,
+                onToggle: () => onToggleSaved(item.adId),
+              }}
               key={item.adId}
-              meta={item.clubName}
+              meta={metaLine(item.clubName, item.teamName, item.category)}
               onPress={() => onNavigate(moduleId, `/position/${item.adId}`)}
               showDivider={index > 0}
+              // Una posizione chiusa resta nei Salvati: §10 vieta di
+              // cancellarne silenziosamente il bookmark per "ripulire" la
+              // Dashboard. Lo dice invece di nasconderlo.
+              status={item.isAvailable ? null : "Non più disponibile"}
               title={getPlayerPositionLabel(item.role, item.role)}
+              // §10: località pubblica pertinente, sulla terza riga come nel
+              // master. Niente indirizzi: città e regione della Società.
+              trailingMeta={item.location}
             />
           ))}
         </DataModule>
       );
+    }
+
+    /**
+     * §19: suggerimento facoltativo, sotto i moduli operativi. Non ha un
+     * titolo di sezione proprio: lo porta la superficie, perché un header
+     * "Migliora la tua visibilità" sopra una card con lo stesso testo
+     * raddoppierebbe il messaggio.
+     */
+    case "personal_profile_suggestion": {
+      if (!personal?.optionalSuggestion) {
+        return null;
+      }
+
+      return (
+        <DashboardSuggestion
+          actionLabel="Imposta aree"
+          body="Indica le aree in cui sei disponibile."
+          onPress={() =>
+            onNavigate(moduleId, personal.optionalSuggestion?.href ?? "/profile/edit")
+          }
+          title={title}
+        />
+      );
+    }
 
     case "society_positions":
       return (
@@ -1411,6 +1748,14 @@ function ModuleRenderer({
 type DataModuleProps = {
   action?: { label: string; onPress: () => void };
   children: React.ReactNode;
+  /**
+   * Tutte le preview erano già mostrate più in alto (§12).
+   *
+   * Non è "vuoto": il modulo si riduce a un accesso compatto alla lista
+   * completa, perché §12 vieta sia il falso "Nessuna candidatura" sia la
+   * sparizione della risorsa.
+   */
+  collapsedToAction?: boolean;
   emptyMessage: string;
   errorMessage: string;
   /** Esiste un payload utilizzabile — da rete o da cache. */
@@ -1438,6 +1783,7 @@ type DataModuleProps = {
 function DataModule({
   action,
   children,
+  collapsedToAction = false,
   emptyMessage,
   errorMessage,
   hasData,
@@ -1468,6 +1814,12 @@ function DataModule({
   }
 
   if (isEmpty) {
+    // §12: la deduplicazione ha svuotato la preview, non il dato. Resta il
+    // solo accesso alla lista completa, e **non** un empty che mentirebbe.
+    if (collapsedToAction && action) {
+      return <DashboardSection action={action} title={title} />;
+    }
+
     return hideWhenEmpty ? null : (
       <DashboardSection title={title}>
         <DashboardModuleEmpty message={emptyMessage} />

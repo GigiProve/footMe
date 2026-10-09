@@ -1,6 +1,25 @@
 import { supabase } from "../../lib/supabase";
 
+/**
+ * Stato dell'azione per l'utente corrente (DAS-REV-03 §15, §17).
+ *
+ * Calcolato da `public.dashboard_position_action_state`, la stessa funzione
+ * che decide se promuovere il reminder in Dashboard: due definizioni di
+ * eligibility divergerebbero al primo cambiamento, e §17 vieta di scegliere
+ * la CTA arbitrariamente.
+ */
+export type PositionActionState = {
+  action_type: "apply" | "register" | "none";
+  already_applied: boolean;
+  can_apply: boolean;
+  deadline_at: string | null;
+  deadline_timezone: string | null;
+  is_open: boolean;
+  reason: string | null;
+};
+
 export type PositionDetail = {
+  action: PositionActionState;
   ad_id: string;
   title: string;
   description: string;
@@ -11,6 +30,11 @@ export type PositionDetail = {
   category: string | null;
   region: string | null;
   compensation_summary: string | null;
+  /**
+   * Data locale legacy, senza istante né fuso. Resta per Cerca (CER-01/04) e
+   * **non** è il cutoff: §14 vieta di assumerne silenziosamente mezzanotte o
+   * fine giornata. Il cutoff autorevole è `action.deadline_at`.
+   */
   deadline: string | null;
   published_at: string | null;
   is_saved: boolean;
@@ -34,8 +58,11 @@ export async function fetchPositionDetail(
   profileId: string,
   adId: string,
 ): Promise<PositionDetail | null> {
-  const [{ data: adData, error: adError }, { data: savedData, error: savedError }] =
-    await Promise.all([
+  const [
+    { data: adData, error: adError },
+    { data: savedData, error: savedError },
+    { data: actionData, error: actionError },
+  ] = await Promise.all([
       supabase
         .from("recruiting_ads")
         .select(
@@ -50,6 +77,7 @@ export async function fetchPositionDetail(
         .eq("ad_id", adId)
         .eq("profile_id", profileId)
         .maybeSingle(),
+      supabase.rpc("dashboard_position_action_state", { p_ad_id: adId }),
     ]);
 
   if (adError) {
@@ -60,6 +88,10 @@ export async function fetchPositionDetail(
     throw savedError;
   }
 
+  if (actionError) {
+    throw actionError;
+  }
+
   if (!adData) {
     return null;
   }
@@ -67,6 +99,15 @@ export async function fetchPositionDetail(
   const ad = adData as unknown as AdDetailRow;
 
   return {
+    action: (actionData as PositionActionState | null) ?? {
+      action_type: "none",
+      already_applied: false,
+      can_apply: false,
+      deadline_at: null,
+      deadline_timezone: null,
+      is_open: true,
+      reason: null,
+    },
     ad_id: ad.id,
     category: ad.category,
     club_id: ad.clubs?.id ?? ad.club_id,

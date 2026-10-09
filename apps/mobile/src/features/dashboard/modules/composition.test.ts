@@ -100,9 +100,14 @@ describe("composeDashboard", () => {
       (module) => module.id,
     );
 
+    // DAS-REV-03 §6: ordine ordinario della composizione personale —
+    // Aggiornamenti recenti, Le tue candidature, Posizioni salvate ed
+    // eventuale suggerimento facoltativo, che resta per ultimo.
     expect(modules).toEqual([
+      "personal_recent_updates",
       "personal_applications",
       "personal_saved_positions",
+      "personal_profile_suggestion",
     ]);
   });
 

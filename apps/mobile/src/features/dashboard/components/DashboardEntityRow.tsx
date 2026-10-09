@@ -27,6 +27,16 @@ export type DashboardEntityRowProps = {
   showDivider?: boolean;
   /** Label canonica del dominio: "Nuova", "In valutazione", "Bozza". */
   status?: string | null;
+  /**
+   * Dove va lo stato (DAS-REV-03 §9).
+   *
+   * `below` è il trattamento di DAS-REV-01, che la Dashboard Società usa
+   * ancora: stato e data sotto i metadata. `trailing` è quello del mockup
+   * DAS-REV-03, con stato e aggiornamento in colonna a destra prima del
+   * chevron. La colonna destra non comprime il titolo: ha larghezza propria,
+   * e un nome lungo manda a capo la colonna sinistra invece di troncare.
+   */
+  statusPlacement?: "below" | "trailing";
   /** Data o informazione in coda allo stato. */
   trailingMeta?: string | null;
   title: string;
@@ -54,9 +64,11 @@ export function DashboardEntityRow({
   onPress,
   showDivider = false,
   status,
+  statusPlacement = "below",
   trailingMeta,
   title,
 }: DashboardEntityRowProps) {
+  const isTrailing = statusPlacement === "trailing";
   const statusLine = [status, trailingMeta].filter(Boolean).join(" · ");
 
   return (
@@ -101,12 +113,38 @@ export function DashboardEntityRow({
               </AppText>
             ) : null}
 
-            {statusLine ? (
+            {statusLine && !isTrailing ? (
               <AppText color="muted" numberOfLines={1} variant="caption">
                 {statusLine}
               </AppText>
             ) : null}
           </View>
+
+          {isTrailing && (status || trailingMeta) ? (
+            <View style={styles.trailing}>
+              {status ? (
+                <AppText
+                  color="secondary"
+                  numberOfLines={2}
+                  style={styles.trailingText}
+                  variant="caption"
+                >
+                  {status}
+                </AppText>
+              ) : null}
+
+              {trailingMeta ? (
+                <AppText
+                  color="muted"
+                  numberOfLines={2}
+                  style={styles.trailingText}
+                  variant="caption"
+                >
+                  {trailingMeta}
+                </AppText>
+              ) : null}
+            </View>
+          ) : null}
         </Pressable>
 
         {bookmark ? (
@@ -171,6 +209,17 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: spacing[4],
+  },
+  // Colonna destra di stato e aggiornamento (§9). `flexShrink: 0` con un
+  // `maxWidth`: non comprime il titolo e non si allarga a mangiarlo.
+  trailing: {
+    alignItems: "flex-end",
+    flexShrink: 0,
+    gap: spacing[4],
+    maxWidth: "38%",
+  },
+  trailingText: {
+    textAlign: "right",
   },
   // La miniatura non detta l'altezza del modulo: è alta quanto un avatar md.
   thumbnail: {

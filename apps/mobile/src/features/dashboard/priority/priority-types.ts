@@ -82,10 +82,33 @@ export type PriorityTargetKind =
   | "content"
   | "profile_section";
 
+/**
+ * Metadati specifici del tipo, trasportati dal segnale senza entrare nel
+ * contratto comune (DAS-REV-03 §21: «Le preview utilizzano ID canonici e soli
+ * metadati necessari»).
+ *
+ * Qui non c'è testo precotto: il backend manda ruolo, società e squadra, il
+ * client compone la riga con le stesse tabelle di localizzazione usate
+ * altrove. `requirements` è l'elenco dei requisiti obbligatori mancanti, che
+ * §13 chiede di far confluire in un solo elemento.
+ */
+export type PrioritySignalPayload = {
+  adTitle?: string | null;
+  clubName?: string | null;
+  /** Fuso in cui il cutoff è espresso. Serve al dettaglio, non alla row. */
+  deadlineTimezone?: string | null;
+  /** Hub di modifica del ruolo, destinazione di più requisiti aggregati. */
+  hubHref?: string | null;
+  requirements?: { description: string; href: string; key: string }[];
+  role?: string | null;
+  teamName?: string | null;
+};
+
 export type DashboardPriorityTypeId =
   | "new_applications"
   | "publication_failed"
-  | "availability_required";
+  | "saved_deadline"
+  | "profile_requirements_missing";
 
 /**
  * Segnale operativo normalizzato, così come arriva dall'adapter.
@@ -109,6 +132,8 @@ export type PrioritySignal = {
   impact: number | null;
   /** Istante dell'evento operativo reale, per la recency (§8). */
   occurredAt: string;
+  /** Metadati del tipo, opzionali: i tipi Società non ne hanno bisogno. */
+  payload?: PrioritySignalPayload;
   /** Revisione del dato: protegge da risposte obsolete (§10). */
   revision: number;
   targetId: string;
@@ -131,6 +156,15 @@ export type PriorityTypeDefinition = {
   /** Modulo promosso quando questa priorità vince. `null` = nessuna promozione. */
   moduleId: DashboardModuleId | null;
   nature: PriorityNature;
+  /**
+   * Trattamento dentro "Da gestire" (DAS-REV-03 §16).
+   *
+   * `card` è la superficie leggera con icona della Foundation. `row` è il
+   * gruppo compatto con divider fra gli elementi che §16 chiede per le
+   * scadenze: «Il link è leggero, non un grande pulsante.» Due scadenze non
+   * devono diventare due cartelli.
+   */
+  presentation: "card" | "row";
   resolution: PriorityResolutionRule;
   /** Dominio di origine, per la diagnostica e per la copertura dei test. */
   source: string;

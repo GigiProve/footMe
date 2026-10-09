@@ -17,8 +17,10 @@ import type {
 import type { DashboardFeatureKey } from "./dashboard-features";
 
 export const DASHBOARD_MODULE_IDS = [
+  "personal_recent_updates",
   "personal_applications",
   "personal_saved_positions",
+  "personal_profile_suggestion",
   "society_applications",
   "society_areas",
   "society_positions",
@@ -68,6 +70,30 @@ export type ModuleDefinition = {
 };
 
 export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
+  /**
+   * DAS-REV-03 §11: presentazione **informativa** di eventi professionali
+   * già avvenuti, distinta dalle azioni obbligatorie di "Da gestire".
+   *
+   * `countsAsContent: false`: un aggiornamento esiste solo se esiste la
+   * candidatura che lo ha generato, quindi contarlo come contenuto non
+   * aggiungerebbe nulla al calcolo del Global Empty e renderebbe quest'ultimo
+   * dipendente da una sezione informativa.
+   *
+   * `order: 5`: §6 lo colloca dopo Azioni rapide e prima di "Le tue
+   * candidature".
+   */
+  personal_recent_updates: {
+    capabilitiesAll: [],
+    capabilitiesAny: [],
+    countsAsContent: false,
+    emptyPolicy: "hide",
+    feature: "personal_recent_updates",
+    id: "personal_recent_updates",
+    kinds: ["person", "media"],
+    order: 5,
+    schemaVersion: 1,
+    title: "Aggiornamenti recenti",
+  },
   personal_applications: {
     capabilitiesAll: [],
     capabilitiesAny: [],
@@ -91,6 +117,28 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
     order: 20,
     schemaVersion: 1,
     title: "Posizioni salvate",
+  },
+  /**
+   * DAS-REV-03 §19: suggerimento **facoltativo** sulle aree geografiche.
+   *
+   * È un modulo e non una priorità perché §19 lo vuole «sotto i moduli
+   * operativi» e vieta di chiamarlo Informazioni richieste o Da gestire: la
+   * gerarchia, il testo e la posizione devono comunicarne il carattere
+   * facoltativo. `countsAsContent: false` per la stessa ragione — un
+   * suggerimento non dimostra che la Dashboard ha attività utili, e §23
+   * vieta che trasformi il primo accesso in un onboarding obbligatorio.
+   */
+  personal_profile_suggestion: {
+    capabilitiesAll: [],
+    capabilitiesAny: [],
+    countsAsContent: false,
+    emptyPolicy: "hide",
+    feature: "personal_availability",
+    id: "personal_profile_suggestion",
+    kinds: ["person", "media"],
+    order: 30,
+    schemaVersion: 1,
+    title: "Migliora la tua visibilità",
   },
   /**
    * DAS-REV-02 §24: il master ordinario mostra "Posizioni aperte" come

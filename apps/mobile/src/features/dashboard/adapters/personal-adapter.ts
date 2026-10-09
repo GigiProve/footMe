@@ -1,18 +1,23 @@
 import { supabase } from "../../../lib/supabase";
+import type { PrioritySignal } from "../priority/priority-types";
 
 /**
- * Adapter della Dashboard personale (master 01).
+ * Adapter della Dashboard personale (DAS-REV-03).
  *
- * Le risorse personali sono già protette dalla RLS dell'actor su se stesso
- * (`is_current_user`), quindi qui non serve una RPC: una select scoped sul
- * proprio profilo è esattamente ciò che il database consente e nulla di più.
+ * DAS-REV-01 leggeva tre select dirette dal client. Non basta più: §15 chiede
+ * che eligibility, autorizzazione e confronto temporale siano server-side, e
+ * §11 che gli aggiornamenti nascano da eventi reali e non da `updated_at`.
+ * Entrambe le cose vivono ora in `fetch_dashboard_personal_overview`.
  *
- * L'adapter è separato da quello Società anche se la riga visuale è la
- * stessa: riutilizzare l'archetipo non significa unificare i modelli (§7).
+ * Due provider, non uno: le Posizioni salvate hanno il proprio, così il loro
+ * fallimento resta locale al modulo mentre riepilogo, candidature e
+ * aggiornamenti restano utilizzabili (§22). Riepilogo, segnali, requisiti,
+ * candidature e aggiornamenti condividono invece la stessa fonte, e §21
+ * vieta di duplicare la richiesta.
  */
 
 /** Stati che il dominio considera una candidatura ancora "attiva". */
-const ACTIVE_APPLICATION_STATUSES = [
+export const ACTIVE_APPLICATION_STATUSES = [
   "submitted",
   "reviewing",
   "shortlisted",
@@ -20,31 +25,82 @@ const ACTIVE_APPLICATION_STATUSES = [
 
 export type PersonalApplication = {
   adId: string;
-  adTitle: string;
+  category: string | null;
   clubLogoUrl: string | null;
   clubName: string;
+  createdAt: string;
   id: string;
+  /** Istante dell'ultimo evento professionale reale. Null = nessun evento. */
+  lastEventAt: string | null;
+  /** Stato raggiunto da quell'evento: distinto dallo stato corrente (§11). */
+  lastEventTo: string | null;
   role: string;
   status: string;
+  teamName: string | null;
+};
+
+/**
+ * Riga di "Aggiornamenti recenti" (§11).
+ *
+ * Tiene separati stato corrente (`status`), evento significativo
+ * (`eventStatus`) e data dell'evento (`occurredAt`): sono tre cose diverse e
+ * confonderle è il modo canonico di inventare un aggiornamento che non c'è.
+ */
+export type PersonalUpdate = {
+  adId: string;
+  applicationId: string;
+  clubLogoUrl: string | null;
+  clubName: string;
+  eventStatus: string;
+  occurredAt: string;
+  role: string;
+  status: string;
+  teamName: string | null;
 };
 
 export type PersonalSavedPosition = {
   adId: string;
-  adTitle: string;
+  category: string | null;
+  clubId: string | null;
   clubLogoUrl: string | null;
   clubName: string;
+  /** La posizione è ancora pubblicata. Una chiusa resta nei Salvati (§10). */
+  isAvailable: boolean;
+  location: string | null;
   role: string;
+  savedAt: string;
+  teamName: string | null;
+};
+
+/** Requisito canonico mancante, già risolto in copy e destinazione (§13). */
+export type PersonalRequirement = {
+  description: string;
+  href: string;
+  key: string;
+};
+
+/** Suggerimento facoltativo del profilo (§19). Mai un requisito. */
+export type PersonalSuggestion = {
+  href: string;
+  key: string;
 };
 
 export type PersonalDashboardData = {
   activeApplicationsCount: number;
   applications: PersonalApplication[];
-  needsAvailability: boolean;
-  savedPositions: PersonalSavedPosition[];
+  /** Scadenze eleggibili totali, prima del cap di due della fonte (§16). */
+  deadlinesTotalCount: number;
+  optionalSuggestion: PersonalSuggestion | null;
+  /** Finestre effettive applicate dal backend, per la diagnostica. */
+  policy: { promotionWindowDays: number; recencyDays: number };
+  prioritySignals: PrioritySignal[];
+  priorityTotalCount: number;
+  recentUpdates: PersonalUpdate[];
+  requirements: PersonalRequirement[];
   savedPositionsCount: number;
 };
 
-/** Forma minima accettata per riusare un record di cache (§14). */
+/** Forma minima accettata per riusare un record di cache. */
 export function isPersonalDashboardData(
   value: unknown,
 ): value is PersonalDashboardData {
@@ -56,183 +112,196 @@ export function isPersonalDashboardData(
 
   return (
     Array.isArray(candidate.applications) &&
-    Array.isArray(candidate.savedPositions) &&
-    typeof candidate.needsAvailability === "boolean"
+    Array.isArray(candidate.recentUpdates) &&
+    Array.isArray(candidate.prioritySignals) &&
+    Array.isArray(candidate.requirements)
   );
 }
 
-type AdJoin = {
-  club: { logo_url: string | null; name: string } | null;
-  id: string;
-  role_required: string;
-  title: string;
+export function isPersonalSavedPositions(
+  value: unknown,
+): value is PersonalSavedPosition[] {
+  return Array.isArray(value);
+}
+
+type OverviewRow = {
+  active_applications_count: number | null;
+  applications_preview: unknown;
+  deadlines_total_count: number | null;
+  optional_suggestion: unknown;
+  policy: unknown;
+  priority_signals: unknown;
+  priority_total_count: number | null;
+  profile_requirements: unknown;
+  recent_updates: unknown;
+  saved_positions_count: number | null;
 };
 
-/**
- * Un solo round trip per ciascun dominio, in parallelo. §20 vieta sia le
- * quindici richieste separate sia la risposta monolitica che attende il
- * dominio più lento: tre query indipendenti sono il compromesso onesto.
- */
-export async function fetchPersonalDashboard(
-  profileId: string,
-): Promise<PersonalDashboardData> {
-  const [applications, saved, availability] = await Promise.all([
-    fetchApplications(profileId),
-    fetchSavedPositions(profileId),
-    fetchNeedsAvailability(profileId),
-  ]);
+type RawApplication = {
+  ad_id: string;
+  category: string | null;
+  club_logo_url: string | null;
+  club_name: string | null;
+  created_at: string;
+  id: string;
+  last_event_at: string | null;
+  last_event_to: string | null;
+  role: string;
+  status: string;
+  team_name: string | null;
+};
+
+type RawUpdate = {
+  ad_id: string;
+  application_id: string;
+  club_logo_url: string | null;
+  club_name: string | null;
+  event_status: string;
+  occurred_at: string;
+  role: string;
+  status: string;
+  team_name: string | null;
+};
+
+type RawSignal = {
+  ad_title?: string | null;
+  aggregation_key: string;
+  club_name?: string | null;
+  count: number;
+  deadline_at?: string | null;
+  deadline_timezone?: string | null;
+  hub_href?: string | null;
+  occurred_at: string;
+  requirements?: PersonalRequirement[];
+  role?: string | null;
+  target_id: string;
+  target_kind: string;
+  team_name?: string | null;
+  type_id: string;
+};
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+export async function fetchPersonalDashboard(): Promise<PersonalDashboardData> {
+  const { data, error } = await supabase
+    .rpc("fetch_dashboard_personal_overview")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const row = (data ?? {}) as OverviewRow;
+  const policy = (row.policy ?? {}) as Record<string, number>;
 
   return {
-    activeApplicationsCount: applications.activeCount,
-    applications: applications.preview,
-    needsAvailability: availability,
-    savedPositions: saved.preview,
-    savedPositionsCount: saved.count,
+    activeApplicationsCount: row.active_applications_count ?? 0,
+    applications: asArray<RawApplication>(row.applications_preview).map(
+      (item) => ({
+        adId: item.ad_id,
+        category: item.category,
+        clubLogoUrl: item.club_logo_url,
+        clubName: item.club_name ?? "",
+        createdAt: item.created_at,
+        id: item.id,
+        lastEventAt: item.last_event_at,
+        lastEventTo: item.last_event_to,
+        role: item.role,
+        status: item.status,
+        teamName: item.team_name,
+      }),
+    ),
+    deadlinesTotalCount: row.deadlines_total_count ?? 0,
+    optionalSuggestion: (row.optional_suggestion as PersonalSuggestion) ?? null,
+    policy: {
+      promotionWindowDays: policy.deadline_promotion_window_days ?? 7,
+      recencyDays: policy.application_update_recency_days ?? 7,
+    },
+    prioritySignals: asArray<RawSignal>(row.priority_signals).map(toSignal),
+    priorityTotalCount: row.priority_total_count ?? 0,
+    recentUpdates: asArray<RawUpdate>(row.recent_updates).map((item) => ({
+      adId: item.ad_id,
+      applicationId: item.application_id,
+      clubLogoUrl: item.club_logo_url,
+      clubName: item.club_name ?? "",
+      eventStatus: item.event_status,
+      occurredAt: item.occurred_at,
+      role: item.role,
+      status: item.status,
+      teamName: item.team_name,
+    })),
+    requirements: asArray<PersonalRequirement>(row.profile_requirements),
+    savedPositionsCount: row.saved_positions_count ?? 0,
   };
 }
 
-async function fetchApplications(profileId: string) {
-  // Il totale arriva da `count: exact`, non dalla lunghezza della preview:
-  // §20 è esplicito su questo, ed è l'errore che rende i numeri inspiegabili.
-  const { count, error: countError } = await supabase
-    .from("recruiting_applications")
-    .select("id", { count: "exact", head: true })
-    .eq("applicant_profile_id", profileId)
-    .in("status", ACTIVE_APPLICATION_STATUSES);
-
-  if (countError) {
-    throw countError;
-  }
-
-  const { data, error } = await supabase
-    .from("recruiting_applications")
-    .select(
-      "id, status, ad:recruiting_ads!inner(id, title, role_required, club:clubs!inner(name, logo_url))",
-    )
-    .eq("applicant_profile_id", profileId)
-    .in("status", ACTIVE_APPLICATION_STATUSES)
-    .order("created_at", { ascending: false })
-    .limit(3);
-
-  if (error) {
-    throw error;
-  }
-
-  const preview = (data ?? []).flatMap((row) => {
-    const ad = row.ad as unknown as AdJoin | null;
-
-    if (!ad) {
-      return [];
-    }
-
-    return [
-      {
-        adId: ad.id,
-        adTitle: ad.title,
-        clubLogoUrl: ad.club?.logo_url ?? null,
-        clubName: ad.club?.name ?? "",
-        id: row.id as string,
-        role: ad.role_required,
-        status: row.status as string,
-      },
-    ];
-  });
-
-  return { activeCount: count ?? 0, preview };
-}
-
-async function fetchSavedPositions(profileId: string) {
-  const { count, error: countError } = await supabase
-    .from("saved_ads")
-    .select("ad_id", { count: "exact", head: true })
-    .eq("profile_id", profileId);
-
-  if (countError) {
-    throw countError;
-  }
-
-  const { data, error } = await supabase
-    .from("saved_ads")
-    .select(
-      "ad_id, ad:recruiting_ads!inner(id, title, role_required, club:clubs!inner(name, logo_url))",
-    )
-    .eq("profile_id", profileId)
-    .order("created_at", { ascending: false })
-    .limit(3);
-
-  if (error) {
-    throw error;
-  }
-
-  const preview = (data ?? []).flatMap((row) => {
-    const ad = row.ad as unknown as AdJoin | null;
-
-    if (!ad) {
-      return [];
-    }
-
-    return [
-      {
-        adId: ad.id,
-        adTitle: ad.title,
-        clubLogoUrl: ad.club?.logo_url ?? null,
-        clubName: ad.club?.name ?? "",
-        role: ad.role_required,
-      },
-    ];
-  });
-
-  return { count: count ?? 0, preview };
-}
-
 /**
- * Condizione della priorità "Completa la disponibilità" (master 01).
- *
- * Non è un suggerimento universale: compare solo per chi **ha dichiarato** un
- * ambito geografico ristretto (REGIONS o PROVINCES) ed è aperto a
- * trasferimenti, ma non ha poi indicato alcuna area. In quel caso la ricerca
- * per zona non può trovarlo, ed è un'attività concreta.
- *
- * Chi ha ambito ITALY è già coperto: §16 vieta di trasformare il mockup in un
- * obbligo di completamento per ogni utente.
+ * Il contesto della riga ("Attaccante · Varese Calcio") è composto qui dalle
+ * sue parti, non precotto dal backend: §8 della Foundation chiede un
+ * `contextLabel` localizzabile, e il ruolo va tradotto dal client con la
+ * stessa tabella usata ovunque.
  */
-async function fetchNeedsAvailability(profileId: string): Promise<boolean> {
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("is_open_to_transfer")
-    .eq("id", profileId)
-    .maybeSingle();
+function toSignal(raw: RawSignal): PrioritySignal {
+  return {
+    aggregationKey: raw.aggregation_key,
+    contextLabel: null,
+    count: raw.count,
+    deadlineAt: raw.deadline_at ?? null,
+    impact: null,
+    occurredAt: raw.occurred_at,
+    revision: 0,
+    targetId: raw.target_id,
+    targetKind: raw.target_kind as PrioritySignal["targetKind"],
+    typeId: raw.type_id as PrioritySignal["typeId"],
+    // Metadati specifici del tipo, letti dai builder di presentazione.
+    payload: {
+      adTitle: raw.ad_title ?? null,
+      clubName: raw.club_name ?? null,
+      deadlineTimezone: raw.deadline_timezone ?? null,
+      hubHref: raw.hub_href ?? null,
+      requirements: raw.requirements ?? [],
+      role: raw.role ?? null,
+      teamName: raw.team_name ?? null,
+    },
+  };
+}
 
-  if (profileError) {
-    throw profileError;
-  }
+type RawSavedPosition = {
+  ad_id: string;
+  category: string | null;
+  club_id: string | null;
+  club_logo_url: string | null;
+  club_name: string | null;
+  is_available: boolean;
+  location: string | null;
+  role: string;
+  saved_at: string;
+  team_name: string | null;
+};
 
-  if (!profile?.is_open_to_transfer) {
-    return false;
-  }
-
-  const { data, error } = await supabase
-    .from("player_profiles")
-    .select("availability_type, transfer_regions, transfer_provinces")
-    .eq("profile_id", profileId)
-    .maybeSingle();
+export async function fetchPersonalSavedPositions(): Promise<
+  PersonalSavedPosition[]
+> {
+  const { data, error } = await supabase.rpc(
+    "fetch_dashboard_personal_saved_positions",
+  );
 
   if (error) {
     throw error;
   }
 
-  if (!data) {
-    // Non è un calciatore: la disponibilità geografica non è pertinente.
-    return false;
-  }
-
-  if (data.availability_type === "REGIONS") {
-    return (data.transfer_regions ?? []).length === 0;
-  }
-
-  if (data.availability_type === "PROVINCES") {
-    return (data.transfer_provinces ?? []).length === 0;
-  }
-
-  return false;
+  return asArray<RawSavedPosition>(data).map((item) => ({
+    adId: item.ad_id,
+    category: item.category,
+    clubId: item.club_id,
+    clubLogoUrl: item.club_logo_url,
+    clubName: item.club_name ?? "",
+    isAvailable: item.is_available,
+    location: item.location,
+    role: item.role,
+    savedAt: item.saved_at,
+    teamName: item.team_name,
+  }));
 }

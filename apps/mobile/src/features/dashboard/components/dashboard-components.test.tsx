@@ -245,6 +245,7 @@ describe("DashboardPriority", () => {
             icon: "people-outline",
             id: "p",
             onPress,
+            presentation: "card",
             title: "5 nuove candidature",
           },
         ]}

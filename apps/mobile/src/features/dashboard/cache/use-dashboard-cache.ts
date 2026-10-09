@@ -41,10 +41,12 @@ export function useDashboardCache<TPayload>(input: {
   identity: DashboardIdentity | null;
   isPayload: (value: unknown) => value is TPayload;
   provider: FreshnessProvider;
+  /** Distingue due provider della stessa identità (DAS-REV-03 §22). */
+  scope?: string;
 }): DashboardCacheState<TPayload> & {
   store: (payload: TPayload, accessVerifiedAt: number, revision: number) => void;
 } {
-  const { actorId, identity, isPayload, provider } = input;
+  const { actorId, identity, isPayload, provider, scope } = input;
 
   const [state, setState] = useState<DashboardCacheState<TPayload>>({
     accessVerifiedAt: null,
@@ -56,7 +58,9 @@ export function useDashboardCache<TPayload>(input: {
 
   // Il contesto per cui lo stato corrente è valido. Serve a ignorare una
   // lettura asincrona che ritorna dopo uno switch (§21).
-  const contextKey = identity ? `${actorId}:${identity.id}` : "";
+  const contextKey = identity
+    ? `${actorId}:${identity.id}:${scope ?? "overview"}`
+    : "";
   const contextRef = useRef(contextKey);
 
   useEffect(() => {
@@ -99,6 +103,7 @@ export function useDashboardCache<TPayload>(input: {
       isPayload,
       now: Date.now(),
       provider,
+      scope,
     }).then((result) => {
       if (!isMounted || contextRef.current !== expectedContext) {
         return;
@@ -132,7 +137,7 @@ export function useDashboardCache<TPayload>(input: {
     // rieseguirebbe l'idratazione a ogni render se un chiamante passasse una
     // lambda.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actorId, contextKey, identity, provider]);
+  }, [actorId, contextKey, identity, provider, scope]);
 
   // Retention: i payload oltre il limite spariscono dal disco. Non estende la
   // finestra di visualizzazione, che resta quella di `freshness-policy`.
@@ -163,9 +168,10 @@ export function useDashboardCache<TPayload>(input: {
         now,
         payload,
         revision,
+        scope,
       });
     },
-    [actorId, identity],
+    [actorId, identity, scope],
   );
 
   return { ...state, store };

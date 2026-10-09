@@ -19,6 +19,9 @@
 export type DashboardFeatureKey =
   | "personal_applications"
   | "personal_availability"
+  | "personal_event_registrations"
+  | "personal_profile_requirements"
+  | "personal_recent_updates"
   | "personal_saved_positions"
   | "society_applications"
   | "society_content_create"
@@ -41,6 +44,8 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
   personal_applications: { available: true },
   personal_saved_positions: { available: true },
   personal_availability: { available: true },
+  personal_profile_requirements: { available: true },
+  personal_recent_updates: { available: true },
   society_positions: { available: true },
   society_applications: { available: true },
   society_teams: { available: true },
@@ -49,6 +54,26 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
   society_content_create: { available: true },
 
   // ── Non disponibili: contratto pronto, dominio assente ─────────────────
+  /**
+   * DAS-REV-03 §16: «Se provini o registrazioni non sono ancora disponibili
+   * nel progetto: mantenere dichiarata l'integrazione; proteggerne la
+   * disponibilità con il meccanismo esistente; non mostrare CTA non
+   * funzionanti in produzione.»
+   *
+   * `dashboard_position_action_state` conosce già l'action type `register` nel
+   * suo vocabolario e non lo emette mai: non esiste un Event con iscrizione.
+   * Le scadenze promosse oggi sono quindi solo quelle delle Posizioni con
+   * `application_deadline_at`, e nessuna CTA "Iscriviti" viene disegnata.
+   */
+  personal_event_registrations: {
+    available: false,
+    blockedReason:
+      "Il dominio Eventi/provini non esiste: nessuna tabella di evento, " +
+      "nessuna iscrizione, nessun termine di registrazione. La scadenza " +
+      "promossa resta quella della Posizione (application_deadline_at) e " +
+      "l'action type 'register' non viene mai emesso.",
+    owner: "Pack Eventi (DAS-REV-28–31)",
+  },
   society_scheduled_content: {
     available: false,
     blockedReason:

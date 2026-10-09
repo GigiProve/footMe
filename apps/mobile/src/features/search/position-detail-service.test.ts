@@ -6,6 +6,10 @@ type MockResponse = { data: unknown; error: unknown };
 
 const mocks = vi.hoisted(() => {
   const queues = new Map<string, MockResponse[]>();
+  // DAS-REV-03 §17: il dettaglio chiede anche l'action state, che è una RPC.
+  const rpc = vi.fn(() =>
+    Promise.resolve({ data: null, error: null } as MockResponse),
+  );
   const calls: { table: string; steps: [string, unknown[]][] }[] = [];
 
   const from = vi.fn((table: string) => {
@@ -29,11 +33,11 @@ const mocks = vi.hoisted(() => {
     return builder;
   });
 
-  return { calls, from, queues };
+  return { calls, from, queues, rpc };
 });
 
 vi.mock("../../lib/supabase", () => ({
-  supabase: { from: mocks.from },
+  supabase: { from: mocks.from, rpc: mocks.rpc },
 }));
 
 function enqueue(table: string, response: MockResponse) {
@@ -46,6 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.queues.clear();
   mocks.calls.length = 0;
+  mocks.rpc.mockResolvedValue({ data: null, error: null });
 });
 
 describe("fetchPositionDetail", () => {
@@ -71,6 +76,17 @@ describe("fetchPositionDetail", () => {
     const detail = await fetchPositionDetail("u1", "ad1");
 
     expect(detail).toEqual({
+      // §17: con una RPC senza risposta l'azione è "none" — il dettaglio non
+      // inventa un'eligibility che il backend non ha confermato.
+      action: {
+        action_type: "none",
+        already_applied: false,
+        can_apply: false,
+        deadline_at: null,
+        deadline_timezone: null,
+        is_open: true,
+        reason: null,
+      },
       ad_id: "ad1",
       category: "Serie D",
       club_id: "c1",

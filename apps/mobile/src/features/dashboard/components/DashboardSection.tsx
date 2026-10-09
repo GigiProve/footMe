@@ -7,7 +7,11 @@ import { AppText } from "../../../ui";
 
 type Props = {
   action?: { label: string; onPress: () => void };
-  children: ReactNode;
+  /**
+   * Opzionale: §12 di DAS-REV-03 prevede un modulo ridotto al solo accesso
+   * alla lista quando tutte le preview sono già mostrate più in alto.
+   */
+  children?: ReactNode;
   title: string;
 };
 
