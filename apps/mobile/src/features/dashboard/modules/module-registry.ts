@@ -21,6 +21,7 @@ export const DASHBOARD_MODULE_IDS = [
   "personal_saved_positions",
   "society_applications",
   "society_areas",
+  "society_positions",
   "society_drafts",
   "society_recent_content",
 ] as const;
@@ -40,12 +41,26 @@ export type ModuleDefinition = {
   capabilitiesAll: readonly DashboardCapability[];
   /** Almeno una di queste, se l'elenco non è vuoto. */
   capabilitiesAny: readonly DashboardCapability[];
+  /**
+   * Il modulo porta **contenuto operativo** oppure è una scorciatoia di
+   * navigazione? (§13)
+   *
+   * Solo il primo tipo dimostra che la Dashboard ha caricato qualcosa di
+   * utile. Un elenco di aree con un conteggio a zero è ancora una pagina
+   * vuota: contarlo come contenuto renderebbe il Global Empty del master 08
+   * irraggiungibile per qualunque Società autorizzata.
+   */
+  countsAsContent: boolean;
   emptyPolicy: EmptyPolicy;
   feature: DashboardFeatureKey;
   id: DashboardModuleId;
   /** Tipi di identità su cui il modulo ha senso. */
   kinds: readonly DashboardIdentityKind[];
-  /** Ordine base. Il riordino dinamico è di DAS-REV-02. */
+  /**
+   * Ordine base (§11). È l'ordine senza priorità: per lo scenario sportivo
+   * Posizioni aperte precede Candidature ricevute. La promozione di
+   * DAS-REV-02 non lo riscrive, lo sovrascrive temporaneamente.
+   */
   order: number;
   /** Versione dello schema dati del modulo, per cache e rollout. */
   schemaVersion: number;
@@ -56,6 +71,7 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
   personal_applications: {
     capabilitiesAll: [],
     capabilitiesAny: [],
+    countsAsContent: true,
     emptyPolicy: "hide",
     feature: "personal_applications",
     id: "personal_applications",
@@ -67,6 +83,7 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
   personal_saved_positions: {
     capabilitiesAll: [],
     capabilitiesAny: [],
+    countsAsContent: true,
     emptyPolicy: "hide",
     feature: "personal_saved_positions",
     id: "personal_saved_positions",
@@ -75,36 +92,57 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
     schemaVersion: 1,
     title: "Posizioni salvate",
   },
+  /**
+   * DAS-REV-02 §24: il master ordinario mostra "Posizioni aperte" come
+   * modulo con azione **Gestisci** e due preview, non come sola riga di
+   * "Aree di gestione". Senza questo modulo non esisterebbe l'ordine base
+   * che la promozione deve poter ripristinare (§11).
+   */
+  society_positions: {
+    capabilitiesAll: ["positions_view"],
+    capabilitiesAny: [],
+    countsAsContent: true,
+    emptyPolicy: "show_empty",
+    feature: "society_positions",
+    id: "society_positions",
+    kinds: ["society"],
+    order: 10,
+    schemaVersion: 1,
+    title: "Posizioni aperte",
+  },
   society_applications: {
     capabilitiesAll: ["applications_view"],
     capabilitiesAny: [],
+    countsAsContent: true,
     emptyPolicy: "show_empty",
     feature: "society_applications",
     id: "society_applications",
     kinds: ["society"],
-    order: 10,
+    order: 20,
     schemaVersion: 1,
     title: "Candidature ricevute",
   },
   society_drafts: {
     capabilitiesAll: ["content_view"],
     capabilitiesAny: [],
+    countsAsContent: true,
     emptyPolicy: "hide",
     feature: "society_drafts",
     id: "society_drafts",
     kinds: ["society"],
-    order: 20,
+    order: 30,
     schemaVersion: 1,
     title: "Bozze e programmati",
   },
   society_recent_content: {
     capabilitiesAll: ["content_view"],
     capabilitiesAny: [],
+    countsAsContent: true,
     emptyPolicy: "hide",
     feature: "society_recent_content",
     id: "society_recent_content",
     kinds: ["society"],
-    order: 30,
+    order: 40,
     schemaVersion: 1,
     title: "Contenuti recenti",
   },
@@ -113,11 +151,12 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
     // Il modulo "Aree di gestione" esiste se almeno una delle due righe è
     // autorizzata: ciascuna riga viene poi filtrata separatamente.
     capabilitiesAny: ["positions_view", "teams_view"],
+    countsAsContent: false,
     emptyPolicy: "hide",
     feature: "society_positions",
     id: "society_areas",
     kinds: ["society"],
-    order: 40,
+    order: 50,
     schemaVersion: 1,
     title: "Aree di gestione",
   },

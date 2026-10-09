@@ -21,6 +21,7 @@ export {
 export {
   ToastProvider,
   useToast,
+  type ToastAction,
   type ToastOptions,
   type ToastTone,
 } from "./Toast/ToastProvider";

@@ -184,6 +184,7 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
         avatarUrl: profile?.avatar_url,
         email: session?.user.email,
         fullName: profile?.full_name,
+        profileId: profile?.id,
       });
       onClose();
       router.replace("/(auth)/sign-in");

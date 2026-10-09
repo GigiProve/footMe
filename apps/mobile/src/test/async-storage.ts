@@ -16,6 +16,14 @@ const AsyncStorage = {
   async clear() {
     store.clear();
   },
+  // La cache della Dashboard enumera e rimuove in blocco le chiavi di un
+  // actor (DAS-REV-02 §15): senza queste due il logout non sarebbe testabile.
+  async getAllKeys() {
+    return [...store.keys()];
+  },
+  async multiRemove(keys: string[]) {
+    keys.forEach((key) => store.delete(key));
+  },
 };
 
 export default AsyncStorage;

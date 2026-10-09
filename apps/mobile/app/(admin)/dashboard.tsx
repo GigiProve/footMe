@@ -122,6 +122,7 @@ export default function AdminDashboardScreen() {
             avatarUrl: profile?.avatar_url,
             email: session?.user.email,
             fullName: profile?.full_name,
+            profileId: profile?.id,
           });
           router.replace("/(auth)/sign-in");
         },

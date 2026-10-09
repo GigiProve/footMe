@@ -14,6 +14,12 @@ export type DashboardEntityRowProps = {
   bookmark?: EntityRowBookmark;
   avatarName?: string;
   avatarUrl?: string | null;
+  /**
+   * Tile con icona al posto dell'avatar: lo usano le Posizioni, che non sono
+   * persone e non hanno un logo proprio. Un avatar con le iniziali del ruolo
+   * (AT per Attaccante) direbbe una cosa falsa.
+   */
+  icon?: keyof typeof Ionicons.glyphMap;
   /** Thumbnail rettangolare dei contenuti editoriali. */
   thumbnailUrl?: string | null;
   meta?: string | null;
@@ -42,6 +48,7 @@ export function DashboardEntityRow({
   bookmark,
   avatarName,
   avatarUrl,
+  icon,
   thumbnailUrl,
   meta,
   onPress,
@@ -68,7 +75,11 @@ export function DashboardEntityRow({
             pressed ? styles.pressed : null,
           ]}
         >
-          {thumbnailUrl !== undefined ? (
+          {icon ? (
+            <View style={styles.iconTile}>
+              <Ionicons color={colors.accent} name={icon} size={20} />
+            </View>
+          ) : thumbnailUrl !== undefined ? (
             <Thumbnail uri={thumbnailUrl} />
           ) : (
             <Avatar
@@ -171,6 +182,14 @@ const styles = StyleSheet.create({
   thumbnailEmpty: {
     borderColor: colors.border,
     borderWidth: 1,
+  },
+  iconTile: {
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius[8],
+    height: 40,
+    justifyContent: "center",
+    width: 40,
   },
   secondaryAction: {
     alignItems: "center",

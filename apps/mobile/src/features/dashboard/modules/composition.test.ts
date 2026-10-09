@@ -111,7 +111,10 @@ describe("composeDashboard", () => {
       identity("society", FULL_SOCIETY),
     ).modules.map((module) => module.id);
 
+    // DAS-REV-02 §11: senza priorità, Posizioni aperte precede Candidature
+    // ricevute. È l'ordine base che la promozione deve poter ripristinare.
     expect(modules).toEqual([
+      "society_positions",
       "society_applications",
       "society_drafts",
       "society_recent_content",
@@ -135,7 +138,11 @@ describe("composeDashboard", () => {
       identity("society", ["dashboard_view", "content_view"]),
     ).modules.map((module) => module.id);
 
-    expect(sport).toEqual(["society_applications", "society_areas"]);
+    expect(sport).toEqual([
+      "society_positions",
+      "society_applications",
+      "society_areas",
+    ]);
     expect(editorial).toEqual(["society_drafts", "society_recent_content"]);
   });
 });

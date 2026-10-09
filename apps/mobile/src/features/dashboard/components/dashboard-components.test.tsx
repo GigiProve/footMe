@@ -238,13 +238,14 @@ describe("DashboardPriority", () => {
       <DashboardPriority
         items={[
           {
+            accessibilityLabel:
+              "Valuta candidature, 5 nuove candidature, Attaccante · Prima squadra",
             actionLabel: "Valuta candidature",
             description: "Attaccante · Prima squadra",
             icon: "people-outline",
             id: "p",
             onPress,
             title: "5 nuove candidature",
-            tone: "neutral",
           },
         ]}
       />,
@@ -256,7 +257,9 @@ describe("DashboardPriority", () => {
     expect(content).toContain("Attaccante · Prima squadra");
 
     const action = renderer.root.find(
-      (node) => node.props.accessibilityLabel === "Valuta candidature",
+      (node) =>
+        node.props.accessibilityLabel ===
+        "Valuta candidature, 5 nuove candidature, Attaccante · Prima squadra",
     );
     act(() => action.props.onPress());
     expect(onPress).toHaveBeenCalledTimes(1);

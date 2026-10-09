@@ -44,6 +44,23 @@ export type PersonalDashboardData = {
   savedPositionsCount: number;
 };
 
+/** Forma minima accettata per riusare un record di cache (§14). */
+export function isPersonalDashboardData(
+  value: unknown,
+): value is PersonalDashboardData {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<PersonalDashboardData>;
+
+  return (
+    Array.isArray(candidate.applications) &&
+    Array.isArray(candidate.savedPositions) &&
+    typeof candidate.needsAvailability === "boolean"
+  );
+}
+
 type AdJoin = {
   club: { logo_url: string | null; name: string } | null;
   id: string;
