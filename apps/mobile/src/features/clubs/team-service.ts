@@ -41,41 +41,6 @@ export async function fetchClubTeams(clubId: string): Promise<ClubTeam[]> {
   return data ?? [];
 }
 
-export async function upsertClubTeam(
-  team: Omit<ClubTeam, "id"> & { id?: string },
-): Promise<ClubTeam> {
-  const { data, error } = await supabase
-    .from("club_teams")
-    .upsert(team)
-    .select(TEAM_COLUMNS)
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function insertClubTeams(
-  teams: Omit<ClubTeam, "id">[],
-): Promise<ClubTeam[]> {
-  if (teams.length === 0) return [];
-
-  const { data, error } = await supabase
-    .from("club_teams")
-    .insert(teams)
-    .select(TEAM_COLUMNS);
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function deleteClubTeam(teamId: string): Promise<void> {
-  const { error } = await supabase
-    .from("club_teams")
-    .delete()
-    .eq("id", teamId);
-
-  if (error) throw error;
-}
-
 export async function fetchClubTeamProfiles(
   teamIds: string[],
 ): Promise<Record<string, ClubTeamProfileDetails>> {
@@ -98,21 +63,6 @@ export async function fetchClubTeamProfiles(
       return [profile.team_id, profile];
     }),
   );
-}
-
-export async function upsertClubTeamProfile(
-  profile: ClubTeamProfileDetails,
-): Promise<void> {
-  const { error } = await supabase.from("club_team_profiles").upsert({
-    competition_name: profile.competition_name,
-    group_name: profile.group_name,
-    media_urls: profile.media_urls,
-    promoted_players_count: profile.promoted_players_count,
-    recent_results: profile.recent_results,
-    team_id: profile.team_id,
-  });
-
-  if (error) throw error;
 }
 
 function normalizeTeamProfile(

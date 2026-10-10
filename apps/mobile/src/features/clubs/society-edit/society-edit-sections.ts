@@ -77,7 +77,7 @@ const LINKED_SECTIONS: readonly ProfileEditHubSection[] = [
     // resta suo.
     icon: "people-outline",
     id: "teams",
-    route: "/club-admin/teams",
+    route: "/(tabs)/dashboard/teams",
     title: "Squadre del club",
   },
   {

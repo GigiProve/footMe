@@ -36,6 +36,12 @@ export const DASHBOARD_CAPABILITIES = [
   // chiave del dominio Shortlist, che esiste dal 20260717090000, non con una
   // regola nuova inventata nella Dashboard.
   "shortlist_view",
+  // DAS-REV-08 §5: quattro capability distinte sulle Squadre. Consultare non
+  // è creare, e leggere i conteggi dell'organico è una terza cosa ancora —
+  // `teams_view` da sola non autorizza nessuna delle altre due.
+  "teams_create",
+  "teams_edit",
+  "roster_view",
 ] as const;
 
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];

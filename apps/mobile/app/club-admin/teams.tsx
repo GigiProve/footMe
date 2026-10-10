@@ -1,67 +1,16 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { Redirect } from "expo-router";
 
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
-
-import { Screen } from "../../src/components/ui/screen";
-import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
-import { ScreenHeader } from "../../src/ui";
-import { ClubTeamsSection } from "../../src/features/clubs/components/ClubTeamsSection";
-import { colors, radius, spacing } from "../../src/theme/tokens";
-
-export default function ClubTeamsScreen() {
-  const router = useRouter();
-
-  return (
-    <Screen>
-      <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
-        <View style={styles.headerRow}>
-          <ScreenHeader
-            title="Squadre e affiliate"
-            action={
-              <Pressable
-                accessibilityLabel="Indietro"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={() => router.back()}
-                style={({ pressed }) => [
-                  styles.backButton,
-                  pressed ? styles.pressed : null,
-                ]}
-              >
-                <Ionicons
-                  color={colors.textPrimary}
-                  name="arrow-back"
-                  size={20}
-                />
-              </Pressable>
-            }
-          />
-        </View>
-
-        <ClubTeamsSection />
-      </KeyboardAwareForm>
-    </Screen>
-  );
+/**
+ * Vecchio accesso gestionale alle squadre.
+ *
+ * DAS-REV-08 §12 chiede **un solo centro e un solo form condiviso**,
+ * raggiungibili anche dagli accessi gestionali del profilo Società. Questa
+ * route resta come reindirizzamento perché è già nei link salvati e nei deep
+ * link, ma non ospita più una seconda gestione: la sezione "Squadre e
+ * affiliate" con `EditTeamsModal` scriveva nome e categoria direttamente su
+ * `club_teams`, cioè la fonte che ora appartiene alla configurazione
+ * stagionale.
+ */
+export default function LegacyClubTeamsRoute() {
+  return <Redirect href="/(tabs)/dashboard/teams" />;
 }
-
-const styles = StyleSheet.create({
-  backButton: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.full,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  headerRow: {
-    marginBottom: spacing[12],
-  },
-  pressed: {
-    opacity: 0.75,
-  },
-  scrollContent: {
-    gap: spacing[18],
-    paddingBottom: spacing[48],
-  },
-});

@@ -48,7 +48,7 @@ export const SOCIETY_HREFS = {
       : "/(tabs)/announcements?focus=positions",
   shortlist: "/shortlist",
   societyProfile: (clubId: string) => `/club/${clubId}`,
-  teams: "/club-admin/teams",
+  teams: "/(tabs)/dashboard/teams",
 } as const;
 
 /** Plurale minimo, senza concatenazioni fragili. */

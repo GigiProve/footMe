@@ -56,7 +56,7 @@ const MENU_ITEMS_AFTER: ClubMenuItem[] = [
   },
   {
     icon: "shield-outline",
-    route: "/club-admin/teams",
+    route: "/(tabs)/dashboard/teams",
     subtitle: "Gestisci squadre interne e società collegate",
     title: "Squadre e affiliate",
   },

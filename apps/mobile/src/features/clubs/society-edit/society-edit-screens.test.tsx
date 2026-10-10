@@ -297,7 +297,7 @@ describe("Hub Modifica profilo Società", () => {
     const tree = await render(<SocietyProfileEditHubScreen />);
 
     await press(tree, "society-profile-edit-row-teams");
-    expect(routerMocks.push).toHaveBeenCalledWith("/club-admin/teams");
+    expect(routerMocks.push).toHaveBeenCalledWith("/(tabs)/dashboard/teams");
 
     await press(tree, "society-profile-edit-row-affiliates");
     expect(routerMocks.push).toHaveBeenCalledWith("/club-admin/affiliates");
@@ -445,7 +445,7 @@ describe("Profilo sportivo", () => {
 
     await press(tree, "society-manage-teams");
 
-    expect(routerMocks.push).toHaveBeenCalledWith("/club-admin/teams");
+    expect(routerMocks.push).toHaveBeenCalledWith("/(tabs)/dashboard/teams");
   });
 });
 

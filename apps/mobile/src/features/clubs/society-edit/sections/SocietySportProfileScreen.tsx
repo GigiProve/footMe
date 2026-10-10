@@ -99,7 +99,7 @@ export function SocietySportProfileScreen() {
       profileType: "society",
       viewerMode: "owner",
     });
-    router.push("/club-admin/teams");
+    router.push("/(tabs)/dashboard/teams");
   }, []);
 
   const handleManageTeams = useUnsavedChangesGuard({

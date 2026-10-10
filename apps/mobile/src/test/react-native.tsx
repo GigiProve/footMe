@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from "react";
 
-import { createElement, forwardRef } from "react";
+import { createElement, forwardRef, isValidElement } from "react";
 
 const createComponent = (name: string) =>
   function MockComponent({
@@ -39,25 +39,55 @@ export const KeyboardAvoidingView = createComponent("KeyboardAvoidingView");
 type MockFlatListProps = {
   data?: readonly unknown[];
   keyExtractor?: (item: unknown, index: number) => string;
+  ListEmptyComponent?: unknown;
+  ListFooterComponent?: unknown;
+  ListHeaderComponent?: unknown;
   renderItem?: (info: { index: number; item: unknown }) => unknown;
 } & Record<string, unknown>;
+
+/**
+ * Le tre slot di contorno sono rese come le rende VirtualizedList: header e
+ * footer sempre, empty solo con `data` vuoto. Senza di loro una schermata
+ * che mette intestazione ed empty state dentro la lista — il Centro Squadre,
+ * per esempio — risultava vuota nei test pur essendo corretta a schermo.
+ */
+function renderSlot(slot: unknown) {
+  if (!slot) {
+    return null;
+  }
+
+  if (isValidElement(slot)) {
+    return slot;
+  }
+
+  return typeof slot === "function"
+    ? createElement(slot as () => never)
+    : null;
+}
 
 export function FlatList({
   data = [],
   keyExtractor,
+  ListEmptyComponent,
+  ListFooterComponent,
+  ListHeaderComponent,
   renderItem,
   ...props
 }: MockFlatListProps) {
   return createElement(
     "FlatList",
     props,
-    data.map((item, index) =>
-      createElement(
-        "View",
-        { key: keyExtractor ? keyExtractor(item, index) : String(index) },
-        renderItem ? (renderItem({ index, item }) as never) : null,
-      ),
-    ),
+    renderSlot(ListHeaderComponent),
+    data.length === 0
+      ? renderSlot(ListEmptyComponent)
+      : data.map((item, index) =>
+          createElement(
+            "View",
+            { key: keyExtractor ? keyExtractor(item, index) : String(index) },
+            renderItem ? (renderItem({ index, item }) as never) : null,
+          ),
+        ),
+    renderSlot(ListFooterComponent),
   );
 }
 export const Alert = {

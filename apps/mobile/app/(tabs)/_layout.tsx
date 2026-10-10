@@ -13,6 +13,12 @@ import { AppSidebar } from "../../src/ui/sidebar";
 import { colors, radius, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
 import { AppText, Icon, type IconName } from "../../src/ui";
 
+/**
+ * Radici delle tab su cui compare il menu laterale flottante. La Home non
+ * c'è: integra il menu nel proprio header.
+ */
+const TAB_ROOTS = ["/cerca", "/dashboard", "/messages", "/profile"];
+
 export default function TabsLayout() {
   const { isLoading, needsOnboarding, profile, session } = useSession();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -22,7 +28,11 @@ export default function TabsLayout() {
   // La Home ha un header proprio con "PROLINK" in alto a sinistra e integra il
   // menu come primo elemento della barra: il pulsante flottante si
   // sovrapporrebbe esattamente al nome. Sulle altre tab resta com'era.
-  const showFloatingMenu = pathname !== "/";
+  //
+  // Dalle schermate **annidate** dentro una tab il menu sparisce: hanno un
+  // back nello stesso angolo (DAS-REV-08 §4, Centro Squadre), e due bersagli
+  // sovrapposti non sono una navigazione.
+  const showFloatingMenu = TAB_ROOTS.includes(pathname);
 
   const conversationsQuery = useQuery({
     enabled: !!profileId,

@@ -103,8 +103,13 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
       "con Society ID, Team ID e stagione. Esiste solo /club/team/[id], che è " +
       "il profilo pubblico della squadra, e §15 vieta di sostituire la " +
       "destinazione gestionale con quello. Le righe della preview restano " +
-      "informative finché il centro Squadre non espone un dettaglio proprio.",
-    owner: "DAS-REV-08/09 — pack Squadre",
+      "informative finché il centro Squadre non espone un dettaglio proprio.\n" +
+      "DAS-REV-08: il Centro Squadre esiste e la sua riga apre il form di " +
+      "modifica di quel pack quando l'actor può modificarla — una " +
+      "destinazione reale, non un sostituto pubblico. Il dettaglio " +
+      "operativo vero (organico, attività, stagioni) resta di DAS-REV-09 e " +
+      "il flag resta falso finché non esiste.",
+    owner: "DAS-REV-09 — dettaglio operativo squadra",
   },
   society_article_composer: {
     available: false,

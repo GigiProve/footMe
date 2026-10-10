@@ -43,7 +43,6 @@ import { EditAgentMediaModal } from "../../src/features/profiles/edit-modals/Edi
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
 import { EditClubSportProfileModal } from "../../src/features/profiles/edit-modals/EditClubSportProfileModal";
 import { EditClubAffiliationsModal } from "../../src/features/profiles/edit-modals/EditClubAffiliationsModal";
-import { EditTeamsModal } from "../../src/features/profiles/edit-modals/EditTeamsModal";
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditDirectorMediaModal } from "../../src/features/profiles/edit-modals/EditDirectorMediaModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
@@ -1389,14 +1388,6 @@ export default function ProfileScreen() {
               />
               {completeProfile.club ? (
                 <>
-                  <EditTeamsModal
-                    clubId={completeProfile.club.id}
-                    clubName={completeProfile.club.name}
-                    onClose={handleCloseModal}
-                    onSaved={handleSaved}
-                    teams={clubTeams}
-                    visible={activeModal === "clubTeams"}
-                  />
                   <EditClubAffiliationsModal
                     clubId={completeProfile.club.id}
                     initialAffiliations={clubOverview.affiliations}
