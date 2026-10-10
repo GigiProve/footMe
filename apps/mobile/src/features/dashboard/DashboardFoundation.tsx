@@ -104,6 +104,7 @@ import { useDashboardCache } from "./cache/use-dashboard-cache";
 import { STALE_MS } from "./cache/freshness-policy";
 import { useDashboardIdentity } from "./identity/use-dashboard-identity";
 import { composeDashboard, type QuickActionId } from "./modules/composition";
+import { isFeatureAvailable } from "./modules/dashboard-features";
 import type { DashboardModuleId } from "./modules/module-registry";
 import {
   aggregateRequirements,
@@ -2176,10 +2177,18 @@ function ModuleRenderer({
               key={item.id}
               meta={teamContextLabel(item.name, item.category)}
               // §15 vieta di sostituire la destinazione gestionale con il
-              // profilo pubblico del Team. Il dettaglio operativo non esiste
-              // ancora (`society_team_detail` è bloccata), quindi la riga
-              // apre il centro Squadre invece di un percorso sbagliato.
-              onPress={() => onNavigate(moduleId, SOCIETY_HREFS.teams)}
+              // profilo pubblico del Team. Da DAS-REV-09 il dettaglio
+              // operativo esiste, e la riga apre quello con il Team ID; se il
+              // flag tornasse falso si ricadrebbe sul centro Squadre, mai sul
+              // profilo pubblico.
+              onPress={() =>
+                onNavigate(
+                  moduleId,
+                  isFeatureAvailable("society_team_detail")
+                    ? `/(tabs)/dashboard/team/${encodeURIComponent(item.id)}`
+                    : SOCIETY_HREFS.teams,
+                )
+              }
               showDivider={index > 0}
               title={item.name}
             />

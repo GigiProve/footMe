@@ -33,6 +33,7 @@ export type DashboardFeatureKey =
   | "society_recent_content"
   | "society_scheduled_content"
   | "society_team_detail"
+  | "society_team_group"
   | "society_teams";
 
 type FeatureConfig = {
@@ -66,6 +67,15 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
    * risolvono con lo stesso lavoro.
    */
   society_invites: { available: true },
+  /**
+   * DAS-REV-09: il dettaglio operativo della squadra esiste
+   * (`app/(tabs)/dashboard/team/[teamId]`), con header, Organico, Posizioni,
+   * Candidature e Inviti su dati e permessi reali.
+   *
+   * Da qui in poi la riga del Centro Squadre e la preview della Dashboard
+   * Società aprono **lo stesso** dettaglio, non più il form di modifica.
+   */
+  society_team_detail: { available: true },
 
   // ── Non disponibili: contratto pronto, dominio assente ─────────────────
   /**
@@ -96,20 +106,31 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
       "La colonna scheduled_count della RPC resta null finché non esiste.",
     owner: "Pack editoriale Società (HOM)",
   },
-  society_team_detail: {
+  /**
+   * DAS-REV-09 §17: il "Gruppo squadra" **non esiste come dominio**.
+   *
+   * `conversations` (20260309000000, estesa da 20260718090000 con
+   * `conversation_type in ('direct','group')`, `title`, `avatar_url`) non ha
+   * alcuna colonna verso `club_teams`, non esiste una tabella ponte, non
+   * esiste una RPC di creazione e nessuna schermata dell'app crea un gruppo:
+   * l'unico esistente è quello del seed demo, legato a una squadra soltanto
+   * dal testo del titolo.
+   *
+   * §3 colloca «gestione completa di Gruppi, partecipanti e messaggistica»
+   * fuori perimetro, quindi il pack si ferma al contratto: le colonne
+   * `group_*` di `fetch_team_detail`, il tipo nell'adapter e la riga
+   * `TeamGroupRow` esistono e sono testate, ma `group_supported` è `false` e
+   * il modulo non viene composto — nessuna CTA senza destinazione (§35).
+   */
+  society_team_group: {
     available: false,
     blockedReason:
-      "DAS-REV-07 §15 chiede che la riga Squadra apra il dettaglio operativo " +
-      "con Society ID, Team ID e stagione. Esiste solo /club/team/[id], che è " +
-      "il profilo pubblico della squadra, e §15 vieta di sostituire la " +
-      "destinazione gestionale con quello. Le righe della preview restano " +
-      "informative finché il centro Squadre non espone un dettaglio proprio.\n" +
-      "DAS-REV-08: il Centro Squadre esiste e la sua riga apre il form di " +
-      "modifica di quel pack quando l'actor può modificarla — una " +
-      "destinazione reale, non un sostituto pubblico. Il dettaglio " +
-      "operativo vero (organico, attività, stagioni) resta di DAS-REV-09 e " +
-      "il flag resta falso finché non esiste.",
-    owner: "DAS-REV-09 — dettaglio operativo squadra",
+      "Il dominio Messaggi non conosce le squadre: conversations non ha " +
+      "club_team_id né tabella ponte, non esiste una RPC di creazione gruppo " +
+      "e nessuna schermata crea gruppi. Servono una colonna (o tabella " +
+      "ponte), una creazione idempotente, la sincronizzazione dei " +
+      "partecipanti da club_members e un punto di ingresso in Messaggi.",
+    owner: "Pack Messaggi — gruppi operativi (non assegnato)",
   },
   society_article_composer: {
     available: false,

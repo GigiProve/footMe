@@ -33,12 +33,33 @@ const filterOptions: { label: string; value: RosterFilter }[] = [
 ];
 
 type ClubRosterSectionProps = {
+  /**
+   * Ruolo con cui aprire subito il modulo di collegamento, quando il flusso
+   * arriva con l'intenzione di invitare (DAS-REV-09 §12). Il modulo chiede
+   * comunque scelta e conferma: non collega nessuno da solo.
+   */
+  autoAddRole?: MemberRole | null;
   /** Show the highlight/players-staff StatCard rows above the section. Defaults to true. */
   showStats?: boolean;
+  /**
+   * Filtro squadra ricevuto dal dettaglio operativo (DAS-REV-09 §18).
+   *
+   * «Gli accessi a Organico … mantengono il filtro Team. La destinazione
+   * espone il contesto secondo il proprio pattern»: qui il pattern esistente
+   * è la lista con le chip Tutti/Giocatori/Staff, che resta e si applica
+   * **dentro** il perimetro della squadra. Non viene aggiunto un secondo
+   * selettore parallelo.
+   *
+   * Non amplia i permessi: la route è già protetta e il filtro restringe,
+   * non espande, ciò che l'actor vedeva comunque.
+   */
+  teamId?: string | null;
 };
 
 export function ClubRosterSection({
+  autoAddRole = null,
   showStats = true,
+  teamId = null,
 }: ClubRosterSectionProps) {
   const { profile, session } = useSession();
   const clubId = profile?.club_id ?? null;
@@ -51,7 +72,9 @@ export function ClubRosterSection({
   const [teams, setTeams] = useState<ClubTeam[]>([]);
   const [rosterFilter, setRosterFilter] = useState<RosterFilter>("all");
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
-  const [addMemberRole, setAddMemberRole] = useState<MemberRole | null>(null);
+  const [addMemberRole, setAddMemberRole] = useState<MemberRole | null>(
+    autoAddRole,
+  );
 
   const loadDashboard = useCallback(async () => {
     if (!userId) return;
@@ -149,9 +172,13 @@ export function ClubRosterSection({
   const teamNameById = new Map<string, string>(
     teams.map((t) => [t.id, t.name]),
   );
+  const scopedTeamName = teamId ? (teamNameById.get(teamId) ?? null) : null;
 
   // Show active + pending members; hide rejected/removed
-  const visibleMembers = members.filter(
+  const scopedMembers = teamId
+    ? members.filter((m) => m.team_id === teamId)
+    : members;
+  const visibleMembers = scopedMembers.filter(
     (m) => m.status === "active" || m.status === "pending",
   );
   const filteredMembers =
@@ -161,7 +188,7 @@ export function ClubRosterSection({
         ? visibleMembers.filter((m) => m.member_role === "player")
         : visibleMembers.filter((m) => m.member_role !== "player");
 
-  const activeMembers = members.filter((m) => m.status === "active");
+  const activeMembers = scopedMembers.filter((m) => m.status === "active");
   const playersCount = activeMembers.filter(
     (m) => m.member_role === "player",
   ).length;
@@ -201,7 +228,11 @@ export function ClubRosterSection({
       ) : null}
 
       <SectionCard
-        description="Gestisci giocatori e staff della tua societa'"
+        description={
+          scopedTeamName
+            ? `Gestisci giocatori e staff di ${scopedTeamName}`
+            : "Gestisci giocatori e staff della tua societa'"
+        }
         title="Rosa"
       >
         <ChipGroup<RosterFilter>
@@ -254,6 +285,7 @@ export function ClubRosterSection({
           memberRole={addMemberRole}
           onClose={() => setAddMemberRole(null)}
           onSaved={handleMemberSaved}
+          teamId={teamId}
           visible={addMemberRole !== null}
         />
       ) : null}

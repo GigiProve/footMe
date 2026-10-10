@@ -44,6 +44,13 @@ function getInitials(name: string): string {
 
 type AvatarProps = {
   uri?: string | null;
+  /**
+   * Iniziali già risolte, quando chi chiama le conosce ma **non** deve
+   * conoscere il nome. Il dettaglio Squadra riceve dal backend solo
+   * `initials` per l'anteprima dell'Organico: ricavarle qui richiederebbe
+   * un nome che la RPC non restituisce di proposito.
+   */
+  initials?: string;
   name?: string;
   size?: AvatarSize;
   square?: boolean;
@@ -52,6 +59,7 @@ type AvatarProps = {
 
 export function Avatar({
   uri,
+  initials: providedInitials,
   name,
   size = "md",
   square = false,
@@ -76,7 +84,7 @@ export function Avatar({
     );
   }
 
-  const initials = name ? getInitials(name) : "";
+  const initials = providedInitials ?? (name ? getInitials(name) : "");
 
   return (
     <View

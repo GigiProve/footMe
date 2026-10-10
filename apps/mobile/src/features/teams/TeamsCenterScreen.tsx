@@ -118,24 +118,28 @@ export function TeamsCenterScreen() {
   /**
    * Destinazione della riga (§9, §12).
    *
-   * Il dettaglio operativo è di DAS-REV-09 e oggi non esiste
-   * (`society_team_detail` è `available: false`). Finché è così la sola
-   * destinazione reale è il form di modifica di questo pack, aperto a chi può
-   * modificare quella squadra: §12 vieta di usare il profilo pubblico come
-   * sostituto e di mostrare frecce verso pagine inesistenti, quindi chi non
-   * può modificare ha una riga informativa senza chevron.
+   * DAS-REV-09 ha reso disponibile il dettaglio operativo: la riga apre
+   * quello, con il Team ID stabile, e non più il form di modifica. Il form
+   * resta raggiungibile da "Modifica squadra" dentro il dettaglio, dove
+   * l'autorizzazione viene rivalidata.
    *
-   * Quando DAS-REV-09 invertirà il flag, questa funzione va reindirizzata al
-   * dettaglio: è l'unico punto da cambiare.
+   * Finché il flag fosse di nuovo falso la destinazione tornerebbe al form:
+   * §12 vieta le frecce verso pagine inesistenti, e questo è l'unico punto
+   * in cui la scelta è espressa.
    */
   const openTeam = useCallback(
     (teamId: string) => {
+      const hasDetail = isFeatureAvailable("society_team_detail");
+
       trackTeamsEvent("teams_team_opened", {
-        destination: isFeatureAvailable("society_team_detail")
-          ? "detail"
-          : "edit",
+        destination: hasDetail ? "detail" : "edit",
       });
-      router.push(`/club-teams/${encodeURIComponent(teamId)}`);
+
+      router.push(
+        hasDetail
+          ? `/(tabs)/dashboard/team/${encodeURIComponent(teamId)}`
+          : `/club-teams/${encodeURIComponent(teamId)}`,
+      );
     },
     [router],
   );

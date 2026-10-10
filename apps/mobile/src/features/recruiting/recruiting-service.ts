@@ -26,6 +26,8 @@ export type RecruitingAdSummary = {
   region: string | null;
   role_required: string;
   status: string;
+  /** Squadra della posizione; `null` = tutta la Società (DAS-REV-09 §18). */
+  team_id: string | null;
   title: string;
 };
 
@@ -45,6 +47,8 @@ export type ClubApplicationSummary = {
     id: string;
     role_required: string;
     status: string;
+    /** Squadra della posizione a cui la candidatura si riferisce. */
+    team_id: string | null;
     title: string;
   };
   applicant: {
@@ -82,7 +86,7 @@ export async function getClubAds(profileId: string) {
 
   const { data, error } = await supabase
     .from("recruiting_ads")
-    .select("id, title, role_required, region, status, created_at")
+    .select("id, title, role_required, region, status, created_at, team_id")
     .eq("club_id", club.id)
     .order("created_at", { ascending: false });
 
@@ -97,7 +101,7 @@ export async function getPublishedAds(profileId: string) {
   const { data: adsData, error: adsError } = await supabase
     .from("recruiting_ads")
     .select(
-      "id, club_id, title, role_required, region, status, created_at, published_at, description, age_min, age_max, compensation_summary",
+      "id, club_id, title, role_required, region, status, created_at, published_at, description, age_min, age_max, compensation_summary, team_id",
     )
     .eq("status", "published")
     .order("published_at", { ascending: false, nullsFirst: false })
@@ -119,6 +123,7 @@ export async function getPublishedAds(profileId: string) {
     region: string | null;
     role_required: string;
     status: string;
+    team_id: string | null;
     title: string;
   }[];
 
@@ -337,7 +342,7 @@ export async function getClubApplications(profileId: string) {
 
   const { data: adsData, error: adsError } = await supabase
     .from("recruiting_ads")
-    .select("id, title, role_required, status")
+    .select("id, title, role_required, status, team_id")
     .eq("club_id", club.id)
     .order("created_at", { ascending: false });
 
@@ -349,6 +354,7 @@ export async function getClubApplications(profileId: string) {
     id: string;
     role_required: string;
     status: string;
+    team_id: string | null;
     title: string;
   }[];
 

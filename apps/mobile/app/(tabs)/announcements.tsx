@@ -87,10 +87,27 @@ export default function AnnouncementsScreen() {
    * Quando è assente o non corrisponde a nulla, la pagina resta quella di
    * sempre: il filtro non può far sparire il contenuto che l'actor ha già.
    */
-  const { adId, focus } = useLocalSearchParams<{
+  const { adId, focus, teamId: teamIdParam } = useLocalSearchParams<{
     adId?: string;
     focus?: string;
+    teamId?: string;
   }>();
+  /**
+   * Filtro squadra proveniente dal dettaglio operativo (DAS-REV-09 §18).
+   *
+   * «Gli accessi a Posizioni e Candidature mantengono il filtro Team.» È un
+   * riferimento canonico: il centro rilegge posizioni e candidature dal
+   * proprio dominio e vi applica il perimetro, non riceve copie dei
+   * conteggi già mostrati altrove.
+   *
+   * Restringe, non amplia: un actor con scope limitato non guadagna nulla
+   * passando o togliendo il parametro, perché i dati sono già quelli che il
+   * suo club gli espone.
+   */
+  const scopedTeamId =
+    typeof teamIdParam === "string" && teamIdParam.length > 0
+      ? teamIdParam
+      : null;
   const focusedAdId = typeof adId === "string" && adId.length > 0 ? adId : null;
   const isApplicationsFocus = focus === "applications";
   const [ads, setAds] = useState<RecruitingAdSummary[]>([]);
@@ -108,6 +125,22 @@ export default function AnnouncementsScreen() {
   >(null);
   const [selectedAdId, setSelectedAdId] = useState<string | null>(null);
   const [coverMessage, setCoverMessage] = useState("");
+  /**
+   * Squadra del composer (DAS-REV-09 §14).
+   *
+   * `undefined` = nessuna scelta dell'utente, quindi vale la preselezione
+   * che arriva dal dettaglio operativo; `null` = l'utente ha scelto "Tutta
+   * la societa'". Tenere i due casi distinti è ciò che permette di
+   * preselezionare **senza** vincolare, e senza un effetto che insegua i
+   * parametri della route.
+   *
+   * Resta una preselezione: il backend rivalida comunque Società, Team e
+   * capability, quindi un actor con scope limitato non crea posizioni per
+   * squadre che non gli appartengono.
+   */
+  const [teamChoice, setTeamChoice] = useState<string | null | undefined>(
+    undefined,
+  );
   const [form, setForm] = useState<RecruitingAdForm>({
     ageMax: "",
     ageMin: "",
@@ -119,6 +152,10 @@ export default function AnnouncementsScreen() {
     teamId: null,
     title: "",
   });
+
+  /** Scelta esplicita se c'è, altrimenti la squadra del contesto di arrivo. */
+  const composerTeamId =
+    teamChoice === undefined ? scopedTeamId : teamChoice;
 
   const loadClubDashboard = useCallback(async () => {
     if (!userId) {
@@ -259,7 +296,10 @@ export default function AnnouncementsScreen() {
 
     try {
       setIsSubmitting(true);
-      const club = await createRecruitingAd(session.user.id, form);
+      const club = await createRecruitingAd(session.user.id, {
+        ...form,
+        teamId: composerTeamId,
+      });
       setClubName(club.name);
       setForm({
         ageMax: "",
@@ -447,12 +487,26 @@ export default function AnnouncementsScreen() {
   // Il riferimento arriva per id, mai per titolo o indice (§20). Un `adId`
   // che non corrisponde a nessun annuncio di questa Società non filtra nulla:
   // il centro resta quello completo invece di mostrarsi vuoto.
+  const scopedAds = scopedTeamId
+    ? ads.filter((ad) => ad.team_id === scopedTeamId)
+    : ads;
+  const scopedApplications = scopedTeamId
+    ? applications.filter(
+        (application) => application.ad.team_id === scopedTeamId,
+      )
+    : applications;
+
   const focusedAd = focusedAdId
-    ? (ads.find((ad) => ad.id === focusedAdId) ?? null)
+    ? (scopedAds.find((ad) => ad.id === focusedAdId) ?? null)
     : null;
   const visibleApplications = focusedAd
-    ? applications.filter((application) => application.ad.id === focusedAd.id)
-    : applications;
+    ? scopedApplications.filter(
+        (application) => application.ad.id === focusedAd.id,
+      )
+    : scopedApplications;
+  const scopedTeamName = scopedTeamId
+    ? (clubTeams.find((team) => team.id === scopedTeamId)?.name ?? null)
+    : null;
 
   return (
     <Screen>
@@ -461,9 +515,13 @@ export default function AnnouncementsScreen() {
           title={isApplicationsFocus ? "Candidature ricevute" : "Annunci societa'"}
           subtitle={
             clubName
-              ? isApplicationsFocus
-                ? `Candidature ricevute da ${clubName}.`
-                : `Stai pubblicando per ${clubName}.`
+              ? scopedTeamName
+                ? isApplicationsFocus
+                  ? `Candidature di ${scopedTeamName}.`
+                  : `Posizioni di ${scopedTeamName}.`
+                : isApplicationsFocus
+                  ? `Candidature ricevute da ${clubName}.`
+                  : `Stai pubblicando per ${clubName}.`
               : "Completa l'onboarding societa' per pubblicare annunci."
           }
         />
@@ -495,7 +553,7 @@ export default function AnnouncementsScreen() {
               </AppText>
               <ChipGroup
                 onChange={(value) =>
-                  patchForm("teamId", value === "all" ? null : value)
+                  setTeamChoice(value === "all" ? null : value)
                 }
                 options={[
                   { label: "Tutta la societa'", value: "all" },
@@ -504,7 +562,7 @@ export default function AnnouncementsScreen() {
                     value: team.id,
                   })),
                 ]}
-                value={form.teamId ?? "all"}
+                value={composerTeamId ?? "all"}
               />
             </View>
           ) : null}
@@ -555,14 +613,14 @@ export default function AnnouncementsScreen() {
 
         <View style={styles.sectionGap}>
           <AppText variant="headingSm">Annunci pubblicati</AppText>
-          {ads.length === 0 && !isLoading ? (
+          {scopedAds.length === 0 && !isLoading ? (
             <EmptyState
               icon="megaphone-outline"
               title="Nessun annuncio"
               description="Nessun annuncio pubblicato finora."
             />
           ) : null}
-          {ads.map((ad) => (
+          {scopedAds.map((ad) => (
             <Card key={ad.id} variant="muted">
               <AppText variant="titleSm">{ad.title}</AppText>
               <AppText variant="bodySm" color="secondary">

@@ -123,15 +123,24 @@ function DashboardGlobalState({
  * Il "Riprova" è una **lettura**: rivaluta accesso, composizione, priorità e
  * dati. Non ripubblica contenuti, non invia messaggi, non tocca candidature.
  */
-export function DashboardGlobalError({ onRetry }: { onRetry: () => void }) {
+export function DashboardGlobalError({
+  body = "Riprova tra poco.",
+  onRetry,
+  title = "Non riusciamo a caricare la Dashboard",
+}: {
+  /** Copy contestuale: il dettaglio Squadra nomina la squadra, non la Dashboard. */
+  body?: string;
+  onRetry: () => void;
+  title?: string;
+}) {
   return (
     <DashboardGlobalState
       actionLabel="Riprova"
-      body="Riprova tra poco."
+      body={body}
       icon="cloud-offline-outline"
       onAction={onRetry}
       showFaultBadge
-      title="Non riusciamo a caricare la Dashboard"
+      title={title}
     />
   );
 }

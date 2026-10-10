@@ -21,6 +21,7 @@ export default function DashboardLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="teams" />
+        <Stack.Screen name="team/[teamId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

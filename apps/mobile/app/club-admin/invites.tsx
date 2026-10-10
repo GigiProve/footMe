@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Screen } from "../../src/components/ui/screen";
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
@@ -18,10 +18,24 @@ import {
 import type { ClubMember } from "../../src/features/clubs/membership-types";
 import { colors, radius, spacing } from "../../src/theme/tokens";
 
+/**
+ * Centro Inviti e richieste.
+ *
+ * Da DAS-REV-09 accetta `teamId` (§18): il dettaglio operativo apre questo
+ * centro già ristretto alla squadra da cui si proviene. È un riferimento
+ * canonico, non una copia del conteggio mostrato nel dettaglio — gli inviti
+ * vengono riletti qui dal dominio proprietario.
+ */
 export default function ClubInvitesScreen() {
   const router = useRouter();
   const { profile } = useSession();
   const clubId = profile?.club_id ?? null;
+  const params = useLocalSearchParams<{ teamId?: string | string[] }>();
+  const rawTeamId = Array.isArray(params.teamId)
+    ? params.teamId[0]
+    : params.teamId;
+  const teamId =
+    typeof rawTeamId === "string" && rawTeamId.length > 0 ? rawTeamId : null;
 
   const [members, setMembers] = useState<ClubMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
@@ -85,7 +99,12 @@ export default function ClubInvitesScreen() {
     );
   }
 
-  const pendingMembers = members.filter((m) => m.status === "pending");
+  // "In attesa" è un invito in **uscita** verso un profilo PROLINK, non una
+  // richiesta ricevuta e non un membro dell'Organico: è la stessa semantica
+  // che il dettaglio conta, e il filtro per squadra la conserva.
+  const pendingMembers = members.filter(
+    (m) => m.status === "pending" && (!teamId || m.team_id === teamId),
+  );
 
   return (
     <Screen>

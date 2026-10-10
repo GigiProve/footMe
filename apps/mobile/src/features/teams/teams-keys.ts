@@ -11,6 +11,12 @@
 export const TEAMS_QK = {
   center: (actorId: string, clubId: string) =>
     ["teams-center", actorId, clubId] as const,
+  /** Dettaglio operativo (DAS-REV-09): base della pagina. */
+  detail: (actorId: string, teamId: string) =>
+    ["team-detail", actorId, teamId] as const,
+  /** Provider separato delle Posizioni: può fallire da solo (§24). */
+  detailPositions: (actorId: string, teamId: string) =>
+    ["team-detail-positions", actorId, teamId] as const,
   editor: (actorId: string, teamId: string) =>
     ["teams-editor", actorId, teamId] as const,
   levels: (typeId: string, seasonId: string | null, query: string) =>
@@ -24,4 +30,6 @@ export const TEAMS_QK_PREFIXES = [
   "teams-center",
   "teams-center-page",
   "teams-editor",
+  "team-detail",
+  "team-detail-positions",
 ] as const;

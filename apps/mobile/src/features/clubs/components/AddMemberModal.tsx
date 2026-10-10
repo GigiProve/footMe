@@ -13,6 +13,12 @@ type AddMemberModalProps = {
   memberRole: MemberRole;
   onClose: () => void;
   onSaved: () => void;
+  /**
+   * Squadra preselezionata quando il flusso arriva dal dettaglio operativo
+   * (DAS-REV-09 §12). Resta modificabile: il valore preimpostato è un punto
+   * di partenza, non un vincolo, e il backend rivalida comunque lo scope.
+   */
+  teamId?: string | null;
   visible: boolean;
 };
 
@@ -28,12 +34,13 @@ export function AddMemberModal({
   memberRole,
   onClose,
   onSaved,
+  teamId = null,
   visible,
 }: AddMemberModalProps) {
   const [name, setName] = useState("");
   const [staffTitle, setStaffTitle] = useState("");
   const [season, setSeason] = useState("");
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(teamId);
   const [teams, setTeams] = useState<ClubTeam[]>([]);
   const [suggestions, setSuggestions] = useState<ProfileSuggestion[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<ProfileSuggestion | null>(null);
@@ -53,7 +60,9 @@ export function AddMemberModal({
     setName("");
     setStaffTitle("");
     setSeason("");
-    setSelectedTeamId(null);
+    // Torna al contesto di partenza, non a "tutta la società": riaprendo il
+    // modulo dal dettaglio di una squadra quella squadra è ancora il contesto.
+    setSelectedTeamId(teamId);
     setSuggestions([]);
     setSelectedProfile(null);
     setIsSaving(false);

@@ -27,7 +27,20 @@ export type TeamsEventName =
   | "teams_create_result"
   | "teams_update_result"
   | "teams_version_conflict"
-  | "teams_unsaved_exit";
+  | "teams_unsaved_exit"
+  // ── Dettaglio operativo squadra (DAS-REV-09 §30) ──────────────────────
+  | "teams_detail_opened"
+  | "teams_detail_roster_opened"
+  | "teams_detail_invite_started"
+  | "teams_detail_positions_opened"
+  | "teams_detail_position_opened"
+  | "teams_detail_position_create_started"
+  | "teams_detail_applications_opened"
+  | "teams_detail_invites_opened"
+  | "teams_detail_group_opened"
+  | "teams_detail_refreshed"
+  | "teams_detail_module_error"
+  | "teams_detail_module_retry";
 
 export function trackTeamsEvent(
   name: TeamsEventName,
