@@ -9,6 +9,12 @@ type RadioProps = {
   label: string;
   onPress: () => void;
   testID?: string;
+  /**
+   * `neutral` disegna etichetta e indicatore in nero neutro invece che
+   * nell'ink e nel blu della palette ProLink (DAS-REV-10 §4, che estende il
+   * vincolo cromatico anche a «sheet, form, selector»).
+   */
+  tone?: "brand" | "neutral";
 };
 
 export function Radio({
@@ -17,7 +23,10 @@ export function Radio({
   label,
   onPress,
   testID,
+  tone = "brand",
 }: RadioProps) {
+  const neutral = tone === "neutral";
+
   return (
     <Pressable
       accessibilityRole="radio"
@@ -27,8 +36,18 @@ export function Radio({
       style={[styles.container, disabled ? styles.disabled : null]}
       testID={testID}
     >
-      <View style={[styles.circle, checked ? styles.circleChecked : null]} />
-      <AppText variant="bodyLg" style={styles.label}>
+      <View
+        style={[
+          styles.circle,
+          checked ? styles.circleChecked : null,
+          checked && neutral ? styles.circleCheckedNeutral : null,
+        ]}
+      />
+      <AppText
+        color={neutral ? "neutral" : "primary"}
+        variant="bodyLg"
+        style={styles.label}
+      >
         {label}
       </AppText>
     </Pressable>
@@ -58,6 +77,9 @@ const styles = StyleSheet.create({
   circleChecked: {
     borderColor: colors.accent,
     borderWidth: 6,
+  },
+  circleCheckedNeutral: {
+    borderColor: colors.borderNeutralStrong,
   },
   label: {
     flex: 1,

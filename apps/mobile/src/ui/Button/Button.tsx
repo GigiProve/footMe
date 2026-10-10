@@ -32,6 +32,7 @@ export type ButtonVariant =
   | "secondary"
   | "tertiary"
   | "outline"
+  | "neutralOutline"
   | "ghost"
   | "danger"
   | "link"
@@ -209,6 +210,7 @@ export function Button({
               variant === "link" ? styles.linkLabel : null,
               variant === "tertiary" ||
               variant === "outline" ||
+              variant === "neutralOutline" ||
               variant === "ghost"
                 ? styles.tertiaryLabel
                 : null,

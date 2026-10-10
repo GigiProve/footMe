@@ -36,6 +36,13 @@ type Props = {
   searchValue?: string;
   /** "Rimuovi selezione": pattern secondario condiviso (§16). */
   onClear?: () => void;
+  /**
+   * `neutral` applica il vincolo cromatico di DAS-REV-10 §4, che vale
+   * «anche per sheet, form, selector e stati non rappresentati». Il selector
+   * è condiviso e aperto da due pack con due palette: il tono è un parametro
+   * e non una seconda copia del componente.
+   */
+  tone?: "brand" | "neutral";
   title: string;
   value: string | null;
   visible: boolean;
@@ -68,10 +75,12 @@ export function TeamSelectorModal({
   searchPlaceholder,
   searchValue,
   title,
+  tone = "brand",
   value,
   visible,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const neutral = tone === "neutral";
 
   return (
     <Modal
@@ -80,7 +89,13 @@ export function TeamSelectorModal({
       presentationStyle="fullScreen"
       visible={visible}
     >
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.root,
+          neutral ? styles.rootNeutral : null,
+          { paddingTop: insets.top },
+        ]}
+      >
         <View style={styles.navBar}>
           <Pressable
             accessibilityLabel="Indietro"
@@ -90,10 +105,19 @@ export function TeamSelectorModal({
             style={styles.backButton}
             testID="team-selector-back"
           >
-            <Ionicons color={colors.textPrimary} name="chevron-back" size={24} />
+            <Ionicons
+              color={neutral ? colors.textNeutral : colors.textPrimary}
+              name="chevron-back"
+              size={24}
+            />
           </Pressable>
 
-          <AppText numberOfLines={1} style={styles.navTitle} variant="titleMd">
+          <AppText
+            color={neutral ? "neutral" : "primary"}
+            numberOfLines={1}
+            style={styles.navTitle}
+            variant="titleMd"
+          >
             {title}
           </AppText>
 
@@ -108,7 +132,7 @@ export function TeamSelectorModal({
           keyboardShouldPersistTaps="handled"
         >
           {contextLine ? (
-            <AppText color="secondary" variant="meta">
+            <AppText color={neutral ? "neutralMuted" : "secondary"} variant="meta">
               {contextLine}
             </AppText>
           ) : null}
@@ -123,12 +147,14 @@ export function TeamSelectorModal({
 
           {isLoading ? (
             <View style={styles.centered}>
-              <ActivityIndicator color={colors.accent} />
+              <ActivityIndicator
+                color={neutral ? colors.textNeutralMuted : colors.accent}
+              />
             </View>
           ) : errorMessage ? (
             // §16: «Distinguere nessun risultato da errore di caricamento.»
             <View accessibilityRole="alert" style={styles.errorBox}>
-              <AppText color="secondary" variant="bodySm">
+              <AppText color={neutral ? "neutralMuted" : "secondary"} variant="bodySm">
                 {errorMessage}
               </AppText>
 
@@ -146,7 +172,7 @@ export function TeamSelectorModal({
               ) : null}
             </View>
           ) : items.length === 0 ? (
-            <AppText color="secondary" variant="bodySm">
+            <AppText color={neutral ? "neutralMuted" : "secondary"} variant="bodySm">
               Nessun risultato.
             </AppText>
           ) : (
@@ -157,10 +183,12 @@ export function TeamSelectorModal({
                   style={[
                     styles.option,
                     item.id === value ? styles.optionSelected : null,
+                    item.id === value && neutral ? styles.optionSelectedNeutral : null,
                   ]}
                 >
                   <Radio
                     checked={item.id === value}
+                    tone={tone}
                     label={
                       item.isRetired ? `${item.label} (non più disponibile)` : item.label
                     }
@@ -198,6 +226,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flex: 1,
   },
+  rootNeutral: {
+    backgroundColor: colors.surface,
+  },
   navBar: {
     alignItems: "center",
     flexDirection: "row",
@@ -228,6 +259,9 @@ const styles = StyleSheet.create({
   },
   optionSelected: {
     backgroundColor: colors.surfaceMuted,
+  },
+  optionSelectedNeutral: {
+    backgroundColor: colors.surfaceNeutral,
   },
   centered: {
     paddingVertical: spacing[32],

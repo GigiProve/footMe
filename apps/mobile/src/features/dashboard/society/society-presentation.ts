@@ -46,6 +46,8 @@ export const SOCIETY_HREFS = {
     adId
       ? `/(tabs)/announcements?focus=positions&adId=${encodeURIComponent(adId)}`
       : "/(tabs)/announcements?focus=positions",
+  /** Centro Stagioni e storico (DAS-REV-10 §9). */
+  seasons: "/(tabs)/dashboard/seasons",
   shortlist: "/shortlist",
   societyProfile: (clubId: string) => `/club/${clubId}`,
   teams: "/(tabs)/dashboard/teams",
@@ -169,6 +171,29 @@ export function buildManagementAreas(
   identity: DashboardIdentity,
 ): ManagementAreaItem[] {
   const items: ManagementAreaItem[] = [];
+
+  /**
+   * DAS-REV-10 §9: «Integrare nella composizione Dashboard una riga
+   * operativa leggera Stagioni e storico, autorizzata e con destinazione
+   * reale. Non imporre Dashboard → Squadre → Dettaglio operativo come
+   * passaggio obbligatorio.»
+   *
+   * La chiave è `teams_view`, la stessa con cui il Centro Stagioni filtra
+   * l'elenco: la riga non deve essere visibile a chi aprendola troverebbe
+   * zero squadre consultabili. Le capability di scrittura — preparare,
+   * correggere, disattivare — sono verificate dentro, squadra per squadra.
+   */
+  if (
+    identity.capabilities.includes("teams_view") &&
+    isFeatureAvailable("society_seasons")
+  ) {
+    items.push({
+      href: SOCIETY_HREFS.seasons,
+      icon: "calendar-outline",
+      id: "seasons",
+      title: "Stagioni e storico",
+    });
+  }
 
   if (identity.capabilities.includes("shortlist_view")) {
     items.push({

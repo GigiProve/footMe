@@ -22,6 +22,32 @@ describe("theme tokens", () => {
     expect(colors.surface).toBe("#FFFFFF");
   });
 
+  it("espone la famiglia neutra di DAS-REV-10 §4", () => {
+    // Testo principale nero neutro, metadati grigi neutri. Niente dominante
+    // blu: il confronto è sul valore, non sul nome del token.
+    expect(colors.textNeutral).toBe("#111111");
+    expect(colors.textNeutralMuted).toBe("#686868");
+    expect(colors.textNeutralSoft).toBe("#737373");
+    expect(colors.borderNeutralStrong).toBe("#111111");
+
+    // I neutri sono grigi veri: le tre componenti RGB coincidono.
+    for (const value of [
+      colors.textNeutral,
+      colors.textNeutralMuted,
+      colors.textNeutralSoft,
+      colors.borderNeutral,
+      colors.dividerNeutral,
+      colors.surfaceNeutral,
+    ]) {
+      const [r, g, b] = [1, 3, 5].map((i) => value.slice(i, i + 2));
+      expect(r).toBe(g);
+      expect(g).toBe(b);
+    }
+
+    // La palette ProLink resta quella che è: §4 vieta di ricolorare il resto.
+    expect(colors.textPrimary).toBe("#0C1B2A");
+  });
+
   it("tiene distinte le due hairline del design", () => {
     // `border` racchiude il modulo, `divider` separa le righe al suo interno.
     expect(colors.border).toBe("#E3E8EF");

@@ -149,7 +149,24 @@ describe("buildManagementAreas", () => {
       society(["dashboard_view", "teams_view", "shortlist_view"]),
     ).map((row) => row.id);
 
-    expect(rows).toEqual(["shortlist", "society_profile"]);
+    // "seasons" resta: DAS-REV-10 §9 la concede con `teams_view`, che è
+    // esattamente la capability di chi gestisce una squadra. Le due righe
+    // amministrative restano fuori.
+    expect(rows).toEqual(["seasons", "shortlist", "society_profile"]);
+  });
+
+  it("mostra Stagioni e storico solo con teams_view (DAS-REV-10 §9)", () => {
+    expect(
+      buildManagementAreas(society(["dashboard_view", "teams_view"])).map(
+        (row) => row.id,
+      ),
+    ).toContain("seasons");
+
+    // Senza la chiave la riga è assente, non disabilitata: aprendola
+    // l'actor troverebbe zero squadre consultabili.
+    expect(
+      buildManagementAreas(society(["dashboard_view"])).map((row) => row.id),
+    ).not.toContain("seasons");
   });
 
   it("withholds Shortlist without its own domain permission", () => {

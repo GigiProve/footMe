@@ -27,6 +27,8 @@ type Props = {
   teamId: string | null;
   typeId: string | null;
   typeLabel: string | null;
+  /** Vedi `TeamSelectorModal`: vincolo cromatico di DAS-REV-10 §4. */
+  tone?: "brand" | "neutral";
   value: string | null;
   visible: boolean;
 };
@@ -50,11 +52,13 @@ export function TeamLevelSelector({
   seasonId,
   seasonLabel,
   teamId,
+  tone = "brand",
   typeId,
   typeLabel,
   value,
   visible,
 }: Props) {
+  const neutral = tone === "neutral";
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [isReporting, setReporting] = useState(false);
@@ -122,9 +126,11 @@ export function TeamLevelSelector({
       }
       footer={
         <View style={styles.help}>
-          <AppText variant="titleSm">Non trovi il tuo campionato?</AppText>
+          <AppText color={neutral ? "neutral" : "primary"} variant="titleSm">
+            Non trovi il tuo campionato?
+          </AppText>
 
-          <AppText color="secondary" variant="bodySm">
+          <AppText color={neutral ? "neutralMuted" : "secondary"} variant="bodySm">
             Puoi continuare senza specificarlo.
           </AppText>
 
@@ -150,7 +156,7 @@ export function TeamLevelSelector({
                 onPress={() => void submitReport()}
                 size="sm"
                 testID="team-level-report-submit"
-                variant="secondary"
+                variant={neutral ? "neutralOutline" : "secondary"}
               />
             </View>
           ) : (
@@ -185,6 +191,7 @@ export function TeamLevelSelector({
       searchPlaceholder="Cerca livello o campionato"
       searchValue={query}
       title="Livello / campionato"
+      tone={tone}
       value={value}
       visible={visible}
     />

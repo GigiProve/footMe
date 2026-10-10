@@ -32,6 +32,7 @@ export type DashboardFeatureKey =
   | "society_positions"
   | "society_recent_content"
   | "society_scheduled_content"
+  | "society_seasons"
   | "society_team_detail"
   | "society_team_group"
   | "society_teams";
@@ -57,6 +58,13 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
   society_recent_content: { available: true },
   society_content_create: { available: true },
   society_management_areas: { available: true },
+  /**
+   * DAS-REV-10: il Centro Stagioni e storico esiste
+   * (`app/(tabs)/dashboard/seasons`), con preparazione, configurazione della
+   * corrente, correzione e inserimento dello storico, disattivazione e
+   * riattivazione su dati e permessi reali.
+   */
+  society_seasons: { available: true },
   /**
    * DAS-REV-07 §14: il centro "Inviti e richieste" esiste
    * (`app/club-admin/invites.tsx`) e il modulo ne mostra il riepilogo.

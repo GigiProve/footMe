@@ -21,6 +21,12 @@ const colorMap = {
   // il design usa due varianti schiarite (§1c).
   inverseAccent: colors.accentOnInverse,
   inverseSuccess: colors.successOnInverse,
+  // DAS-REV-10 §4: testo nero neutro e metadati grigi neutri. Tre colori in
+  // più, non una ridefinizione di `primary`/`secondary`: il resto dell'app
+  // continua a leggere l'ink blu della palette ProLink.
+  neutral: colors.textNeutral,
+  neutralMuted: colors.textNeutralMuted,
+  neutralSoft: colors.textNeutralSoft,
 } as const;
 
 type AppTextProps = TextProps & {

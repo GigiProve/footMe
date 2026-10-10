@@ -105,6 +105,21 @@ export const buttonVariants = {
     borderWidth: 1,
     textColor: colors.textSecondary,
   },
+  /**
+   * CTA outlined neutra (DAS-REV-10 §4): «fondo bianco, bordo scuro, testo
+   * nero». Non una variante di `outline`, che usa la hairline chiara e il
+   * grigio-blu della palette ProLink e resterebbe un bottone secondario.
+   *
+   * Qui l'outlined **è** la CTA primaria della schermata: il bordo scuro a
+   * 1,5px le dà il peso che il blu pieno aveva nel mockup, senza estendere
+   * il blu ai pulsanti — che §4 vieta espressamente.
+   */
+  neutralOutline: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderNeutralStrong,
+    borderWidth: 1.5,
+    textColor: colors.textNeutral,
+  },
   primary: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
@@ -157,6 +172,12 @@ export const destructiveOverrides = {
   outline: {
     backgroundColor: "transparent",
     borderColor: colors.danger,
+    textColor: colors.dangerStrong,
+  },
+  neutralOutline: {
+    backgroundColor: colors.surface,
+    borderColor: colors.danger,
+    borderWidth: 1.5,
     textColor: colors.dangerStrong,
   },
   primary: {

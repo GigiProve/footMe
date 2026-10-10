@@ -22,6 +22,13 @@ export default function DashboardLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="teams" />
         <Stack.Screen name="team/[teamId]" />
+        {/* DAS-REV-10 §9: le tre viste di consultazione di Stagioni e
+            storico sono figlie della stessa tab — bottom navigation
+            visibile, Dashboard selezionata. I flussi focalizzati stanno
+            invece in app/team-seasons/. */}
+        <Stack.Screen name="seasons/index" />
+        <Stack.Screen name="seasons/inactive" />
+        <Stack.Screen name="seasons/[teamId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

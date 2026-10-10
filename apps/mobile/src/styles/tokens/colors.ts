@@ -117,4 +117,29 @@ export const colors = {
   mediaDangerSurface: "rgba(226,61,61,0.45)",
   mediaHairlineOnMedia: "rgba(255,255,255,0.18)",
   mediaBorderOnMedia: "rgba(255,255,255,0.45)",
+
+  // ── Neutri (DAS-REV-10 §4) ──────────────────────────────────────────────
+  // «Il testo principale deve essere nero neutro. Non usare navy, indigo, blu
+  // scuro o un token denominato black che contenga una dominante blu.»
+  //
+  // `textPrimary` (#0C1B2A) è esattamente quel caso: è l'ink della palette,
+  // blu al 9% di saturazione, e resta la scelta giusta ovunque il design
+  // ProLink la usi oggi. Non viene ridefinito — §4 vieta di «ricolorare
+  // indiscriminatamente altre aree dell'app» — ma accanto esiste ora una
+  // famiglia neutra, usata dalle superfici che la task richiede.
+  //
+  // Due grigi e non uno: #686868 regge l'AA su fondo bianco (5.0:1), #737373
+  // su fondo bianco è 4.6:1 e resta leggibile su `surfaceMuted`. §4 chiede
+  // appunto di «scegliere il contrasto adeguato alla superficie».
+  textNeutral: "#111111",
+  textNeutralMuted: "#686868",
+  textNeutralSoft: "#737373",
+  /** Bordo scuro delle CTA outlined neutre e delle icone ordinarie. */
+  borderNeutralStrong: "#111111",
+  /** Hairline neutra fra righe: equivalente neutro di `divider`. */
+  dividerNeutral: "#E5E5E5",
+  /** Cornice neutra di un modulo: equivalente neutro di `border`. */
+  borderNeutral: "#D4D4D4",
+  /** Superficie secondaria neutra (campi read-only, bande informative). */
+  surfaceNeutral: "#F5F5F5",
 } as const;
