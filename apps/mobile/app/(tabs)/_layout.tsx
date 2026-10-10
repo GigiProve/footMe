@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "../../src/features/auth/use-session";
 import { fetchCommunications } from "../../src/features/messaging/communications-service";
 import { fetchInboxConversations } from "../../src/features/messaging/messaging-service";
+import { usePendingSocietyInvite } from "../../src/features/network/use-pending-society-invite";
 import { usePendingAssistitoInvite } from "../../src/features/relationships/assistiti/use-pending-assistito-invite";
 import { AppSidebar } from "../../src/ui/sidebar";
 import { colors, radius, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
@@ -48,7 +49,13 @@ export default function TabsLayout() {
 
   // Un invito aperto prima del login riparte da qui: le tab sono il punto in
   // cui confluiscono sia chi accede sia chi finisce l'onboarding.
-  usePendingAssistitoInvite(Boolean(session) && !needsOnboarding && !isLoading);
+  const isReadyForInvites = Boolean(session) && !needsOnboarding && !isLoading;
+
+  usePendingAssistitoInvite(isReadyForInvites);
+  // DAS-REV-11 §19: lo stesso gancio per l'invito di collegamento societario.
+  // Il contesto deve sopravvivere a login, registrazione e onboarding, e le
+  // tab sono l'unico punto che entrambi i percorsi attraversano.
+  usePendingSocietyInvite(isReadyForInvites);
 
   const unreadThreadsCount = profileId
     ? (conversationsQuery.data ?? []).filter((item) => item.unread_count > 0).length +

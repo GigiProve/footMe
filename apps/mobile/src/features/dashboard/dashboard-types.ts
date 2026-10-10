@@ -42,6 +42,17 @@ export const DASHBOARD_CAPABILITIES = [
   "teams_create",
   "teams_edit",
   "roster_view",
+  // DAS-REV-11 §5: otto operazioni distinte sulla rete societaria.
+  // Consultare non è gestire, gestire una richiesta ricevuta non è
+  // annullarne una inviata, e nessuna delle otto scende a scope di Team.
+  "network_view",
+  "network_requests_view",
+  "network_request_send",
+  "network_request_manage",
+  "network_request_cancel",
+  "network_invite_create",
+  "network_terminate",
+  "network_history_view",
 ] as const;
 
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];

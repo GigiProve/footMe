@@ -29,6 +29,16 @@ type TabBarProps<T extends string> = {
   onChange: (value: T) => void;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /**
+   * `neutral` disegna etichetta e indicatore in nero neutro invece che nel
+   * blu ProLink (DAS-REV-11 §3: «Le tab interne hanno testo nero e
+   * sottolineatura nera quando selezionate, grigio neutro quando inattive»).
+   *
+   * Resta una tab in tutto il resto — testo e indicatore 2px, mai una
+   * pillola piena, che §3 vieta esplicitamente ("Non trasformarle in pill
+   * blu sature") e che il design ProLink già escludeva.
+   */
+  tone?: "brand" | "neutral";
 };
 
 export function TabBar<T extends string>({
@@ -38,9 +48,17 @@ export function TabBar<T extends string>({
   onChange,
   style,
   testID,
+  tone = "brand",
 }: TabBarProps<T>) {
+  const neutral = tone === "neutral";
+  const activeColor = neutral ? "neutral" : "accent";
+  const inactiveColor = neutral ? "neutralMuted" : "muted";
+
   return (
-    <View style={[styles.bar, style]} testID={testID}>
+    <View
+      style={[styles.bar, neutral ? styles.barNeutral : null, style]}
+      testID={testID}
+    >
       {items.map((item) => {
         const isActive = item.value === active;
 
@@ -54,11 +72,11 @@ export function TabBar<T extends string>({
             style={[
               styles.tab,
               fill ? styles.tabFill : null,
-              isActive ? styles.tabActive : null,
+              isActive ? (neutral ? styles.tabActiveNeutral : styles.tabActive) : null,
             ]}
           >
             <AppText
-              color={isActive ? "accent" : "muted"}
+              color={isActive ? activeColor : inactiveColor}
               style={isActive ? null : styles.inactiveLabel}
               variant="tabLabel"
             >
@@ -66,7 +84,7 @@ export function TabBar<T extends string>({
             </AppText>
             {item.count != null && item.count > 0 ? (
               <AppText
-                color={isActive ? "accent" : "muted"}
+                color={isActive ? activeColor : inactiveColor}
                 style={styles.count}
                 variant="numeric"
               >
@@ -105,6 +123,12 @@ const styles = StyleSheet.create({
   },
   tabActive: {
     borderBottomColor: colors.accent,
+  },
+  barNeutral: {
+    borderBottomColor: colors.dividerNeutral,
+  },
+  tabActiveNeutral: {
+    borderBottomColor: colors.textNeutral,
   },
   inactiveLabel: {
     fontWeight: "600",

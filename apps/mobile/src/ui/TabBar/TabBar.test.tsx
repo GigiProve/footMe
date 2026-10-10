@@ -50,6 +50,36 @@ describe("TabBar", () => {
     expect(inactive.backgroundColor).toBeUndefined();
   });
 
+  /**
+   * DAS-REV-11 §3: «Le tab interne hanno testo nero e sottolineatura nera
+   * quando selezionate, grigio neutro quando inattive. Non trasformarle in
+   * pill blu sature.»
+   */
+  it("in tono neutro usa nero e grigio neutro, mai una pillola", () => {
+    const tree = render(
+      <TabBar active="per_te" items={ITEMS} onChange={vi.fn()} tone="neutral" />,
+    );
+    const tabs = tabsOf(tree);
+    const [active, inactive] = tabs.map((tab) => flatStyle(tab.props.style));
+
+    expect(active.borderBottomColor).toBe(colors.textNeutral);
+    expect(active.borderBottomColor).toBe("#111111");
+    expect(active.borderBottomWidth).toBe(2);
+    expect(active.backgroundColor).toBeUndefined();
+    expect(inactive.borderBottomColor).toBe("transparent");
+
+    const labelColors = tabs.map(
+      (tab) =>
+        flatStyle(
+          tab.findAll((node) => String(node.type) === "Text")[0].props.style,
+        ).color,
+    );
+
+    expect(labelColors[0]).toBe(colors.textNeutral);
+    expect(labelColors[1]).toBe(colors.textNeutralMuted);
+    expect(labelColors).not.toContain(colors.accent);
+  });
+
   it("distribuisce le tab a larghezza uguale solo con fill", () => {
     const filled = tabsOf(
       render(<TabBar active="per_te" fill items={ITEMS} onChange={vi.fn()} />),

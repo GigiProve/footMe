@@ -81,10 +81,12 @@ const LINKED_SECTIONS: readonly ProfileEditHubSection[] = [
     title: "Squadre del club",
   },
   {
+    // DAS-REV-11 §2: la gestione dei collegamenti è il centro Rete
+    // societaria, non più l'elenco manuale delle affiliate.
     icon: "git-network-outline",
     id: "affiliates",
-    route: "/club-admin/affiliates",
-    title: "Società affiliate",
+    route: "/(tabs)/dashboard/network",
+    title: "Società collegate",
   },
   {
     // Gestione Posizioni già completata: annunci e candidature non si
@@ -119,11 +121,12 @@ export function buildSocietyEditSectionGroups(
   clubId: string | null,
   options: { canOpenClubAdmin: boolean } = { canOpenClubAdmin: true },
 ): readonly ProfileEditHubGroup[] {
+  // DAS-REV-11 §2: "Società collegate" non passa più da /club-admin — punta
+  // al centro Rete societaria, che si protegge da sé con `network_view`.
+  // Resta filtrata la sola riga che dipende davvero da quello stack.
   const linked = options.canOpenClubAdmin
     ? LINKED_SECTIONS
-    : LINKED_SECTIONS.filter(
-        (section) => section.id !== "teams" && section.id !== "affiliates",
-      );
+    : LINKED_SECTIONS.filter((section) => section.id !== "teams");
 
   return [
     {

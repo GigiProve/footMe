@@ -13,11 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../src/features/auth/use-session";
-import {
-  fetchPublicClubSquadraOverview,
-  type PublicClubProfile,
-  type PublicClubSquadraOverview,
-} from "../../src/features/clubs/club-service";
+import { type PublicClubProfile } from "../../src/features/clubs/club-service";
 import { getUnreadCount } from "../../src/features/clubs/notification-service";
 import {
   SocietyMasterProfileView,
@@ -42,7 +38,6 @@ import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioMod
 import { EditAgentMediaModal } from "../../src/features/profiles/edit-modals/EditAgentMediaModal";
 import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
 import { EditClubSportProfileModal } from "../../src/features/profiles/edit-modals/EditClubSportProfileModal";
-import { EditClubAffiliationsModal } from "../../src/features/profiles/edit-modals/EditClubAffiliationsModal";
 import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
 import { EditDirectorMediaModal } from "../../src/features/profiles/edit-modals/EditDirectorMediaModal";
 import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
@@ -97,14 +92,6 @@ import {
 import { colors, radius, spacing } from "../../src/theme/tokens";
 import { ActionSheet, AppText, Button, HeaderBell, SectionCard } from "../../src/ui";
 
-const emptyClubOverview: PublicClubSquadraOverview = {
-  affiliations: [],
-  parentAffiliation: null,
-  positionPreview: [],
-  positionsTotal: 0,
-  seasonSummaries: [],
-};
-
 const MEMBER_ROLE_LABELS: Record<string, string> = {
   coach: "Allenatore",
   director: "Dirigente",
@@ -131,8 +118,6 @@ export default function ProfileScreen() {
   const [completeProfile, setCompleteProfile] =
     useState<CompleteProfessionalProfile | null>(null);
   const [clubTeams, setClubTeams] = useState<ClubTeam[]>([]);
-  const [clubOverview, setClubOverview] =
-    useState<PublicClubSquadraOverview>(emptyClubOverview);
   /*
     REV-PROF-17: il profilo pubblico della Società arriva dalla stessa RPC che
     serve la route /club/[id]. L'owner mode non viene dedotto dal fatto che
@@ -196,13 +181,11 @@ export default function ProfileScreen() {
       setCompleteProfile(data);
 
       if (data.club?.id) {
-        // `teams` e `overview` restano: li consumano gli editor Squadre e
-        // Affiliate, che REV-PROF-17 non tocca.
-        const [teams, overview, society] = await Promise.all([
+        // `teams` resta: lo consuma leditor Squadre, che REV-PROF-17 non
+        // tocca. `overview` serviva solo alleditor manuale delle Affiliate,
+        // che DAS-REV-11 ha sostituito con il centro Rete societaria.
+        const [teams, society] = await Promise.all([
           fetchClubTeams(data.club.id),
-          fetchPublicClubSquadraOverview(data.club.id).catch(
-            () => emptyClubOverview,
-          ),
           /*
             L'errore non viene più inghiottito: lo registriamo, così il ramo
             club può mostrare un errore con "Riprova" invece di restare in
@@ -212,18 +195,15 @@ export default function ProfileScreen() {
         ]);
 
         setClubTeams(teams);
-        setClubOverview(overview);
         setSocietyProfile(society);
         setSocietyLoadFailed(society === null);
       } else {
         setClubTeams([]);
-        setClubOverview(emptyClubOverview);
         setSocietyProfile(null);
         setSocietyLoadFailed(false);
       }
     } catch {
       setClubTeams([]);
-      setClubOverview(emptyClubOverview);
       setSocietyProfile(null);
       setSocietyLoadFailed(true);
       // Copy leggibile: niente messaggi tecnici del backend (§36).
@@ -1386,17 +1366,6 @@ export default function ProfileScreen() {
                 userId={userId}
                 visible={activeModal === "clubSportProfile"}
               />
-              {completeProfile.club ? (
-                <>
-                  <EditClubAffiliationsModal
-                    clubId={completeProfile.club.id}
-                    initialAffiliations={clubOverview.affiliations}
-                    onClose={handleCloseModal}
-                    onSaved={handleSaved}
-                    visible={activeModal === "clubAffiliations"}
-                  />
-                </>
-              ) : null}
             </>
           ) : null}
         </>

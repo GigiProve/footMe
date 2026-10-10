@@ -117,12 +117,6 @@ export type PublicClubTeamProfile = {
   team: ClubTeam;
 };
 
-export type ClubAffiliationInput = {
-  affiliateClubId: string;
-  relationshipLabel: string | null;
-  sortOrder: number;
-};
-
 export async function fetchPublicClubProfile(clubId: string): Promise<PublicClubProfile | null> {
   const { data, error } = await supabase
     .from("clubs")
@@ -607,69 +601,21 @@ export async function updateClubSportProfile(input: {
   }
 }
 
-export async function saveClubAffiliations(
-  clubId: string,
-  affiliations: ClubAffiliationInput[],
-) {
-  const { error: deleteError } = await supabase
-    .from("club_affiliations")
-    .delete()
-    .eq("club_id", clubId);
-
-  if (deleteError) {
-    throw deleteError;
-  }
-
-  if (affiliations.length === 0) {
-    return;
-  }
-
-  const { error: insertError } = await supabase.from("club_affiliations").insert(
-    affiliations.map((affiliation, index) => ({
-      affiliate_club_id: affiliation.affiliateClubId,
-      club_id: clubId,
-      relationship_label: affiliation.relationshipLabel,
-      sort_order: affiliation.sortOrder ?? index,
-    })),
-  );
-
-  if (insertError) {
-    throw insertError;
-  }
-}
-
-export async function searchClubsForAffiliation(
-  query: string,
-  excludedClubId: string,
-  limit = 8,
-): Promise<ClubAffiliationSummary[]> {
-  const trimmedQuery = query.trim();
-
-  if (trimmedQuery.length < 2) {
-    return [];
-  }
-
-  const { data, error } = await supabase
-    .from("clubs")
-    .select("id, name, city, region, category, logo_url")
-    .ilike("name", `%${trimmedQuery}%`)
-    .neq("id", excludedClubId)
-    .limit(limit);
-
-  if (error) {
-    throw error;
-  }
-
-  return ((data ?? []) as PublicClubSummaryRow[]).map((club) => ({
-    category: club.category ?? null,
-    city: club.city ?? "",
-    id: club.id,
-    logo_url: club.logo_url ?? null,
-    name: club.name ?? "",
-    region: club.region ?? "",
-    relationship_label: null,
-  }));
-}
+/*
+ * DAS-REV-11 §2, §24: le affiliazioni non si scrivono più da qui.
+ *
+ * `saveClubAffiliations` cancellava tutte le righe del club e le reinseriva,
+ * e `searchClubsForAffiliation` era un secondo motore di ricerca accanto a
+ * `search_clubs_page`. Entrambi appartenevano all'elenco manuale: un club
+ * poteva dichiararsi affiliate società che non lo sapevano, e quella
+ * dichiarazione finiva sul profilo pubblico e in Cerca.
+ *
+ * Ora `club_affiliations` è una **proiezione** del dominio canonico
+ * `club_relationships`, mantenuta da un trigger, e un guard del database
+ * impedisce a un client di toccare le righe nate da un consenso. Le letture
+ * qui sotto restano: servono al profilo pubblico e al raggruppamento di
+ * Cerca, che leggono la stessa tabella di prima.
+ */
 
 type RecruitingAdRow = {
   category: string | null;

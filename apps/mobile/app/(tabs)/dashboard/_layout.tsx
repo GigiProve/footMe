@@ -29,6 +29,13 @@ export default function DashboardLayout() {
         <Stack.Screen name="seasons/index" />
         <Stack.Screen name="seasons/inactive" />
         <Stack.Screen name="seasons/[teamId]" />
+        {/* DAS-REV-11 §4: negli screen 01, 02, 08 e 10 la bottom navigation
+            resta visibile con Dashboard selezionata. Ricerca, form di
+            richiesta e revisione del consenso stanno invece in
+            app/society-link/, e la landing pubblica in app/society-invite/. */}
+        <Stack.Screen name="network/index" />
+        <Stack.Screen name="network/history" />
+        <Stack.Screen name="network/[relationshipId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

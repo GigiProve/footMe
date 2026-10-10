@@ -32,7 +32,16 @@ type IconName = keyof typeof Ionicons.glyphMap;
  * mostrato».
  */
 export const SOCIETY_HREFS = {
-  affiliates: "/club-admin/affiliates",
+  /**
+   * Centro Rete societaria (DAS-REV-11 §2).
+   *
+   * «La voce Società collegate già prevista nella Dashboard apre
+   * direttamente il nuovo centro Rete societaria. Non mantenere una pagina
+   * intermedia con un secondo elenco delle stesse relazioni.» Puntava a
+   * `/club-admin/affiliates`, che apriva l'editor manuale delle affiliate:
+   * quella era la seconda lista, e ora non esiste più.
+   */
+  affiliates: "/(tabs)/dashboard/network",
   /** Centro Candidature, eventualmente ristretto a una Posizione. */
   applications: (adId?: string | null) =>
     adId
@@ -211,7 +220,17 @@ export function buildManagementAreas(
       id: "permissions",
       title: "Amministratori e permessi",
     });
+  }
 
+  /**
+   * Società collegate (DAS-REV-11 §5).
+   *
+   * Era gated su `isOwner` perché `/club-admin/affiliates` è protetta dal
+   * ruolo e non da una capability. Il centro ha ora una chiave propria, e
+   * `network_view` è Society-level per costruzione: una delega limitata a un
+   * Team non la ottiene (§5).
+   */
+  if (identity.isOwner || identity.capabilities.includes("network_view")) {
     items.push({
       href: SOCIETY_HREFS.affiliates,
       icon: "link-outline",

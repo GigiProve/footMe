@@ -258,7 +258,7 @@ describe("Hub Modifica profilo Società", () => {
       "Contatti pubblici",
       "Gestione collegata",
       "Squadre del club",
-      "Società affiliate",
+      "Società collegate",
       "Posizioni",
       "Media e contenuti",
     ]) {
@@ -300,7 +300,7 @@ describe("Hub Modifica profilo Società", () => {
     expect(routerMocks.push).toHaveBeenCalledWith("/(tabs)/dashboard/teams");
 
     await press(tree, "society-profile-edit-row-affiliates");
-    expect(routerMocks.push).toHaveBeenCalledWith("/club-admin/affiliates");
+    expect(routerMocks.push).toHaveBeenCalledWith("/(tabs)/dashboard/network");
 
     await press(tree, "society-profile-edit-row-positions");
     expect(routerMocks.push).toHaveBeenCalledWith("/(tabs)/announcements");
@@ -321,7 +321,9 @@ describe("Hub Modifica profilo Società", () => {
     const labels = texts(await render(<SocietyProfileEditHubScreen />));
 
     expect(labels).not.toContain("Squadre del club");
-    expect(labels).not.toContain("Società affiliate");
+    // DAS-REV-11 §2: "Società collegate" punta ora al centro Rete
+    // societaria, che non passa da /club-admin e resta raggiungibile.
+    expect(labels).toContain("Società collegate");
     // Posizioni e Media non passano da /club-admin: restano raggiungibili.
     expect(labels).toContain("Posizioni");
     expect(labels).toContain("Media e contenuti");

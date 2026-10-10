@@ -11,8 +11,6 @@ import {
   fetchPublicClubRoster,
   fetchPublicClubTeamProfile,
   followClub,
-  saveClubAffiliations,
-  searchClubsForAffiliation,
   updateClubSportProfile,
   unfollowClub,
 } from "./club-service";
@@ -758,76 +756,6 @@ describe("club-service", () => {
         table: "clubs",
       }),
     );
-  });
-
-  it("replaces club affiliations with ordered relationship labels", async () => {
-    mocks.queueResponses({ error: null }, { error: null });
-
-    await saveClubAffiliations("club-1", [
-      {
-        affiliateClubId: "club-affiliate",
-        relationshipLabel: "Academy ufficiale",
-        sortOrder: 0,
-      },
-    ]);
-
-    expect(mocks.operations[0]).toEqual(
-      expect.objectContaining({
-        action: "delete",
-        filters: [{ column: "club_id", value: "club-1" }],
-        table: "club_affiliations",
-      }),
-    );
-    expect(mocks.operations[1]).toEqual(
-      expect.objectContaining({
-        action: "insert",
-        payload: [
-          {
-            affiliate_club_id: "club-affiliate",
-            club_id: "club-1",
-            relationship_label: "Academy ufficiale",
-            sort_order: 0,
-          },
-        ],
-        table: "club_affiliations",
-      }),
-    );
-  });
-
-  it("searches existing clubs for affiliation management", async () => {
-    await expect(searchClubsForAffiliation("a", "club-1")).resolves.toEqual([]);
-    expect(mocks.operations).toHaveLength(0);
-
-    mocks.queueResponses({
-      data: [
-        {
-          category: "Scuola calcio",
-          city: "Cantù",
-          id: "club-affiliate",
-          logo_url: null,
-          name: "Como Academy Cantù",
-          region: "Lombardia",
-        },
-      ],
-      error: null,
-    });
-
-    const results = await searchClubsForAffiliation("Como", "club-1", 5);
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        id: "club-affiliate",
-        name: "Como Academy Cantù",
-        relationship_label: null,
-      }),
-    ]);
-    expect(mocks.operations[0].ilikeFilters).toEqual([
-      { column: "name", value: "%Como%" },
-    ]);
-    expect(mocks.operations[0].neqFilters).toEqual([
-      { column: "id", value: "club-1" },
-    ]);
-    expect(mocks.operations[0].limitValue).toBe(5);
   });
 
   it("reads whether the current profile follows the club", async () => {

@@ -9,8 +9,8 @@
  */
 import { Linking, Platform, Share } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { createPendingLinkStore } from "../../../lib/pending-deep-link";
 import type { InviteChannel } from "./assistiti-model";
 
 /**
@@ -133,35 +133,23 @@ export const INVITE_CHANNELS: readonly {
  * il redirect su login lo perderebbe per strada (è quello che succede oggi con
  * `app/invite/[token].tsx`). Il token resta locale al dispositivo e viene
  * consumato una volta sola, al primo ingresso utile.
+ *
+ * Da DAS-REV-11 il meccanismo vive in `lib/pending-deep-link.ts`: la Rete
+ * societaria ha lo stesso bisogno e §19 chiede di riusare quello esistente,
+ * non di scriverne un secondo. Qui restano la chiave e i nomi pubblici.
  */
-const PENDING_INVITE_KEY = "@footme/pending-assistito-invite/v1";
+const pendingAssistitoInvite = createPendingLinkStore(
+  "@footme/pending-assistito-invite/v1",
+);
 
 export async function storePendingInviteToken(token: string): Promise<void> {
-  try {
-    await AsyncStorage.setItem(PENDING_INVITE_KEY, token);
-  } catch {
-    // Un invito non ripreso è un fastidio; un crash all'avvio no.
-  }
+  await pendingAssistitoInvite.store(token);
 }
 
 export async function consumePendingInviteToken(): Promise<string | null> {
-  try {
-    const token = await AsyncStorage.getItem(PENDING_INVITE_KEY);
-
-    if (token) {
-      await AsyncStorage.removeItem(PENDING_INVITE_KEY);
-    }
-
-    return token;
-  } catch {
-    return null;
-  }
+  return pendingAssistitoInvite.consume();
 }
 
 export async function clearPendingInviteToken(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(PENDING_INVITE_KEY);
-  } catch {
-    // vedi sopra
-  }
+  await pendingAssistitoInvite.clear();
 }

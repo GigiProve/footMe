@@ -59,7 +59,6 @@ type EditSection =
   | "clubInfo"
   | "clubSeasons"
   | "clubSportProfile"
-  | "clubAffiliations"
   | "clubTeams";
 
 type ProfileReadonlyViewProps = {
