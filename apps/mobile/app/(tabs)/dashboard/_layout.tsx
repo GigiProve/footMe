@@ -20,6 +20,10 @@ export default function DashboardLayout() {
     <DashboardIdentityProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        {/* DAS-REV-12 §6: l'hub Struttura societaria è una figlia della tab,
+            non una schermata intermedia fra Dashboard e centri — le
+            scorciatoie dirette di "Aree di gestione" restano tali. */}
+        <Stack.Screen name="structure" />
         <Stack.Screen name="teams" />
         <Stack.Screen name="team/[teamId]" />
         {/* DAS-REV-10 §9: le tre viste di consultazione di Stagioni e

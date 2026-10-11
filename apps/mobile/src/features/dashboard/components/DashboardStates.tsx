@@ -153,11 +153,18 @@ export function DashboardGlobalError({
  * innescare un ciclo di richieste — la Foundation aggiorna lo stato di
  * connessione e mantiene il feedback coerente.
  */
-export function DashboardGlobalOffline({ onRetry }: { onRetry: () => void }) {
+export function DashboardGlobalOffline({
+  body = "Connettiti a Internet per caricare la tua Dashboard.",
+  onRetry,
+}: {
+  /** Copy contestuale: l'hub nomina la struttura societaria, non la Dashboard. */
+  body?: string;
+  onRetry: () => void;
+}) {
   return (
     <DashboardGlobalState
       actionLabel="Riprova"
-      body="Connettiti a Internet per caricare la tua Dashboard."
+      body={body}
       icon="cloud-offline-outline"
       onAction={onRetry}
       title="Sei offline"

@@ -135,11 +135,55 @@ describe("buildManagementAreas", () => {
     ).map((row) => row.id);
 
     expect(rows).toEqual([
+      "structure",
       "shortlist",
       "permissions",
       "affiliates",
       "society_profile",
     ]);
+  });
+
+  it("apre Gestione società in cima, nell'ordine del master 01 (DAS-REV-12 §5)", () => {
+    const rows = buildManagementAreas(
+      society(
+        ["dashboard_view", "teams_view", "shortlist_view", "network_view"],
+        true,
+      ),
+    );
+
+    expect(rows.map((row) => row.id)).toEqual([
+      "structure",
+      "seasons",
+      "shortlist",
+      "permissions",
+      "affiliates",
+      "society_profile",
+    ]);
+
+    // §5: «Il tap apre direttamente la pagina Struttura societaria.» Non una
+    // schermata intermedia, e non una seconda copia delle scorciatoie.
+    expect(rows[0].href).toBe(SOCIETY_HREFS.structure);
+    expect(rows[0].title).toBe("Gestione società");
+  });
+
+  it("omette Gestione società senza alcun dominio strutturale (§5)", () => {
+    // Shortlist non è un dominio della struttura: chi ha solo quella non
+    // vede l'ingresso, ma conserva la propria scorciatoia.
+    const rows = buildManagementAreas(
+      society(["dashboard_view", "shortlist_view"]),
+    ).map((row) => row.id);
+
+    expect(rows).not.toContain("structure");
+    expect(rows).toContain("shortlist");
+  });
+
+  it("non duplica Stagioni e storico nello stesso gruppo (QA-03)", () => {
+    const rows = buildManagementAreas(
+      society(["dashboard_view", "teams_view"]),
+    ).map((row) => row.id);
+
+    expect(rows.filter((id) => id === "seasons")).toHaveLength(1);
+    expect(rows.filter((id) => id === "structure")).toHaveLength(1);
   });
 
   it("withholds the admin rows from a member who only manages a team", () => {
@@ -152,7 +196,12 @@ describe("buildManagementAreas", () => {
     // "seasons" resta: DAS-REV-10 §9 la concede con `teams_view`, che è
     // esattamente la capability di chi gestisce una squadra. Le due righe
     // amministrative restano fuori.
-    expect(rows).toEqual(["seasons", "shortlist", "society_profile"]);
+    expect(rows).toEqual([
+      "structure",
+      "seasons",
+      "shortlist",
+      "society_profile",
+    ]);
   });
 
   it("mostra Stagioni e storico solo con teams_view (DAS-REV-10 §9)", () => {

@@ -16,6 +16,7 @@ import type { DashboardIdentity } from "../dashboard-types";
 import { isFeatureAvailable } from "../modules/dashboard-features";
 import type { QuickActionId } from "../modules/composition";
 import type { SocietyOverview } from "../adapters/society-adapter";
+import { hasStructuralDomain } from "../structure/structure-presentation";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -59,6 +60,13 @@ export const SOCIETY_HREFS = {
   seasons: "/(tabs)/dashboard/seasons",
   shortlist: "/shortlist",
   societyProfile: (clubId: string) => `/club/${clubId}`,
+  /**
+   * Hub Struttura societaria (DAS-REV-12 §5).
+   *
+   * «Il tap apre direttamente la pagina Struttura societaria. Gestione
+   * società è il nome della riga di ingresso, non una schermata intermedia.»
+   */
+  structure: "/(tabs)/dashboard/structure",
   teams: "/(tabs)/dashboard/teams",
 } as const;
 
@@ -180,6 +188,30 @@ export function buildManagementAreas(
   identity: DashboardIdentity,
 ): ManagementAreaItem[] {
   const items: ManagementAreaItem[] = [];
+
+  /**
+   * DAS-REV-12 §5: «Integra Gestione società › nella parte inferiore della
+   * Dashboard Società, all'interno di Aree di gestione», in prima posizione
+   * quando tutte le destinazioni del master 01 sono autorizzate.
+   *
+   * La riga **non** sostituisce le scorciatoie che seguono: §5 è esplicito —
+   * «Il nuovo hub non deve rendere obbligatorio un passaggio aggiuntivo per
+   * le scorciatoie già definite». Stagioni, Amministratori e Società
+   * collegate restano raggiungibili in un tap da qui.
+   *
+   * `hasStructuralDomain` decide la riga, la RPC rivalida l'accesso: §5
+   * chiede di omettere l'ingresso quando «nessun dominio strutturale è
+   * disponibile per l'actor», e i soli dati master non sono un dominio
+   * strutturale.
+   */
+  if (hasStructuralDomain(identity)) {
+    items.push({
+      href: SOCIETY_HREFS.structure,
+      icon: "grid-outline",
+      id: "structure",
+      title: "Gestione società",
+    });
+  }
 
   /**
    * DAS-REV-10 §9: «Integrare nella composizione Dashboard una riga

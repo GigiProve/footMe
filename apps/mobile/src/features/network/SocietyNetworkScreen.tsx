@@ -21,7 +21,7 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   useInfiniteQuery,
   useQuery,
@@ -88,7 +88,19 @@ export function SocietyNetworkScreen() {
   const { current } = useDashboardIdentity();
   const clubId = current?.kind === "society" ? current.id : null;
   const { connection, reportFailure, reportSuccess } = useDashboardConnection();
-  const [tab, setTab] = useState<NetworkTab>("links");
+  /**
+   * DAS-REV-12 §14: «Hub / Gruppo richieste → Rete societaria / Richieste /
+   * Ricevute». Il centro resta uno solo: il parametro sceglie la tab
+   * iniziale, non apre una seconda pagina.
+   *
+   * È un valore **iniziale**: la tab effettiva resta derivata dalle
+   * capability subito sotto, così un deep link non seleziona una tab che
+   * l'actor non può leggere.
+   */
+  const { focus } = useLocalSearchParams<{ focus?: string }>();
+  const [tab, setTab] = useState<NetworkTab>(
+    focus === "requests" ? "requests" : "links",
+  );
   const [activeInvite, setActiveInvite] = useState<PendingInviteItem | null>(null);
 
   const headerQuery = useQuery({
