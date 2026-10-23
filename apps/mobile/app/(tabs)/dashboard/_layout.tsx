@@ -48,6 +48,11 @@ export default function DashboardLayout() {
             focalizzati in app/admin-invite/, e la landing pubblica sta in
             app/admin-invite/[token]. */}
         <Stack.Screen name="admins" />
+        {/* DAS-REV-14 §4: lo screen 01 «mantiene Home | Cerca | Dashboard |
+            Messaggi | Profilo, con Dashboard selezionata». Gli screen 02–12
+            sono flussi focalizzati e stanno in app/club-roles/ e
+            app/society-admin/. */}
+        <Stack.Screen name="roles" />
       </Stack>
     </DashboardIdentityProvider>
   );

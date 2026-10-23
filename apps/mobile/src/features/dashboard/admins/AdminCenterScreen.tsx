@@ -55,6 +55,7 @@ import {
   fetchAdminInvites,
   fetchAdmins,
 } from "./admins-service";
+import { ACCESS_HREFS } from "./access/access-routes";
 import { ADMIN_HREFS } from "./admins-routes";
 
 const PAGE_SIZE = 20;
@@ -337,11 +338,14 @@ export function AdminCenterScreen() {
                     key={row.profileId}
                     meta={row.roleLabel}
                     note={row.scopeLabel}
-                    /* §7.1: le righe aprono il **dettaglio amministratore**,
-                       non il profilo pubblico. Quel dettaglio è di
-                       DAS-REV-14: finché non esiste, la riga non è tappabile
-                       — §7 vieta «un chevron morto o un toast fittizio
-                       presentato come integrazione completata». */
+                    /* §7.1: le righe aprono il **dettaglio
+                       amministratore**, non il profilo pubblico. La
+                       destinazione è di DAS-REV-14 §14, e ora esiste. */
+                    onPress={() =>
+                      router.push(
+                        ACCESS_HREFS.detail(row.profileId) as never,
+                      )
+                    }
                     showDivider={index > 0}
                     testID={`admin-row-${row.profileId}`}
                     title={row.fullName}
@@ -391,19 +395,15 @@ export function AdminCenterScreen() {
                     key={row.inviteId}
                     meta={row.roleLabel}
                     note={row.scopeLabel}
-                    /* §12: «L'invito esterno pending deve poter essere
-                       riaperto dal centro per ricondividere il link
-                       autorizzato.» L'invito interno non ha un link: la sua
-                       riga resta informativa. */
-                    onPress={
-                      row.recipientKind === "email" && center.canInvite
-                        ? () =>
-                            router.push(
-                              ADMIN_HREFS.external({
-                                inviteId: row.inviteId,
-                              }) as never,
-                            )
-                        : undefined
+                    /* DAS-REV-14 §23 apre il **dettaglio** dell'invito,
+                       da cui si annulla. La ricondivisione del link esterno
+                       (DAS-REV-13 §12) resta raggiungibile da lì: due
+                       destinazioni per la stessa riga sarebbero due
+                       significati per lo stesso tocco. */
+                    onPress={() =>
+                      router.push(
+                        ACCESS_HREFS.invite(row.inviteId) as never,
+                      )
                     }
                     showDivider={index > 0}
                     status={inviteChannelLabel(row)}

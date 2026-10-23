@@ -77,17 +77,8 @@ export const pendingAdminInvite = createPendingLinkStore(
 /**
  * Chiave di idempotenza di una mutazione (§19).
  *
- * «I retry di create/accept/reject riusano la stessa chiave finché l'esito
- * non è conosciuto.» Nasce una volta per decisione dell'utente e sopravvive
- * ai retry; cambia solo quando cambia la proposta.
+ * Vive in `operation-key` perché DAS-REV-14 la usa in schermate che non
+ * condividono nessun link e non devono importare il clipboard. Qui resta
+ * ri-esportata: i chiamanti di DAS-REV-13 non cambiano.
  */
-export function newAdminOperationKey(): string {
-  const globalCrypto = (globalThis as { crypto?: { randomUUID?: () => string } })
-    .crypto;
-
-  if (typeof globalCrypto?.randomUUID === "function") {
-    return globalCrypto.randomUUID();
-  }
-
-  return `adm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
+export { newAdminOperationKey } from "./operation-key";

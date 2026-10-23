@@ -38,9 +38,10 @@ export const ADMIN_HREFS = {
   /**
    * Ruoli e permessi: la destinazione reale del sistema condiviso.
    *
-   * Oggi è la schermata owner-gated introdotta prima della Dashboard.
-   * DAS-REV-14 la sostituirà con l'editor completo; il centro continuerà a
-   * puntare qui perché è l'unico indirizzo canonico esistente.
+   * Era la schermata owner-gated introdotta prima della Dashboard, ed è il
+   * motivo per cui `can_open_roles` restava owner-only. DAS-REV-14 §8 crea
+   * il centro vero, gated sulla sola chiave `admin_roles_view`: la riga non
+   * è più un chevron morto per un delegato.
    */
-  roles: "/club-admin/permissions",
+  roles: "/(tabs)/dashboard/roles?from=admins",
 } as const;

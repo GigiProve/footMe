@@ -62,6 +62,22 @@ export const DASHBOARD_CAPABILITIES = [
   "admin_invites_view",
   "admins_invite",
   "admin_roles_view",
+  // DAS-REV-14 §6: «Distinguere almeno lettura ruoli, creazione/modifica
+  // ruoli, lettura amministratori, cambio ruolo, modifica scope, revoca
+  // amministratore, lettura/annullamento inviti e trasferimento ownership.»
+  // Le prime cinque diventano chiavi; il trasferimento no — §18 lo riserva
+  // all'Owner corrente, e una chiave sarebbe il modo di farlo finire dentro
+  // un bundle Gestisci.
+  "admin_roles_manage",
+  "admins_assign_role",
+  "admins_manage_scope",
+  "admins_revoke",
+  "admin_invites_cancel",
+  // DAS-REV-14 §7: la lettura dei dati societari non aveva una chiave ed era
+  // derivata dal perimetro. Un ruolo che concede «Dati della società →
+  // Visualizza» ora ha un effetto reale.
+  "society_profile_view",
+  "society_manage_profile",
 ] as const;
 
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];
