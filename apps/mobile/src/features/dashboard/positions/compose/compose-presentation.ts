@@ -13,14 +13,19 @@ import {
   PLAYER_SITUATION_LABELS,
   POSITION_SCHEMAS,
 } from "./compose-schema";
+import type { PositionField } from "./compose-schema";
 import type { ComposeError } from "./compose-service";
 import type {
+  PositionAgeMode,
   PositionAvailability,
   PositionBlocker,
   PositionCatalogItem,
+  PositionDetailsForm,
   PositionDraft,
+  PositionEligibleTeam,
   PositionLimits,
   PositionReadiness,
+  PositionSecondaryTeam,
 } from "./compose-types";
 
 /** Le copy minime di §31, in un posto solo. */
@@ -165,7 +170,18 @@ export function describeComposeError(error: ComposeError): string {
     case "POSITION_LIFECYCLE_CONFLICT":
       return COMPOSE_COPY.selectionChanged;
     case "POSITION_IDENTITY_LOCKED":
-      return "Questa posizione è già pubblicata: profilo, ruolo, squadra e ambito non sono più modificabili.";
+      /* DAS-REV-17 §28, riga «Identificativi bloccati nell'attiva». */
+      return "Le informazioni identificative non possono essere modificate dopo la pubblicazione.";
+    case "POSITION_FIELD_NOT_EDITABLE":
+      return "Uno dei campi inviati non è modificabile in questo stato.";
+    case "POSITION_AGE_UNSET_NOT_ALLOWED":
+      return COMPOSE_COPY.ageRequired;
+    case "POSITION_SECONDARY_TEAM_IS_PRIMARY":
+      return "La squadra principale non può essere anche una squadra secondaria.";
+    case "POSITION_PATCH_INVALID":
+      return COMPOSE_COPY.saveFailed;
+    case "POSITION_NOT_AVAILABLE":
+      return "Questa posizione non è più disponibile.";
     case "POSITION_NOT_PUBLISHABLE":
       return error.blockers.length > 0
         ? describeBlocker(error.blockers[0])
@@ -501,4 +517,229 @@ export function incompatibleAreas(
   }
 
   return areas;
+}
+
+// ── Buffer dei dettagli: lettura, differenza e validazione ─────────────────
+//
+// Tre funzioni pure condivise dalle due superfici che montano
+// `PositionSchemaFields`: lo step 2 del composer e l'editor di una Position
+// già persistita (DAS-REV-17 §20). Stanno qui e non nel componente perché
+// §35 chiede test che verifichino «contratti e rischi reali, evitando una
+// copia delle condizioni del componente come unica prova»: una patch si
+// verifica chiamando una funzione, non montando un form.
+
+/** Lo snapshot persistito, letto come buffer di form. */
+export function formFromDraft(draft: {
+  ageMax: number | null;
+  ageMin: number | null;
+  ageMode: PositionAgeMode;
+  description: string | null;
+  details: PositionDraft["details"];
+  secondaryTeams: readonly { teamId: string }[];
+}): PositionDetailsForm {
+  return {
+    ageMax: draft.ageMax !== null ? String(draft.ageMax) : "",
+    ageMin: draft.ageMin !== null ? String(draft.ageMin) : "",
+    ageMode: draft.ageMode,
+    availability: draft.details.availability ?? null,
+    coachQualificationId: draft.details.coachQualificationId ?? null,
+    description: draft.description ?? "",
+    experience: draft.details.experience ?? [],
+    playerExperience: draft.details.playerExperience ?? null,
+    playerSituation: draft.details.playerSituation ?? null,
+    requirements: draft.details.requirements ?? "",
+    responsibilities: draft.details.responsibilities ?? "",
+    secondaryTeamIds: draft.secondaryTeams.map((team) => team.teamId),
+    staffQualification: draft.details.staffQualification ?? "",
+  };
+}
+
+/** Forma minima della patch prodotta dal form dei dettagli. */
+export type PositionDetailsPatch = Partial<{
+  ageMax: number | null;
+  ageMin: number | null;
+  ageMode: PositionAgeMode;
+  description: string | null;
+  details: Partial<{
+    availability: PositionAvailability | null;
+    coachQualificationId: string | null;
+    experience: string[] | null;
+    playerExperience: PositionDraft["details"]["playerExperience"] | null;
+    playerSituation: PositionDraft["details"]["playerSituation"] | null;
+    requirements: string | null;
+    responsibilities: string | null;
+    staffQualification: string | null;
+  }>;
+  secondaryTeamIds: string[];
+}>;
+
+function sameSet(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+
+  return sortedA.every((value, index) => value === sortedB[index]);
+}
+
+/**
+ * La differenza fra lo snapshot persistito e il buffer (§21; DAS-REV-17 §12).
+ *
+ * «Usa patch parziali. Un campo non presente nel comando significa nessuna
+ * modifica; un azzeramento esplicito significa rimozione soltanto se
+ * permessa. Non serializzare automaticamente tutti i campi non visibili come
+ * null.» Da qui una chiave per ogni campo **cambiato**, e nessuna per gli
+ * altri: è ciò che preserva i dati legacy che questo client non conosce.
+ */
+export function buildDetailsPatch(
+  original: PositionDetailsForm,
+  next: PositionDetailsForm,
+): PositionDetailsPatch {
+  const patch: PositionDetailsPatch = {};
+
+  if (next.description !== original.description) {
+    patch.description = next.description.trim() === "" ? null : next.description;
+  }
+
+  if (
+    next.ageMode !== original.ageMode ||
+    next.ageMin !== original.ageMin ||
+    next.ageMax !== original.ageMax
+  ) {
+    patch.ageMode = next.ageMode;
+    patch.ageMin = next.ageMode === "range" ? Number(next.ageMin) : null;
+    patch.ageMax = next.ageMode === "range" ? Number(next.ageMax) : null;
+  }
+
+  if (!sameSet(next.secondaryTeamIds, original.secondaryTeamIds)) {
+    patch.secondaryTeamIds = next.secondaryTeamIds;
+  }
+
+  const details: NonNullable<PositionDetailsPatch["details"]> = {};
+
+  if (JSON.stringify(next.availability) !== JSON.stringify(original.availability)) {
+    details.availability = next.availability ?? null;
+  }
+
+  if (!sameSet(next.experience, original.experience)) {
+    details.experience = next.experience.length > 0 ? next.experience : null;
+  }
+
+  if (
+    JSON.stringify(next.playerExperience) !==
+    JSON.stringify(original.playerExperience)
+  ) {
+    details.playerExperience = next.playerExperience ?? null;
+  }
+
+  if (next.playerSituation !== original.playerSituation) {
+    details.playerSituation = next.playerSituation ?? null;
+  }
+
+  if (next.coachQualificationId !== original.coachQualificationId) {
+    details.coachQualificationId = next.coachQualificationId ?? null;
+  }
+
+  if (next.staffQualification !== original.staffQualification) {
+    details.staffQualification =
+      next.staffQualification.trim() === "" ? null : next.staffQualification;
+  }
+
+  if (next.requirements !== original.requirements) {
+    details.requirements =
+      next.requirements.trim() === "" ? null : next.requirements;
+  }
+
+  if (next.responsibilities !== original.responsibilities) {
+    details.responsibilities =
+      next.responsibilities.trim() === "" ? null : next.responsibilities;
+  }
+
+  if (Object.keys(details).length > 0) {
+    patch.details = details;
+  }
+
+  return patch;
+}
+
+/**
+ * Validazione locale dei soli campi presenti nello schema (§7).
+ *
+ * «La validazione server è autorevole. Il client applica le stesse regole
+ * per feedback immediato, senza diventare l'unico guard.» Non decide quindi
+ * se una Position sia pubblicabile: controlla la forma di ciò che è stato
+ * digitato, e `position_publish_blockers` resta l'autorità.
+ */
+export function detailsFormErrors(
+  form: PositionDetailsForm,
+  fields: readonly PositionField[],
+  limits: PositionLimits,
+): Record<string, string | null> {
+  const errors: Record<string, string | null> = {};
+
+  if (
+    fields.some((field) => field.kind === "ageRange") &&
+    form.ageMode === "range"
+  ) {
+    const error = validateAgeInput(
+      { max: form.ageMax, min: form.ageMin, mode: "range" },
+      limits,
+    );
+
+    if (error) {
+      errors.ageRange = error;
+    }
+  }
+
+  for (const field of fields) {
+    if (
+      (field.kind === "shortText" || field.kind === "longText") &&
+      field.limitKey
+    ) {
+      const value = (form as unknown as Record<string, string>)[field.key] ?? "";
+      const error = validateText(value, limits[field.limitKey]);
+
+      if (error) {
+        errors[field.key] = error;
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Le squadre nominabili come secondarie (§27).
+ *
+ * Alle eleggibili si aggiungono quelle **già collegate**: una secondaria
+ * disattivata non compare fra le eleggibili, e §27 vieta di «usare una
+ * lista di opzioni vuota come prova che le relazioni sono state rimosse».
+ * Senza questa fusione il form mostrerebbe un campo vuoto al posto di una
+ * relazione che esiste, e il salvataggio la cancellerebbe.
+ */
+export function mergeSecondaryTeamOptions(
+  eligible: readonly PositionEligibleTeam[],
+  linked: readonly PositionSecondaryTeam[],
+): PositionEligibleTeam[] {
+  const out = [...eligible];
+
+  for (const team of linked) {
+    if (out.some((entry) => entry.teamId === team.teamId)) {
+      continue;
+    }
+
+    out.push({
+      /* Non eleggibile per una **nuova** selezione, ma presente: resta
+         leggibile e rimovibile, non viene riproposta come scelta. */
+      canCreate: false,
+      canPublish: false,
+      contextLabel: null,
+      teamId: team.teamId,
+      teamName: team.name,
+    });
+  }
+
+  return out;
 }

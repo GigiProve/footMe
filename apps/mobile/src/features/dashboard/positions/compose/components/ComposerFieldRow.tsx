@@ -9,6 +9,15 @@ type Props = {
   helper?: string | null;
   error?: string | null;
   label: string;
+  /**
+   * DAS-REV-17 §31: «righe fisse annunciate come non modificabili».
+   *
+   * Cambia solo l'annuncio allo screen reader, non il colore: §19 vieta
+   * per le righe bloccate «chevron, cursore di modifica o trattamento
+   * disabled a basso contrasto». Si legge come le altre, si annuncia per
+   * quello che è.
+   */
+  locked?: boolean;
   onPress?: () => void;
   /** `true` aggiunge « · Opzionale» grigio accanto alla label (§4). */
   optional?: boolean;
@@ -34,6 +43,7 @@ export function ComposerFieldRow({
   error,
   helper,
   label,
+  locked = false,
   onPress,
   optional = false,
   placeholder,
@@ -95,7 +105,9 @@ export function ComposerFieldRow({
       ) : (
         <View
           accessible
-          accessibilityLabel={`${label}: ${value ?? emptyLabel}`}
+          accessibilityLabel={`${label}: ${value ?? emptyLabel}${
+            locked ? ", non modificabile" : ""
+          }`}
           testID={testID}
         >
           {body}

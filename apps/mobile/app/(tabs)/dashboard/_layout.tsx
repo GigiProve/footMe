@@ -57,9 +57,15 @@ export default function DashboardLayout() {
             Posizioni aperte. Apri direttamente il Centro, senza imporre il
             passaggio attraverso Struttura societaria.» Qui la bottom
             navigation resta visibile con Dashboard selezionata (screen
-            01/03/04/06); il dettaglio gestionale di una singola Position è
-            invece un flusso focalizzato e sta in app/society-position/. */}
-        <Stack.Screen name="positions" />
+            01/03/04/06).
+
+            DAS-REV-17 §6 porta qui anche il dettaglio gestionale della
+            singola Position: «Le pagine di dettaglio mantengono la
+            navigazione Home | Cerca | Dashboard | Messaggi | Profilo, con
+            Dashboard selezionata.» Editor e anteprima restano flussi
+            focalizzati in app/position-manage/. */}
+        <Stack.Screen name="positions/index" />
+        <Stack.Screen name="positions/[id]" />
       </Stack>
     </DashboardIdentityProvider>
   );

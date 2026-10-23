@@ -12,6 +12,7 @@
 
 import type Ionicons from "@expo/vector-icons/Ionicons";
 
+import { POSITIONS_HREFS } from "../positions/positions-routes";
 import { hasSomeCapability, type DashboardIdentity } from "../dashboard-types";
 import { isFeatureAvailable } from "../modules/dashboard-features";
 import type { QuickActionId } from "../modules/composition";
@@ -75,7 +76,7 @@ export const SOCIETY_HREFS = {
    */
   positions: (adId?: string | null) =>
     adId
-      ? `/society-position/${encodeURIComponent(adId)}`
+      ? POSITIONS_HREFS.detail(adId, { from: "dashboard" })
       : "/(tabs)/dashboard/positions?from=dashboard",
   /** Centro Stagioni e storico (DAS-REV-10 §9). */
   seasons: "/(tabs)/dashboard/seasons",

@@ -19,6 +19,8 @@
  * gestione.
  */
 
+import { POSITIONS_HREFS } from "../../dashboard/positions/positions-routes";
+
 export const TEAM_DETAIL_HREFS = {
   /** Centro Candidature filtrato sulla squadra. */
   applications: (teamId: string) =>
@@ -49,8 +51,7 @@ export const TEAM_DETAIL_HREFS = {
    * Lo stesso Position ID del Centro, della Dashboard e di Cerca: §18 vieta
    * di «creare un oggetto gestionale separato» per la stessa ricerca.
    */
-  position: (adId: string) =>
-    `/society-position/${encodeURIComponent(adId)}`,
+  position: (adId: string) => POSITIONS_HREFS.detail(adId, { from: "team" }),
   /**
    * Centro Posizioni con la squadra preselezionata (DAS-REV-15 §5).
    *

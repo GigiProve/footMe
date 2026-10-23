@@ -15,7 +15,6 @@ import { supabase } from "../../../lib/supabase";
 import { DashboardTimeoutError } from "../state/error-classification";
 import { MODULE_TIMEOUT_MS, withTimeout } from "../state/retry-policy";
 import type {
-  PositionDetail,
   PositionFilter,
   PositionFilterOption,
   PositionGroup,
@@ -264,63 +263,5 @@ export async function fetchPositionsPage(input: {
     hasMore: list.length >= limit,
     nextCursor: last ? text(last.next_cursor) : null,
     rows: mapped,
-  };
-}
-
-// ── Dettaglio gestionale ────────────────────────────────────────────────────
-
-export async function fetchSocietyPositionDetail(
-  positionId: string,
-): Promise<PositionDetail> {
-  const rows = await rpc<RawRecord[]>("fetch_society_position_detail", {
-    p_ad_id: positionId,
-  });
-
-  const row = Array.isArray(rows) ? rows[0] : null;
-
-  if (!row) {
-    throw new PositionsAccessError("POSITION_NOT_AVAILABLE");
-  }
-
-  const group = text(row.group_key);
-
-  return {
-    accessVerifiedAt: row.access_verified_at
-      ? new Date(String(row.access_verified_at)).getTime()
-      : Date.now(),
-    ageMax: count(row.age_max),
-    ageMin: count(row.age_min),
-    applicationsNew: count(row.applications_new),
-    applicationsTotal: count(row.applications_total),
-    canClose: bool(row.can_close),
-    canEdit: bool(row.can_edit),
-    canPublish: bool(row.can_publish),
-    closedAt: text(row.closed_at),
-    clubId: text(row.club_id) ?? "",
-    clubIsVerified: bool(row.club_is_verified),
-    clubLogoUrl: text(row.club_logo_url),
-    clubName: text(row.club_name) ?? "",
-    compensationSummary: text(row.compensation_summary),
-    contextLabel: text(row.context_label),
-    countsAvailable: bool(row.counts_available),
-    deadlineAt: text(row.deadline_at),
-    deadlineTimezone: text(row.deadline_timezone),
-    description: text(row.description),
-    group:
-      group === "drafts" || group === "closed" ? group : "active",
-    id: text(row.position_id) ?? positionId,
-    publishedAt: text(row.published_at),
-    receivingClosed: bool(row.receiving_closed),
-    region: text(row.region),
-    roleRequired: text(row.role_required),
-    scope: text(row.position_scope) === "society" ? "society" : "team",
-    seasonLabel: text(row.season_label),
-    status: text(row.status) ?? "",
-    targetRole: text(row.target_role),
-    teamId: text(row.team_id),
-    teamIsInactive: bool(row.team_is_inactive),
-    teamName: text(row.team_name),
-    title: text(row.title),
-    updatedAt: text(row.updated_at),
   };
 }

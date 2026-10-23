@@ -26,6 +26,10 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  createSessionNonce,
+  operationKeyOf,
+} from "./compose-operation-key";
 import type { PositionProfileType, PositionScope } from "./compose-types";
 import type { ComposeOrigin } from "./compose-routes";
 
@@ -91,18 +95,7 @@ const EMPTY_PROPOSAL: ComposeProposal = {
  * che è esattamente il contratto di §10.
  */
 function useOperationKey(nonce: string, signature: string): string {
-  return `${nonce}-${fingerprint(signature)}`;
-}
-
-/** djb2: basta a distinguere due proposte, e non deve resistere a un attacco. */
-function fingerprint(value: string): string {
-  let hash = 5381;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = ((hash << 5) + hash + value.charCodeAt(index)) | 0;
-  }
-
-  return (hash >>> 0).toString(36);
+  return operationKeyOf(nonce, signature);
 }
 
 export function ComposeSessionProvider({
@@ -129,10 +122,7 @@ export function ComposeSessionProvider({
 
   /* Il nonce nasce con la sessione e non cambia più: è ciò che rende la
      chiave idempotente irripetibile fra due sessioni e stabile dentro una. */
-  const [sessionNonce] = useState(
-    () =>
-      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
-  );
+  const [sessionNonce] = useState(createSessionNonce);
 
   const createSignature = [
     proposal.profileType ?? "",

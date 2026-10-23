@@ -7,7 +7,7 @@
  * societaria — i tre ingressi (Dashboard, dettaglio Squadra, disattivazione)
  * puntano direttamente qui.
  */
-import { PositionsCenterScreen } from "../../../src/features/dashboard/positions/PositionsCenterScreen";
+import { PositionsCenterScreen } from "../../../../src/features/dashboard/positions/PositionsCenterScreen";
 
 export default function DashboardPositionsRoute() {
   return <PositionsCenterScreen />;

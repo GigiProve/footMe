@@ -61,9 +61,15 @@ export const POSITIONS_HREFS = {
       scope: options?.scope,
       teamId: options?.teamId,
     })}`,
-  /** Dettaglio gestionale della stessa Position, mai la scheda visitor. */
+  /**
+   * Dettaglio gestionale della stessa Position, mai la scheda visitor.
+   *
+   * DAS-REV-17 §6 lo vuole figlio della tab Dashboard, con la bottom
+   * navigation visibile: il vecchio indirizzo `/society-position/<id>`
+   * resta come reindirizzamento per i link già in circolazione.
+   */
   detail: (positionId: string, options?: { from?: PositionsOrigin }) =>
-    `/society-position/${encodeURIComponent(positionId)}${query({
+    `${CENTER}/${encodeURIComponent(positionId)}${query({
       from: options?.from,
     })}`,
   /** Candidature della Position, nel loro dominio (§20). */

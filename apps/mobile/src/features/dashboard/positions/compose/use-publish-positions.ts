@@ -25,7 +25,20 @@ import {
 
 export function usePublishPositions(options: {
   onError: (error: ComposeError, message: string) => void;
+  /**
+   * Dove andare dopo un commit confermato.
+   *
+   * Il composer torna al Centro; DAS-REV-17 §6 chiede invece che
+   * pubblicando da una bozza si apra «il dettaglio attivo dello stesso ID
+   * con feedback leggero». Due destinazioni, una sola pubblicazione: §16
+   * vieta «un endpoint che aggira validazione, idempotenza o permessi»
+   * perché cambia la superficie d'ingresso, e lo stesso vale per l'hook
+   * che la esegue.
+   */
+  onSuccessNavigate?: (published: readonly { positionId: string }[]) => void;
   operationKey: string;
+  /** Sovrascrive «2 posizioni pubblicate» con la copy di §28. */
+  successMessage?: (published: number, remaining: number) => string;
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -70,9 +83,18 @@ export function usePublishPositions(options: {
       /* §26: «Nessuna pagina celebrativa o confetti.» Un toast e il ritorno
          all'origin. */
       showToast({
-        message: publishSuccessMessage(published.length, remaining),
+        message: (options.successMessage ?? publishSuccessMessage)(
+          published.length,
+          remaining,
+        ),
         tone: "success",
       });
+
+      if (options.onSuccessNavigate) {
+        options.onSuccessNavigate(published);
+
+        return;
+      }
 
       router.dismissAll();
       router.replace("/(tabs)/dashboard/positions" as never);

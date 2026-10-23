@@ -18,7 +18,6 @@ const {
   fetchPositionFilterOptions,
   fetchPositionsCenter,
   fetchPositionsPage,
-  fetchSocietyPositionDetail,
   toPositionsError,
 } = await import("./positions-service");
 
@@ -294,47 +293,6 @@ describe("pagina (§10, §16, §22)", () => {
     });
 
     expect(page.rows).toHaveLength(1);
-  });
-});
-
-describe("dettaglio gestionale (§18)", () => {
-  it("mappa gruppo e azioni autorizzate", async () => {
-    rpc.mockReturnValue(
-      ok([
-        {
-          access_verified_at: "2026-09-12T09:00:00Z",
-          can_close: false,
-          can_edit: true,
-          can_publish: true,
-          club_id: "club-1",
-          club_is_verified: true,
-          club_logo_url: null,
-          club_name: "AC Como",
-          counts_available: false,
-          group_key: "drafts",
-          position_id: "pos-1",
-          position_scope: "team",
-          status: "draft",
-          title: "Difensore centrale",
-        },
-      ]),
-    );
-
-    const detail = await fetchSocietyPositionDetail("pos-1");
-
-    expect(detail.group).toBe("drafts");
-    expect(detail.canEdit).toBe(true);
-    expect(detail.canClose).toBe(false);
-    expect(detail.countsAvailable).toBe(false);
-    expect(detail.applicationsTotal).toBeNull();
-  });
-
-  it("una Position non più accessibile non è un dettaglio vuoto", async () => {
-    rpc.mockReturnValue(fail("POSITION_NOT_AVAILABLE"));
-
-    await expect(fetchSocietyPositionDetail("pos-1")).rejects.toMatchObject({
-      code: "POSITION_NOT_AVAILABLE",
-    });
   });
 });
 

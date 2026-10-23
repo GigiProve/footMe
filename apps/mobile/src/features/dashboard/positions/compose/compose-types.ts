@@ -70,6 +70,34 @@ export type PositionDetails = {
   staffQualification?: string;
 };
 
+/**
+ * Il buffer dei dettagli mentre si compila (DAS-REV-16 §11; DAS-REV-17 §11).
+ *
+ * Distinto da `PositionDetails`, che è ciò che viene **persistito**: qui i
+ * numeri dell'età sono stringhe perché un campo di testo semivuoto non è un
+ * numero, e le chiavi assenti diventano `null`/`""` perché un form non ha
+ * il concetto di «chiave non presente».
+ *
+ * Vive nei tipi e non nel componente perché due superfici lo costruiscono
+ * — lo step 2 del composer e l'editor di una Position esistente — e le
+ * funzioni pure che lo trasformano in patch stanno nella presentazione.
+ */
+export type PositionDetailsForm = {
+  ageMax: string;
+  ageMin: string;
+  ageMode: "range" | "unrestricted" | "unset";
+  availability: PositionAvailability | null;
+  coachQualificationId: string | null;
+  description: string;
+  experience: string[];
+  playerExperience: PositionPlayerExperience | null;
+  playerSituation: PositionPlayerSituation | null;
+  requirements: string;
+  responsibilities: string;
+  secondaryTeamIds: string[];
+  staffQualification: string;
+};
+
 export type PositionSecondaryTeam = {
   isInactive: boolean;
   name: string;

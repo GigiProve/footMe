@@ -15,6 +15,10 @@ import { describe, expect, it } from "vitest";
 import {
   COMPOSE_COPY,
   ageSummary,
+  buildDetailsPatch,
+  detailsFormErrors,
+  formFromDraft,
+  mergeSecondaryTeamOptions,
   availabilitySummary,
   contextSummary,
   continueLabel,
@@ -432,5 +436,134 @@ describe("matrice dei quattro schemi (§7, §39)", () => {
     for (const schema of Object.values(POSITION_SCHEMAS)) {
       expect(schema.fields.some((field) => field.key === "title")).toBe(false);
     }
+  });
+});
+
+/**
+ * La patch è il contratto fra il form e il server (§21; DAS-REV-17 §12).
+ *
+ * «Un campo non presente nel comando significa "nessuna modifica"; un
+ * azzeramento esplicito significa rimozione soltanto se permessa. Non
+ * serializzare automaticamente tutti i campi non visibili come null.» È
+ * esattamente ciò che si verifica qui, e che un `{...form}` spedito intero
+ * romperebbe senza che nessuna schermata cambi aspetto.
+ */
+describe("patch dei dettagli (§21)", () => {
+  const base = draft({
+    ageMax: 25,
+    ageMin: 18,
+    ageMode: "range",
+    description: "Progetto sportivo",
+    details: {
+      availability: { mode: "immediate" },
+      requirements: "Disponibilità al trasferimento",
+    },
+    profileType: "player",
+  });
+
+  it("un form invariato non produce nessuna chiave", () => {
+    const form = formFromDraft(base);
+
+    expect(buildDetailsPatch(form, form)).toEqual({});
+  });
+
+  it("nomina soltanto i campi cambiati", () => {
+    const form = formFromDraft(base);
+    const patch = buildDetailsPatch(form, { ...form, description: "Nuovo testo" });
+
+    expect(patch).toEqual({ description: "Nuovo testo" });
+    expect(patch.details).toBeUndefined();
+    expect("ageMode" in patch).toBe(false);
+  });
+
+  it("un testo svuotato rimuove, e gli spazi soltanto valgono come vuoto", () => {
+    const form = formFromDraft(base);
+
+    expect(
+      buildDetailsPatch(form, { ...form, requirements: "   " }).details,
+    ).toEqual({ requirements: null });
+  });
+
+  it("l'età viaggia come terna coerente, mai come numeri orfani", () => {
+    const form = formFromDraft(base);
+    const patch = buildDetailsPatch(form, {
+      ...form,
+      ageMax: "",
+      ageMin: "",
+      ageMode: "unrestricted",
+    });
+
+    expect(patch).toEqual({ ageMax: null, ageMin: null, ageMode: "unrestricted" });
+  });
+
+  it("un riordino delle squadre secondarie non è una modifica", () => {
+    const form = { ...formFromDraft(base), secondaryTeamIds: ["a", "b"] };
+
+    expect(
+      buildDetailsPatch(form, { ...form, secondaryTeamIds: ["b", "a"] }),
+    ).toEqual({});
+  });
+
+  it("una chiave legacy sconosciuta al client non entra nella patch", () => {
+    const legacy = draft({
+      details: { legacyField: "da preservare" } as never,
+      profileType: "player",
+    });
+    const form = formFromDraft(legacy);
+    const patch = buildDetailsPatch(form, { ...form, description: "x" });
+
+    expect(JSON.stringify(patch)).not.toContain("legacyField");
+  });
+
+  it("valida i testi sul limite centrale, per code point", () => {
+    const form = {
+      ...formFromDraft(base),
+      description: "x".repeat(LIMITS.description + 1),
+    };
+
+    expect(
+      detailsFormErrors(form, POSITION_SCHEMAS.player.fields, LIMITS).description,
+    ).toBe(COMPOSE_COPY.textTooLong);
+  });
+});
+
+describe("opzioni delle squadre secondarie (§27)", () => {
+  it("conserva una secondaria già collegata che non è più eleggibile", () => {
+    const merged = mergeSecondaryTeamOptions(
+      [
+        {
+          canCreate: true,
+          canPublish: true,
+          contextLabel: "Serie D",
+          teamId: "team-first",
+          teamName: "Prima squadra",
+        },
+      ],
+      [{ isInactive: true, name: "Under 15", teamId: "team-u15" }],
+    );
+
+    expect(merged.map((team) => team.teamId)).toEqual([
+      "team-first",
+      "team-u15",
+    ]);
+    /* Resta leggibile e rimovibile, ma non si ripropone come scelta nuova. */
+    expect(merged[1].canCreate).toBe(false);
+  });
+
+  it("non duplica una squadra presente in entrambe le liste", () => {
+    const merged = mergeSecondaryTeamOptions(
+      [
+        {
+          canCreate: true,
+          canPublish: true,
+          contextLabel: null,
+          teamId: "team-u15",
+          teamName: "Under 15",
+        },
+      ],
+      [{ isInactive: false, name: "Under 15", teamId: "team-u15" }],
+    );
+
+    expect(merged).toHaveLength(1);
   });
 });

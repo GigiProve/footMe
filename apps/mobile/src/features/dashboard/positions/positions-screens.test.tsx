@@ -309,8 +309,10 @@ describe("screen 01 — Attive", () => {
       byTestID(tree, "position-row-pos-centrocampista").props.onPress();
     });
 
+    /* DAS-REV-17 §6: il dettaglio è figlio della tab Dashboard, perché la
+       bottom navigation deve restare visibile con Dashboard selezionata. */
     expect(routerMocks.push).toHaveBeenCalledWith(
-      "/society-position/pos-centrocampista",
+      "/(tabs)/dashboard/positions/pos-centrocampista",
     );
   });
 });

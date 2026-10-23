@@ -9,34 +9,25 @@ import { STALE_MS } from "../../cache/freshness-policy";
 import { DashboardGlobalEmpty, DashboardSkeleton } from "../../components/DashboardStates";
 import { useDashboardIdentity } from "../../identity/use-dashboard-identity";
 import { colors, spacing } from "../../../../theme/tokens";
-import { AppText, Button } from "../../../../ui";
-import { AgeRangeSheet, type AgeRangeValue } from "./components/AgeRangeSheet";
-import { AvailabilitySheet } from "./components/AvailabilitySheet";
-import { ComposerFieldRow } from "./components/ComposerFieldRow";
+import { AppText } from "../../../../ui";
 import { ComposerFooter } from "./components/ComposerFooter";
 import { ComposerNavBar } from "./components/ComposerNavBar";
-import { ComposerOptionSheet } from "./components/ComposerOptionSheet";
 import { ComposerStepHeader } from "./components/ComposerStepHeader";
-import { ComposerTextField } from "./components/ComposerTextField";
+import {
+  PositionSchemaFields,
+  PositionSchemaFieldsError,
+} from "./components/PositionSchemaFields";
+import type { PositionDetailsForm } from "./compose-types";
 import { COMPOSE_HREFS } from "./compose-routes";
 import { COMPOSE_QK } from "./compose-keys";
+import { POSITION_SCHEMAS } from "./compose-schema";
 import {
-  PLAYER_EXPERIENCE_LABELS,
-  PLAYER_SITUATION_LABELS,
-  POSITION_SCHEMAS,
-  SOCIETY_DESCRIPTION_PLACEHOLDER,
-} from "./compose-schema";
-import {
-  ageSummary,
-  availabilitySummary,
+  buildDetailsPatch,
   contextSummary,
   describeComposeError,
-  experienceSummary,
-  listNames,
-  playerExperienceSummary,
-  secondaryTeamsHelper,
-  validateAgeInput,
-  validateText,
+  detailsFormErrors,
+  formFromDraft,
+  mergeSecondaryTeamOptions,
 } from "./compose-presentation";
 import {
   fetchCatalogs,
@@ -47,100 +38,18 @@ import {
   updatePositionDraft,
   type PositionPatch,
 } from "./compose-service";
-import type {
-  PositionAgeMode,
-  PositionAvailability,
-  PositionPlayerExperience,
-  PositionPlayerSituation,
-} from "./compose-types";
 import { useUnsavedChangesGuard } from "../../../profiles/edit/use-unsaved-changes-guard";
 import { useComposeSession } from "./ComposeSessionProvider";
-
-type FormState = {
-  ageMax: string;
-  ageMin: string;
-  ageMode: "range" | "unrestricted" | "unset";
-  availability: PositionAvailability | null;
-  coachQualificationId: string | null;
-  description: string;
-  experience: string[];
-  playerExperience: PositionPlayerExperience | null;
-  playerSituation: PositionPlayerSituation | null;
-  requirements: string;
-  responsibilities: string;
-  secondaryTeamIds: string[];
-  staffQualification: string;
-};
-
-/** Forma minima della patch: il contratto completo vive in `compose-service`. */
-type DetailsPatch = Partial<{
-  availability: PositionAvailability | null;
-  coachQualificationId: string | null;
-  experience: string[] | null;
-  playerExperience: PositionPlayerExperience | null;
-  playerSituation: PositionPlayerSituation | null;
-  requirements: string | null;
-  responsibilities: string | null;
-  staffQualification: string | null;
-}>;
-
-type LocalPatch = Partial<{
-  ageMax: number | null;
-  ageMin: number | null;
-  ageMode: PositionAgeMode;
-  description: string | null;
-  details: DetailsPatch;
-  secondaryTeamIds: string[];
-}>;
-
-function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
-
-  return sortedA.every((value, index) => value === sortedB[index]);
-}
-
-function formFromDraft(draft: {
-  ageMax: number | null;
-  ageMin: number | null;
-  ageMode: PositionAgeMode;
-  description: string | null;
-  details: {
-    availability?: PositionAvailability;
-    coachQualificationId?: string;
-    experience?: string[];
-    playerExperience?: PositionPlayerExperience;
-    playerSituation?: PositionPlayerSituation;
-    requirements?: string;
-    responsibilities?: string;
-    staffQualification?: string;
-  };
-  secondaryTeams: readonly { teamId: string }[];
-}): FormState {
-  return {
-    ageMax: draft.ageMax !== null ? String(draft.ageMax) : "",
-    ageMin: draft.ageMin !== null ? String(draft.ageMin) : "",
-    ageMode: draft.ageMode,
-    availability: draft.details.availability ?? null,
-    coachQualificationId: draft.details.coachQualificationId ?? null,
-    description: draft.description ?? "",
-    experience: draft.details.experience ?? [],
-    playerExperience: draft.details.playerExperience ?? null,
-    playerSituation: draft.details.playerSituation ?? null,
-    requirements: draft.details.requirements ?? "",
-    responsibilities: draft.details.responsibilities ?? "",
-    secondaryTeamIds: draft.secondaryTeams.map((team) => team.teamId),
-    staffQualification: draft.details.staffQualification ?? "",
-  };
-}
 
 /**
  * Step 2 di dettaglio: una sola Position (DAS-REV-16 §11-§20, screen 05, 06,
  * 08, 10).
+ *
+ * I campi e i loro selector vivono in `PositionSchemaFields`, montato anche
+ * dall'editor di una Position già persistita (DAS-REV-17 §20): lo schema e
+ * l'ordine devono essere gli stessi nelle due superfici, e un componente
+ * condiviso è ciò che lo rende vero per costruzione invece che per
+ * disciplina.
  */
 export function PositionComposeDetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -195,8 +104,8 @@ export function PositionComposeDetailsScreen() {
     staleTime: STALE_MS.operational,
   });
 
-  const [form, setForm] = useState<FormState | null>(null);
-  const [original, setOriginal] = useState<FormState | null>(null);
+  const [form, setForm] = useState<PositionDetailsForm | null>(null);
+  const [original, setOriginal] = useState<PositionDetailsForm | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [syncedKey, setSyncedKey] = useState<string | null>(null);
@@ -223,17 +132,6 @@ export function PositionComposeDetailsScreen() {
     setFieldErrors({});
     setSaveError(null);
   }
-
-  const [ageSheetVisible, setAgeSheetVisible] = useState(false);
-  const [availabilitySheetVisible, setAvailabilitySheetVisible] = useState(false);
-  const [playerExperienceSheetVisible, setPlayerExperienceSheetVisible] = useState(false);
-  const [playerExperienceCategoryVisible, setPlayerExperienceCategoryVisible] = useState(false);
-  const [playerSituationSheetVisible, setPlayerSituationSheetVisible] = useState(false);
-  const [coachQualificationSheetVisible, setCoachQualificationSheetVisible] = useState(false);
-  const [experienceSheetVisible, setExperienceSheetVisible] = useState(false);
-  const [experienceDraftSelection, setExperienceDraftSelection] = useState<string[]>([]);
-  const [secondaryTeamsSheetVisible, setSecondaryTeamsSheetVisible] = useState(false);
-  const [secondaryTeamsDraftSelection, setSecondaryTeamsDraftSelection] = useState<string[]>([]);
 
   /**
    * La destinazione dopo un salvataggio riuscito dipende da chi ha chiesto
@@ -271,11 +169,6 @@ export function PositionComposeDetailsScreen() {
    * Continua a modificare, Salva bozza ed esci quando il salvataggio è
    * consentito e valido, Esci senza salvare.»
    *
-   * È l'hook già usato dai sei editor di profilo, esteso con la terza
-   * azione: §27 chiede anche che il back di sistema e la gesture si
-   * comportino come il chevron, e `beforeRemove` è l'unico punto che le
-   * intercetta entrambe.
-   *
    * `onSaveAndLeave` è `undefined` quando il salvataggio non sarebbe
    * valido: §27 la vuole «quando il salvataggio è consentito e valido», e
    * un pulsante che fallisce sistematicamente non è un'uscita.
@@ -293,9 +186,7 @@ export function PositionComposeDetailsScreen() {
       router.back();
     },
     onSaveAndLeave:
-      Object.keys(localErrors()).length === 0
-        ? () => handleSave(true)
-        : undefined,
+      Object.keys(localErrors()).length === 0 ? () => handleSave(true) : undefined,
   });
 
   if (draftsQuery.isLoading || contextQuery.isLoading) {
@@ -306,7 +197,7 @@ export function PositionComposeDetailsScreen() {
     );
   }
 
-  if (!draft || !form || !original) {
+  if (!draft || !form || !original || !schema) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <DashboardGlobalEmpty
@@ -323,101 +214,21 @@ export function PositionComposeDetailsScreen() {
   }
 
   const catalogs = catalogsQuery.data ?? null;
-  const teams = teamsQuery.data ?? [];
 
-  function updateForm(patch: Partial<FormState>) {
+  function updateForm(patch: Partial<PositionDetailsForm>) {
     setForm((prev) => (prev ? { ...prev, ...patch } : prev));
+    /* L'errore di un campo sparisce appena quel campo cambia: §21 chiede di
+       «mantenere i valori digitati», non di mantenere un errore superato. */
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+
+      for (const key of Object.keys(patch)) {
+        delete next[key === "ageMode" || key === "ageMin" || key === "ageMax" ? "ageRange" : key];
+      }
+
+      return next;
+    });
     markDirty();
-  }
-
-  function secondaryTeamNames(ids: readonly string[]): string[] {
-    const source = teams.length > 0 ? teams : draft!.secondaryTeams.map((team) => ({ teamId: team.teamId, teamName: team.name }));
-
-    return ids
-      .map((id) => source.find((team) => team.teamId === id)?.teamName)
-      .filter((name): name is string => !!name);
-  }
-
-  function handleAgeConfirm(value: AgeRangeValue) {
-    if (value.mode === "unrestricted") {
-      updateForm({ ageMax: "", ageMin: "", ageMode: "unrestricted" });
-    } else {
-      updateForm({ ageMax: value.max, ageMin: value.min, ageMode: "range" });
-    }
-
-    setFieldErrors((prev) => ({ ...prev, ageRange: null }));
-    setAgeSheetVisible(false);
-  }
-
-  function handleAvailabilityConfirm(value: PositionAvailability | null) {
-    updateForm({ availability: value });
-    setAvailabilitySheetVisible(false);
-  }
-
-  function handlePlayerExperienceOption(id: string) {
-    if (id === "none") {
-      updateForm({ playerExperience: null });
-      setPlayerExperienceSheetVisible(false);
-      return;
-    }
-
-    if (id === "from_category") {
-      // §14: la scelta "da categoria" non si applica da sola, serve il
-      // secondo livello col catalogo categorie.
-      setPlayerExperienceSheetVisible(false);
-      setPlayerExperienceCategoryVisible(true);
-      return;
-    }
-
-    updateForm({ playerExperience: { mode: id as "higher_categories" | "in_category" } });
-    setPlayerExperienceSheetVisible(false);
-  }
-
-  function handlePlayerExperienceCategory(levelId: string) {
-    updateForm({ playerExperience: { levelId, mode: "from_category" } });
-    setPlayerExperienceCategoryVisible(false);
-  }
-
-  function handlePlayerSituationOption(id: string) {
-    updateForm({ playerSituation: id === "none" ? null : (id as PositionPlayerSituation) });
-    setPlayerSituationSheetVisible(false);
-  }
-
-  function handleCoachQualificationOption(id: string) {
-    updateForm({ coachQualificationId: id === "none" ? null : id });
-    setCoachQualificationSheetVisible(false);
-  }
-
-  function openExperienceSheet() {
-    setExperienceDraftSelection(form!.experience);
-    setExperienceSheetVisible(true);
-  }
-
-  function toggleExperienceOption(id: string) {
-    setExperienceDraftSelection((prev) =>
-      prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id],
-    );
-  }
-
-  function confirmExperienceSheet() {
-    updateForm({ experience: experienceDraftSelection });
-    setExperienceSheetVisible(false);
-  }
-
-  function openSecondaryTeamsSheet() {
-    setSecondaryTeamsDraftSelection(form!.secondaryTeamIds);
-    setSecondaryTeamsSheetVisible(true);
-  }
-
-  function toggleSecondaryTeamOption(id: string) {
-    setSecondaryTeamsDraftSelection((prev) =>
-      prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id],
-    );
-  }
-
-  function confirmSecondaryTeamsSheet() {
-    updateForm({ secondaryTeamIds: secondaryTeamsDraftSelection });
-    setSecondaryTeamsSheetVisible(false);
   }
 
   function navigateAfterNoop(exitAfter = false) {
@@ -430,73 +241,6 @@ export function PositionComposeDetailsScreen() {
     }
   }
 
-  function buildPatch(): LocalPatch {
-    const patch: LocalPatch = {};
-
-    if (form!.description !== original!.description) {
-      patch.description = form!.description.trim() === "" ? null : form!.description;
-    }
-
-    if (
-      form!.ageMode !== original!.ageMode ||
-      form!.ageMin !== original!.ageMin ||
-      form!.ageMax !== original!.ageMax
-    ) {
-      patch.ageMode = form!.ageMode as PositionAgeMode;
-      patch.ageMin = form!.ageMode === "range" ? Number(form!.ageMin) : null;
-      patch.ageMax = form!.ageMode === "range" ? Number(form!.ageMax) : null;
-    }
-
-    if (!arraysEqual(form!.secondaryTeamIds, original!.secondaryTeamIds)) {
-      patch.secondaryTeamIds = form!.secondaryTeamIds;
-    }
-
-    const details: DetailsPatch = {};
-
-    if (JSON.stringify(form!.availability) !== JSON.stringify(original!.availability)) {
-      details.availability = form!.availability ?? null;
-    }
-
-    if (!arraysEqual(form!.experience, original!.experience)) {
-      details.experience = form!.experience.length > 0 ? form!.experience : null;
-    }
-
-    if (JSON.stringify(form!.playerExperience) !== JSON.stringify(original!.playerExperience)) {
-      details.playerExperience = form!.playerExperience ?? null;
-    }
-
-    if (form!.playerSituation !== original!.playerSituation) {
-      details.playerSituation = form!.playerSituation ?? null;
-    }
-
-    if (form!.coachQualificationId !== original!.coachQualificationId) {
-      details.coachQualificationId = form!.coachQualificationId ?? null;
-    }
-
-    if (form!.staffQualification !== original!.staffQualification) {
-      details.staffQualification = form!.staffQualification.trim() === "" ? null : form!.staffQualification;
-    }
-
-    if (form!.requirements !== original!.requirements) {
-      details.requirements = form!.requirements.trim() === "" ? null : form!.requirements;
-    }
-
-    // Non elencato esplicitamente fra i campi "dentro details" della
-    // specifica, ma appartiene comunque a PositionDetails (solo Dirigente):
-    // va trattato come gli altri testuali, altrimenti non sarebbe mai
-    // salvabile.
-    if (form!.responsibilities !== original!.responsibilities) {
-      details.responsibilities =
-        form!.responsibilities.trim() === "" ? null : form!.responsibilities;
-    }
-
-    if (Object.keys(details).length > 0) {
-      patch.details = details;
-    }
-
-    return patch;
-  }
-
   /**
    * Validazione locale, la stessa che decide se «Salva bozza ed esci» sia
    * un'azione offribile (§27: «quando il salvataggio è consentito e
@@ -504,41 +248,11 @@ export function PositionComposeDetailsScreen() {
    * dialogo può interrogarla senza accendere errori sul form.
    */
   function localErrors(): Record<string, string | null> {
-    const errors: Record<string, string | null> = {};
-
     if (!limits || !form || !schema) {
-      return errors;
+      return {};
     }
 
-    if (
-      schema.fields.some((field) => field.kind === "ageRange") &&
-      form.ageMode === "range"
-    ) {
-      const error = validateAgeInput(
-        { max: form.ageMax, min: form.ageMin, mode: "range" },
-        limits,
-      );
-
-      if (error) {
-        errors.ageRange = error;
-      }
-    }
-
-    for (const field of schema.fields) {
-      if (
-        (field.kind === "shortText" || field.kind === "longText") &&
-        field.limitKey
-      ) {
-        const value = (form as unknown as Record<string, string>)[field.key] ?? "";
-        const error = validateText(value, limits[field.limitKey]);
-
-        if (error) {
-          errors[field.key] = error;
-        }
-      }
-    }
-
-    return errors;
+    return detailsFormErrors(form, schema.fields, limits);
   }
 
   function handleSave(exitAfter = false) {
@@ -556,7 +270,7 @@ export function PositionComposeDetailsScreen() {
       return;
     }
 
-    const patch = buildPatch();
+    const patch = buildDetailsPatch(original!, form!);
 
     if (Object.keys(patch).length === 0) {
       // §21: una patch vuota non deve bumpare resourceVersion per nulla.
@@ -564,59 +278,22 @@ export function PositionComposeDetailsScreen() {
       return;
     }
 
-    mutation.mutate({ exitAfter, patch: patch as unknown as PositionPatch });
+    mutation.mutate({ exitAfter, patch: patch as PositionPatch });
   }
 
   const showNoDetailsHint =
-    from === "single" && schema!.guidance !== null && !draft.hasDetails;
-
-  const ageRangeValid =
-    form.ageMode === "range" && limits
-      ? validateAgeInput({ max: form.ageMax, min: form.ageMin, mode: "range" }, limits) === null
-      : false;
-
-  const secondaryNames = secondaryTeamNames(form.secondaryTeamIds);
-  const secondaryOptions = teams
-    .filter((team) => team.teamId !== draft.teamId && team.canCreate)
-    .map((team) => ({ id: team.teamId, label: team.teamName }));
-
-  const playerExperienceSelected = !form.playerExperience
-    ? ["none"]
-    : form.playerExperience.mode === "from_category"
-      ? ["from_category"]
-      : [form.playerExperience.mode];
-
-  const playerExperienceOptions = [
-    ...Object.entries(PLAYER_EXPERIENCE_LABELS).map(([id, label]) => ({ id, label })),
-    { id: "none", label: "Nessuna preferenza" },
-  ];
-
-  const playerSituationOptions = [
-    ...Object.entries(PLAYER_SITUATION_LABELS).map(([id, label]) => ({ id, label })),
-    { id: "none", label: "Nessuna preferenza" },
-  ];
-
-  const qualificationOptions = [
-    ...(catalogs?.qualifications ?? []).map((item) => ({ id: item.id, label: item.label })),
-    { id: "none", label: "Nessuna preferenza" },
-  ];
-
-  // §17: un incarico SOCIETY non ha una categoria di riferimento, quindi le
-  // opzioni di esperienza che la richiedono non hanno senso.
-  const experienceOptions = (catalogs?.experiences ?? [])
-    .filter((item) => draft.scope !== "society" || !item.needsContext)
-    .map((item) => ({ id: item.id, label: item.label }));
+    from === "single" && schema.guidance !== null && !draft.hasDetails;
 
   const primaryLabel = from === "hub" ? "Salva dettagli" : "Anteprima";
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <ComposerNavBar
-          isVerified={contextQuery.data?.clubIsVerified ?? draft.clubIsVerified}
-          logoUrl={contextQuery.data?.clubLogoUrl ?? draft.clubLogoUrl}
-          name={contextQuery.data?.clubName ?? draft.clubName}
-          onBack={confirmExit}
-        />
+      <ComposerNavBar
+        isVerified={contextQuery.data?.clubIsVerified ?? draft.clubIsVerified}
+        logoUrl={contextQuery.data?.clubLogoUrl ?? draft.clubLogoUrl}
+        name={contextQuery.data?.clubName ?? draft.clubName}
+        onBack={confirmExit}
+      />
 
       <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>
         <ComposerStepHeader
@@ -632,147 +309,42 @@ export function PositionComposeDetailsScreen() {
         ) : null}
 
         {catalogsQuery.isError ? (
-          <View style={styles.errorBlock}>
-            <AppText color="neutral" variant="bodySm">
-              {describeComposeError(toComposeError(catalogsQuery.error))}
-            </AppText>
-            <Button label="Riprova" onPress={() => catalogsQuery.refetch()} variant="secondary" />
-          </View>
+          <PositionSchemaFieldsError
+            message={describeComposeError(toComposeError(catalogsQuery.error))}
+            onRetry={() => void catalogsQuery.refetch()}
+          />
         ) : (
-          schema!.fields.map((field) => {
-            if (field.kind === "ageRange") {
-              return (
-                <View key={field.key}>
-                  <ComposerFieldRow
-                    error={fieldErrors.ageRange}
-                    label={field.label}
-                    onPress={() => setAgeSheetVisible(true)}
-                    optional={false}
-                    value={ageSummary({
-                      ageMax: form.ageMax === "" ? null : Number(form.ageMax),
-                      ageMin: form.ageMin === "" ? null : Number(form.ageMin),
-                      ageMode: form.ageMode,
-                    })}
-                  />
-
-                  {ageRangeValid && draft.contextLabel ? (
-                    <AppText color="neutralMuted" variant="meta">
-                      {`Questa fascia d'età potrebbe non essere compatibile con ${draft.contextLabel}. Verifica le regole della competizione.`}
-                    </AppText>
-                  ) : null}
-                </View>
-              );
+          <PositionSchemaFields
+            catalogs={catalogs}
+            context={{
+              contextLabel: draft.contextLabel,
+              primaryTeamId: draft.teamId,
+              primaryTeamName: draft.teamName,
+              profileType: draft.profileType,
+              scope: draft.scope,
+            }}
+            errors={fieldErrors}
+            fields={schema.fields}
+            limits={
+              limits ?? {
+                ageMax: 70,
+                ageMin: 5,
+                customRoleName: 80,
+                description: 2000,
+                requirements: 1000,
+                responsibilities: 1500,
+                staffQualification: 300,
+              }
             }
-
-            if (field.kind === "availability") {
-              return (
-                <ComposerFieldRow
-                  key={field.key}
-                  label={field.label}
-                  onPress={() => setAvailabilitySheetVisible(true)}
-                  optional
-                  value={availabilitySummary(form.availability ?? undefined, catalogs?.seasons ?? [])}
-                />
-              );
-            }
-
-            if (field.kind === "playerExperience") {
-              return (
-                <ComposerFieldRow
-                  key={field.key}
-                  label={field.label}
-                  onPress={() => setPlayerExperienceSheetVisible(true)}
-                  optional
-                  value={playerExperienceSummary(form.playerExperience ?? undefined, catalogs?.categories ?? [])}
-                />
-              );
-            }
-
-            if (field.kind === "playerSituation") {
-              return (
-                <ComposerFieldRow
-                  key={field.key}
-                  label={field.label}
-                  onPress={() => setPlayerSituationSheetVisible(true)}
-                  optional
-                  value={
-                    form.playerSituation
-                      ? (PLAYER_SITUATION_LABELS[form.playerSituation] ?? null)
-                      : null
-                  }
-                />
-              );
-            }
-
-            if (field.kind === "coachQualification") {
-              const selectedQualification = catalogs?.qualifications.find(
-                (item) => item.id === form.coachQualificationId,
-              );
-
-              return (
-                <ComposerFieldRow
-                  key={field.key}
-                  label={field.label}
-                  onPress={() => setCoachQualificationSheetVisible(true)}
-                  optional
-                  value={selectedQualification?.label ?? null}
-                />
-              );
-            }
-
-            if (field.kind === "experienceMulti") {
-              return (
-                <ComposerFieldRow
-                  key={field.key}
-                  label={field.label}
-                  onPress={openExperienceSheet}
-                  optional
-                  value={experienceSummary(form.experience, catalogs?.experiences ?? [])}
-                />
-              );
-            }
-
-            if (field.kind === "secondaryTeams") {
-              return (
-                <ComposerFieldRow
-                  helper={secondaryTeamsHelper(draft.profileType, secondaryNames)}
-                  key={field.key}
-                  label={field.label}
-                  onPress={openSecondaryTeamsSheet}
-                  optional
-                  value={secondaryNames.length > 0 ? listNames(secondaryNames) : null}
-                />
-              );
-            }
-
-            // shortText / longText
-            const value = (form as unknown as Record<string, string>)[field.key] ?? "";
-            const placeholder =
-              field.key === "description" && draft.scope === "society"
-                ? SOCIETY_DESCRIPTION_PLACEHOLDER
-                : field.placeholder;
-
-            return (
-              <ComposerTextField
-                error={fieldErrors[field.key]}
-                key={field.key}
-                label={field.label}
-                limit={limits ? limits[field.limitKey!] : 0}
-                multiline={field.kind === "longText"}
-                onChangeText={(text: string) =>
-                  updateForm({ [field.key]: text } as Partial<FormState>)
-                }
-                optional={field.optional}
-                placeholder={placeholder}
-                value={value}
-              />
-            );
-          })
+            onChange={updateForm}
+            teams={mergeSecondaryTeamOptions(teamsQuery.data ?? [], draft.secondaryTeams)}
+            value={form}
+          />
         )}
       </ScrollView>
 
       {saveError ? (
-        <AppText color="danger" style={styles.saveError} variant="meta">
+        <AppText accessibilityRole="alert" color="danger" style={styles.saveError} variant="meta">
           {saveError}
         </AppText>
       ) : null}
@@ -782,121 +354,14 @@ export function PositionComposeDetailsScreen() {
         primaryLabel={primaryLabel}
         primaryLoading={mutation.isPending}
       />
-
-      <AgeRangeSheet
-        initial={
-          form.ageMode === "unrestricted"
-            ? { mode: "unrestricted" }
-            : form.ageMode === "range"
-              ? { max: form.ageMax, min: form.ageMin, mode: "range" }
-              : null
-        }
-        limits={limits ?? { ageMax: 99, ageMin: 0 }}
-        onClose={() => setAgeSheetVisible(false)}
-        onConfirm={handleAgeConfirm}
-        visible={ageSheetVisible}
-      />
-
-      <AvailabilitySheet
-        initial={form.availability}
-        onClose={() => setAvailabilitySheetVisible(false)}
-        onConfirm={handleAvailabilityConfirm}
-        seasons={catalogs?.seasons ?? []}
-        visible={availabilitySheetVisible}
-      />
-
-      <ComposerOptionSheet
-        emptyMessage="Nessuna opzione disponibile."
-        onClose={() => setPlayerExperienceSheetVisible(false)}
-        onToggle={handlePlayerExperienceOption}
-        options={playerExperienceOptions}
-        selected={playerExperienceSelected}
-        title="Esperienza richiesta"
-        visible={playerExperienceSheetVisible}
-      />
-
-      <ComposerOptionSheet
-        emptyMessage="Nessuna categoria disponibile."
-        onClose={() => setPlayerExperienceCategoryVisible(false)}
-        onToggle={handlePlayerExperienceCategory}
-        options={(catalogs?.categories ?? []).map((item) => ({ id: item.id, label: item.label }))}
-        selected={
-          form.playerExperience?.mode === "from_category" && form.playerExperience.levelId
-            ? [form.playerExperience.levelId]
-            : []
-        }
-        title="Esperienza richiesta"
-        visible={playerExperienceCategoryVisible}
-      />
-
-      <ComposerOptionSheet
-        emptyMessage="Nessuna opzione disponibile."
-        onClose={() => setPlayerSituationSheetVisible(false)}
-        onToggle={handlePlayerSituationOption}
-        options={playerSituationOptions}
-        selected={form.playerSituation ? [form.playerSituation] : ["none"]}
-        title="Situazione del calciatore"
-        visible={playerSituationSheetVisible}
-      />
-
-      <ComposerOptionSheet
-        emptyMessage="Nessuna qualifica disponibile."
-        onClose={() => setCoachQualificationSheetVisible(false)}
-        onToggle={handleCoachQualificationOption}
-        options={qualificationOptions}
-        selected={form.coachQualificationId ? [form.coachQualificationId] : ["none"]}
-        title="Patentino / qualifica richiesta"
-        visible={coachQualificationSheetVisible}
-      />
-
-      <ComposerOptionSheet
-        emptyMessage="Nessuna esperienza disponibile."
-        multiple
-        onClose={() => setExperienceSheetVisible(false)}
-        onConfirm={confirmExperienceSheet}
-        onToggle={toggleExperienceOption}
-        options={experienceOptions}
-        selected={experienceDraftSelection}
-        title="Esperienza richiesta"
-        visible={experienceSheetVisible}
-      />
-
-      <ComposerOptionSheet
-        contextLabel="Squadra principale"
-        contextValue={draft.teamName}
-        emptyMessage="Nessun'altra squadra disponibile."
-        helper={
-          draft.profileType === "coach"
-            ? "Seleziona altre squadre solo se lo stesso allenatore seguirà anche queste squadre."
-            : "Seleziona altre squadre solo se la stessa persona seguirà anche queste squadre."
-        }
-        multiple
-        onClose={() => setSecondaryTeamsSheetVisible(false)}
-        onConfirm={confirmSecondaryTeamsSheet}
-        onToggle={toggleSecondaryTeamOption}
-        options={secondaryOptions}
-        selected={secondaryTeamsDraftSelection}
-        title="Altre squadre coinvolte nell'incarico"
-        visible={secondaryTeamsSheetVisible}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  /* La barra condivide il gutter orizzontale del contenuto: senza, il back
-     resta incollato al bordo e la app bar non si allinea alle altre
-     schermate del flusso. */
-  bar: {
-    paddingHorizontal: spacing[20],
-  },
   content: {
     gap: spacing[16],
     paddingHorizontal: spacing[20],
-    paddingVertical: spacing[16],
-  },
-  errorBlock: {
-    gap: spacing[12],
     paddingVertical: spacing[16],
   },
   saveError: {
