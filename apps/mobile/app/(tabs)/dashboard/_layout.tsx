@@ -40,6 +40,14 @@ export default function DashboardLayout() {
         <Stack.Screen name="network/index" />
         <Stack.Screen name="network/history" />
         <Stack.Screen name="network/[relationshipId]" />
+        {/* DAS-REV-13 §6: il Centro Amministratori è raggiunto da due
+            ingressi — Dashboard Società e hub Struttura societaria — e
+            nessuno dei due deve passare da una pagina intermedia. Qui la
+            bottom navigation resta visibile con Dashboard selezionata
+            (screen 01); ricerca, composer e invito esterno sono flussi
+            focalizzati in app/admin-invite/, e la landing pubblica sta in
+            app/admin-invite/[token]. */}
+        <Stack.Screen name="admins" />
       </Stack>
     </DashboardIdentityProvider>
   );

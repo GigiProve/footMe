@@ -31,8 +31,14 @@ type IconName = keyof typeof Ionicons.glyphMap;
  * verso pagine inesistenti o funzioni simulate».
  */
 export const STRUCTURE_HREFS = {
-  /** Centro Amministratori (oggi `/club-admin/permissions`, owner-gated). */
-  admins: "/club-admin/permissions",
+  /**
+   * Centro Amministratori (DAS-REV-13 §6).
+   *
+   * `from=structure` conserva l'origine: §24 vuole che il back torni «stesso
+   * hub, Society e posizione di scorrimento quando validi», e non alla
+   * Dashboard solo perché è l'altro ingresso allo stesso centro.
+   */
+  admins: "/(tabs)/dashboard/admins?from=structure",
   /** Modifica profilo **della Società**, non della persona autenticata. */
   companyEdit: (clubId: string) =>
     `/profile/society-edit?clubId=${encodeURIComponent(clubId)}`,

@@ -21,6 +21,11 @@ import { AppText } from "../AppText/AppText";
 type SearchFieldProps = {
   autoFocus?: boolean;
   onChangeText?: (value: string) => void;
+  /**
+   * Azzera il campo. Quando è passato, con un valore non vuoto compare la X
+   * del master: è un target proprio da 44pt, non un'icona dentro il testo.
+   */
+  onClear?: () => void;
   onPress?: () => void;
   onSubmitEditing?: () => void;
   placeholder: string;
@@ -32,6 +37,7 @@ type SearchFieldProps = {
 export function SearchField({
   autoFocus,
   onChangeText,
+  onClear,
   onPress,
   onSubmitEditing,
   placeholder,
@@ -80,6 +86,18 @@ export function SearchField({
         testID={testID}
         value={value}
       />
+
+      {onClear && (value ?? "").length > 0 ? (
+        <Pressable
+          accessibilityLabel="Cancella la ricerca"
+          accessibilityRole="button"
+          hitSlop={12}
+          onPress={onClear}
+          testID={testID ? `${testID}-clear` : undefined}
+        >
+          <Ionicons color={colors.textMuted} name="close" size={18} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

@@ -53,6 +53,15 @@ export const DASHBOARD_CAPABILITIES = [
   "network_invite_create",
   "network_terminate",
   "network_history_view",
+  // DAS-REV-13 §23: quattro controlli distinti sul dominio amministrativo.
+  // Leggere gli amministratori non è leggere gli inviti, e nessuno dei due è
+  // poter invitare. Come le chiavi di rete, non scendono a scope di Team:
+  // «uno scope Primavera non autorizza ad amministrare gli accessi
+  // dell'intera Society».
+  "admins_view",
+  "admin_invites_view",
+  "admins_invite",
+  "admin_roles_view",
 ] as const;
 
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];

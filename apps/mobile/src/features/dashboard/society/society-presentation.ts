@@ -12,7 +12,7 @@
 
 import type Ionicons from "@expo/vector-icons/Ionicons";
 
-import type { DashboardIdentity } from "../dashboard-types";
+import { hasSomeCapability, type DashboardIdentity } from "../dashboard-types";
 import { isFeatureAvailable } from "../modules/dashboard-features";
 import type { QuickActionId } from "../modules/composition";
 import type { SocietyOverview } from "../adapters/society-adapter";
@@ -50,7 +50,16 @@ export const SOCIETY_HREFS = {
       : "/(tabs)/announcements?focus=applications",
   contentComposer: "/(tabs)/profile?compose=club",
   invites: "/club-admin/invites",
-  permissions: "/club-admin/permissions",
+  /**
+   * Centro Amministratori (DAS-REV-13 §6).
+   *
+   * Era `/club-admin/permissions`, una schermata gated sul ruolo
+   * `club_admin`. Il centro canonico vive ora nello Stack della Dashboard,
+   * è gated sulle capability e conserva l'origine: §6 chiede che i due
+   * ingressi — questo e l'hub — passino «la stessa Society canonica» senza
+   * «una pagina intermedia tra l'entry e il centro».
+   */
+  permissions: "/(tabs)/dashboard/admins?from=dashboard",
   /** Centro Posizioni, filtrato sulle aperte. */
   positions: (adId?: string | null) =>
     adId
@@ -245,7 +254,23 @@ export function buildManagementAreas(
     });
   }
 
-  if (identity.isOwner) {
+  /**
+   * Amministratori e permessi (DAS-REV-13 §7.3).
+   *
+   * Era gated su `isOwner` perché la destinazione era owner-gated sul ruolo.
+   * Il centro ha ora chiavi proprie, e §7.3 chiede che «la possibilità di
+   * leggere gli attivi, leggere gli inviti, invitare e aprire Ruoli e
+   * permessi» sia distinta: basta una delle tre letture perché la riga abbia
+   * senso. Chi non ne ha nessuna non vede la voce — non una disabilitata.
+   */
+  if (
+    identity.isOwner ||
+    hasSomeCapability(identity, [
+      "admins_view",
+      "admin_invites_view",
+      "admins_invite",
+    ])
+  ) {
     items.push({
       href: SOCIETY_HREFS.permissions,
       icon: "people-outline",

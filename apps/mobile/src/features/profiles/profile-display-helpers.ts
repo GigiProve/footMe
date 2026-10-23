@@ -11,6 +11,8 @@ const roleLabels: Record<string, string> = {
   club_admin: "Societa'",
   coach: "Allenatore",
   director: "Dirigente",
+  fan: "Tifoso",
+  media: "Media/Creator",
   player: "Calciatore",
   staff: "Staff",
 };

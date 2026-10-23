@@ -9,6 +9,7 @@ import { useSession } from "../../src/features/auth/use-session";
 import { fetchCommunications } from "../../src/features/messaging/communications-service";
 import { fetchInboxConversations } from "../../src/features/messaging/messaging-service";
 import { usePendingSocietyInvite } from "../../src/features/network/use-pending-society-invite";
+import { usePendingAdminInvite } from "../../src/features/dashboard/admins/use-pending-admin-invite";
 import { usePendingAssistitoInvite } from "../../src/features/relationships/assistiti/use-pending-assistito-invite";
 import { AppSidebar } from "../../src/ui/sidebar";
 import { colors, radius, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
@@ -56,6 +57,10 @@ export default function TabsLayout() {
   // Il contesto deve sopravvivere a login, registrazione e onboarding, e le
   // tab sono l'unico punto che entrambi i percorsi attraversano.
   usePendingSocietyInvite(isReadyForInvites);
+  // DAS-REV-13 §14: stesso gancio per l'invito amministrativo. «Dopo il
+  // successo riprendi lo stesso invito»: il token torna qui e la landing lo
+  // risolve di nuovo sul server, perché averlo non prova nulla.
+  usePendingAdminInvite(isReadyForInvites);
 
   const unreadThreadsCount = profileId
     ? (conversationsQuery.data ?? []).filter((item) => item.unread_count > 0).length +
