@@ -286,7 +286,15 @@ export function TeamDetailScreen({ teamId }: { teamId: string }) {
 
   const canOpenRoster = team.canViewRoster && team.isOwner;
   const canInvite = team.canManageRoster && team.isOwner;
-  const canOpenPositions = team.canViewPositions && team.isOwner;
+  /**
+   * DAS-REV-15 §5, §20: il Centro Posizioni è gated sulle capability, non
+   * sulla proprietà. `isOwner` serviva solo perché la vecchia destinazione
+   * (`/(tabs)/announcements`) caricava il club via `owner_profile_id` e
+   * avrebbe rimbalzato un amministratore con la capability giusta. La nuova
+   * destinazione risolve capability e scope server-side, quindi il vincolo
+   * cade — e §9 vieta di nascondere a un actor un'azione che gli compete.
+   */
+  const canOpenPositions = team.canViewPositions;
   const canCreatePosition = team.canCreatePositions && team.isOwner;
   const canOpenApplications = team.canViewApplications && team.isOwner;
   const canOpenInvites = team.canViewInvites && team.isOwner;
@@ -408,10 +416,7 @@ export function TeamDetailScreen({ teamId }: { teamId: string }) {
                               ? () =>
                                   go(
                                     "teams_detail_position_opened",
-                                    TEAM_DETAIL_HREFS.position(
-                                      teamId,
-                                      position.id,
-                                    ),
+                                    TEAM_DETAIL_HREFS.position(position.id),
                                   )
                               : null
                           }

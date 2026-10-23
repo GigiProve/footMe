@@ -305,8 +305,12 @@ describe("master 01 e 02 — dettaglio standard, una sola pagina", () => {
     await press("team-applications-row");
     await press("team-invites-row");
 
+    /* DAS-REV-15 §5, §20: «Vedi posizioni» apre ora il Centro Posizioni
+       condiviso con il Team preselezionato, non la vecchia schermata
+       owner-gated. L'origine viaggia con il link perché §21 chiede che il
+       back torni al dettaglio squadra. */
     expect(routerMocks.push).toHaveBeenCalledWith(
-      "/(tabs)/announcements?focus=positions&teamId=team-1",
+      "/(tabs)/dashboard/positions?from=team&teamId=team-1",
     );
     expect(routerMocks.push).toHaveBeenCalledWith(
       "/(tabs)/announcements?focus=applications&teamId=team-1",

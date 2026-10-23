@@ -60,11 +60,23 @@ export const SOCIETY_HREFS = {
    * «una pagina intermedia tra l'entry e il centro».
    */
   permissions: "/(tabs)/dashboard/admins?from=dashboard",
-  /** Centro Posizioni, filtrato sulle aperte. */
+  /**
+   * Centro Posizioni aperte (DAS-REV-15 §5, §20).
+   *
+   * «Aggiorna gli ingressi della DAS-REV-07 e DAS-REV-09 in modo che
+   * Gestisci/Vedi posizioni aprano questo Centro condiviso.» Puntava a
+   * `/(tabs)/announcements`, che è owner-gated e mescola Posizioni e
+   * Candidature: un amministratore con la capability ma senza la proprietà
+   * veniva rimbalzato.
+   *
+   * Con un `adId` la destinazione è il **dettaglio gestionale** della
+   * Position, non il Centro filtrato: §18 chiede che la riga apra «il
+   * dettaglio gestionale della stessa Position».
+   */
   positions: (adId?: string | null) =>
     adId
-      ? `/(tabs)/announcements?focus=positions&adId=${encodeURIComponent(adId)}`
-      : "/(tabs)/announcements?focus=positions",
+      ? `/society-position/${encodeURIComponent(adId)}`
+      : "/(tabs)/dashboard/positions?from=dashboard",
   /** Centro Stagioni e storico (DAS-REV-10 §9). */
   seasons: "/(tabs)/dashboard/seasons",
   shortlist: "/shortlist",

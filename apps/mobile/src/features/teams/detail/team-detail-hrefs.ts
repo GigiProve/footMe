@@ -43,14 +43,23 @@ export const TEAM_DETAIL_HREFS = {
   /** Composer condiviso delle Posizioni con la squadra preselezionata. */
   newPosition: (teamId: string) =>
     `/(tabs)/announcements?focus=positions&compose=1&teamId=${encodeURIComponent(teamId)}`,
-  /** Dettaglio gestionale della singola Posizione nel centro proprietario. */
-  position: (teamId: string, adId: string) =>
-    `/(tabs)/announcements?focus=positions&teamId=${encodeURIComponent(
-      teamId,
-    )}&adId=${encodeURIComponent(adId)}`,
-  /** Centro Posizioni filtrato sulla squadra. */
+  /**
+   * Dettaglio gestionale della singola Posizione (DAS-REV-15 §18).
+   *
+   * Lo stesso Position ID del Centro, della Dashboard e di Cerca: §18 vieta
+   * di «creare un oggetto gestionale separato» per la stessa ricerca.
+   */
+  position: (adId: string) =>
+    `/society-position/${encodeURIComponent(adId)}`,
+  /**
+   * Centro Posizioni con la squadra preselezionata (DAS-REV-15 §5).
+   *
+   * «Dettaglio operativo squadra → Vedi posizioni: Centro con Team
+   * preselezionato.» Il Centro è gated sulle capability e non sulla
+   * proprietà, quindi questa voce non richiede più `isOwner`.
+   */
   positions: (teamId: string) =>
-    `/(tabs)/announcements?focus=positions&teamId=${encodeURIComponent(teamId)}`,
+    `/(tabs)/dashboard/positions?from=team&teamId=${encodeURIComponent(teamId)}`,
   /** Gestione canonica dell'Organico della stessa squadra. */
   roster: (teamId: string) =>
     `/club-admin/roster?teamId=${encodeURIComponent(teamId)}`,

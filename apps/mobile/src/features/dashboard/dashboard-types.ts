@@ -24,6 +24,11 @@ export const DASHBOARD_CAPABILITIES = [
   "dashboard_view",
   "positions_view",
   "positions_create",
+  // DAS-REV-15 §9: il controllo "Crea e gestisci posizioni" del catalogo
+  // DAS-REV-14 concede **due** chiavi, e questa mancava qui pur essendo nel
+  // CHECK SQL e nell'array dell'owner. Un ruolo che concedesse solo questa
+  // sarebbe risultato senza poteri sulle Posizioni, in silenzio.
+  "society_manage_positions",
   "applications_view",
   "teams_view",
   "content_view",

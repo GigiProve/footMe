@@ -53,6 +53,13 @@ export default function DashboardLayout() {
             sono flussi focalizzati e stanno in app/club-roles/ e
             app/society-admin/. */}
         <Stack.Screen name="roles" />
+        {/* DAS-REV-15 §5: «Percorso principale: Dashboard Società →
+            Posizioni aperte. Apri direttamente il Centro, senza imporre il
+            passaggio attraverso Struttura societaria.» Qui la bottom
+            navigation resta visibile con Dashboard selezionata (screen
+            01/03/04/06); il dettaglio gestionale di una singola Position è
+            invece un flusso focalizzato e sta in app/society-position/. */}
+        <Stack.Screen name="positions" />
       </Stack>
     </DashboardIdentityProvider>
   );

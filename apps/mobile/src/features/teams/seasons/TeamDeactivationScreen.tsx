@@ -21,6 +21,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { colors, sizes, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 import { useSession } from "../../auth/use-session";
+import { POSITIONS_HREFS } from "../../dashboard/positions/positions-routes";
 import { SOCIETY_HREFS } from "../../dashboard/society/society-presentation";
 import { ProfileEditFieldsSkeleton } from "../../profiles/edit/ProfileEditStates";
 import { SeasonsIdentityHeader } from "./components/SeasonsIdentityHeader";
@@ -91,12 +92,24 @@ export function TeamDeactivationScreen({ teamId }: { teamId: string }) {
 
       // I centri esistenti, non elenchi gestionali paralleli (§26). Il
       // perimetro viene rivalidato dal dominio proprietario.
+      //
+      // DAS-REV-15 §5: «Disattivazione squadra → attività da gestire → Vedi
+      // posizioni: stesso Centro con Team e tab Attive.» Il Team viaggia nel
+      // link perché il blocker riguarda quella squadra: aprire il Centro su
+      // tutte le posizioni avrebbe costretto a ritrovarla a mano. Non è un
+      // permesso — il Centro rivalida scope e perimetro (§15).
       const href =
-        blocker.kind === "positions" ? SOCIETY_HREFS.positions() : SOCIETY_HREFS.invites;
+        blocker.kind === "positions"
+          ? POSITIONS_HREFS.center({
+              from: "deactivation",
+              group: "active",
+              teamId,
+            })
+          : SOCIETY_HREFS.invites;
 
       router.push(href as Parameters<typeof router.push>[0]);
     },
-    [router],
+    [router, teamId],
   );
 
   if (contextQuery.isLoading || checkQuery.isLoading || !context) {
