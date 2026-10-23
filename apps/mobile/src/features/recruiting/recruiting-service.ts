@@ -8,18 +8,6 @@ type ClubSummary = {
   region: string;
 };
 
-export type RecruitingAdForm = {
-  ageMax: string;
-  ageMin: string;
-  category: string;
-  compensationSummary: string;
-  description: string;
-  region: string;
-  roleRequired: "goalkeeper" | "defender" | "midfielder" | "forward";
-  teamId?: string | null;
-  title: string;
-};
-
 export type RecruitingAdSummary = {
   created_at: string;
   id: string;
@@ -441,35 +429,14 @@ export async function getClubApplications(profileId: string) {
     .filter((application) => application !== null) as ClubApplicationSummary[];
 }
 
-export async function createRecruitingAd(
-  profileId: string,
-  input: RecruitingAdForm,
-) {
-  const club = await getOwnedClub(profileId);
-
-  if (!club) {
-    throw new Error("Nessuna societa' associata al profilo corrente.");
-  }
-
-  const { error } = await supabase.from("recruiting_ads").insert({
-    age_max: input.ageMax ? Number(input.ageMax) : null,
-    age_min: input.ageMin ? Number(input.ageMin) : null,
-    category: input.category.trim() || club.category,
-    club_id: club.id,
-    compensation_summary: input.compensationSummary.trim() || null,
-    created_by_profile_id: profileId,
-    description: input.description.trim(),
-    published_at: new Date().toISOString(),
-    region: input.region.trim() || club.region,
-    role_required: input.roleRequired,
-    status: "published",
-    team_id: input.teamId ?? null,
-    title: input.title.trim(),
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return club;
-}
+/**
+ * La creazione di una Position vive nel composer di DAS-REV-16
+ * (`src/features/dashboard/positions/compose/`), che passa dal servizio
+ * canonico con bozze, ambito, schema per profilo e capability di
+ * pubblicazione.
+ *
+ * `createRecruitingAd` faceva un insert diretto che pubblicava subito e
+ * saltava tutti e quattro i controlli: §35 vieta «due ecosistemi
+ * paralleli», quindi è stata rimossa invece di essere lasciata senza
+ * chiamanti.
+ */

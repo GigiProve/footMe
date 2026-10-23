@@ -48,6 +48,16 @@ type UnsavedChangesGuardOptions = {
   isSaving: boolean;
   onLeave: () => void;
   /**
+   * Terza azione, «Salva … ed esci», inserita fra «Continua a modificare» e
+   * «Esci senza salvare».
+   *
+   * Esiste per DAS-REV-16 §27, che chiede le tre azioni «quando il
+   * salvataggio è consentito e valido» — e che quindi passa `undefined`
+   * quando non lo è. Gli editor di profilo che non la forniscono
+   * mantengono il dialogo a due azioni con cui sono stati approvati.
+   */
+  onSaveAndLeave?: (() => void) | undefined;
+  /**
    * Titolo del dialogo. Il default è quello con cui i primi ruoli sono stati
    * approvati; REV-PROF-20 chiede la forma più breve, e cambiarla solo dove è
    * richiesta evita di riscrivere la copy di sei editor già rilasciati.
@@ -59,6 +69,7 @@ export function useUnsavedChangesGuard({
   isDirty,
   isSaving,
   onLeave,
+  onSaveAndLeave,
   title = "Uscire senza salvare?",
 }: UnsavedChangesGuardOptions) {
   /*
@@ -98,12 +109,15 @@ export function useUnsavedChangesGuard({
 
         Alert.alert(title, "Le modifiche effettuate andranno perse.", [
           { style: "cancel", text: "Continua a modificare" },
+          ...(onSaveAndLeave
+            ? [{ onPress: onSaveAndLeave, text: "Salva bozza ed esci" }]
+            : []),
           {
             onPress: () => {
               bypassRef.current = true;
               navigator.dispatch(event.data.action);
             },
-            style: "destructive",
+            style: "destructive" as const,
             text: "Esci senza salvare",
           },
         ]);
@@ -111,7 +125,7 @@ export function useUnsavedChangesGuard({
     );
 
     return unsubscribe;
-  }, [isDirty, isSaving, navigation, title]);
+  }, [isDirty, isSaving, navigation, onSaveAndLeave, title]);
 
   return useCallback(() => {
     if (isSaving) {
@@ -124,8 +138,15 @@ export function useUnsavedChangesGuard({
     }
 
     Alert.alert(title, "Le modifiche effettuate andranno perse.", [
-      { style: "cancel", text: "Continua a modificare" },
-      { onPress: onLeave, style: "destructive", text: "Esci senza salvare" },
+      { style: "cancel" as const, text: "Continua a modificare" },
+      ...(onSaveAndLeave
+        ? [{ onPress: onSaveAndLeave, text: "Salva bozza ed esci" }]
+        : []),
+      {
+        onPress: onLeave,
+        style: "destructive" as const,
+        text: "Esci senza salvare",
+      },
     ]);
-  }, [isDirty, isSaving, onLeave, title]);
+  }, [isDirty, isSaving, onLeave, onSaveAndLeave, title]);
 }

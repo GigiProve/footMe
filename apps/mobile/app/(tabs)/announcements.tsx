@@ -8,7 +8,6 @@ import { useSession } from "../../src/features/auth/use-session";
 import { openDirectConversation } from "../../src/features/messaging/messaging-service";
 import {
   applyToRecruitingAd,
-  createRecruitingAd,
   getClubApplications,
   getClubAds,
   getPublishedAds,
@@ -17,7 +16,6 @@ import {
   type ApplicationStatus,
   type ClubApplicationSummary,
   type DiscoverableRecruitingAd,
-  type RecruitingAdForm,
   type RecruitingAdSummary,
 } from "../../src/features/recruiting/recruiting-service";
 import { JobCard } from "../../src/features/recruiting/components/JobCard";
@@ -25,27 +23,16 @@ import {
   fetchClubTeams,
   type ClubTeam,
 } from "../../src/features/clubs/team-service";
-import { sizes, spacing } from "../../src/theme/tokens";
+import { spacing } from "../../src/theme/tokens";
 import {
   AppText,
   Badge,
   Button,
   Card,
-  ChipGroup,
   EmptyState,
   Input,
   ScreenHeader,
 } from "../../src/ui";
-
-const positions: readonly {
-  label: string;
-  value: RecruitingAdForm["roleRequired"];
-}[] = [
-  { label: "Portiere", value: "goalkeeper" },
-  { label: "Difensore", value: "defender" },
-  { label: "Centrocampista", value: "midfielder" },
-  { label: "Attaccante", value: "forward" },
-];
 
 const roleLabels: Record<string, string> = {
   defender: "Difensore",
@@ -118,44 +105,12 @@ export default function AnnouncementsScreen() {
   const [clubName, setClubName] = useState<string | null>(null);
   const [clubTeams, setClubTeams] = useState<ClubTeam[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [contactingApplicationId, setContactingApplicationId] = useState<
     string | null
   >(null);
   const [selectedAdId, setSelectedAdId] = useState<string | null>(null);
   const [coverMessage, setCoverMessage] = useState("");
-  /**
-   * Squadra del composer (DAS-REV-09 §14).
-   *
-   * `undefined` = nessuna scelta dell'utente, quindi vale la preselezione
-   * che arriva dal dettaglio operativo; `null` = l'utente ha scelto "Tutta
-   * la societa'". Tenere i due casi distinti è ciò che permette di
-   * preselezionare **senza** vincolare, e senza un effetto che insegua i
-   * parametri della route.
-   *
-   * Resta una preselezione: il backend rivalida comunque Società, Team e
-   * capability, quindi un actor con scope limitato non crea posizioni per
-   * squadre che non gli appartengono.
-   */
-  const [teamChoice, setTeamChoice] = useState<string | null | undefined>(
-    undefined,
-  );
-  const [form, setForm] = useState<RecruitingAdForm>({
-    ageMax: "",
-    ageMin: "",
-    category: "",
-    compensationSummary: "",
-    description: "",
-    region: "",
-    roleRequired: "forward",
-    teamId: null,
-    title: "",
-  });
-
-  /** Scelta esplicita se c'è, altrimenti la squadra del contesto di arrivo. */
-  const composerTeamId =
-    teamChoice === undefined ? scopedTeamId : teamChoice;
 
   const loadClubDashboard = useCallback(async () => {
     if (!userId) {
@@ -277,51 +232,6 @@ export default function AnnouncementsScreen() {
     }
   }
 
-  function patchForm<Key extends keyof RecruitingAdForm>(
-    key: Key,
-    value: RecruitingAdForm[Key],
-  ) {
-    setForm((current) => ({ ...current, [key]: value }));
-  }
-
-  async function handleCreateAd() {
-    if (!session?.user) {
-      return;
-    }
-
-    if (!form.title.trim() || !form.description.trim()) {
-      Alert.alert("Campi mancanti", "Titolo e descrizione sono obbligatori.");
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const club = await createRecruitingAd(session.user.id, {
-        ...form,
-        teamId: composerTeamId,
-      });
-      setClubName(club.name);
-      setForm({
-        ageMax: "",
-        ageMin: "",
-        category: "",
-        compensationSummary: "",
-        description: "",
-        region: "",
-        roleRequired: "forward",
-        title: "",
-      });
-      await loadClubDashboard();
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Errore durante la creazione dell'annuncio.";
-      Alert.alert("Creazione annuncio non riuscita", message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   async function handleToggleSavedAd(adId: string, shouldSave: boolean) {
     if (!session?.user) {
@@ -534,80 +444,25 @@ export default function AnnouncementsScreen() {
         */}
         {!isApplicationsFocus ? (
           <>
+        {/*
+          DAS-REV-16 §3, §42.2: la creazione di una Position vive in **un**
+          posto solo — il composer a tre fasi di `app/position-compose/`.
+          Qui c'era un secondo form che pubblicava con un insert diretto,
+          senza bozze, ambito, schema per profilo né capability di
+          pubblicazione: due percorsi di creazione sono esattamente i «due
+          ecosistemi paralleli» che §35 vieta. Resta l'ingresso, non il
+          form.
+        */}
         <Card>
-          <AppText variant="headingSm">Nuovo annuncio</AppText>
-          <Input
-            onChangeText={(value) => patchForm("title", value)}
-            placeholder="Titolo annuncio"
-            value={form.title}
-          />
-          <ChipGroup
-            onChange={(value) => { if (value !== null) patchForm("roleRequired", value); }}
-            options={positions}
-            value={form.roleRequired}
-          />
-          {clubTeams.length > 0 ? (
-            <View style={styles.teamPicker}>
-              <AppText color="secondary" variant="caption">
-                Squadra
-              </AppText>
-              <ChipGroup
-                onChange={(value) =>
-                  setTeamChoice(value === "all" ? null : value)
-                }
-                options={[
-                  { label: "Tutta la societa'", value: "all" },
-                  ...clubTeams.map((team) => ({
-                    label: team.name,
-                    value: team.id,
-                  })),
-                ]}
-                value={composerTeamId ?? "all"}
-              />
-            </View>
-          ) : null}
-          <View style={styles.ageRow}>
-            <Input
-              keyboardType="number-pad"
-              onChangeText={(value) => patchForm("ageMin", value)}
-              placeholder="Eta' min"
-              style={styles.flex1}
-              value={form.ageMin}
-            />
-            <Input
-              keyboardType="number-pad"
-              onChangeText={(value) => patchForm("ageMax", value)}
-              placeholder="Eta' max"
-              style={styles.flex1}
-              value={form.ageMax}
-            />
-          </View>
-          <Input
-            onChangeText={(value) => patchForm("category", value)}
-            placeholder="Categoria"
-            value={form.category}
-          />
-          <Input
-            onChangeText={(value) => patchForm("region", value)}
-            placeholder="Regione"
-            value={form.region}
-          />
-          <Input
-            onChangeText={(value) => patchForm("compensationSummary", value)}
-            placeholder="Rimborso o benefit"
-            value={form.compensationSummary}
-          />
-          <Input
-            multiline
-            onChangeText={(value) => patchForm("description", value)}
-            placeholder="Descrizione annuncio"
-            style={{ minHeight: sizes.recruitingDescriptionMinHeight }}
-            value={form.description}
-          />
+          <AppText variant="headingSm">Nuova posizione</AppText>
+          <AppText color="secondary" variant="bodySm">
+            Scegli profilo, ruolo e squadra, prepara i dettagli e pubblica
+            quando vuoi.
+          </AppText>
           <Button
-            disabled={isSubmitting || isLoading}
-            label={isSubmitting ? "Pubblicazione..." : "Pubblica annuncio"}
-            onPress={handleCreateAd}
+            disabled={isLoading}
+            label="Crea una posizione"
+            onPress={() => router.push("/position-compose" as never)}
           />
         </Card>
 

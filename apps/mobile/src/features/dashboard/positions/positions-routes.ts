@@ -43,15 +43,21 @@ export const POSITIONS_HREFS = {
   /**
    * Composer condiviso delle Posizioni (DAS-REV-16).
    *
+   * Flusso focalizzato in `app/position-compose/`, non una route della tab:
+   * DAS-REV-16 §4 vieta la bottom navigation sopra i campi.
+   *
    * §19: «Passa Society ID e origine. Con Team specifico valido
    * preselezionato, passa quel Team; … Con più Team e filtro Tutte le
    * posizioni non scegliere arbitrariamente il primo.» Da qui il `teamId`
    * opzionale: assente significa "scegli nel flow", non "Prima squadra".
    */
-  compose: (options?: { scope?: "society" | "team"; teamId?: string | null }) =>
-    `/(tabs)/announcements${query({
-      compose: "1",
-      focus: "positions",
+  compose: (options?: {
+    from?: PositionsOrigin;
+    scope?: "society" | "team";
+    teamId?: string | null;
+  }) =>
+    `/position-compose${query({
+      from: options?.from,
       scope: options?.scope,
       teamId: options?.teamId,
     })}`,
