@@ -105,6 +105,10 @@ const STATE_LABELS: Record<InviteRecordState, string> = {
   cancelled: "Annullato",
   declined: "Rifiutato",
   pending: "In attesa",
+  /* DAS-REV-20 §25: «Il Centro e i dettagli possono mostrare Collegamento
+     completato tramite un altro percorso; non è una nuova azione da
+     proporre alla persona.» */
+  superseded: "Collegamento completato tramite un altro percorso",
 };
 
 /**

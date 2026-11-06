@@ -187,6 +187,7 @@ const STATES: readonly InviteRecordState[] = [
   "declined",
   "cancelled",
   "approved",
+  "superseded",
 ];
 
 function recordState(value: unknown): InviteRecordState | null {

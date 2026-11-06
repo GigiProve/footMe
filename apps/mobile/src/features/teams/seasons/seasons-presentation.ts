@@ -252,6 +252,19 @@ export function blockerCopy(blocker: DeactivationBlocker): {
     };
   }
 
+  if (blocker.kind === "join_links") {
+    return {
+      actionLabel: blocker.canOpen ? "Gestisci link" : null,
+      body:
+        blocker.count === null
+          ? "Gestiti da un amministratore autorizzato."
+          : blocker.count === 1
+            ? "1 link ancora utilizzabile"
+            : `${blocker.count} link ancora utilizzabili`,
+      title: "Link di invito utilizzabili",
+    };
+  }
+
   // §25: una condizione non riconosciuta dal client resta un impedimento.
   return {
     actionLabel: null,

@@ -88,6 +88,20 @@ export const DASHBOARD_CAPABILITIES = [
   // Visualizza» ora ha un effetto reale.
   "society_profile_view",
   "society_manage_profile",
+  // DAS-REV-20 §8: «Distinguere almeno capacità di consultare link, creare
+  // link, modificarne scadenza/limite, disattivarli, consultare le persone e
+  // rimuovere un incarico.» Le persone si consultano con `roster_view`, che
+  // già significa quello; restano cinque chiavi.
+  //
+  // `assignments_remove` non appartiene al dominio del link: lo stesso potere
+  // termina un incarico nato da un invito individuale. §8 è esplicito — «Il
+  // diritto di gestione link non implica da solo il diritto di rimuovere
+  // persone».
+  "join_links_view",
+  "join_links_create",
+  "join_links_manage",
+  "join_links_revoke",
+  "assignments_remove",
 ] as const;
 
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];

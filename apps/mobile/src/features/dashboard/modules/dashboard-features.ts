@@ -28,6 +28,7 @@ export type DashboardFeatureKey =
   | "society_drafts"
   | "society_article_composer"
   | "society_invites"
+  | "society_join_links"
   | "society_management_areas"
   | "society_positions"
   | "society_recent_content"
@@ -75,6 +76,17 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
    * capability `invites_view` / `member_requests_view`.
    */
   society_invites: { available: true },
+  /**
+   * DAS-REV-20: il centro "Link di invito" esiste
+   * (`app/(tabs)/dashboard/join-links`), con le due tab, il composer, la
+   * landing pubblica, il percorso del destinatario, la gestione di scadenza
+   * e limite, la disattivazione e la rimozione del singolo incarico.
+   *
+   * §44: «capability/feature flag e API devono impedire di distribuire link
+   * che il percorso destinatario non sa ancora completare». Il flag è vero
+   * perché entrambe le metà esistono: emettere e riscattare.
+   */
+  society_join_links: { available: true },
   /**
    * DAS-REV-09: il dettaglio operativo della squadra esiste
    * (`app/(tabs)/dashboard/team/[teamId]`), con header, Organico, Posizioni,

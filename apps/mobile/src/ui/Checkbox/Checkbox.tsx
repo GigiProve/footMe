@@ -13,6 +13,18 @@ type CheckboxProps = {
    */
   description?: string;
   disabled?: boolean;
+  /**
+   * Stato parziale di una casella «seleziona tutto» (DAS-REV-20 §12).
+   *
+   * «Deselezionandone una lo stato globale diventa parziale/non selezionato
+   * secondo il componente accessibile.» Il valore non è una terza scelta
+   * salvabile — §12 avverte che «l'eventuale stato indeterminato non viene
+   * salvato come categoria» — ma una descrizione di che cosa farà il tap:
+   * da parziale si completa la selezione, da completo la si svuota.
+   *
+   * Vale solo con `checked` falso: una casella piena non è anche parziale.
+   */
+  indeterminate?: boolean;
   label: string;
   onValueChange: (value: boolean) => void;
   testID?: string;
@@ -22,24 +34,37 @@ export function Checkbox({
   checked,
   description,
   disabled = false,
+  indeterminate = false,
   label,
   onValueChange,
   testID,
 }: CheckboxProps) {
+  const partial = indeterminate && !checked;
+
   return (
     <Pressable
       accessibilityLabel={description ? `${label}, ${description}` : label}
       accessibilityRole="checkbox"
-      accessibilityState={{ checked, disabled }}
+      /* "mixed" è il valore che i lettori di schermo annunciano come
+         parzialmente selezionato: §46 vieta di affidare lo stato al solo
+         colore del quadratino. */
+      accessibilityState={{ checked: partial ? "mixed" : checked, disabled }}
       disabled={disabled}
       onPress={() => onValueChange(!checked)}
       style={[styles.container, disabled ? styles.disabled : null]}
       testID={testID}
     >
-      <View style={[styles.box, checked ? styles.boxChecked : null]}>
+      <View
+        style={[
+          styles.box,
+          checked ? styles.boxChecked : null,
+          partial ? styles.boxPartial : null,
+        ]}
+      >
         {checked ? (
           <Ionicons color={colors.inkInvert} name="checkmark" size={14} />
         ) : null}
+        {partial ? <View style={styles.dash} /> : null}
       </View>
       <View style={styles.text}>
         <AppText variant="bodyLg" style={styles.label}>
@@ -80,6 +105,15 @@ const styles = StyleSheet.create({
   boxChecked: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
+  },
+  boxPartial: {
+    borderColor: colors.accent,
+  },
+  dash: {
+    backgroundColor: colors.accent,
+    borderRadius: 1,
+    height: 2,
+    width: 10,
   },
   text: {
     flex: 1,

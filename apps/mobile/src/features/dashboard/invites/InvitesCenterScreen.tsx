@@ -14,7 +14,14 @@
  * navigation resta visibile con Dashboard selezionata (§6).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   useInfiniteQuery,
@@ -43,8 +50,20 @@ import { InviteListRow } from "./components/InviteListRow";
 import { InviteScopeRow } from "./components/InviteScopeRow";
 import { InviteScopeSheet } from "./components/InviteScopeSheet";
 import { InvitesCenterHeader } from "./components/InvitesCenterHeader";
+import { JOIN_LINKS_HREFS } from "../join-links/join-links-routes";
+import { hasCapability } from "../dashboard-types";
+import { isFeatureAvailable } from "../modules/dashboard-features";
 import { trackInvitesEvent } from "./invites-analytics";
 import { INVITES_QK } from "./invites-keys";
+
+/**
+ * DAS-REV-20 §6: l'ingresso ai Link di invito vive qui, non come terza
+ * tab. Le due stringhe restano locali al punto d'uso: appartengono a quel
+ * pack e non alla copy del Centro Inviti.
+ */
+const JOIN_LINKS_ENTRY_TITLE = "Link di invito";
+const JOIN_LINKS_ENTRY_BODY =
+  "Un link riutilizzabile per collegare più persone a una squadra.";
 import {
   INVITES_COPY,
   INVITE_TABS,
@@ -513,9 +532,60 @@ export function InvitesCenterScreen() {
     tab: activeTab,
   });
 
+  /*
+   * DAS-REV-20 §6: «La voce è presente solo quando il modulo è realmente
+   * disponibile e consultabile.» La capability lato client decide se
+   * **mostrare** l'ingresso; la destinazione rivalida comunque sul server,
+   * dove vive l'autorizzazione vera.
+   */
+  const canViewJoinLinks =
+    isFeatureAvailable("society_join_links") &&
+    hasCapability(current, "join_links_view");
+
+  const openJoinLinks = () => {
+    router.push(
+      JOIN_LINKS_HREFS.center({ from: "invites" }) as Parameters<
+        typeof router.push
+      >[0],
+    );
+  };
+
   const header = (
     <View>
       {connection === "offline" ? <DashboardOfflineNotice /> : null}
+
+      {/* DAS-REV-20 §6: «Il Centro Inviti conserva le due tab Inviti
+          inviati e Richieste ricevute: non aggiungere una terza tab di link
+          e non mescolare le relative righe.» L'ingresso è quindi una riga di
+          navigazione verso una destinazione dedicata, e compare solo quando
+          il modulo è davvero disponibile e consultabile. */}
+      {canViewJoinLinks ? (
+        <Pressable
+          accessibilityLabel={`${JOIN_LINKS_ENTRY_TITLE}. ${JOIN_LINKS_ENTRY_BODY}`}
+          accessibilityRole="button"
+          onPress={openJoinLinks}
+          style={({ pressed }) => [
+            styles.joinLinksRow,
+            pressed ? styles.joinLinksPressed : null,
+          ]}
+          testID="invites-join-links"
+        >
+          <View style={styles.joinLinksText}>
+            <AppText color="neutral" variant="titleSm">
+              {JOIN_LINKS_ENTRY_TITLE}
+            </AppText>
+            <AppText color="neutralMuted" variant="bodySm">
+              {JOIN_LINKS_ENTRY_BODY}
+            </AppText>
+          </View>
+
+          <Ionicons
+            color={colors.textNeutralSoft}
+            name="chevron-forward"
+            size={18}
+          />
+        </Pressable>
+      ) : null}
 
       {/* §12: CTA primaria sotto il titolo, solo quando autorizzata. */}
       {center.canInvite ? (
@@ -738,6 +808,25 @@ function ListFooter({
 }
 
 const styles = StyleSheet.create({
+  joinLinksRow: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: spacing[12],
+    marginBottom: spacing[12],
+    minHeight: 44,
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[12],
+  },
+  joinLinksText: {
+    flex: 1,
+    gap: spacing[4],
+  },
+  joinLinksPressed: {
+    opacity: 0.6,
+  },
   root: {
     backgroundColor: colors.surface,
     flex: 1,

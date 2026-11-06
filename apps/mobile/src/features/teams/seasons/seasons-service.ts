@@ -189,7 +189,15 @@ export type HistoryCommitResult = {
 
 // ── Lifecycle ────────────────────────────────────────────────────────────
 
-export type DeactivationBlockerKind = "invites" | "positions";
+/**
+ * DAS-REV-20 §37: «Integra i link realmente utilizzabili per creare nuovi
+ * incarichi fra le attività da gestire prima della disattivazione Team.
+ * Non contare tutti i link esistenti come blocker: REVOKED, esauriti o
+ * scaduti non sono inviti attualmente utilizzabili.»
+ *
+ * Il conteggio lo fa il server: qui arriva già filtrato.
+ */
+export type DeactivationBlockerKind = "invites" | "join_links" | "positions";
 
 export type DeactivationBlocker = {
   canOpen: boolean;

@@ -33,7 +33,17 @@ export type InviteRecordState =
   | "accepted"
   | "declined"
   | "cancelled"
-  | "approved";
+  | "approved"
+  /**
+   * DAS-REV-20 §25: la proposta è stata **soddisfatta da un altro percorso**
+   * — tipicamente un link di squadra che ha creato lo stesso incarico.
+   *
+   * Non è un'accettazione del destinatario né un'approvazione di un
+   * amministratore: §25 vieta di «fingere ACCEPTED dall'invito originale o
+   * APPROVED da un amministratore che non ha compiuto quell'azione». È
+   * terminale e non azionabile.
+   */
+  | "superseded";
 
 /** Composizione del Centro: che cosa l'actor può leggere e fare (§12). */
 export type InvitesCenter = {

@@ -23,6 +23,7 @@ import { AppText } from "../../../ui";
 import { useSession } from "../../auth/use-session";
 import { POSITIONS_HREFS } from "../../dashboard/positions/positions-routes";
 import { INVITES_HREFS } from "../../dashboard/invites/invites-routes";
+import { JOIN_LINKS_HREFS } from "../../dashboard/join-links/join-links-routes";
 import { ProfileEditFieldsSkeleton } from "../../profiles/edit/ProfileEditStates";
 import { SeasonsIdentityHeader } from "./components/SeasonsIdentityHeader";
 import { SeasonsScaffold } from "./components/SeasonsScaffold";
@@ -42,6 +43,7 @@ import { trackSeasonsEvent } from "./seasons-analytics";
 
 const BLOCKER_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   invites: "person-add-outline",
+  join_links: "link-outline",
   positions: "document-text-outline",
 };
 
@@ -98,8 +100,14 @@ export function TeamDeactivationScreen({ teamId }: { teamId: string }) {
       // link perché il blocker riguarda quella squadra: aprire il Centro su
       // tutte le posizioni avrebbe costretto a ritrovarla a mano. Non è un
       // permesso — il Centro rivalida scope e perimetro (§15).
+      /* DAS-REV-20 §37: «L'ingresso contestuale conserva team_id e scope; il
+         centro può mostrare il contesto squadra senza aggiungere una nuova
+         search bar globale.» Nessun elenco gestionale parallelo: è lo stesso
+         Centro Link di invito, filtrato su questa squadra. */
       const href =
-        blocker.kind === "positions"
+        blocker.kind === "join_links"
+          ? JOIN_LINKS_HREFS.center({ from: "deactivation", teamId })
+          : blocker.kind === "positions"
           ? POSITIONS_HREFS.center({
               from: "deactivation",
               group: "active",

@@ -11,6 +11,7 @@ import { fetchInboxConversations } from "../../src/features/messaging/messaging-
 import { usePendingSocietyInvite } from "../../src/features/network/use-pending-society-invite";
 import { usePendingAdminInvite } from "../../src/features/dashboard/admins/use-pending-admin-invite";
 import { usePendingAssistitoInvite } from "../../src/features/relationships/assistiti/use-pending-assistito-invite";
+import { usePendingTeamJoin } from "../../src/features/dashboard/join-links/join/use-pending-team-join";
 import { AppSidebar } from "../../src/ui/sidebar";
 import { colors, radius, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
 import { AppText, Icon, type IconName } from "../../src/ui";
@@ -61,6 +62,12 @@ export default function TabsLayout() {
   // successo riprendi lo stesso invito»: il token torna qui e la landing lo
   // risolve di nuovo sul server, perché averlo non prova nulla.
   usePendingAdminInvite(isReadyForInvites);
+  // DAS-REV-20 §20: stesso gancio per il link di squadra. «Conserva un
+  // riferimento sicuro al link attraverso landing, login, signup,
+  // onboarding e conferma»: il token torna qui e il percorso del
+  // destinatario risolve di nuovo la configurazione canonica dal backend,
+  // perché possedere il token non prova nulla.
+  usePendingTeamJoin(isReadyForInvites);
 
   const unreadThreadsCount = profileId
     ? (conversationsQuery.data ?? []).filter((item) => item.unread_count > 0).length +

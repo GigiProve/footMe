@@ -75,6 +75,17 @@ export default function DashboardLayout() {
         <Stack.Screen name="invites/index" />
         <Stack.Screen name="invites/[inviteId]" />
         <Stack.Screen name="invites/request/[requestId]" />
+        {/* DAS-REV-20 §6: «Nel centro principale mantieni Home | Cerca |
+            Dashboard | Messaggi | Profilo, Dashboard selezionata», e lo
+            stesso vale per dettaglio del link, persone collegate e
+            dettaglio della persona, che sono pagine gestionali della
+            Società. Composer in app/team-link/, landing pubblica in
+            app/team-invite/ e percorso del destinatario in app/team-join/
+            restano flussi focalizzati senza bottom navigation. */}
+        <Stack.Screen name="join-links/index" />
+        <Stack.Screen name="join-links/[linkId]/index" />
+        <Stack.Screen name="join-links/[linkId]/people/index" />
+        <Stack.Screen name="join-links/[linkId]/people/[assignmentId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

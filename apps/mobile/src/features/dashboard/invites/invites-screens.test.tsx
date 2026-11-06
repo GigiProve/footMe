@@ -208,7 +208,11 @@ beforeEach(() => {
   });
 
   identityMocks.useDashboardIdentity.mockReturnValue({
-    current: { id: COMO, isOwner: true, kind: "society" },
+    /* DAS-REV-20: il Centro legge `capabilities` per decidere se mostrare
+       l'ingresso ai Link di invito. Il mock le dichiara vuote — come il tipo
+       canonico richiede — così la riga resta assente dai test che non la
+       riguardano. */
+    current: { capabilities: [], id: COMO, isOwner: true, kind: "society" },
   });
 
   serviceMocks.fetchInvitesCenter.mockResolvedValue(center());
