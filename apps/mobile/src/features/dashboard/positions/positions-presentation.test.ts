@@ -28,6 +28,7 @@ function row(overrides: Partial<PositionRow> = {}): PositionRow {
   return {
     applicationsNew: null,
     applicationsTotal: null,
+    closeReason: null,
     closedAt: null,
     contextLabel: null,
     countsAvailable: false,

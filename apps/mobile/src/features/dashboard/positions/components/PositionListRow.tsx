@@ -6,6 +6,7 @@ import { AppText } from "../../../../ui";
 import {
   POSITIONS_COPY,
   applicationsLabel,
+  closeReasonLabel,
   formatClosedLabel,
   formatDraftUpdatedLabel,
   positionContextLine,
@@ -74,6 +75,11 @@ export function PositionListRow({
           ? POSITIONS_COPY.deadlinePassed
           : null;
 
+  /* DAS-REV-18 §26: «eventuale motivo breve interno». Una riga sola, sotto
+     la data, e solo sulle Chiuse: il testo esteso di «Altro» resta nel
+     dettaglio, e un motivo assente non produce «Non specificato». */
+  const reason = group === "closed" ? closeReasonLabel(row.closeReason) : null;
+
   const showInactive = row.teamIsInactive && group !== "active";
   const showCountsRetry = countsFailed && Boolean(onRetryCounts);
 
@@ -112,6 +118,16 @@ export function PositionListRow({
           {meta ? (
             <AppText color="neutralMuted" variant="meta">
               {meta}
+            </AppText>
+          ) : null}
+
+          {reason ? (
+            <AppText
+              color="neutralMuted"
+              testID={`position-row-reason-${row.id}`}
+              variant="meta"
+            >
+              {reason}
             </AppText>
           ) : null}
 

@@ -23,7 +23,7 @@ import type {
   PositionProfileType,
   PositionSecondaryTeam,
 } from "../compose/compose-types";
-import type { PositionGroup } from "../positions-types";
+import type { PositionCloseReason, PositionGroup } from "../positions-types";
 import type { PositionLifecycle, PositionManageDetail } from "./manage-types";
 
 type RawRecord = Record<string, unknown>;
@@ -106,6 +106,18 @@ function mapLifecycle(value: unknown): PositionLifecycle {
   return raw === "published" || raw === "closed" ? raw : "draft";
 }
 
+/** Un motivo fuori dai quattro canonici vale «nessun motivo» (§20, §26). */
+function mapCloseReason(value: unknown): PositionCloseReason | null {
+  const raw = text(value);
+
+  return raw === "filled" ||
+    raw === "no_longer_needed" ||
+    raw === "cancelled" ||
+    raw === "other"
+    ? raw
+    : null;
+}
+
 /**
  * La lettura gestionale, una sola (§23).
  *
@@ -155,6 +167,8 @@ export async function fetchPositionManageDetail(
     canClose: bool(row.can_close),
     canEdit: bool(row.can_edit),
     canPublish: bool(row.can_publish),
+    closeReason: mapCloseReason(row.close_reason),
+    closeReasonText: text(row.close_reason_text),
     closedAt: text(row.closed_at),
     clubCity: text(row.club_city),
     clubId: text(row.club_id) ?? "",
@@ -230,4 +244,54 @@ export async function updatePublishedPosition(input: {
   const row = Array.isArray(rows) ? rows[0] : null;
 
   return { resourceVersion: int(row?.resource_version) ?? 1 };
+}
+
+export type ClosePositionResult = {
+  closeReason: PositionCloseReason | null;
+  closeReasonText: string | null;
+  closedAt: string | null;
+  lifecycle: PositionLifecycle;
+  positionId: string;
+  resourceVersion: number;
+};
+
+/**
+ * Il comando di chiusura, PUBLISHED → CLOSED (DAS-REV-18 §22).
+ *
+ * Porta una chiave idempotente come la pubblicazione: §22 — «Se la risposta
+ * è persa, riconcilia con lo stesso operation ID invece di presentare una
+ * nuova operazione come necessaria.» La stessa chiave con gli stessi
+ * parametri rigioca l'esito già committato; con parametri diversi il server
+ * rifiuta, così un motivo cambiato dopo l'invio non diventa una seconda
+ * chiusura.
+ *
+ * `closedAt` e il lifecycle finale arrivano dal server: §35 — «Le date di
+ * chiusura e di prima pubblicazione sono server-owned.» Qui non si costruisce
+ * nessun `new Date()`.
+ */
+export async function closePosition(input: {
+  expectedVersion: number | null;
+  operationKey: string;
+  positionId: string;
+  reason: PositionCloseReason | null;
+  reasonText: string | null;
+}): Promise<ClosePositionResult> {
+  const rows = await rpc<RawRecord[]>("close_position", {
+    p_ad_id: input.positionId,
+    p_expected_version: input.expectedVersion,
+    p_operation_key: input.operationKey,
+    p_reason: input.reason,
+    p_reason_text: input.reasonText,
+  });
+
+  const row = Array.isArray(rows) ? rows[0] : null;
+
+  return {
+    closeReason: mapCloseReason(row?.close_reason),
+    closeReasonText: text(row?.close_reason_text),
+    closedAt: text(row?.closed_at),
+    lifecycle: mapLifecycle(row?.status),
+    positionId: text(row?.position_id) ?? input.positionId,
+    resourceVersion: int(row?.resource_version) ?? 1,
+  };
 }

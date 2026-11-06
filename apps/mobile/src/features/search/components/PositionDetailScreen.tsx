@@ -10,6 +10,7 @@ import {
 } from "../../recruiting/recruiting-service";
 import { formatDeadlineDetailLabel } from "../../dashboard/personal/personal-presentation";
 import { fetchPositionDetail } from "../position-detail-service";
+import { formatCivilDateLabel } from "../../dashboard/positions/positions-presentation";
 import { formatDeadlineLabel } from "../search-format";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import {
@@ -89,24 +90,70 @@ export function PositionDetailScreen() {
     switch (detail.action.reason) {
       case "already_applied":
         return "Hai già inviato la tua candidatura per questa posizione.";
-      case "deadline_passed":
-        return "Il termine per candidarsi è scaduto.";
       case "role_not_supported":
         return "La candidatura è disponibile per i profili calciatore.";
-      case "not_available":
-        return "Questa posizione non accetta più candidature.";
+      /* `deadline_passed`, `position_closed` e `not_available` hanno il loro
+         blocco in testa alla pagina (DAS-REV-18 §32, screen 11-12):
+         ripeterli qui sarebbe la stessa frase due volte. */
       default:
         return null;
     }
   })();
 
-  const cutoffLabel = detail?.action.deadline_at
-    ? formatDeadlineDetailLabel(detail.action.deadline_at, {
-        actionType:
-          detail.action.action_type === "register" ? "register" : "apply",
-        timeZone: detail.action.deadline_timezone,
-      })
-    : null;
+  /**
+   * Lo stato della ricezione, in testa alla scheda (DAS-REV-18 §32).
+   *
+   * Due casi distinti, con parole diverse: una PUBLISHED il cui termine è
+   * scaduto «non accetta più candidature **per ora**» — e il mockup le dà
+   * la data del termine, perché è l'informazione che spiega il blocco —
+   * mentre una CLOSED è una ricerca conclusa, senza data e senza termine da
+   * mostrare.
+   *
+   * Nessun dato gestionale in nessuno dei due: niente motivo interno,
+   * niente conteggi, niente cronologia (§32).
+   */
+  const publicStatus = (() => {
+    if (!detail) {
+      return null;
+    }
+
+    if (detail.action.status === "closed") {
+      return {
+        body: "Questa posizione non accetta più candidature.",
+        deadline: null,
+        testID: "position-public-closed",
+        title: "Posizione chiusa",
+      };
+    }
+
+    if (detail.action.reason === "deadline_passed") {
+      return {
+        body: "Il termine per candidarsi è scaduto.",
+        /* §32: «un termine presente e rilevante mostra Scadenza candidature
+           con la data civile corretta». La data viene dal server: il cutoff
+           memorizzato è esclusivo e formattarlo darebbe il giorno dopo. */
+        deadline: formatCivilDateLabel(detail.action.deadline_date),
+        testID: "position-public-receiving-closed",
+        title: "Candidature chiuse",
+      };
+    }
+
+    return null;
+  })();
+
+  /* §32: «Una Position senza deadline non mostra al candidato un campo
+     Nessuna scadenza.» E su una chiusa il termine non compare affatto: la
+     ricerca è conclusa, non in attesa di una data. */
+  const cutoffLabel =
+    detail && detail.action.status !== "closed" && !publicStatus
+      ? detail.action.deadline_at
+        ? formatDeadlineDetailLabel(detail.action.deadline_at, {
+            actionType:
+              detail.action.action_type === "register" ? "register" : "apply",
+            timeZone: detail.action.deadline_timezone,
+          })
+        : null
+      : null;
 
   const toggleSavedMutation = useMutation({
     mutationFn: () => {
@@ -229,6 +276,30 @@ export function PositionDetailScreen() {
             ) : null}
           </View>
 
+          {/* DAS-REV-18 §32, screen 11-12: lo stato della ricezione sta
+              sopra il contenuto, dove il candidato lo legge prima di
+              leggere la descrizione. Testo neutro, nessun badge colorato e
+              nessuna CTA Candidati funzionante sotto. */}
+          {publicStatus ? (
+            <View style={styles.publicStatus} testID={publicStatus.testID}>
+              <AppText variant="titleSm">{publicStatus.title}</AppText>
+
+              {publicStatus.deadline ? (
+                <View style={styles.publicStatusDeadline}>
+                  <AppText color="muted" variant="bodySm">
+                    Scadenza candidatura
+                  </AppText>
+
+                  <AppText variant="bodyLg">{publicStatus.deadline}</AppText>
+                </View>
+              ) : null}
+
+              <AppText color="muted" variant="bodySm">
+                {publicStatus.body}
+              </AppText>
+            </View>
+          ) : null}
+
           {detail.compensation_summary ? (
             <AppText variant="bodySm" color="secondary" style={styles.compensation}>
               {detail.compensation_summary}
@@ -307,6 +378,16 @@ const styles = StyleSheet.create({
   },
   clubText: {
     flex: 1,
+    gap: spacing[4],
+  },
+  publicStatus: {
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: spacing[8],
+    marginTop: spacing[16],
+    paddingTop: spacing[16],
+  },
+  publicStatusDeadline: {
     gap: spacing[4],
   },
   compensation: {

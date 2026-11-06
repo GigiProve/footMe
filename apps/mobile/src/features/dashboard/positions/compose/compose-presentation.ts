@@ -202,6 +202,22 @@ export function describeComposeError(error: ComposeError): string {
       return "Non puoi creare un incarico per l'intera società.";
     case "POSITION_OPERATION_CONFLICT":
       return "I dati della richiesta sono cambiati. Riprova.";
+    /* DAS-REV-18 §38, riga «Giorno passato alla conferma». Il server
+       rivalida al commit: una pagina aperta prima di mezzanotte non congela
+       il tempo, e questo è il messaggio che lo spiega. */
+    case "POSITION_DEADLINE_PAST":
+      return "La data scelta è trascorsa. Seleziona oggi o una data successiva.";
+    /* DAS-REV-18 §38, riga «CLOSED mentre si modifica». Una chiusura vinta
+       da un altro amministratore non è un problema di rete né un conflitto
+       di versione: è una decisione definitiva da comunicare come tale. */
+    case "POSITION_CLOSED_IMMUTABLE":
+      return "La posizione è stata chiusa e non può più essere modificata.";
+    case "POSITION_CLOSE_REASON_INVALID":
+      return "Scegli un motivo valido oppure lascia il campo vuoto.";
+    case "POSITION_CLOSE_REASON_TEXT_NOT_ALLOWED":
+      return "Il dettaglio è disponibile solo con il motivo «Altro».";
+    case "POSITION_CLOSE_REASON_TEXT_TOO_LONG":
+      return COMPOSE_COPY.textTooLong;
     case "POSITION_NOT_FOUND":
       return "Questa posizione non è più disponibile.";
     default:

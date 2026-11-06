@@ -23,6 +23,10 @@ export default function PositionManageLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="[id]/edit" />
         <Stack.Screen name="[id]/preview" />
+        {/* DAS-REV-18 §20, screen 08: la scelta del motivo di chiusura è un
+            flusso focalizzato come gli altri due — back, titolo e una CTA,
+            senza bottom navigation. */}
+        <Stack.Screen name="[id]/close-reason" />
       </Stack>
     </DashboardIdentityProvider>
   );

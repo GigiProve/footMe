@@ -13,8 +13,24 @@ export type PositionActionState = {
   already_applied: boolean;
   can_apply: boolean;
   deadline_at: string | null;
+  /**
+   * Il giorno civile della scadenza, nel fuso della società (DAS-REV-18 §8).
+   *
+   * Server-owned. Formattare `deadline_at` mostrerebbe il **giorno
+   * successivo**, perché il cutoff memorizzato è esclusivo: l'inizio del
+   * giorno dopo quello scelto.
+   */
+  deadline_date: string | null;
   deadline_timezone: string | null;
   is_open: boolean;
+  /** Il lifecycle reale dell'annuncio: `published` o `closed` (§32). */
+  status: string | null;
+  /**
+   * `deadline_passed` e `position_closed` sono motivi **distinti**
+   * (DAS-REV-18 §32): il primo è una PUBLISHED che ha smesso di ricevere,
+   * il secondo una ricerca conclusa. Gli screen 11 e 12 dicono cose
+   * diverse, e il renderer non deve indovinare quale sia il caso.
+   */
   reason: string | null;
 };
 
@@ -113,9 +129,11 @@ export async function fetchPositionDetail(
       already_applied: false,
       can_apply: false,
       deadline_at: null,
+      deadline_date: null,
       deadline_timezone: null,
       is_open: true,
       reason: null,
+      status: null,
     },
     ad_id: ad.id,
     category: ad.category,

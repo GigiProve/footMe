@@ -90,6 +90,8 @@ export function PositionComposePreviewScreen() {
 
   /* La scadenza persiste sulla **stessa** bozza con patch e versione: §23
      — «non pubblica e non crea una copia della bozza». */
+  const [deadlineError, setDeadlineError] = useState<string | null>(null);
+
   const deadlineMutation = useMutation({
     mutationFn: (deadlineDate: string | null) =>
       setPositionDeadline({
@@ -97,10 +99,13 @@ export function PositionComposePreviewScreen() {
         expectedVersion: draft?.resourceVersion ?? null,
         positionId,
       }),
+    /* L'errore della scadenza vive accanto al suo controllo e non nella
+       riga di errore della pagina: DAS-REV-18 §37 — «Errore di un modulo
+       conserva gli altri.» */
     onError: (mutationError) =>
-      setError(describeComposeError(toComposeError(mutationError))),
+      setDeadlineError(describeComposeError(toComposeError(mutationError))),
     onSuccess: () => {
-      setError(null);
+      setDeadlineError(null);
       queryClient.invalidateQueries({ queryKey: ["position-compose-drafts"] });
     },
   });
@@ -171,11 +176,15 @@ export function PositionComposePreviewScreen() {
         />
 
         {/* §23: il controllo sta dopo il contenuto e prima delle CTA, ed è
-            owner-only — il renderer candidato non lo conosce. */}
-        {canPublish ? (
+            owner-only — il renderer candidato non lo conosce.
+            DAS-REV-18 §6 e §43.24: la condizione è `canEdit`, non
+            `canPublish` — «Chi può modificare una DRAFT può configurarne la
+            deadline … Pubblicare richiede comunque la capability Publish.» */}
+        {draft.canEdit ? (
           <DeadlineControl
             busy={deadlineMutation.isPending}
-            onChange={(value) => deadlineMutation.mutate(value)}
+            error={deadlineError}
+            onChange={(value) => deadlineMutation.mutateAsync(value)}
             value={draft.deadlineDate}
           />
         ) : null}

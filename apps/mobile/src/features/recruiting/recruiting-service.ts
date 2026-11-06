@@ -206,37 +206,64 @@ export async function toggleSavedAd(
   }
 }
 
+/**
+ * I motivi di dominio per cui una candidatura non viene accettata
+ * (DAS-REV-18 §17, §38).
+ *
+ * Il server li distingue, e la UI deve dirne parole diverse: una ricerca
+ * chiusa e un termine scaduto non sono la stessa cosa per chi legge.
+ */
+const APPLY_MESSAGES: Record<string, string> = {
+  POSITION_APPLICANT_NOT_ELIGIBLE:
+    "La candidatura è disponibile solo per profili calciatore completati.",
+  POSITION_CLOSED: "Questa posizione non accetta più candidature.",
+  POSITION_DEADLINE_PASSED: "Il termine per candidarsi è scaduto.",
+  POSITION_NOT_AVAILABLE: "Questa posizione non è più disponibile.",
+  POSITION_ROLE_NOT_SUPPORTED:
+    "La candidatura è disponibile per i profili calciatore.",
+};
+
+/**
+ * Invia la candidatura attraverso il guard transazionale (DAS-REV-18 §17).
+ *
+ * Non è più un insert diretto. §17 chiede che «L'invio di una candidatura
+ * deve rileggere e verificare l'oggetto autorevole al commit» e che «Il
+ * confronto usa l'orologio server nell'operazione transazionale»: la RPC
+ * prende un lock sulla riga della Position, rilegge stato e cutoff dopo il
+ * lock, e solo allora scrive. Un insert dal client non poteva farlo —
+ * leggeva e scriveva in due momenti diversi, e una chiusura concorrente
+ * passava in mezzo.
+ *
+ * Un retry di un invio **già committato** restituisce l'esito originale con
+ * `replayed = true`, anche se nel frattempo il termine è passato (§17). Un
+ * invio mai committato rivalida invece lo stato corrente: è il server a
+ * distinguere i due casi, perché solo lui sa se la riga esiste già.
+ */
 export async function applyToRecruitingAd(
   profileId: string,
   adId: string,
   coverMessage: string,
 ) {
-  const { data: playerProfile, error: playerProfileError } = await supabase
-    .from("player_profiles")
-    .select("profile_id")
-    .eq("profile_id", profileId)
-    .maybeSingle();
-
-  if (playerProfileError) {
-    throw playerProfileError;
-  }
-
-  if (!playerProfile) {
-    throw new Error(
-      "La candidatura e' disponibile solo per profili giocatore completati.",
-    );
-  }
-
-  const { error } = await supabase.from("recruiting_applications").insert({
-    ad_id: adId,
-    applicant_profile_id: profileId,
-    cover_message: coverMessage.trim() || null,
-    player_profile_id: profileId,
-    status: "submitted",
+  const { data, error } = await supabase.rpc("apply_to_position", {
+    p_ad_id: adId,
+    p_cover_message: coverMessage.trim() || null,
   });
 
   if (error) {
-    throw error;
+    const known = Object.keys(APPLY_MESSAGES).find((code) =>
+      error.message?.includes(code),
+    );
+
+    throw known ? new Error(APPLY_MESSAGES[known]) : error;
+  }
+
+  const row = Array.isArray(data) ? data[0] : null;
+
+  /* Un replay non è un nuovo invio: niente seconda notifica al club, che
+     altrimenti arriverebbe a ogni retry di una risposta persa (§34 —
+     «Gli eventi tecnici necessari … non sono notifiche utente»). */
+  if (row?.replayed === true) {
+    return;
   }
 
   // Notify the club owner of the new application.

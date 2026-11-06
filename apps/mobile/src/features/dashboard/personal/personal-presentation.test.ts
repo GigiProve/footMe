@@ -74,10 +74,16 @@ describe("formatDeadlineRowLabel", () => {
 
 describe("formatDeadlineDetailLabel", () => {
   it("adds the year, and the time only when it changes the decision (§14)", () => {
+    /* DAS-REV-18 §8 ha reso il cutoff **esclusivo**: mezzanotte del 15 è il
+       confine che chiude il 14, non un termine «entro il 15». Il giorno
+       stampato è quindi il 14, e non c'è nessuna ora da aggiungere perché
+       il giorno è incluso per intero. */
     expect(
       formatDeadlineDetailLabel("2026-09-15T00:00:00Z", { timeZone: "UTC" }),
-    ).toBe("Candidature entro il 15 settembre 2026");
+    ).toBe("Candidature entro il 14 settembre 2026");
 
+    /* Un cutoff a metà giornata resta un istante: lì l'ora cambia davvero
+       la decisione di chi legge, e il giorno è quello del cutoff. */
     expect(
       formatDeadlineDetailLabel("2026-09-15T18:00:00Z", { timeZone: "UTC" }),
     ).toBe("Candidature entro il 15 settembre 2026, ore 18:00 (UTC)");

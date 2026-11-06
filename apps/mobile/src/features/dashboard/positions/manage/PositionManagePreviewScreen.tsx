@@ -17,7 +17,7 @@
 import { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing } from "../../../../theme/tokens";
@@ -33,10 +33,18 @@ import {
   createSessionNonce,
   operationKeyOf,
 } from "../compose/compose-operation-key";
-import { describeBlocker } from "../compose/compose-presentation";
-import { fetchCatalogs } from "../compose/compose-service";
+import {
+  describeBlocker,
+  describeComposeError,
+} from "../compose/compose-presentation";
+import {
+  fetchCatalogs,
+  setPositionDeadline,
+  toComposeError,
+} from "../compose/compose-service";
 import { ComposerFooter } from "../compose/components/ComposerFooter";
 import { ComposerNavBar } from "../compose/components/ComposerNavBar";
+import { DeadlineControl } from "../compose/components/DeadlineControl";
 import { PositionPublicContent } from "../compose/components/PositionPublicContent";
 import { usePublishPositions } from "../compose/use-publish-positions";
 import { POSITIONS_QK } from "../positions-keys";
@@ -61,7 +69,9 @@ export function PositionManagePreviewScreen() {
   const positionId = typeof id === "string" ? id : "";
 
   const [error, setError] = useState<string | null>(null);
+  const [deadlineError, setDeadlineError] = useState<string | null>(null);
   const [nonce] = useState(createSessionNonce);
+  const queryClient = useQueryClient();
 
   const detailQuery = useQuery({
     enabled: !!positionId && !!actorId,
@@ -91,6 +101,28 @@ export function PositionManagePreviewScreen() {
     successMessage: () => MANAGE_COPY.publishSuccess,
   });
 
+  /* DAS-REV-18 §10: stesso comando della bozza, stessa versione attesa.
+     Confermare la scadenza **non** pubblica: «Configurare la data non
+     aggiunge una seconda conferma di publish.» */
+  const deadlineMutation = useMutation({
+    mutationFn: (deadlineDate: string | null) =>
+      setPositionDeadline({
+        deadlineDate,
+        expectedVersion: detail?.resourceVersion ?? null,
+        positionId,
+      }),
+    onError: (mutationError) =>
+      setDeadlineError(describeComposeError(toComposeError(mutationError))),
+    onSuccess: () => {
+      setDeadlineError(null);
+      /* §10: «Dati, deadline e versione mostrati all'actor devono
+         coincidere con la versione validata al commit.» Il refetch allinea
+         la `resourceVersion` che la pubblicazione userà. */
+      void detailQuery.refetch();
+      queryClient.invalidateQueries({ queryKey: ["position-compose-drafts"] });
+    },
+  });
+
   if (detailQuery.isLoading && !detail) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -115,6 +147,7 @@ export function PositionManagePreviewScreen() {
     );
   }
 
+  const isDraft = detail.lifecycle === "draft";
   const publishable = detail.canPublish && detail.blockers.length === 0;
   const blocker = detail.blockers[0] ?? null;
 
@@ -139,6 +172,21 @@ export function PositionManagePreviewScreen() {
           catalogs={catalogsQuery.data ?? EMPTY_CATALOGS}
           draft={detail}
         />
+
+        {/* DAS-REV-18 §10: «Nella pubblicazione rapida della DAS-REV-17
+            aggiungi lo stesso controllo Scadenza candidature allo sheet e
+            alla preview collegata, senza riaprire il wizard "1 di 3".»
+            Stesso componente dello step 3, stesso comando, stesso valore
+            letto dalla bozza — «Leggi il valore salvato sulla bozza; non
+            resettarlo a Nessuna scadenza ogni volta.» */}
+        {isDraft && detail.canEdit ? (
+          <DeadlineControl
+            busy={deadlineMutation.isPending}
+            error={deadlineError}
+            onChange={(value) => deadlineMutation.mutateAsync(value)}
+            value={detail.deadlineDate}
+          />
+        ) : null}
 
         {blocker ? (
           <AppText accessibilityRole="alert" color="danger" variant="meta">

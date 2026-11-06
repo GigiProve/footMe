@@ -70,6 +70,7 @@ vi.mock("../../../../ui/Toast/ToastProvider", () => ({
 }));
 
 const manageMocks = vi.hoisted(() => ({
+  closePosition: vi.fn(),
   fetchPositionManageDetail: vi.fn(),
   updatePublishedPosition: vi.fn(),
 }));
@@ -154,6 +155,8 @@ function detail(
     canClose: false,
     canEdit: true,
     canPublish: true,
+    closeReason: null,
+    closeReasonText: null,
     closedAt: null,
     clubCity: "Como",
     clubId: "club-1",
@@ -683,8 +686,23 @@ describe("screen 12 — sola consultazione", () => {
 
     expect(hasTestID(tree, "position-manage-counts")).toBe(false);
     expect(hasTestID(tree, "position-manage-applications")).toBe(false);
-    expect(content.join(" ")).not.toContain("candidature");
+    /* Il conteggio, non la parola: da DAS-REV-18 §12 un actor in sola
+       consultazione **vede** la sezione «Scadenza candidature», che il
+       testo contiene. Cercare la sottostringa qui vieterebbe una riga che
+       la spec richiede. */
+    expect(content.join(" ")).not.toMatch(/\d+ candidature/);
+    expect(content.join(" ")).not.toContain("nuove");
     expect(content).not.toContain("0 candidature");
+  });
+
+  /* DAS-REV-18 §12: «Un actor view-only vede il valore leggibile senza
+     chevron di modifica.» Il valore sì, il comando no. */
+  it("mostra la scadenza ma nessun comando per cambiarla", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    expect(hasTestID(tree, "position-manage-deadline")).toBe(true);
+    expect(hasTestID(tree, "position-manage-deadline-edit")).toBe(false);
+    expect(hasTestID(tree, "position-manage-close")).toBe(false);
   });
 });
 
@@ -854,5 +872,331 @@ describe("screen 02 e 03 — editor di una bozza", () => {
       positionId: "pos-a",
     });
     expect(manageMocks.updatePublishedPosition).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * DAS-REV-18 — scadenza, chiusura e storico, sugli stessi componenti.
+ *
+ * Gli screen 03, 04, 07 e 10 del nuovo master sono **la stessa Position**
+ * in quattro momenti: attiva con ricezione aperta, attiva con termine
+ * superato, in chiusura, chiusa. Da qui un solo ID per tutti, come §42
+ * chiede («Gli screen rappresentano alternative temporali; non creare
+ * dodici Position duplicate»).
+ */
+describe("DAS-REV-18 screen 03 — attiva, ricezione aperta", () => {
+  const ATTIVA = detail({
+    ...ACTIVE,
+    canClose: true,
+    deadlineAt: "2026-09-30T22:00:00.000Z",
+    deadlineDate: "2026-09-30",
+    deadlineTimezone: "Europe/Rome",
+    receivingClosed: false,
+  });
+
+  beforeEach(() => {
+    routerMocks.params = { id: ATTIVA.id };
+    manageMocks.fetchPositionManageDetail.mockResolvedValue(ATTIVA);
+  });
+
+  it("mostra Chiudi posizione immediatamente sotto Modifica posizione", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    /* §12: «Non inserire dati, divider di sezione o altre CTA fra le due.»
+       L'ordine si verifica sull'albero, non sulla copy: due testID
+       adiacenti nello stesso contenitore. */
+    /* `findAll` restituisce sia il componente composito sia il nodo host,
+       quindi ogni testID compare più volte: si tiene la prima occorrenza,
+       che è l'ordine di montaggio. */
+    const seen = new Set<string>();
+    const order = tree.root
+      .findAll((node) => typeof node.props?.testID === "string")
+      .map((node) => node.props.testID as string)
+      .filter(
+        (id) => id === "position-manage-edit" || id === "position-manage-close",
+      )
+      .filter((id) => !seen.has(id) && seen.add(id) !== undefined);
+
+    expect(order).toEqual(["position-manage-edit", "position-manage-close"]);
+  });
+
+  it("mostra la scadenza reale e il comando per cambiarla", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    expect(texts(tree)).toContain("30 settembre 2026");
+    expect(hasTestID(tree, "position-manage-deadline-edit")).toBe(true);
+  });
+
+  it("non annuncia Candidature chiuse finché il termine non è superato", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    expect(hasTestID(tree, "position-manage-receiving")).toBe(false);
+    expect(texts(tree)).toContain("Attiva");
+  });
+
+  it("non mostra la Cronologia su una posizione ancora attiva", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    expect(hasTestID(tree, "position-manage-history")).toBe(false);
+  });
+});
+
+describe("DAS-REV-18 screen 04 — attiva, termine superato", () => {
+  const SCADUTA = detail({
+    ...ACTIVE,
+    canClose: true,
+    deadlineAt: "2026-09-23T22:00:00.000Z",
+    deadlineDate: "2026-09-23",
+    deadlineTimezone: "Europe/Rome",
+    receivingClosed: true,
+  });
+
+  beforeEach(() => {
+    routerMocks.params = { id: SCADUTA.id };
+    manageMocks.fetchPositionManageDetail.mockResolvedValue(SCADUTA);
+  });
+
+  it("tiene Attiva e Candidature chiuse come due condizioni separate", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+    const content = texts(tree);
+
+    /* §14: «la Position resta PUBLISHED e nella tab Attive» — lo stato non
+       diventa «Scaduta», e la ricezione interrotta è una riga in più. */
+    expect(content).toContain("Attiva");
+    expect(content).toContain("Candidature chiuse");
+    expect(content).toContain("Scadenza superata il 23 settembre 2026");
+  });
+
+  it("conserva l'accesso alle candidature già ricevute", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    /* §14: «Mantieni accessibili le candidature ricevute». La scadenza non
+       le ritira e non le azzera. */
+    expect(texts(tree)).toContain("12 candidature · 3 nuove");
+    expect(hasTestID(tree, "position-manage-applications")).toBe(true);
+  });
+
+  it("spiega come riaprire la ricezione", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    expect(texts(tree)).toContain(
+      "Estendi o rimuovi la scadenza per ricevere nuove candidature.",
+    );
+  });
+
+  it("adatta la prima conseguenza nello sheet di chiusura", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    await act(async () => {
+      byTestID(tree, "position-manage-close").props.onPress();
+    });
+
+    const content = texts(tree);
+
+    /* §19: annunciare che «non accetterà più candidature» a una posizione
+       che ha già smesso di riceverne non informa di niente. */
+    expect(content).toContain(
+      "La posizione verrà chiusa definitivamente e spostata tra le posizioni Chiuse.",
+    );
+    expect(content).not.toContain(
+      "La posizione non accetterà più candidature e verrà spostata tra le posizioni Chiuse.",
+    );
+    expect(content).toContain("Le candidature già ricevute resteranno disponibili.");
+    expect(content).toContain("Questa operazione non può essere annullata.");
+  });
+});
+
+describe("DAS-REV-18 screen 07 — conferma di chiusura", () => {
+  const ATTIVA = detail({ ...ACTIVE, canClose: true });
+
+  beforeEach(() => {
+    routerMocks.params = { id: ATTIVA.id };
+    manageMocks.fetchPositionManageDetail.mockResolvedValue(ATTIVA);
+  });
+
+  it("il tap sull'azione non chiude nulla: apre lo sheet", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    await act(async () => {
+      byTestID(tree, "position-manage-close").props.onPress();
+    });
+
+    expect(openSheets(tree)).toBe(1);
+    expect(manageMocks.closePosition).not.toHaveBeenCalled();
+  });
+
+  it("parte senza motivo selezionato", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    await act(async () => {
+      byTestID(tree, "position-manage-close").props.onPress();
+    });
+
+    /* §20: «L'iniziale è nessuna selezione. Lo screen 08 mostra un momento
+       successivo alla scelta di Profilo trovato; non è una preselezione
+       obbligatoria.» */
+    expect(texts(tree)).toContain("Nessun motivo");
+    expect(texts(tree)).not.toContain("Profilo trovato");
+  });
+
+  it("annullare non chiude e non lascia lo sheet aperto", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    await act(async () => {
+      byTestID(tree, "position-manage-close").props.onPress();
+    });
+    await act(async () => {
+      byTestID(tree, "position-close-cancel").props.onPress();
+    });
+
+    expect(openSheets(tree)).toBe(0);
+    expect(manageMocks.closePosition).not.toHaveBeenCalled();
+  });
+
+  it("invia il comando una sola volta anche con due tap nello stesso frame", async () => {
+    manageMocks.closePosition.mockResolvedValue({
+      closeReason: null,
+      closeReasonText: null,
+      closedAt: "2026-09-24T10:00:00Z",
+      lifecycle: "closed",
+      positionId: ATTIVA.id,
+      resourceVersion: ATTIVA.resourceVersion + 1,
+    });
+
+    const tree = await render(<PositionManageDetailScreen />);
+
+    await act(async () => {
+      byTestID(tree, "position-manage-close").props.onPress();
+    });
+
+    await act(async () => {
+      byTestID(tree, "position-close-confirm").props.onPress();
+      byTestID(tree, "position-close-confirm").props.onPress();
+    });
+    await flush();
+
+    /* §22: «Disabilita doppi submit.» L'idempotenza del server è la
+       seconda rete, non la prima. */
+    expect(manageMocks.closePosition).toHaveBeenCalledTimes(1);
+    expect(manageMocks.closePosition.mock.calls[0][0]).toMatchObject({
+      expectedVersion: ATTIVA.resourceVersion,
+      positionId: ATTIVA.id,
+      reason: null,
+      reasonText: null,
+    });
+    expect(
+      manageMocks.closePosition.mock.calls[0][0].operationKey.length,
+    ).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe("DAS-REV-18 screen 10 — dettaglio storico", () => {
+  const CHIUSA = detail({
+    ...ACTIVE,
+    canClose: false,
+    canEdit: false,
+    canPublish: false,
+    closeReason: "filled",
+    closeReasonText: null,
+    closedAt: "2026-09-24T10:00:00Z",
+    deadlineAt: "2026-09-30T22:00:00.000Z",
+    deadlineDate: "2026-09-30",
+    deadlineTimezone: "Europe/Rome",
+    group: "closed",
+    lifecycle: "closed",
+    publishedAt: "2026-09-01T08:00:00Z",
+    receivingClosed: false,
+    status: "closed",
+  });
+
+  beforeEach(() => {
+    routerMocks.params = { id: CHIUSA.id };
+    manageMocks.fetchPositionManageDetail.mockResolvedValue(CHIUSA);
+  });
+
+  it("mostra la Cronologia con le sole tre voci previste", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+    const content = texts(tree);
+
+    expect(content).toContain("Chiusa");
+    expect(content).toContain("Cronologia");
+    expect(content).toContain("Pubblicata il");
+    expect(content).toContain("1 settembre 2026");
+    expect(content).toContain("Chiusa il");
+    expect(content).toContain("24 settembre 2026");
+    expect(content).toContain("Motivo di chiusura");
+    expect(content).toContain("Profilo trovato");
+    expect(content).toContain("Visibile solo alla società");
+  });
+
+  it("non espone nessun comando di modifica, chiusura o riapertura", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+    const content = texts(tree);
+
+    /* §25: «Non presentare comandi disabled come falso catalogo di
+       funzionalità.» Assenti, non disattivati. */
+    expect(hasTestID(tree, "position-manage-edit")).toBe(false);
+    expect(hasTestID(tree, "position-manage-close")).toBe(false);
+    expect(hasTestID(tree, "position-manage-deadline-edit")).toBe(false);
+    expect(hasTestID(tree, "position-manage-publish")).toBe(false);
+    expect(content).not.toContain("Riapri posizione");
+    expect(content).not.toContain("Duplica");
+    expect(content).not.toContain("Elimina");
+  });
+
+  it("conserva la scadenza storica senza riscriverla con la data di chiusura", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+
+    /* §28: «Il termine può essere precedente o successivo a closed_at: non
+       riscriverlo con la data di chiusura.» Qui è successivo. */
+    expect(texts(tree)).toContain("30 settembre 2026");
+  });
+
+  it("porta le candidature nella sezione dello storico", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+    const content = texts(tree);
+
+    expect(content).toContain("Candidature ricevute");
+    expect(hasTestID(tree, "position-manage-view-applications")).toBe(true);
+    /* La riga in testa con «3 nuove» appartiene alla gestione di una
+       posizione attiva: §26 vieta di enfatizzare le nuove nello storico. */
+    expect(hasTestID(tree, "position-manage-counts")).toBe(false);
+  });
+
+  it("non enfatizza le nuove candidature nello storico", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+    const content = texts(tree);
+
+    /* §26: «Nelle Chiuse non enfatizzare nuove candidature, urgenze o
+       countdown.» Il totale resta, il richiamo operativo no. Trovato solo
+       dal confronto con il master: i test di dominio passavano. */
+    expect(content).toContain("12 candidature");
+    expect(content.join(" ")).not.toContain("nuove");
+  });
+
+  it("non ripete identità e «Sola consultazione» su una chiusa", async () => {
+    const tree = await render(<PositionManageDetailScreen />);
+    const content = texts(tree);
+
+    /* §28 la vuole leggibile «come documento»: su una chiusa `canEdit` è
+       falso per lifecycle, non per capability, e spiegare una modifica che
+       nessuno sta cercando aggiunge righe che il master non ha. */
+    expect(hasTestID(tree, "position-manage-identity")).toBe(false);
+    expect(hasTestID(tree, "position-manage-readonly")).toBe(false);
+    expect(content).not.toContain("Sola consultazione");
+  });
+
+  it("omette il motivo quando non c'è, senza «Non specificato»", async () => {
+    manageMocks.fetchPositionManageDetail.mockResolvedValue({
+      ...CHIUSA,
+      closeReason: null,
+    });
+
+    const tree = await render(<PositionManageDetailScreen />);
+    const content = texts(tree);
+
+    expect(content).toContain("Cronologia");
+    expect(content).not.toContain("Motivo di chiusura");
+    expect(content).not.toContain("Non specificato");
   });
 });

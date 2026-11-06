@@ -9,6 +9,7 @@
  */
 import { getPlayerPositionLabel } from "../../profiles/player-sports";
 import type {
+  PositionCloseReason,
   PositionFilter,
   PositionFilterOption,
   PositionGroup,
@@ -45,7 +46,75 @@ export const POSITIONS_COPY = {
   /** §13: chiusura reale ma senza data affidabile. Non diventa "oggi". */
   closedUnknown: "Posizione chiusa",
   untitled: "Posizione senza titolo",
+
+  // ── DAS-REV-18 ──────────────────────────────────────────────────────────
+  deadlineLabel: "Scadenza candidature",
+  deadlineNone: "Nessuna scadenza",
+  /** §9: il controllo è una configurazione, non un obbligo. */
+  deadlineComposeHelper: "Puoi impostare un termine prima di pubblicare.",
+  /** §9, helper dello sheet: il giorno scelto è incluso per intero. */
+  deadlineSheetHelper:
+    "Candidature fino alla fine del giorno scelto, nel fuso della società.",
+  /** §14: condizione separata dallo stato Attiva, non un errore. */
+  receivingClosed: "Candidature chiuse",
+  /** §14: «Estendi o rimuovi la scadenza per ricevere nuove candidature.» */
+  receivingClosedHelper:
+    "Estendi o rimuovi la scadenza per ricevere nuove candidature.",
+  /** §15: la proroga riapre la ricezione, e lo dice prima di salvare. */
+  deadlineReopensHelper: "La posizione tornerà ad accettare candidature.",
+  /** §37: l'errore nomina ciò che non è stato caricato. */
+  closedListError: "Non siamo riusciti a caricare le posizioni chiuse.",
 } as const;
+
+/**
+ * Il messaggio d'errore della lista, per gruppo (DAS-REV-18 §37).
+ *
+ * «Errore lista: "Non siamo riusciti a caricare le posizioni chiuse."» Le
+ * altre due tab conservano la frase generica già approvata in DAS-REV-15:
+ * cambiarle tutte e tre non era richiesto, e §2 vieta di «riprogettare le
+ * altre schermate per uniformarli arbitrariamente».
+ */
+export function listErrorCopy(group: PositionGroup): string {
+  return group === "closed"
+    ? POSITIONS_COPY.closedListError
+    : POSITIONS_COPY.listError;
+}
+
+/**
+ * Le label italiane dei quattro motivi canonici (§20).
+ *
+ * La mappa è esaustiva sul tipo: un quinto valore del dominio non
+ * compilerebbe, invece di comparire come stringa vuota in produzione.
+ */
+export const CLOSE_REASON_LABELS: Record<PositionCloseReason, string> = {
+  cancelled: "Posizione annullata",
+  filled: "Profilo trovato",
+  no_longer_needed: "Ricerca non più necessaria",
+  other: "Altro",
+};
+
+/**
+ * L'ordine del selector (§20, screen 08), che non è quello alfabetico né
+ * quello dell'enum: «Profilo trovato» per primo perché è l'esito più
+ * frequente, «Altro» per ultimo perché è il ripiego.
+ */
+export const CLOSE_REASON_ORDER: readonly PositionCloseReason[] = [
+  "filled",
+  "no_longer_needed",
+  "cancelled",
+  "other",
+];
+
+/**
+ * Il limite del testo «Altro», condiviso con il backend (§20).
+ *
+ * «Usa il limite centrale dei motivi brevi; se non esiste, introdurre un
+ * unico limite configurabile di 300 caratteri, condiviso da UI e backend.»
+ * Il gemello SQL è il CHECK `recruiting_ad_closures_text_length` e
+ * `position_close_reason_max_length()`: i tre valori vanno tenuti allineati
+ * a mano, perché un CHECK non può chiamare una funzione.
+ */
+export const CLOSE_REASON_TEXT_MAX = 300;
 
 export const POSITION_TABS: readonly { label: string; value: PositionGroup }[] =
   [
@@ -171,6 +240,62 @@ export function formatClosedLabel(closedAt: string | null): string {
   }
 
   return `Chiusa ${articledDay(parts.day)} ${month} ${parts.year}`;
+}
+
+/**
+ * «30 settembre 2026» da un giorno civile `YYYY-MM-DD` (DAS-REV-18 §7).
+ *
+ * L'ingresso è **già** il giorno nel fuso della società, calcolato dal
+ * server: qui non si costruisce nessun `Date` e non si converte niente, per
+ * non reintrodurre lo spostamento di un giorno che §8 vuole evitare. Una
+ * stringa malformata torna `null`, e il chiamante omette il campo invece di
+ * mostrare `2026-09-30`.
+ */
+export function formatCivilDateLabel(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+  if (!match) {
+    return null;
+  }
+
+  const month = ITALIAN_MONTHS[Number(match[2]) - 1];
+
+  return month ? `${Number(match[3])} ${month} ${match[1]}` : null;
+}
+
+/**
+ * «Scadenza superata il 23 settembre 2026» (§14).
+ *
+ * La data è il **giorno finale scelto**, non l'istante del cutoff: lo stato
+ * «superata» comincia il giorno dopo, ma la frase nomina il termine, che è
+ * l'informazione con cui il gestore ragiona.
+ */
+export function formatDeadlinePassedLabel(
+  deadlineDate: string | null,
+): string | null {
+  const label = formatCivilDateLabel(deadlineDate);
+
+  if (!label) {
+    return null;
+  }
+
+  /* `articledDay` perché l'elisione vale anche qui: «superata l'8 settembre»,
+     non «superata il 8 settembre». La label porta già il giorno in testa, da
+     cui lo `slice` del numero invece di riformattarlo. */
+  const [day, ...rest] = label.split(" ");
+
+  return `Scadenza superata ${articledDay(Number(day))} ${rest.join(" ")}`;
+}
+
+/** La label italiana del motivo, o `null` per ometterlo del tutto (§21). */
+export function closeReasonLabel(
+  reason: PositionCloseReason | null,
+): string | null {
+  return reason ? CLOSE_REASON_LABELS[reason] : null;
 }
 
 /**
@@ -447,6 +572,16 @@ export function rowAccessibilityLabel(input: {
 
   if (input.meta) {
     parts.push(input.meta);
+  }
+
+  /* DAS-REV-18 §41: lo stato e il motivo vanno annunciati testualmente, non
+     lasciati al solo ordine visivo delle righe. */
+  if (input.group === "closed") {
+    const reason = closeReasonLabel(input.row.closeReason);
+
+    if (reason) {
+      parts.push(reason);
+    }
   }
 
   if (input.row.teamIsInactive && input.group !== "active") {

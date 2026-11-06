@@ -50,6 +50,7 @@ import {
   POSITIONS_COPY,
   POSITION_TABS,
   emptyCopy,
+  listErrorCopy,
   filterIsAuthorized,
   sameFilter,
 } from "./positions-presentation";
@@ -496,7 +497,7 @@ export function PositionsCenterScreen() {
           trackPositionsEvent("positions_center_retry", { tab: group });
           void refresh();
         }}
-        title={POSITIONS_COPY.listError}
+        title={listErrorCopy(group)}
       />,
     );
   }
@@ -592,7 +593,7 @@ export function PositionsCenterScreen() {
         <View style={styles.listError}>
           <DashboardModuleError
             isRetrying={listQuery.isRefetching}
-            message={POSITIONS_COPY.listError}
+            message={listErrorCopy(group)}
             onRetry={() => {
               trackPositionsEvent("positions_center_retry", { tab: group });
               void listQuery.refetch();

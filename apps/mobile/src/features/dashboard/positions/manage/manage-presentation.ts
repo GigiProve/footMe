@@ -29,6 +29,8 @@ import type {
   PositionCatalogs,
   PositionReadiness,
 } from "../compose/compose-types";
+import { closeReasonLabel } from "../positions-presentation";
+import type { PositionCloseReason } from "../positions-types";
 import { DETAILS_SECTION_ANCHOR } from "./manage-routes";
 import type { PositionManageDetail, PositionMissingItem } from "./manage-types";
 
@@ -97,6 +99,31 @@ export const MANAGE_COPY = {
     "La squadra selezionata non è più disponibile. Controlla la posizione.",
   versionConflict:
     "La posizione è stata aggiornata. Controlla la versione più recente prima di salvare.",
+
+  // ── DAS-REV-18 ──────────────────────────────────────────────────────────
+  /** §12, §18: l'unica azione distruttiva, sotto «Modifica posizione». */
+  closeAction: "Chiudi posizione",
+  closeFailed: "Non è stato possibile chiudere la posizione. Riprova.",
+  closeSuccess: "Posizione chiusa",
+  /** §38, riga «CLOSED mentre si modifica». */
+  closedConflict:
+    "La posizione è stata chiusa e non può più essere modificata.",
+  /** §12: il comando dedicato alla configurazione della pubblicazione. */
+  deadlineEditAction: "Modifica scadenza",
+  deadlineRemoved: "Scadenza rimossa",
+  deadlineSaveFailed:
+    "Non è stato possibile aggiornare la scadenza. Riprova.",
+  deadlineUpdated: "Scadenza aggiornata",
+  /** §28: le tre sole voci della Cronologia dello storico. */
+  historyClosed: "Chiusa il",
+  historyInternal: "Visibile solo alla società",
+  historyPublished: "Pubblicata il",
+  historyReason: "Motivo di chiusura",
+  historyTitle: "Cronologia",
+  /** §28: la sezione delle candidature nello storico. */
+  receivedApplications: "Candidature ricevute",
+  receivedNone: "Nessuna candidatura ricevuta",
+  viewApplications: "Vedi candidature",
 } as const;
 
 /**
@@ -278,7 +305,11 @@ const BLOCKER_HINTS: Partial<Record<PositionBlocker, string>> = {
   /* §10 cita questa frase per lettera, nel caso Attaccante dello screen 06. */
   AGE_UNSET: MANAGE_COPY.ageUnset,
   CUSTOM_ROLE_MISSING: COMPOSE_COPY.roleCustomRequired,
-  DEADLINE_PASSED: "La scadenza è già passata. Scegli una nuova data o rimuovila.",
+  /* DAS-REV-18 §10 cita questa frase per lettera per la bozza con termine
+     ormai trascorso. Non è «Candidature chiuse»: una bozza non ha mai
+     ricevuto candidature, e il problema è risolvibile prima di pubblicare. */
+  DEADLINE_PASSED:
+    "La scadenza impostata è trascorsa. Scegli una nuova data o rimuovila prima di pubblicare.",
   ROLE_MISSING: COMPOSE_COPY.roleRequired,
   SCOPE_CONFLICT: COMPOSE_COPY.scopeRequired,
   SCOPE_NOT_ALLOWED: COMPOSE_COPY.scopeRequired,
@@ -396,11 +427,20 @@ export function lockedInfoBody(detail: {
  * quando non sono ancora arrivati: §18 vieta di «sostituire un count
  * sconosciuto con zero», e una riga assente è diversa da una riga a zero.
  */
-export function applicationsLine(detail: {
-  applicationsNew: number | null;
-  applicationsTotal: number | null;
-  countsAvailable: boolean;
-}): string | null {
+export function applicationsLine(
+  detail: {
+    applicationsNew: number | null;
+    applicationsTotal: number | null;
+    countsAvailable: boolean;
+  },
+  /**
+   * DAS-REV-18 §26: nello storico il totale sì, le «nuove» no — «Nelle
+   * Chiuse non enfatizzare nuove candidature, urgenze o countdown». Una
+   * candidatura non letta su una ricerca conclusa non è un richiamo
+   * operativo, e il conteggio resta comunque leggibile.
+   */
+  options: { emphasiseNew?: boolean } = {},
+): string | null {
   if (!detail.countsAvailable || detail.applicationsTotal === null) {
     return null;
   }
@@ -408,7 +448,7 @@ export function applicationsLine(detail: {
   const total = detail.applicationsTotal;
   const head = total === 1 ? "1 candidatura" : `${total} candidature`;
 
-  if (!detail.applicationsNew) {
+  if (!detail.applicationsNew || options.emphasiseNew === false) {
     return head;
   }
 
@@ -417,6 +457,114 @@ export function applicationsLine(detail: {
 
 /** Le sezioni leggibili del dettaglio (§7, §18). */
 export type ManageSection = { key: string; label: string; value: string };
+
+/** Una riga della Cronologia (DAS-REV-18 §28). */
+export type HistoryRow = {
+  /** «Visibile solo alla società», sotto il motivo. */
+  helper?: string;
+  key: string;
+  label: string;
+  value: string;
+};
+
+/**
+ * La Cronologia dello storico (DAS-REV-18 §28; screen 10).
+ *
+ * «La sezione Cronologia contiene **soltanto**: Pubblicata il, Chiusa il,
+ * Motivo di chiusura … helper Visibile solo alla società.» Non è una
+ * timeline di modifiche, non è una storia versioni, non è un pannello di
+ * audit — §28 li esclude tutti e tre, e la funzione non ha modo di
+ * produrli perché non ne riceve i dati.
+ *
+ * Un timestamp mancante viene **omesso**, non inventato: §28 — «Se manca un
+ * timestamp legacy, ometti il valore sconosciuto … non ricavarlo
+ * arbitrariamente da altri eventi.» Una chiusura importata senza data (il
+ * backfill di DAS-REV-15 ne ha lasciate) mostra quindi la sola riga di
+ * pubblicazione, non la data di oggi.
+ *
+ * Il motivo compare solo se esiste: §21 — «Motivo nullo non produce una
+ * label "Nessun motivo" nell'interfaccia storica: ometti il campo.»
+ */
+export function historyRows(detail: {
+  closeReason: PositionCloseReason | null;
+  closeReasonText: string | null;
+  closedAt: string | null;
+  lifecycle: PositionManageDetail["lifecycle"];
+  publishedAt: string | null;
+}): HistoryRow[] {
+  if (detail.lifecycle !== "closed") {
+    return [];
+  }
+
+  const rows: HistoryRow[] = [];
+  const published = formatHistoryDate(detail.publishedAt);
+  const closed = formatHistoryDate(detail.closedAt);
+
+  if (published) {
+    rows.push({
+      key: "published",
+      label: MANAGE_COPY.historyPublished,
+      value: published,
+    });
+  }
+
+  if (closed) {
+    rows.push({
+      key: "closed",
+      label: MANAGE_COPY.historyClosed,
+      value: closed,
+    });
+  }
+
+  const reason = closeReasonLabel(detail.closeReason);
+
+  if (reason) {
+    rows.push({
+      helper: MANAGE_COPY.historyInternal,
+      key: "reason",
+      label: MANAGE_COPY.historyReason,
+      /* Il dettaglio di «Altro» sta qui, nel dettaglio, e non in lista:
+         §26 — «Il testo Altro esteso resta nel dettaglio.» */
+      value: detail.closeReasonText
+        ? `${reason} · ${detail.closeReasonText}`
+        : reason,
+    });
+  }
+
+  return rows;
+}
+
+/** «1 settembre 2026». Lo storico porta sempre l'anno (§28). */
+function formatHistoryDate(iso: string | null): string | null {
+  if (!iso) {
+    return null;
+  }
+
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const month = ITALIAN_HISTORY_MONTHS[date.getMonth()];
+
+  return month ? `${date.getDate()} ${month} ${date.getFullYear()}` : null;
+}
+
+const ITALIAN_HISTORY_MONTHS = [
+  "gennaio",
+  "febbraio",
+  "marzo",
+  "aprile",
+  "maggio",
+  "giugno",
+  "luglio",
+  "agosto",
+  "settembre",
+  "ottobre",
+  "novembre",
+  "dicembre",
+] as const;
 
 /**
  * Le sezioni compilate, nell'ordine dello schema del profilo.

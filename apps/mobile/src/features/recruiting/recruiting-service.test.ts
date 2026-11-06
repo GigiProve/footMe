@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => {
   const recruitingAdMaybeSingleMock = vi.fn();
   const profileMaybeSingleMock = vi.fn();
   const notificationsInsertMock = vi.fn();
+  const rpcMock = vi.fn();
 
   const deleteChain = {
     eq: deleteFinalEqMock,
@@ -26,6 +27,7 @@ const mocks = vi.hoisted(() => {
   return {
     clubMaybeSingleMock,
     deleteChain,
+    rpcMock,
     deleteFinalEqMock,
     deleteFirstEqMock,
     fromMock: vi.fn((table: string) => {
@@ -108,6 +110,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("../../lib/supabase", () => ({
   supabase: {
     from: mocks.fromMock,
+    rpc: mocks.rpcMock,
   },
 }));
 
@@ -125,6 +128,11 @@ describe("recruiting-service", () => {
     mocks.playerProfileMaybeSingleMock.mockReset();
     mocks.playerProfileMaybeSingleMock.mockResolvedValue({
       data: { profile_id: "player-1" },
+      error: null,
+    });
+    mocks.rpcMock.mockReset();
+    mocks.rpcMock.mockResolvedValue({
+      data: [{ application_id: "app-1", replayed: false, status: "submitted" }],
       error: null,
     });
     mocks.recruitingApplicationInsertMock.mockReset();
@@ -184,31 +192,71 @@ describe("recruiting-service", () => {
     );
   });
 
-  it("rejects applications for profiles without a completed player profile", async () => {
-    mocks.playerProfileMaybeSingleMock.mockResolvedValueOnce({
+  /**
+   * DAS-REV-18 §17: la candidatura passa dalla RPC transazionale, non da un
+   * insert diretto. L'eligibility, il lifecycle e il cutoff li decide il
+   * server **sotto lock**, non il client prima di scrivere: qui si verifica
+   * che il client non riprenda a decidere per conto suo.
+   */
+  it("non precalcola l'eligibility: la decide il server", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
       data: null,
-      error: null,
+      error: { message: "PostgREST: POSITION_APPLICANT_NOT_ELIGIBLE" },
     });
 
     await expect(
       applyToRecruitingAd("profile-4", "ad-8", "Disponibile subito"),
     ).rejects.toThrow(
-      "La candidatura e' disponibile solo per profili giocatore completati.",
+      "La candidatura è disponibile solo per profili calciatore completati.",
     );
 
     expect(mocks.recruitingApplicationInsertMock).not.toHaveBeenCalled();
   });
 
-  it("inserts a recruiting application with a trimmed optional cover message", async () => {
+  it("traduce i motivi di dominio in frasi distinte", async () => {
+    /* §32: una ricerca chiusa e un termine scaduto non sono la stessa cosa
+       per chi legge, e il server li distingue proprio per questo. */
+    for (const [code, message] of [
+      ["POSITION_CLOSED", "Questa posizione non accetta più candidature."],
+      ["POSITION_DEADLINE_PASSED", "Il termine per candidarsi è scaduto."],
+    ] as const) {
+      mocks.rpcMock.mockResolvedValueOnce({
+        data: null,
+        error: { message: `PostgREST: ${code}` },
+      });
+
+      await expect(
+        applyToRecruitingAd("profile-4", "ad-8", ""),
+      ).rejects.toThrow(message);
+    }
+  });
+
+  it("invia la candidatura con il messaggio ripulito", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [{ application_id: "app-1", replayed: false, status: "submitted" }],
+      error: null,
+    });
+
     await applyToRecruitingAd("profile-5", "ad-9", "  Pronto a mettermi in gioco ");
 
-    expect(mocks.recruitingApplicationInsertMock).toHaveBeenCalledWith({
-      ad_id: "ad-9",
-      applicant_profile_id: "profile-5",
-      cover_message: "Pronto a mettermi in gioco",
-      player_profile_id: "profile-5",
-      status: "submitted",
+    expect(mocks.rpcMock).toHaveBeenCalledWith("apply_to_position", {
+      p_ad_id: "ad-9",
+      p_cover_message: "Pronto a mettermi in gioco",
     });
+    expect(mocks.recruitingApplicationInsertMock).not.toHaveBeenCalled();
+  });
+
+  it("un replay non produce una seconda notifica al club", async () => {
+    /* §17: «Retry idempotente di un invio già committato restituisce
+       l'esito originale.» Un esito recuperato non è un nuovo invio. */
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [{ application_id: "app-1", replayed: true, status: "submitted" }],
+      error: null,
+    });
+
+    await applyToRecruitingAd("profile-5", "ad-9", "Pronto");
+
+    expect(mocks.notificationsInsertMock).not.toHaveBeenCalled();
   });
 
   it("notifies the club owner when a new application is submitted", async () => {

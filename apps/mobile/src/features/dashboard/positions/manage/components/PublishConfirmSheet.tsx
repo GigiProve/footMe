@@ -24,6 +24,15 @@ import { MANAGE_COPY } from "../manage-presentation";
 type Props = {
   /** «Primavera · Settore giovanile» oppure «Intera società». */
   context: string;
+  /**
+   * Il controllo della scadenza (DAS-REV-18 §10).
+   *
+   * Arriva come nodo e non come valore + callback: lo sheet non deve
+   * conoscere versione, giorno civile né comando: §10 chiede «lo stesso
+   * controllo», e lo stesso controllo è `DeadlineControl`, che il chiamante
+   * monta già altrove con la sua mutation.
+   */
+  deadline?: React.ReactNode;
   onCancel: () => void;
   onPreview: () => void;
   onPublish: () => void;
@@ -35,6 +44,7 @@ type Props = {
 
 export function PublishConfirmSheet({
   context,
+  deadline,
   onCancel,
   onPreview,
   onPublish,
@@ -62,6 +72,11 @@ export function PublishConfirmSheet({
         <AppText color="neutralMuted" variant="bodySm">
           {MANAGE_COPY.publishConsequence}
         </AppText>
+
+        {/* DAS-REV-18 §10: la scadenza si configura anche da qui, senza
+            riaprire il wizard. Resta una configurazione, non uno step:
+            confermarla «non aggiunge una seconda conferma di publish». */}
+        {deadline}
 
         {/* §15: «Vedi anteprima annuncio» è una scelta facoltativa, non uno
             step. Testo premuto, non una seconda primaria. */}

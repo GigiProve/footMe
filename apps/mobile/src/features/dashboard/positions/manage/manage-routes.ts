@@ -52,6 +52,14 @@ export const MANAGE_HREFS = {
   /** Anteprima pubblica della versione candidata alla pubblicazione (§15). */
   preview: (positionId: string) =>
     `${FOCUSED}/${encodeURIComponent(positionId)}/preview`,
+  /**
+   * Scelta del motivo di chiusura (DAS-REV-18 §20, screen 08).
+   *
+   * È una subview dello sheet di conferma, non un passo autonomo: ci si
+   * arriva solo da lì e si torna lì, con lo stato dello sheet intatto.
+   */
+  closeReason: (positionId: string) =>
+    `${FOCUSED}/${encodeURIComponent(positionId)}/close-reason`,
 } as const;
 
 /** L'ancora convenzionale della sezione «Dettagli dell'annuncio» (§6). */

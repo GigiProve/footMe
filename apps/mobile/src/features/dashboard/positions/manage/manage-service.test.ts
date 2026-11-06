@@ -20,10 +20,11 @@ vi.mock("../../../../lib/supabase", () => ({
   supabase: { rpc: (...args: unknown[]) => rpc(...args) },
 }));
 
-const { fetchPositionManageDetail, updatePublishedPosition } = await import(
-  "./manage-service"
+const { closePosition, fetchPositionManageDetail, updatePublishedPosition } =
+  await import("./manage-service");
+const { setPositionDeadline, toComposeError } = await import(
+  "../compose/compose-service"
 );
-const { toComposeError } = await import("../compose/compose-service");
 
 beforeEach(() => {
   rpc.mockReset();
@@ -199,5 +200,206 @@ describe("modifica della posizione attiva (§21)", () => {
         positionId: "pos-c",
       }),
     ).rejects.toMatchObject({ code: "POSITION_VERSION_CONFLICT" });
+  });
+});
+
+/**
+ * Il comando di chiusura (DAS-REV-18 §22).
+ *
+ * Due rischi di trasporto che non si vedono a schermo: una data di chiusura
+ * costruita dal client invece che letta dal server, e un motivo che sopravvive
+ * al viaggio in una forma che il server non riconosce.
+ */
+describe("closePosition", () => {
+  it("manda ID, versione, motivo e chiave idempotente, e nient'altro", async () => {
+    rpc.mockReturnValueOnce(
+      ok([
+        {
+          close_reason: "filled",
+          close_reason_text: null,
+          closed_at: "2026-09-24T10:00:00Z",
+          position_id: "pos-c",
+          resource_version: 8,
+          status: "closed",
+        },
+      ]),
+    );
+
+    const result = await closePosition({
+      expectedVersion: 7,
+      operationKey: "nonce:close:pos-c:7",
+      positionId: "pos-c",
+      reason: "filled",
+      reasonText: null,
+    });
+
+    expect(rpc).toHaveBeenCalledWith("close_position", {
+      p_ad_id: "pos-c",
+      p_expected_version: 7,
+      p_operation_key: "nonce:close:pos-c:7",
+      p_reason: "filled",
+      p_reason_text: null,
+    });
+
+    /* §35: «Le date di chiusura e di prima pubblicazione sono server-owned.»
+       Il mapper le trasporta, non le calcola. */
+    expect(result).toEqual({
+      closeReason: "filled",
+      closeReasonText: null,
+      closedAt: "2026-09-24T10:00:00Z",
+      lifecycle: "closed",
+      positionId: "pos-c",
+      resourceVersion: 8,
+    });
+  });
+
+  it("non inventa una data di chiusura quando il server non la manda", async () => {
+    rpc.mockReturnValueOnce(
+      ok([
+        {
+          closed_at: null,
+          position_id: "pos-c",
+          resource_version: 8,
+          status: "closed",
+        },
+      ]),
+    );
+
+    const result = await closePosition({
+      expectedVersion: 7,
+      operationKey: "nonce:close:pos-c:7",
+      positionId: "pos-c",
+      reason: null,
+      reasonText: null,
+    });
+
+    expect(result.closedAt).toBeNull();
+    expect(result.closeReason).toBeNull();
+  });
+
+  it("scarta un motivo fuori dai quattro canonici", async () => {
+    /* §26: un codice sconosciuto si omette. Mostrarlo come stringa grezza
+       nello storico sarebbe peggio di non mostrarlo. */
+    rpc.mockReturnValueOnce(
+      ok([
+        {
+          close_reason: "merged_with_other_team",
+          position_id: "pos-c",
+          resource_version: 8,
+          status: "closed",
+        },
+      ]),
+    );
+
+    const result = await closePosition({
+      expectedVersion: 7,
+      operationKey: "nonce:close:pos-c:7",
+      positionId: "pos-c",
+      reason: null,
+      reasonText: null,
+    });
+
+    expect(result.closeReason).toBeNull();
+  });
+
+  it("classifica i codici d'errore della chiusura", async () => {
+    for (const code of [
+      "POSITION_LIFECYCLE_CONFLICT",
+      "POSITION_VERSION_CONFLICT",
+      "POSITION_CLOSE_REASON_TEXT_TOO_LONG",
+      "POSITION_OPERATION_CONFLICT",
+    ] as const) {
+      rpc.mockReturnValueOnce(fail(`PostgREST: ${code}`));
+
+      const error = await closePosition({
+        expectedVersion: 7,
+        operationKey: "nonce:close:pos-c:7",
+        positionId: "pos-c",
+        reason: null,
+        reasonText: null,
+      }).catch((caught: unknown) => caught);
+
+      expect(toComposeError(error).code).toBe(code);
+    }
+  });
+});
+
+/**
+ * La scadenza su una Position attiva (§13).
+ *
+ * `set_position_deadline` è **lo stesso** comando della bozza: §3 vieta una
+ * seconda implementazione, e il test fissa il contratto che le due superfici
+ * condividono.
+ */
+describe("setPositionDeadline", () => {
+  it("riporta il giorno civile del server, non un istante da riconvertire", async () => {
+    rpc.mockReturnValueOnce(
+      ok([
+        {
+          deadline_at: "2026-10-15T22:00:00.000Z",
+          deadline_date: "2026-10-15",
+          deadline_timezone: "Europe/Rome",
+          position_id: "pos-c",
+          receiving_closed: false,
+          resource_version: 9,
+          server_now: "2026-09-24T08:00:00Z",
+          status: "published",
+        },
+      ]),
+    );
+
+    const result = await setPositionDeadline({
+      deadlineDate: "2026-10-15",
+      expectedVersion: 8,
+      positionId: "pos-c",
+    });
+
+    expect(rpc).toHaveBeenCalledWith("set_position_deadline", {
+      p_ad_id: "pos-c",
+      p_deadline_date: "2026-10-15",
+      p_expected_version: 8,
+    });
+
+    /* §8: il cutoff memorizzato è l'inizio del giorno **successivo**. Il
+       client non lo riconverte mai: usa `deadline_date`. */
+    expect(result.deadlineDate).toBe("2026-10-15");
+    expect(result.receivingClosed).toBe(false);
+    expect(result.resourceVersion).toBe(9);
+  });
+
+  it("manda null per «Nessuna scadenza», mai una data sentinella", async () => {
+    rpc.mockReturnValueOnce(
+      ok([
+        {
+          deadline_at: null,
+          deadline_date: null,
+          deadline_timezone: null,
+          position_id: "pos-c",
+          receiving_closed: false,
+          resource_version: 10,
+          status: "published",
+        },
+      ]),
+    );
+
+    await setPositionDeadline({
+      deadlineDate: null,
+      expectedVersion: 9,
+      positionId: "pos-c",
+    });
+
+    expect(rpc.mock.calls.at(-1)?.[1]).toMatchObject({ p_deadline_date: null });
+  });
+
+  it("distingue una data trascorsa da un conflitto di versione", async () => {
+    rpc.mockReturnValueOnce(fail("PostgREST: POSITION_DEADLINE_PAST"));
+
+    const error = await setPositionDeadline({
+      deadlineDate: "2020-01-01",
+      expectedVersion: 8,
+      positionId: "pos-c",
+    }).catch((caught: unknown) => caught);
+
+    expect(toComposeError(error).code).toBe("POSITION_DEADLINE_PAST");
   });
 });

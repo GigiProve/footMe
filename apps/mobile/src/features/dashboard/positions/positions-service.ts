@@ -15,6 +15,7 @@ import { supabase } from "../../../lib/supabase";
 import { DashboardTimeoutError } from "../state/error-classification";
 import { MODULE_TIMEOUT_MS, withTimeout } from "../state/retry-policy";
 import type {
+  PositionCloseReason,
   PositionFilter,
   PositionFilterOption,
   PositionGroup,
@@ -198,6 +199,24 @@ export async function fetchPositionFilterOptions(input: {
 
 // ── Pagina ──────────────────────────────────────────────────────────────────
 
+/**
+ * Il motivo di chiusura, solo se è uno dei quattro canonici (§20).
+ *
+ * Un valore sconosciuto diventa `null` e la riga omette il campo: §26 vieta
+ * una label «Non specificato», e mostrare un codice interno sarebbe peggio
+ * che non mostrare niente.
+ */
+function closeReason(value: unknown): PositionCloseReason | null {
+  const raw = text(value);
+
+  return raw === "filled" ||
+    raw === "no_longer_needed" ||
+    raw === "cancelled" ||
+    raw === "other"
+    ? raw
+    : null;
+}
+
 function mapRow(row: RawRecord): PositionRow | null {
   const id = text(row.position_id);
 
@@ -208,6 +227,7 @@ function mapRow(row: RawRecord): PositionRow | null {
   return {
     applicationsNew: count(row.applications_new),
     applicationsTotal: count(row.applications_total),
+    closeReason: closeReason(row.close_reason),
     closedAt: text(row.closed_at),
     contextLabel: text(row.context_label),
     countsAvailable: bool(row.counts_available),

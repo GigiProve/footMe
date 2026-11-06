@@ -58,11 +58,26 @@ export type ComposeErrorCode =
   | "POSITION_TEAM_NOT_ELIGIBLE"
   | "POSITION_TEAM_REQUIRED"
   | "POSITION_VERSION_CONFLICT"
+  /* DAS-REV-18 §38: la data scelta è trascorsa al momento del salvataggio.
+     Distinto da `DEADLINE_PASSED`, che è un blocker di pubblicabilità. */
+  | "POSITION_DEADLINE_PAST"
+  /** DAS-REV-18 §20: motivo fuori dai quattro canonici. */
+  | "POSITION_CLOSE_REASON_INVALID"
+  /** DAS-REV-18 §20: testo libero inviato senza il motivo «Altro». */
+  | "POSITION_CLOSE_REASON_TEXT_NOT_ALLOWED"
+  | "POSITION_CLOSE_REASON_TEXT_TOO_LONG"
+  /** DAS-REV-18 §25: scrittura diretta tentata su una Position chiusa. */
+  | "POSITION_CLOSED_IMMUTABLE"
   | "UNKNOWN";
 
 const ERROR_CODES: readonly ComposeErrorCode[] = [
   /* Ordine rilevante: i codici più specifici precedono i prefissi di cui
      sono estensione, perché il match è per sottostringa. */
+  "POSITION_CLOSE_REASON_TEXT_NOT_ALLOWED",
+  "POSITION_CLOSE_REASON_TEXT_TOO_LONG",
+  "POSITION_CLOSE_REASON_INVALID",
+  "POSITION_CLOSED_IMMUTABLE",
+  "POSITION_DEADLINE_PAST",
   "POSITION_PUBLISH_NOT_AUTHORIZED",
   "POSITION_COMPOSER_NOT_AUTHORIZED",
   "POSITION_SECONDARY_TEAMS_NOT_ALLOWED",
@@ -478,12 +493,41 @@ export async function updatePositionDraft(input: {
   return { resourceVersion: int(row?.resource_version) ?? 1 };
 }
 
+/**
+ * L'esito autorevole di un salvataggio della scadenza (DAS-REV-18 §13).
+ *
+ * `deadlineDate` è il **giorno civile** così come il server lo riproietta
+ * dal cutoff: non si ricalcola dal client, perché il cutoff memorizzato è
+ * l'inizio del giorno **successivo** (§8) e formattarlo direttamente
+ * mostrerebbe la data sbagliata di un giorno.
+ */
+export type PositionDeadlineResult = {
+  deadlineAt: string | null;
+  deadlineDate: string | null;
+  deadlineTimezone: string | null;
+  lifecycle: string;
+  positionId: string;
+  /** Proiezione autorevole della ricezione, non una deduzione locale (§7). */
+  receivingClosed: boolean;
+  resourceVersion: number;
+  /** Orologio del server al momento del salvataggio (§7). */
+  serverNow: string | null;
+};
+
+/**
+ * Salva (o rimuove) la scadenza candidature di una Position.
+ *
+ * **Una sola funzione per bozza e pubblicata**, ed è voluto: DAS-REV-18 §3
+ * — «La proprietà del container non giustifica una seconda implementazione
+ * del comando.» Cambia la CTA («Conferma» sulla bozza, «Salva scadenza»
+ * sull'attiva) e cambia la copy che la accompagna, non il comando.
+ */
 export async function setPositionDeadline(input: {
   /** Data civile `YYYY-MM-DD`, o `null` per «Nessuna scadenza» (§23). */
   deadlineDate: string | null;
   expectedVersion: number | null;
   positionId: string;
-}): Promise<{ resourceVersion: number }> {
+}): Promise<PositionDeadlineResult> {
   const rows = await rpc<RawRecord[]>("set_position_deadline", {
     p_ad_id: input.positionId,
     p_deadline_date: input.deadlineDate,
@@ -492,7 +536,16 @@ export async function setPositionDeadline(input: {
 
   const row = Array.isArray(rows) ? rows[0] : null;
 
-  return { resourceVersion: int(row?.resource_version) ?? 1 };
+  return {
+    deadlineAt: text(row?.deadline_at),
+    deadlineDate: text(row?.deadline_date),
+    deadlineTimezone: text(row?.deadline_timezone),
+    lifecycle: text(row?.status) ?? "draft",
+    positionId: text(row?.position_id) ?? input.positionId,
+    receivingClosed: bool(row?.receiving_closed),
+    resourceVersion: int(row?.resource_version) ?? 1,
+    serverNow: text(row?.server_now),
+  };
 }
 
 export type PublishResult = { positionId: string; publishedAt: string | null };

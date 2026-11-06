@@ -17,7 +17,7 @@
  * lifecycle completo, conteggi Application autorizzati e scadenza.
  */
 import type { PositionDraft } from "../compose/compose-types";
-import type { PositionGroup } from "../positions-types";
+import type { PositionCloseReason, PositionGroup } from "../positions-types";
 
 /**
  * Il lifecycle reale del dominio, non le label italiane.
@@ -37,9 +37,18 @@ export type PositionManageDetail = PositionDraft & {
    */
   applicationsNew: number | null;
   applicationsTotal: number | null;
-  /** Chiusura: DAS-REV-18. Qui serve solo a non mostrare azioni assenti. */
   canClose: boolean;
   closedAt: string | null;
+  /**
+   * Motivo della chiusura, interno alla società (DAS-REV-18 §21).
+   *
+   * Arriva solo su questa lettura gestionale, mai nel renderer pubblico: il
+   * serializer del candidato non lo conosce affatto, perché vive in una
+   * tabella con RLS propria e non su `recruiting_ads`.
+   */
+  closeReason: PositionCloseReason | null;
+  /** Il dettaglio libero di «Altro», quando c'è. `null` altrimenti (§20). */
+  closeReasonText: string | null;
   countsAvailable: boolean;
   dataRevision: number;
   deadlineAt: string | null;

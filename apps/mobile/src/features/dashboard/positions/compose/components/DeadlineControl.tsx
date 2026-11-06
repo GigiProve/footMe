@@ -1,68 +1,76 @@
-import { useEffect, useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, sizes, spacing } from "../../../../../theme/tokens";
-import { AppText, BottomSheet, Button } from "../../../../../ui";
+import { AppText } from "../../../../../ui";
+import { PositionDeadlineSheet } from "../../components/PositionDeadlineSheet";
+import {
+  POSITIONS_COPY,
+  formatCivilDateLabel,
+} from "../../positions-presentation";
 
 type Props = {
   busy?: boolean;
   error?: string | null;
-  /** Giorno civile `YYYY-MM-DD` già nel fuso della Società, o `null`. */
-  onChange: (deadlineDate: string | null) => void;
+  /**
+   * Giorno civile `YYYY-MM-DD` già nel fuso della Società, o `null`.
+   *
+   * Può restituire una promessa: lo sheet si chiude **solo** quando quella
+   * si risolve. §9 — «in errore conserva la selezione e non mostrare la
+   * scelta come già salvata»: chiudere prima dell'esito farebbe esattamente
+   * il contrario, e costringerebbe a riscegliere la data.
+   */
+  onChange: (deadlineDate: string | null) => void | Promise<unknown>;
+  /** Nascosto su una riga di riepilogo: lo screen 01 lo mostra, §11 no. */
+  showHelper?: boolean;
+  testID?: string;
   value: string | null;
 };
 
 /**
- * Scadenza candidature, nella fase di pubblicazione (DAS-REV-16 §23,
- * master DAS-REV-18).
+ * Riga «Scadenza candidature» nella fase di pubblicazione (DAS-REV-18 §9;
+ * screen 01).
  *
- * «Nello step 3, dopo il contenuto della preview e prima delle CTA, mostra
- * il controllo owner Scadenza candidature · Nessuna scadenza. Il selector
- * condiviso offre soltanto Nessuna scadenza e Imposta una data.»
+ * «Inserisci Scadenza candidature nella fase 3 di 3 · Anteprima, dopo il
+ * contenuto di preview e prima delle azioni finali. È una configurazione
+ * owner della pubblicazione, visivamente separata dal renderer del
+ * candidato.»
  *
- * Il valore è un **giorno civile**, non un istante: il server lo trasforma
- * nell'ultimo istante di quel giorno nel fuso della Società. Per questo qui
- * non compare nessun `toISOString()`, che sposterebbe il giorno di chi vive
- * a ovest di Greenwich (§23).
+ * Il selector non vive qui: è `PositionDeadlineSheet`, lo stesso che la
+ * posizione attiva apre da «Modifica scadenza». §3 — «La proprietà del
+ * container non giustifica una seconda implementazione del comando.»
+ * Questo componente è solo la riga e il suo stato di apertura.
  *
- * Nessuna ora, nessun preset di durata, nessun «Applica a tutte»: §23 li
- * esclude, e §24 chiede che la modifica riguardi solo quell'ID.
+ * Confermare **non pubblica** (§9): `onChange` persiste sulla stessa bozza,
+ * e la pubblicazione resta la CTA del footer.
  */
-export function DeadlineControl({ busy = false, error, onChange, value }: Props) {
+export function DeadlineControl({
+  busy = false,
+  error,
+  onChange,
+  showHelper = true,
+  testID = "compose-deadline",
+  value,
+}: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [mode, setMode] = useState<"none" | "date">(value ? "date" : "none");
-  const [draftDate, setDraftDate] = useState<string | null>(value);
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  /* Riapertura: lo sheet riparte sempre dal valore confermato, mai da ciò
-     che era rimasto da un'apertura abbandonata. */
-  useEffect(() => {
-    if (sheetOpen) {
-      setMode(value ? "date" : "none");
-      setDraftDate(value);
-      setPickerOpen(false);
-    }
-  }, [sheetOpen, value]);
-
-  const summary = value ? formatCivilDate(value) : "Nessuna scadenza";
+  const summary = formatCivilDateLabel(value) ?? POSITIONS_COPY.deadlineNone;
 
   return (
     <View style={styles.block}>
       <Pressable
         accessibilityHint="Apre la scelta della scadenza"
-        accessibilityLabel={`Scadenza candidature: ${summary}`}
+        accessibilityLabel={`${POSITIONS_COPY.deadlineLabel}: ${summary}`}
         accessibilityRole="button"
         accessibilityState={{ busy }}
         disabled={busy}
         onPress={() => setSheetOpen(true)}
         style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
-        testID="compose-deadline"
+        testID={testID}
       >
         <View style={styles.rowText}>
           <AppText color="neutralMuted" variant="meta">
-            Scadenza candidature
+            {POSITIONS_COPY.deadlineLabel}
           </AppText>
 
           <AppText color="neutral" variant="bodyLg">
@@ -73,203 +81,60 @@ export function DeadlineControl({ busy = false, error, onChange, value }: Props)
         <Ionicons color={colors.textNeutralSoft} name="chevron-forward" size={18} />
       </Pressable>
 
-      {error ? (
+      {/* §9: «Puoi impostare un termine prima di pubblicare.» Una data
+          assente è valida, e la riga lo dice invece di sembrare un campo da
+          compilare. */}
+      {showHelper ? (
+        <AppText color="neutralMuted" variant="meta">
+          {POSITIONS_COPY.deadlineComposeHelper}
+        </AppText>
+      ) : null}
+
+      {/* L'errore compare sotto la riga solo quando lo sheet è chiuso: con
+          lo sheet aperto è lì che va letto, accanto alla scelta. */}
+      {error && !sheetOpen ? (
         <AppText accessibilityRole="alert" color="danger" variant="meta">
           {error}
         </AppText>
       ) : null}
 
-      <BottomSheet
+      <PositionDeadlineSheet
+        busy={busy}
+        error={error}
+        mode="draft"
         onClose={() => setSheetOpen(false)}
-        title="Scadenza candidature"
+        onConfirm={(deadlineDate) => {
+          const result = onChange(deadlineDate);
+
+          if (result instanceof Promise) {
+            result.then(
+              () => setSheetOpen(false),
+              /* Il messaggio arriva da `error`: qui basta non chiudere, e
+                 non lasciare una promessa rifiutata senza gestore. */
+              () => undefined,
+            );
+
+            return;
+          }
+
+          setSheetOpen(false);
+        }}
+        value={value}
         visible={sheetOpen}
-      >
-        <OptionRow
-          label="Nessuna scadenza"
-          onPress={() => {
-            setMode("none");
-            setDraftDate(null);
-            setPickerOpen(false);
-          }}
-          selected={mode === "none"}
-        />
-
-        <OptionRow
-          label="Imposta una data"
-          onPress={() => {
-            setMode("date");
-            setPickerOpen(true);
-          }}
-          selected={mode === "date"}
-        />
-
-        {mode === "date" ? (
-          <View style={styles.picker}>
-            {Platform.OS === "ios" ? (
-              <DateTimePicker
-                display="inline"
-                mode="date"
-                onChange={(_event, date) => {
-                  if (date) {
-                    setDraftDate(toCivilDate(date));
-                  }
-                }}
-                value={fromCivilDate(draftDate)}
-              />
-            ) : (
-              <>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setPickerOpen(true)}
-                  style={styles.androidDate}
-                >
-                  <AppText color="neutral" variant="bodyLg">
-                    {draftDate ? formatCivilDate(draftDate) : "Scegli una data"}
-                  </AppText>
-                </Pressable>
-
-                {pickerOpen ? (
-                  <DateTimePicker
-                    display="default"
-                    mode="date"
-                    onChange={(_event, date) => {
-                      setPickerOpen(false);
-
-                      if (date) {
-                        setDraftDate(toCivilDate(date));
-                      }
-                    }}
-                    value={fromCivilDate(draftDate)}
-                  />
-                ) : null}
-              </>
-            )}
-          </View>
-        ) : null}
-
-        <View style={styles.confirm}>
-          <Button
-            disabled={mode === "date" && !draftDate}
-            fullWidth
-            label="Conferma"
-            onPress={() => {
-              onChange(mode === "none" ? null : draftDate);
-              setSheetOpen(false);
-            }}
-            testID="compose-deadline-confirm"
-          />
-        </View>
-      </BottomSheet>
+      />
     </View>
   );
 }
 
-function OptionRow({
-  label,
-  onPress,
-  selected,
-}: {
-  label: string;
-  onPress: () => void;
-  selected: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.option, pressed ? styles.pressed : null]}
-    >
-      <AppText color="neutral" style={styles.optionLabel} variant="bodyLg">
-        {label}
-      </AppText>
-
-      <View style={[styles.radio, selected ? styles.radioOn : null]}>
-        {selected ? <View style={styles.dot} /> : null}
-      </View>
-    </Pressable>
-  );
-}
-
-/**
- * `Date` → `YYYY-MM-DD` nel fuso **locale**.
- *
- * `toISOString()` convertirebbe in UTC e, per chi sta a ovest di Greenwich,
- * restituirebbe il giorno precedente. §23 vieta esattamente questo: «senza
- * fuso orario implicito o conversione UTC che sposti il giorno».
- */
-function toCivilDate(date: Date): string {
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
-/** `new Date("YYYY-MM-DD")` sarebbe UTC: il costruttore a tre argomenti no. */
-function fromCivilDate(value: string | null): Date {
-  if (!value) {
-    return new Date();
-  }
-
-  const [year, month, day] = value.split("-").map(Number);
-
-  return new Date(year, (month ?? 1) - 1, day ?? 1);
-}
-
-function formatCivilDate(value: string): string {
-  const [year, month, day] = value.split("-");
-
-  return year && month && day ? `${day}/${month}/${year}` : value;
-}
-
 const styles = StyleSheet.create({
-  androidDate: {
-    justifyContent: "center",
-    minHeight: sizes.touchTarget,
-  },
   block: {
     borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
     gap: spacing[4],
     paddingTop: spacing[12],
   },
-  confirm: {
-    paddingTop: spacing[12],
-  },
-  dot: {
-    backgroundColor: colors.accent,
-    borderRadius: 999,
-    height: 10,
-    width: 10,
-  },
-  option: {
-    alignItems: "center",
-    borderBottomColor: colors.divider,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: spacing[12],
-    minHeight: sizes.touchTarget,
-  },
-  optionLabel: {
-    flex: 1,
-  },
-  picker: {
-    paddingTop: spacing[8],
-  },
   pressed: {
     opacity: 0.7,
-  },
-  radio: {
-    alignItems: "center",
-    borderColor: colors.border,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    height: 22,
-    justifyContent: "center",
-    width: 22,
-  },
-  radioOn: {
-    borderColor: colors.accent,
   },
   row: {
     alignItems: "center",

@@ -109,6 +109,39 @@ function partsInZone(
 }
 
 /**
+ * Il giorno civile di un cutoff, e se quel cutoff è un confine di giornata.
+ *
+ * DAS-REV-18 §8 ha reso il cutoff **esclusivo**: il valore memorizzato è
+ * l'inizio del giorno successivo a quello scelto. Formattarlo com'è
+ * mostrerebbe un giorno in più — «Candidature entro il 1 ottobre» per una
+ * scadenza del 30 settembre. L'adapter sottrae un millisecondo prima di
+ * leggere il giorno, esattamente come fa `position_deadline_date` lato SQL,
+ * e il risultato è corretto sia con la rappresentazione esclusiva sia con la
+ * vecchia (ultimo istante del giorno scelto).
+ *
+ * `isDayBoundary` distingue i due casi: a mezzanotte esatta il cutoff è il
+ * confine di una giornata intera e l'ora non aggiunge nulla da stampare; un
+ * cutoff a metà giornata resta un istante, e l'ora cambia la decisione di
+ * chi legge.
+ */
+function deadlineParts(
+  date: Date,
+  timeZone: string | null,
+): {
+  civil: ReturnType<typeof partsInZone>;
+  isDayBoundary: boolean;
+  raw: ReturnType<typeof partsInZone>;
+} {
+  const raw = partsInZone(date, timeZone);
+
+  return {
+    civil: partsInZone(new Date(date.getTime() - 1), timeZone),
+    isDayBoundary: raw.hour === 0 && raw.minute === 0,
+    raw,
+  };
+}
+
+/**
  * Etichetta della scadenza nella row di "Da gestire" (§14).
  *
  * «Utilizzare formattazione localizzata: Iscrizioni entro il 15 settembre.»
@@ -130,7 +163,11 @@ export function formatDeadlineRowLabel(
     return null;
   }
 
-  const { day, month } = partsInZone(date, options.timeZone ?? null);
+  const { civil, isDayBoundary, raw } = deadlineParts(
+    date,
+    options.timeZone ?? null,
+  );
+  const { day, month } = isDayBoundary ? civil : raw;
   const monthLabel = ITALIAN_MONTHS[month - 1];
 
   if (!monthLabel) {
@@ -164,7 +201,8 @@ export function formatDeadlineDetailLabel(
   }
 
   const timeZone = options.timeZone ?? null;
-  const { day, hour, minute, month, year } = partsInZone(date, timeZone);
+  const { civil, isDayBoundary, raw } = deadlineParts(date, timeZone);
+  const { day, hour, minute, month, year } = isDayBoundary ? civil : raw;
   const monthLabel = ITALIAN_MONTHS[month - 1];
 
   if (!monthLabel) {
@@ -178,7 +216,10 @@ export function formatDeadlineDetailLabel(
 
   const base = `${prefix} ${day} ${monthLabel} ${year}`;
 
-  if (hour === 0 && minute === 0) {
+  /* Confine di giornata: il giorno scelto è incluso per intero e non c'è
+     nessuna ora da stampare. L'ora resta solo per un cutoff che cade a metà
+     giornata, dove cambia davvero la decisione di chi legge. */
+  if (isDayBoundary || (hour === 0 && minute === 0)) {
     return base;
   }
 

@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -39,12 +39,14 @@ import { COMPOSE_HREFS } from "./compose-routes";
 import {
   fetchComposerContext,
   fetchPositionDrafts,
+  setPositionDeadline,
   toComposeError,
 } from "./compose-service";
 import type { PositionDraft } from "./compose-types";
 import { ComposerFooter } from "./components/ComposerFooter";
 import { ComposerNavBar } from "./components/ComposerNavBar";
 import { ComposerStepHeader } from "./components/ComposerStepHeader";
+import { DeadlineControl } from "./components/DeadlineControl";
 import { useComposeSession } from "./ComposeSessionProvider";
 import { usePublishPositions } from "./use-publish-positions";
 
@@ -55,6 +57,7 @@ export function PositionComposeBatchPreviewScreen() {
   const actorId = profile?.id ?? "";
   const { current } = useDashboardIdentity();
   const clubId = current?.kind === "society" ? current.id : null;
+  const queryClient = useQueryClient();
 
   const { createdIds, publishOperationKey, selectedIds, setSelectedIds, toggleSelected } =
     useComposeSession();
@@ -107,6 +110,40 @@ export function PositionComposeBatchPreviewScreen() {
     : draftsLoaded
       ? selectedIds.filter((id) => publishable.some((draft) => draft.id === id))
       : selectedIds;
+
+  /**
+   * La scadenza del riepilogo, una Position per volta (DAS-REV-18 §11).
+   *
+   * «Nel riepilogo dello step 3 ogni Position ha il proprio valore Scadenza
+   * candidature e il proprio accesso di modifica. Non inserire Applica a
+   * tutte, una scadenza batch, preset 7/14/30 giorni o una propagazione
+   * implicita.» Da qui un solo `deadlineTarget`: la mutation sa su quale ID
+   * sta scrivendo, e l'errore resta sulla riga che l'ha prodotto senza
+   * toccare le altre (§11 — «Modificare la deadline di un elemento non
+   * cambia valori o selezioni degli altri»).
+   */
+  const [deadlineTarget, setDeadlineTarget] = useState<string | null>(null);
+  const [deadlineError, setDeadlineError] = useState<string | null>(null);
+
+  const deadlineMutation = useMutation({
+    mutationFn: (input: {
+      deadlineDate: string | null;
+      draft: PositionDraft;
+    }) =>
+      setPositionDeadline({
+        deadlineDate: input.deadlineDate,
+        expectedVersion: input.draft.resourceVersion,
+        positionId: input.draft.id,
+      }),
+    onMutate: (input) => setDeadlineTarget(input.draft.id),
+    onError: (mutationError) =>
+      setDeadlineError(describeComposeError(toComposeError(mutationError))),
+    onSettled: () => setDeadlineTarget(null),
+    onSuccess: () => {
+      setDeadlineError(null);
+      queryClient.invalidateQueries({ queryKey: ["position-compose-drafts"] });
+    },
+  });
 
   /* La potatura va in un effetto e non nel corpo del render: scrivere lo
      stato durante il render di un componente che legge quello stesso valore
@@ -179,6 +216,8 @@ export function PositionComposeBatchPreviewScreen() {
 
         {drafts.map((draft) => (
           <BatchRow
+            deadlineBusy={deadlineTarget === draft.id}
+            deadlineError={deadlineTarget === draft.id ? deadlineError : null}
             draft={draft}
             isLocked={singleTarget !== null}
             key={draft.id}
@@ -187,6 +226,9 @@ export function PositionComposeBatchPreviewScreen() {
             }
             onComplete={() =>
               router.push(COMPOSE_HREFS.details(draft.id, { from: "hub" }) as never)
+            }
+            onDeadlineChange={(deadlineDate) =>
+              deadlineMutation.mutateAsync({ deadlineDate, draft })
             }
             onToggle={() => toggleSelected(draft.id)}
             selected={effectiveSelection.includes(draft.id)}
@@ -250,16 +292,22 @@ export function PositionComposeBatchPreviewScreen() {
  * procinto di essere pubblicata.
  */
 function BatchRow({
+  deadlineBusy,
+  deadlineError,
   draft,
   isLocked,
   onComplete,
+  onDeadlineChange,
   onOpenPreview,
   onToggle,
   selected,
 }: {
+  deadlineBusy: boolean;
+  deadlineError: string | null;
   draft: PositionDraft;
   isLocked: boolean;
   onComplete: () => void;
+  onDeadlineChange: (deadlineDate: string | null) => Promise<unknown>;
   onOpenPreview: () => void;
   onToggle: () => void;
   selected: boolean;
@@ -344,6 +392,21 @@ function BatchRow({
             </Pressable>
           </>
         )}
+
+        {/* DAS-REV-18 §11: la scadenza è **per Position**, anche nel batch.
+            Compare dove la configurazione ha senso — su una bozza che si sta
+            per pubblicare e che l'actor può modificare — e senza l'helper
+            della riga singola, che qui si ripeterebbe a ogni elemento. */}
+        {draft.canEdit ? (
+          <DeadlineControl
+            busy={deadlineBusy}
+            error={deadlineError}
+            onChange={onDeadlineChange}
+            showHelper={false}
+            testID={`compose-deadline-${draft.id}`}
+            value={draft.deadlineDate}
+          />
+        ) : null}
       </View>
     </View>
   );

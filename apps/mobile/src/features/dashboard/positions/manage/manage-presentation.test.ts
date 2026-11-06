@@ -51,6 +51,8 @@ function detail(
     canClose: false,
     canEdit: true,
     canPublish: true,
+    closeReason: null,
+    closeReasonText: null,
     closedAt: null,
     clubCity: "Como",
     clubId: "club-1",

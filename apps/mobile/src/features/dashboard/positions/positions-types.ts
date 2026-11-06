@@ -52,10 +52,30 @@ export type PositionFilterOption =
  * autorizzato **o** quando il valore non è ancora noto: `countsAvailable` li
  * distingue. §10: «Un valore nullo non significa zero.»
  */
+/**
+ * I quattro motivi canonici della chiusura (DAS-REV-18 §20).
+ *
+ * Sono gli enum del dominio, non le label italiane: `filled` resta `filled`
+ * anche quando la UI scrive «Profilo trovato». `null` significa «nessun
+ * motivo», e §21 chiede di **omettere** il campo in quel caso, non di
+ * scrivere «Non specificato».
+ */
+export type PositionCloseReason =
+  | "cancelled"
+  | "filled"
+  | "no_longer_needed"
+  | "other";
+
 export type PositionRow = {
   applicationsNew: number | null;
   applicationsTotal: number | null;
   closedAt: string | null;
+  /**
+   * Solo sulle Chiuse, e solo se l'actor ha perimetro gestionale (§21).
+   * Il testo esteso di «Altro» non arriva mai in lista: §26 lo lascia al
+   * dettaglio, perché una lista di paragrafi non è una lista.
+   */
+  closeReason: PositionCloseReason | null;
   /** Livello/competizione, o «Settore giovanile» quando è il solo noto. */
   contextLabel: string | null;
   countsAvailable: boolean;
