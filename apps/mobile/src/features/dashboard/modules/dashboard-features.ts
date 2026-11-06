@@ -66,13 +66,13 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
    */
   society_seasons: { available: true },
   /**
-   * DAS-REV-07 §14: il centro "Inviti e richieste" esiste
-   * (`app/club-admin/invites.tsx`) e il modulo ne mostra il riepilogo.
+   * DAS-REV-19: il centro "Inviti e richieste" esiste
+   * (`app/(tabs)/dashboard/invites`), con le due tab, il filtro
+   * multiselezione, il composer a tre passi, il dettaglio dell'invito
+   * inviato e l'annullamento del pending, su dati e permessi reali.
    *
-   * Resta `requiresOwner` nel registry, non bloccato qui: la funzione c'è,
-   * ma la sua route è ancora gated sul ruolo `club_admin`. Distinguere le due
-   * cose conta — "non esiste" e "esiste per il solo proprietario" non si
-   * risolvono con lo stesso lavoro.
+   * `requiresOwner` è caduto con la route legacy: il gate è ora sulle
+   * capability `invites_view` / `member_requests_view`.
    */
   society_invites: { available: true },
   /**

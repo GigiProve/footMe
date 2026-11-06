@@ -111,12 +111,12 @@ export function composeQuickActions(
 
   if (
     identity.capabilities.includes("invites_create") &&
-    identity.isOwner &&
     isFeatureAvailable("society_invites")
   ) {
-    // `isOwner`: il flusso Inviti canonico vive in /club-admin/invites, che
-    // redirige chi non ha `profile.role === 'club_admin'`. §11 vuole che
-    // l'azione apra il flusso reale, non che rimbalzi un membro autorizzato.
+    // DAS-REV-19: il gate su `isOwner` esisteva perché il flusso canonico
+    // viveva in /club-admin/invites, owner-gated per ruolo. Il composer
+    // ora è gated sulla sola capability, quindi la condizione che
+    // proteggeva da un rimbalzo non ha più niente da proteggere.
     actions.push("society_invite_person");
   }
 

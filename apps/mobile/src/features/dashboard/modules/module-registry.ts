@@ -192,15 +192,20 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
    * aperto.
    */
   society_invites: {
-    capabilitiesAll: ["invites_view"],
-    capabilitiesAny: [],
+    /**
+     * DAS-REV-19 §8: consultare gli inviti e consultare le richieste sono
+     * due facoltà distinte, e il Centro si apre con **una** delle due.
+     * `capabilitiesAll: ["invites_view"]` avrebbe nascosto il riepilogo a
+     * chi può leggere solo le richieste.
+     */
+    capabilitiesAll: [],
+    capabilitiesAny: ["invites_view", "member_requests_view"],
     countsAsContent: false,
     emptyPolicy: "hide",
     feature: "society_invites",
     id: "society_invites",
     kinds: ["society"],
     order: 30,
-    requiresOwner: true,
     schemaVersion: 1,
     title: "Inviti e richieste",
   },

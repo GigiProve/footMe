@@ -150,6 +150,15 @@ export function NotificationCenterScreen() {
       item.type === "application_status"
     ) {
       router.push("/(tabs)/announcements" as never);
+    } else if (item.type === "society_invitation_created") {
+      /* DAS-REV-19 §27: «La notifica apre lo stesso invitation_id. Il
+         backend valida l'accesso del destinatario anche quando il link
+         proviene da una notifica legittima.» La riga porta l'ID, non la
+         proposta: il contenuto viene riletto dalla destinazione. */
+      const inviteId = item.data?.invite_id;
+      if (inviteId) {
+        router.push(`/invitation/${inviteId}` as never);
+      }
     } else if (item.type === "new_follower") {
       const followerProfileId = item.data?.follower_profile_id;
       if (followerProfileId) {

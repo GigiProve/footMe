@@ -22,7 +22,7 @@ import { colors, sizes, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 import { useSession } from "../../auth/use-session";
 import { POSITIONS_HREFS } from "../../dashboard/positions/positions-routes";
-import { SOCIETY_HREFS } from "../../dashboard/society/society-presentation";
+import { INVITES_HREFS } from "../../dashboard/invites/invites-routes";
 import { ProfileEditFieldsSkeleton } from "../../profiles/edit/ProfileEditStates";
 import { SeasonsIdentityHeader } from "./components/SeasonsIdentityHeader";
 import { SeasonsScaffold } from "./components/SeasonsScaffold";
@@ -105,7 +105,11 @@ export function TeamDeactivationScreen({ teamId }: { teamId: string }) {
               group: "active",
               teamId,
             })
-          : SOCIETY_HREFS.invites;
+          : /* DAS-REV-19 §34: «Il Centro aperto da Gestisci inviti conserva il
+               filtro Team e permette le azioni autorizzate realmente
+               disponibili, incluso l'annullamento del pending.» Il Team
+               viaggia nel link per lo stesso motivo delle Posizioni. */
+            INVITES_HREFS.center({ from: "deactivation", teamId });
 
       router.push(href as Parameters<typeof router.push>[0]);
     },

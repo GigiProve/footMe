@@ -1595,7 +1595,8 @@ function buildQuickActions(
           icon: "person-add-outline" as const,
           id,
           label: "Invita persona",
-          onPress: () => go(id, SOCIETY_HREFS.invites),
+          // DAS-REV-19 §6: l'azione rapida apre il composer, non il Centro.
+          onPress: () => go(id, SOCIETY_HREFS.invitePerson),
         };
       case "society_new_article":
         return {

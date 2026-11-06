@@ -30,18 +30,27 @@ export const TEAM_DETAIL_HREFS = {
   /** Conversazione di gruppo nel dominio Messaggi. */
   group: (conversationId: string) =>
     `/messages/${encodeURIComponent(conversationId)}`,
-  /** Centro Inviti e richieste filtrato sulla squadra. */
-  invites: (teamId: string) =>
-    `/club-admin/invites?teamId=${encodeURIComponent(teamId)}`,
   /**
-   * Flusso Inviti condiviso con Team preimpostato (§12).
+   * Centro Inviti e richieste filtrato sulla squadra (DAS-REV-19 §6).
    *
-   * Apre la gestione dell'Organico e vi chiede di aprire il modulo di
-   * collegamento già posizionato sulla squadra. Non collega nessuno da solo:
-   * la scelta della persona e la conferma restano nel flusso proprietario.
+   * Non più `/club-admin/invites`: il Centro canonico è gated sulle
+   * capability e il filtro per squadra è quello reale del dominio, non un
+   * `filter()` sul client.
+   */
+  invites: (teamId: string) =>
+    `/(tabs)/dashboard/invites?from=team&teamId=${encodeURIComponent(teamId)}`,
+  /**
+   * Composer dell'invito con Team preimpostato (DAS-REV-19 §16).
+   *
+   * «Dal Dettaglio squadra preimposta il Team canonico quando il tipo di
+   * incarico selezionato lo consente; non sostituire la scelta con una copia
+   * del suo nome.» Passa quindi il Team ID, e il composer risolve il resto.
+   *
+   * Prima apriva la gestione dell'Organico con un parametro che le chiedeva
+   * di aprire un modulo: due schermate per arrivare a una.
    */
   invitePerson: (teamId: string) =>
-    `/club-admin/roster?teamId=${encodeURIComponent(teamId)}&invite=player`,
+    `/member-invite/search?from=team&teamId=${encodeURIComponent(teamId)}`,
   /** Composer condiviso delle Posizioni con la squadra preselezionata. */
   newPosition: (teamId: string) =>
     `/(tabs)/announcements?focus=positions&compose=1&teamId=${encodeURIComponent(teamId)}`,

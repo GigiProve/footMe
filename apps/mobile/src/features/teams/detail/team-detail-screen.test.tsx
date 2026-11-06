@@ -316,7 +316,7 @@ describe("master 01 e 02 — dettaglio standard, una sola pagina", () => {
       "/(tabs)/announcements?focus=applications&teamId=team-1",
     );
     expect(routerMocks.push).toHaveBeenCalledWith(
-      "/club-admin/invites?teamId=team-1",
+      "/(tabs)/dashboard/invites?from=team&teamId=team-1",
     );
   });
 });
@@ -438,7 +438,7 @@ describe("master 04 — squadra appena creata", () => {
     });
 
     expect(routerMocks.push).toHaveBeenCalledWith(
-      "/club-admin/roster?teamId=team-1&invite=player",
+      "/member-invite/search?from=team&teamId=team-1",
     );
   });
 });

@@ -101,15 +101,38 @@ describe("isModuleEligible", () => {
     expect(isModuleEligible(anyOfTwo, one)).toBe(true);
   });
 
-  it("hides a module whose destination is still gated on the owner role", () => {
-    // DAS-REV-07 §16: applicare i permessi a ogni voce. `/club-admin/invites`
-    // redirige chi non ha `profile.role === 'club_admin'`, quindi il modulo
-    // sarebbe una promessa che la route rimanda indietro.
+  it("apre il modulo Inviti a chi ha una sola delle due letture", () => {
+    // DAS-REV-19 §8: il Centro ha due tab e due capability distinte. Il
+    // modulo era `capabilitiesAll: ["invites_view"]` più `requiresOwner`,
+    // e con quella forma un delegato che può leggere solo le richieste non
+    // vedeva niente — pur avendo una destinazione che lo accetta.
+    const onlySent = identity("society", ["dashboard_view", "invites_view"]);
+    const onlyRequests = identity("society", [
+      "dashboard_view",
+      "member_requests_view",
+    ]);
+    const neither = identity("society", ["dashboard_view", "teams_view"]);
+
+    expect(isModuleEligible(MODULE_REGISTRY.society_invites, onlySent)).toBe(
+      true,
+    );
+    expect(
+      isModuleEligible(MODULE_REGISTRY.society_invites, onlyRequests),
+    ).toBe(true);
+    expect(isModuleEligible(MODULE_REGISTRY.society_invites, neither)).toBe(
+      false,
+    );
+  });
+
+  it("non richiede più la proprietà per il modulo Inviti", () => {
+    // Il gate su `isOwner` proteggeva da un rimbalzo della vecchia route
+    // `/club-admin/invites`. La destinazione nuova è gated sulle capability,
+    // e §8 vieta di nascondere a un actor un'azione che gli compete.
     const member = identity("society", ["dashboard_view", "invites_view"]);
     const owner: DashboardIdentity = { ...member, isOwner: true };
 
     expect(isModuleEligible(MODULE_REGISTRY.society_invites, member)).toBe(
-      false,
+      true,
     );
     expect(isModuleEligible(MODULE_REGISTRY.society_invites, owner)).toBe(true);
   });
@@ -220,16 +243,23 @@ describe("composeQuickActions", () => {
     expect(composeQuickActions(editor)).not.toContain("society_new_article");
   });
 
-  it("withholds the invite action from a member whose route rejects them", () => {
-    // DAS-REV-07 §11: l'azione apre «il flusso canonico di invito
-    // nell'organico». Per un membro autorizzato ma non proprietario quel
-    // flusso rimbalza, quindi l'azione non compare.
+  it("dà l'azione Invita persona a chi ha la capability, proprietario o no", () => {
+    // DAS-REV-19 §6: il composer è un flusso focalizzato gated sulla sola
+    // capability. Il vincolo `isOwner` esisteva perché il flusso canonico
+    // viveva in `/club-admin/roster`, protetto dal ruolo `club_admin`.
     const member = identity("society", ["dashboard_view", "invites_create"]);
 
-    expect(composeQuickActions(member)).not.toContain("society_invite_person");
-    expect(
-      composeQuickActions({ ...member, isOwner: true }),
-    ).toContain("society_invite_person");
+    expect(composeQuickActions(member)).toContain("society_invite_person");
+    expect(composeQuickActions({ ...member, isOwner: true })).toContain(
+      "society_invite_person",
+    );
+  });
+
+  it("non dà l'azione Invita persona senza la capability di creazione", () => {
+    // Leggere gli inviti non è spedirne: §8 tiene le due facoltà distinte.
+    const reader = identity("society", ["dashboard_view", "invites_view"]);
+
+    expect(composeQuickActions(reader)).not.toContain("society_invite_person");
   });
 
   it("keeps at most two quick actions with mixed responsibilities", () => {

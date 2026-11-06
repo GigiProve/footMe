@@ -37,6 +37,11 @@ export const DASHBOARD_CAPABILITIES = [
   // DAS-REV-07 §14: leggere lo stato degli inviti non è spedirne. Un
   // amministratore può sapere a che punto è l'organico senza poter invitare.
   "invites_view",
+  // DAS-REV-19 §8: annullare un pending altrui e leggere le richieste
+  // ricevute sono due facoltà che §8 vieta di dedurre da un generico
+  // Gestisci — e dalle quali dipendono due controlli distinti del Centro.
+  "invites_cancel",
+  "member_requests_view",
   // DAS-REV-07 §16: la riga "Shortlist" di Aree di gestione si decide con la
   // chiave del dominio Shortlist, che esiste dal 20260717090000, non con una
   // regola nuova inventata nella Dashboard.

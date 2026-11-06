@@ -41,7 +41,8 @@ export function resolveNotificationCategory(
     item.type === "agent_representation_responded" ||
     item.type === "agent_representation_visibility_proposed" ||
     item.type === "agent_representation_removed" ||
-    item.type === "agent_invite_reconciled"
+    item.type === "agent_invite_reconciled" ||
+    item.type === "society_invitation_created"
   ) {
     return "richieste";
   }
@@ -164,6 +165,7 @@ export function groupNotifications(
 export function ctaLabelFor(item: AppNotification): string {
   const category = resolveNotificationCategory(item);
 
+  if (item.type === "society_invitation_created") return "Vedi invito";
   if (item.type === "new_follower") return "Vedi profilo";
   if (item.type === "content_tag") return "Apri contenuto";
   if (category === "richieste") return "Gestisci richiesta";

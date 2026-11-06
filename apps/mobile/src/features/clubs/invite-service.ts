@@ -1,3 +1,20 @@
+/**
+ * Link di invito riutilizzabili (`club_invite_links`).
+ *
+ * Due metà con sorti diverse dopo la rimozione dello schermo legacy
+ * `/club-admin/invites`:
+ *
+ *   · **ricezione** — `joinClubViaInvite` è viva e serve la landing pubblica
+ *     `app/invite/[token].tsx`, raggiungibile da deep link;
+ *   · **generazione** — `fetchClubInviteLinks`, `createInviteLink`,
+ *     `deactivateInviteLink` e `buildInviteUrl` non hanno più chiamanti: la
+ *     loro unica UI era `InviteLinkModal`, montata solo da quello schermo, e
+ *     nessun ingresso del prodotto ci portava più da DAS-REV-19.
+ *
+ * Restano perché il dominio è di **DAS-REV-20 — Inviti multipli tramite
+ * link**, che le riuserà con una UI propria. Cancellarle qui significherebbe
+ * smantellare un dominio che questa pulizia non possiede.
+ */
 import { supabase } from "../../lib/supabase";
 import type { ClubInviteLink, MemberRole } from "./membership-types";
 

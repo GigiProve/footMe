@@ -66,6 +66,15 @@ export default function DashboardLayout() {
             focalizzati in app/position-manage/. */}
         <Stack.Screen name="positions/index" />
         <Stack.Screen name="positions/[id]" />
+        {/* DAS-REV-19 §6: «Il Centro conserva la bottom navigation Home |
+            Cerca | Dashboard | Messaggi | Profilo, con Dashboard
+            selezionata.» Lo stesso vale per il dettaglio dell'invito
+            inviato e per quello della richiesta ricevuta, che sono pagine
+            gestionali della Società. Composer e superfici del destinatario
+            stanno invece in app/member-invite/ e app/invitation/. */}
+        <Stack.Screen name="invites/index" />
+        <Stack.Screen name="invites/[inviteId]" />
+        <Stack.Screen name="invites/request/[requestId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

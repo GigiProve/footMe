@@ -16,7 +16,9 @@ export default function ClubAdminLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="roster" />
-      <Stack.Screen name="invites" />
+      {/* `invites` è stata rimossa: il Centro Inviti e richieste canonico di
+          DAS-REV-19 vive in `app/(tabs)/dashboard/invites/`, gated sulle
+          capability invece che sul ruolo `club_admin`. */}
       <Stack.Screen name="teams" />
       <Stack.Screen name="affiliates" />
       <Stack.Screen name="permissions/index" />

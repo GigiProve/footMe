@@ -50,7 +50,18 @@ export const SOCIETY_HREFS = {
       ? `/(tabs)/announcements?focus=applications&adId=${encodeURIComponent(adId)}`
       : "/(tabs)/announcements?focus=applications",
   contentComposer: "/(tabs)/profile?compose=club",
-  invites: "/club-admin/invites",
+  /**
+   * Centro Inviti e richieste (DAS-REV-19 §6).
+   *
+   * Era `/club-admin/invites`, lo schermo legacy costruito su righe
+   * `club_members` pending e gated sul ruolo `club_admin`. Il centro
+   * canonico vive ora nello Stack della Dashboard ed è gated sulle
+   * capability: un amministratore con `invites_view` ma senza la proprietà
+   * non viene più rimbalzato.
+   */
+  invites: "/(tabs)/dashboard/invites?from=dashboard",
+  /** Primo passo del composer: §6 lo vuole raggiungibile direttamente. */
+  invitePerson: "/member-invite/search?from=dashboard",
   /**
    * Centro Amministratori (DAS-REV-13 §6).
    *
@@ -132,10 +143,13 @@ export function societyApplicationStatusLabel(status: string): string | null {
 /**
  * Frasi del modulo "Inviti e richieste" (§14).
  *
- * Due quantità **distinte**, ciascuna presente solo se consultabile. Oggi
- * `invitesIncomingCount` è sempre `null` — il dominio non modella una
- * richiesta di adesione in attesa — e §14 chiede di omettere l'aggregato non
- * consultabile invece di mostrarlo a zero.
+ * Due quantità **distinte**, ciascuna presente solo se consultabile, e §14
+ * chiede di omettere l'aggregato non consultabile invece di mostrarlo a zero.
+ *
+ * `invitesIncomingCount` era sempre `null`: il dominio non modellava una
+ * richiesta di adesione in attesa. DAS-REV-19 §15 la legge dal modello
+ * canonico delle richieste avviate dalla persona, quindi il numero è ora
+ * reale — e resta `null` per chi non ha `member_requests_view`.
  */
 export function societyInviteLines(overview: SocietyOverview): string[] {
   const lines: string[] = [];
@@ -359,9 +373,8 @@ export function societyFirstRunProposals(
     proposals.push({
       actionLabel: "Invita persona",
       body:
-        "Invita calciatori, allenatori, staff e dirigenti, anche se non sono " +
-        "su PROLINK.",
-      href: SOCIETY_HREFS.invites,
+        "Invita calciatori, allenatori, staff e dirigenti già su PROLINK.",
+      href: SOCIETY_HREFS.invitePerson,
       icon: "people-outline",
       id: "first_invite",
       title: "Costruisci l'organico",

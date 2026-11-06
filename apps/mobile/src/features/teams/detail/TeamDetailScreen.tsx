@@ -285,7 +285,13 @@ export function TeamDetailScreen({ teamId }: { teamId: string }) {
   }
 
   const canOpenRoster = team.canViewRoster && team.isOwner;
-  const canInvite = team.canManageRoster && team.isOwner;
+  /**
+   * DAS-REV-19 §6: «Invita persona» apre ora il composer condiviso, gated
+   * sulla sola capability. Era owner-gated perché la vecchia destinazione
+   * (`/club-admin/roster`) è protetta dal ruolo `club_admin`; quella
+   * ragione è caduta con la destinazione.
+   */
+  const canInvite = team.canManageRoster;
   /**
    * DAS-REV-15 §5, §20: il Centro Posizioni è gated sulle capability, non
    * sulla proprietà. `isOwner` serviva solo perché la vecchia destinazione
@@ -297,7 +303,8 @@ export function TeamDetailScreen({ teamId }: { teamId: string }) {
   const canOpenPositions = team.canViewPositions;
   const canCreatePosition = team.canCreatePositions && team.isOwner;
   const canOpenApplications = team.canViewApplications && team.isOwner;
-  const canOpenInvites = team.canViewInvites && team.isOwner;
+  /* Idem per il Centro Inviti: capability e scope sono risolti dal server. */
+  const canOpenInvites = team.canViewInvites;
 
   return (
     <View style={styles.root}>
