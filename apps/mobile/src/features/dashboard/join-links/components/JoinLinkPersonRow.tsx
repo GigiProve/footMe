@@ -15,17 +15,30 @@ import { formatConnectedDate, JOIN_LINKS_COPY } from "../join-links-presentation
 import type { JoinLinkPerson } from "../join-links-types";
 
 type JoinLinkPersonRowProps = {
+  /** Squadra del link: serve a dire se il contesto attuale è cambiato (§39). */
+  linkTeamName?: string | null;
   onPress: () => void;
   person: JoinLinkPerson;
   showDivider: boolean;
 };
 
 export function JoinLinkPersonRow({
+  linkTeamName,
   onPress,
   person,
   showDivider,
 }: JoinLinkPersonRowProps) {
   const connectedOn = formatConnectedDate(person.connectedAt);
+  /*
+   * DAS-REV-21 §39: il contesto compare solo quando è **diverso** da quello
+   * del link. Ripeterlo su ogni riga di una lista che è già filtrata per
+   * squadra sarebbe rumore; ometterlo quando la persona si è spostata
+   * sarebbe la bugia che §39 vieta.
+   */
+  const movedTo =
+    person.contextLabel && person.contextLabel !== linkTeamName
+      ? person.contextLabel
+      : null;
 
   return (
     <TouchableOpacity
@@ -41,7 +54,7 @@ export function JoinLinkPersonRow({
           {person.personName}
         </AppText>
         <AppText color="neutralMuted" numberOfLines={1} variant="bodySm">
-          {person.roleLabel}
+          {movedTo ? `${person.roleLabel} · ${movedTo}` : person.roleLabel}
         </AppText>
         {connectedOn ? (
           <AppText color="neutralSoft" variant="meta">

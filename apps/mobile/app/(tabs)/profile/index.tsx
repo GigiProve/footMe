@@ -11,39 +11,39 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
-import { KeyboardAwareForm } from "../../src/components/ui/keyboard-aware-form";
-import { useSession } from "../../src/features/auth/use-session";
-import { type PublicClubProfile } from "../../src/features/clubs/club-service";
-import { getUnreadCount } from "../../src/features/clubs/notification-service";
+import { KeyboardAwareForm } from "../../../src/components/ui/keyboard-aware-form";
+import { useSession } from "../../../src/features/auth/use-session";
+import { type PublicClubProfile } from "../../../src/features/clubs/club-service";
+import { getUnreadCount } from "../../../src/features/clubs/notification-service";
 import {
   SocietyMasterProfileView,
   SocietyProfileSkeleton,
   type SocietyTab,
-} from "../../src/features/clubs/society/SocietyMasterProfileView";
-import { fetchSocietyMasterProfile } from "../../src/features/clubs/society/society-profile-service";
-import { buildClubShareMessage } from "../../src/features/clubs/society/society-profile-model";
-import type { PositionFilter } from "../../src/features/clubs/society/society-profile-model";
-import type { SocietyMasterProfile } from "../../src/features/clubs/society/society-profile-types";
+} from "../../../src/features/clubs/society/SocietyMasterProfileView";
+import { fetchSocietyMasterProfile } from "../../../src/features/clubs/society/society-profile-service";
+import { buildClubShareMessage } from "../../../src/features/clubs/society/society-profile-model";
+import type { PositionFilter } from "../../../src/features/clubs/society/society-profile-model";
+import type { SocietyMasterProfile } from "../../../src/features/clubs/society/society-profile-types";
 import {
   fetchPendingMemberships,
   respondToMembership,
   type PendingMembership,
-} from "../../src/features/clubs/membership-service";
+} from "../../../src/features/clubs/membership-service";
 import {
   fetchClubTeams,
   type ClubTeam,
-} from "../../src/features/clubs/team-service";
-import type { AppRole } from "../../src/features/onboarding/create-initial-profile";
-import { EditBioModal } from "../../src/features/profiles/edit-modals/EditBioModal";
-import { EditAgentMediaModal } from "../../src/features/profiles/edit-modals/EditAgentMediaModal";
-import { EditClubSeasonsModal } from "../../src/features/profiles/edit-modals/EditClubSeasonsModal";
-import { EditClubSportProfileModal } from "../../src/features/profiles/edit-modals/EditClubSportProfileModal";
-import { EditContactModal } from "../../src/features/profiles/edit-modals/EditContactModal";
-import { EditDirectorMediaModal } from "../../src/features/profiles/edit-modals/EditDirectorMediaModal";
-import { EditPersonalInfoModal } from "../../src/features/profiles/edit-modals/EditPersonalInfoModal";
-import { StaffProfileTabView } from "../../src/features/profiles/career/StaffProfileTabView";
-import { AgentProfileTabView } from "../../src/features/profiles/career/AgentProfileTabView";
-import { DirectorProfileTabView } from "../../src/features/profiles/career/DirectorProfileTabView";
+} from "../../../src/features/clubs/team-service";
+import type { AppRole } from "../../../src/features/onboarding/create-initial-profile";
+import { EditBioModal } from "../../../src/features/profiles/edit-modals/EditBioModal";
+import { EditAgentMediaModal } from "../../../src/features/profiles/edit-modals/EditAgentMediaModal";
+import { EditClubSeasonsModal } from "../../../src/features/profiles/edit-modals/EditClubSeasonsModal";
+import { EditClubSportProfileModal } from "../../../src/features/profiles/edit-modals/EditClubSportProfileModal";
+import { EditContactModal } from "../../../src/features/profiles/edit-modals/EditContactModal";
+import { EditDirectorMediaModal } from "../../../src/features/profiles/edit-modals/EditDirectorMediaModal";
+import { EditPersonalInfoModal } from "../../../src/features/profiles/edit-modals/EditPersonalInfoModal";
+import { StaffProfileTabView } from "../../../src/features/profiles/career/StaffProfileTabView";
+import { AgentProfileTabView } from "../../../src/features/profiles/career/AgentProfileTabView";
+import { DirectorProfileTabView } from "../../../src/features/profiles/career/DirectorProfileTabView";
 import {
   buildAgentProfileHeaderDetails,
   buildHeaderDetails,
@@ -51,11 +51,11 @@ import {
   buildDirectorProfileHeaderDetails,
   buildPlayerProfileHeaderDetails,
   buildStaffProfileHeaderDetails,
-} from "../../src/features/profiles/profile-edit-helpers";
+} from "../../../src/features/profiles/profile-edit-helpers";
 import {
   ProfileReadonlyView,
   type EditSection,
-} from "../../src/features/profiles/ProfileReadonlyView";
+} from "../../../src/features/profiles/ProfileReadonlyView";
 import {
   AgentProfileHeader,
   CoachProfileHeader,
@@ -63,34 +63,35 @@ import {
   PlayerProfileHeader,
   ProfileHeader,
   StaffProfileHeader,
-} from "../../src/features/profiles/profile-screen-components";
-import { FanProfileView } from "../../src/features/profiles/FanProfileView";
-import { MediaProfileView } from "../../src/features/profiles/MediaProfileView";
+} from "../../../src/features/profiles/profile-screen-components";
+import { MySocietiesEntry } from "../../../src/features/role-link/components/MySocietiesEntry";
+import { FanProfileView } from "../../../src/features/profiles/FanProfileView";
+import { MediaProfileView } from "../../../src/features/profiles/MediaProfileView";
 import {
   getCompleteProfessionalProfile,
   saveAgentProfileMedia,
   saveDirectorProfileMedia,
   savePlayerProfileMedia,
   type CompleteProfessionalProfile,
-} from "../../src/features/profiles/profile-service";
+} from "../../../src/features/profiles/profile-service";
 import {
   normalizePlayerMediaItems,
   type PlayerMediaItemRecord,
-} from "../../src/features/profiles/player-media";
-import { removeMediaFromStorage } from "../../src/features/profiles/media-upload-service";
-import { fetchAgentPublicAssistiti } from "../../src/features/relationships/agent-representation-service";
-import type { MediaLinkedTarget } from "../../src/features/profiles/career/MediaTabContent";
-import { CoachProfileTabView } from "../../src/features/profiles/career/CoachProfileTabView";
-import { ProfileTabView } from "../../src/features/profiles/career/ProfileTabView";
-import { ProfileSectionError } from "../../src/features/profiles/master/ProfileSectionBlock";
-import { ProfileSkeleton } from "../../src/features/profiles/master/ProfileSkeleton";
+} from "../../../src/features/profiles/player-media";
+import { removeMediaFromStorage } from "../../../src/features/profiles/media-upload-service";
+import { fetchAgentPublicAssistiti } from "../../../src/features/relationships/agent-representation-service";
+import type { MediaLinkedTarget } from "../../../src/features/profiles/career/MediaTabContent";
+import { CoachProfileTabView } from "../../../src/features/profiles/career/CoachProfileTabView";
+import { ProfileTabView } from "../../../src/features/profiles/career/ProfileTabView";
+import { ProfileSectionError } from "../../../src/features/profiles/master/ProfileSectionBlock";
+import { ProfileSkeleton } from "../../../src/features/profiles/master/ProfileSkeleton";
 import {
   trackPlayerProfileViewed,
   trackProfileViewed,
   trackProfileEvent,
-} from "../../src/features/profiles/profile-analytics";
-import { colors, radius, spacing } from "../../src/theme/tokens";
-import { ActionSheet, AppText, Button, HeaderBell, SectionCard } from "../../src/ui";
+} from "../../../src/features/profiles/profile-analytics";
+import { colors, radius, spacing } from "../../../src/theme/tokens";
+import { ActionSheet, AppText, Button, HeaderBell, SectionCard } from "../../../src/ui";
 
 const MEMBER_ROLE_LABELS: Record<string, string> = {
   coach: "Allenatore",
@@ -1278,6 +1279,16 @@ export default function ProfileScreen() {
             role={role}
           />
         ) : null}
+        {/*
+          DAS-REV-21 §26: «Riutilizza/inserisci l'accesso owner Società e
+          ruoli nel proprio Profilo, con lo stesso percorso per Calciatore,
+          Allenatore, Staff e Dirigente.» Una riga sola, dopo il Master
+          Profile, che porta alla gestione dei rapporti sportivi: §26 vieta
+          di «obbligare a ritrovare la società in Cerca per gestire un
+          rapporto attivo».
+        */}
+        <MySocietiesEntry role={role} />
+
         {/*
           REV-PROF-01 §5: il Master Profile finisce con le tab. "Salvati" e
           "Seguiti" sono aree personali con una schermata propria e restano

@@ -253,6 +253,8 @@ export function ClubRosterSection({
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <ClubMemberRow
+                clubId={clubId}
+                entryTeamId={teamId}
                 member={item}
                 onReject={handleRejectMember}
                 onRemove={handleRemoveMember}

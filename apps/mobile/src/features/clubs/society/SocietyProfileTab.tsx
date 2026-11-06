@@ -16,6 +16,7 @@ import {
   formatTeamsCount,
   hasPublicAffiliates,
 } from "./society-profile-model";
+import { SocietyRoleLinkBlock } from "../../role-link/components/SocietyRoleLinkBlock";
 import { SocietyListRow } from "./SocietyRows";
 import type {
   SocietyAffiliate,
@@ -25,6 +26,8 @@ import type {
 
 type SocietyProfileTabProps = {
   affiliates: readonly SocietyAffiliate[];
+  /** Identifica il club per il blocco «Fai parte di questa società?» (§11). */
+  clubId: string;
   onOpenAffiliate: (clubId: string) => void;
   /**
    * Porta alla Dashboard dall'empty state delle squadre. Opzionale: senza
@@ -41,6 +44,7 @@ type SocietyProfileTabProps = {
 
 export function SocietyProfileTab({
   affiliates,
+  clubId,
   onOpenAffiliate,
   onOpenDashboard,
   onOpenTeam,
@@ -55,6 +59,18 @@ export function SocietyProfileTab({
 
   return (
     <View style={styles.container} testID="society-profile-tab">
+      {/*
+        DAS-REV-21 §11: «Inserisci il blocco contestuale Fai parte di questa
+        società? con accesso Richiedi conferma del ruolo, separato dalle
+        azioni Segui/Contatta.» Sta nella tab Profilo, sopra le squadre, e
+        non fra le azioni social dell'header: è la dichiarazione di un
+        rapporto già esistente, non un modo di seguire il club.
+
+        Per l'Owner non ha senso — sta già gestendo la propria società — e il
+        componente sparisce senza produrre un blocco vuoto.
+      */}
+      {viewer.mode === "visitor" ? <SocietyRoleLinkBlock clubId={clubId} /> : null}
+
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitles}>

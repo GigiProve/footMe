@@ -86,6 +86,13 @@ export default function DashboardLayout() {
         <Stack.Screen name="join-links/[linkId]/index" />
         <Stack.Screen name="join-links/[linkId]/people/index" />
         <Stack.Screen name="join-links/[linkId]/people/[assignmentId]" />
+        {/* DAS-REV-21 §6: «Gestione societaria Team | Dashboard Società →
+            Struttura società → squadra → Organico → persona». Nel PNG lo
+            screen 21 mostra la bottom navigation con Dashboard selezionata.
+            Il dettaglio del singolo incarico (screen 22), il form condiviso
+            e le conferme sono flussi focalizzati in app/role-link/. */}
+        <Stack.Screen name="people/index" />
+        <Stack.Screen name="people/[profileId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

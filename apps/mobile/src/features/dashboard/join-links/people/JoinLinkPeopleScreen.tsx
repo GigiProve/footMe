@@ -259,6 +259,7 @@ export function JoinLinkPeopleScreen() {
         }
         renderItem={({ index, item }) => (
           <JoinLinkPersonRow
+            linkTeamName={validLink.teamName}
             onPress={() => {
               trackJoinLinksEvent("join_link_person_opened");
               router.push(

@@ -73,6 +73,7 @@ import {
   retainAuthorizedTeams,
   sameFilter,
 } from "./invites-presentation";
+import { ROLE_LINK_HREFS } from "../../role-link/role-link-routes";
 import { INVITES_HREFS, type InvitesOrigin } from "./invites-routes";
 import {
   INVITES_PAGE_SIZE,
@@ -366,10 +367,15 @@ export function InvitesCenterScreen() {
     (row: InviteRow) => {
       trackInvitesEvent("invite_row_opened", { kind: row.kind, tab });
 
+      /* DAS-REV-21 §20: stessa route, due letture. Il `kind` arriva dal
+         backend e decide quale dominio risolve l'ID — una richiesta
+         canonica e una riga storica non sono lo stesso oggetto. */
       router.push(
         (row.kind === "invite"
           ? INVITES_HREFS.sentDetail(row.id)
-          : INVITES_HREFS.requestDetail(row.id)) as never,
+          : row.kind === "role_request"
+            ? ROLE_LINK_HREFS.societyRequest(row.id)
+            : INVITES_HREFS.requestDetail(row.id)) as never,
       );
     },
     [router, tab],

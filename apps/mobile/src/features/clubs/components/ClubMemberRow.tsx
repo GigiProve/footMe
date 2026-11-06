@@ -4,9 +4,14 @@ import { useRouter } from "expo-router";
 
 import { spacing } from "../../../theme/tokens";
 import { Avatar, Badge, Button, ListItem } from "../../../ui";
+import { ROLE_LINK_HREFS } from "../../role-link/role-link-routes";
 import type { ClubMember } from "../membership-types";
 
 type ClubMemberRowProps = {
+  /** Società di contesto: serve alla gestione sportiva (DAS-REV-21 §32). */
+  clubId?: string | null;
+  /** Squadra di provenienza, per tornare all'organico corretto (§6). */
+  entryTeamId?: string | null;
   member: ClubMember;
   onRemove: (memberId: string) => void;
   onReject: (memberId: string) => void;
@@ -22,6 +27,8 @@ const roleLabelMap: Record<string, string> = {
 };
 
 export function ClubMemberRow({
+  clubId,
+  entryTeamId,
   member,
   onRemove,
   onReject,
@@ -46,9 +53,29 @@ export function ClubMemberRow({
   const subtitle = subtitleParts.join(" · ");
 
   function handlePress() {
-    if (isLinked && member.profile_id) {
-      router.push(`/profile/${member.profile_id}` as never);
+    if (!isLinked || !member.profile_id) return;
+
+    /*
+     * DAS-REV-21 §32: «Dal dettaglio operativo Team si accede all'organico
+     * canonico; la persona apre Ruoli in AC Como.» Dall'Organico la riga
+     * porta quindi alla **gestione del rapporto**, non al profilo pubblico:
+     * quello resta raggiungibile da lì con "Visualizza profilo".
+     *
+     * Senza contesto societario — l'Organico aperto fuori da una Società —
+     * il comportamento storico resta quello di prima.
+     */
+    if (clubId) {
+      router.push(
+        ROLE_LINK_HREFS.societyPerson(clubId, member.profile_id, {
+          from: entryTeamId ? "team" : "roster",
+          teamId: entryTeamId ?? undefined,
+        }) as never,
+      );
+
+      return;
     }
+
+    router.push(`/profile/${member.profile_id}` as never);
   }
 
   function handleActions() {

@@ -219,9 +219,16 @@ export function RequestDetailScreen() {
         ) : null}
 
         {request.state === "pending" ? (
+          /*
+           * Questa è una riga `club_members.self_request` **storica**: non
+           * ha ruolo strutturato, ambito né versione, e DAS-REV-21 §48 vieta
+           * di «reinterpretare record terminali validi» inventandoglieli.
+           * Le proposte canoniche hanno la propria destinazione, con Approva
+           * e Rifiuta, sulla stessa route con `kind=role`.
+           */
           <AppText color="neutralMuted" style={styles.helper} variant="meta">
-            La gestione delle richieste di collegamento non è ancora
-            disponibile in questa versione.
+            Questa richiesta è stata inviata prima della gestione dei ruoli e
+            può essere risolta soltanto dall'organico della squadra.
           </AppText>
         ) : null}
       </ScrollView>

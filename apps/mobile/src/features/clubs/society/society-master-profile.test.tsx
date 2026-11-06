@@ -23,6 +23,24 @@ import type {
   SocietyViewer,
 } from "./society-profile-types";
 
+/*
+ * DAS-REV-21 §11: la tab Profilo ospita ora il blocco «Fai parte di questa
+ * società?», che naviga e legge uno stato privato dell'actor. Qui si
+ * verifica la struttura sportiva della tab, non quel blocco — che ha i
+ * propri test — quindi expo-router e la sessione sono stub.
+ */
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ canGoBack: () => true, push: vi.fn(), replace: vi.fn() }),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: () => ({ data: null, isLoading: false, isSuccess: false }),
+}));
+
+vi.mock("../../auth/use-session", () => ({
+  useSession: () => ({ profile: null }),
+}));
+
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: (props: Record<string, unknown>) => React.createElement("Ionicon", props),
 }));
@@ -170,6 +188,7 @@ function teamDetail(overrides: Partial<SocietyTeamDetail> = {}): SocietyTeamDeta
 function profileTabProps(overrides: Record<string, unknown> = {}) {
   return {
     affiliates: [] as SocietyAffiliate[],
+    clubId: "club-1",
     onOpenAffiliate: vi.fn(),
     onOpenTeam: vi.fn(),
     onSeeAllTeams: vi.fn(),

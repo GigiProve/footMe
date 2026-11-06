@@ -73,7 +73,13 @@ export type InviteRow = {
   id: string;
   /** `true` solo per una richiesta non ancora letta da **questo** actor. */
   isUnread: boolean;
-  kind: "invite" | "request";
+  /**
+   * DAS-REV-21 §20: la tab Richieste ricevute unisce due sorgenti. Le righe
+   * `request` sono le `club_members.self_request` storiche, in sola
+   * lettura; le `role_request` sono le proposte canoniche, risolvibili. La
+   * destinazione è diversa, e §20 vieta «CTA non funzionanti».
+   */
+  kind: "invite" | "request" | "role_request";
   personName: string;
   personProfileId: string;
   roleLabel: string;

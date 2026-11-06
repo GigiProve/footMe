@@ -177,6 +177,7 @@ export async function fetchSocietyStructure(
     adminInvitesPendingCount: count(row.admin_invites_pending_count),
     adminsCount: count(row.admins_count),
     canEditCompanyData: bool(row.can_edit_company_data),
+    canViewSocietyRoles: row.can_view_society_roles === true,
     canOpenAdminCenter: bool(row.can_open_admin_center),
     canViewAdminInvites: bool(row.can_view_admin_invites),
     canViewAdmins: bool(row.can_view_admins),

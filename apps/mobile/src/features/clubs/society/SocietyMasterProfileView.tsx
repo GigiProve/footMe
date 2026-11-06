@@ -146,6 +146,7 @@ export function SocietyMasterProfileView({
         {activeTab === "profile" ? (
           <SocietyProfileTab
             affiliates={affiliates}
+            clubId={club.id}
             onOpenAffiliate={onOpenAffiliate}
             onOpenDashboard={onOpenDashboard}
             onOpenTeam={onOpenTeam}

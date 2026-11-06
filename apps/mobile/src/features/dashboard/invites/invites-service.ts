@@ -279,7 +279,12 @@ function mapRow(row: RawRecord): InviteRow | null {
   const kind = text(row.record_kind);
   const personProfileId = text(row.person_profile_id);
 
-  if (!id || !state || !personProfileId || (kind !== "invite" && kind !== "request")) {
+  if (
+    !id ||
+    !state ||
+    !personProfileId ||
+    (kind !== "invite" && kind !== "request" && kind !== "role_request")
+  ) {
     return null;
   }
 

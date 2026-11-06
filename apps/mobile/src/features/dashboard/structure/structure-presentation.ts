@@ -53,6 +53,9 @@ export const STRUCTURE_HREFS = {
   /** Revisione di una richiesta ricevuta. */
   requestReview: (clubId: string, relationshipId: string) =>
     `/society-link/review?clubId=${encodeURIComponent(clubId)}&relationshipId=${encodeURIComponent(relationshipId)}`,
+  /** Persone con un incarico societario (DAS-REV-21 §32). */
+  societyRoles: (clubId: string) =>
+    `/(tabs)/dashboard/people?clubId=${encodeURIComponent(clubId)}`,
   /** Centro Squadre. */
   teams: "/(tabs)/dashboard/teams",
   /** Prepara o configura la stagione di una squadra. */
@@ -238,6 +241,20 @@ export function domainRows(
           icon: "calendar-outline",
           id: "seasons",
           title: "Stagioni e storico",
+        });
+      }
+
+      /*
+       * DAS-REV-21 §32: l'Organico è per squadra e non contiene gli
+       * incarichi con ambito Intera società. La riga esiste solo per chi può
+       * leggerli davvero — §32 vieta «una CTA non funzionante».
+       */
+      if (structure.canViewSocietyRoles) {
+        rows.push({
+          href: STRUCTURE_HREFS.societyRoles(structure.clubId),
+          icon: "people-outline",
+          id: "society-roles",
+          title: "Ruoli societari",
         });
       }
 

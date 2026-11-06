@@ -56,6 +56,8 @@ export type SocietyStructure = {
   /** `null` = non autorizzato. Mai zero. */
   adminsCount: number | null;
   canEditCompanyData: boolean;
+  /** DAS-REV-21 §32: può leggere gli incarichi con ambito Intera società. */
+  canViewSocietyRoles: boolean;
   canOpenAdminCenter: boolean;
   canViewAdminInvites: boolean;
   canViewAdmins: boolean;

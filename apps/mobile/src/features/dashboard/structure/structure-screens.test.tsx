@@ -85,6 +85,7 @@ function structure(overrides: Partial<SocietyStructure> = {}): SocietyStructure 
     adminInvitesPendingCount: 1,
     adminsCount: 4,
     canEditCompanyData: true,
+  canViewSocietyRoles: false,
     canOpenAdminCenter: true,
     canViewAdminInvites: true,
     canViewAdmins: true,

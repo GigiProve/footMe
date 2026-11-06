@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Screen } from "../../components/ui/screen";
 import { useSession } from "../auth/use-session";
+import { ROLE_LINK_HREFS } from "../role-link/role-link-routes";
 import { colors, spacing } from "../../styles";
 import {
   ActionSheet,
@@ -158,6 +159,60 @@ export function NotificationCenterScreen() {
       const inviteId = item.data?.invite_id;
       if (inviteId) {
         router.push(`/invitation/${inviteId}` as never);
+      }
+    } else if (item.type === "role_request_created") {
+      /* DAS-REV-21 §41: la notifica apre lo stesso request_id. Il backend
+         rivalida l'accesso anche quando il link viene da una notifica
+         legittima. */
+      const requestId = item.data?.request_id;
+      if (requestId) {
+        router.push(ROLE_LINK_HREFS.societyRequest(requestId) as never);
+      }
+    } else if (
+      item.type === "role_request_approved" ||
+      item.type === "role_request_declined"
+    ) {
+      /* L'esito della propria richiesta: il record personale, non il Centro
+         della Società, a cui la persona non ha accesso (§41). */
+      const requestId = item.data?.request_id;
+      if (requestId) {
+        router.push(
+          ROLE_LINK_HREFS.myRequest(requestId, { from: "notification" }) as never,
+        );
+      }
+    } else if (item.type.startsWith("role_assignment_")) {
+      /* §41: «Le modifiche già attive aprono il rapporto/incarico
+         gestionale, senza Approva/Rifiuta e senza spostare l'utente nel
+         Centro Inviti.» Il destinatario decide quale lato: la persona apre
+         il proprio incarico, la Società quello della persona. */
+      const isSociety = item.type.endsWith("_by_person");
+      const assignmentId = item.data?.assignment_id;
+      const clubId = item.data?.club_id;
+      const personId = item.data?.profile_id;
+
+      if (isSociety && clubId && personId) {
+        router.push(
+          ROLE_LINK_HREFS.societyPerson(clubId, personId, {
+            from: "notification",
+          }) as never,
+        );
+      } else if (assignmentId) {
+        router.push(ROLE_LINK_HREFS.assignment(assignmentId) as never);
+      }
+    } else if (item.type.startsWith("role_link_")) {
+      /* §38: «Le terminazioni aprono un esito/storico autorizzato, non un
+         detail con comandi ormai invalidi.» */
+      const clubId = item.data?.club_id;
+      const personId = item.data?.profile_id;
+
+      if (item.type === "role_link_left" && clubId && personId) {
+        router.push(
+          ROLE_LINK_HREFS.societyPerson(clubId, personId, {
+            from: "notification",
+          }) as never,
+        );
+      } else {
+        router.push(ROLE_LINK_HREFS.societies as never);
       }
     } else if (item.type === "new_follower") {
       const followerProfileId = item.data?.follower_profile_id;

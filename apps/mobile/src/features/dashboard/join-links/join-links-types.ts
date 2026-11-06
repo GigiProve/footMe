@@ -128,6 +128,15 @@ export type JoinLinkPerson = {
   assignmentId: string;
   avatarUrl: string | null;
   connectedAt: string | null;
+  /**
+   * DAS-REV-21 §39: «Nei lettori gestionali necessari mostra il contesto
+   * attuale quando differisce dall'origine; non presentare un Allenatore
+   * della Primavera come ancora membro della Prima squadra.»
+   *
+   * È il Team (o l'ambito societario) dell'incarico **corrente** della
+   * linea, che una modifica può aver spostato altrove rispetto al link.
+   */
+  contextLabel: string | null;
   personName: string;
   profileId: string;
   roleLabel: string;
@@ -151,6 +160,8 @@ export type JoinLinkPersonDetail = {
   clubLogoUrl: string | null;
   clubName: string;
   connectedAt: string | null;
+  /** Il contesto attuale dell'incarico, che può differire dall'origine (§39). */
+  contextLabel: string | null;
   isActive: boolean;
   personName: string;
   profileId: string;
