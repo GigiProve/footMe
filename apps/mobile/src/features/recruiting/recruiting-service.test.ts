@@ -205,7 +205,7 @@ describe("recruiting-service", () => {
     });
 
     await expect(
-      applyToRecruitingAd("profile-4", "ad-8", "Disponibile subito"),
+      applyToRecruitingAd("ad-8", "Disponibile subito"),
     ).rejects.toThrow(
       "La candidatura è disponibile solo per profili calciatore completati.",
     );
@@ -226,7 +226,7 @@ describe("recruiting-service", () => {
       });
 
       await expect(
-        applyToRecruitingAd("profile-4", "ad-8", ""),
+        applyToRecruitingAd("ad-8", ""),
       ).rejects.toThrow(message);
     }
   });
@@ -237,37 +237,47 @@ describe("recruiting-service", () => {
       error: null,
     });
 
-    await applyToRecruitingAd("profile-5", "ad-9", "  Pronto a mettermi in gioco ");
+    await applyToRecruitingAd("ad-9", "  Pronto a mettermi in gioco ");
 
     expect(mocks.rpcMock).toHaveBeenCalledWith("apply_to_position", {
       p_ad_id: "ad-9",
       p_cover_message: "Pronto a mettermi in gioco",
+      p_expected_revision: null,
+      p_idempotency_key: null,
     });
     expect(mocks.recruitingApplicationInsertMock).not.toHaveBeenCalled();
   });
 
-  it("un replay non produce una seconda notifica al club", async () => {
-    /* §17: «Retry idempotente di un invio già committato restituisce
-       l'esito originale.» Un esito recuperato non è un nuovo invio. */
+  it("non scrive la notifica dal client", async () => {
+    /* DAS-REV-23 §25: la notifica nasce nella stessa transazione della
+       submission ed è deduplicata per candidatura + revisione. Scriverla qui
+       significava non notificare mai una ricandidatura, perdere la notifica
+       quando la rete cadeva fra RPC e insert, e far scrivere al client nella
+       casella di un altro utente. */
     mocks.rpcMock.mockResolvedValueOnce({
-      data: [{ application_id: "app-1", replayed: true, status: "submitted" }],
+      data: [{ application_id: "app-1", replayed: false, status: "submitted" }],
       error: null,
     });
 
-    await applyToRecruitingAd("profile-5", "ad-9", "Pronto");
+    await applyToRecruitingAd("ad-9", "Pronto");
 
     expect(mocks.notificationsInsertMock).not.toHaveBeenCalled();
   });
 
-  it("notifies the club owner when a new application is submitted", async () => {
-    await applyToRecruitingAd("profile-5", "ad-9", "Pronto");
+  it("porta la chiave dell'operazione quando il chiamante ne ha una", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [{ application_id: "app-1", replayed: false, status: "submitted" }],
+      error: null,
+    });
 
-    expect(mocks.notificationsInsertMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        recipient_profile_id: "club-owner-1",
-        type: "application_received",
-      }),
-    );
+    await applyToRecruitingAd("ad-9", "", "apply:ad-9:1:abcd");
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith("apply_to_position", {
+      p_ad_id: "ad-9",
+      p_cover_message: null,
+      p_expected_revision: null,
+      p_idempotency_key: "apply:ad-9:1:abcd",
+    });
   });
 
   it("updates an application status and notifies the applicant", async () => {

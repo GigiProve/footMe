@@ -44,13 +44,14 @@ import {
   APPLICATIONS_QK,
   APPLICATIONS_QK_PREFIXES,
 } from "./applications-keys";
+import { ApplicationStatusBlock } from "../../applications/lifecycle/components/ApplicationStatusBlock";
+import { societyLifecycleStatus } from "../../applications/lifecycle/lifecycle-presentation";
 import {
   APPLICATIONS_COPY,
   identityLine,
   positionLine,
   profileTypeLabel,
   receivedLine,
-  withdrawnLine,
 } from "./applications-presentation";
 import { APPLICATIONS_HREFS, CANDIDATE_HREFS } from "./applications-routes";
 import {
@@ -383,6 +384,13 @@ export function ApplicationDetailScreen() {
 
   const received = receivedLine(detail.latestSubmittedAt);
 
+  const lifecycleStatus = societyLifecycleStatus({
+    adStatus: detail.adStatus,
+    receivingClosed: detail.receivingClosed,
+    state: detail.state,
+    withdrawnAt: detail.withdrawnAt,
+  });
+
   return shell(
     <>
       <ScrollView
@@ -437,27 +445,36 @@ export function ApplicationDetailScreen() {
             </AppText>
           ) : null}
 
-          {/* §13, §24: ritiro e chiusura sono due fatti, e nel dettaglio si
-              conservano entrambi. */}
-          {detail.state === "withdrawn" ? (
+          {detail.seasonLabel ? (
             <AppText color="neutralMuted" variant="bodySm">
-              {withdrawnLine(detail.withdrawnAt)}
-            </AppText>
-          ) : null}
-
-          {detail.adStatus === "closed" ? (
-            <AppText color="neutralMuted" variant="bodySm">
-              {[APPLICATIONS_COPY.positionClosed, detail.seasonLabel]
-                .filter(Boolean)
-                .join(" · ")}
-            </AppText>
-          ) : detail.receivingClosed ? (
-            /* §24: «La deadline superata non è Position CLOSED.» */
-            <AppText color="neutralMuted" variant="bodySm">
-              Scadenza candidature superata
+              {detail.seasonLabel}
             </AppText>
           ) : null}
         </CandidateSection>
+
+        {/*
+          DAS-REV-23 §17, §14, §15 — screen 06-09.
+
+          Ritiro, termine scaduto e chiusura erano tre righe grigie sciolte
+          sotto il contesto. Il PNG 23 le mostra come un **riquadro di stato**
+          con la propria spiegazione: «Candidatura ritirata / Ritirata il …»,
+          «Termine candidature scaduto / Le candidature ricevute restano
+          valutabili.», «Posizione chiusa / Le candidature ricevute restano
+          valutabili.»
+
+          È lo stesso componente della pagina personale: §29 dà ai tre stati
+          lo stesso trattamento neutro, e due copie divergerebbero proprio sul
+          colore. §17: «Se ritiro e Position CLOSED coesistono, conserva
+          entrambi i fatti» — e infatti il riquadro le porta entrambe.
+        */}
+        {lifecycleStatus ? (
+          <View style={styles.statusBlock}>
+            <ApplicationStatusBlock
+              status={lifecycleStatus}
+              testID="application-lifecycle-status"
+            />
+          </View>
+        ) : null}
 
         {/* §16, §27: i blocchi professionali hanno la loro disponibilità. Un
             loro errore non toglie la candidatura, e non diventa «nessuna
@@ -563,6 +580,9 @@ const styles = StyleSheet.create({
   },
   blockSkeleton: {
     paddingTop: spacing[16],
+  },
+  statusBlock: {
+    paddingTop: spacing[12],
   },
   links: {
     borderTopColor: colors.dividerNeutral,

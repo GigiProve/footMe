@@ -1,10 +1,16 @@
-import { Screen } from "../../src/components/ui/screen";
-import { ApplicationDetailScreen } from "../../src/features/applications/ApplicationDetailScreen";
+import { Redirect, useLocalSearchParams } from "expo-router";
 
-export default function ApplicationDetailRoute() {
+/** Reindirizzamento del dettaglio personale (DAS-REV-23 §28). */
+export default function MyApplicationDetailRedirect() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+
   return (
-    <Screen>
-      <ApplicationDetailScreen />
-    </Screen>
+    <Redirect
+      href={
+        `/(tabs)/dashboard/my-applications/${encodeURIComponent(
+          typeof id === "string" ? id : "",
+        )}` as never
+      }
+    />
   );
 }

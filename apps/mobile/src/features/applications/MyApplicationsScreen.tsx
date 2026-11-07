@@ -151,7 +151,7 @@ export function MyApplicationsScreen() {
               index={index}
               isFocused={item.id === focusId}
               item={item}
-              onPress={() => router.push(`/applications/${item.id}` as never)}
+              onPress={() => router.push(`/(tabs)/dashboard/my-applications/${item.id}` as never)}
             />
           )}
         />

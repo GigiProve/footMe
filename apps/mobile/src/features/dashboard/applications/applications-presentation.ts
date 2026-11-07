@@ -6,6 +6,10 @@
  * contro applicati, riepiloghi con i plurali giusti — ed è anche l'unica
  * verificabile senza montare un albero React.
  */
+import {
+  LIFECYCLE_COPY,
+  formatLongDate,
+} from "../../applications/lifecycle/lifecycle-presentation";
 import type {
   ApplicantProfileType,
   ApplicationFilterOption,
@@ -27,8 +31,8 @@ export const APPLICATIONS_COPY = {
 
   /** §13. Stati neutri, mai un trattamento di errore. */
   newBadge: "Nuova",
-  withdrawn: "Ritirata",
-  positionClosed: "Posizione chiusa",
+  withdrawn: LIFECYCLE_COPY.withdrawn,
+  positionClosed: LIFECYCLE_COPY.positionClosed,
 
   /** §15: l'eyebrow del contesto storico dell'invio. */
   appliedFor: "Candidatura per",
@@ -90,21 +94,6 @@ export const APPLICATIONS_TABS: readonly {
 // Date
 // ---------------------------------------------------------------------------
 
-const LONG_MONTHS = [
-  "gennaio",
-  "febbraio",
-  "marzo",
-  "aprile",
-  "maggio",
-  "giugno",
-  "luglio",
-  "agosto",
-  "settembre",
-  "ottobre",
-  "novembre",
-  "dicembre",
-] as const;
-
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
@@ -158,28 +147,21 @@ export function formatSubmittedAgo(
   return hours < 1 ? `${minutes}min` : `${hours}h`;
 }
 
-/** «13 settembre 2026» (§15). Il dettaglio porta sempre l'anno. */
-export function formatSubmittedOn(value: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const month = LONG_MONTHS[date.getMonth()];
-
-  return month ? `${date.getDate()} ${month} ${date.getFullYear()}` : null;
-}
+/**
+ * «13 settembre 2026» (§15). Il dettaglio porta sempre l'anno.
+ *
+ * Delega al formattatore del dominio Candidature: DAS-REV-23 mostra la stessa
+ * data sulle due sponde — «Inviata il …» per la persona, «Ricevuta il …» per
+ * la Società — e due implementazioni finirebbero per divergere proprio sul
+ * mese.
+ */
+export const formatSubmittedOn = formatLongDate;
 
 /** §15: «Ricevuta il 13 settembre 2026», oppure niente. */
 export function receivedLine(value: string | null): string | null {
   const formatted = formatSubmittedOn(value);
 
-  return formatted ? `Ricevuta il ${formatted}` : null;
+  return formatted ? LIFECYCLE_COPY.receivedOn(formatted) : null;
 }
 
 /** §19: il ritiro è un fatto separato, con la sua data. */
@@ -187,7 +169,7 @@ export function withdrawnLine(value: string | null): string {
   const formatted = formatSubmittedOn(value);
 
   return formatted
-    ? `${APPLICATIONS_COPY.withdrawn} il ${formatted}`
+    ? LIFECYCLE_COPY.withdrawnOn(formatted)
     : APPLICATIONS_COPY.withdrawn;
 }
 

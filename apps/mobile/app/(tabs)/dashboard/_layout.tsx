@@ -102,6 +102,14 @@ export default function DashboardLayout() {
         <Stack.Screen name="applications/index" />
         <Stack.Screen name="applications/[applicationId]" />
         <Stack.Screen name="applications/position/[positionId]" />
+        {/* DAS-REV-23 §28: «Bottom navigation canonica … Dashboard
+            selezionata nelle pagine della tavola aperte dal relativo
+            percorso.» Gli screen 01-04 sono pagine **personali**, non
+            gestionali: vivono qui per la bottom navigation, non per il
+            contesto Società — e infatti non usano l'identità della
+            Dashboard. app/applications/ resta come reindirizzamento. */}
+        <Stack.Screen name="my-applications/index" />
+        <Stack.Screen name="my-applications/[id]" />
       </Stack>
     </DashboardIdentityProvider>
   );

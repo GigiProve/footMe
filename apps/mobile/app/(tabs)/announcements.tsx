@@ -264,7 +264,7 @@ export default function AnnouncementsScreen() {
 
     try {
       setIsActionLoading(adId);
-      await applyToRecruitingAd(session.user.id, adId, coverMessage);
+      await applyToRecruitingAd(adId, coverMessage);
       setCoverMessage("");
       setSelectedAdId(null);
       await loadPublicAnnouncements();

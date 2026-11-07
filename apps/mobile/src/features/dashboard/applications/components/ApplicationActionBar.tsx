@@ -76,7 +76,7 @@ export function ApplicationActionBar({
           label={APPLICATIONS_COPY.addToShortlist}
           loading={shortlistBusy}
           onPress={onAddShortlist}
-          size="md"
+          size="lg"
           style={styles.action}
           testID="application-add-shortlist"
           variant="primary"
@@ -89,7 +89,7 @@ export function ApplicationActionBar({
           label={APPLICATIONS_COPY.message}
           loading={messageBusy}
           onPress={onMessage}
-          size="md"
+          size="lg"
           style={styles.action}
           testID="application-message"
           variant="neutralOutline"
@@ -107,18 +107,26 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderNeutral,
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
+    /* DAS-REV-23 §34: «nessun overflow orizzontale o testo troncato nelle
+       azioni essenziali», e §29 vieta di rimpicciolire il testo per farcelo
+       stare. Con una base di 150 le due azioni stanno affiancate al viewport
+       di riferimento — com'è nel PNG — e vanno a capo sotto i ~340 px, dove
+       «Aggiungi alla shortlist» accanto a «Messaggio» non entrerebbe. */
+    flexWrap: "wrap",
     gap: spacing[12],
     paddingHorizontal: spacing[20],
     paddingTop: spacing[12],
   },
   action: {
-    flex: 1,
+    flexBasis: 150,
+    flexGrow: 1,
   },
   shortlistState: {
     alignItems: "center",
     backgroundColor: colors.surfaceNeutral,
     borderRadius: radius.full,
-    flex: 1,
+    flexBasis: 150,
+    flexGrow: 1,
     flexDirection: "row",
     gap: spacing[8],
     justifyContent: "center",

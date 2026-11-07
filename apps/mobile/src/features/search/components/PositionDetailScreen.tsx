@@ -51,7 +51,7 @@ export function PositionDetailScreen() {
         throw new Error("Sessione non valida.");
       }
 
-      return applyToRecruitingAd(profileId, detail.ad_id, "");
+      return applyToRecruitingAd(detail.ad_id, "");
     },
     onError: (error) => {
       showToast({

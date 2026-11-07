@@ -1466,7 +1466,7 @@ function buildPersonalSummary(
         "Candidatura attiva",
         "Candidature attive",
       ),
-      onPress: () => go("personal_summary", "/applications?filter=active"),
+      onPress: () => go("personal_summary", "/(tabs)/dashboard/my-applications?filter=active"),
       value: data.activeApplicationsCount,
     },
     {
@@ -1741,8 +1741,8 @@ function ModuleRenderer({
                 onNavigate(
                   moduleId,
                   item.isCompleted
-                    ? `/applications?filter=completed&focus=${item.applicationId}`
-                    : `/applications/${item.applicationId}`,
+                    ? `/(tabs)/dashboard/my-applications?filter=completed&focus=${item.applicationId}`
+                    : `/(tabs)/dashboard/my-applications/${item.applicationId}`,
                 )
               }
               showDivider={index > 0}
@@ -1829,7 +1829,7 @@ function ModuleRenderer({
               : {
                   label: "Vedi tutte",
                   onPress: () =>
-                    onNavigate(moduleId, "/applications?filter=active"),
+                    onNavigate(moduleId, "/(tabs)/dashboard/my-applications?filter=active"),
                 }
           }
           // §10: tutte le preview già mostrate in alto non producono un falso
@@ -1843,7 +1843,7 @@ function ModuleRenderer({
             hasHistoryOnly ? (
               <ApplicationsHistoryEmpty
                 onPress={() =>
-                  onNavigate(moduleId, "/applications?filter=completed")
+                  onNavigate(moduleId, "/(tabs)/dashboard/my-applications?filter=completed")
                 }
               />
             ) : undefined
@@ -1876,7 +1876,7 @@ function ModuleRenderer({
               // §9: la row apre il **dettaglio della candidatura** tramite il
               // suo ID. Aprire la posizione mostrerebbe l'annuncio, non lo
               // stato e il percorso della candidatura.
-              onPress={() => onNavigate(moduleId, `/applications/${item.id}`)}
+              onPress={() => onNavigate(moduleId, `/(tabs)/dashboard/my-applications/${item.id}`)}
               showDivider={index > 0}
               status={applicationStatusLabel(item.status)}
               statusPlacement="trailing"

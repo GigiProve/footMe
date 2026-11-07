@@ -238,15 +238,28 @@ const APPLY_MESSAGES: Record<string, string> = {
  * `replayed = true`, anche se nel frattempo il termine è passato (§17). Un
  * invio mai committato rivalida invece lo stato corrente: è il server a
  * distinguere i due casi, perché solo lui sa se la riga esiste già.
+ *
+ * La **ricandidatura** dopo un ritiro usa la stessa RPC ma passa da
+ * `lifecycle-service.ts`, che porta anche la revisione osservata come
+ * precondizione (DAS-REV-23 §12).
  */
 export async function applyToRecruitingAd(
-  profileId: string,
   adId: string,
   coverMessage: string,
+  /**
+   * DAS-REV-23 §13: identità dell'operazione. Lo stesso valore ritentato dopo
+   * un timeout fa riconoscere al server la ricevuta invece di ripetere
+   * l'effetto; un'intenzione nuova deve portarne uno nuovo. Facoltativo
+   * perché i percorsi che non hanno uno stato di schermata in cui tenerlo
+   * restano coperti dal vincolo di unicità persona + Position.
+   */
+  operationKey?: string,
 ) {
-  const { data, error } = await supabase.rpc("apply_to_position", {
+  const { error } = await supabase.rpc("apply_to_position", {
     p_ad_id: adId,
     p_cover_message: coverMessage.trim() || null,
+    p_expected_revision: null,
+    p_idempotency_key: operationKey ?? null,
   });
 
   if (error) {
@@ -257,43 +270,17 @@ export async function applyToRecruitingAd(
     throw known ? new Error(APPLY_MESSAGES[known]) : error;
   }
 
-  const row = Array.isArray(data) ? data[0] : null;
-
-  /* Un replay non è un nuovo invio: niente seconda notifica al club, che
-     altrimenti arriverebbe a ogni retry di una risposta persa (§34 —
-     «Gli eventi tecnici necessari … non sono notifiche utente»). */
-  if (row?.replayed === true) {
-    return;
-  }
-
-  // Notify the club owner of the new application.
-  const { data: ad } = await supabase
-    .from("recruiting_ads")
-    .select("title, club_id, clubs(owner_profile_id)")
-    .eq("id", adId)
-    .maybeSingle();
-
-  const club = ad
-    ? ((Array.isArray(ad.clubs) ? ad.clubs[0] : ad.clubs) as {
-        owner_profile_id: string;
-      } | null)
-    : null;
-
-  if (club?.owner_profile_id) {
-    const { data: applicant } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", profileId)
-      .maybeSingle();
-
-    await supabase.from("notifications").insert({
-      body: `${applicant?.full_name ?? "Un candidato"} si e' candidato per "${ad?.title ?? "un annuncio"}"`,
-      data: { ad_id: adId, applicant_profile_id: profileId },
-      recipient_profile_id: club.owner_profile_id,
-      title: "Hai ricevuto una nuova candidatura",
-      type: "application_received",
-    });
-  }
+  /*
+   * DAS-REV-23 §25: la notifica alla Società nasce **dentro** la RPC, nella
+   * stessa transazione della submission e deduplicata per candidatura +
+   * revisione.
+   *
+   * Prima stava qui: tre letture e un insert dopo la risposta. Significava
+   * che una ricandidatura — che non passa di qui — non notificava nulla, che
+   * una rete persa fra RPC e insert lasciava la Società all'oscuro di una
+   * candidatura esistente, e che il client scriveva nella casella di un
+   * altro utente.
+   */
 }
 
 export type ApplicationStatus =
