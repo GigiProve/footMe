@@ -2284,6 +2284,7 @@ function ModuleRenderer({
           icon: area.icon,
           id: area.id,
           onPress: () => onNavigate(moduleId, area.href),
+          subtitle: area.subtitle,
           title: area.title,
         }),
       );

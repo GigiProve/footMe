@@ -1,3 +1,4 @@
+import { SHORTLIST_QK_PREFIXES } from "../../dashboard/shortlist/shortlist-keys";
 import { useEffect, useState } from "react";
 import { Modal, SafeAreaView, StyleSheet, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -54,7 +55,12 @@ export function AddEvaluationModal({
   const { showToast } = useToast();
 
   const [step, setStep] = useState<"form" | "success">("form");
-  const [priority, setPriority] = useState<ShortlistPriority>("media");
+  /**
+   * §17, QA028: «non forzare Media alle nuove entry». Il default del
+   * 2026-07 era proprio quello, ed era anche il default della colonna:
+   * ora nessuno dei due lo è.
+   */
+  const [priority, setPriority] = useState<ShortlistPriority | null>(null);
   const [status, setStatus] = useState<ShortlistEvaluationStatus>("da_valutare");
   const [note, setNote] = useState("");
 
@@ -87,6 +93,13 @@ export function AddEvaluationModal({
       queryClient.invalidateQueries({ queryKey: ["shortlist-entries", listId] });
       queryClient.invalidateQueries({ queryKey: ["shortlists", clubId] });
       queryClient.invalidateQueries({ queryKey: ["shortlist-overview", clubId] });
+
+      /* §28: dopo aggiunta dal profilo il Centro Shortlist deve riflettere count,
+         righe e stella. Le sue chiavi vivono nel modulo della Dashboard e
+         non sono raggiunte dai prefissi legacy qui sopra. */
+      for (const prefix of SHORTLIST_QK_PREFIXES) {
+        queryClient.invalidateQueries({ queryKey: [prefix] });
+      }
       queryClient.invalidateQueries({
         queryKey: ["shortlist-memberships", profile.id],
       });
@@ -157,7 +170,16 @@ export function AddEvaluationModal({
                   <AppText color="muted" variant="bodySm">
                     Priorità
                   </AppText>
-                  <Badge label={getPriorityLabel(priority)} variant={getPriorityBadgeVariant(priority)} />
+                  {priority ? (
+                    <Badge
+                      label={getPriorityLabel(priority) ?? ""}
+                      variant={getPriorityBadgeVariant(priority)}
+                    />
+                  ) : (
+                    <AppText color="muted" variant="bodySm">
+                      Nessuna
+                    </AppText>
+                  )}
                 </View>
                 <Divider spacing={8} />
                 <View style={styles.summaryRow}>

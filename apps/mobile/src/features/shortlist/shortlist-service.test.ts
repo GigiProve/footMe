@@ -7,7 +7,6 @@ import {
   fetchClubShortlists,
   fetchProfileShortlistMemberships,
   fetchShortlistEntries,
-  fetchShortlistOverviewCounts,
   fetchShortlistedProfileIds,
   getEvaluationStatusLabel,
   getPriorityLabel,
@@ -74,42 +73,6 @@ describe("rpc readers", () => {
     expect(result).toHaveLength(1);
   });
 
-  it("fetchShortlistOverviewCounts coerces string counts to numbers", async () => {
-    mocks.rpc.mockResolvedValue({
-      data: [
-        {
-          alta_count: "4",
-          da_contattare_count: "2",
-          lists_count: "3",
-          total_entries: "9",
-        },
-      ],
-      error: null,
-    });
-
-    const counts = await fetchShortlistOverviewCounts("club-1");
-
-    expect(counts).toEqual({
-      alta_count: 4,
-      da_contattare_count: 2,
-      lists_count: 3,
-      total_entries: 9,
-    });
-  });
-
-  it("fetchShortlistOverviewCounts defaults to zero when the row is missing fields", async () => {
-    mocks.rpc.mockResolvedValue({ data: [{}], error: null });
-
-    const counts = await fetchShortlistOverviewCounts("club-1");
-
-    expect(counts).toEqual({
-      alta_count: 0,
-      da_contattare_count: 0,
-      lists_count: 0,
-      total_entries: 0,
-    });
-  });
-
   it("fetchShortlistEntries forwards shortlist id and pagination", async () => {
     mocks.rpc.mockResolvedValue({ data: [{ id: "e1" }], error: null });
     const result = await fetchShortlistEntries("list-1", 2, 50);
@@ -132,16 +95,18 @@ describe("createShortlist", () => {
     const id = await createShortlist("club-1", "profile-1", {
       description: "  Profili offensivi  ",
       name: "  Attaccanti 2025/26  ",
-      scope: "prima_squadra",
+      teamId: "team-1",
     });
 
     expect(mocks.from).toHaveBeenCalledWith("club_shortlists");
+    /* DAS-REV-24 §22: il perimetro è una squadra reale, e §23 vieta al
+       client di inviare campi protetti — `list_type` non compare. */
     expect(mocks.builder.insert).toHaveBeenCalledWith({
       club_id: "club-1",
       created_by_profile_id: "profile-1",
       description: "Profili offensivi",
       name: "Attaccanti 2025/26",
-      scope: "prima_squadra",
+      team_id: "team-1",
     });
     expect(id).toBe("list-99");
   });
@@ -172,6 +137,10 @@ describe("addShortlistEntry", () => {
 
     expect(mocks.builder.insert).toHaveBeenCalledWith({
       added_by_profile_id: "adder-1",
+      /* DAS-REV-24 §19: l'origine di nascita la scrive il client solo qui,
+         dove l'ingresso è il profilo; il legame con una candidatura lo
+         stabilisce il server (§23). */
+      created_source: "profile",
       evaluation_status: "interessante",
       internal_note: "Ottimo colpo di testa",
       player_profile_id: "player-1",
@@ -185,6 +154,7 @@ describe("addShortlistEntry", () => {
 
     expect(mocks.builder.insert).toHaveBeenCalledWith({
       added_by_profile_id: "adder-1",
+      created_source: "profile",
       evaluation_status: "da_valutare",
       internal_note: null,
       player_profile_id: "player-1",
@@ -228,6 +198,48 @@ describe("updateShortlistEntry", () => {
       p_internal_note: null,
       p_priority: "alta",
       p_set_note: false,
+      /* DAS-REV-24 §17, §20: cancellazione esplicita della priorità e
+       compare-and-set sulla revisione. `p_set_priority` segue la presenza
+       della chiave nel patch, non il suo valore. */
+      p_set_priority: true,
+      p_expected_revision: null,
+    });
+  });
+
+  it("clears the priority when it is explicitly null (DAS-REV-24 §17)", async () => {
+    mocks.rpc.mockResolvedValue({ error: null });
+
+    await updateShortlistEntry("entry-1", { priority: null });
+
+    /* Senza `p_set_priority` un `null` sarebbe indistinguibile da «lascia
+       com'è», e una priorità non si potrebbe più togliere. */
+    expect(mocks.rpc).toHaveBeenCalledWith("update_shortlist_entry", {
+      p_entry_id: "entry-1",
+      p_evaluation_status: null,
+      p_internal_note: null,
+      p_priority: null,
+      p_set_note: false,
+      p_set_priority: true,
+      p_expected_revision: null,
+    });
+  });
+
+  it("forwards the expected revision for compare-and-set (DAS-REV-24 §20)", async () => {
+    mocks.rpc.mockResolvedValue({ error: null });
+
+    await updateShortlistEntry("entry-1", {
+      evaluationStatus: "interessante",
+      expectedRevision: 7,
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledWith("update_shortlist_entry", {
+      p_entry_id: "entry-1",
+      p_evaluation_status: "interessante",
+      p_internal_note: null,
+      p_priority: null,
+      p_set_note: false,
+      p_set_priority: false,
+      p_expected_revision: 7,
     });
   });
 
@@ -242,6 +254,10 @@ describe("updateShortlistEntry", () => {
       p_internal_note: null,
       p_priority: null,
       p_set_note: true,
+      /* DAS-REV-24 §17, §20: cancellazione esplicita della priorità e
+       compare-and-set sulla revisione, entrambi facoltativi. */
+      p_set_priority: false,
+      p_expected_revision: null,
     });
   });
 
@@ -259,6 +275,10 @@ describe("updateShortlistEntry", () => {
       p_internal_note: "Nota aggiornata",
       p_priority: null,
       p_set_note: true,
+      /* DAS-REV-24 §17, §20: cancellazione esplicita della priorità e
+       compare-and-set sulla revisione, entrambi facoltativi. */
+      p_set_priority: false,
+      p_expected_revision: null,
     });
   });
 

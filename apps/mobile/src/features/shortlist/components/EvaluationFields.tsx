@@ -12,7 +12,13 @@ import {
 } from "../shortlist-service";
 import { getPriorityBadgeVariant } from "../shortlist-display-helpers";
 
-const PRIORITIES: ShortlistPriority[] = ["alta", "media", "bassa"];
+/**
+ * DAS-REV-24 §17: «Priorità: Alta, Media, Bassa **oppure non impostata**.»
+ * `null` è il primo valore selezionabile e non un'assenza da riempire: una
+ * entry nata dalla candidatura arriva così (§17: «priority nulla»), e senza
+ * questa opzione aprirne l'editor la forzerebbe a un valore.
+ */
+const PRIORITIES: (ShortlistPriority | null)[] = [null, "alta", "media", "bassa"];
 
 const STATUSES: ShortlistEvaluationStatus[] = [
   "da_valutare",
@@ -28,9 +34,9 @@ type EvaluationFieldsProps = {
   canEditStatus: boolean;
   note: string;
   onNoteChange: (note: string) => void;
-  onPriorityChange: (priority: ShortlistPriority) => void;
+  onPriorityChange: (priority: ShortlistPriority | null) => void;
   onStatusChange: (status: ShortlistEvaluationStatus) => void;
-  priority: ShortlistPriority;
+  priority: ShortlistPriority | null;
   status: ShortlistEvaluationStatus;
 };
 
@@ -53,16 +59,22 @@ export function EvaluationFields({
           Priorità
         </AppText>
         {PRIORITIES.map((option) => (
-          <View key={option} style={styles.radioRow}>
+          <View key={option ?? "none"} style={styles.radioRow}>
             <View style={styles.radioLabel}>
               <Radio
                 checked={priority === option}
                 disabled={!canEditStatus}
-                label={getPriorityLabel(option)}
+                label={getPriorityLabel(option) ?? "Nessuna priorità"}
                 onPress={() => onPriorityChange(option)}
               />
             </View>
-            <Badge label={getPriorityLabel(option)} variant={getPriorityBadgeVariant(option)} />
+
+            {option ? (
+              <Badge
+                label={getPriorityLabel(option) ?? ""}
+                variant={getPriorityBadgeVariant(option)}
+              />
+            ) : null}
           </View>
         ))}
       </View>

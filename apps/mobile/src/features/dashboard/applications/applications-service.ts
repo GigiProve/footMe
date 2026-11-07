@@ -485,9 +485,21 @@ export async function markApplicationRead(input: {
  */
 export async function addApplicationToShortlist(
   applicationId: string,
+  /**
+   * DAS-REV-24 §13: «Il retry usa la protezione idempotente della stessa
+   * operazione finché il suo esito non è risolto.» La chiave la genera il
+   * client, una per intenzione — un retry dopo timeout la riusa e replica
+   * la ricevuta; una nuova aggiunta dopo una rimozione ne porta una nuova
+   * ed è un'intenzione diversa (§20).
+   */
+  idempotencyKey: string | null = null,
 ): Promise<ShortlistAddResult> {
-  const rows = await rpc<RawRecord[]>("add_position_shortlist_entry", {
+  /* DAS-REV-24 §26: il comando è ora quello del core unico.
+     `add_position_shortlist_entry` resta come wrapper di compatibilità per
+     i client non aggiornati, ma non porta la chiave idempotente. */
+  const rows = await rpc<RawRecord[]>("add_application_to_shortlist", {
     p_application_id: applicationId,
+    p_idempotency_key: idempotencyKey,
   });
 
   const row = Array.isArray(rows) ? rows[0] : null;
@@ -497,11 +509,11 @@ export async function addApplicationToShortlist(
   }
 
   return {
-    /* `position_id` e non `ad_id`: le colonne OUT della RPC non possono
+    /* `position_ref` e non `ad_id`: le colonne OUT della RPC non possono
        portare il nome di una colonna della tabella su cui scrive. */
-    adId: text(row.position_id) ?? "",
+    adId: text(row.position_ref) ?? "",
     already: bool(row.already),
     entryId: text(row.entry_id) ?? "",
-    personId: text(row.person_id) ?? "",
+    personId: text(row.person_ref) ?? "",
   };
 }

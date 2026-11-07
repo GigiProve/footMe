@@ -46,6 +46,19 @@ export const DASHBOARD_CAPABILITIES = [
   // chiave del dominio Shortlist, che esiste dal 20260717090000, non con una
   // regola nuova inventata nella Dashboard.
   "shortlist_view",
+  // DAS-REV-24 §5: «Distinguere almeno le capacità equivalenti a consultare,
+  // creare liste personalizzate, aggiungere profili, scrivere note interne,
+  // modificare valutazione/priorità e rimuovere profili.» Le altre cinque
+  // chiavi esistono nel CHECK e nel catalogo DAS-REV-14 dal 20260717090000,
+  // ma qui ne compariva una sola: un ruolo che concedesse soltanto
+  // shortlist_add_profiles risultava senza poteri alla Dashboard, in
+  // silenzio — lo stesso bug che DAS-REV-15 aveva corretto per
+  // society_manage_positions.
+  "shortlist_create_lists",
+  "shortlist_add_profiles",
+  "shortlist_add_notes",
+  "shortlist_edit_status",
+  "shortlist_remove_profiles",
   // DAS-REV-08 §5: quattro capability distinte sulle Squadre. Consultare non
   // è creare, e leggere i conteggi dell'organico è una terza cosa ancora —
   // `teams_view` da sola non autorizza nessuna delle altre due.

@@ -7,19 +7,25 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { KeyboardAwareForm } from "../../../components/ui/keyboard-aware-form";
 import { AppText, Button, Divider, Input, ModalHeader, Radio, useToast } from "../../../ui";
 import { colors, spacing } from "../../../theme/tokens";
-import {
-  createShortlist,
-  getScopeLabel,
-  type ShortlistScope,
-} from "../shortlist-service";
+import { useQuery } from "@tanstack/react-query";
 
-const SCOPES: ShortlistScope[] = [
-  "tutta_la_societa",
-  "prima_squadra",
-  "juniores",
-  "under_17",
-  "under_15",
-];
+import { SHORTLIST_QK_PREFIXES } from "../../dashboard/shortlist/shortlist-keys";
+import { createShortlist } from "../shortlist-service";
+import { fetchClubTeamOptions } from "../shortlist-scope-service";
+
+/**
+ * DAS-REV-24 §22, screen 06: l'ambito di una lista CUSTOM è una **squadra
+ * reale** della Società, oppure l'intera Società. I cinque token del
+ * 2026-07 (`prima_squadra`, `juniores`, …) non identificavano nessuna riga
+ * di `club_teams`, quindi un amministratore con ambito Primavera non
+ * poteva vedere «solo le liste del suo perimetro» — che è esattamente
+ * quello che QA079 verifica.
+ *
+ * Il valore `null` è «Intera società»: §22 — «Una lista Intera società non
+ * diventa accessibile automaticamente a tutti gli amministratori di una
+ * singola squadra», e la RLS lo impone.
+ */
+const SOCIETY_WIDE = "__society__";
 
 type CreateListModalProps = {
   clubId: string;
@@ -47,7 +53,7 @@ export function CreateListModal({
   const [step, setStep] = useState<"form" | "success">("form");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [scope, setScope] = useState<ShortlistScope>("tutta_la_societa");
+  const [teamId, setTeamId] = useState<string>(SOCIETY_WIDE);
   const [createdListId, setCreatedListId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,17 +61,36 @@ export function CreateListModal({
       setStep("form");
       setName("");
       setDescription("");
-      setScope("tutta_la_societa");
+      setTeamId(SOCIETY_WIDE);
       setCreatedListId(null);
     }
   }, [visible]);
+
+  /**
+   * §25: «Riutilizza campi, validazioni e ambiti del form esistente: nome,
+   * descrizione se prevista, scope autorizzato.» Le squadre arrivano dal
+   * dominio canonico e sono già filtrate dal perimetro dell'actor: un
+   * amministratore con ambito Primavera non può creare una lista di Prima
+   * squadra.
+   */
+  const teamsQuery = useQuery({
+    enabled: visible && !!clubId,
+    queryFn: () => fetchClubTeamOptions(clubId),
+    queryKey: ["shortlist-scope-teams", clubId],
+  });
+
+  const teams = teamsQuery.data ?? [];
+  const scopeLabel =
+    teamId === SOCIETY_WIDE
+      ? "Intera società"
+      : (teams.find((team) => team.id === teamId)?.name ?? "Intera società");
 
   const mutation = useMutation({
     mutationFn: () =>
       createShortlist(clubId, createdByProfileId, {
         description: description.trim() || undefined,
         name: name.trim(),
-        scope,
+        teamId: teamId === SOCIETY_WIDE ? null : teamId,
       }),
     onError: (error) => {
       showToast({
@@ -77,6 +102,15 @@ export function CreateListModal({
     onSuccess: (newListId) => {
       queryClient.invalidateQueries({ queryKey: ["shortlists", clubId] });
       queryClient.invalidateQueries({ queryKey: ["shortlist-overview", clubId] });
+
+      /* DAS-REV-24 §28: «nuova CUSTOM: riga presente anche a zero» (QA107).
+         Il centro non si rimonta alla chiusura del modale — un Modal non
+         toglie il focus alla schermata sotto — quindi senza questa
+         invalidazione la lista appena creata non comparirebbe fino al
+         prossimo ingresso. */
+      for (const prefix of SHORTLIST_QK_PREFIXES) {
+        queryClient.invalidateQueries({ queryKey: [prefix] });
+      }
 
       if (successMode === "skip") {
         // In modalità skip la chiusura e la transizione successiva sono
@@ -121,12 +155,19 @@ export function CreateListModal({
                 <AppText color="muted" variant="caption">
                   Ambito
                 </AppText>
-                {SCOPES.map((option) => (
+                <Radio
+                  checked={teamId === SOCIETY_WIDE}
+                  key={SOCIETY_WIDE}
+                  label="Intera società"
+                  onPress={() => setTeamId(SOCIETY_WIDE)}
+                />
+
+                {teams.map((team) => (
                   <Radio
-                    checked={scope === option}
-                    key={option}
-                    label={getScopeLabel(option)}
-                    onPress={() => setScope(option)}
+                    checked={teamId === team.id}
+                    key={team.id}
+                    label={team.name}
+                    onPress={() => setTeamId(team.id)}
                   />
                 ))}
               </View>
@@ -167,7 +208,7 @@ export function CreateListModal({
                   <AppText color="muted" variant="bodySm">
                     Ambito
                   </AppText>
-                  <AppText variant="bodySm">{getScopeLabel(scope)}</AppText>
+                  <AppText variant="bodySm">{scopeLabel}</AppText>
                 </View>
                 <Divider spacing={8} />
                 <View style={styles.summaryRow}>

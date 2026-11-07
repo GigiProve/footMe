@@ -44,6 +44,8 @@ import {
   APPLICATIONS_QK,
   APPLICATIONS_QK_PREFIXES,
 } from "./applications-keys";
+import { SHORTLIST_QK_PREFIXES } from "../shortlist/shortlist-keys";
+import { useOperationKey } from "../roles/use-operation-key";
 import { ApplicationStatusBlock } from "../../applications/lifecycle/components/ApplicationStatusBlock";
 import { societyLifecycleStatus } from "../../applications/lifecycle/lifecycle-presentation";
 import {
@@ -211,16 +213,38 @@ export function ApplicationDetailScreen() {
 
   // ── Azioni ────────────────────────────────────────────────────────────────
 
+  /**
+   * DAS-REV-24 §13: «Il retry usa la protezione idempotente della stessa
+   * operazione finché il suo esito non è risolto.»
+   *
+   * La firma è la candidatura: finché resta la stessa, un retry dopo un
+   * timeout riusa la chiave e il server replica la ricevuta invece di
+   * creare una seconda membership (QA044).
+   */
+  const shortlistKey = useOperationKey(`shortlist-add:${applicationId}`);
+
   const shortlist = useMutation({
-    mutationFn: () => addApplicationToShortlist(applicationId),
-    onError: () => {
+    mutationFn: () => addApplicationToShortlist(applicationId, shortlistKey()),
+    onError: (error) => {
       trackApplicationsEvent("application_shortlist_result", { outcome: "error" });
       /* §20: «Nessun falso stato In shortlist.» Il pulsante resta
          riutilizzabile e lo stato non cambia. */
+      /* DAS-REV-24 §30: «La candidatura è stata ritirata» quando è noto il
+         motivo autorizzato, «I dati sono cambiati» per un conflitto che
+         richiede una nuova lettura. Altrimenti l'errore generico, che non
+         rivela dettagli di query né l'esistenza di dati non accessibili. */
+      const reason =
+        error instanceof Error && error.message.includes("APPLICATION_WITHDRAWN")
+          ? APPLICATIONS_COPY.shortlistWithdrawn
+          : error instanceof Error &&
+              error.message.includes("OPERATION_CONTENT_CHANGED")
+            ? APPLICATIONS_COPY.shortlistConflict
+            : APPLICATIONS_COPY.shortlistError;
+
       showToast({
         icon: "alert-circle-outline",
         id: "application-shortlist-error",
-        message: APPLICATIONS_COPY.shortlistError,
+        message: reason,
       });
     },
     onSuccess: (result) => {
@@ -235,9 +259,19 @@ export function ApplicationDetailScreen() {
       );
 
       /* §28: «Dopo shortlist aggiorna dettaglio, dominio Shortlist e
-         relativi aggregati reali. Non modificare il count candidature.» */
+         relativi aggregati reali. Non modificare il count candidature.»
+
+         DAS-REV-24 §28 elenca il resto: «prima aggiunta: POSITION da 0 a 1
+         compare nel centro», «count e lista aggiornati, stella coerente».
+         I prefissi vivono accanto alle chiavi che invalidano, così una
+         chiave nuova non resta fuori per dimenticanza. */
       void queryClient.invalidateQueries({ queryKey: ["shortlists"] });
       void queryClient.invalidateQueries({ queryKey: ["shortlist-memberships"] });
+      void queryClient.invalidateQueries({ queryKey: ["shortlist-membership-flags"] });
+
+      for (const prefix of SHORTLIST_QK_PREFIXES) {
+        void queryClient.invalidateQueries({ queryKey: [prefix] });
+      }
     },
   });
 

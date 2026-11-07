@@ -1,3 +1,4 @@
+import { SHORTLIST_QK_PREFIXES } from "../../dashboard/shortlist/shortlist-keys";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -80,6 +81,13 @@ export function ShortlistEntryDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["shortlist-entries", listId] });
       queryClient.invalidateQueries({ queryKey: ["shortlists", clubId] });
       queryClient.invalidateQueries({ queryKey: ["shortlist-overview", clubId] });
+
+      /* §28: dopo rimozione dell'ultima entry il Centro Shortlist deve riflettere count,
+         righe e stella. Le sue chiavi vivono nel modulo della Dashboard e
+         non sono raggiunte dai prefissi legacy qui sopra. */
+      for (const prefix of SHORTLIST_QK_PREFIXES) {
+        queryClient.invalidateQueries({ queryKey: [prefix] });
+      }
 
       if (entry) {
         queryClient.invalidateQueries({
@@ -165,10 +173,18 @@ export function ShortlistEntryDetailScreen() {
             <AppText color="muted" variant="bodySm">
               Priorità
             </AppText>
-            <Badge
-              label={getPriorityLabel(entry.priority)}
-              variant={getPriorityBadgeVariant(entry.priority)}
-            />
+            {/* §17, §30: una priorità non impostata è un valore valido e si
+                omette; non diventa un badge “Non impostata”. */}
+            {entry.priority ? (
+              <Badge
+                label={getPriorityLabel(entry.priority) ?? ""}
+                variant={getPriorityBadgeVariant(entry.priority)}
+              />
+            ) : (
+              <AppText color="muted" variant="bodySm">
+                —
+              </AppText>
+            )}
           </View>
           <View style={styles.evalRow}>
             <AppText color="muted" variant="bodySm">

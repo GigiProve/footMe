@@ -74,9 +74,14 @@ export function ShortlistManageSheet({
                 size={20}
               />
             }
-            subtitle={`${getPriorityLabel(membership.priority)} • ${getEvaluationStatusLabel(
-              membership.evaluation_status,
-            )}`}
+            /* §17: la priorità assente non produce un separatore
+               penzolante né la parola “nessuna”. */
+            subtitle={[
+              getPriorityLabel(membership.priority),
+              getEvaluationStatusLabel(membership.evaluation_status),
+            ]
+              .filter((part): part is string => !!part)
+              .join(" • ")}
             title={membership.shortlist_name}
           />
         ))}

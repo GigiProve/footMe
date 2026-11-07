@@ -110,6 +110,15 @@ export default function DashboardLayout() {
             Dashboard. app/applications/ resta come reindirizzamento. */}
         <Stack.Screen name="my-applications/index" />
         <Stack.Screen name="my-applications/[id]" />
+        {/* DAS-REV-24 §5, §25: «Home | Cerca | Dashboard | Messaggi | Profilo
+            → Dashboard Società → Shortlist», con Dashboard selezionata. Il
+            centro, la vista base del pool di una Position e il dettaglio di
+            una lista personalizzata sono tutte pagine gestionali della
+            Società: in questo pack non esiste nessun flusso focalizzato.
+            app/shortlist/ resta come reindirizzamento (§26). */}
+        <Stack.Screen name="shortlist/index" />
+        <Stack.Screen name="shortlist/position/[positionId]" />
+        <Stack.Screen name="shortlist/list/[listId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

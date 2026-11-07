@@ -99,7 +99,14 @@ export const SOCIETY_HREFS = {
       : "/(tabs)/dashboard/positions?from=dashboard",
   /** Centro Stagioni e storico (DAS-REV-10 §9). */
   seasons: "/(tabs)/dashboard/seasons",
-  shortlist: "/shortlist",
+  /**
+   * Centro Shortlist (DAS-REV-24 §8, §25).
+   *
+   * Puntava a `/shortlist`, fuori dalle tab: la bottom navigation spariva,
+   * e §25 la vuole visibile con Dashboard selezionata. Il vecchio percorso
+   * resta come reindirizzamento per i link già emessi (§26).
+   */
+  shortlist: "/(tabs)/dashboard/shortlist",
   societyProfile: (clubId: string) => `/club/${clubId}`,
   /**
    * Hub Struttura societaria (DAS-REV-12 §5).
@@ -206,10 +213,20 @@ export function teamContextLabel(
   return normalize(category) === normalize(name) ? null : category;
 }
 
+/**
+ * DAS-REV-24 §30: la copy della riga vive accanto alle altre stringhe
+ * centralizzate. Non viene importata dal modulo Shortlist per non legare la
+ * composizione della Dashboard al caricamento di quel feature module.
+ */
+export const SHORTLIST_MODULE_DESCRIPTION =
+  "Profili selezionati e valutazioni interne";
+
 export type ManagementAreaItem = {
   href: string;
   icon: IconName;
   id: string;
+  /** DAS-REV-24 §8: solo dove la task che possiede la riga la prescrive. */
+  subtitle?: string;
   title: string;
 };
 
@@ -280,11 +297,25 @@ export function buildManagementAreas(
     });
   }
 
+  /**
+   * Shortlist (DAS-REV-24 §8).
+   *
+   * «Aggiungi o aggiorna la voce Shortlist nel modulo di navigazione della
+   * Dashboard Società … titolo: Shortlist; descrizione: Profili selezionati
+   * e valutazioni interne; icona coerente con il sistema condiviso.»
+   *
+   * §35: «L'icona Shortlist è distinta dal bookmark, coerente con la stella
+   * del modulo» — `star-outline`, non `bookmark-outline`, che appartiene ai
+   * Salvati personali e non va confuso con uno strumento della Società.
+   *
+   * §8: «Con accesso Shortlist assente, non mostrare la riga disabilitata.»
+  */
   if (identity.capabilities.includes("shortlist_view")) {
     items.push({
       href: SOCIETY_HREFS.shortlist,
-      icon: "clipboard-outline",
+      icon: "star-outline",
       id: "shortlist",
+      subtitle: SHORTLIST_MODULE_DESCRIPTION,
       title: "Shortlist",
     });
   }

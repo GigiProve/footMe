@@ -77,7 +77,10 @@ import {
 } from "../saved/saved-service";
 import { AddToShortlistFlow } from "../shortlist/components/AddToShortlistFlow";
 import { useShortlistPermissions } from "../shortlist/use-shortlist-permissions";
-import { fetchProfileShortlistMemberships } from "../shortlist/shortlist-service";
+import {
+  fetchProfileShortlistMemberships,
+  fetchProfileShortlistStar,
+} from "../shortlist/shortlist-service";
 import { colors, spacing } from "../../theme/tokens";
 import { ActionSheet, AppText, Button, useToast } from "../../ui";
 
@@ -150,7 +153,32 @@ export function PublicProfileScreen() {
       ),
     queryKey: ["shortlist-memberships", viewedProfileId],
   });
-  const isShortlisted = (shortlistMemberships?.length ?? 0) > 0;
+  /**
+   * DAS-REV-24 §15: la stella è piena per **qualunque** appartenenza
+   * accessibile della Society operativa, anche nata da una candidatura
+   * (QA093). `shortlistMemberships` non basta: è filtrata sulle CUSTOM
+   * perché alimenta il selector, e una entry della lista di una Position
+   * non vi compare.
+   */
+  const { data: isShortlisted = false } = useQuery({
+    enabled: canViewShortlist && !!viewedProfileId && !!shortlistPermissions?.club_id,
+    queryFn: () =>
+      fetchProfileShortlistStar(
+        shortlistPermissions?.club_id as string,
+        viewedProfileId as string,
+      ),
+    /* §28: «quelle della stella il contesto organizzativo». Senza il club
+       nella chiave, aprire lo stesso profilo come un'altra Society
+       riuserebbe il valore precedente (§15, QA095). */
+    queryKey: [
+      "shortlist-star",
+      shortlistPermissions?.club_id ?? "none",
+      viewedProfileId,
+    ],
+  });
+
+  /** Il flusso di gestione resta quello delle CUSTOM (§15: il pack 26 lo raffina). */
+  const hasCustomMembership = (shortlistMemberships?.length ?? 0) > 0;
   // Con il solo permesso di visualizzazione la stella comparirebbe ma il
   // flusso di aggiunta fallirebbe alla RLS: la mostriamo solo a chi può
   // aggiungere profili o gestire una presenza già esistente.
@@ -160,7 +188,7 @@ export function PublicProfileScreen() {
 
   function handleShortlistPress() {
     setShortlistFlow({
-      initialMode: isShortlisted ? "manage" : "picker",
+      initialMode: hasCustomMembership ? "manage" : "picker",
       open: true,
     });
   }

@@ -60,7 +60,7 @@ Il contratto trasversale della Dashboard è registrato in
 | `DAS-REV-nn` | revisione Dashboard (backlog attivo) |
 | `DAS-HOLD-01` | Store — **sospeso**, 5 blocchi, non iniziare senza conferma |
 
-Il messaggio di commit usa il codice task: `DAS-REV-23 - Lifecycle e permessi Candidature`.
+Il messaggio di commit usa il codice task: `DAS-REV-24 - Shortlist core e centro unificato`.
 
 ## Stato per area (2026-11-07)
 
@@ -78,8 +78,8 @@ Il messaggio di commit usa il codice task: `DAS-REV-23 - Lifecycle e permessi Ca
 | Messaggi | 3 | 0 | 3 |
 | Cerca | 5 | 0 | 1 |
 | Home | 1 | 0 | 16 |
-| Dashboard | 24 | 0 | 22 |
-| **Totale** | **127** | **4** | **69** |
+| Dashboard | 25 | 0 | 21 |
+| **Totale** | **128** | **4** | **68** |
 
 ### Chiuso e consolidato
 
@@ -95,13 +95,14 @@ Il messaggio di commit usa il codice task: `DAS-REV-23 - Lifecycle e permessi Ca
 - **Dashboard** — foundation, dashboard personale e Società, squadre e
   stagioni, rete societaria, amministratori e ruoli/permessi, Posizioni
   (centro, composer, lifecycle, scadenza), inviti e collegamento
-  persona–società, candidature ricevute e lifecycle (DAS-REV-00..23).
+  persona–società, candidature ricevute e lifecycle, core Shortlist
+  unificato e relativo centro (DAS-REV-00..24).
 
 ### Backlog attivo — Dashboard (in ordine)
 
 | Task | Oggetto |
 | --- | --- |
-| DAS-REV-24..27 | **Shortlist**: core e centro unificato, shortlist di Position, aggiunta dal profilo, liste personalizzate + QA |
+| DAS-REV-25..27 | **Shortlist**: dettaglio Position e valutazione, aggiunta dal profilo, liste personalizzate + QA |
 | DAS-REV-28..31 | **Eventi**: centro e creazione, landing e iscrizione, inviti e partecipanti, profili/shortlist/lifecycle + QA |
 | DAS-REV-32..35 | **Gruppi**: centro e creazione, gestione e lifecycle, integrazione Messaging/Push, UI premium + QA |
 | DAS-REV-36..39 | **Comunicazioni**: core/inbox/centro, composer e invio, lettura e condivisione, lifecycle e scheduling + QA |

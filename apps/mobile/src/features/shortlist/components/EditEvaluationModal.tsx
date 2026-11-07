@@ -1,3 +1,4 @@
+import { SHORTLIST_QK_PREFIXES } from "../../dashboard/shortlist/shortlist-keys";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -36,7 +37,9 @@ export function EditEvaluationModal({
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  const [priority, setPriority] = useState<ShortlistPriority>(entry.priority);
+  const [priority, setPriority] = useState<ShortlistPriority | null>(
+    entry.priority,
+  );
   const [status, setStatus] = useState<ShortlistEvaluationStatus>(
     entry.evaluation_status,
   );
@@ -53,7 +56,9 @@ export function EditEvaluationModal({
   const mutation = useMutation({
     mutationFn: () => {
       const patch: {
-        priority?: ShortlistPriority;
+        /* §17: `null` significa «togli la priorità», non «lascia com'è» —
+           la distinzione la fa `p_set_priority` lato RPC. */
+        priority?: ShortlistPriority | null;
         evaluationStatus?: ShortlistEvaluationStatus;
         internalNote?: string | null;
       } = {};
@@ -87,6 +92,13 @@ export function EditEvaluationModal({
       queryClient.invalidateQueries({ queryKey: ["shortlist-entries", listId] });
       queryClient.invalidateQueries({ queryKey: ["shortlists", clubId] });
       queryClient.invalidateQueries({ queryKey: ["shortlist-overview", clubId] });
+
+      /* §28: dopo modifica di valutazione o nota il Centro Shortlist deve riflettere count,
+         righe e stella. Le sue chiavi vivono nel modulo della Dashboard e
+         non sono raggiunte dai prefissi legacy qui sopra. */
+      for (const prefix of SHORTLIST_QK_PREFIXES) {
+        queryClient.invalidateQueries({ queryKey: [prefix] });
+      }
       queryClient.invalidateQueries({
         queryKey: ["shortlist-memberships", entry.player_profile_id],
       });

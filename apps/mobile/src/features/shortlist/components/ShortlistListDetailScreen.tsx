@@ -19,7 +19,6 @@ import { useShortlistPermissions } from "../use-shortlist-permissions";
 import {
   fetchClubShortlists,
   fetchShortlistEntries,
-  getScopeLabel,
   type ShortlistEntry,
 } from "../shortlist-service";
 import { formatListSubtitle } from "../shortlist-display-helpers";
@@ -129,7 +128,7 @@ export function ShortlistListDetailScreen() {
 
       {list ? (
         <AppText color="muted" style={styles.subheader} variant="bodySm">
-          {`${getScopeLabel(list.scope)} • ${formatListSubtitle(list)}`}
+          {`${list.scope_label} • ${formatListSubtitle(list)}`}
         </AppText>
       ) : null}
 

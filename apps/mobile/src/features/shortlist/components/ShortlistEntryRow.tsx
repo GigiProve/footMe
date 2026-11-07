@@ -43,10 +43,14 @@ export function ShortlistEntryRow({ entry, listId }: ShortlistEntryRowProps) {
           {formatEntrySubtitle(entry)}
         </AppText>
         <View style={styles.badgeRow}>
-          <Badge
-            label={getPriorityLabel(entry.priority)}
-            variant={getPriorityBadgeVariant(entry.priority)}
-          />
+          {/* §17: «Dove il dato non è utile, ometti la priorità assente
+              invece di mostrare un warning.» */}
+          {entry.priority ? (
+            <Badge
+              label={getPriorityLabel(entry.priority) ?? ""}
+              variant={getPriorityBadgeVariant(entry.priority)}
+            />
+          ) : null}
           <Badge
             label={getEvaluationStatusLabel(entry.evaluation_status)}
             variant={getStatusBadgeVariant(entry.evaluation_status)}

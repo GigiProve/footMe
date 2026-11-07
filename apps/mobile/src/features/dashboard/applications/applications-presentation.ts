@@ -48,8 +48,14 @@ export const APPLICATIONS_COPY = {
   /** §20. */
   addToShortlist: "Aggiungi alla shortlist",
   inShortlist: "In shortlist",
+  /* DAS-REV-24 §30 fissa il testo esatto, con «profilo» al posto di
+     «candidato»: la stessa frase compare nel centro Shortlist, e due
+     formulazioni per lo stesso errore sono due stringhe da tradurre. */
   shortlistError:
-    "Non è stato possibile aggiungere il candidato alla shortlist. Riprova.",
+    "Non è stato possibile aggiungere il profilo alla shortlist. Riprova.",
+  /** §30: il motivo autorizzato della mancata aggiunta, quando è noto. */
+  shortlistWithdrawn: "La candidatura è stata ritirata.",
+  shortlistConflict: "I dati sono cambiati. Aggiorna e riprova.",
 
   /** §22. */
   message: "Messaggio",

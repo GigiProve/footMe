@@ -10,6 +10,14 @@ export type AreaRowItem = {
   icon: keyof typeof Ionicons.glyphMap;
   id: string;
   onPress: () => void;
+  /**
+   * Descrizione sotto il titolo, quando la task che possiede la riga la
+   * prescrive — DAS-REV-24 §8 per Shortlist: «descrizione: Profili
+   * selezionati e valutazioni interne». Facoltativa: §8 vieta di
+   * ricostruire le altre righe del mockup, e una riga senza descrizione
+   * resta esattamente com'era.
+   */
+  subtitle?: string;
   title: string;
 };
 
@@ -32,11 +40,13 @@ export function DashboardAreaRows({ items }: Props) {
           {index > 0 ? <View style={styles.divider} /> : null}
 
           <Pressable
-            accessibilityLabel={
-              item.count === null
-                ? item.title
-                : `${item.title}, ${item.count}`
-            }
+            accessibilityLabel={[
+              item.title,
+              item.subtitle,
+              item.count === null ? null : String(item.count),
+            ]
+              .filter((part): part is string => !!part)
+              .join(", ")}
             accessibilityRole="button"
             onPress={item.onPress}
             style={({ pressed }) => [
@@ -48,9 +58,17 @@ export function DashboardAreaRows({ items }: Props) {
               <Ionicons color={colors.accent} name={item.icon} size={18} />
             </View>
 
-            <AppText numberOfLines={1} style={styles.title} variant="titleMd">
-              {item.title}
-            </AppText>
+            <View style={styles.body}>
+              <AppText numberOfLines={1} variant="titleMd">
+                {item.title}
+              </AppText>
+
+              {item.subtitle ? (
+                <AppText color="secondary" numberOfLines={2} variant="meta">
+                  {item.subtitle}
+                </AppText>
+              ) : null}
+            </View>
 
             {item.count !== null ? (
               <AppText color="secondary" variant="metaStrong">
@@ -96,8 +114,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 34,
   },
-  title: {
+  body: {
     flex: 1,
+    gap: 2,
   },
   pressed: {
     opacity: 0.7,
