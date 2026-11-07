@@ -4,6 +4,8 @@
 
 This repository uses npm workspaces. The active app lives in `apps/mobile`, a React Native + Expo project with Expo Router screens under `apps/mobile/app` and feature code under `apps/mobile/src/features`. Shared UI primitives live in `apps/mobile/src/ui`, reusable helpers in `apps/mobile/src/lib`, and design tokens in `apps/mobile/src/styles` and `apps/mobile/src/theme`. Tests usually sit next to the code they cover as `*.test.ts` or `*.test.tsx`. Database changes belong in `supabase/migrations`; setup notes and product/architecture docs live in `docs/`.
 
+Start from `docs/README.md`: it labels each document as live or historical. The three that matter before touching code are `docs/backlog-state.md` (what is done and what is next), `docs/feature-map.md` (where a domain lives and which modules are legacy) and `docs/verification-playbook.md` (how to verify, and the traps).
+
 ## Build, Test, and Development Commands
 
 - `npm install`: install workspace dependencies from the repo root.
@@ -27,8 +29,7 @@ Vitest is the test runner for unit and component tests. Name tests `*.test.ts` o
 
 ## Commit & Pull Request Guidelines
 
-Recent history follows concise Conventional Commit-style messages such as `feat(onboarding): ...`, `fix: ...`, and `feat: ... (#39)`. Keep commits scoped and imperative. PRs should explain user-visible changes, note any schema or environment updates, link the related issue, and include screenshots or screen recordings for UI changes.
-
+Commits are named after the Freedcamp task they close, e.g. `DAS-REV-23 - Lifecycle e permessi Candidature`. Older history used Conventional Commits (`feat(onboarding): ...`); follow the task-code form for new work. 
 ## Security & Configuration Tips
 
 Do not commit secrets. Use `apps/mobile/.env.example` as the template for local environment variables. Review Supabase migrations carefully before pushing, and keep documentation in `docs/` updated when workflows or schema assumptions change.

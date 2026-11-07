@@ -1,5 +1,9 @@
 # ProLink MVP Backlog
 
+> **Documento storico.** Backlog MVP iniziale, sostituito dal progetto
+> Freedcamp *Sviluppo APP* come fonte di verità.
+> Stato reale: [`backlog-state.md`](./backlog-state.md).
+
 ## Scopo del backlog
 
 Questo backlog traduce il piano di alto livello in lavoro operativo per la prima release MVP mobile di ProLink.

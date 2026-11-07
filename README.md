@@ -24,10 +24,10 @@ npm run dev:mobile
 
 Documenti di riferimento:
 
-- `docs/product-requirements.md`
-- `docs/implementation-roadmap.md`
-- `docs/mvp-backlog.md`
-- `docs/technical-architecture.md`
-- `docs/mobile-ux-ui-guidelines.md`
-- `docs/react-best-practices.md`
-- `docs/supabase-best-practices.md`
+Parti da [`docs/README.md`](docs/README.md), che indicizza tutto e segnala cosa è
+aggiornato e cosa è storico. I tre documenti da leggere prima di toccare il
+codice:
+
+- [`docs/backlog-state.md`](docs/backlog-state.md) - stato del backlog e come si legge una task
+- [`docs/feature-map.md`](docs/feature-map.md) - dove vive ogni dominio e convenzioni di modulo
+- [`docs/verification-playbook.md`](docs/verification-playbook.md) - come si verifica una modifica

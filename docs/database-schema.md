@@ -1,5 +1,10 @@
 # ProLink Initial Database Model
 
+> **Documento storico.** Copre il primo slice di schema del marzo 2026.
+> Le migrazioni oggi sono circa 157 e il modello è molto più ampio.
+> Per com’è fatto un dominio adesso, parti dalla migrazione più recente che lo
+> nomina in `supabase/migrations/`; vedi [`feature-map.md`](./feature-map.md).
+
 ## Obiettivo
 
 Questo schema copre il primo slice tecnico richiesto per utenti, profili, club, annunci, candidature e messaggi.

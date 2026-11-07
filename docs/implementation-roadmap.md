@@ -1,5 +1,10 @@
 # ProLink Implementation Roadmap
 
+> **Documento storico.** Descrive il repository di marzo 2026, quando solo il
+> dominio Profilo era avviato. Non usarlo come stato attuale: oggi onboarding,
+> profili, rete, ricerca e gran parte della Dashboard sono consegnati.
+> Stato reale: [`backlog-state.md`](./backlog-state.md).
+
 ## Obiettivo del piano
 
 Questo piano divide il lavoro in fasi come in un contesto aziendale, con obiettivi, task, dipendenze e risultati attesi. Il focus iniziale e' la consegna di una prima versione mobile iOS e Android, lasciando la versione web fuori scope.
