@@ -72,10 +72,21 @@ export const POSITIONS_HREFS = {
     `${CENTER}/${encodeURIComponent(positionId)}${query({
       from: options?.from,
     })}`,
-  /** Candidature della Position, nel loro dominio (§20). */
-  positionApplications: (positionId: string) =>
-    `/(tabs)/announcements${query({
-      adId: positionId,
-      focus: "applications",
-    })}`,
+  /**
+   * Candidature della Position, nel loro dominio (§20).
+   *
+   * DAS-REV-22 §23: «Tap apre lo stesso elenco canonico limitato all'esatto
+   * position_id.» Puntava a `/(tabs)/announcements?focus=applications`, che
+   * è la lista legacy costruita su `owns_club`: un amministratore con
+   * `applications_view` ma senza la proprietà vedeva qui i conteggi e lì una
+   * pagina vuota. L'id non è più un filtro di una lista generale, è il
+   * contesto della route.
+   */
+  positionApplications: (
+    positionId: string,
+    options?: { tab?: "new" | "all" },
+  ) =>
+    `/(tabs)/dashboard/applications/position/${encodeURIComponent(positionId)}${query(
+      { tab: options?.tab },
+    )}`,
 } as const;

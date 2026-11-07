@@ -23,6 +23,8 @@ import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
 import { getPlayerMediaTagMeta } from "../player-media";
 
 type ProfileTabViewProps = {
+  /** Tab su cui aprire: vedi la nota accanto a `activeTab`. */
+  initialTab?: ProfileTab;
   completeProfile: CompleteProfessionalProfile;
   isOwner: boolean;
   onManageMedia: () => void;
@@ -36,13 +38,27 @@ type ProfileTabViewProps = {
 
 export function ProfileTabView({
   completeProfile,
+  initialTab,
   isOwner,
   onManageMedia,
   onDeleteMedia,
   onToggleMediaFeatured,
 }: ProfileTabViewProps) {
-  // Carriera è la tab iniziale (§5).
-  const [activeTab, setActiveTab] = useState<ProfileTab>("career");
+  /**
+   * Tab iniziale richiesta dalla route (DAS-REV-22 §21).
+   *
+   * «Vedi carriera completa apre direttamente la tab Carriera … Il link al
+   * profilo e quello alla carriera hanno destinazioni diverse.» Carriera è
+   * già il default, quindi senza un parametro esplicito le due destinazioni
+   * sarebbero lo stesso URL: il `?tab=career` lo rende una richiesta, non
+   * una coincidenza, e resta corretto se un domani il default cambiasse.
+   *
+   * Stesso contratto di `FanProfileView` e `MediaProfileView`, che lo
+   * avevano già.
+   */
+  const [activeTab, setActiveTab] = useState<ProfileTab>(
+    initialTab ?? "career",
+  );
 
   const careerView = useMemo(
     () =>

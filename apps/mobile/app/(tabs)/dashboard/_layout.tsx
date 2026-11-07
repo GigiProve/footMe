@@ -93,6 +93,15 @@ export default function DashboardLayout() {
             e le conferme sono flussi focalizzati in app/role-link/. */}
         <Stack.Screen name="people/index" />
         <Stack.Screen name="people/[profileId]" />
+        {/* DAS-REV-22 §11: «Bottom navigation canonica Home | Cerca |
+            Dashboard | Messaggi | Profilo. Dashboard selezionata nelle
+            superfici di questa task.» Centro, elenco di una Position e
+            dettaglio della candidatura sono tutti e tre pagine gestionali
+            della Società: in questo pack non esiste nessun flusso
+            focalizzato, perché non si compone niente — si consulta. */}
+        <Stack.Screen name="applications/index" />
+        <Stack.Screen name="applications/[applicationId]" />
+        <Stack.Screen name="applications/position/[positionId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

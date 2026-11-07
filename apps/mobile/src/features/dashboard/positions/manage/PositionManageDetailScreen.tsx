@@ -529,22 +529,41 @@ export function PositionManageDetailScreen() {
             non a zero — quando l'actor non li può vedere o non sono noti.
             Su una chiusa i conteggi stanno nella sezione «Candidature
             ricevute» di §28, non qui in testa. */}
-        {counts && !isClosed ? (
-          <AppText color="neutral" style={styles.counts} testID="position-manage-counts" variant="bodyLg">
-            {counts}
-          </AppText>
-        ) : null}
+        {/* DAS-REV-22 §23: «Nel dettaglio Position mostra un accesso
+            visibile Candidature ricevute con count reali e CTA Gestisci
+            candidature.» Prima il conteggio era una riga sciolta in testa e
+            l'ingresso un link più in basso: due pezzi della stessa cosa,
+            separati. Ora il blocco è lo stesso dello storico (§28 di
+            DAS-REV-18), così i due ingressi non divergono.
 
+            Senza diritto all'aggregato il blocco non si disegna affatto:
+            §9 di DAS-REV-22 — «Non mostrare un aggregato sensibile a chi non
+            può conoscerlo». `applicationsLine` restituisce già `null` in
+            quel caso, quindi non resta niente da rendere fuori dal blocco. */}
         {detail.countsAvailable && !isClosed ? (
-          <InlineAction
-            label={MANAGE_COPY.manageApplications}
-            onPress={() =>
-              router.push(
-                POSITIONS_HREFS.positionApplications(detail.id) as never,
-              )
-            }
-            testID="position-manage-applications"
-          />
+          <View style={styles.block} testID="position-manage-received-open">
+            <AppText color="neutral" variant="metaStrong">
+              {MANAGE_COPY.receivedApplications}
+            </AppText>
+
+            <AppText
+              color="neutral"
+              testID="position-manage-counts"
+              variant="bodyLg"
+            >
+              {counts ?? MANAGE_COPY.receivedNone}
+            </AppText>
+
+            <InlineAction
+              label={MANAGE_COPY.manageApplications}
+              onPress={() =>
+                router.push(
+                  POSITIONS_HREFS.positionApplications(detail.id) as never,
+                )
+              }
+              testID="position-manage-applications"
+            />
+          </View>
         ) : null}
 
         {/* §12: «Il gruppo delle azioni contiene Modifica posizione e,
@@ -713,9 +732,16 @@ export function PositionManageDetailScreen() {
             {detail.applicationsTotal ? (
               <InlineAction
                 label={MANAGE_COPY.viewApplications}
+                /* DAS-REV-22 §23: «Per l'ingresso storico da una Position
+                   CLOSED apri Tutte, come 13, così le candidature conservate
+                   sono immediatamente raggiungibili.» Nuove resterebbe vuota
+                   per definizione, e §23 vieta di segnarle lette per
+                   ottenere quel risultato. */
                 onPress={() =>
                   router.push(
-                    POSITIONS_HREFS.positionApplications(detail.id) as never,
+                    POSITIONS_HREFS.positionApplications(detail.id, {
+                      tab: "all",
+                    }) as never,
                   )
                 }
                 testID="position-manage-view-applications"

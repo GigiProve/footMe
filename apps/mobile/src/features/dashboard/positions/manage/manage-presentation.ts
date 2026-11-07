@@ -452,7 +452,14 @@ export function applicationsLine(
     return head;
   }
 
-  return `${head} · ${detail.applicationsNew} nuove`;
+  /* DAS-REV-22 §31: il plurale è localizzato anche per uno. «1 nuove»
+     era l'unico punto in cui il conteggio delle candidature non lo era —
+     `applicationsLabel` del Centro lo faceva già bene, e lo screen 11 di
+     questa task mostra proprio il caso a uno. */
+  const fresh =
+    detail.applicationsNew === 1 ? "1 nuova" : `${detail.applicationsNew} nuove`;
+
+  return `${head} · ${fresh}`;
 }
 
 /** Le sezioni leggibili del dettaglio (§7, §18). */

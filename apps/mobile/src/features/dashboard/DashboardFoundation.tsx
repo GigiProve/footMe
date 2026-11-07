@@ -126,6 +126,7 @@ import {
   type SavedUpdateRow,
 } from "./personal/saved-positions-presentation";
 import { useToggleDashboardSavedAd } from "./personal/use-toggle-saved-ad";
+import { APPLICATIONS_HREFS } from "./applications/applications-routes";
 import {
   buildManagementAreas,
   societyApplicationStatusLabel,
@@ -2104,8 +2105,16 @@ function ModuleRenderer({
               // §13: il tap apre la candidatura nel suo gruppo, non il profilo
               // pubblico della persona. Due candidature della stessa persona
               // restano due righe con contesti distinti.
+              //
+              // DAS-REV-22 §12: «Le preview del widget aprono lo stesso
+              // dettaglio» — quello canonico, condiviso con il centro e con
+              // l'elenco della Position. Prima la preview apriva la lista
+              // legacy filtrata sull'annuncio, che è un'altra schermata.
               onPress={() =>
-                onNavigate(moduleId, SOCIETY_HREFS.applications(item.adId))
+                onNavigate(
+                  moduleId,
+                  APPLICATIONS_HREFS.detail(item.id, { from: "widget" }),
+                )
               }
               showDivider={index > 0}
               // §10: lo stesso lifecycle letto dal lato Società — "Nuova" al

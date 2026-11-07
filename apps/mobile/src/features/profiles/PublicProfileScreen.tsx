@@ -49,6 +49,7 @@ import { AgentProfileTabView } from "./career/AgentProfileTabView";
 import { DirectorProfileTabView } from "./career/DirectorProfileTabView";
 import type { MediaLinkedTarget } from "./career/MediaTabContent";
 import { FanProfileView, type FanProfileTab } from "./FanProfileView";
+import type { ProfileTab } from "./career/ProfileTabBar";
 import { MediaProfileView } from "./MediaProfileView";
 import {
   parseMediaProfileTab,
@@ -129,6 +130,8 @@ export function PublicProfileScreen() {
   const fanInitialTab = parseFanProfileTab(requestedTab);
   /** REV-PROF-21: deep link a una tab del Master Profile Media/Creator. */
   const mediaInitialTab = parseMediaProfileTab(requestedTab);
+  /** DAS-REV-22 §21: «Vedi carriera completa apre direttamente la tab Carriera.» */
+  const careerInitialTab = parseProfileTab(requestedTab);
   const currentUserId = session?.user.id ?? null;
   const viewerRole = (viewerProfile?.role ?? null) as AppRole | null;
   const viewedProfileId = completeProfile?.profile.id ?? null;
@@ -683,6 +686,7 @@ export function PublicProfileScreen() {
             />
             <ProfileContentBlock
               completeProfile={completeProfile}
+              careerInitialTab={careerInitialTab}
               fanInitialTab={fanInitialTab}
               mediaInitialTab={mediaInitialTab}
               onOpenClub={handleOpenFavoriteClub}
@@ -986,6 +990,7 @@ function ProfileHeaderBlock({
 
 function ProfileContentBlock({
   completeProfile,
+  careerInitialTab,
   fanInitialTab,
   mediaInitialTab,
   isFollowed = false,
@@ -1010,6 +1015,7 @@ function ProfileContentBlock({
 }: {
   completeProfile: CompleteProfessionalProfile;
   /** REV-PROF-19: deep link a una tab del Master Profile Tifoso. */
+  careerInitialTab?: ProfileTab;
   fanInitialTab?: FanProfileTab;
   /** REV-PROF-21: deep link a una tab del Master Profile Media/Creator. */
   mediaInitialTab?: MediaProfileTab;
@@ -1137,6 +1143,7 @@ function ProfileContentBlock({
 
         <ProfileTabView
           completeProfile={completeProfile}
+          initialTab={careerInitialTab}
           isOwner={false}
           onManageMedia={noop}
         />
@@ -1148,6 +1155,7 @@ function ProfileContentBlock({
     return (
       <CoachProfileTabView
         completeProfile={completeProfile}
+        initialTab={careerInitialTab}
         isOwner={false}
         onManageMedia={noop}
         onOpenClub={onOpenClub}
@@ -1159,6 +1167,7 @@ function ProfileContentBlock({
     return (
       <StaffProfileTabView
         completeProfile={completeProfile}
+        initialTab={careerInitialTab}
         isOwner={false}
         onManageMedia={noop}
         onOpenClub={onOpenClub}
@@ -1197,6 +1206,7 @@ function ProfileContentBlock({
       */
       <DirectorProfileTabView
         completeProfile={completeProfile}
+        initialTab={careerInitialTab}
         isOwner={false}
         onOpenClub={onOpenClub}
         onOpenLinkedTarget={onOpenDirectorLinkedTarget}
@@ -1260,6 +1270,21 @@ function ProfileContentBlock({
       role={role}
     />
   );
+}
+
+/**
+ * Tab del Master Profile richiesta dalla route (DAS-REV-22 §21).
+ *
+ * Stessa regola delle altre due: una tab sconosciuta non apre niente di
+ * inesistente, lascia il default.
+ */
+function parseProfileTab(value: string | undefined): ProfileTab | undefined {
+  return value === "career" ||
+    value === "media" ||
+    value === "info" ||
+    value === "details"
+    ? value
+    : undefined;
 }
 
 /** Tab valida o niente: un valore sconosciuto non apre una tab inesistente. */

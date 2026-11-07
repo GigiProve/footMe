@@ -293,26 +293,28 @@ describe("societyFirstRunProposals", () => {
 });
 
 describe("SOCIETY_HREFS", () => {
-  it("carries the group as an explicit filter", () => {
+  it("carries the group as an explicit context", () => {
     // §13: «L'eventuale filtro della preview deve essere esplicito nel
     // collegamento; non aprire una lista vuota o estranea al gruppo mostrato.»
+    //
+    // DAS-REV-22 §23: l'annuncio non è più un filtro di una lista generale,
+    // è il contesto della route — e la lista legacy, gated su `owns_club`,
+    // non è più la destinazione di nessuno dei due casi.
     expect(SOCIETY_HREFS.applications("ad-1")).toBe(
-      "/(tabs)/announcements?focus=applications&adId=ad-1",
+      "/(tabs)/dashboard/applications/position/ad-1",
     );
     expect(SOCIETY_HREFS.applications()).toBe(
-      "/(tabs)/announcements?focus=applications",
+      "/(tabs)/dashboard/applications?from=dashboard",
     );
   });
 
   it("keeps the two centres distinguishable", () => {
-    // Il centro Posizioni e il centro Candidature sono oggi la stessa
-    // schermata: senza `focus` le due destinazioni sarebbero indistinguibili.
     expect(SOCIETY_HREFS.positions()).not.toBe(SOCIETY_HREFS.applications());
   });
 
   it("escapes a reference instead of interpolating it raw", () => {
     expect(SOCIETY_HREFS.applications("a d&x")).toBe(
-      "/(tabs)/announcements?focus=applications&adId=a%20d%26x",
+      "/(tabs)/dashboard/applications/position/a%20d%26x",
     );
   });
 });

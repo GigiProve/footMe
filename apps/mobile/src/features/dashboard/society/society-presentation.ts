@@ -44,11 +44,19 @@ export const SOCIETY_HREFS = {
    * quella era la seconda lista, e ora non esiste più.
    */
   affiliates: "/(tabs)/dashboard/network",
-  /** Centro Candidature, eventualmente ristretto a una Posizione. */
+  /**
+   * Centro Candidature, eventualmente ristretto a una Posizione.
+   *
+   * DAS-REV-22 §12: «Ingresso: Dashboard della Society → Candidature
+   * ricevute. Le preview del widget aprono lo stesso dettaglio; Vedi tutte
+   * apre il centro secondo il contesto esplicito.» Era
+   * `/(tabs)/announcements?focus=applications`, gated su `owns_club` e non
+   * sulle capability.
+   */
   applications: (adId?: string | null) =>
     adId
-      ? `/(tabs)/announcements?focus=applications&adId=${encodeURIComponent(adId)}`
-      : "/(tabs)/announcements?focus=applications",
+      ? `/(tabs)/dashboard/applications/position/${encodeURIComponent(adId)}`
+      : "/(tabs)/dashboard/applications?from=dashboard",
   contentComposer: "/(tabs)/profile?compose=club",
   /**
    * Centro Inviti e richieste (DAS-REV-19 §6).

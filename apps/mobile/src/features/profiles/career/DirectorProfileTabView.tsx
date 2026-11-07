@@ -40,6 +40,8 @@ import { ProfileTabBar, type ProfileTab } from "./ProfileTabBar";
 const PROFILE_TYPE = "director";
 
 type DirectorProfileTabViewProps = {
+  /** Tab su cui aprire: vedi la nota accanto a `activeTab`. */
+  initialTab?: ProfileTab;
   completeProfile: CompleteProfessionalProfile;
   isOwner?: boolean;
   /** Punto d'ingresso esistente alla gestione carriera. Solo Owner. */
@@ -63,6 +65,7 @@ type DirectorProfileTabViewProps = {
 
 export function DirectorProfileTabView({
   completeProfile,
+  initialTab,
   isOwner = false,
   onAddExperience,
   onDeleteMedia,
@@ -74,8 +77,21 @@ export function DirectorProfileTabView({
   onOpenClub,
   onToggleMediaFeatured,
 }: DirectorProfileTabViewProps) {
-  // Carriera è la tab iniziale, come negli altri Master Profile.
-  const [activeTab, setActiveTab] = useState<ProfileTab>("career");
+  /**
+   * Tab iniziale richiesta dalla route (DAS-REV-22 §21).
+   *
+   * «Vedi carriera completa apre direttamente la tab Carriera … Il link al
+   * profilo e quello alla carriera hanno destinazioni diverse.» Carriera è
+   * già il default, quindi senza un parametro esplicito le due destinazioni
+   * sarebbero lo stesso URL: il `?tab=career` lo rende una richiesta, non
+   * una coincidenza, e resta corretto se un domani il default cambiasse.
+   *
+   * Stesso contratto di `FanProfileView` e `MediaProfileView`, che lo
+   * avevano già.
+   */
+  const [activeTab, setActiveTab] = useState<ProfileTab>(
+    initialTab ?? "career",
+  );
   const [careerPath, setCareerPath] = useState<DirectorCareerPath>("director");
   const viewerMode = isOwner ? "owner" : "visitor";
 
