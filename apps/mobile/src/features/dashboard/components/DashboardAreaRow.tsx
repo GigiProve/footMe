@@ -18,6 +18,8 @@ export type AreaRowItem = {
    * resta esattamente com'era.
    */
   subtitle?: string;
+  /** Riga indirizzabile nei test e nella QA visuale. */
+  testID?: string;
   title: string;
 };
 
@@ -53,6 +55,7 @@ export function DashboardAreaRows({ items }: Props) {
               styles.row,
               pressed ? styles.pressed : null,
             ]}
+            testID={item.testID}
           >
             <View style={styles.iconCircle}>
               <Ionicons color={colors.accent} name={item.icon} size={18} />

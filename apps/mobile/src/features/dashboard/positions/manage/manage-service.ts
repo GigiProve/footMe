@@ -144,6 +144,10 @@ export async function fetchPositionManageDetail(
   const totalRaw = int(row.applications_total);
   const newRaw = int(row.applications_new);
   const countsAvailable = bool(row.counts_available);
+  /* DAS-REV-25 §9, QA010: la riga Shortlist ha una capability propria.
+     Senza di essa il conteggio resta null — non zero, che direbbe «non c'è
+     nessuno» a chi non ha diritto di saperlo. */
+  const shortlistAvailable = bool(row.shortlist_available);
 
   return {
     accessVerifiedAt: row.access_verified_at
@@ -178,6 +182,10 @@ export async function fetchPositionManageDetail(
     clubRegion: text(row.club_region),
     contextLabel: text(row.context_label),
     countsAvailable,
+    shortlistAvailable,
+    shortlistProfilesCount: shortlistAvailable
+      ? int(row.shortlist_profiles_count) ?? 0
+      : null,
     creationBatchId: text(row.creation_batch_id),
     customRoleName: text(row.custom_role_name),
     dataRevision: int(row.data_revision) ?? 0,

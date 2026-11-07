@@ -63,6 +63,8 @@ function detail(
     contextLabel: "Settore giovanile",
     countsAvailable: false,
     creationBatchId: null,
+    shortlistAvailable: true,
+    shortlistProfilesCount: 3,
     customRoleName: "Responsabile scouting",
     dataRevision: 1,
     deadlineAt: null,

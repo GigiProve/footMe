@@ -1,30 +1,32 @@
 /**
- * Vista base del pool di una Position (DAS-REV-24 §14, screen 11).
+ * Pool di una Position (DAS-REV-25 §12, §13, §14 — screen 02, 04, 11, 13, 16).
  *
- * «Il tap su una riga Per posizione apre una route reale della lista
- * corrispondente … La vista base dello screen 11 deve essere realmente
- * raggiungibile; non lasciare il tap del centro verso una pagina vuota in
- * attesa della 25» (§3).
+ * La 24 aveva consegnato qui una vista base deliberatamente minima. §3 della
+ * 25 la completa: filtri, conteggi reali, paginazione, e il tap di riga che
+ * porta alla scheda interna invece che al profilo pubblico.
  *
- * Un solo elenco, con dentro chi si è candidato e chi è stato individuato
- * dalla Società. Nessun filtro per origine, nessuna tab, nessuna toolbar:
- * §14 — «Non aggiungere una nuova toolbar di filtri, ordinamento, aggiunta,
- * rimozione o valutazione soltanto per riempire la tavola.» La gestione
- * completa è il pack 25 e non viene anticipata qui.
+ * Quattro superfici e non quattro schermate (§5): lista, lista filtrata,
+ * vuoto reale e vuoto filtrato sono stati dello stesso componente, e quale
+ * mostrare lo decide `poolPresentation`, non un `if` qui dentro — §28 vuole
+ * che vuoto reale e vuoto filtrato restino **distinti**, ed è l'errore più
+ * facile da commettere con un solo `rows.length === 0`.
  *
- * Il tap di riga apre il profilo canonico: §14 — «Il tap di riga riutilizza
- * il dettaglio entry già funzionante; se non esiste, usa l'apertura del
- * profilo canonico autorizzato come vista base. Non creare un nuovo editor
- * di valutazione in questa task. Nessuna route placeholder.»
+ * «Posizione chiusa» è un metadato neutro accanto al conteggio, non un
+ * blocco: §23 — «Position CLOSED | Entry conservate e azioni autorizzate
+ * ancora disponibili» (screen 13).
+ *
+ * I due conteggi arrivano dal server: §14 — «Questi numeri non sono il
+ * conteggio del batch già caricato.»
  */
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { useRouter } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing } from "../../../theme/tokens";
-import { AppText } from "../../../ui";
+import { AppText, Button } from "../../../ui";
 import { useSession } from "../../auth/use-session";
 import { STALE_MS } from "../cache/freshness-policy";
 import {
@@ -35,12 +37,26 @@ import {
 import { SocietyContextHeader } from "../components/SocietyContextHeader";
 import { useDashboardIdentity } from "../identity/use-dashboard-identity";
 import { useDashboardConnection } from "../state/use-dashboard-connection";
+import { ShortlistFilterControl } from "./components/ShortlistFilterControl";
+import { ShortlistFilterSheet } from "./components/ShortlistFilterSheet";
 import { ShortlistPoolRowView } from "./components/ShortlistPoolRow";
 import { ShortlistSectionSkeleton } from "./components/ShortlistSection";
 import { SHORTLIST_QK } from "./shortlist-keys";
-import { SHORTLIST_COPY, profilesLabel } from "./shortlist-presentation";
-import { fetchShortlistContext, fetchShortlistPool } from "./shortlist-service";
-import { ShortlistError } from "./shortlist-types";
+import {
+  EMPTY_FILTERS,
+  SHORTLIST_COPY,
+  filtersAreActive,
+  filtersKey,
+  poolCountLabel,
+  poolPresentation,
+} from "./shortlist-presentation";
+import { SHORTLIST_HREFS } from "./shortlist-routes";
+import { fetchShortlistContext, fetchShortlistPoolPage } from "./shortlist-service";
+import {
+  ShortlistError,
+  type ShortlistFilters,
+  type ShortlistPoolPage,
+} from "./shortlist-types";
 
 const DOUBLE_TAP_MS = 600;
 
@@ -59,6 +75,22 @@ export function PositionShortlistScreen({ positionId, shortlistId }: Props) {
   const { current } = useDashboardIdentity();
   const clubId = current?.kind === "society" ? current.id : null;
   const { connection } = useDashboardConnection();
+  const params = useLocalSearchParams<{ focus?: string }>();
+  const focusEntryId = typeof params.focus === "string" ? params.focus : null;
+
+  /* §13: i filtri **applicati**. Il draft vive nello sheet, e una chiusura
+     senza Applica non li tocca. */
+  const [filters, setFilters] = useState<ShortlistFilters>(EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  /* §24: «Se il pool visitato in precedenza aveva filtri che escludono
+     quella persona, questa apertura contestuale parte senza restrizioni.»
+     L'apertura con `focus` è quella di Vedi nella shortlist. */
+  useEffect(() => {
+    if (focusEntryId) {
+      setFilters(EMPTY_FILTERS);
+    }
+  }, [focusEntryId]);
 
   const ref = positionId
     ? ({ positionId } as const)
@@ -76,16 +108,57 @@ export function PositionShortlistScreen({ positionId, shortlistId }: Props) {
   });
 
   const context = contextQuery.data ?? null;
+  const listId = context?.shortlistId ?? null;
+  const appliedKey = filtersKey(filters);
 
-  /* §24: «Un count di 60 entry resta 60 mentre il dettaglio carica una
-     pagina di 20» (QA097). Il conteggio arriva dal contesto, non dalla
-     lunghezza della pagina caricata. */
-  const poolQuery = useQuery({
-    enabled: !!context?.shortlistId,
-    queryFn: () => fetchShortlistPool(context?.shortlistId as string),
-    queryKey: SHORTLIST_QK.pool(actorId, context?.shortlistId ?? ""),
+  /**
+   * §14: paginazione server-side con cursore. La chiave di cache porta i
+   * filtri **normalizzati**, quindi due selezioni equivalenti condividono
+   * una pagina sola; e «Dopo applicazione azzera il cursore della lista»
+   * viene gratis, perché cambiando chiave cambia la query.
+   */
+  const poolQuery = useInfiniteQuery<
+    ShortlistPoolPage,
+    Error,
+    { pageParams: (string | null)[]; pages: ShortlistPoolPage[] },
+    readonly unknown[],
+    string | null
+  >({
+    enabled: !!listId,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    initialPageParam: null,
+    queryFn: ({ pageParam }) =>
+      fetchShortlistPoolPage(listId as string, filters, pageParam),
+    queryKey: SHORTLIST_QK.pool(actorId, listId ?? "", appliedKey),
+    retry: (failureCount, error) =>
+      !(error instanceof ShortlistError && error.kind !== "network") &&
+      failureCount < 1,
     staleTime: STALE_MS.operational,
   });
+
+  const pages = poolQuery.data?.pages ?? [];
+  const head = pages[0] ?? null;
+  const rows = pages.flatMap((page) => page.rows);
+
+  /**
+   * §24: «Raggiungere la entry tramite cursore/ancora autorizzata o lookup
+   * paginato compatibile: non scaricare l'intera lista e non alterare
+   * l'ordinamento.»
+   *
+   * Si avanza di una pagina per volta finché la persona non compare o le
+   * pagine finiscono — nello stesso ordine di sempre, con gli stessi
+   * cursori autorizzati. Niente salto, niente lista intera.
+   */
+  const focusReached =
+    !focusEntryId || rows.some((row) => row.entryId === focusEntryId);
+
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = poolQuery;
+
+  useEffect(() => {
+    if (!focusReached && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [fetchNextPage, focusReached, hasNextPage, isFetchingNextPage]);
 
   const lastPushRef = useRef<{ at: number; href: string } | null>(null);
 
@@ -110,21 +183,24 @@ export function PositionShortlistScreen({ positionId, shortlistId }: Props) {
         queryKey: SHORTLIST_QK.context(actorId, refKey),
       }),
       queryClient.invalidateQueries({
-        queryKey: SHORTLIST_QK.pool(actorId, context?.shortlistId ?? ""),
+        queryKey: SHORTLIST_QK.pool(actorId, listId ?? "", appliedKey),
       }),
     ]);
-  }, [actorId, context?.shortlistId, queryClient, refKey]);
+  }, [actorId, appliedKey, listId, queryClient, refKey]);
+
+  const header = (title: string | null) => (
+    <SocietyContextHeader
+      isVerified={current?.isVerified ?? false}
+      logoUrl={current?.avatarUrl ?? null}
+      name={current?.name ?? ""}
+      onBack={() => router.back()}
+      title={title}
+    />
+  );
 
   const shell = (children: React.ReactNode) => (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <SocietyContextHeader
-        isVerified={current?.isVerified ?? false}
-        logoUrl={current?.avatarUrl ?? null}
-        name={current?.name ?? ""}
-        onBack={() => router.back()}
-        title={SHORTLIST_COPY.title}
-      />
-
+      {header(SHORTLIST_COPY.title)}
       {children}
     </View>
   );
@@ -145,16 +221,24 @@ export function PositionShortlistScreen({ positionId, shortlistId }: Props) {
 
   if (contextQuery.error instanceof ShortlistError &&
       contextQuery.error.kind !== "network") {
-    /* §22: «Non rivelare nome della lista o Society se non più autorizzati.» */
+    /* §9: la bozza senza perimetro ha un rimedio proprio — completare il
+       contesto nel flusso Position — quindi non si confonde con «non
+       disponibile». */
+    const scopeUndefined = contextQuery.error.kind === "scopeUndefined";
+
     return shell(
       <DashboardGlobalEmpty
         copy={{
           actionLabel: SHORTLIST_COPY.backToDashboard,
-          body: SHORTLIST_COPY.unavailableBody,
-          icon: "lock-closed-outline",
-          title: SHORTLIST_COPY.unavailableTitle,
+          body: scopeUndefined
+            ? SHORTLIST_COPY.scopeUndefinedBody
+            : SHORTLIST_COPY.unavailableBody,
+          icon: scopeUndefined ? "alert-circle-outline" : "lock-closed-outline",
+          title: scopeUndefined
+            ? SHORTLIST_COPY.scopeUndefinedTitle
+            : SHORTLIST_COPY.unavailableTitle,
         }}
-        onAction={() => router.replace("/(tabs)/dashboard")}
+        onAction={() => router.back()}
       />,
     );
   }
@@ -164,19 +248,18 @@ export function PositionShortlistScreen({ positionId, shortlistId }: Props) {
       <DashboardGlobalError
         body={SHORTLIST_COPY.errorBody}
         onRetry={() => void refresh()}
-        title={SHORTLIST_COPY.errorTitle}
+        title={SHORTLIST_COPY.poolErrorTitle}
       />,
     );
   }
 
   if (!context) {
-    /* §27: offline senza dati utilizzabili è uno stato proprio. La query
-       resta in pausa e non va in errore: senza questo ramo il deep link
-       aperto senza rete mostrerebbe uno skeleton che non finisce mai. */
+    /* §28: offline senza dati utilizzabili è uno stato proprio, non un
+       empty operativo. La query resta in pausa e non va in errore. */
     if (connection === "offline") {
       return shell(
         <DashboardGlobalOffline
-          body={SHORTLIST_COPY.offlineBody}
+          body={SHORTLIST_COPY.poolOfflineBody}
           onRetry={() => void refresh()}
         />,
       );
@@ -189,36 +272,86 @@ export function PositionShortlistScreen({ positionId, shortlistId }: Props) {
     );
   }
 
-  const rows = poolQuery.data ?? [];
+  /* §14: il totale è quello del server. Finché la prima pagina non è
+     arrivata resta quello del contesto, che è la stessa count. */
+  const total = head?.total ?? context.profilesCount;
+  const filtersApplied = head?.filtersApplied ?? filtersAreActive(filters);
+  const filtered = head?.filtered ?? total;
+  const surface = poolPresentation({
+    filtersApplied,
+    rowCount: rows.length,
+    total,
+  });
+
+  const contextLine = [context.title, context.scopeLabel]
+    .filter((part): part is string => !!part && part.length > 0)
+    .join(" · ");
+
+  /* §9 e §10 della 24: metadati neutri, uno per volta. Una bozza non è
+     chiusa, e la Position non può essere entrambe. */
+  const lifecycleLabel = context.isClosed
+    ? SHORTLIST_COPY.positionClosed
+    : context.isDraft
+      ? SHORTLIST_COPY.draftLabel
+      : null;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <SocietyContextHeader
-        isVerified={current?.isVerified ?? false}
-        logoUrl={current?.avatarUrl ?? null}
-        name={current?.name ?? ""}
-        onBack={() => router.back()}
-        title={SHORTLIST_COPY.title}
-      />
+      {header(SHORTLIST_COPY.title)}
 
-      {/* §14: «Mostra heading Shortlist, titolo/Team della Position e
-          conteggio reale.» */}
       <View style={styles.context} testID="shortlist-pool-context">
-        <AppText accessibilityRole="header" color="neutral" variant="headingSm">
-          {context.scopeLabel
-            ? `${context.title} · ${context.scopeLabel}`
-            : context.title}
+        <AppText color="neutral" variant="bodySm">
+          {contextLine}
         </AppText>
 
-        <AppText color="neutralMuted" variant="meta">
-          {context.isClosed
-            ? `${profilesLabel(context.profilesCount)} · ${SHORTLIST_COPY.positionClosed}`
-            : profilesLabel(context.profilesCount)}
-        </AppText>
+        {lifecycleLabel ? (
+          <AppText color="neutralMuted" variant="meta">
+            {lifecycleLabel}
+          </AppText>
+        ) : null}
+
+        <View style={styles.countRow}>
+          <AppText
+            accessibilityLiveRegion="polite"
+            color="neutral"
+            style={styles.count}
+            testID="shortlist-pool-count"
+            variant="bodySm"
+          >
+            {poolCountLabel({ filtered, filtersApplied, total })}
+          </AppText>
+
+          {/* §28: «Nascondi il filtro non utile nel viewport vuoto senza
+              convertirne lo stato memorizzato in una cancellazione delle
+              preferenze.» Lo stato resta in `filters`: se arrivano entry,
+              il controllo torna con la selezione di prima. */}
+          {total > 0 ? (
+            <ShortlistFilterControl
+              active={filtersApplied}
+              onPress={() => setFilterOpen(true)}
+            />
+          ) : null}
+        </View>
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: spacing[32] + insets.bottom },
+        ]}
+        onMomentumScrollEnd={(event) => {
+          const { contentOffset, contentSize, layoutMeasurement } =
+            event.nativeEvent;
+
+          if (
+            poolQuery.hasNextPage &&
+            !poolQuery.isFetchingNextPage &&
+            contentOffset.y + layoutMeasurement.height >=
+              contentSize.height - 120
+          ) {
+            void poolQuery.fetchNextPage();
+          }
+        }}
         refreshControl={
           <RefreshControl
             onRefresh={() => void refresh()}
@@ -232,24 +365,92 @@ export function PositionShortlistScreen({ positionId, shortlistId }: Props) {
           <ShortlistSectionSkeleton rows={3} />
         ) : null}
 
-        {!poolQuery.isLoading && rows.length === 0 ? (
-          /* §24: «Il contesto della Position può continuare a mostrare una
-             vista vuota» quando l'ultima entry è stata rimossa. */
-          <AppText color="neutralMuted" style={styles.empty} variant="bodySm">
-            {SHORTLIST_COPY.positionsEmpty}
-          </AppText>
+        {/* §28: «Errore caricamento pool: Impossibile caricare la shortlist
+            / Riprova.» Locale al dominio, non un reload della Dashboard. */}
+        {poolQuery.isError ? (
+          <DashboardGlobalError
+            body={SHORTLIST_COPY.errorBody}
+            onRetry={() => void poolQuery.refetch()}
+            title={SHORTLIST_COPY.poolErrorTitle}
+          />
+        ) : null}
+
+        {!poolQuery.isLoading && !poolQuery.isError && surface === "empty" ? (
+          /* §28: «Vuoto reale, dopo una lettura valida con totale 0.»
+             Nessun Crea shortlist, nessun Cerca profili. */
+          <View style={styles.empty} testID="shortlist-pool-empty">
+            <Ionicons
+              color={colors.textNeutralSoft}
+              name="star-outline"
+              size={40}
+            />
+
+            <AppText color="neutral" variant="titleSm">
+              {SHORTLIST_COPY.poolEmptyTitle}
+            </AppText>
+
+            <AppText color="neutralMuted" variant="bodySm">
+              {SHORTLIST_COPY.poolEmptyBody}
+            </AppText>
+          </View>
+        ) : null}
+
+        {!poolQuery.isLoading &&
+        !poolQuery.isError &&
+        surface === "filteredEmpty" ? (
+          /* §13: «La CTA Azzera filtri nello stato senza risultati agisce
+             invece subito sui filtri applicati e ricarica l'elenco
+             completo.» */
+          <View style={styles.empty} testID="shortlist-pool-filtered-empty">
+            <Ionicons
+              color={colors.textNeutralSoft}
+              name="star-outline"
+              size={40}
+            />
+
+            <AppText color="neutral" variant="titleSm">
+              {SHORTLIST_COPY.poolFilteredEmptyTitle}
+            </AppText>
+
+            <AppText color="neutralMuted" variant="bodySm">
+              {SHORTLIST_COPY.poolFilteredEmptyBody}
+            </AppText>
+
+            <Button
+              fullWidth
+              label={SHORTLIST_COPY.filterClear}
+              onPress={() => setFilters(EMPTY_FILTERS)}
+              size="lg"
+              testID="shortlist-pool-clear-filters"
+              variant="primary"
+            />
+          </View>
         ) : null}
 
         {rows.map((row, index) => (
           <ShortlistPoolRowView
-            canSeeEvaluation={context.canEditStatus || context.canAddNotes}
+            focused={focusEntryId === row.entryId}
             key={row.entryId}
-            onPress={() => go(`/profile/${encodeURIComponent(row.personId)}`)}
+            onPress={() => go(SHORTLIST_HREFS.entry(row.entryId))}
             row={row}
             showDivider={index > 0}
           />
         ))}
+
+        {poolQuery.isFetchingNextPage ? (
+          <ShortlistSectionSkeleton rows={1} />
+        ) : null}
       </ScrollView>
+
+      <ShortlistFilterSheet
+        applied={filters}
+        onApply={(next) => {
+          setFilters(next);
+          setFilterOpen(false);
+        }}
+        onClose={() => setFilterOpen(false)}
+        visible={filterOpen}
+      />
     </View>
   );
 }
@@ -264,10 +465,22 @@ const styles = StyleSheet.create({
     gap: spacing[4],
     paddingBottom: spacing[8],
   },
+  countRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[12],
+    paddingTop: spacing[4],
+  },
+  count: {
+    flex: 1,
+  },
   content: {
-    paddingBottom: spacing[32],
+    gap: 0,
   },
   empty: {
-    paddingVertical: spacing[24],
+    alignItems: "center",
+    gap: spacing[8],
+    paddingHorizontal: spacing[20],
+    paddingVertical: spacing[40],
   },
 });

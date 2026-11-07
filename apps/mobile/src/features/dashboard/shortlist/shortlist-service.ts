@@ -11,18 +11,26 @@
  * errori di dominio in modo che la UI possa distinguerli (§23).
  */
 import { supabase } from "../../../lib/supabase";
+import { normalizeFilters } from "./shortlist-presentation";
 import {
   ShortlistError,
+  type ShortlistApplicationState,
   type ShortlistCenterHeader,
   type ShortlistContext,
   type ShortlistCreatedSource,
   type ShortlistCustomRow,
+  type ShortlistEntryDetail,
+  type ShortlistEvaluationOutcome,
+  type ShortlistEvaluationPatch,
   type ShortlistEvaluationStatus,
+  type ShortlistFilters,
   type ShortlistGroupPage,
   type ShortlistMembership,
+  type ShortlistPoolPage,
   type ShortlistPoolRow,
   type ShortlistPositionRow,
   type ShortlistPriority,
+  type ShortlistRemoveOutcome,
 } from "./shortlist-types";
 
 type RawRecord = Record<string, unknown>;
@@ -106,6 +114,36 @@ export function classifyShortlistError(error: unknown): ShortlistError {
 
   if (message.includes("REVISION_STALE") || message.includes("OPERATION_CONTENT_CHANGED")) {
     return new ShortlistError("conflict", message);
+  }
+
+  /* §18: «Un valore troppo lungo non viene tagliato silenziosamente.» È un
+     errore di validazione inline accanto al campo, non un guasto di rete. */
+  if (message.includes("SHORTLIST_NOTE_TOO_LONG")) {
+    return new ShortlistError("noteTooLong", message);
+  }
+
+  /* §13: una enum non consentita è rifiutata, non ignorata. Arriva solo da
+     un client fuori contratto: la UI non può produrla. */
+  if (message.includes("SHORTLIST_FILTER_INVALID")) {
+    return new ShortlistError("notFound", message);
+  }
+
+  /* §14: un cursore di un'altra query non restituisce dati estranei. Il
+     chiamante riparte dalla prima pagina dei filtri correnti. */
+  if (message.includes("SHORTLIST_CURSOR_INVALID")) {
+    return new ShortlistError("staleCursor", message);
+  }
+
+  /* §9: la bozza senza perimetro persistito ha un rimedio proprio —
+     completare il contesto nel flusso Position — e quindi una copy propria. */
+  if (message.includes("SHORTLIST_SCOPE_UNDEFINED")) {
+    return new ShortlistError("scopeUndefined", message);
+  }
+
+  /* §26, §28: la entry non c'è più. Distinta da «non autorizzato», perché
+     il ritorno è il pool e non la Dashboard. */
+  if (message.includes("SHORTLIST_ENTRY_NOT_FOUND")) {
+    return new ShortlistError("gone", message);
   }
 
   if (
@@ -208,6 +246,7 @@ export async function fetchShortlistPositionGroup(
       return [
         {
           isClosed: bool(row.is_closed),
+          isDraft: bool(row.is_draft),
           positionId,
           profilesCount: count(row.profiles_count),
           scopeLabel: nullableText(row.scope_label),
@@ -286,8 +325,10 @@ export async function fetchShortlistContext(
     canAddProfiles: bool(row.can_add_profiles),
     canEditStatus: bool(row.can_edit_status),
     canRemoveProfiles: bool(row.can_remove_profiles),
+    canViewNotes: bool(row.can_view_notes),
     clubId: text(row.club_id),
     isClosed: bool(row.is_closed),
+    isDraft: bool(row.is_draft),
     kind: row.list_type === "position" ? "position" : "custom",
     positionId: nullableText(row.position_id),
     profilesCount: count(row.profiles_count),
@@ -297,51 +338,241 @@ export async function fetchShortlistContext(
   };
 }
 
-export async function fetchShortlistPool(
+/** §16: `null` = non autorizzato a conoscere la relazione Application. */
+function applicationState(value: unknown): ShortlistApplicationState {
+  return value === "active" || value === "none" || value === "withdrawn"
+    ? value
+    : null;
+}
+
+/**
+ * Una pagina del pool, con filtri, cursore e i due conteggi (§13, §14).
+ *
+ * I filtri vengono **normalizzati prima di partire**: §13 chiede che due
+ * selezioni equivalenti producano la stessa query, e la stessa chiave di
+ * cache. Un array vuoto diventa `null`, perché «Nessuna scelta in una
+ * dimensione significa nessuna restrizione per quella dimensione» e `[]`
+ * sarebbe un filtro che non seleziona niente.
+ */
+export async function fetchShortlistPoolPage(
   shortlistId: string,
-  page = 0,
+  filters: ShortlistFilters,
+  cursor: string | null = null,
   pageSize = 20,
-): Promise<ShortlistPoolRow[]> {
-  const { data, error } = await supabase.rpc("fetch_shortlist_entries", {
+): Promise<ShortlistPoolPage> {
+  const normalized = normalizeFilters(filters);
+
+  const { data, error } = await supabase.rpc("fetch_shortlist_pool_page", {
+    p_cursor: cursor,
     p_limit: pageSize,
-    p_offset: page * pageSize,
+    p_priorities:
+      normalized.priorities.length > 0 ? [...normalized.priorities] : null,
     p_shortlist_id: shortlistId,
+    p_statuses: normalized.statuses.length > 0 ? [...normalized.statuses] : null,
   });
 
   if (error) {
     throw classifyShortlistError(error);
   }
 
-  return ((data ?? []) as RawRecord[]).flatMap((row) => {
-    const entryId = nullableText(row.id);
-    const personId = nullableText(row.player_profile_id);
+  const payload = (data ?? null) as RawRecord | null;
 
-    if (!entryId || !personId) {
-      return [];
-    }
+  if (!payload) {
+    throw new ShortlistError("network");
+  }
 
-    return [
-      {
-        avatarUrl: nullableText(row.avatar_url),
-        createdSource: createdSource(row.created_source),
-        currentTeam: nullableText(row.current_team),
-        entryId,
-        evaluationStatus: evaluationStatus(row.evaluation_status),
-        /* §22: `null` significa «non autorizzato a saperlo», e non va
-           trasformato in «non si è candidato». */
-        hasApplication:
-          typeof row.has_application === "boolean" ? row.has_application : null,
-        name: text(row.full_name, "Profilo"),
-        personId,
-        priority: priority(row.priority),
-        revision: count(row.revision),
-        role: nullableText(row.role),
-      },
-    ];
-  });
+  const items = Array.isArray(payload.items)
+    ? (payload.items as RawRecord[])
+    : [];
+
+  return {
+    canEditStatus: bool(payload.can_edit_status),
+    canRemove: bool(payload.can_remove),
+    canViewApplications: bool(payload.can_view_applications),
+    canViewNotes: bool(payload.can_view_notes),
+    filtered: count(payload.filtered),
+    filtersApplied: bool(payload.filters_applied),
+    nextCursor: nullableText(payload.next_cursor),
+    rows: items.flatMap((row) => {
+      const entryId = nullableText(row.entry_id);
+      const personId = nullableText(row.person_id);
+
+      if (!entryId || !personId) {
+        return [];
+      }
+
+      return [
+        {
+          applicationState: applicationState(row.application_state),
+          avatarUrl: nullableText(row.avatar_url),
+          createdSource: createdSource(row.created_source),
+          entryId,
+          evaluationStatus: evaluationStatus(row.evaluation_status),
+          name: text(row.name, "Profilo"),
+          notePreview: nullableText(row.note_preview),
+          personId,
+          primaryPosition: nullableText(row.primary_position),
+          priority: priority(row.priority),
+          revision: count(row.revision),
+          role: nullableText(row.role),
+          situation: nullableText(row.situation),
+        },
+      ];
+    }),
+    total: count(payload.total),
+  };
 }
 
 /**
+ * Scheda interna della membership (§15), indirizzabile in due modi.
+ *
+ * Dal pool si conosce la entry; dallo sheet §11 si conosce soltanto la
+ * candidatura, e §10 vuole che sia il server a derivare persona e Position.
+ * `withNote: false` è la proiezione dello sheet: §11 — «Non caricare
+ * l'intera nota privata per riempire lo sheet.»
+ */
+export async function fetchShortlistEntry(
+  ref: { applicationId: string } | { entryId: string },
+  withNote = true,
+): Promise<ShortlistEntryDetail> {
+  const { data, error } = await supabase.rpc("fetch_shortlist_entry", {
+    p_application_id: "applicationId" in ref ? ref.applicationId : null,
+    p_entry_id: "entryId" in ref ? ref.entryId : null,
+    p_with_note: withNote,
+  });
+
+  if (error) {
+    throw classifyShortlistError(error);
+  }
+
+  const row = (data ?? null) as RawRecord | null;
+
+  if (!row) {
+    throw new ShortlistError("gone");
+  }
+
+  return {
+    addedByName: nullableText(row.added_by_name),
+    applicationId: nullableText(row.application_id),
+    applicationState: applicationState(row.application_state),
+    avatarUrl: nullableText(row.avatar_url),
+    canEditNote: bool(row.can_edit_note),
+    canEditStatus: bool(row.can_edit_status),
+    canRemove: bool(row.can_remove),
+    canViewApplications: bool(row.can_view_applications),
+    canViewNotes: bool(row.can_view_notes),
+    clubId: text(row.club_id),
+    createdAt: nullableText(row.created_at),
+    createdSource: createdSource(row.created_source),
+    entryId: text(row.entry_id),
+    evaluationStatus: evaluationStatus(row.evaluation_status),
+    isClosed: bool(row.is_closed),
+    isDraft: bool(row.is_draft),
+    name: text(row.name, "Profilo"),
+    note: nullableText(row.note),
+    personId: text(row.person_id),
+    positionId: nullableText(row.position_id),
+    positionTitle: text(row.position_title, "Posizione"),
+    primaryPosition: nullableText(row.primary_position),
+    priority: priority(row.priority),
+    revision: count(row.revision),
+    role: nullableText(row.role),
+    scopeLabel: nullableText(row.scope_label),
+    shortlistId: text(row.shortlist_id),
+    situation: nullableText(row.situation),
+  };
+}
+
+/**
+ * L'unico commit della valutazione (§19).
+ *
+ * «Non implementare autosave della valutazione. La mutation avviene
+ * esclusivamente con Salva modifiche, con versione attesa della entry e
+ * protezione dalle ripetizioni prevista dal core.»
+ *
+ * §18: «Campi presenti con null indicano una cancellazione esplicita
+ * ammessa; campi omessi significano invariati.» Da cui i due flag
+ * `p_set_*`: senza di essi un `null` sarebbe indistinguibile da «non
+ * toccare», e togliere una priorità diventerebbe impossibile.
+ */
+export async function saveShortlistEvaluation(
+  entryId: string,
+  patch: ShortlistEvaluationPatch,
+  expectedRevision: number,
+  idempotencyKey: string,
+): Promise<ShortlistEvaluationOutcome> {
+  const setPriority = "priority" in patch;
+  const setNote = "note" in patch;
+
+  const { data, error } = await supabase.rpc("update_shortlist_entry", {
+    p_entry_id: entryId,
+    p_evaluation_status: patch.evaluationStatus ?? null,
+    p_expected_revision: expectedRevision,
+    p_idempotency_key: idempotencyKey,
+    p_internal_note: setNote ? patch.note ?? null : null,
+    p_priority: setPriority ? patch.priority ?? null : null,
+    p_set_note: setNote,
+    p_set_priority: setPriority,
+  });
+
+  if (error) {
+    throw classifyShortlistError(error);
+  }
+
+  const row = (data ?? null) as RawRecord | null;
+
+  if (!row) {
+    throw new ShortlistError("network");
+  }
+
+  return {
+    entryId: text(row.entry_id, entryId),
+    evaluationStatus: evaluationStatus(row.evaluation_status),
+    priority: priority(row.priority),
+    replayed: bool(row.replayed),
+    revision: count(row.revision),
+  };
+}
+
+/**
+ * Rimozione di **una** membership (§21).
+ *
+ * L'esito porta con sé quanto serve a riconciliare senza una seconda
+ * lettura: il totale della lista e la stella della Society — §22, «se la
+ * persona rimane in una CUSTOM o in un'altra Position accessibile, la
+ * stella resta piena».
+ */
+export async function removeShortlistEntry(
+  entryId: string,
+  idempotencyKey: string,
+): Promise<ShortlistRemoveOutcome> {
+  const { data, error } = await supabase.rpc("remove_shortlist_entry", {
+    p_entry_id: entryId,
+    p_idempotency_key: idempotencyKey,
+  });
+
+  if (error) {
+    throw classifyShortlistError(error);
+  }
+
+  const row = (data ?? null) as RawRecord | null;
+
+  if (!row) {
+    throw new ShortlistError("network");
+  }
+
+  return {
+    entryId: text(row.entry_id, entryId),
+    inAnyList: bool(row.in_any_list),
+    personId: text(row.person_id),
+    positionId: nullableText(row.position_id),
+    profilesTotal: count(row.profiles_total),
+    shortlistId: text(row.shortlist_id),
+  };
+}
+
+/**
+ * Stella e appartenenza alla Position/**
  * Stella e appartenenza alla Position (§15, §23).
  *
  * «Supporta caricamenti efficienti per più profili quando la superficie lo

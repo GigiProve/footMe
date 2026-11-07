@@ -33,7 +33,7 @@ docs/                  questa documentazione
 | `app/notifications.tsx`, `app/notification-preferences.tsx` | `features/notifications` | |
 | `app/position*/`, `app/society-position/*` | `features/dashboard/positions` | centro, composer, manage |
 | `app/(tabs)/dashboard/my-applications/*` | `features/applications` | candidature inviate (lato persona); `app/applications/*` resta come redirect per i deep link già inviati |
-| `app/(tabs)/dashboard/shortlist/*` | `features/dashboard/shortlist` | centro unificato e vista base del pool (DAS-REV-24) |
+| `app/(tabs)/dashboard/shortlist/*` | `features/dashboard/shortlist` | centro, pool di Position con filtri, scheda «Profilo in shortlist» ed editor di valutazione (DAS-REV-24/25) |
 | `app/shortlist/*` | `features/shortlist` | dettaglio lista, selector dal profilo, valutazione; `index` reindirizza al centro |
 | `app/club-*`, `app/team-*`, `app/society-admin/*` | `features/clubs`, `features/teams` | |
 | `app/role-link/*` | `features/role-link` | collegamento persona–società |

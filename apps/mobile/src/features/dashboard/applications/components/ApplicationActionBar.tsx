@@ -7,19 +7,26 @@
  *
  * Lo stato dopo l'aggiunta non è un successo celebrato: §20 — «Dopo conferma
  * mostra **✓ In shortlist**, con superficie grigio neutro e testo nero. Non
- * usare verde decorativo, popup di successo o una schermata celebrativa.» È
- * anche **non tappabile**: «Non rendere In shortlist un comando nascosto di
- * rimozione.»
+ * usare verde decorativo, popup di successo o una schermata celebrativa.»
+ *
+ * DAS-REV-24 lo aveva reso **non tappabile**, per non farne «un comando
+ * nascosto di rimozione». DAS-REV-25 §11 completa quel comportamento senza
+ * contraddirlo: il controllo resta neutro e continua a non rimuovere nulla
+ * al tap, ma apre uno sheet di azioni — «Il controllo confermato resta
+ * neutro e diventa un accesso ad azioni, con label accessibile equivalente
+ * a In shortlist, apri azioni. Non annunciarlo come rimozione e non
+ * rimuovere al tap.»
  *
  * Un'azione non autorizzata non diventa un pulsante disabilitato: §22 — «Se
  * il sistema non consente alla Society corrente di scrivere, nascondi
  * l'azione non autorizzata.» Lo stesso vale per la shortlist.
  */
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, sizes, spacing } from "../../../../theme/tokens";
 import { AppText, Button } from "../../../../ui";
+import { SHORTLIST_COPY } from "../../shortlist/shortlist-presentation";
 import { APPLICATIONS_COPY } from "../applications-presentation";
 
 type Props = {
@@ -30,6 +37,8 @@ type Props = {
   messageBusy: boolean;
   onAddShortlist: () => void;
   onMessage: () => void;
+  /** DAS-REV-25 §11: apre lo sheet delle azioni sulla membership. */
+  onOpenShortlistActions: () => void;
   shortlistBusy: boolean;
 };
 
@@ -41,6 +50,7 @@ export function ApplicationActionBar({
   messageBusy,
   onAddShortlist,
   onMessage,
+  onOpenShortlistActions,
   shortlistBusy,
 }: Props) {
   const showShortlist = inShortlist || canAddShortlist;
@@ -53,21 +63,28 @@ export function ApplicationActionBar({
     <View style={[styles.bar, { paddingBottom: spacing[12] + bottomInset }]}>
       {inShortlist ? (
         /*
-          Non è un Button: un `Button` con `disabled` comunicherebbe
-          «azione momentaneamente non disponibile», mentre questo è un
-          **esito**. Resta nell'albero di accessibilità come testo di stato.
+          Non è un `Button`: la superficie resta quella neutra dell'esito,
+          non quella di una CTA (§4 della 25 — «In shortlist: superficie
+          grigia neutra, check e testo neri»). È però un controllo, e
+          l'etichetta accessibile dice che cosa fa il tap: §31 — «In
+          shortlist deve annunciare stato e apertura azioni.»
         */
-        <View
-          accessibilityRole="text"
-          accessibilityLabel={`${APPLICATIONS_COPY.inShortlist}. Candidato già aggiunto alla shortlist di questa posizione.`}
-          style={styles.shortlistState}
+        <Pressable
+          accessibilityHint="Apre le azioni sulla shortlist di questa posizione"
+          accessibilityLabel={`${APPLICATIONS_COPY.inShortlist}. ${SHORTLIST_COPY.sheetOpenActions}`}
+          accessibilityRole="button"
+          onPress={onOpenShortlistActions}
+          style={({ pressed }) => [
+            styles.shortlistState,
+            pressed ? styles.pressed : null,
+          ]}
           testID="application-in-shortlist"
         >
           <Ionicons color={colors.textNeutral} name="checkmark" size={16} />
           <AppText color="neutral" variant="actionLabel">
             {APPLICATIONS_COPY.inShortlist}
           </AppText>
-        </View>
+        </Pressable>
       ) : canAddShortlist ? (
         <Button
           /* §20: «Durante la richiesta disabilita soltanto l'azione
@@ -120,6 +137,9 @@ const styles = StyleSheet.create({
   action: {
     flexBasis: 150,
     flexGrow: 1,
+  },
+  pressed: {
+    opacity: 0.6,
   },
   shortlistState: {
     alignItems: "center",

@@ -167,6 +167,8 @@ function detail(
     contextLabel: "Settore giovanile",
     countsAvailable: false,
     creationBatchId: null,
+    shortlistAvailable: true,
+    shortlistProfilesCount: 3,
     customRoleName: "Responsabile scouting",
     dataRevision: 1,
     deadlineAt: null,
@@ -630,8 +632,11 @@ describe("screen 07 — posizione attiva", () => {
     const content = texts(tree);
 
     expect(content).toContain("Attiva");
+    /* DAS-REV-25 §9: i conteggi vivono nel sottotitolo della riga sorella
+       «Candidature ricevute», non più in un blocco con CTA testuale. */
     expect(content).toContain("12 candidature · 3 nuove");
-    expect(content).toContain("Gestisci candidature");
+    expect(content).toContain("Candidature ricevute");
+    expect(hasTestID(tree, "position-manage-area-applications")).toBe(true);
     expect(content).toContain("Modifica posizione");
   });
 
@@ -973,7 +978,8 @@ describe("DAS-REV-18 screen 04 — attiva, termine superato", () => {
     /* §14: «Mantieni accessibili le candidature ricevute». La scadenza non
        le ritira e non le azzera. */
     expect(texts(tree)).toContain("12 candidature · 3 nuove");
-    expect(hasTestID(tree, "position-manage-applications")).toBe(true);
+    /* DAS-REV-25 §9: l'ingresso è la riga sorella «Candidature ricevute». */
+    expect(hasTestID(tree, "position-manage-area-applications")).toBe(true);
   });
 
   it("spiega come riaprire la ricezione", async () => {
@@ -1157,10 +1163,12 @@ describe("DAS-REV-18 screen 10 — dettaglio storico", () => {
     const content = texts(tree);
 
     expect(content).toContain("Candidature ricevute");
-    expect(hasTestID(tree, "position-manage-view-applications")).toBe(true);
-    /* La riga in testa con «3 nuove» appartiene alla gestione di una
-       posizione attiva: §26 vieta di enfatizzare le nuove nello storico. */
-    expect(hasTestID(tree, "position-manage-counts")).toBe(false);
+    /* DAS-REV-25 §9: anche su una chiusa l'ingresso è la riga sorella, con
+       la stessa forma di una Position attiva. */
+    expect(hasTestID(tree, "position-manage-area-applications")).toBe(true);
+    /* Le «3 nuove» appartengono alla gestione di una posizione attiva:
+       §26 vieta di enfatizzare le nuove nello storico. */
+    expect(content).not.toContain("3 nuove");
   });
 
   it("non enfatizza le nuove candidature nello storico", async () => {

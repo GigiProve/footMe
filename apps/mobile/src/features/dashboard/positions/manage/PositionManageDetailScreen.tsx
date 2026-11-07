@@ -35,6 +35,15 @@ import {
   DashboardGlobalOffline,
   DashboardSkeleton,
 } from "../../components/DashboardStates";
+import {
+  DashboardAreaRows,
+  type AreaRowItem,
+} from "../../components/DashboardAreaRow";
+import {
+  SHORTLIST_COPY,
+  profilesLabel,
+} from "../../shortlist/shortlist-presentation";
+import { SHORTLIST_HREFS } from "../../shortlist/shortlist-routes";
 import { useDashboardConnection } from "../../state/use-dashboard-connection";
 import { COMPOSE_QK } from "../compose/compose-keys";
 import {
@@ -405,6 +414,61 @@ export function PositionManageDetailScreen() {
   /* §7: «Pubblicabile» è permesso **più** contenuto valido. Il primo lo dice
      `canPublish`, il secondo l'assenza di blockers: §4 vieta di confonderli
      in un unico flag persistito. */
+  /**
+   * DAS-REV-25 §9: «Nel dettaglio gestionale Position mostra, quando
+   * ciascun dominio è autorizzato, due righe sorelle.»
+   *
+   * Sorelle davvero: stessa forma, stesso gruppo, conteggi indipendenti —
+   * «Non annidare Shortlist in Candidature ricevute. Non mostrare due
+   * conteggi di candidati con nomi diversi.»
+   *
+   * La riga Application non compare su una bozza: §9 — «Non aggiungere
+   * preview di candidature inesistenti: la row Application segue
+   * l'eligibility reale del relativo dominio» (screen 12). La riga
+   * Shortlist invece sì, anche a zero: §9 — «La row Shortlist è
+   * accessibile anche con 0 profili.»
+   */
+  const areaRows: AreaRowItem[] = [];
+
+  if (detail.countsAvailable && !isDraft) {
+    areaRows.push({
+      count: null,
+      icon: "people-outline",
+      id: "applications",
+      onPress: () =>
+        router.push(
+          POSITIONS_HREFS.positionApplications(
+            detail.id,
+            /* DAS-REV-22 §23: da una CLOSED si apre Tutte, perché Nuove
+               resterebbe vuota per definizione. */
+            isClosed ? { tab: "all" } : undefined,
+          ) as never,
+        ),
+      subtitle: counts ?? MANAGE_COPY.receivedNone,
+      testID: "position-manage-area-applications",
+      title: MANAGE_COPY.receivedApplications,
+    });
+  }
+
+  if (detail.shortlistAvailable) {
+    areaRows.push({
+      count: null,
+      icon: "star-outline",
+      id: "shortlist",
+      /* §9: «Una route per position_id può leggere il contesto autorizzato
+         e una lista vuota senza creare un record.» L'href porta la
+         Position, non una lista che potrebbe non esistere. */
+      onPress: () =>
+        router.push(SHORTLIST_HREFS.position(detail.id) as never),
+      subtitle: profilesLabel(detail.shortlistProfilesCount ?? 0),
+      testID: "position-manage-area-shortlist",
+      title: SHORTLIST_COPY.positionRowTitle,
+    });
+  }
+
+  /* §7: «Pubblicabile» è permesso **più** contenuto valido. Il primo lo dice
+     `canPublish`, il secondo l'assenza di blockers: §4 vieta di confonderli
+     in un unico flag persistito. */
   const canPublishNow = detail.canPublish && detail.blockers.length === 0;
   const showComplete = isDraft && detail.canEdit && readiness === "incomplete";
 
@@ -540,29 +604,14 @@ export function PositionManageDetailScreen() {
             §9 di DAS-REV-22 — «Non mostrare un aggregato sensibile a chi non
             può conoscerlo». `applicationsLine` restituisce già `null` in
             quel caso, quindi non resta niente da rendere fuori dal blocco. */}
-        {detail.countsAvailable && !isClosed ? (
-          <View style={styles.block} testID="position-manage-received-open">
-            <AppText color="neutral" variant="metaStrong">
-              {MANAGE_COPY.receivedApplications}
-            </AppText>
-
-            <AppText
-              color="neutral"
-              testID="position-manage-counts"
-              variant="bodyLg"
-            >
-              {counts ?? MANAGE_COPY.receivedNone}
-            </AppText>
-
-            <InlineAction
-              label={MANAGE_COPY.manageApplications}
-              onPress={() =>
-                router.push(
-                  POSITIONS_HREFS.positionApplications(detail.id) as never,
-                )
-              }
-              testID="position-manage-applications"
-            />
+        {/* DAS-REV-25 §9, screen 01 e 12: Candidature ricevute e Shortlist
+            sono due righe sorelle con chevron e tap dell'intera riga, non
+            due blocchi con una CTA testuale ciascuno. Un solo gruppo per
+            tutti i lifecycle: una Position chiusa non cambia forma, cambia
+            solo dove porta la riga delle candidature (§23). */}
+        {areaRows.length > 0 ? (
+          <View style={styles.areaRows} testID="position-manage-areas">
+            <DashboardAreaRows items={areaRows} />
           </View>
         ) : null}
 
@@ -716,39 +765,10 @@ export function PositionManageDetailScreen() {
           </View>
         ) : null}
 
-        {/* §28: «La sezione Candidature ricevute mostra il totale autorizzato
-            e Vedi candidature … Senza diritto al dominio/aggregato, ometti
-            dati e azioni; errore di caricamento non equivale a zero.» */}
-        {isClosed && detail.countsAvailable ? (
-          <View style={styles.block} testID="position-manage-received">
-            <AppText color="neutral" variant="metaStrong">
-              {MANAGE_COPY.receivedApplications}
-            </AppText>
-
-            <AppText color="neutral" variant="bodyLg">
-              {counts ?? MANAGE_COPY.receivedNone}
-            </AppText>
-
-            {detail.applicationsTotal ? (
-              <InlineAction
-                label={MANAGE_COPY.viewApplications}
-                /* DAS-REV-22 §23: «Per l'ingresso storico da una Position
-                   CLOSED apri Tutte, come 13, così le candidature conservate
-                   sono immediatamente raggiungibili.» Nuove resterebbe vuota
-                   per definizione, e §23 vieta di segnarle lette per
-                   ottenere quel risultato. */
-                onPress={() =>
-                  router.push(
-                    POSITIONS_HREFS.positionApplications(detail.id, {
-                      tab: "all",
-                    }) as never,
-                  )
-                }
-                testID="position-manage-view-applications"
-              />
-            ) : null}
-          </View>
-        ) : null}
+        {/* DAS-REV-18 §28 — «La sezione Candidature ricevute mostra il
+            totale autorizzato e Vedi candidature» — è ora la riga sorella
+            del gruppo qui sopra, identica a quella di una Position attiva
+            (DAS-REV-25 §9). */}
 
         {/* §7: «Sola consultazione» è un'indicazione discreta, non un
             avviso. Compare solo quando non c'è davvero nessuna azione. */}
@@ -1206,6 +1226,9 @@ function isAccessError(error: unknown): error is ComposeError {
 }
 
 const styles = StyleSheet.create({
+  areaRows: {
+    paddingTop: spacing[4],
+  },
   block: {
     borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,

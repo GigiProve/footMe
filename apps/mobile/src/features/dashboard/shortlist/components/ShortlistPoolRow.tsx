@@ -1,67 +1,97 @@
 /**
- * Riga del pool misto (§14, screen 11).
+ * Riga del pool misto (DAS-REV-25 §12, screen 02, 04, 13).
  *
- * «Righe compatte con avatar, nome, ruolo, contesto pubblico corrente, stato
- * di valutazione interno se autorizzato, priorità soltanto se presente ed
- * eventuale informazione discreta sulla candidatura collegata.»
+ * «avatar, nome e cognome; tipo/ruolo professionale e contesto corrente
+ * essenziale; stato di valutazione; priorità soltanto se non nulla;
+ * informazione autorizzata sull'origine o sulla candidatura; eventuale
+ * anteprima della nota in una sola riga; chevron decorativo, con intera riga
+ * tappabile.»
  *
- * Nessuna segmentazione per origine: §14 — «Il pool contiene insieme persone
- * con e senza Application. Nessuna tab Candidati/Scouting, nessuna
- * segmentazione automatica, nessuna priorità di ranking assegnata in base
- * all'origine.»
+ * E l'elenco di ciò che **non** entra qui, che è altrettanto vincolante:
+ * «Non portare nella riga carriera completa, statistiche, altezza/piede,
+ * testo integrale della nota, added_by/data o una serie di pulsanti
+ * edit/remove/messaggio.»
  *
- * «Da candidatura» e «Aggiunto dal profilo» sono metadati grigi, non badge
- * colorati, e la nota interna non compare mai qui — §14: «Non caricare o
- * mostrare note complete nella riga.»
+ * Le due origini convivono in un elenco solo: §12 — «Non creare tab
+ * Candidati/Scouting, Da candidatura/Dal profilo o tab per stato.»
+ *
+ * Tutto ciò che si può sbagliare in un `if` dentro il render — quale
+ * dicitura di origine è lecita, quando la priorità si omette — sta in
+ * `poolRowLines`, dove i test lo raggiungono.
  */
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, sizes, spacing } from "../../../../theme/tokens";
 import { AppText, Avatar } from "../../../../ui";
-import { poolRowMeta } from "../shortlist-presentation";
+import { formatRole } from "../../../profiles/profile-display-helpers";
+import { getPlayerPositionLabel } from "../../../profiles/player-sports";
+import { poolRowLines } from "../shortlist-presentation";
 import type { ShortlistPoolRow as Row } from "../shortlist-types";
 
 type Props = {
-  canSeeEvaluation: boolean;
+  focused?: boolean;
   onPress: () => void;
   row: Row;
   showDivider?: boolean;
 };
 
-/** §14: «ruolo, contesto pubblico corrente». Senza contesto, niente puntino. */
-function identityLine(row: Row): string {
-  return [row.role, row.currentTeam]
+/**
+ * «Calciatore · Centrocampista» (§12).
+ *
+ * Senza posizione resta la sola tipologia, e senza nemmeno quella la riga
+ * non mostra un segnaposto: §12 — «I dati non disponibili non vengono
+ * sostituiti con valori demo o stringhe null.»
+ */
+export function identityLine(row: {
+  primaryPosition: string | null;
+  role: string | null;
+}): string {
+  return [
+    row.role ? formatRole(row.role) : null,
+    row.primaryPosition ? getPlayerPositionLabel(row.primaryPosition, "") : null,
+  ]
     .filter((part): part is string => !!part && part.length > 0)
     .join(" · ");
 }
 
 export function ShortlistPoolRowView({
-  canSeeEvaluation,
+  focused = false,
   onPress,
   row,
   showDivider = false,
 }: Props) {
   const identity = identityLine(row);
-  const meta = poolRowMeta({
-    canSeeEvaluation,
-    createdSource: row.createdSource,
-    evaluationStatus: row.evaluationStatus,
-    hasApplication: row.hasApplication,
-    priority: row.priority,
-  });
+  const lines = poolRowLines(row);
 
   return (
     <View>
       {showDivider ? <View style={styles.divider} /> : null}
 
       <Pressable
-        accessibilityLabel={[row.name, identity, ...meta]
-          .filter((part) => part.length > 0)
+        /* §31: «La riga di persona è un solo target coerente, con chevron
+           decorativo.» Una sola etichetta annunciata, nell'ordine in cui si
+           legge. */
+        accessibilityLabel={[
+          row.name,
+          identity,
+          row.situation,
+          lines.evaluation,
+          lines.origin,
+          lines.note,
+        ]
+          .filter((part): part is string => !!part && part.length > 0)
           .join(". ")}
         accessibilityRole="button"
         onPress={onPress}
-        style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+        style={({ pressed }) => [
+          styles.row,
+          /* §24: «Un'evidenziazione transitoria neutra e il focus
+             accessibile possono indicare la persona raggiunta.» Neutra: non
+             un colore che dica «selezionato». */
+          focused ? styles.focused : null,
+          pressed ? styles.pressed : null,
+        ]}
         testID={`shortlist-pool-${row.personId}`}
       >
         <Avatar name={row.name} size="md" uri={row.avatarUrl ?? undefined} />
@@ -77,9 +107,30 @@ export function ShortlistPoolRowView({
             </AppText>
           ) : null}
 
-          {meta.length > 0 ? (
-            <AppText color="neutralMuted" numberOfLines={2} variant="meta">
-              {meta.join(" · ")}
+          {row.situation ? (
+            <AppText color="neutralMuted" numberOfLines={1} variant="meta">
+              {row.situation}
+            </AppText>
+          ) : null}
+
+          {/* §4: «priorità, valutazioni … testo neutro, senza colori che
+              suggeriscano un giudizio automatico.» */}
+          <AppText color="neutral" numberOfLines={1} variant="meta">
+            {lines.evaluation}
+          </AppText>
+
+          {lines.origin ? (
+            <AppText color="neutralMuted" numberOfLines={1} variant="meta">
+              {lines.origin}
+            </AppText>
+          ) : null}
+
+          {/* §12: «La sola anteprima della nota nella lista può essere
+              troncata a una riga.» Il troncamento vero lo fa il server; qui
+              c'è solo il vincolo di layout. */}
+          {lines.note ? (
+            <AppText color="neutralMuted" numberOfLines={1} variant="meta">
+              {lines.note}
             </AppText>
           ) : null}
         </View>
@@ -108,7 +159,10 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    gap: spacing[4],
+    gap: 2,
+  },
+  focused: {
+    backgroundColor: colors.surfaceNeutral,
   },
   pressed: {
     opacity: 0.6,

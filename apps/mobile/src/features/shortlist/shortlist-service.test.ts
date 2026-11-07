@@ -292,11 +292,30 @@ describe("updateShortlistEntry", () => {
 });
 
 describe("removeShortlistEntry", () => {
-  it("deletes the entry by id", async () => {
+  /* DAS-REV-25 §21: la rimozione è un comando, non un delete diretto. Un
+     secondo percorso avrebbe autorizzazioni e ricevute diverse sullo stesso
+     dato. */
+  it("passa dal comando autorizzato e non dalla tabella", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: null });
+
     await removeShortlistEntry("entry-1");
-    expect(mocks.from).toHaveBeenCalledWith("club_shortlist_entries");
-    expect(mocks.builder.delete).toHaveBeenCalled();
-    expect(mocks.builder.eq).toHaveBeenCalledWith("id", "entry-1");
+
+    expect(mocks.rpc).toHaveBeenCalledWith("remove_shortlist_entry", {
+      p_entry_id: "entry-1",
+      p_idempotency_key: null,
+    });
+    expect(mocks.builder.delete).not.toHaveBeenCalled();
+  });
+
+  it("inoltra la chiave idempotente quando il chiamante ne ha una", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: null });
+
+    await removeShortlistEntry("entry-1", "op-7");
+
+    expect(mocks.rpc).toHaveBeenCalledWith("remove_shortlist_entry", {
+      p_entry_id: "entry-1",
+      p_idempotency_key: "op-7",
+    });
   });
 });
 

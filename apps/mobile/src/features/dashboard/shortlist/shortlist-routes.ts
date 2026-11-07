@@ -28,4 +28,27 @@ export const SHORTLIST_HREFS = {
    */
   customList: (shortlistId: string) =>
     `${CENTER}/list/${encodeURIComponent(shortlistId)}`,
+  /**
+   * Scheda interna «Profilo in shortlist» (DAS-REV-25 §15, screen 05).
+   *
+   * Dentro lo Stack della tab Dashboard, non fuori: §4 della 25 — «Le
+   * pagine gestionali mantengono Home | Cerca | Dashboard | Messaggi |
+   * Profilo, Dashboard selezionata», e gli screen 05/08/14/15 la mostrano.
+   * L'editor invece è focalizzato e **non** è una route: vive come modale
+   * sopra la schermata che lo apre, così il ritorno dopo Salva è quello
+   * giusto per costruzione (§19, §24).
+   */
+  entry: (entryId: string) =>
+    `${CENTER}/entry/${encodeURIComponent(entryId)}`,
+  /**
+   * Il pool con una persona da raggiungere (§24).
+   *
+   * «Per Vedi nella shortlist, apri un contesto di consultazione completo
+   * della stessa lista con focus sulla entry. Se il pool visitato in
+   * precedenza aveva filtri che escludono quella persona, questa apertura
+   * contestuale parte senza restrizioni.» Il parametro porta solo un id:
+   * §29 vieta nomi, note o dati personali negli URL.
+   */
+  positionFocused: (positionId: string, entryId: string) =>
+    `${CENTER}/position/${encodeURIComponent(positionId)}?focus=${encodeURIComponent(entryId)}`,
 } as const;

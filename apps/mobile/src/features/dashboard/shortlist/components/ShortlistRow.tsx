@@ -24,6 +24,13 @@ import { SHORTLIST_COPY, profilesLabel } from "../shortlist-presentation";
 type Props = {
   /** §10: metadato neutro su riga propria, come nel master 03. */
   isClosed?: boolean;
+  /**
+   * DAS-REV-25 §9: «Se una DRAFT persistita possiede entry accessibili,
+   * includila nella sezione Per posizione con label neutra **Bozza**.»
+   * Neutra come «Posizione chiusa», e mutuamente esclusiva con essa: una
+   * Position non è insieme bozza e chiusa.
+   */
+  isDraft?: boolean;
   onPress: () => void;
   profilesCount: number;
   scopeLabel: string | null;
@@ -34,6 +41,7 @@ type Props = {
 
 export function ShortlistRow({
   isClosed = false,
+  isDraft = false,
   onPress,
   profilesCount,
   scopeLabel,
@@ -43,8 +51,13 @@ export function ShortlistRow({
 }: Props) {
   const counts = profilesLabel(profilesCount);
   const meta = scopeLabel ? `${scopeLabel} · ${counts}` : counts;
-  const announced = isClosed
-    ? `${title}. ${meta}. ${SHORTLIST_COPY.positionClosed}`
+  const lifecycle = isClosed
+    ? SHORTLIST_COPY.positionClosed
+    : isDraft
+      ? SHORTLIST_COPY.draftLabel
+      : null;
+  const announced = lifecycle
+    ? `${title}. ${meta}. ${lifecycle}`
     : `${title}. ${meta}`;
 
   return (
@@ -70,9 +83,9 @@ export function ShortlistRow({
             {meta}
           </AppText>
 
-          {isClosed ? (
+          {lifecycle ? (
             <AppText color="neutralMuted" variant="meta">
-              {SHORTLIST_COPY.positionClosed}
+              {lifecycle}
             </AppText>
           ) : null}
         </View>

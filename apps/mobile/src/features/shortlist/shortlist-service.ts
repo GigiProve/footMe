@@ -236,11 +236,28 @@ export async function updateShortlistEntry(
   }
 }
 
-export async function removeShortlistEntry(entryId: string): Promise<void> {
-  const { error } = await supabase
-    .from("club_shortlist_entries")
-    .delete()
-    .eq("id", entryId);
+/**
+ * Rimozione di una membership (DAS-REV-25 §21).
+ *
+ * Era un `delete` diretto su `club_shortlist_entries`: autorizzato dalla
+ * policy RLS, ma senza esito, senza ricevuta e senza i dati per
+ * riconciliare count e stella. §21 la vuole comando, e averne **uno solo**
+ * è il punto: due percorsi di rimozione avrebbero due comportamenti
+ * diversi sullo stesso dato.
+ *
+ * La chiave idempotente è opzionale perché questo ingresso — il dettaglio
+ * di una lista CUSTOM di RET-07 — non ne genera ancora una; senza chiave il
+ * server esegue il comando con le stesse autorizzazioni e non registra la
+ * ricevuta. Il percorso con chiave è quello del pack 25.
+ */
+export async function removeShortlistEntry(
+  entryId: string,
+  idempotencyKey: string | null = null,
+): Promise<void> {
+  const { error } = await supabase.rpc("remove_shortlist_entry", {
+    p_entry_id: entryId,
+    p_idempotency_key: idempotencyKey,
+  });
 
   if (error) {
     throw error;

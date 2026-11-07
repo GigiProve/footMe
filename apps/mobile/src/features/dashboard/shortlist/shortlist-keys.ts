@@ -24,9 +24,30 @@ export const SHORTLIST_QK = {
   /** Contesto di una lista, per id oppure per Position (§25). */
   context: (actorId: string, ref: string) =>
     ["society-shortlist-context", actorId, ref] as const,
-  /** Entry di una lista. */
-  pool: (actorId: string, shortlistId: string) =>
-    ["society-shortlist-pool", actorId, shortlistId] as const,
+  /**
+   * Una pagina del pool (DAS-REV-25 §27).
+   *
+   * «Per il pool includi filtri normalizzati e cursore.» La chiave passa
+   * dalla **normalizzazione**, quindi due selezioni che il server tratta
+   * allo stesso modo — ordine diverso, duplicati, tutti i valori di una
+   * dimensione — condividono una sola voce di cache invece di produrne due
+   * con lo stesso contenuto.
+   */
+  pool: (actorId: string, shortlistId: string, filters = "*#*") =>
+    ["society-shortlist-pool", actorId, shortlistId, filters] as const,
+  /** Scheda interna della membership (§15). */
+  entry: (actorId: string, entryId: string) =>
+    ["society-shortlist-entry", actorId, entryId] as const,
+  /**
+   * Riepilogo della membership vista dalla candidatura (§11).
+   *
+   * Chiave propria e non `entry`: lo sheet legge una proiezione più
+   * stretta — senza nota — e condividere la cache con la scheda intera
+   * significherebbe o servire allo sheet dati che non ha chiesto, o
+   * svuotare la scheda ogni volta che lo sheet si apre.
+   */
+  applicationEntry: (actorId: string, applicationId: string) =>
+    ["society-shortlist-application-entry", actorId, applicationId] as const,
   /**
    * Stella e appartenenza alla Position: §28 — «Query della lista includono
    * il riferimento canonico; quelle della stella il contesto organizzativo.»
@@ -46,6 +67,8 @@ export const SHORTLIST_QK_PREFIXES = [
   "society-shortlist-custom-group",
   "society-shortlist-context",
   "society-shortlist-pool",
+  "society-shortlist-entry",
+  "society-shortlist-application-entry",
   "society-shortlist-membership",
 ] as const;
 
@@ -58,6 +81,10 @@ export const SHORTLIST_QK_PREFIXES = [
  * `society-application-detail` porta `inShortlist`.
  */
 export const SHORTLIST_CROSS_PREFIXES = [
+  /* DAS-REV-25 §27: «Rimozione → … row Position». Il dettaglio gestionale
+     porta il conteggio della riga sorella Shortlist, quindi una mutazione
+     del pool lo invalida come invalida il centro. */
+  "society-position-detail",
   "shortlists",
   "shortlist-membership-flags",
   "shortlist-memberships",

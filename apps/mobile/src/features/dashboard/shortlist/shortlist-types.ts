@@ -78,6 +78,11 @@ export type ShortlistCenterHeader = ShortlistCapabilities & {
 export type ShortlistPositionRow = {
   /** §10: metadato neutro, non un badge d'allarme. */
   isClosed: boolean;
+  /**
+   * DAS-REV-25 §9: «Se una DRAFT persistita possiede entry accessibili,
+   * includila nella sezione Per posizione con label neutra Bozza.»
+   */
+  isDraft: boolean;
   positionId: string;
   profilesCount: number;
   /** §9: «Team o scope canonico». Può mancare su una Position storica. */
@@ -107,8 +112,15 @@ export type ShortlistContext = {
   canAddProfiles: boolean;
   canEditStatus: boolean;
   canRemoveProfiles: boolean;
+  /**
+   * DAS-REV-25 §8: il catalogo distingue «Leggere note interne» da
+   * «Visualizzare la shortlist», quindi la lettura non è implicita.
+   */
+  canViewNotes: boolean;
   clubId: string;
   isClosed: boolean;
+  /** DAS-REV-25 §9: label neutra **Bozza**, che `isClosed` non esprime. */
+  isDraft: boolean;
   kind: ShortlistKind;
   positionId: string | null;
   profilesCount: number;
@@ -126,17 +138,135 @@ export type ShortlistContext = {
  */
 export type ShortlistPoolRow = {
   avatarUrl: string | null;
+  /**
+   * DAS-REV-25 §16: relazione **corrente** con la candidatura, distinta
+   * dall'origine. `null` significa «non autorizzato a saperlo», e §16 vieta
+   * di tradurlo in «non si è candidato».
+   */
+  applicationState: ShortlistApplicationState;
   createdSource: ShortlistCreatedSource;
-  currentTeam: string | null;
+  situation: string | null;
   entryId: string;
   evaluationStatus: ShortlistEvaluationStatus;
-  hasApplication: boolean | null;
   name: string;
+  /**
+   * DAS-REV-25 §12: «eventuale anteprima della nota in una sola riga». È il
+   * server a troncarla: la riga non riceve mai il testo integrale.
+   */
+  notePreview: string | null;
   personId: string;
+  primaryPosition: string | null;
   /** §14: «priorità soltanto se presente». */
   priority: ShortlistPriority | null;
   revision: number;
   role: string | null;
+};
+
+/** DAS-REV-25 §16: `null` = non autorizzato a conoscere la relazione. */
+export type ShortlistApplicationState = "active" | "none" | "withdrawn" | null;
+
+/**
+ * DAS-REV-25 §13: la priorità assente è un valore filtrabile.
+ *
+ * «Senza priorità seleziona null, non Bassa.» Nel filtro viaggia come
+ * `"none"`, nell'editor è «Nessuna» e nel dettaglio un trattino: tre
+ * rappresentazioni dello stesso `null`.
+ */
+export type ShortlistPriorityFilter = ShortlistPriority | "none";
+
+/** DAS-REV-25 §13: due dimensioni, OR interno e AND fra di esse. */
+export type ShortlistFilters = {
+  priorities: readonly ShortlistPriorityFilter[];
+  statuses: readonly ShortlistEvaluationStatus[];
+};
+
+/**
+ * Una pagina del pool (§14, §25).
+ *
+ * `total` e `filtered` arrivano dal backend e non dalla lunghezza di
+ * `rows`: §14 — «Questi numeri non sono il conteggio del batch già
+ * caricato.»
+ */
+export type ShortlistPoolPage = {
+  canEditStatus: boolean;
+  canRemove: boolean;
+  canViewApplications: boolean;
+  canViewNotes: boolean;
+  filtered: number;
+  filtersApplied: boolean;
+  nextCursor: string | null;
+  rows: ShortlistPoolRow[];
+  total: number;
+};
+
+/**
+ * Scheda interna «Profilo in shortlist» (§15).
+ *
+ * `note` nullo e `canViewNotes` falso non sono la stessa cosa: §15 vieta di
+ * usare «Nessuna nota aggiunta.» per una nota nascosta dai permessi.
+ */
+export type ShortlistEntryDetail = {
+  addedByName: string | null;
+  applicationId: string | null;
+  applicationState: ShortlistApplicationState;
+  avatarUrl: string | null;
+  canEditNote: boolean;
+  canEditStatus: boolean;
+  canRemove: boolean;
+  canViewApplications: boolean;
+  canViewNotes: boolean;
+  clubId: string;
+  createdAt: string | null;
+  createdSource: ShortlistCreatedSource;
+  situation: string | null;
+  entryId: string;
+  evaluationStatus: ShortlistEvaluationStatus;
+  isClosed: boolean;
+  isDraft: boolean;
+  name: string;
+  note: string | null;
+  personId: string;
+  positionId: string | null;
+  positionTitle: string;
+  primaryPosition: string | null;
+  priority: ShortlistPriority | null;
+  revision: number;
+  role: string | null;
+  scopeLabel: string | null;
+  shortlistId: string;
+};
+
+/**
+ * Patch della valutazione (§18).
+ *
+ * «Campi presenti con null indicano una cancellazione esplicita ammessa;
+ * campi omessi significano invariati.» Da cui i due flag espliciti: un
+ * `priority: null` deve poter dire «togli la priorità», e con il solo
+ * valore sarebbe indistinguibile da «non toccarla».
+ */
+export type ShortlistEvaluationPatch = {
+  evaluationStatus?: ShortlistEvaluationStatus;
+  note?: string | null;
+  priority?: ShortlistPriority | null;
+};
+
+/** Esito del salvataggio: proiezione autorizzata, non un booleano (§19). */
+export type ShortlistEvaluationOutcome = {
+  entryId: string;
+  evaluationStatus: ShortlistEvaluationStatus;
+  priority: ShortlistPriority | null;
+  replayed: boolean;
+  revision: number;
+};
+
+/** Esito della rimozione, con quanto serve a riconciliare (§21, §22). */
+export type ShortlistRemoveOutcome = {
+  entryId: string;
+  inAnyList: boolean;
+  personId: string;
+  positionId: string | null;
+  profilesTotal: number;
+  shortlistId: string;
 };
 
 /** §15, §23: due appartenenze distinte, mai confuse. */
@@ -149,9 +279,13 @@ export type ShortlistMembership = {
 /** Errori di dominio distinguibili internamente (§23). */
 export type ShortlistErrorKind =
   | "conflict"
+  | "gone"
   | "network"
+  | "noteTooLong"
   | "notAuthorized"
   | "notFound"
+  | "scopeUndefined"
+  | "staleCursor"
   | "withdrawn";
 
 export class ShortlistError extends Error {

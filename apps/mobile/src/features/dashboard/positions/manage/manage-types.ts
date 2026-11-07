@@ -50,6 +50,15 @@ export type PositionManageDetail = PositionDraft & {
   /** Il dettaglio libero di «Altro», quando c'è. `null` altrimenti (§20). */
   closeReasonText: string | null;
   countsAvailable: boolean;
+  /**
+   * DAS-REV-25 §9: la riga sorella Shortlist del dettaglio.
+   *
+   * «Senza capability Shortlist la row e il count sono assenti anche dal
+   * payload Position» (QA010): il conteggio arriva `null`, non zero, e la
+   * riga non si disegna affatto.
+   */
+  shortlistAvailable: boolean;
+  shortlistProfilesCount: number | null;
   dataRevision: number;
   deadlineAt: string | null;
   group: PositionGroup;

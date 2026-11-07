@@ -44,7 +44,25 @@ import {
   APPLICATIONS_QK,
   APPLICATIONS_QK_PREFIXES,
 } from "./applications-keys";
-import { SHORTLIST_QK_PREFIXES } from "../shortlist/shortlist-keys";
+import { ShortlistEntrySheet } from "../shortlist/components/ShortlistEntrySheet";
+import { ShortlistEvaluationEditor } from "../shortlist/components/ShortlistEvaluationEditor";
+import { ShortlistRemoveConfirm } from "../shortlist/components/ShortlistRemoveConfirm";
+import { SHORTLIST_QK, SHORTLIST_QK_PREFIXES } from "../shortlist/shortlist-keys";
+import {
+  SHORTLIST_COPY,
+  removeErrorCopy,
+  saveErrorCopy,
+} from "../shortlist/shortlist-presentation";
+import { SHORTLIST_HREFS } from "../shortlist/shortlist-routes";
+import {
+  fetchShortlistEntry,
+  removeShortlistEntry,
+  saveShortlistEvaluation,
+} from "../shortlist/shortlist-service";
+import {
+  ShortlistError,
+  type ShortlistEvaluationPatch,
+} from "../shortlist/shortlist-types";
 import { useOperationKey } from "../roles/use-operation-key";
 import { ApplicationStatusBlock } from "../../applications/lifecycle/components/ApplicationStatusBlock";
 import { societyLifecycleStatus } from "../../applications/lifecycle/lifecycle-presentation";
@@ -222,6 +240,129 @@ export function ApplicationDetailScreen() {
    * creare una seconda membership (QA044).
    */
   const shortlistKey = useOperationKey(`shortlist-add:${applicationId}`);
+
+  /* ── DAS-REV-25 §11: lo sheet di azioni dietro ✓ In shortlist ────────
+     Tre superfici sopra la candidatura, nessuna delle quali la sostituisce:
+     §11 — «Lo sfondo dello sheet è il dettaglio candidatura, non Profilo in
+     shortlist.» */
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
+
+  /**
+   * Riepilogo della membership per lo sheet (§11).
+   *
+   * `withNote: false`: «Non caricare l'intera nota privata per riempire lo
+   * sheet.» La nota arriva soltanto quando si apre davvero l'editor, con la
+   * lettura completa qui sotto.
+   *
+   * Parte all'apertura dello sheet e non al mount: §11 vuole che questo sia
+   * un accesso ad azioni, non un terzo carico su ogni dettaglio aperto.
+   */
+  const membershipQuery = useQuery({
+    enabled: !!actorId && (sheetOpen || removeOpen),
+    queryFn: () => fetchShortlistEntry({ applicationId }, false),
+    queryKey: SHORTLIST_QK.applicationEntry(actorId, applicationId),
+    retry: (failureCount, error) =>
+      !(error instanceof ShortlistError && error.kind !== "network") &&
+      failureCount < 1,
+    staleTime: STALE_MS.operational,
+  });
+
+  const membership = membershipQuery.data ?? null;
+
+  /* L'editor condiviso ha bisogno della nota, quindi di una lettura propria
+     (§15, §17). Chiave diversa da quella dello sheet: §27 — proiezioni
+     diverse non condividono una voce di cache. */
+  const editorQuery = useQuery({
+    enabled: !!actorId && editorOpen && !!membership?.entryId,
+    queryFn: () => fetchShortlistEntry({ entryId: membership?.entryId ?? "" }),
+    queryKey: SHORTLIST_QK.entry(actorId, membership?.entryId ?? ""),
+    staleTime: STALE_MS.operational,
+  });
+
+  const editorEntry = editorQuery.data ?? null;
+
+  const reconcileShortlist = useCallback(() => {
+    for (const prefix of [
+      ...SHORTLIST_QK_PREFIXES,
+      "shortlists",
+      "shortlist-memberships",
+      "shortlist-membership-flags",
+    ]) {
+      void queryClient.invalidateQueries({ queryKey: [prefix] });
+    }
+
+    /* §21: «dallo sheet Application torna all'Application e riconcilia il
+       suo stato.» `inShortlist` e `canAddShortlist` vengono dal dettaglio,
+       che va riletto — non modificato a mano. */
+    void queryClient.invalidateQueries({
+      queryKey: APPLICATIONS_QK.detail(actorId, applicationId),
+    });
+  }, [actorId, applicationId, queryClient]);
+
+  const evaluateKey = useOperationKey(
+    `shortlist-evaluate:${membership?.entryId ?? ""}:${editorEntry?.revision ?? 0}`,
+  );
+  const removeEntryKey = useOperationKey(
+    `shortlist-remove:${membership?.entryId ?? ""}`,
+  );
+
+  const evaluate = useMutation({
+    mutationFn: (patch: ShortlistEvaluationPatch) =>
+      saveShortlistEvaluation(
+        editorEntry?.entryId ?? "",
+        patch,
+        editorEntry?.revision ?? 0,
+        evaluateKey(),
+      ),
+    onError: (error) => {
+      setEvaluationError(
+        saveErrorCopy(error instanceof ShortlistError ? error.kind : "network"),
+      );
+    },
+    onSuccess: () => {
+      setEvaluationError(null);
+      setEditorOpen(false);
+      reconcileShortlist();
+      /* §19: «alla stessa candidatura se aperto dal suo sheet di azioni,
+         senza introdurre la nota nel layout Application». Chiudere la
+         modale è esattamente quel ritorno. */
+      showToast({
+        id: "shortlist-evaluation-saved",
+        message: SHORTLIST_COPY.saveDone,
+      });
+    },
+  });
+
+  const removeMembership = useMutation({
+    mutationFn: () => removeShortlistEntry(membership?.entryId ?? "", removeEntryKey()),
+    onError: (error) => {
+      setRemoveOpen(false);
+
+      showToast({
+        icon: "alert-circle-outline",
+        id: "shortlist-remove-error",
+        message: removeErrorCopy(
+          error instanceof ShortlistError ? error.kind : "network",
+        ),
+      });
+
+      if (error instanceof ShortlistError && error.kind === "gone") {
+        reconcileShortlist();
+      }
+    },
+    onSuccess: () => {
+      setRemoveOpen(false);
+      setSheetOpen(false);
+      reconcileShortlist();
+      showToast({
+        id: "shortlist-removed",
+        message: SHORTLIST_COPY.removeDone,
+      });
+    },
+  });
 
   const shortlist = useMutation({
     mutationFn: () => addApplicationToShortlist(applicationId, shortlistKey()),
@@ -581,8 +722,70 @@ export function ApplicationDetailScreen() {
           shortlist.mutate();
         }}
         onMessage={() => message.mutate()}
+        onOpenShortlistActions={() => setSheetOpen(true)}
         shortlistBusy={shortlist.isPending}
       />
+
+      {/* §11: lo sheet esiste solo quando la membership è davvero
+          leggibile. Un errore di lettura non diventa uno sheet vuoto con
+          azioni che il server rifiuterebbe. */}
+      {membership ? (
+        <ShortlistEntrySheet
+          entry={membership}
+          onClose={() => setSheetOpen(false)}
+          onEdit={() => {
+            setSheetOpen(false);
+            setEvaluationError(null);
+            setEditorOpen(true);
+          }}
+          onRemove={() => {
+            setSheetOpen(false);
+            setRemoveOpen(true);
+          }}
+          onSeeInShortlist={() => {
+            setSheetOpen(false);
+
+            if (membership.positionId) {
+              /* §24: «Vedi nella shortlist apre il pool della Position con
+                 persona raggiunta e origine Application», e §24 di nuovo:
+                 quell'apertura parte **senza restrizioni**. */
+              router.push(
+                SHORTLIST_HREFS.positionFocused(
+                  membership.positionId,
+                  membership.entryId,
+                ) as never,
+              );
+            }
+          }}
+          visible={sheetOpen}
+        />
+      ) : null}
+
+      {editorEntry ? (
+        <ShortlistEvaluationEditor
+          busy={evaluate.isPending}
+          entry={editorEntry}
+          error={evaluationError}
+          onClose={() => {
+            setEvaluationError(null);
+            setEditorOpen(false);
+          }}
+          onSave={(patch) => evaluate.mutate(patch)}
+          visible={editorOpen}
+        />
+      ) : null}
+
+      {membership ? (
+        <ShortlistRemoveConfirm
+          busy={removeMembership.isPending}
+          name={membership.name}
+          onCancel={() => setRemoveOpen(false)}
+          onConfirm={() => removeMembership.mutate()}
+          positionTitle={membership.positionTitle}
+          scopeLabel={membership.scopeLabel}
+          visible={removeOpen}
+        />
+      ) : null}
     </>,
     null,
   );

@@ -119,6 +119,9 @@ export default function DashboardLayout() {
         <Stack.Screen name="shortlist/index" />
         <Stack.Screen name="shortlist/position/[positionId]" />
         <Stack.Screen name="shortlist/list/[listId]" />
+        {/* DAS-REV-25 §15: la scheda interna sta dentro la tab Dashboard,
+            perché §4 vuole la bottom navigation sugli screen 05/08/14/15. */}
+        <Stack.Screen name="shortlist/entry/[entryId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

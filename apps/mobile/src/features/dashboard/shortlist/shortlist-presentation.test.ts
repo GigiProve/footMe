@@ -9,9 +9,18 @@ import { describe, expect, it } from "vitest";
 import {
   SHORTLIST_COPY,
   addErrorCopy,
+  addedByLine,
   centerPresentation,
-  poolRowMeta,
+  filtersAreActive,
+  filtersKey,
+  normalizeFilters,
+  originAuditLabel,
+  poolCountLabel,
+  poolPresentation,
+  poolRowLines,
+  priorityLabel,
   profilesLabel,
+  removeConfirmBody,
   rowSubtitle,
 } from "./shortlist-presentation";
 
@@ -169,60 +178,219 @@ describe("centerPresentation", () => {
   });
 });
 
-describe("poolRowMeta", () => {
+describe("poolRowLines — §12, §16", () => {
   const base = {
-    canSeeEvaluation: true,
+    applicationState: "active" as const,
     createdSource: "application" as const,
     evaluationStatus: "da_valutare" as const,
-    hasApplication: true,
+    notePreview: null,
     priority: null,
   };
 
-  it("omette la priorità quando non è impostata (§17, QA028)", () => {
-    expect(poolRowMeta(base)).toEqual([
-      "Da valutare",
-      SHORTLIST_COPY.fromApplication,
-    ]);
+  it("omette la priorità quando non è impostata (§12, QA031)", () => {
+    expect(poolRowLines(base).evaluation).toBe("Da valutare");
   });
 
-  it("mostra la priorità solo se presente (§14)", () => {
-    expect(poolRowMeta({ ...base, priority: "alta" })).toEqual([
-      "Da valutare",
-      "Priorità alta",
-      SHORTLIST_COPY.fromApplication,
-    ]);
-  });
-
-  it("segue la relazione corrente, non l'origine storica (§14, QA053)", () => {
+  it("mostra priorità e stato insieme quando la priorità c'è (§12)", () => {
     expect(
-      poolRowMeta({
+      poolRowLines({ ...base, evaluationStatus: "interessante", priority: "alta" })
+        .evaluation,
+    ).toBe("Alta · Interessante");
+  });
+
+  it("dice Da candidatura quando la membership è nata da lì (§16)", () => {
+    expect(poolRowLines(base).origin).toBe(SHORTLIST_COPY.fromApplication);
+  });
+
+  it("non nega una candidatura solo perché l'origine è PROFILE (§16, QA064)", () => {
+    expect(
+      poolRowLines({ ...base, createdSource: "profile" }).origin,
+    ).toBe(SHORTLIST_COPY.entryApplicationReceived);
+  });
+
+  it("usa la label neutra per una candidatura ritirata (§16, QA061)", () => {
+    expect(
+      poolRowLines({
         ...base,
+        applicationState: "withdrawn",
         createdSource: "profile",
-        evaluationStatus: "interessante",
-        hasApplication: true,
-      }),
-    ).toContain(SHORTLIST_COPY.fromApplication);
+      }).origin,
+    ).toBe(SHORTLIST_COPY.entryApplicationWithdrawn);
+  });
 
+  it("dice Aggiunto dal profilo quando non esiste candidatura (§16)", () => {
     expect(
-      poolRowMeta({
+      poolRowLines({
         ...base,
+        applicationState: "none",
         createdSource: "profile",
-        hasApplication: false,
-      }),
-    ).toContain(SHORTLIST_COPY.fromProfile);
+      }).origin,
+    ).toBe(SHORTLIST_COPY.fromProfile);
   });
 
-  it("non afferma «non si è candidato» quando il metadata non è autorizzato (QA057)", () => {
-    const meta = poolRowMeta({ ...base, hasApplication: null });
-
-    expect(meta).not.toContain(SHORTLIST_COPY.fromProfile);
-    expect(meta).not.toContain(SHORTLIST_COPY.fromApplication);
-  });
-
-  it("nasconde lo stato di valutazione a chi non è autorizzato (§14, §22)", () => {
+  it("non afferma niente sulla candidatura senza autorizzazione (§16, QA062)", () => {
+    /* Il server manda già `unknown` al posto di `application`: insieme a
+       `applicationState: null` non resta nessuna dicitura. */
     expect(
-      poolRowMeta({ ...base, canSeeEvaluation: false, hasApplication: null }),
-    ).toEqual([]);
+      poolRowLines({
+        ...base,
+        applicationState: null,
+        createdSource: "unknown",
+      }).origin,
+    ).toBeNull();
+  });
+
+  it("non inventa una nota quando non c'è (§12, QA032)", () => {
+    expect(poolRowLines(base).note).toBeNull();
+    expect(poolRowLines({ ...base, notePreview: "Buona visione." }).note).toBe(
+      "Buona visione.",
+    );
+  });
+});
+
+describe("poolCountLabel — §14", () => {
+  it("mostra il solo totale senza restrizioni (QA050)", () => {
+    expect(
+      poolCountLabel({ filtered: 3, filtersApplied: false, total: 3 }),
+    ).toBe("3 profili");
+  });
+
+  it("mostra «1 di 3 profili» con filtri attivi (screen 04)", () => {
+    expect(
+      poolCountLabel({ filtered: 1, filtersApplied: true, total: 3 }),
+    ).toBe("1 di 3 profili");
+  });
+
+  it("mostra «0 di 3 profili» senza corrispondenze (screen 16, QA047)", () => {
+    expect(
+      poolCountLabel({ filtered: 0, filtersApplied: true, total: 3 }),
+    ).toBe("0 di 3 profili");
+  });
+});
+
+describe("normalizeFilters — §13", () => {
+  it("deduplica e riordina stabilmente (QA054)", () => {
+    expect(
+      normalizeFilters({
+        priorities: ["media", "alta", "alta"],
+        statuses: [],
+      }).priorities,
+    ).toEqual(["alta", "media"]);
+  });
+
+  it("tratta tutti i valori di una dimensione come nessuna restrizione (QA042)", () => {
+    expect(
+      normalizeFilters({
+        priorities: ["alta", "media", "bassa", "none"],
+        statuses: [],
+      }),
+    ).toEqual({ priorities: [], statuses: [] });
+  });
+
+  it("produce la stessa chiave per selezioni equivalenti (§27)", () => {
+    expect(filtersKey({ priorities: ["media", "alta"], statuses: [] })).toBe(
+      filtersKey({ priorities: ["alta", "media"], statuses: [] }),
+    );
+  });
+
+  it("distingue «Senza priorità» da «Bassa» (§13, QA040)", () => {
+    expect(filtersKey({ priorities: ["none"], statuses: [] })).not.toBe(
+      filtersKey({ priorities: ["bassa"], statuses: [] }),
+    );
+  });
+
+  it("non considera attivo un filtro che non restringe nulla (QA041)", () => {
+    expect(filtersAreActive({ priorities: [], statuses: [] })).toBe(false);
+    expect(
+      filtersAreActive({
+        priorities: ["alta", "media", "bassa", "none"],
+        statuses: [],
+      }),
+    ).toBe(false);
+    expect(filtersAreActive({ priorities: ["alta"], statuses: [] })).toBe(true);
+  });
+});
+
+describe("poolPresentation — §28", () => {
+  it("distingue il vuoto reale dal vuoto filtrato (QA047)", () => {
+    expect(
+      poolPresentation({ filtersApplied: false, rowCount: 0, total: 0 }),
+    ).toBe("empty");
+
+    expect(
+      poolPresentation({ filtersApplied: true, rowCount: 0, total: 3 }),
+    ).toBe("filteredEmpty");
+  });
+
+  it("una lista senza membership non diventa un vuoto filtrato", () => {
+    /* §28: «Non confonderlo con una lista senza membership.» Anche con i
+       filtri attivi, totale 0 è il vuoto reale. */
+    expect(
+      poolPresentation({ filtersApplied: true, rowCount: 0, total: 0 }),
+    ).toBe("empty");
+  });
+
+  it("mostra le righe quando ce ne sono", () => {
+    expect(
+      poolPresentation({ filtersApplied: true, rowCount: 1, total: 3 }),
+    ).toBe("rows");
+  });
+});
+
+describe("originAuditLabel e addedByLine — §15, §16, §30", () => {
+  it("conserva l'origine storica anche con una candidatura collegata (QA060)", () => {
+    expect(originAuditLabel("profile")).toBe(SHORTLIST_COPY.fromProfile);
+    expect(originAuditLabel("application")).toBe(SHORTLIST_COPY.fromApplication);
+  });
+
+  it("non inventa un'origine sconosciuta (§30)", () => {
+    expect(originAuditLabel("unknown")).toBeNull();
+  });
+
+  it("omette l'autore mancante invece di sostituirlo (QA065)", () => {
+    expect(
+      addedByLine({ addedByName: null, createdAtLabel: "12 set 2026" }),
+    ).toBe("12 set 2026");
+
+    expect(
+      addedByLine({ addedByName: "Marco Bianchi", createdAtLabel: "13 set 2026" }),
+    ).toBe("Aggiunto da Marco Bianchi · 13 set 2026");
+
+    expect(
+      addedByLine({ addedByName: null, createdAtLabel: null }),
+    ).toBeNull();
+  });
+});
+
+describe("removeConfirmBody — §21", () => {
+  it("nomina persona e destinazione reali (QA093)", () => {
+    expect(
+      removeConfirmBody({
+        name: "Mario Rossi",
+        positionTitle: "Centrocampista",
+        scopeLabel: "Prima squadra",
+      }),
+    ).toBe("Mario Rossi verrà rimosso da Centrocampista · Prima squadra.");
+  });
+
+  it("non lascia un separatore penzolante senza scope", () => {
+    expect(
+      removeConfirmBody({
+        name: "Mario Rossi",
+        positionTitle: "Centrocampista",
+        scopeLabel: null,
+      }),
+    ).toBe("Mario Rossi verrà rimosso da Centrocampista.");
+  });
+});
+
+describe("priorityLabel — §12, §15, §17", () => {
+  it("non produce testo per una priorità assente (QA031)", () => {
+    /* Lo stesso null è «omesso» nella lista, «—» nel dettaglio, «Senza
+       priorità» nel filtro e «Nessuna» nell'editor: la funzione non ne
+       sceglie nessuno al posto del chiamante. */
+    expect(priorityLabel(null)).toBeNull();
+    expect(priorityLabel("alta")).toBe("Alta");
   });
 });
 

@@ -423,6 +423,7 @@ export function ShortlistCenterScreen() {
           {positionRows.map((row, index) => (
             <ShortlistRow
               isClosed={row.isClosed}
+              isDraft={row.isDraft}
               key={row.shortlistId}
               onPress={() => go(SHORTLIST_HREFS.position(row.positionId))}
               profilesCount={row.profilesCount}
