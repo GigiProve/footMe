@@ -21,6 +21,23 @@ export const SELECTION_EVENTS_QK = {
     ["selection-events-teams", actorId, clubId] as const,
   editor: (actorId: string, eventId: string) =>
     ["selection-event-editor", actorId, eventId] as const,
+  /**
+   * DAS-REV-29 §23: la cache personale/gestionale è per actor ed evento; la
+   * proiezione pubblica per identificatore pubblico, senza actor perché non
+   * contiene nulla di personale.
+   */
+  detail: (actorId: string, eventId: string) =>
+    ["selection-event-detail", actorId, eventId] as const,
+  detailByPublicId: (actorId: string, publicId: string) =>
+    ["selection-event-detail-public-id", actorId, publicId] as const,
+  publicEvent: (publicId: string) =>
+    ["selection-event-public", publicId] as const,
+  pendingRequests: (actorId: string, eventId: string) =>
+    ["selection-event-pending-requests", actorId, eventId] as const,
+  request: (actorId: string, participationId: string) =>
+    ["selection-event-request", actorId, participationId] as const,
+  flyerUrl: (actorId: string, path: string) =>
+    ["selection-event-flyer-url", actorId, path] as const,
 } as const;
 
 /**
@@ -34,4 +51,11 @@ export const SELECTION_EVENTS_QK_PREFIXES = [
   "selection-events-section",
   "selection-events-teams",
   "selection-event-editor",
+  /* DAS-REV-29 §23: dopo conferma, ritiro, decisione o modifica si
+     aggiornano dettaglio, stato personale, Centro, preview e capienza. */
+  "selection-event-detail",
+  "selection-event-detail-public-id",
+  "selection-event-public",
+  "selection-event-pending-requests",
+  "selection-event-request",
 ] as const;

@@ -5,11 +5,9 @@
  * Dashboard (bottom navigation visibile, Dashboard selezionata, §4); il
  * wizard è un flusso focalizzato fuori dalle tab, senza bottom navigation.
  *
- * Il dettaglio dell'evento **non esiste** in questo pack: §23 vieta di
- * creare «un dettaglio fittizio come soluzione temporanea» e di rilasciare
- * chevron verso 404. Non c'è quindi una funzione `detail` qui; quando la
- * 29–31 lo costruirà, si aggiunge accanto a queste e le righe del Centro si
- * collegano allo stesso ID.
+ * DAS-REV-29 aggiunge il dettaglio canonico, la richiesta singola, la
+ * modifica dell'evento pubblicato e il percorso del link pubblico: le righe
+ * del Centro, le notifiche e il link aprono lo stesso ID (§7).
  */
 
 export type SelectionEventsOrigin = "dashboard";
@@ -24,4 +22,26 @@ export const SELECTION_EVENTS_HREFS = {
   /** Riapertura della stessa bozza, con lo stesso ID (§13, §23). */
   draft: (eventId: string) =>
     `/event-compose?eventId=${encodeURIComponent(eventId)}`,
+  /**
+   * DAS-REV-29 §7: il dettaglio canonico. Una sola route per Centro,
+   * notifica, link e future liste partecipanti; vive nello Stack della tab
+   * Dashboard, con Dashboard selezionata (screen 01, 08, 11-15).
+   */
+  detail: (eventId: string) =>
+    `/(tabs)/dashboard/events/${encodeURIComponent(eventId)}`,
+  /**
+   * DAS-REV-29 §8, screen 02: modifica di un evento pubblicato nello stesso
+   * wizard a tre passaggi della 28, aperto sul passaggio indicato.
+   */
+  edit: (eventId: string, step: 1 | 2 | 3 = 2) =>
+    `/event-compose?eventId=${encodeURIComponent(eventId)}&mode=edit&step=${step}`,
+  /** DAS-REV-29 §17: la richiesta singola, riusabile dalla 30. */
+  request: (participationId: string) =>
+    `/(tabs)/dashboard/events/request/${encodeURIComponent(participationId)}`,
+  /**
+   * DAS-REV-29 §12: il percorso del link pubblico dentro l'app. Lo stesso
+   * percorso dell'URL HTTPS, così Universal/App Links e schema `footme://`
+   * arrivano qui senza traduzioni.
+   */
+  link: (publicId: string) => `/event/${encodeURIComponent(publicId)}`,
 } as const;

@@ -51,7 +51,13 @@ export function resolveNotificationCategory(
   ) {
     return "richieste";
   }
-  if (item.type === "application_received" || item.type === "application_status") {
+  if (
+    item.type === "application_received" ||
+    item.type === "application_status" ||
+    /* DAS-REV-29 §22: stessa scala del trigger notifications_before_insert. */
+    item.type === "selection_event_participation_confirmed" ||
+    item.type === "selection_event_participation_rejected"
+  ) {
     return "candidature";
   }
   if (item.type === "content_tag") return "attivita";

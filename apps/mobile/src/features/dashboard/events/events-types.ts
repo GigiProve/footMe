@@ -37,7 +37,12 @@ export const EVENT_SECTIONS: readonly EventSection[] = [
 export type EventLimits = {
   birthYearMax: number;
   birthYearMin: number;
+  /** DAS-REV-29 §18: messaggio facoltativo della non accettazione. */
+  decisionMessage: number;
   description: number;
+  /** DAS-REV-29 §8: stessi valori del bucket Storage. */
+  flyerMaxBytes: number;
+  flyerMimeTypes: readonly string[];
   maxParticipants: number;
   requirements: number;
   title: number;
@@ -124,13 +129,26 @@ export type EventDraftValues = {
   title: string;
   venueAddress: string;
   venueName: string;
+  /** DAS-REV-29 §8: asset locandina della Società, o null. */
+  flyerMediaId: string | null;
 };
 
 /** Configurazione completa letta per il wizard. */
+/** DAS-REV-29 §8: riferimento a un asset locandina della Società. */
+export type EventFlyerRef = {
+  height: number | null;
+  id: string;
+  path: string;
+  width: number | null;
+};
+
 export type SelectionEventEditor = {
   canEdit: boolean;
   canPublish: boolean;
   clubId: string;
+  /** Confermati attuali: il limite non scende sotto (§20 della 28). */
+  confirmedCount: number | null;
+  flyer: EventFlyerRef | null;
   hasActivity: boolean;
   id: string;
   status: SelectionEventStatus;

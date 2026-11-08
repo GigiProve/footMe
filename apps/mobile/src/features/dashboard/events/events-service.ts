@@ -46,6 +46,13 @@ export type SelectionEventsErrorCode =
   | "SELECTION_EVENT_INVALID"
   | "OPERATION_CONTENT_CHANGED"
   | "TEAM_NOT_ACTIVE"
+  /* DAS-REV-29: iscrizione, ritiro e decisione. */
+  | "SELECTION_EVENT_REGISTRATION_CLOSED"
+  | "SELECTION_EVENT_REGISTRATION_REJECTED"
+  | "SELECTION_EVENT_FULL"
+  | "SELECTION_EVENT_NOT_ELIGIBLE"
+  | "SELECTION_EVENT_NOT_OPERATIONAL"
+  | "SELECTION_EVENT_PARTICIPATION_CHANGED"
   | "NETWORK"
   | "TIMEOUT"
   | "UNKNOWN";
@@ -65,6 +72,12 @@ const SERVER_CODES: readonly SelectionEventsErrorCode[] = [
   "SELECTION_EVENT_INVALID",
   "OPERATION_CONTENT_CHANGED",
   "TEAM_NOT_ACTIVE",
+  "SELECTION_EVENT_REGISTRATION_CLOSED",
+  "SELECTION_EVENT_REGISTRATION_REJECTED",
+  "SELECTION_EVENT_FULL",
+  "SELECTION_EVENT_NOT_ELIGIBLE",
+  "SELECTION_EVENT_NOT_OPERATIONAL",
+  "SELECTION_EVENT_PARTICIPATION_CHANGED",
 ] as const;
 
 export class SelectionEventsError extends Error {
@@ -199,7 +212,10 @@ function confirmation(value: unknown): ConfirmationMode | null {
 const DEFAULT_LIMITS: EventLimits = {
   birthYearMax: new Date().getFullYear(),
   birthYearMin: 1900,
+  decisionMessage: 500,
   description: 2000,
+  flyerMaxBytes: 8388608,
+  flyerMimeTypes: ["image/jpeg", "image/png", "image/webp"],
   maxParticipants: 10000,
   requirements: 1000,
   title: 120,
@@ -209,12 +225,19 @@ const DEFAULT_LIMITS: EventLimits = {
 
 export function mapLimits(value: unknown): EventLimits {
   const raw = (value && typeof value === "object" ? value : {}) as RawRecord;
-  const read = (key: keyof EventLimits) => int(raw[key]) ?? DEFAULT_LIMITS[key];
+  const read = (key: Exclude<keyof EventLimits, "flyerMimeTypes">) =>
+    int(raw[key]) ?? DEFAULT_LIMITS[key];
+  const mimes = Array.isArray(raw.flyerMimeTypes)
+    ? raw.flyerMimeTypes.filter((entry): entry is string => typeof entry === "string")
+    : [];
 
   return {
     birthYearMax: read("birthYearMax"),
     birthYearMin: read("birthYearMin"),
+    decisionMessage: read("decisionMessage"),
     description: read("description"),
+    flyerMaxBytes: read("flyerMaxBytes"),
+    flyerMimeTypes: mimes.length > 0 ? mimes : DEFAULT_LIMITS.flyerMimeTypes,
     maxParticipants: read("maxParticipants"),
     requirements: read("requirements"),
     title: read("title"),
@@ -223,7 +246,8 @@ export function mapLimits(value: unknown): EventLimits {
   };
 }
 
-async function rpc<T>(name: string, params: Record<string, unknown>): Promise<T> {
+/** Esportata per i sottoflussi (dettaglio, richieste): stesso timeout, stessa classificazione. */
+export async function selectionEventsRpc<T>(name: string, params: Record<string, unknown>): Promise<T> {
   let result: { data: unknown; error: unknown };
 
   try {
@@ -266,7 +290,7 @@ export function mapCenter(row: RawRecord | null | undefined, clubId: string): Se
 }
 
 export async function fetchSelectionEventsCenter(clubId: string): Promise<SelectionEventsCenter> {
-  const rows = await rpc<RawRecord[]>("fetch_selection_events_center", {
+  const rows = await selectionEventsRpc<RawRecord[]>("fetch_selection_events_center", {
     p_club_id: clubId,
   });
 
@@ -310,7 +334,7 @@ export async function fetchSelectionEventsPage(input: {
   limit?: number;
   section: EventSection;
 }): Promise<SelectionEventsPage> {
-  const rows = await rpc<RawRecord[]>("fetch_selection_events_page", {
+  const rows = await selectionEventsRpc<RawRecord[]>("fetch_selection_events_page", {
     p_club_id: input.clubId,
     p_cursor: input.cursor ?? null,
     p_limit: input.limit ?? SECTION_PAGE_SIZE,
@@ -330,7 +354,7 @@ export async function fetchSelectionEventsPage(input: {
 }
 
 export async function fetchSelectionEventTeams(clubId: string): Promise<SelectionEventTeam[]> {
-  const rows = await rpc<RawRecord[]>("fetch_selection_event_teams", {
+  const rows = await selectionEventsRpc<RawRecord[]>("fetch_selection_event_teams", {
     p_club_id: clubId,
   });
 
@@ -368,10 +392,25 @@ export function mapEditor(row: RawRecord | null | undefined): SelectionEventEdit
   const yearTo = int(row.birth_year_to);
   const capacity = int(row.max_participants);
 
+  const flyerId = text(row.flyer_media_id);
+  const flyerPath = text(row.flyer_path);
+
   return {
     canEdit: bool(row.can_edit),
     canPublish: bool(row.can_publish),
     clubId: text(row.club_id) ?? "",
+    confirmedCount: int(row.confirmed_count),
+    /* DAS-REV-29 §8: la locandina salvata, con le dimensioni per riservare
+       lo spazio dell'anteprima. */
+    flyer:
+      flyerId && flyerPath
+        ? {
+            height: int(row.flyer_height),
+            id: flyerId,
+            path: flyerPath,
+            width: int(row.flyer_width),
+          }
+        : null,
     hasActivity: bool(row.has_activity),
     id,
     status: status(row.status),
@@ -396,13 +435,14 @@ export function mapEditor(row: RawRecord | null | undefined): SelectionEventEdit
       title: asText(row.title),
       venueAddress: asText(row.venue_address),
       venueName: asText(row.venue_name),
+      flyerMediaId: text(row.flyer_media_id),
     },
     version: int(row.version) ?? 1,
   };
 }
 
 export async function fetchSelectionEventEditor(eventId: string): Promise<SelectionEventEditor> {
-  const rows = await rpc<RawRecord[]>("fetch_selection_event_editor", {
+  const rows = await selectionEventsRpc<RawRecord[]>("fetch_selection_event_editor", {
     p_event_id: eventId,
   });
 
@@ -439,7 +479,7 @@ export async function saveSelectionEventDraft(input: {
   idempotencyKey: string;
   patch: Record<string, unknown>;
 }): Promise<SaveResult> {
-  const rows = await rpc<RawRecord[]>("save_selection_event_draft", {
+  const rows = await selectionEventsRpc<RawRecord[]>("save_selection_event_draft", {
     p_club_id: input.clubId,
     p_event_id: input.eventId,
     p_expected_version: input.expectedVersion,
@@ -456,7 +496,7 @@ export async function publishSelectionEvent(input: {
   expectedVersion: number;
   idempotencyKey: string;
 }): Promise<SaveResult> {
-  const rows = await rpc<RawRecord[]>("publish_selection_event", {
+  const rows = await selectionEventsRpc<RawRecord[]>("publish_selection_event", {
     p_event_id: input.eventId,
     p_expected_version: input.expectedVersion,
     p_idempotency_key: input.idempotencyKey,
@@ -467,3 +507,24 @@ export async function publishSelectionEvent(input: {
 
 /** Valori del form, così come il server li ha (per il diff della patch). */
 export type ServerValues = EventDraftValues;
+
+/**
+ * Modifica di un evento PUBLISHED (DAS-REV-29 §8, screen 02): lo stesso
+ * comando che la 28 ha preparato per il dettaglio, con i suoi guard di
+ * attività e capienza. Non pubblica e non cambia stato.
+ */
+export async function updateSelectionEvent(input: {
+  eventId: string;
+  expectedVersion: number;
+  idempotencyKey: string;
+  patch: Record<string, unknown>;
+}): Promise<SaveResult> {
+  const rows = await selectionEventsRpc<RawRecord[]>("update_selection_event", {
+    p_event_id: input.eventId,
+    p_expected_version: input.expectedVersion,
+    p_idempotency_key: input.idempotencyKey,
+    p_patch: input.patch,
+  });
+
+  return mapSave(rows);
+}

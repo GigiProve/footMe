@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Screen } from "../../components/ui/screen";
 import { useSession } from "../auth/use-session";
+import { SELECTION_EVENTS_HREFS } from "../dashboard/events/events-routes";
 import { ROLE_LINK_HREFS } from "../role-link/role-link-routes";
 import { colors, spacing } from "../../styles";
 import {
@@ -151,6 +152,16 @@ export function NotificationCenterScreen() {
       item.type === "application_status"
     ) {
       router.push("/(tabs)/announcements" as never);
+    } else if (
+      item.type === "selection_event_participation_confirmed" ||
+      item.type === "selection_event_participation_rejected"
+    ) {
+      /* DAS-REV-29 §22: «Tap apre lo stesso evento con stato personale
+         corrente; non una chat.» Il dettaglio rilegge lo stato dal server. */
+      const eventId = item.data?.event_id;
+      if (typeof eventId === "string" && eventId) {
+        router.push(SELECTION_EVENTS_HREFS.detail(eventId) as never);
+      }
     } else if (item.type === "society_invitation_created") {
       /* DAS-REV-19 §27: «La notifica apre lo stesso invitation_id. Il
          backend valida l'accesso del destinatario anche quando il link

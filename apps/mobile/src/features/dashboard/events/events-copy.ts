@@ -90,6 +90,10 @@ export const EVENTS_COPY = {
   sectionError: "Non siamo riusciti a caricare questa sezione.",
   draftSaved: "Bozza salvata",
   published: "Evento pubblicato",
+  /* DAS-REV-29 §8. */
+  updated: "Evento aggiornato",
+  flyerPermission:
+    "Consenti l’accesso alle foto per aggiungere una locandina, oppure continua senza.",
 
   // Wizard
   stepInfo: "Informazioni evento",
@@ -201,6 +205,11 @@ export const VALIDATION_COPY = {
   structure_locked:
     "Questo campo non può essere modificato dopo l'avvio delle partecipazioni.",
   malformed: "Alcuni dati non sono validi. Controlla i campi e riprova.",
+  /* DAS-REV-29 §8, §25. */
+  flyer_invalid: "Impossibile caricare la locandina. Riprova oppure continua senza.",
+  flyer_missing: "Impossibile caricare la locandina. Riprova oppure continua senza.",
+  flyer_format: "Formato non supportato. Usa un’immagine JPG, PNG o WebP.",
+  flyer_too_large: "L’immagine è troppo grande. Scegli un file più leggero.",
 } as const;
 
 export type ValidationCode = keyof typeof VALIDATION_COPY;

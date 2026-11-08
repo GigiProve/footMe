@@ -12,6 +12,7 @@ import { usePendingSocietyInvite } from "../../src/features/network/use-pending-
 import { usePendingAdminInvite } from "../../src/features/dashboard/admins/use-pending-admin-invite";
 import { usePendingAssistitoInvite } from "../../src/features/relationships/assistiti/use-pending-assistito-invite";
 import { usePendingTeamJoin } from "../../src/features/dashboard/join-links/join/use-pending-team-join";
+import { usePendingEventLink } from "../../src/features/dashboard/events/detail/use-pending-event-link";
 import { AppSidebar } from "../../src/ui/sidebar";
 import { colors, radius, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
 import { AppText, Icon, type IconName } from "../../src/ui";
@@ -68,6 +69,10 @@ export default function TabsLayout() {
   // destinatario risolve di nuovo la configurazione canonica dal backend,
   // perché possedere il token non prova nulla.
   usePendingTeamJoin(isReadyForInvites);
+  // DAS-REV-29 §12: lo stesso gancio per il link di un evento. Torna al
+  // dettaglio dopo login, signup e onboarding; il dettaglio rivalida
+  // disponibilità, profilo e stato personale, e non iscrive nessuno.
+  usePendingEventLink(isReadyForInvites);
 
   const unreadThreadsCount = profileId
     ? (conversationsQuery.data ?? []).filter((item) => item.unread_count > 0).length +

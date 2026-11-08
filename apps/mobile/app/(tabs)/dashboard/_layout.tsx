@@ -126,6 +126,13 @@ export default function DashboardLayout() {
             selector focalizzati senza bottom navigation». Il wizard sta in
             app/event-compose/. */}
         <Stack.Screen name="events/index" />
+        {/* DAS-REV-29 §4, §17: dettaglio canonico e richiesta singola con
+            Dashboard selezionata (screen 01, 08-16). Gli sheet sono modali
+            sopra queste pagine; la modifica dell'evento resta nel wizard
+            focalizzato di app/event-compose/, il link pubblico in
+            app/event/. */}
+        <Stack.Screen name="events/[eventId]" />
+        <Stack.Screen name="events/request/[participationId]" />
       </Stack>
     </DashboardIdentityProvider>
   );

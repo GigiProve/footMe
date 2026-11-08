@@ -134,12 +134,11 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
    * wizard, che esiste.
    */
   society_selection_event_detail: {
-    available: false,
-    blockedReason:
-      "Il dettaglio dell'evento di selezione (gestione, partecipanti, " +
-      "pagina pubblica) non esiste ancora: la DAS-REV-28 costruisce Centro " +
-      "e creazione, il dettaglio arriva con i pack successivi.",
-    owner: "Pack Eventi (DAS-REV-29–31)",
+    /* DAS-REV-29: dettaglio canonico, condivisione, preview delle richieste
+       e decisione manuale esistono. La gestione completa dei partecipanti
+       resta della 30, che riusa la stessa route e gli stessi comandi. */
+    available: true,
+    owner: "Pack Eventi (DAS-REV-29)",
   },
   society_scheduled_content: {
     available: false,

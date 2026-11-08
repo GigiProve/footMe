@@ -31,6 +31,9 @@ import {
 const LIMITS: EventLimits = {
   birthYearMax: 2026,
   birthYearMin: 1900,
+  decisionMessage: 500,
+  flyerMaxBytes: 8388608,
+  flyerMimeTypes: ["image/jpeg", "image/png", "image/webp"],
   description: 2000,
   maxParticipants: 10000,
   requirements: 1000,
@@ -61,6 +64,7 @@ function e4(patch: Partial<EventDraftValues> = {}): EventDraftValues {
     title: "Open day Primavera",
     venueAddress: "Via Roma 22, Como",
     venueName: "Centro Sportivo Comunale",
+    flyerMediaId: null,
     ...patch,
   };
 }

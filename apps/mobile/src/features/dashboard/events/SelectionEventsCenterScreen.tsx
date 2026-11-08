@@ -269,11 +269,11 @@ export function SelectionEventsCenterScreen() {
           : null;
       }
 
-      /* Gate `society_selection_event_detail` (dashboard-features): spento
-         finché la 29–31 non costruisce il dettaglio. Quel pack aggiunge la
-         destinazione a SELECTION_EVENTS_HREFS e la collega qui, sullo
-         stesso ID. */
-      return null;
+      /* DAS-REV-29 §7, QA-008: il dettaglio canonico esiste; In programma e
+         Storico lo aprono con lo stesso ID e il backstack della tab. */
+      return () => {
+        router.push(SELECTION_EVENTS_HREFS.detail(row.id) as never);
+      };
     },
     [router],
   );

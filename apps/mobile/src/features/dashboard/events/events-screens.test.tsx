@@ -71,6 +71,9 @@ vi.mock("./events-service", async (importOriginal) => {
 const LIMITS = {
   birthYearMax: 2026,
   birthYearMin: 1900,
+  decisionMessage: 500,
+  flyerMaxBytes: 8388608,
+  flyerMimeTypes: ["image/jpeg", "image/png", "image/webp"],
   description: 2000,
   maxParticipants: 10000,
   requirements: 1000,
@@ -204,12 +207,13 @@ describe("Centro (screen 01, 02, 03, 15, 16)", () => {
     expect(content.some((text) => /0 in attesa/.test(text) && !/8 in attesa/.test(text))).toBe(false);
   });
 
-  it("§23: la bozza riapre il wizard, l'evento pubblicato non porta a un dettaglio inesistente", async () => {
+  it("§23 + DAS-REV-29 QA-008: la bozza riapre il wizard, l'evento pubblicato apre il dettaglio canonico", async () => {
     const tree = await render(<SelectionEventsCenterScreen />);
 
-    expect(byTestID(tree, "event-row-u1")).toBeUndefined();
     await act(async () => byTestID(tree, "event-row-d1").props.onPress());
     expect(routerMocks.push).toHaveBeenCalledWith("/event-compose?eventId=d1");
+    await act(async () => byTestID(tree, "event-row-u1").props.onPress());
+    expect(routerMocks.push).toHaveBeenCalledWith("/(tabs)/dashboard/events/u1");
   });
 
   it("QA-003: Centro vuoto con CTA nel corpo", async () => {
@@ -243,6 +247,8 @@ function editor(patch: Partial<SelectionEventEditor["values"]> = {}): SelectionE
     canEdit: true,
     canPublish: true,
     clubId: "club-1",
+    confirmedCount: 0,
+    flyer: null,
     hasActivity: false,
     id: "e4",
     status: "draft",
@@ -267,6 +273,7 @@ function editor(patch: Partial<SelectionEventEditor["values"]> = {}): SelectionE
       title: "Open day Primavera",
       venueAddress: "Via Roma 22, Como",
       venueName: "Centro Sportivo Comunale",
+      flyerMediaId: null,
       ...patch,
     },
     version: 3,

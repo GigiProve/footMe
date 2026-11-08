@@ -51,7 +51,8 @@ import {
   PARTICIPATION_LABELS,
   VALIDATION_COPY,
 } from "../events-copy";
-import { SELECTION_EVENTS_QK } from "../events-keys";
+import { signFlyerUrl } from "../detail/event-detail-service";
+import { SELECTION_EVENTS_QK, SELECTION_EVENTS_QK_PREFIXES } from "../events-keys";
 import { formatCivilDate } from "../events-presentation";
 import { SELECTION_EVENTS_HREFS } from "../events-routes";
 import {
@@ -62,10 +63,12 @@ import {
   publishSelectionEvent,
   saveSelectionEventDraft,
   toSelectionEventsError,
+  updateSelectionEvent,
 } from "../events-service";
 import type {
   ConfirmationMode,
   EventDraftValues,
+  EventFlyerRef,
   ParticipationMode,
   SelectionEventTeam,
 } from "../events-types";
@@ -74,6 +77,9 @@ import { CivilPickerSheet } from "./components/CivilPickerSheet";
 import { EventSelectField } from "./components/EventSelectField";
 import { EventStepHeader } from "./components/EventStepHeader";
 import { EventTeamSheet } from "./components/EventTeamSheet";
+import { EDIT_HEADER_COPY, EventEditHeader } from "./components/EventEditHeader";
+import { EventFlyerField } from "./components/EventFlyerField";
+import { FlyerUploadError, pickFlyerImage, uploadFlyer } from "./event-flyer-service";
 import {
   buildPatch,
   commandSignature,
@@ -114,9 +120,16 @@ export function EventComposeScreen() {
   const actorId = profile?.id ?? "";
   const { current } = useDashboardIdentity();
   const clubId = current?.kind === "society" ? current.id : null;
-  const params = useLocalSearchParams<{ eventId?: string }>();
+  const params = useLocalSearchParams<{ eventId?: string; mode?: string; step?: string }>();
   const routeEventId =
     typeof params.eventId === "string" && params.eventId ? params.eventId : null;
+  /* DAS-REV-29 §8, screen 02: modifica di un evento esistente nello stesso
+     wizard a tre passaggi, aperto sul passaggio richiesto. */
+  const editMode = params.mode === "edit" && routeEventId !== null;
+  const routeStep: ComposeStep | null =
+    params.step === "1" || params.step === "2" || params.step === "3"
+      ? (Number(params.step) as ComposeStep)
+      : null;
 
   const [nonce] = useState(createSessionNonce);
   const [step, setStep] = useState<ComposeStep>(1);
@@ -132,7 +145,16 @@ export function EventComposeScreen() {
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
-  const [exitWith, setExitWith] = useState<"saved" | "published" | "revoked" | null>(null);
+  const [exitWith, setExitWith] = useState<"saved" | "published" | "updated" | "revoked" | null>(null);
+  /**
+   * DAS-REV-29 §8: gli asset locandina noti a questo form (salvato e appena
+   * caricati), con l'anteprima locale di quelli nuovi. Il form conserva solo
+   * l'ID in `values.flyerMediaId`: patch, dirty e merge lo trattano come ogni
+   * altro campo.
+   */
+  const [flyers, setFlyers] = useState<Record<string, EventFlyerRef & { localUri?: string }>>({});
+  const [flyerUploading, setFlyerUploading] = useState(false);
+  const [flyerError, setFlyerError] = useState<string | null>(null);
 
   // ── Letture ───────────────────────────────────────────────────────────────
 
@@ -172,15 +194,28 @@ export function EventComposeScreen() {
     setBaseline(editor.values);
     setVersion(editor.version);
     setEventId(editor.id);
+    if (editor.flyer) {
+      setFlyers({ [editor.flyer.id]: editor.flyer });
+    }
     setStep(
-      Object.keys(stepErrors(1, editor.values, limits)).length > 0
-        ? 1
-        : Object.keys(stepErrors(2, editor.values, limits)).length > 0
-          ? 2
-          : 3,
+      editMode && routeStep
+        ? routeStep
+        : Object.keys(stepErrors(1, editor.values, limits)).length > 0
+          ? 1
+          : Object.keys(stepErrors(2, editor.values, limits)).length > 0
+            ? 2
+            : 3,
     );
     setHydrated(true);
   }
+
+  const currentFlyer = values.flyerMediaId ? (flyers[values.flyerMediaId] ?? null) : null;
+  const flyerSignedQuery = useQuery({
+    enabled: !!currentFlyer && !currentFlyer.localUri && !!actorId,
+    queryFn: () => signFlyerUrl(currentFlyer?.path ?? ""),
+    queryKey: SELECTION_EVENTS_QK.flyerUrl(actorId, currentFlyer?.path ?? ""),
+    staleTime: 30 * 60 * 1000,
+  });
 
   const dirty = isDirty(values, baseline);
 
@@ -232,7 +267,12 @@ export function EventComposeScreen() {
     }
 
     showToast({
-      message: exitWith === "published" ? EVENTS_COPY.published : EVENTS_COPY.draftSaved,
+      message:
+        exitWith === "published"
+          ? EVENTS_COPY.published
+          : exitWith === "updated"
+            ? EVENTS_COPY.updated
+            : EVENTS_COPY.draftSaved,
       tone: "success",
     });
     leave();
@@ -522,6 +562,99 @@ export function EventComposeScreen() {
     }
   }, [limits, step, values]);
 
+  /**
+   * DAS-REV-29 §8: «Il tap Salva in modifica applica solo i cambi consentiti
+   * dopo validazione dell'intero patch; non pubblica una bozza e non salta i
+   * guard di attività/capienza.» Il comando è `update_selection_event`, che
+   * applica quei guard; la validazione client è quella strutturale della
+   * bozza, il resto torna dal server come errori per campo.
+   */
+  const saveChanges = useCallback(async () => {
+    if (busy || !limits || !eventId || version === null || flyerUploading) {
+      return;
+    }
+
+    const invalid = draftErrors(values, limits);
+
+    if (Object.keys(invalid).length > 0) {
+      setErrors(invalid);
+      setStep(firstStepWithError(invalid) ?? step);
+
+      return;
+    }
+
+    const patch = buildPatch(values, baseline);
+
+    if (Object.keys(patch).length === 0) {
+      leave();
+
+      return;
+    }
+
+    setBusy("save");
+    setBanner(null);
+
+    try {
+      const result = await updateSelectionEvent({
+        eventId,
+        expectedVersion: version,
+        idempotencyKey: operationKeyOf(nonce, commandSignature({ eventId, kind: "save", patch, version })),
+        patch,
+      });
+
+      setVersion(result.version);
+      setBaseline(values);
+      for (const prefix of SELECTION_EVENTS_QK_PREFIXES) {
+        void queryClient.invalidateQueries({ queryKey: [prefix] });
+      }
+      setExitWith("updated");
+    } catch (error) {
+      handleFailure(error, "save");
+    } finally {
+      setBusy(null);
+    }
+  }, [baseline, busy, eventId, flyerUploading, handleFailure, leave, limits, nonce, queryClient, step, values, version]);
+
+  /**
+   * Scelta e caricamento della locandina (§8). Il riferimento entra nel form
+   * solo ad asset pronto; fino ad allora resta quello di prima. Un errore non
+   * tocca il resto del form e si può proseguire senza immagine.
+   */
+  const chooseFlyer = useCallback(async () => {
+    if (!clubId || !limits || flyerUploading) {
+      return;
+    }
+
+    setFlyerError(null);
+
+    try {
+      const picked = await pickFlyerImage();
+
+      if (!picked) {
+        return;
+      }
+
+      setFlyerUploading(true);
+
+      const asset = await uploadFlyer({ clubId, limits, picked });
+
+      setFlyers((previous) => ({ ...previous, [asset.id]: { ...asset, localUri: picked.uri } }));
+      update({ flyerMediaId: asset.id }, ["flyer"]);
+    } catch (error) {
+      const code = error instanceof FlyerUploadError ? error.code : toSelectionEventsError(error).fields[0];
+
+      setFlyerError(
+        code === "permission_denied"
+          ? EVENTS_COPY.flyerPermission
+          : code === "flyer_format" || code === "flyer_too_large"
+            ? VALIDATION_COPY[code]
+            : VALIDATION_COPY.flyer_invalid,
+      );
+    } finally {
+      setFlyerUploading(false);
+    }
+  }, [clubId, flyerUploading, limits, update]);
+
   // ── Stati della schermata ─────────────────────────────────────────────────
 
   const shell = (content: React.ReactNode) => (
@@ -539,7 +672,14 @@ export function EventComposeScreen() {
   const editorDenied =
     editorQuery.error instanceof SelectionEventsError && editorQuery.error.isAuthorization;
 
-  if (!clubId || editorDenied || (editor && (!editor.canEdit || editor.status !== "draft"))) {
+  /* La 28 apre solo bozze; la 29 aggiunge la modifica di un PUBLISHED
+     quando il server concede `can_edit` (azione `manage`). Annullati e
+     conclusi restano fuori. */
+  const editableStatus = editor
+    ? editor.status === "draft" || (editMode && editor.status === "published")
+    : true;
+
+  if (!clubId || editorDenied || (editor && (!editor.canEdit || !editableStatus))) {
     return shell(
       <DashboardGlobalEmpty
         copy={{
@@ -613,14 +753,30 @@ export function EventComposeScreen() {
     .filter(Boolean)
     .join(" · ");
 
+  /* Screen 02: solo un evento già pubblicato si modifica con «Salva»; una
+     bozza aperta con lo stesso link resta nel percorso della 28. */
+  const editingPublished = editMode && editor?.status === "published";
+  const flyerPreviewUri = currentFlyer
+    ? (currentFlyer.localUri ?? flyerSignedQuery.data ?? null)
+    : null;
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <ComposerNavBar
-        isVerified={center.clubIsVerified}
-        logoUrl={center.clubLogoUrl}
-        name={center.clubName}
-        onBack={requestExit}
-      />
+      {editingPublished ? (
+        <EventEditHeader
+          onCancel={requestExit}
+          onSave={() => void saveChanges()}
+          saveDisabled={busy !== null || flyerUploading}
+          saving={busy === "save"}
+        />
+      ) : (
+        <ComposerNavBar
+          isVerified={center.clubIsVerified}
+          logoUrl={center.clubLogoUrl}
+          name={center.clubName}
+          onBack={requestExit}
+        />
+      )}
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -752,6 +908,23 @@ export function EventComposeScreen() {
 
         {step === 2 ? (
           <View>
+            {/* DAS-REV-29 §8: «Inserisci "Locandina — facoltativa" all'inizio
+                del secondo passaggio»; nessun quarto step. */}
+            <EventFlyerField
+              error={flyerError ?? errorText("flyer")}
+              hasFlyer={!!currentFlyer}
+              height={currentFlyer?.height ?? null}
+              onAdd={() => void chooseFlyer()}
+              onRemove={() => {
+                setFlyerError(null);
+                update({ flyerMediaId: null }, ["flyer"]);
+              }}
+              previewUri={flyerPreviewUri}
+              title={values.title}
+              uploading={flyerUploading}
+              width={currentFlyer?.width ?? null}
+            />
+
             <ComposerTextField
               error={errorText("description")}
               label={EVENTS_COPY.fieldDescription}
@@ -922,6 +1095,18 @@ export function EventComposeScreen() {
         ) : null}
       </ScrollView>
 
+      {editingPublished ? (
+        <ComposerFooter
+          onPrimary={step < 3 ? goNext : () => void saveChanges()}
+          primaryDisabled={busy !== null || flyerUploading}
+          primaryLabel={step < 3 ? EVENTS_COPY.continue : EDIT_HEADER_COPY.save}
+          primaryLoading={step === 3 && busy === "save"}
+          primaryTestID={step < 3 ? "event-continue" : "event-edit-save-footer"}
+          secondaryLabel={step > 1 ? EVENTS_COPY.back : null}
+          secondaryOnPress={() => setStep((Math.max(1, step - 1)) as ComposeStep)}
+          secondaryTestID="event-step-back"
+        />
+      ) : (
       <ComposerFooter
         inlineSecondary={
           step === 3 && !canPublish ? null : (
@@ -948,6 +1133,7 @@ export function EventComposeScreen() {
         secondaryOnPress={() => setStep((Math.max(1, step - 1)) as ComposeStep)}
         secondaryTestID="event-step-back"
       />
+      )}
 
       <ComposerOptionSheet
         emptyMessage=""

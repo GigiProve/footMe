@@ -34,6 +34,7 @@ export type ComposeField =
   | "participationMode"
   | "confirmationMode"
   | "deadline"
+  | "flyer"
   | "general";
 
 export type FieldErrors = Partial<Record<ComposeField, ValidationCode>>;
@@ -44,6 +45,7 @@ export const FIELD_STEP: Record<ComposeField, ComposeStep> = {
   description: 2,
   endTime: 1,
   eventType: 1,
+  flyer: 2,
   general: 1,
   maxParticipants: 2,
   participationMode: 3,
@@ -74,6 +76,7 @@ export function fieldOfCode(code: string): ComposeField {
   if (code === "mode_missing") return "participationMode";
   if (code === "confirmation_missing") return "confirmationMode";
   if (code.startsWith("deadline")) return "deadline";
+  if (code.startsWith("flyer")) return "flyer";
 
   return "general";
 }
@@ -123,6 +126,7 @@ export function emptyValues(): EventDraftValues {
     title: "",
     venueAddress: "",
     venueName: "",
+    flyerMediaId: null,
   };
 }
 
@@ -396,6 +400,8 @@ export function toServerFields(values: EventDraftValues): Record<string, unknown
     title: textOrNull(values.title),
     venue_address: textOrNull(values.venueAddress),
     venue_name: textOrNull(values.venueName),
+    /* DAS-REV-29 §8: la locandina viaggia nella stessa patch del form. */
+    flyer_media_id: values.flyerMediaId,
   };
 }
 
