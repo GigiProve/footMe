@@ -71,10 +71,29 @@ function publicState(value: unknown): EventPublicState {
       "closed";
 }
 
-function participationStatus(value: unknown): ParticipationStatus | null {
-  return value === "pending" || value === "confirmed" || value === "rejected" || value === "withdrawn"
-    ? value
+const PARTICIPATION_STATUSES: readonly ParticipationStatus[] = [
+  "pending",
+  "confirmed",
+  "rejected",
+  "withdrawn",
+  "invited",
+  "declined",
+  "revoked",
+  "removed",
+];
+
+/**
+ * DAS-REV-30 QA-150: uno stato sconosciuto non diventa mai CONFIRMED né un
+ * altro stato noto; la riga cade e il chiamante mostra il fallback.
+ */
+export function participationStatus(value: unknown): ParticipationStatus | null {
+  return PARTICIPATION_STATUSES.includes(value as ParticipationStatus)
+    ? (value as ParticipationStatus)
     : null;
+}
+
+function confirmationSource(value: unknown) {
+  return value === "automatic" || value === "manual" || value === "invitation" ? value : null;
 }
 
 function confirmation(value: unknown) {
@@ -157,10 +176,15 @@ function mapParticipation(value: unknown): MyParticipation | null {
   }
 
   return {
+    confirmationSource: confirmationSource(raw.confirmation_source),
     confirmedAt: text(raw.confirmed_at),
     decisionMessage: text(raw.decision_message),
     id,
+    invitationGeneration: int(raw.invitation_generation) ?? 0,
+    invitationMessage: text(raw.invitation_message),
+    invitedAt: text(raw.invited_at),
     rejectedAt: text(raw.rejected_at),
+    removalMessage: text(raw.removal_message),
     source: raw.source === "invitation" ? "invitation" : "registration",
     status,
     submittedAt: text(raw.submitted_at),
@@ -181,6 +205,9 @@ function mapPersonal(value: unknown): PersonalState {
     birthYear: int(raw.birth_year),
     birthYearMismatch: bool(raw.birth_year_mismatch),
     capabilities: {
+      accept: bool(caps.accept),
+      acceptBlockedReason: caps.accept_blocked_reason === "full" ? "full" : null,
+      decline: bool(caps.decline),
       register: bool(caps.register),
       registerAgain: bool(caps.register_again),
       withdraw: bool(caps.withdraw),
@@ -199,6 +226,7 @@ export function mapDetail(value: unknown): SelectionEventDetail {
   }
 
   const management = obj(raw.management);
+  const participants = management ? obj(management.participants) : null;
 
   return {
     ...base,
@@ -208,8 +236,21 @@ export function mapDetail(value: unknown): SelectionEventDetail {
       ? {
           canDecide: bool(management.can_decide),
           canEdit: bool(management.can_edit),
+          canInvite: bool(management.can_invite),
+          canManageParticipants: bool(management.can_manage_participants),
+          canReadParticipants: bool(management.can_read_participants),
           canShare: bool(management.can_share),
           confirmedCount: int(management.confirmed_count) ?? 0,
+          inviteBlockedReason: management.invite_blocked_reason === "full" ? "full" : null,
+          /* §8: i count esistono solo con la lettura partecipanti; senza,
+             il blocco è null e la sezione non compare (mai «0» inventati). */
+          participants: participants
+            ? {
+                confirmedCount: int(participants.confirmed_count) ?? 0,
+                invitedCount: int(participants.invited_count) ?? 0,
+                pendingCount: int(participants.pending_count) ?? 0,
+              }
+            : null,
           pendingRequestsCount: int(management.pending_requests_count),
         }
       : null,
@@ -254,7 +295,7 @@ export async function fetchPublicSelectionEvent(publicId: string): Promise<Event
 
 // ── Comandi della persona ───────────────────────────────────────────────────
 
-function mapCommand(value: unknown): ParticipationCommandResult {
+export function mapCommand(value: unknown): ParticipationCommandResult {
   const raw = obj(value) ?? {};
   const outcome = text(raw.outcome);
 
@@ -265,7 +306,12 @@ function mapCommand(value: unknown): ParticipationCommandResult {
       outcome === "already_registered" ||
       outcome === "replayed" ||
       outcome === "request_withdrawn" ||
-      outcome === "participation_cancelled"
+      outcome === "participation_cancelled" ||
+      outcome === "already_invited" ||
+      outcome === "invitation_accepted" ||
+      outcome === "invitation_declined" ||
+      outcome === "invitation_revoked" ||
+      outcome === "participant_removed"
         ? outcome
         : null,
     participationId: text(raw.participation_id),
@@ -299,6 +345,33 @@ export async function withdrawSelectionEventParticipation(input: {
       p_idempotency_key: input.idempotencyKey,
       p_participation_id: input.participationId,
     }),
+  );
+}
+
+/**
+ * DAS-REV-30 §18, §20: risposta all'invito. Il comando cita versione e
+ * generazione **viste**: un tap da una schermata vecchia non tocca un
+ * reinvito successivo. Nessun `person_id`: il destinatario è la sessione.
+ */
+export async function respondToEventInvitation(input: {
+  expectedGeneration: number;
+  expectedVersion: number;
+  idempotencyKey: string;
+  participationId: string;
+  response: "accept" | "decline";
+}): Promise<ParticipationCommandResult> {
+  return mapCommand(
+    await selectionEventsRpc<unknown>(
+      input.response === "accept"
+        ? "accept_selection_event_invitation"
+        : "decline_selection_event_invitation",
+      {
+        p_expected_generation: input.expectedGeneration,
+        p_expected_version: input.expectedVersion,
+        p_idempotency_key: input.idempotencyKey,
+        p_participation_id: input.participationId,
+      },
+    ),
   );
 }
 

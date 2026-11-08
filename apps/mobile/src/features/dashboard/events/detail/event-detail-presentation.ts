@@ -33,7 +33,6 @@ export const DETAIL_COPY = {
   linkCopied: "Link copiato.",
   copyFailed: "Impossibile copiare il link. Riprova.",
   shareUnavailable: "Il link pubblico non è disponibile per questo evento.",
-  pendingEyebrow: "Richieste da valutare",
   confirmedSuffix: "confermati",
 
   // Contenuti
@@ -116,7 +115,60 @@ export const DETAIL_COPY = {
   retry: "Riprova",
   uncertain: "Stiamo verificando l’esito. Controlla lo stato tra un momento.",
   loginToContinue: "Accedi per continuare",
+
+  // DAS-REV-30 — Società (screen 01)
+  invite: "Invita profili",
+  inviteFullNotice: "L’evento ha raggiunto il numero massimo di partecipanti: non è possibile inviare nuovi inviti.",
+  participantsTitle: "Partecipanti",
+  manageParticipants: "Gestisci partecipanti",
+
+  // DAS-REV-30 — destinatario (screen 07–10, 21, 22)
+  invitedTitle: "Sei stato invitato",
+  invitedHelper: "La partecipazione viene confermata al momento dell’accettazione, in base ai posti disponibili.",
+  acceptInvitation: "Accetta invito",
+  declineInvitation: "Rifiuta",
+  acceptedTitle: "Partecipazione confermata",
+  acceptedBody: (club: string) => `Hai accettato l’invito di ${club}.`,
+  fullInviteBody: "Al momento l’evento ha raggiunto il numero massimo di partecipanti.",
+  declineTitle: "Rifiutare l’invito?",
+  declineBody: (club: string) => `${club} vedrà che non parteciperai all’evento.`,
+  declineConfirm: "Rifiuta invito",
+  declinedTitle: "Invito rifiutato",
+  revokedTitle: "Invito non più disponibile",
+  revokedBody: (club: string) => `${club} ha ritirato il tuo invito.`,
+  removedTitle: "Partecipazione annullata",
+  removedBody: (club: string) => `${club} ha annullato la tua partecipazione.`,
+  canRequestAgain: "Puoi inviare una richiesta di partecipazione.",
+  acceptError: "Impossibile accettare l’invito. Riprova.",
+  invitationError: "Impossibile aggiornare l’invito. Riprova.",
+  invitationGone: "L’invito non è più disponibile. Controlla lo stato corrente.",
+  rateLimited: "Hai eseguito troppe operazioni in poco tempo. Riprova tra qualche minuto.",
 } as const;
+
+/** «32 confermati», «1 confermato» — §8, righe del riepilogo. */
+export function participantsSummaryRows(summary: {
+  confirmedCount: number;
+  invitedCount: number;
+  pendingCount: number;
+}): { filter: "confirmed" | "pending" | "invited"; icon: "people-outline" | "time-outline" | "mail-outline"; label: string }[] {
+  return [
+    {
+      filter: "confirmed",
+      icon: "people-outline",
+      label: `${summary.confirmedCount} ${summary.confirmedCount === 1 ? "confermato" : "confermati"}`,
+    },
+    {
+      filter: "pending",
+      icon: "time-outline",
+      label: `${summary.pendingCount} ${summary.pendingCount === 1 ? "richiesta in attesa" : "richieste in attesa"}`,
+    },
+    {
+      filter: "invited",
+      icon: "mail-outline",
+      label: `${summary.invitedCount} ${summary.invitedCount === 1 ? "invito inviato" : "inviti inviati"}`,
+    },
+  ];
+}
 
 // ── Formattazione condivisa ────────────────────────────────────────────────
 
@@ -208,7 +260,8 @@ export type NoticeIcon =
   | "lock-closed-outline"
   | "alert-circle-outline"
   | "flag-outline"
-  | "person-outline";
+  | "person-outline"
+  | "mail-outline";
 
 export type Notice = {
   icon: NoticeIcon;
@@ -217,7 +270,13 @@ export type Notice = {
   tone: NoticeTone;
 };
 
-export type PersonalAction = "register" | "register_again" | "withdraw_request" | "cancel_participation";
+export type PersonalAction =
+  | "register"
+  | "register_again"
+  | "withdraw_request"
+  | "cancel_participation"
+  | "accept_invitation"
+  | "decline_invitation";
 
 /**
  * Cosa mostra la parte personale del dettaglio, in ordine di precedenza
@@ -230,7 +289,11 @@ export type PersonalAction = "register" | "register_again" | "withdraw_request" 
  *   3. senza partecipazione, la matrice di §10.
  */
 export type PersonalView = {
-  action: { kind: PersonalAction; label: string } | null;
+  action: { disabled?: boolean; kind: PersonalAction; label: string } | null;
+  /** DAS-REV-30 §18: copy sotto il messaggio dell'invito (screen 07). */
+  helper: string | null;
+  /** DAS-REV-30 §18: Rifiuta accanto ad Accetta invito. */
+  secondaryAction: { kind: PersonalAction; label: string } | null;
   /** Avviso sull'evento: chiuso, pieno, annullato, concluso, non eleggibile. */
   eventNotice: Notice | null;
   /** «Messaggio di AC Como», solo se il testo esiste (§18, QA-103). */
@@ -250,10 +313,44 @@ function statusNotice(detail: SelectionEventDetail): Notice | null {
 
   switch (participation.status) {
     case "confirmed":
+      /* DAS-REV-30 §18, screen 08: la conferma da invito dice da chi viene. */
+      return participation.confirmationSource === "invitation"
+        ? {
+            icon: "checkmark-circle",
+            lines: [DETAIL_COPY.acceptedBody(detail.club.name)],
+            title: DETAIL_COPY.acceptedTitle,
+            tone: "neutral",
+          }
+        : {
+            icon: "checkmark-circle",
+            lines: [DETAIL_COPY.confirmedBody],
+            title: DETAIL_COPY.confirmedTitle,
+            tone: "neutral",
+          };
+    case "invited":
+      return { icon: "mail-outline", lines: [], title: DETAIL_COPY.invitedTitle, tone: "neutral" };
+    case "declined":
       return {
-        icon: "checkmark-circle",
-        lines: [DETAIL_COPY.confirmedBody],
-        title: DETAIL_COPY.confirmedTitle,
+        icon: "close-circle",
+        lines: detail.personal.capabilities.registerAgain ? [DETAIL_COPY.canRequestAgain] : [],
+        title: DETAIL_COPY.declinedTitle,
+        tone: "neutral",
+      };
+    case "revoked":
+      return {
+        icon: "alert-circle-outline",
+        lines: [
+          DETAIL_COPY.revokedBody(detail.club.name),
+          ...(detail.personal.capabilities.registerAgain ? [DETAIL_COPY.canRequestAgain] : []),
+        ],
+        title: DETAIL_COPY.revokedTitle,
+        tone: "neutral",
+      };
+    case "removed":
+      return {
+        icon: "alert-circle-outline",
+        lines: [DETAIL_COPY.removedBody(detail.club.name)],
+        title: DETAIL_COPY.removedTitle,
         tone: "neutral",
       };
     case "pending":
@@ -332,16 +429,22 @@ export function personalView(
 ): PersonalView {
   const view = personalViewFor(detail);
 
-  if (options.canActPersonally === false && view.action) {
+  /* DAS-REV-30 §12: «Società e Media non accettano come partecipanti.»
+     Accetta e Rifiuta seguono la stessa regola di Iscriviti. */
+  if (options.canActPersonally === false && (view.action || view.secondaryAction)) {
+    const label = view.action?.label ?? view.secondaryAction?.label ?? "";
+
     return {
       ...view,
       action: null,
       eventNotice: view.eventNotice ?? {
         icon: "person-outline",
         lines: [DETAIL_COPY.notEligible],
-        title: view.action.label,
+        title: label,
         tone: "neutral",
       },
+      helper: null,
+      secondaryAction: null,
     };
   }
 
@@ -352,17 +455,46 @@ function personalViewFor(detail: SelectionEventDetail): PersonalView {
   const { capabilities, participation } = detail.personal;
   const terminal = lifecycleNotice(detail);
   const status = statusNotice(detail);
-  const message =
-    participation?.status === "rejected" && participation.decisionMessage
-      ? {
-          body: participation.decisionMessage,
-          title: DETAIL_COPY.clubMessageTitle(detail.club.name),
-        }
-      : null;
+  /* §18 della 29 e §9/§25 della 30: un solo messaggio corrente, quello che
+     lo stato giustifica. Un vecchio messaggio non appare come attuale. */
+  const messageBody =
+    participation?.status === "rejected"
+      ? participation.decisionMessage
+      : participation?.status === "invited"
+        ? participation.invitationMessage
+        : participation?.status === "removed"
+          ? participation.removalMessage
+          : null;
+  const message = messageBody
+    ? { body: messageBody, title: DETAIL_COPY.clubMessageTitle(detail.club.name) }
+    : null;
+  const none = { helper: null, secondaryAction: null } as const;
 
   // 1. Evento terminato: dominante, storico personale senza azioni.
   if (terminal) {
-    return { action: null, eventNotice: terminal, message, modeLine: null, status };
+    return { ...none, action: null, eventNotice: terminal, message, modeLine: null, status };
+  }
+
+  // 2a. DAS-REV-30 §18: invito corrente. Accetta e Rifiuta, mai Iscriviti.
+  if (participation?.status === "invited") {
+    const blocked = capabilities.acceptBlockedReason === "full";
+
+    return {
+      action:
+        capabilities.accept || blocked
+          ? { disabled: !capabilities.accept, kind: "accept_invitation", label: DETAIL_COPY.acceptInvitation }
+          : null,
+      eventNotice: blocked
+        ? { icon: "alert-circle-outline", lines: [DETAIL_COPY.fullInviteBody], title: DETAIL_COPY.fullTitle, tone: "neutral" }
+        : null,
+      helper: blocked || !capabilities.accept ? null : DETAIL_COPY.invitedHelper,
+      message,
+      modeLine: null,
+      secondaryAction: capabilities.decline
+        ? { kind: "decline_invitation", label: DETAIL_COPY.declineInvitation }
+        : null,
+      status,
+    };
   }
 
   // 2. Partecipazione esistente: lo stato personale prevale.
@@ -375,6 +507,12 @@ function personalViewFor(detail: SelectionEventDetail): PersonalView {
       action = { kind: "withdraw_request", label: DETAIL_COPY.withdrawRequest };
     } else if (participation.status === "withdrawn" && capabilities.registerAgain) {
       action = { kind: "register_again", label: DETAIL_COPY.registerAgain };
+    } else if (
+      (participation.status === "declined" || participation.status === "revoked") &&
+      capabilities.registerAgain
+    ) {
+      /* §19, screen 21: una **nuova** richiesta spontanea, non l'invito. */
+      action = { kind: "register_again", label: DETAIL_COPY.register };
     }
 
     /* Dopo un ritiro, se la reiscrizione non è possibile, si dice perché con
@@ -384,13 +522,14 @@ function personalViewFor(detail: SelectionEventDetail): PersonalView {
         ? availabilityNotice(detail)
         : null;
 
-    return { action, eventNotice, message, modeLine: null, status };
+    return { ...none, action, eventNotice, message, modeLine: null, status };
   }
 
   // 3. Nessuna partecipazione: matrice di §10.
   const notice = availabilityNotice(detail);
 
   return {
+    ...none,
     action: capabilities.register ? { kind: "register", label: DETAIL_COPY.register } : null,
     eventNotice: notice,
     message: null,
@@ -475,10 +614,20 @@ export function withdrawSheetCopy(status: ParticipationStatus) {
  */
 export function societyActions(detail: SelectionEventDetail, url: string | null) {
   const management = detail.management;
+  const canInvite = !!management?.canInvite;
 
   return {
     canCopy: !!management?.canShare && !!url,
     canEdit: !!management?.canEdit,
+    /**
+     * DAS-REV-30 §8: con l'invito disponibile la primaria operativa è
+     * «Invita profili» e copia/condividi restano dirette come secondarie.
+     * Senza invito torna la gerarchia della 29 (Condividi primaria).
+     */
+    canInvite,
+    /** Spiegazione sobria quando l'invito manca solo per la capienza. */
+    inviteFullNotice: management?.inviteBlockedReason === "full" ? DETAIL_COPY.inviteFullNotice : null,
+    shareIsPrimary: !canInvite,
     canShare: !!management?.canShare && !!url,
     /* §9: per lo storico pubblico wording neutro; nessuna promessa di
        iscrizioni nel messaggio condiviso. */
@@ -492,6 +641,10 @@ export const REQUEST_STATUS_LABELS: Record<ParticipationStatus, string> = {
   pending: "In attesa",
   rejected: "Non accettata",
   withdrawn: "Ritirata",
+  invited: "Invito inviato",
+  declined: "Invito rifiutato",
+  revoked: "Invito revocato",
+  removed: "Rimossa dall’evento",
 };
 
 export function requestCapacityLine(request: EventRequestDetail): string {
@@ -517,7 +670,7 @@ export function decisionMessageError(value: string, limit: number): string | nul
 
 // ── Errori dei comandi (§21, §25) ──────────────────────────────────────────
 
-export type CommandKind = "register" | "withdraw" | "decision";
+export type CommandKind = "register" | "withdraw" | "decision" | "accept" | "invitation";
 
 /**
  * Validation, conflitto, permesso e rete restano distinguibili (§21). Il
@@ -535,16 +688,27 @@ export function commandErrorCopy(
       ? DETAIL_COPY.registerError
       : kind === "withdraw"
         ? DETAIL_COPY.participationError
-        : DETAIL_COPY.requestError;
+        : kind === "accept"
+          ? DETAIL_COPY.acceptError
+          : kind === "invitation"
+            ? DETAIL_COPY.invitationError
+            : DETAIL_COPY.requestError;
 
   switch (code) {
     case "NETWORK":
       return { message: DETAIL_COPY.offline, refresh: false, uncertain: true };
     case "TIMEOUT":
       return { message: DETAIL_COPY.uncertain, refresh: true, uncertain: true };
+    case "RATE_LIMIT":
+      return { message: DETAIL_COPY.rateLimited, refresh: false, uncertain: false };
     case "SELECTION_EVENT_FULL":
       return {
-        message: kind === "decision" ? DETAIL_COPY.noSeats : `${DETAIL_COPY.fullTitle}. ${DETAIL_COPY.fullAutomaticBody}`,
+        message:
+          kind === "decision"
+            ? DETAIL_COPY.noSeats
+            : kind === "accept"
+              ? `${DETAIL_COPY.fullTitle}. ${DETAIL_COPY.fullInviteBody}`
+              : `${DETAIL_COPY.fullTitle}. ${DETAIL_COPY.fullAutomaticBody}`,
         refresh: true,
         uncertain: false,
       };
@@ -557,7 +721,13 @@ export function commandErrorCopy(
     case "SELECTION_EVENT_PARTICIPATION_CHANGED":
     case "SELECTION_EVENT_NOT_OPERATIONAL":
     case "OPERATION_CONTENT_CHANGED":
-      return { message: DETAIL_COPY.changed, refresh: true, uncertain: false };
+      /* DAS-REV-30 §19: un invito già revocato/ritirato è uno stato di
+         dominio, non un errore di rete. */
+      return {
+        message: kind === "accept" || kind === "invitation" ? DETAIL_COPY.invitationGone : DETAIL_COPY.changed,
+        refresh: true,
+        uncertain: false,
+      };
     case "SELECTION_EVENT_NOT_AVAILABLE":
       return { message: DETAIL_COPY.unavailableBody, refresh: true, uncertain: false };
     default:

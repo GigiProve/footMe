@@ -44,4 +44,15 @@ export const SELECTION_EVENTS_HREFS = {
    * arrivano qui senza traduzioni.
    */
   link: (publicId: string) => `/event/${encodeURIComponent(publicId)}`,
+  /**
+   * DAS-REV-30 §21: il centro Partecipanti, con il filtro preimpostato dalle
+   * tre righe del dettaglio. Stack della tab Dashboard.
+   */
+  participants: (eventId: string, filter: "confirmed" | "pending" | "invited" = "confirmed") =>
+    `/(tabs)/dashboard/events/participants/${encodeURIComponent(eventId)}?filter=${filter}`,
+  /** DAS-REV-30 §13: Invita profili dal dettaglio (flusso focalizzato). */
+  invite: (eventId: string) => `/event-invite?eventId=${encodeURIComponent(eventId)}`,
+  /** DAS-REV-30 §17: Invita a evento dal profilo (scelta evento, poi conferma). */
+  inviteFromProfile: (personId: string) =>
+    `/event-invite?personId=${encodeURIComponent(personId)}`,
 } as const;

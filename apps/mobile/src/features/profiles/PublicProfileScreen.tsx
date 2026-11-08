@@ -27,6 +27,7 @@ import {
   AgentProfileHeader,
   CoachProfileHeader,
   DirectorProfileHeader,
+  InviteToEventButton,
   PlayerProfileHeader,
   ProfileHeader,
   StaffProfileHeader,
@@ -80,6 +81,9 @@ import { ProfileShortlistFlow } from "../dashboard/shortlist/profile/ProfileShor
 import { starPresentation } from "../dashboard/shortlist/profile/profile-shortlist-presentation";
 import { fetchProfileShortlistState } from "../dashboard/shortlist/profile/profile-shortlist-service";
 import { SHORTLIST_QK } from "../dashboard/shortlist/shortlist-keys";
+import { SELECTION_EVENTS_QK } from "../dashboard/events/events-keys";
+import { SELECTION_EVENTS_HREFS } from "../dashboard/events/events-routes";
+import { fetchProfileEventInviteState } from "../dashboard/events/invite/invite-service";
 import { colors, spacing } from "../../theme/tokens";
 import { ActionSheet, AppText, Button, useToast } from "../../ui";
 
@@ -169,6 +173,23 @@ export function PublicProfileScreen() {
   const shortlistStar = canFollowOrSave
     ? starPresentation({ state: shortlistStateQuery.data })
     : "hidden";
+
+  /**
+   * DAS-REV-30 §17: «Invita a evento» solo in contesto Società valido con
+   * permesso di invito, deciso dal server per actor, Società e persona.
+   * Fuori dal contesto operativo la query non parte e la CTA non esiste.
+   */
+  const eventInviteQuery = useQuery({
+    enabled: canFollowOrSave && !!operatingSociety && !!viewedProfileId && !!actorId,
+    queryFn: () =>
+      fetchProfileEventInviteState(operatingSociety?.id as string, viewedProfileId as string),
+    queryKey: SELECTION_EVENTS_QK.profileInviteState(
+      actorId,
+      operatingSociety?.id ?? "none",
+      viewedProfileId ?? "",
+    ),
+  });
+  const canInviteToEvent = canFollowOrSave && eventInviteQuery.data === true;
 
   function handleShortlistPress() {
     /* §9: il tap di ★ non rimuove nulla — apre il riepilogo. */
@@ -686,6 +707,11 @@ export function PublicProfileScreen() {
                 void handleShareProfile();
               }}
               onShortlistPress={shortlistStar === "hidden" ? undefined : handleShortlistPress}
+              onInviteToEventPress={
+                canInviteToEvent && viewedProfileId
+                  ? () => router.push(SELECTION_EVENTS_HREFS.inviteFromProfile(viewedProfileId) as never)
+                  : undefined
+              }
               playerHeaderDetails={playerHeaderDetails}
               staffHeaderDetails={staffHeaderDetails}
             />
@@ -829,6 +855,7 @@ function ProfileHeaderBlock({
   onSavePress,
   onSharePress,
   onShortlistPress,
+  onInviteToEventPress,
   playerHeaderDetails,
   staffHeaderDetails,
 }: {
@@ -847,6 +874,7 @@ function ProfileHeaderBlock({
   onSavePress?: () => void;
   onSharePress?: () => void;
   onShortlistPress?: () => void;
+  onInviteToEventPress?: () => void;
   playerHeaderDetails: ReturnType<typeof buildPlayerProfileHeaderDetails>;
   staffHeaderDetails: ReturnType<typeof buildStaffProfileHeaderDetails>;
 }) {
@@ -871,6 +899,7 @@ function ProfileHeaderBlock({
         onFollowPress={onFollowPress}
         onSavePress={onSavePress}
         onShortlistPress={onShortlistPress}
+        onInviteToEventPress={onInviteToEventPress}
         onSharePress={onSharePress}
         primaryRole={playerHeaderDetails.primaryRole}
         quickFacts={playerHeaderDetails.quickFacts}
@@ -886,6 +915,11 @@ function ProfileHeaderBlock({
         avatarUrl={completeProfile.profile.avatar_url}
         clubLabel={coachHeaderDetails.clubLabel}
         coverImageUrl={completeProfile.profile.cover_url}
+        footerAction={
+          onInviteToEventPress ? (
+            <InviteToEventButton fullName={coachHeaderDetails.fullName} onPress={onInviteToEventPress} />
+          ) : undefined
+        }
         fullName={coachHeaderDetails.fullName}
         isFollowed={isFollowed}
         isMessaging={isMessaging}
@@ -909,6 +943,11 @@ function ProfileHeaderBlock({
         avatarUrl={completeProfile.profile.avatar_url}
         clubLabel={staffHeaderDetails.clubLabel}
         coverImageUrl={completeProfile.profile.cover_url}
+        footerAction={
+          onInviteToEventPress ? (
+            <InviteToEventButton fullName={staffHeaderDetails.fullName} onPress={onInviteToEventPress} />
+          ) : undefined
+        }
         fullName={staffHeaderDetails.fullName}
         isFollowed={isFollowed}
         isMessaging={isMessaging}

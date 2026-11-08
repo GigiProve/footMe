@@ -74,6 +74,12 @@ type PlayerProfileHeaderProps = {
   onSavePress?: () => void;
   isShortlisted?: boolean;
   onShortlistPress?: () => void;
+  /**
+   * DAS-REV-30 §17: micro-CTA «Invita a evento» con icona calendario, su
+   * una riga compatta propria. Solo in contesto Società con permesso di
+   * invito: assente, la riga non esiste.
+   */
+  onInviteToEventPress?: () => void;
   primaryRole: string;
   quickFacts?: readonly ProfileQuickFact[];
   secondaryRole?: string;
@@ -164,6 +170,7 @@ export function PlayerProfileHeader({
   onSavePress,
   isShortlisted,
   onShortlistPress,
+  onInviteToEventPress,
   primaryRole,
   quickFacts = [],
   secondaryRole,
@@ -226,6 +233,11 @@ export function PlayerProfileHeader({
         availabilityLabel={availabilityLabel}
         avatarUrl={withDefaultProfileAvatar(avatarUrl)}
         coverImageUrl={coverImageUrl}
+        footerAction={
+          mode === "visitor" && onInviteToEventPress ? (
+            <InviteToEventButton fullName={fullName} onPress={onInviteToEventPress} />
+          ) : undefined
+        }
         fullName={fullName}
         metaRows={metaRows}
         primaryRole={primaryRole}
@@ -360,6 +372,25 @@ function MasterProfileHeader({
         testID={`${testIDPrefix}-quick-facts`}
       />
     </View>
+  );
+}
+
+/**
+ * DAS-REV-30 §17: micro-CTA «Invita a evento», icona calendario e label
+ * visibile, su una riga compatta propria sotto le azioni del Visitor. Una
+ * sola definizione per Calciatore, Allenatore e Staff tecnico.
+ */
+export function InviteToEventButton({ fullName, onPress }: { fullName: string; onPress: () => void }) {
+  return (
+    <Button
+      accessibilityLabel={`Invita ${fullName} a un evento`}
+      label="Invita a evento"
+      leftIcon={<Ionicons color={colors.accent} name="calendar-outline" size={18} />}
+      onPress={onPress}
+      size="sm"
+      testID="profile-invite-to-event"
+      variant="secondary"
+    />
   );
 }
 

@@ -154,7 +154,13 @@ export function NotificationCenterScreen() {
       router.push("/(tabs)/announcements" as never);
     } else if (
       item.type === "selection_event_participation_confirmed" ||
-      item.type === "selection_event_participation_rejected"
+      item.type === "selection_event_participation_rejected" ||
+      /* DAS-REV-30 §18, §24, §25: invito ricevuto, ritirato, partecipazione
+         annullata. Stesso dettaglio, stato corrente; mai un'azione
+         automatica dalla notifica (§20). */
+      item.type === "selection_event_invitation_received" ||
+      item.type === "selection_event_invitation_revoked" ||
+      item.type === "selection_event_participation_removed"
     ) {
       /* DAS-REV-29 §22: «Tap apre lo stesso evento con stato personale
          corrente; non una chat.» Il dettaglio rilegge lo stato dal server. */

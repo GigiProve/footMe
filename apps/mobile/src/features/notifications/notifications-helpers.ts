@@ -56,7 +56,11 @@ export function resolveNotificationCategory(
     item.type === "application_status" ||
     /* DAS-REV-29 §22: stessa scala del trigger notifications_before_insert. */
     item.type === "selection_event_participation_confirmed" ||
-    item.type === "selection_event_participation_rejected"
+    item.type === "selection_event_participation_rejected" ||
+    /* DAS-REV-30: stessa scala del trigger per invito, revoca e rimozione. */
+    item.type === "selection_event_invitation_received" ||
+    item.type === "selection_event_invitation_revoked" ||
+    item.type === "selection_event_participation_removed"
   ) {
     return "candidature";
   }

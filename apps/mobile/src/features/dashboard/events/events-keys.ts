@@ -38,6 +38,24 @@ export const SELECTION_EVENTS_QK = {
     ["selection-event-request", actorId, participationId] as const,
   flyerUrl: (actorId: string, path: string) =>
     ["selection-event-flyer-url", actorId, path] as const,
+  /**
+   * DAS-REV-30 §29: «Cache candidate/source/stella/partecipanti scoped a
+   * utente, Società attiva, evento, query/filtro». Le pagine stanno nella
+   * stessa infinite query; il server rifiuta un cursore di un altro
+   * perimetro.
+   */
+  participants: (actorId: string, clubId: string, eventId: string, filter: string, query: string) =>
+    ["selection-event-participants", actorId, clubId, eventId, filter, query] as const,
+  inviteSources: (actorId: string, clubId: string, eventId: string) =>
+    ["selection-event-invite-sources", actorId, clubId, eventId] as const,
+  candidates: (actorId: string, clubId: string, eventId: string, source: string, query: string) =>
+    ["selection-event-candidates", actorId, clubId, eventId, source, query] as const,
+  invitableEvents: (actorId: string, clubId: string, personId: string) =>
+    ["selection-event-invitable", actorId, clubId, personId] as const,
+  invitePerson: (actorId: string, personId: string) =>
+    ["selection-event-invite-person", actorId, personId] as const,
+  profileInviteState: (actorId: string, clubId: string, personId: string) =>
+    ["selection-event-profile-invite", actorId, clubId, personId] as const,
 } as const;
 
 /**
@@ -58,4 +76,10 @@ export const SELECTION_EVENTS_QK_PREFIXES = [
   "selection-event-public",
   "selection-event-pending-requests",
   "selection-event-request",
+  /* DAS-REV-30 §29: invio, accettazione, revoca e rimozione aggiornano
+     partecipanti, count e stato dei candidati. Le cache Shortlist no. */
+  "selection-event-participants",
+  "selection-event-candidates",
+  "selection-event-invitable",
+  "selection-event-profile-invite",
 ] as const;

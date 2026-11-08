@@ -74,14 +74,38 @@ export type EventPublicProjection = {
   version: number;
 };
 
-export type ParticipationStatus = "pending" | "confirmed" | "rejected" | "withdrawn";
+/**
+ * DAS-REV-30 §9: gli stati canonici della partecipazione. Invito, rifiuto
+ * del destinatario, revoca e rimozione sono distinti da richiesta, non
+ * accettazione e ritiro volontario.
+ */
+export type ParticipationStatus =
+  | "pending"
+  | "confirmed"
+  | "rejected"
+  | "withdrawn"
+  | "invited"
+  | "declined"
+  | "revoked"
+  | "removed";
+
+/** DAS-REV-30 §9: provenienza della conferma corrente. */
+export type ConfirmationSource = "automatic" | "manual" | "invitation";
 
 export type MyParticipation = {
+  confirmationSource: ConfirmationSource | null;
   confirmedAt: string | null;
   /** Solo su REJECTED (§18): una reiscrizione non lo ripropone. */
   decisionMessage: string | null;
   id: string;
+  /** DAS-REV-30 §20: la generazione che i comandi devono citare. */
+  invitationGeneration: number;
+  /** Solo mentre l'invito è corrente (§9). */
+  invitationMessage: string | null;
+  invitedAt: string | null;
   rejectedAt: string | null;
+  /** Solo su REMOVED (§25). */
+  removalMessage: string | null;
   source: "registration" | "invitation";
   status: ParticipationStatus;
   submittedAt: string | null;
@@ -93,6 +117,11 @@ export type MyParticipation = {
 
 /** §20: «capability effettive (register, withdraw, register_again)». */
 export type PersonalCapabilities = {
+  /** DAS-REV-30 §18: Accetta invito, rivalidato al commit. */
+  accept: boolean;
+  /** «full» quando manca solo il posto (screen 09). */
+  acceptBlockedReason: "full" | null;
+  decline: boolean;
   register: boolean;
   registerAgain: boolean;
   withdraw: boolean;
@@ -107,11 +136,25 @@ export type PersonalState = {
   participation: MyParticipation | null;
 };
 
+/** DAS-REV-30 §8: i tre count privati, solo con la lettura partecipanti. */
+export type ParticipantsSummary = {
+  confirmedCount: number;
+  invitedCount: number;
+  pendingCount: number;
+};
+
 export type EventManagement = {
   canDecide: boolean;
   canEdit: boolean;
+  /** DAS-REV-30 §8: nuovi inviti (operativo, non pieno, capability). */
+  canInvite: boolean;
+  canManageParticipants: boolean;
+  canReadParticipants: boolean;
   canShare: boolean;
   confirmedCount: number;
+  /** «full» quando l'invito manca solo per la capienza (§8). */
+  inviteBlockedReason: "full" | null;
+  participants: ParticipantsSummary | null;
   pendingRequestsCount: number | null;
 };
 
@@ -188,6 +231,11 @@ export type ParticipationCommandResult = {
     | "replayed"
     | "request_withdrawn"
     | "participation_cancelled"
+    | "already_invited"
+    | "invitation_accepted"
+    | "invitation_declined"
+    | "invitation_revoked"
+    | "participant_removed"
     | null;
   participationId: string | null;
   replayed: boolean;

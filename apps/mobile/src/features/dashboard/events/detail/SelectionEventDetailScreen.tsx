@@ -12,12 +12,18 @@
  *     sotto i contenuti la preview «Richieste da valutare» (§17);
  *   · persona → screen 08, 11–15: stato personale e azioni autorizzate.
  *
+ * DAS-REV-30 §8 (screen 01): con l'invito disponibile la primaria diventa
+ * «Invita profili», copia e condividi restano dirette come secondarie; la
+ * preview delle richieste lascia il posto al riepilogo di tre righe verso
+ * il centro Partecipanti. §18–§19 (screen 07–10, 21, 22): il destinatario
+ * accetta o rifiuta l'invito nello stesso dettaglio.
+ *
  * Nessuna schermata di successo separata (§5): l'esito di un comando è lo
  * stato che il server restituisce, nello stesso dettaglio. Nessun optimistic
  * update (§23: «Non confermare posti optimistic senza commit affidabile»).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { AppState, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,7 +47,7 @@ import {
   EventUnavailableState,
 } from "./components/EventDetailParts";
 import { RegisterSheet, WithdrawSheet } from "./components/EventSheets";
-import { PendingRequestsPreview } from "./components/PendingRequestsPreview";
+import { ParticipantsSummary } from "./components/ParticipantsSummary";
 import {
   DETAIL_COPY,
   capacityLine,
@@ -50,6 +56,7 @@ import {
   eventYearsLabel,
   personMeta,
   personalView,
+  type PersonalAction,
   registerSheetModel,
   societyActions,
   venueLines,
@@ -58,9 +65,9 @@ import {
   withdrawSheetCopy,
 } from "./event-detail-presentation";
 import {
-  fetchPendingRequestsPreview,
   fetchSelectionEventDetail,
   registerForSelectionEvent,
+  respondToEventInvitation,
   signFlyerUrl,
   withdrawSelectionEventParticipation,
 } from "./event-detail-service";
@@ -138,14 +145,10 @@ export function SelectionEventDetailScreen() {
     staleTime: 30 * 60 * 1000,
   });
 
-  const canSeePending =
-    societyView && !!detail?.management?.canDecide && (detail.management.pendingRequestsCount ?? 0) > 0;
-  const pendingQuery = useQuery({
-    enabled: canSeePending,
-    queryFn: () => fetchPendingRequestsPreview(eventId),
-    queryKey: SELECTION_EVENTS_QK.pendingRequests(actorId, eventId),
-    staleTime: 0,
-  });
+  /* §5: su smartphone compatto le secondarie si impilano, senza ridurre il
+     font per farle stare su una riga. */
+  const { width } = useWindowDimensions();
+  const stackSecondary = width < 360;
 
   const invalidate = useCallback(() => {
     for (const prefix of SELECTION_EVENTS_QK_PREFIXES) {
@@ -155,7 +158,7 @@ export function SelectionEventDetailScreen() {
 
   // ── Comandi della persona ────────────────────────────────────────────────
   const [nonce] = useState(createSessionNonce);
-  const [sheet, setSheet] = useState<"none" | "register" | "withdraw">("none");
+  const [sheet, setSheet] = useState<"none" | "register" | "withdraw" | "decline">("none");
   const [busy, setBusy] = useState(false);
   /**
    * §21: la chiave nasce con l'intenzione (apertura del sheet) e sopravvive ai
@@ -164,7 +167,7 @@ export function SelectionEventDetailScreen() {
    */
   const keyRef = useRef<string | null>(null);
 
-  const openSheet = (kind: "register" | "withdraw", signature: string) => {
+  const openSheet = (kind: "register" | "withdraw" | "decline", signature: string) => {
     keyRef.current = operationKeyOf(nonce, `${signature}|${Date.now()}`);
     setSheet(kind);
   };
@@ -177,7 +180,10 @@ export function SelectionEventDetailScreen() {
     setSheet("none");
   };
 
-  const runCommand = async (kind: "register" | "withdraw", run: (key: string) => Promise<unknown>) => {
+  const runCommand = async (
+    kind: "register" | "withdraw" | "accept" | "decline",
+    run: (key: string) => Promise<unknown>,
+  ) => {
     const key = keyRef.current ?? operationKeyOf(nonce, `${kind}|${Date.now()}`);
 
     keyRef.current = key;
@@ -190,7 +196,10 @@ export function SelectionEventDetailScreen() {
       invalidate();
       await refetchDetail();
     } catch (error) {
-      const copy = commandErrorCopy(error, kind);
+      const copy = commandErrorCopy(
+        error,
+        kind === "decline" ? "invitation" : kind,
+      );
 
       if (!copy.uncertain) {
         keyRef.current = null;
@@ -212,6 +221,42 @@ export function SelectionEventDetailScreen() {
     void runCommand("register", (key) => registerForSelectionEvent({ eventId, idempotencyKey: key }));
 
   const participation = detail?.personal.participation ?? null;
+
+  /**
+   * DAS-REV-30 §18, §20: la chiave nasce dall'invito visto (partecipazione
+   * + generazione), così un doppio tap o un retry dopo esito incerto non
+   * confermano due volte e un reinvito successivo è un intento nuovo.
+   */
+  const confirmAccept = () => {
+    if (!participation) {
+      return;
+    }
+
+    keyRef.current =
+      keyRef.current ?? operationKeyOf(nonce, `accept|${participation.id}|${participation.invitationGeneration}`);
+    void runCommand("accept", (key) =>
+      respondToEventInvitation({
+        expectedGeneration: participation.invitationGeneration,
+        expectedVersion: participation.version,
+        idempotencyKey: key,
+        participationId: participation.id,
+        response: "accept",
+      }),
+    );
+  };
+
+  const confirmDecline = () =>
+    participation
+      ? void runCommand("decline", (key) =>
+          respondToEventInvitation({
+            expectedGeneration: participation.invitationGeneration,
+            expectedVersion: participation.version,
+            idempotencyKey: key,
+            participationId: participation.id,
+            response: "decline",
+          }),
+        )
+      : undefined;
 
   const confirmWithdraw = () =>
     participation
@@ -353,9 +398,26 @@ export function SelectionEventDetailScreen() {
 
         {societyView ? (
           <>
-            {/* §9: azioni dirette, impilate senza ridurre il font. */}
+            {/* §9 della 29, §8 della 30: azioni dirette. Con l'invito la
+                primaria è «Invita profili» e copia/condividi restano visibili
+                come secondarie; senza, torna la gerarchia della 29. */}
             <View style={styles.actions}>
-              {actions.canShare ? (
+              {actions.canInvite ? (
+                <Button
+                  fullWidth
+                  label={DETAIL_COPY.invite}
+                  onPress={() => router.push(SELECTION_EVENTS_HREFS.invite(detail.eventId) as never)}
+                  size="lg"
+                  testID="event-invite"
+                  variant="primary"
+                />
+              ) : null}
+              {actions.inviteFullNotice ? (
+                <AppText color="neutralMuted" testID="event-invite-full" variant="bodySm">
+                  {actions.inviteFullNotice}
+                </AppText>
+              ) : null}
+              {actions.shareIsPrimary && actions.canShare ? (
                 <Button
                   fullWidth
                   label={DETAIL_COPY.share}
@@ -365,7 +427,7 @@ export function SelectionEventDetailScreen() {
                   variant="primary"
                 />
               ) : null}
-              {actions.canCopy ? (
+              {actions.shareIsPrimary && actions.canCopy ? (
                 <Button
                   fullWidth
                   label={DETAIL_COPY.copyLink}
@@ -374,6 +436,32 @@ export function SelectionEventDetailScreen() {
                   testID="event-copy-link"
                   variant="secondary"
                 />
+              ) : null}
+              {!actions.shareIsPrimary && (actions.canCopy || actions.canShare) ? (
+                <View style={stackSecondary ? styles.secondaryStack : styles.secondaryRow}>
+                  {actions.canCopy ? (
+                    <Button
+                      fullWidth={stackSecondary}
+                      label={DETAIL_COPY.copyLink}
+                      onPress={() => void copy()}
+                      size="md"
+                      style={stackSecondary ? null : styles.secondaryButton}
+                      testID="event-copy-link"
+                      variant="secondary"
+                    />
+                  ) : null}
+                  {actions.canShare ? (
+                    <Button
+                      fullWidth={stackSecondary}
+                      label={DETAIL_COPY.share}
+                      onPress={() => void share(detail)}
+                      size="md"
+                      style={stackSecondary ? null : styles.secondaryButton}
+                      testID="event-share"
+                      variant="secondary"
+                    />
+                  ) : null}
+                </View>
               ) : null}
               {actions.canEdit ? (
                 <Button
@@ -387,16 +475,16 @@ export function SelectionEventDetailScreen() {
               ) : null}
             </View>
 
-            <EventContent detail={detail} years={years} />
-
-            {canSeePending && pendingQuery.data && pendingQuery.data.items.length > 0 ? (
-              <PendingRequestsPreview
-                items={pendingQuery.data.items}
-                onOpen={(participationId) =>
-                  router.push(SELECTION_EVENTS_HREFS.request(participationId) as never)
-                }
+            {/* §8: count privati solo con la lettura partecipanti. */}
+            {detail.management?.participants ? (
+              <ParticipantsSummary
+                onManage={() => router.push(SELECTION_EVENTS_HREFS.participants(detail.eventId) as never)}
+                onOpen={(filter) => router.push(SELECTION_EVENTS_HREFS.participants(detail.eventId, filter) as never)}
+                summary={detail.management.participants}
               />
             ) : null}
+
+            <EventContent detail={detail} years={years} />
           </>
         ) : (
           <>
@@ -415,21 +503,51 @@ export function SelectionEventDetailScreen() {
               </View>
             ) : null}
 
+            {view.helper ? (
+              <AppText color="neutralMuted" testID="event-invite-helper" variant="bodySm">
+                {view.helper}
+              </AppText>
+            ) : null}
+
+            {/* DAS-REV-30 §18, screen 09: posti esauriti sopra Accetta. */}
+            {view.status && view.eventNotice && view.action?.kind === "accept_invitation" ? (
+              <EventNoticeCard notice={view.eventNotice} testID="event-invite-full-notice" />
+            ) : null}
+
             {view.status && view.action ? (
               <PersonalActionButton
+                disabled={view.action.disabled || busy}
                 kind={view.action.kind}
                 label={view.action.label}
+                loading={busy && view.action.kind === "accept_invitation"}
+                unavailable={view.action.disabled}
                 onPress={() =>
-                  view.action?.kind === "register_again"
-                    ? openSheet("register", `again|${participation?.version ?? 0}`)
-                    : openSheet("withdraw", `withdraw|${participation?.version ?? 0}`)
+                  view.action?.kind === "accept_invitation"
+                    ? confirmAccept()
+                    : view.action?.kind === "register_again"
+                      ? openSheet("register", `again|${participation?.version ?? 0}`)
+                      : openSheet("withdraw", `withdraw|${participation?.version ?? 0}`)
+                }
+              />
+            ) : null}
+
+            {view.secondaryAction ? (
+              <PersonalActionButton
+                disabled={busy}
+                kind={view.secondaryAction.kind}
+                label={view.secondaryAction.label}
+                onPress={() =>
+                  openSheet(
+                    "decline",
+                    `decline|${participation?.id ?? ""}|${participation?.invitationGeneration ?? 0}`,
+                  )
                 }
               />
             ) : null}
 
             {view.status ? null : <EventContent detail={detail} years={years} />}
 
-            {view.eventNotice ? (
+            {view.eventNotice && view.action?.kind !== "accept_invitation" ? (
               <EventNoticeCard notice={view.eventNotice} testID="event-availability-notice" />
             ) : null}
 
@@ -473,6 +591,17 @@ export function SelectionEventDetailScreen() {
         when={whenInline(detail)}
       />
 
+      {/* DAS-REV-30 §19, screen 10: nessun motivo, nessun campo messaggio. */}
+      <WithdrawSheet
+        body={DETAIL_COPY.declineBody(detail.club.name)}
+        busy={busy}
+        confirmLabel={DETAIL_COPY.declineConfirm}
+        onCancel={closeSheet}
+        onConfirm={confirmDecline}
+        title={DETAIL_COPY.declineTitle}
+        visible={sheet === "decline"}
+      />
+
       {withdrawCopy ? (
         <WithdrawSheet
           body={withdrawCopy.body}
@@ -514,24 +643,36 @@ function EventContent({ detail, years }: { detail: SelectionEventDetail; years: 
  * partecipazione sono secondarie outlined (screen 11, 12, 14).
  */
 function PersonalActionButton({
+  disabled,
   kind,
   label,
+  loading,
   onPress,
+  unavailable,
 }: {
-  kind: "register" | "register_again" | "withdraw_request" | "cancel_participation";
+  disabled?: boolean;
+  /** L'azione esiste ma il server la nega ora (posti esauriti). */
+  unavailable?: boolean;
+  kind: PersonalAction;
   label: string;
+  loading?: boolean;
   onPress: () => void;
 }) {
-  const primary = kind === "register" || kind === "register_again";
+  /* DAS-REV-30 §18: Accetta invito primaria, Rifiuta secondaria. */
+  const primary = kind === "register" || kind === "register_again" || kind === "accept_invitation";
 
   return (
     <Button
+      disabled={disabled}
       fullWidth
+      loading={loading}
       label={label}
       onPress={onPress}
       size="lg"
       testID={`event-action-${kind}`}
-      variant={primary ? "primary" : "secondary"}
+      /* DAS-REV-30 §5, screen 09: «nessun blu pallido». Una primaria non
+         disponibile diventa neutra invece di sbiadire il blu. */
+      variant={primary ? (unavailable ? "neutralOutline" : "primary") : "secondary"}
     />
   );
 }
@@ -559,6 +700,16 @@ const styles = StyleSheet.create({
   scroll: {
     gap: spacing[16],
     paddingTop: spacing[12],
+  },
+  secondaryButton: {
+    flex: 1,
+  },
+  secondaryRow: {
+    flexDirection: "row",
+    gap: spacing[12],
+  },
+  secondaryStack: {
+    gap: spacing[12],
   },
   sections: {
     gap: spacing[12],

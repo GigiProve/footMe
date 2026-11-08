@@ -53,6 +53,9 @@ export type SelectionEventsErrorCode =
   | "SELECTION_EVENT_NOT_ELIGIBLE"
   | "SELECTION_EVENT_NOT_OPERATIONAL"
   | "SELECTION_EVENT_PARTICIPATION_CHANGED"
+  /* DAS-REV-30: sorgente Shortlist revocata, anti-abuso tecnico (§14, §27). */
+  | "SHORTLIST_SOURCE_NOT_AVAILABLE"
+  | "RATE_LIMIT"
   | "NETWORK"
   | "TIMEOUT"
   | "UNKNOWN";
@@ -78,6 +81,8 @@ const SERVER_CODES: readonly SelectionEventsErrorCode[] = [
   "SELECTION_EVENT_NOT_ELIGIBLE",
   "SELECTION_EVENT_NOT_OPERATIONAL",
   "SELECTION_EVENT_PARTICIPATION_CHANGED",
+  "SHORTLIST_SOURCE_NOT_AVAILABLE",
+  "RATE_LIMIT",
 ] as const;
 
 export class SelectionEventsError extends Error {

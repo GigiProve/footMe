@@ -133,6 +133,10 @@ export default function DashboardLayout() {
             app/event/. */}
         <Stack.Screen name="events/[eventId]" />
         <Stack.Screen name="events/request/[participationId]" />
+        {/* DAS-REV-30 §5, §21: centro Partecipanti con Dashboard
+            selezionata (screen 11-19, 23). Selector e conferma dell'invito
+            sono flussi focalizzati in app/event-invite/. */}
+        <Stack.Screen name="events/participants/[eventId]" />
       </Stack>
     </DashboardIdentityProvider>
   );
