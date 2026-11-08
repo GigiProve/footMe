@@ -279,11 +279,15 @@ export type ShortlistMembership = {
 /** Errori di dominio distinguibili internamente (§23). */
 export type ShortlistErrorKind =
   | "conflict"
+  | "descriptionTooLong"
   | "gone"
+  | "nameRequired"
+  | "nameTooLong"
   | "network"
   | "noteTooLong"
   | "notAuthorized"
   | "notFound"
+  | "scopeInvalid"
   | "scopeUndefined"
   | "staleCursor"
   | "withdrawn";

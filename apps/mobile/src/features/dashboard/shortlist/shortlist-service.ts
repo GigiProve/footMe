@@ -122,6 +122,28 @@ export function classifyShortlistError(error: unknown): ShortlistError {
     return new ShortlistError("noteTooLong", message);
   }
 
+  /* DAS-REV-26 §16, §17: errori di validazione del form CUSTOM, inline
+     accanto al campo e mai una copy di rete. Il nome e la descrizione
+     conservano il testo digitato. */
+  if (message.includes("SHORTLIST_LIST_NAME_REQUIRED")) {
+    return new ShortlistError("nameRequired", message);
+  }
+
+  if (message.includes("SHORTLIST_LIST_NAME_TOO_LONG")) {
+    return new ShortlistError("nameTooLong", message);
+  }
+
+  if (message.includes("SHORTLIST_LIST_DESCRIPTION_TOO_LONG")) {
+    return new ShortlistError("descriptionTooLong", message);
+  }
+
+  /* §17: «Se l'accesso cambia prima del commit, ricarica le opzioni e
+     richiedi una scelta ancora valida senza allargare automaticamente lo
+     scope.» */
+  if (message.includes("SHORTLIST_SCOPE_INVALID")) {
+    return new ShortlistError("scopeInvalid", message);
+  }
+
   /* §13: una enum non consentita è rifiutata, non ignorata. Arriva solo da
      un client fuori contratto: la UI non può produrla. */
   if (message.includes("SHORTLIST_FILTER_INVALID")) {

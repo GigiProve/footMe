@@ -694,6 +694,32 @@ function VisitorHeaderActions({
           variant="secondary"
         />
       ) : null}
+      {/* DAS-REV-26 §4, §30: la stella è un'azione secondaria discreta,
+          distinta dal bookmark dei Salvati — target e label propri. Nero
+          neutro, piena/vuota distinguibili per forma: mai oro o blu. */}
+      {onShortlistPress ? (
+        <Pressable
+          accessibilityLabel={
+            isShortlisted
+              ? "Profilo presente in shortlist, apri liste"
+              : "Aggiungi a shortlist"
+          }
+          accessibilityRole="button"
+          hitSlop={4}
+          onPress={onShortlistPress}
+          style={({ pressed }) => [
+            styles.headerSaveButton,
+            pressed ? styles.headerSavePressed : null,
+          ]}
+          testID="profile-shortlist-star"
+        >
+          <Ionicons
+            color={colors.textNeutral}
+            name={isShortlisted ? "star" : "star-outline"}
+            size={22}
+          />
+        </Pressable>
+      ) : null}
       {onSavePress ? (
         <Pressable
           accessibilityLabel={isSaved ? "Rimuovi dai salvati" : "Salva profilo"}
@@ -708,24 +734,6 @@ function VisitorHeaderActions({
           <Ionicons
             color={isSaved ? colors.accent : colors.textMuted}
             name={isSaved ? "bookmark" : "bookmark-outline"}
-            size={20}
-          />
-        </Pressable>
-      ) : null}
-      {onShortlistPress ? (
-        <Pressable
-          accessibilityLabel={isShortlisted ? "Gestisci shortlist" : "Aggiungi a shortlist"}
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={onShortlistPress}
-          style={({ pressed }) => [
-            styles.headerSaveButton,
-            pressed ? styles.headerSavePressed : null,
-          ]}
-        >
-          <Ionicons
-            color={isShortlisted ? colors.accent : colors.textMuted}
-            name={isShortlisted ? "star" : "star-outline"}
             size={20}
           />
         </Pressable>
@@ -925,8 +933,9 @@ const styles = StyleSheet.create({
     opacity: 0.82,
   },
   headerSaveButton: {
-    width: 36,
-    height: 36,
+    /* DAS-REV-26 §30: «Target almeno 44×44pt.» */
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },

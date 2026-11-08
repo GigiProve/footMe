@@ -54,6 +54,26 @@ export const SHORTLIST_QK = {
    */
   membership: (actorId: string, clubId: string, scope: string) =>
     ["society-shortlist-membership", actorId, clubId, scope] as const,
+  /**
+   * DAS-REV-26 §26: «Chiavi private almeno con account, Society, persona …
+   * Non utilizzare una cache di stella globale per person_id.» Le tre letture
+   * del profilo portano actor, Società operativa e persona; il selector
+   * anche il gruppo, perché i due gruppi falliscono e paginano da soli (§11).
+   */
+  profileState: (actorId: string, clubId: string, personId: string) =>
+    ["society-shortlist-profile-state", actorId, clubId, personId] as const,
+  profileMemberships: (actorId: string, clubId: string, personId: string) =>
+    ["society-shortlist-profile-memberships", actorId, clubId, personId] as const,
+  profileDestinations: (
+    actorId: string,
+    clubId: string,
+    personId: string,
+    group: "position" | "custom",
+  ) =>
+    ["society-shortlist-profile-destinations", actorId, clubId, personId, group] as const,
+  /** §17: ambiti autorizzati del form CUSTOM, per ingresso. */
+  scopeOptions: (actorId: string, clubId: string, withAdd: boolean) =>
+    ["society-shortlist-scope-options", actorId, clubId, withAdd ? "add" : "create"] as const,
 } as const;
 
 /**
@@ -70,6 +90,10 @@ export const SHORTLIST_QK_PREFIXES = [
   "society-shortlist-entry",
   "society-shortlist-application-entry",
   "society-shortlist-membership",
+  "society-shortlist-profile-state",
+  "society-shortlist-profile-memberships",
+  "society-shortlist-profile-destinations",
+  "society-shortlist-scope-options",
 ] as const;
 
 /**

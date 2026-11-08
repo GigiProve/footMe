@@ -66,22 +66,31 @@ export function ConfirmModal({
               <View style={styles.childrenSlot}>{children}</View>
             ) : null}
           </View>
+          {/* Due `width: 100%` affiancati in una riga sforavano la card: il
+              secondo bottone finiva fuori dal bordo (DAS-REV-26, screen 09).
+              Ogni bottone occupa ora metà riga dentro il proprio slot. */}
           <View style={styles.footer}>
-            <Button
-              fullWidth
-              label={cancelLabel}
-              onPress={onCancel}
-              variant="secondary"
-              disabled={isBusy}
-            />
-            <Button
-              destructive={destructive}
-              fullWidth
-              label={isBusy ? "..." : confirmLabel}
-              loading={isBusy}
-              onPress={onConfirm}
-              variant="primary"
-            />
+            <View style={styles.footerAction}>
+              <Button
+                fullWidth
+                label={cancelLabel}
+                onPress={onCancel}
+                testID="confirm-modal-cancel"
+                variant="secondary"
+                disabled={isBusy}
+              />
+            </View>
+            <View style={styles.footerAction}>
+              <Button
+                destructive={destructive}
+                fullWidth
+                label={isBusy ? "..." : confirmLabel}
+                loading={isBusy}
+                onPress={onConfirm}
+                testID="confirm-modal-confirm"
+                variant="primary"
+              />
+            </View>
           </View>
         </View>
       </View>
@@ -130,5 +139,8 @@ const styles = StyleSheet.create({
     gap: spacing[12],
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[14],
+  },
+  footerAction: {
+    flex: 1,
   },
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -75,12 +75,11 @@ import {
   saveProfile,
   unsaveProfile,
 } from "../saved/saved-service";
-import { AddToShortlistFlow } from "../shortlist/components/AddToShortlistFlow";
-import { useShortlistPermissions } from "../shortlist/use-shortlist-permissions";
-import {
-  fetchProfileShortlistMemberships,
-  fetchProfileShortlistStar,
-} from "../shortlist/shortlist-service";
+import { DashboardContext } from "../dashboard/identity/DashboardIdentityProvider";
+import { ProfileShortlistFlow } from "../dashboard/shortlist/profile/ProfileShortlistFlow";
+import { starPresentation } from "../dashboard/shortlist/profile/profile-shortlist-presentation";
+import { fetchProfileShortlistState } from "../dashboard/shortlist/profile/profile-shortlist-service";
+import { SHORTLIST_QK } from "../dashboard/shortlist/shortlist-keys";
 import { colors, spacing } from "../../theme/tokens";
 import { ActionSheet, AppText, Button, useToast } from "../../ui";
 
@@ -124,9 +123,9 @@ export function PublicProfileScreen() {
   const [isSavePending, setIsSavePending] = useState(false);
   const [profileActionsVisible, setProfileActionsVisible] = useState(false);
   const [shortlistFlow, setShortlistFlow] = useState<{
-    initialMode: "picker" | "manage";
+    initialStep: "selector" | "summary";
     open: boolean;
-  }>({ initialMode: "picker", open: false });
+  }>({ initialStep: "selector", open: false });
 
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
   const requestedTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
@@ -141,54 +140,40 @@ export function PublicProfileScreen() {
   const canFollowOrSave =
     !!currentUserId && !!viewedProfileId && currentUserId !== viewedProfileId;
 
-  const { data: shortlistPermissions } = useShortlistPermissions();
-  const canViewShortlist = !!shortlistPermissions?.can_view && canFollowOrSave;
-
-  const { data: shortlistMemberships } = useQuery({
-    enabled: canViewShortlist && !!viewedProfileId,
-    queryFn: () =>
-      fetchProfileShortlistMemberships(
-        viewedProfileId as string,
-        shortlistPermissions?.club_id as string,
-      ),
-    queryKey: ["shortlist-memberships", viewedProfileId],
-  });
   /**
-   * DAS-REV-24 §15: la stella è piena per **qualunque** appartenenza
-   * accessibile della Society operativa, anche nata da una candidatura
-   * (QA093). `shortlistMemberships` non basta: è filtrata sulle CUSTOM
-   * perché alimenta il selector, e una entry della lista di una Position
-   * non vi compare.
+   * DAS-REV-26 §8, §9: la stella è una proiezione **privata** dell'actor nel
+   * contesto della Società operativa — quella già scelta nella Dashboard,
+   * senza chiedere «Per quale società?». Senza un contesto Società valido
+   * non c'è stella (QA009). Il contesto si legge senza pretendere il
+   * provider: il profilo si apre anche da route che non lo montano, e lì la
+   * stella semplicemente non compare.
    */
-  const { data: isShortlisted = false } = useQuery({
-    enabled: canViewShortlist && !!viewedProfileId && !!shortlistPermissions?.club_id,
-    queryFn: () =>
-      fetchProfileShortlistStar(
-        shortlistPermissions?.club_id as string,
-        viewedProfileId as string,
-      ),
-    /* §28: «quelle della stella il contesto organizzativo». Senza il club
-       nella chiave, aprire lo stesso profilo come un'altra Society
-       riuserebbe il valore precedente (§15, QA095). */
-    queryKey: [
-      "shortlist-star",
-      shortlistPermissions?.club_id ?? "none",
-      viewedProfileId,
-    ],
-  });
+  const dashboardContext = useContext(DashboardContext);
+  const operatingSociety =
+    dashboardContext?.current?.kind === "society" ? dashboardContext.current : null;
+  const actorId = viewerProfile?.id ?? currentUserId ?? "";
 
-  /** Il flusso di gestione resta quello delle CUSTOM (§15: il pack 26 lo raffina). */
-  const hasCustomMembership = (shortlistMemberships?.length ?? 0) > 0;
-  // Con il solo permesso di visualizzazione la stella comparirebbe ma il
-  // flusso di aggiunta fallirebbe alla RLS: la mostriamo solo a chi può
-  // aggiungere profili o gestire una presenza già esistente.
-  const canUseShortlistStar =
-    canViewShortlist &&
-    (!!shortlistPermissions?.can_add_profiles || isShortlisted);
+  /* §26: chiave con actor, Società e persona — mai una stella globale per
+     person_id. Loading ed errore non diventano ☆: `starPresentation` vede
+     `undefined` e tiene la stella assente finché lo stato non è noto. */
+  const shortlistStateQuery = useQuery({
+    enabled: canFollowOrSave && !!operatingSociety && !!viewedProfileId && !!actorId,
+    queryFn: () =>
+      fetchProfileShortlistState(operatingSociety?.id as string, viewedProfileId as string),
+    queryKey: SHORTLIST_QK.profileState(
+      actorId,
+      operatingSociety?.id ?? "none",
+      viewedProfileId ?? "",
+    ),
+  });
+  const shortlistStar = canFollowOrSave
+    ? starPresentation({ state: shortlistStateQuery.data })
+    : "hidden";
 
   function handleShortlistPress() {
+    /* §9: il tap di ★ non rimuove nulla — apre il riepilogo. */
     setShortlistFlow({
-      initialMode: hasCustomMembership ? "manage" : "picker",
+      initialStep: shortlistStar === "filled" ? "summary" : "selector",
       open: true,
     });
   }
@@ -278,14 +263,6 @@ export function PublicProfileScreen() {
       viewerMode: "visitor",
     });
   }, [completeProfile?.profile.role, viewedProfileId]);
-
-  const shortlistProfileSubtitle =
-    playerHeaderDetails?.primaryRole ??
-    coachHeaderDetails?.primaryRole ??
-    staffHeaderDetails?.primaryRole ??
-    directorHeaderDetails?.primaryRole ??
-    agentHeaderDetails?.primaryRole ??
-    "";
 
   const loadProfile = useCallback(async () => {
     if (!profileId || !session?.user) {
@@ -671,7 +648,7 @@ export function PublicProfileScreen() {
                 profileAction.type === "message"
               }
               isSaved={isProfileSaved}
-              isShortlisted={canUseShortlistStar ? isShortlisted : undefined}
+              isShortlisted={shortlistStar === "hidden" ? undefined : shortlistStar === "filled"}
               onContactPress={
                 canFollowOrSave
                   ? () => {
@@ -708,7 +685,7 @@ export function PublicProfileScreen() {
                 });
                 void handleShareProfile();
               }}
-              onShortlistPress={canUseShortlistStar ? handleShortlistPress : undefined}
+              onShortlistPress={shortlistStar === "hidden" ? undefined : handleShortlistPress}
               playerHeaderDetails={playerHeaderDetails}
               staffHeaderDetails={staffHeaderDetails}
             />
@@ -813,18 +790,22 @@ export function PublicProfileScreen() {
         title="Azioni profilo"
         visible={profileActionsVisible}
       />
-      {shortlistPermissions && viewedProfileId ? (
-        <AddToShortlistFlow
-          clubId={shortlistPermissions.club_id}
-          initialMode={shortlistFlow.initialMode}
+      {operatingSociety && viewedProfileId && actorId ? (
+        <ProfileShortlistFlow
+          actorId={actorId}
+          initialStep={shortlistFlow.initialStep}
           onClose={() => setShortlistFlow((prev) => ({ ...prev, open: false }))}
           open={shortlistFlow.open}
-          permissions={shortlistPermissions}
-          profile={{
-            avatarUrl: completeProfile?.profile.avatar_url,
+          person={{
+            avatarUrl: completeProfile?.profile.avatar_url ?? null,
             fullName: completeProfile?.profile.full_name ?? "Profilo",
             id: viewedProfileId,
-            subtitle: shortlistProfileSubtitle,
+          }}
+          society={{
+            id: operatingSociety.id,
+            isVerified: operatingSociety.isVerified,
+            logoUrl: operatingSociety.avatarUrl,
+            name: operatingSociety.name,
           }}
         />
       ) : null}
