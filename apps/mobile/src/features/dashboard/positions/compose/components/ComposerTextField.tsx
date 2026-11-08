@@ -1,10 +1,12 @@
-import { StyleSheet, TextInput, View } from "react-native";
+import { StyleSheet, TextInput, View, type KeyboardTypeOptions } from "react-native";
 
 import { colors, radius, sizes, spacing, typography } from "../../../../../theme/tokens";
 import { AppText } from "../../../../../ui";
 
 type Props = {
   error?: string | null;
+  /** DAS-REV-28 §16: la capienza è un intero, con tastiera numerica. */
+  keyboardType?: KeyboardTypeOptions;
   label: string;
   limit: number;
   multiline?: boolean;
@@ -32,6 +34,7 @@ type Props = {
  */
 export function ComposerTextField({
   error,
+  keyboardType,
   label,
   limit,
   multiline = true,
@@ -60,6 +63,7 @@ export function ComposerTextField({
 
       <TextInput
         accessibilityLabel={`${label}${optional ? ", opzionale" : ""}`}
+        keyboardType={keyboardType}
         multiline={multiline}
         onChangeText={onChangeText}
         placeholder={placeholder}

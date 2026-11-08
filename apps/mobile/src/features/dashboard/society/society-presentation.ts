@@ -12,6 +12,11 @@
 
 import type Ionicons from "@expo/vector-icons/Ionicons";
 
+import {
+  SELECTION_EVENTS_MODULE_DESCRIPTION,
+  SELECTION_EVENTS_MODULE_TITLE,
+} from "../events/events-copy";
+import { SELECTION_EVENTS_HREFS } from "../events/events-routes";
 import { POSITIONS_HREFS } from "../positions/positions-routes";
 import { hasSomeCapability, type DashboardIdentity } from "../dashboard-types";
 import { isFeatureAvailable } from "../modules/dashboard-features";
@@ -58,6 +63,8 @@ export const SOCIETY_HREFS = {
       ? `/(tabs)/dashboard/applications/position/${encodeURIComponent(adId)}`
       : "/(tabs)/dashboard/applications?from=dashboard",
   contentComposer: "/(tabs)/profile?compose=club",
+  /** Centro Provini, stage e open day (DAS-REV-28 §7). */
+  events: SELECTION_EVENTS_HREFS.center({ from: "dashboard" }),
   /**
    * Centro Inviti e richieste (DAS-REV-19 §6).
    *
@@ -317,6 +324,31 @@ export function buildManagementAreas(
       id: "shortlist",
       subtitle: SHORTLIST_MODULE_DESCRIPTION,
       title: "Shortlist",
+    });
+  }
+
+  /**
+   * Centro Provini, stage e open day (DAS-REV-28 §7).
+   *
+   * «Integra nella composizione Foundation la voce Centro Provini, stage e
+   * open day, sottotitolo Organizza eventi di selezione e gestisci i
+   * partecipanti, chevron. Usa area operativa coerente con
+   * recruiting/scouting» — accanto a Shortlist, quindi.
+   *
+   * La chiave è la sola lettura: §7 vuole il modulo «visibile a chi può
+   * consultarlo anche se il Centro è vuoto». Creare è deciso dentro, dal
+   * backend.
+   */
+  if (
+    identity.capabilities.includes("selection_events_view") &&
+    isFeatureAvailable("society_selection_events")
+  ) {
+    items.push({
+      href: SOCIETY_HREFS.events,
+      icon: "calendar-number-outline",
+      id: "selection_events",
+      subtitle: SELECTION_EVENTS_MODULE_DESCRIPTION,
+      title: SELECTION_EVENTS_MODULE_TITLE,
     });
   }
 

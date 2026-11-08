@@ -34,6 +34,8 @@ export type DashboardFeatureKey =
   | "society_recent_content"
   | "society_scheduled_content"
   | "society_seasons"
+  | "society_selection_event_detail"
+  | "society_selection_events"
   | "society_team_detail"
   | "society_team_group"
   | "society_teams";
@@ -66,6 +68,12 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
    * riattivazione su dati e permessi reali.
    */
   society_seasons: { available: true },
+  /**
+   * DAS-REV-28: Centro Provini, stage e open day e wizard di creazione.
+   * Entrambi esistono e funzionano su dati reali; la riga in «Aree di
+   * gestione» si accende con questo flag e con `selection_events_view`.
+   */
+  society_selection_events: { available: true },
   /**
    * DAS-REV-19: il centro "Inviti e richieste" esiste
    * (`app/(tabs)/dashboard/invites`), con le due tab, il filtro
@@ -117,6 +125,21 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
       "promossa resta quella della Posizione (application_deadline_at) e " +
       "l'action type 'register' non viene mai emesso.",
     owner: "Pack Eventi (DAS-REV-28–31)",
+  },
+  /**
+   * DAS-REV-28 §23: «Tap su evento operativo/storico usa il dettaglio
+   * canonico quando disponibile … Non creare un dettaglio fittizio come
+   * soluzione temporanea.» Le righe In programma e Storico restano senza
+   * tap e senza chevron finché questo flag è spento; le Bozze aprono il
+   * wizard, che esiste.
+   */
+  society_selection_event_detail: {
+    available: false,
+    blockedReason:
+      "Il dettaglio dell'evento di selezione (gestione, partecipanti, " +
+      "pagina pubblica) non esiste ancora: la DAS-REV-28 costruisce Centro " +
+      "e creazione, il dettaglio arriva con i pack successivi.",
+    owner: "Pack Eventi (DAS-REV-29–31)",
   },
   society_scheduled_content: {
     available: false,

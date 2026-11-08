@@ -122,6 +122,10 @@ export default function DashboardLayout() {
         {/* DAS-REV-25 §15: la scheda interna sta dentro la tab Dashboard,
             perché §4 vuole la bottom navigation sugli screen 05/08/14/15. */}
         <Stack.Screen name="shortlist/entry/[entryId]" />
+        {/* DAS-REV-28 §4: «Centro con Dashboard selezionata; wizard e
+            selector focalizzati senza bottom navigation». Il wizard sta in
+            app/event-compose/. */}
+        <Stack.Screen name="events/index" />
       </Stack>
     </DashboardIdentityProvider>
   );

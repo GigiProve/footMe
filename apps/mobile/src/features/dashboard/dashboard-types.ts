@@ -115,6 +115,13 @@ export const DASHBOARD_CAPABILITIES = [
   "join_links_manage",
   "join_links_revoke",
   "assignments_remove",
+  // DAS-REV-28 §7: «Vedere eventi di selezione, Creare eventi di selezione,
+  // Gestire eventi di selezione». La pubblicazione non ha una chiave propria:
+  // §7 chiede di mapparla esplicitamente, e il server la lega a
+  // `selection_events_create` sulla squadra dell'evento.
+  "selection_events_view",
+  "selection_events_create",
+  "selection_events_manage",
 ] as const;
 
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];
