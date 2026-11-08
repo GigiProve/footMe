@@ -33,9 +33,10 @@ docs/                  questa documentazione
 | `app/notifications.tsx`, `app/notification-preferences.tsx` | `features/notifications` | |
 | `app/position*/`, `app/society-position/*` | `features/dashboard/positions` | centro, composer, manage |
 | `app/(tabs)/dashboard/my-applications/*` | `features/applications` | candidature inviate (lato persona); `app/applications/*` resta come redirect per i deep link già inviati |
-| `app/(tabs)/dashboard/shortlist/*` | `features/dashboard/shortlist` | centro, pool di Position con filtri, scheda «Profilo in shortlist» ed editor di valutazione (DAS-REV-24/25) |
+| `app/(tabs)/dashboard/shortlist/*` | `features/dashboard/shortlist` | centro, pool di Position con filtri, scheda «Profilo in shortlist» ed editor di valutazione (DAS-REV-24/25); pool condiviso in `use-shortlist-pool` + `ShortlistPoolList` |
+| `app/(tabs)/dashboard/shortlist/list/[listId]`, `app/shortlist/recovery/*` | `features/dashboard/shortlist/custom` | Liste personalizzate: dettaglio, Gestisci lista, Gestisci accesso, Modifica lista con impatto ambito, Elimina, recupero amministrativo del proprietario (DAS-REV-27) |
 | stella sul profilo (`app/profile/[id]`) | `features/dashboard/shortlist/profile` | selector Position/CUSTOM, riepilogo membership, azioni, crea e aggiungi, recupero (DAS-REV-26); il form CUSTOM canonico resta `features/shortlist/components/CreateListModal` |
-| `app/shortlist/*` | `features/shortlist` | dettaglio lista CUSTOM legacy e flusso RET-07 ancora usato da Cerca e dal dettaglio lista; il profilo usa il flusso DAS-REV-26; `index` reindirizza al centro |
+| `app/shortlist/*` | `features/shortlist` | flusso RET-07 ancora usato da Cerca; il profilo usa il flusso DAS-REV-26; `index` e `[listId]` reindirizzano alla tab Dashboard (DAS-REV-27); il form CUSTOM canonico `CreateListModal` vive qui |
 | `app/club-*`, `app/team-*`, `app/society-admin/*` | `features/clubs`, `features/teams` | |
 | `app/role-link/*` | `features/role-link` | collegamento persona–società |
 | `app/representation/*`, `app/assistito-invite/*` | `features/relationships` | procuratore ↔ assistito |

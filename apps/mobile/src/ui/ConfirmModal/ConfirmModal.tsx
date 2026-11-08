@@ -19,6 +19,13 @@ export type ConfirmModalProps = {
    * già previsto dal design system, invece di sembrare una conferma qualsiasi.
    */
   destructive?: boolean;
+  /**
+   * DAS-REV-27 §4: «Le azioni distruttive seguono il trattamento sobrio del
+   * design system: testo/bordo rosso». `neutralOutline` usa la variante
+   * distruttiva già prevista da `button-tokens` (bordo e testo rossi, fondo
+   * bianco). Default invariato per tutti gli altri dialoghi.
+   */
+  confirmVariant?: "primary" | "neutralOutline";
   children?: ReactNode;
 };
 
@@ -32,6 +39,7 @@ export function ConfirmModal({
   onCancel,
   isBusy = false,
   destructive = false,
+  confirmVariant = "primary",
   children,
 }: ConfirmModalProps) {
   return (
@@ -88,7 +96,7 @@ export function ConfirmModal({
                 loading={isBusy}
                 onPress={onConfirm}
                 testID="confirm-modal-confirm"
-                variant="primary"
+                variant={confirmVariant}
               />
             </View>
           </View>

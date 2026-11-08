@@ -287,9 +287,16 @@ export type ShortlistErrorKind =
   | "noteTooLong"
   | "notAuthorized"
   | "notFound"
+  /* DAS-REV-27 §11, §14, §19, §22: errori di governo della CUSTOM. */
+  | "ownerIneligible"
+  | "ownerScopeInvalid"
+  | "ownerValid"
   | "scopeInvalid"
   | "scopeUndefined"
+  | "shareEmpty"
+  | "shareIneligible"
   | "staleCursor"
+  | "versionConflict"
   | "withdrawn";
 
 export class ShortlistError extends Error {

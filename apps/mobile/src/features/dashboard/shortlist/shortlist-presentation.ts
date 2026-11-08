@@ -61,8 +61,9 @@ export const SHORTLIST_COPY = {
 
   /** §22, deep link non disponibile. */
   unavailableTitle: "Contenuto non disponibile",
-  unavailableBody:
-    "Non hai accesso a questa shortlist oppure non è più disponibile.",
+  /* DAS-REV-27 §18, screen 11: la stessa frase per inesistente, revocata,
+     privata o eliminata — senza dire perché. */
+  unavailableBody: "Questo contenuto non è disponibile.",
   backToDashboard: "Torna alla Dashboard",
 
   /** §30, errori contestuali. */
@@ -425,11 +426,13 @@ export function filtersKey(filters: ShortlistFilters): string {
  *     confonderlo con una lista senza membership»;
  *   · `rows` — tutto il resto.
  */
+export type PoolSurface = "empty" | "filteredEmpty" | "rows";
+
 export function poolPresentation(input: {
   filtersApplied: boolean;
   rowCount: number;
   total: number;
-}): "empty" | "filteredEmpty" | "rows" {
+}): PoolSurface {
   if (input.total === 0) {
     return "empty";
   }

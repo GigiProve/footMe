@@ -20,13 +20,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing } from "../../../theme/tokens";
-import { AppText, Button } from "../../../ui";
+import { AppText } from "../../../ui";
 import { useSession } from "../../auth/use-session";
 import { STALE_MS } from "../cache/freshness-policy";
 import {
@@ -39,24 +38,20 @@ import { useDashboardIdentity } from "../identity/use-dashboard-identity";
 import { useDashboardConnection } from "../state/use-dashboard-connection";
 import { ShortlistFilterControl } from "./components/ShortlistFilterControl";
 import { ShortlistFilterSheet } from "./components/ShortlistFilterSheet";
-import { ShortlistPoolRowView } from "./components/ShortlistPoolRow";
+import { ShortlistPoolList } from "./components/ShortlistPoolList";
 import { ShortlistSectionSkeleton } from "./components/ShortlistSection";
 import { SHORTLIST_QK } from "./shortlist-keys";
 import {
   EMPTY_FILTERS,
   SHORTLIST_COPY,
   filtersAreActive,
-  filtersKey,
   poolCountLabel,
   poolPresentation,
 } from "./shortlist-presentation";
 import { SHORTLIST_HREFS } from "./shortlist-routes";
-import { fetchShortlistContext, fetchShortlistPoolPage } from "./shortlist-service";
-import {
-  ShortlistError,
-  type ShortlistFilters,
-  type ShortlistPoolPage,
-} from "./shortlist-types";
+import { fetchShortlistContext } from "./shortlist-service";
+import { ShortlistError, type ShortlistFilters } from "./shortlist-types";
+import { useShortlistPool } from "./use-shortlist-pool";
 
 const DOUBLE_TAP_MS = 600;
 
@@ -109,56 +104,12 @@ export function PositionShortlistScreen({ positionId, shortlistId }: Props) {
 
   const context = contextQuery.data ?? null;
   const listId = context?.shortlistId ?? null;
-  const appliedKey = filtersKey(filters);
-
-  /**
-   * §14: paginazione server-side con cursore. La chiave di cache porta i
-   * filtri **normalizzati**, quindi due selezioni equivalenti condividono
-   * una pagina sola; e «Dopo applicazione azzera il cursore della lista»
-   * viene gratis, perché cambiando chiave cambia la query.
-   */
-  const poolQuery = useInfiniteQuery<
-    ShortlistPoolPage,
-    Error,
-    { pageParams: (string | null)[]; pages: ShortlistPoolPage[] },
-    readonly unknown[],
-    string | null
-  >({
-    enabled: !!listId,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    initialPageParam: null,
-    queryFn: ({ pageParam }) =>
-      fetchShortlistPoolPage(listId as string, filters, pageParam),
-    queryKey: SHORTLIST_QK.pool(actorId, listId ?? "", appliedKey),
-    retry: (failureCount, error) =>
-      !(error instanceof ShortlistError && error.kind !== "network") &&
-      failureCount < 1,
-    staleTime: STALE_MS.operational,
+  const { appliedKey, head, poolQuery, rows } = useShortlistPool({
+    actorId,
+    filters,
+    focusEntryId,
+    listId,
   });
-
-  const pages = poolQuery.data?.pages ?? [];
-  const head = pages[0] ?? null;
-  const rows = pages.flatMap((page) => page.rows);
-
-  /**
-   * §24: «Raggiungere la entry tramite cursore/ancora autorizzata o lookup
-   * paginato compatibile: non scaricare l'intera lista e non alterare
-   * l'ordinamento.»
-   *
-   * Si avanza di una pagina per volta finché la persona non compare o le
-   * pagine finiscono — nello stesso ordine di sempre, con gli stessi
-   * cursori autorizzati. Niente salto, niente lista intera.
-   */
-  const focusReached =
-    !focusEntryId || rows.some((row) => row.entryId === focusEntryId);
-
-  const { fetchNextPage, hasNextPage, isFetchingNextPage } = poolQuery;
-
-  useEffect(() => {
-    if (!focusReached && hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage();
-    }
-  }, [fetchNextPage, focusReached, hasNextPage, isFetchingNextPage]);
 
   const lastPushRef = useRef<{ at: number; href: string } | null>(null);
 
@@ -361,85 +312,20 @@ export function PositionShortlistScreen({ positionId, shortlistId }: Props) {
         }
         testID="shortlist-pool-scroll"
       >
-        {poolQuery.isLoading && rows.length === 0 ? (
-          <ShortlistSectionSkeleton rows={3} />
-        ) : null}
-
-        {/* §28: «Errore caricamento pool: Impossibile caricare la shortlist
-            / Riprova.» Locale al dominio, non un reload della Dashboard. */}
-        {poolQuery.isError ? (
-          <DashboardGlobalError
-            body={SHORTLIST_COPY.errorBody}
-            onRetry={() => void poolQuery.refetch()}
-            title={SHORTLIST_COPY.poolErrorTitle}
-          />
-        ) : null}
-
-        {!poolQuery.isLoading && !poolQuery.isError && surface === "empty" ? (
-          /* §28: «Vuoto reale, dopo una lettura valida con totale 0.»
-             Nessun Crea shortlist, nessun Cerca profili. */
-          <View style={styles.empty} testID="shortlist-pool-empty">
-            <Ionicons
-              color={colors.textNeutralSoft}
-              name="star-outline"
-              size={40}
-            />
-
-            <AppText color="neutral" variant="titleSm">
-              {SHORTLIST_COPY.poolEmptyTitle}
-            </AppText>
-
-            <AppText color="neutralMuted" variant="bodySm">
-              {SHORTLIST_COPY.poolEmptyBody}
-            </AppText>
-          </View>
-        ) : null}
-
-        {!poolQuery.isLoading &&
-        !poolQuery.isError &&
-        surface === "filteredEmpty" ? (
-          /* §13: «La CTA Azzera filtri nello stato senza risultati agisce
-             invece subito sui filtri applicati e ricarica l'elenco
-             completo.» */
-          <View style={styles.empty} testID="shortlist-pool-filtered-empty">
-            <Ionicons
-              color={colors.textNeutralSoft}
-              name="star-outline"
-              size={40}
-            />
-
-            <AppText color="neutral" variant="titleSm">
-              {SHORTLIST_COPY.poolFilteredEmptyTitle}
-            </AppText>
-
-            <AppText color="neutralMuted" variant="bodySm">
-              {SHORTLIST_COPY.poolFilteredEmptyBody}
-            </AppText>
-
-            <Button
-              fullWidth
-              label={SHORTLIST_COPY.filterClear}
-              onPress={() => setFilters(EMPTY_FILTERS)}
-              size="lg"
-              testID="shortlist-pool-clear-filters"
-              variant="primary"
-            />
-          </View>
-        ) : null}
-
-        {rows.map((row, index) => (
-          <ShortlistPoolRowView
-            focused={focusEntryId === row.entryId}
-            key={row.entryId}
-            onPress={() => go(SHORTLIST_HREFS.entry(row.entryId))}
-            row={row}
-            showDivider={index > 0}
-          />
-        ))}
-
-        {poolQuery.isFetchingNextPage ? (
-          <ShortlistSectionSkeleton rows={1} />
-        ) : null}
+        {/* §28: errore locale al dominio, vuoto reale e vuoto filtrato
+            distinti; nessun Crea shortlist o Cerca profili nel vuoto. */}
+        <ShortlistPoolList
+          emptyBody={SHORTLIST_COPY.poolEmptyBody}
+          focusEntryId={focusEntryId}
+          isError={poolQuery.isError}
+          isFetchingNextPage={poolQuery.isFetchingNextPage}
+          isLoading={poolQuery.isLoading}
+          onClearFilters={() => setFilters(EMPTY_FILTERS)}
+          onRetry={() => void poolQuery.refetch()}
+          onRowPress={(row) => go(SHORTLIST_HREFS.entry(row.entryId))}
+          rows={rows}
+          surface={surface}
+        />
       </ScrollView>
 
       <ShortlistFilterSheet
@@ -476,11 +362,5 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: 0,
-  },
-  empty: {
-    alignItems: "center",
-    gap: spacing[8],
-    paddingHorizontal: spacing[20],
-    paddingVertical: spacing[40],
   },
 });

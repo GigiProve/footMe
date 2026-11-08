@@ -19,6 +19,12 @@ type Props = {
   title?: string | null;
   /** Uscita dal flusso focalizzato (§6). Nel Centro non esiste. */
   onCancel?: (() => void) | null;
+  /**
+   * Menu secondario della superficie (DAS-REV-27 §19: «nel menu del Centro
+   * Shortlist, mostra Recupera liste soltanto agli actor con capability
+   * adeguata»). Assente = nessun pulsante, non un pulsante disabilitato.
+   */
+  menu?: { accessibilityLabel: string; onPress: () => void } | null;
 };
 
 /**
@@ -46,6 +52,7 @@ export function SocietyContextHeader({
   logoUrl,
   name,
   onBack,
+  menu,
   onCancel,
   step,
   title,
@@ -104,6 +111,19 @@ export function SocietyContextHeader({
             </AppText>
           </Pressable>
         ) : null}
+
+        {menu ? (
+          <Pressable
+            accessibilityLabel={menu.accessibilityLabel}
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={menu.onPress}
+            style={({ pressed }) => [styles.menu, pressed ? styles.pressed : null]}
+            testID="society-header-menu"
+          >
+            <Ionicons color={colors.textNeutral} name="ellipsis-horizontal" size={22} />
+          </Pressable>
+        ) : null}
       </View>
 
       {step ? (
@@ -143,6 +163,13 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     fontWeight: "600",
+  },
+  menu: {
+    alignItems: "flex-end",
+    height: sizes.touchTarget,
+    justifyContent: "center",
+    marginLeft: "auto",
+    width: sizes.touchTarget,
   },
   step: {
     paddingTop: spacing[8],

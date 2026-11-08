@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   addShortlistEntry,
-  createShortlist,
-  deleteShortlist,
   fetchClubShortlists,
   fetchProfileShortlistMemberships,
   fetchShortlistEntries,
@@ -12,7 +10,6 @@ import {
   getPriorityLabel,
   getScopeLabel,
   removeShortlistEntry,
-  updateShortlist,
   updateShortlistEntry,
   type ShortlistEvaluationStatus,
   type ShortlistPriority,
@@ -82,48 +79,6 @@ describe("rpc readers", () => {
       p_shortlist_id: "list-1",
     });
     expect(result).toHaveLength(1);
-  });
-});
-
-describe("createShortlist", () => {
-  it("inserts a row and returns the new id", async () => {
-    (mocks.builder.single as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { id: "list-99" },
-      error: null,
-    });
-
-    const id = await createShortlist("club-1", "profile-1", {
-      description: "  Profili offensivi  ",
-      name: "  Attaccanti 2025/26  ",
-      teamId: "team-1",
-    });
-
-    expect(mocks.from).toHaveBeenCalledWith("club_shortlists");
-    /* DAS-REV-24 §22: il perimetro è una squadra reale, e §23 vieta al
-       client di inviare campi protetti — `list_type` non compare. */
-    expect(mocks.builder.insert).toHaveBeenCalledWith({
-      club_id: "club-1",
-      created_by_profile_id: "profile-1",
-      description: "Profili offensivi",
-      name: "Attaccanti 2025/26",
-      team_id: "team-1",
-    });
-    expect(id).toBe("list-99");
-  });
-});
-
-describe("updateShortlist / deleteShortlist", () => {
-  it("updates the row by id", async () => {
-    await updateShortlist("list-1", { name: "Nuovo nome" });
-    expect(mocks.from).toHaveBeenCalledWith("club_shortlists");
-    expect(mocks.builder.update).toHaveBeenCalledWith({ name: "Nuovo nome" });
-    expect(mocks.builder.eq).toHaveBeenCalledWith("id", "list-1");
-  });
-
-  it("deletes the row by id", async () => {
-    await deleteShortlist("list-1");
-    expect(mocks.builder.delete).toHaveBeenCalled();
-    expect(mocks.builder.eq).toHaveBeenCalledWith("id", "list-1");
   });
 });
 

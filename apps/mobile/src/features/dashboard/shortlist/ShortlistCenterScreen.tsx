@@ -17,14 +17,14 @@
  * vive nello Stack annidato della tab.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, spacing } from "../../../theme/tokens";
-import { AppText, Button } from "../../../ui";
+import { colors, sizes, spacing } from "../../../theme/tokens";
+import { AppText, BottomSheet, Button } from "../../../ui";
 import { useSession } from "../../auth/use-session";
 import { CreateListModal } from "../../shortlist/components/CreateListModal";
 import { STALE_MS } from "../cache/freshness-policy";
@@ -39,6 +39,8 @@ import { useDashboardIdentity } from "../identity/use-dashboard-identity";
 import { useAccessWindow } from "../state/use-access-window";
 import { useDashboardConnection } from "../state/use-dashboard-connection";
 import { ShortlistRow } from "./components/ShortlistRow";
+import { CUSTOM_COPY } from "./custom/custom-shortlist-presentation";
+import { fetchShortlistGovernanceCaps } from "./custom/custom-shortlist-service";
 import {
   ShortlistSection,
   ShortlistSectionEmpty,
@@ -80,6 +82,20 @@ export function ShortlistCenterScreen() {
   const { connection, reportFailure, reportSuccess } = useDashboardConnection();
 
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const [isMenuOpen, setMenuOpen] = useState(false);
+
+  /* DAS-REV-27 §19: la voce «Recupera liste» dipende da una capability
+     amministrativa propria, non da quelle Shortlist: si legge a parte e non
+     blocca il Centro se fallisce. */
+  const capsQuery = useQuery({
+    enabled: !!clubId && !!actorId,
+    queryFn: () => fetchShortlistGovernanceCaps(clubId as string),
+    queryKey: SHORTLIST_QK.governanceCaps(actorId, clubId ?? ""),
+    staleTime: STALE_MS.operational,
+  });
+  const headerMenu = capsQuery.data?.canRecover
+    ? { accessibilityLabel: "Altre azioni Shortlist", onPress: () => setMenuOpen(true) }
+    : null;
 
   // ── Eligibility prima dei dati (§5, §12) ──────────────────────────────
   //
@@ -191,17 +207,39 @@ export function ShortlistCenterScreen() {
 
   // ── Shell ─────────────────────────────────────────────────────────────
 
+  const recoveryMenu = (
+    <BottomSheet onClose={() => setMenuOpen(false)} visible={isMenuOpen}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          setMenuOpen(false);
+          router.push(SHORTLIST_HREFS.recoveryList() as never);
+        }}
+        style={({ pressed }) => [styles.menuRow, pressed ? styles.menuPressed : null]}
+        testID="shortlist-menu-recover"
+      >
+        <Ionicons color={colors.textNeutral} name="person-add-outline" size={20} />
+        <AppText color="neutral" style={styles.menuLabel} variant="bodyLg">
+          {CUSTOM_COPY.menuRecover}
+        </AppText>
+        <Ionicons color={colors.textNeutralSoft} name="chevron-forward" size={18} />
+      </Pressable>
+    </BottomSheet>
+  );
+
   const shell = (children: React.ReactNode, headerProps?: { name: string; logoUrl: string | null; isVerified: boolean }) => (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <SocietyContextHeader
         isVerified={headerProps?.isVerified ?? false}
         logoUrl={headerProps?.logoUrl ?? null}
+        menu={headerMenu}
         name={headerProps?.name ?? (current?.name ?? "")}
         onBack={() => router.back()}
         title={SHORTLIST_COPY.title}
       />
 
       {children}
+      {recoveryMenu}
     </View>
   );
 
@@ -363,6 +401,11 @@ export function ShortlistCenterScreen() {
             clubId={clubId}
             createdByProfileId={profile.id}
             onClose={() => setCreateOpen(false)}
+            onCreated={(listId) => {
+              setCreateOpen(false);
+              go(SHORTLIST_HREFS.customList(listId));
+            }}
+            society={{ logoUrl: header.clubLogoUrl, name: header.clubName }}
             successMode="skip"
             visible={isCreateOpen}
           />
@@ -376,6 +419,7 @@ export function ShortlistCenterScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <SocietyContextHeader
         {...headerProps}
+        menu={headerMenu}
         onBack={() => router.back()}
         title={SHORTLIST_COPY.title}
       />
@@ -487,10 +531,18 @@ export function ShortlistCenterScreen() {
           clubId={clubId}
           createdByProfileId={profile.id}
           onClose={() => setCreateOpen(false)}
+          onCreated={(listId) => {
+            /* DAS-REV-27 §10: «Successo confermato apre la stessa nuova
+               CUSTOM, vuota se creata dal Centro.» */
+            setCreateOpen(false);
+            go(SHORTLIST_HREFS.customList(listId));
+          }}
+          society={{ logoUrl: header.clubLogoUrl, name: header.clubName }}
           successMode="skip"
           visible={isCreateOpen}
         />
       ) : null}
+      {recoveryMenu}
     </View>
   );
 }
@@ -563,6 +615,18 @@ async function loadMorePositions(
 }
 
 const styles = StyleSheet.create({
+  menuRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[14],
+    minHeight: sizes.touchTarget + spacing[8],
+  },
+  menuLabel: {
+    flex: 1,
+  },
+  menuPressed: {
+    opacity: 0.6,
+  },
   root: {
     backgroundColor: colors.surface,
     flex: 1,

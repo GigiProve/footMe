@@ -137,6 +137,35 @@ export function classifyShortlistError(error: unknown): ShortlistError {
     return new ShortlistError("descriptionTooLong", message);
   }
 
+  /* DAS-REV-27 §11: SHARED senza persone e destinatario non più eleggibile
+     sono validazioni del form accessi, non guasti di rete; §22: la versione
+     osservata è cambiata; §14, §19: l'owner fuori ambito, ancora valido o
+     un candidato non idoneo hanno una copy propria. Prima di SCOPE_INVALID:
+     «SHORTLIST_OWNER_SCOPE_INVALID» è un caso diverso. */
+  if (message.includes("SHORTLIST_SHARE_EMPTY")) {
+    return new ShortlistError("shareEmpty", message);
+  }
+
+  if (message.includes("SHORTLIST_SHARE_INELIGIBLE")) {
+    return new ShortlistError("shareIneligible", message);
+  }
+
+  if (message.includes("SHORTLIST_VERSION_CONFLICT")) {
+    return new ShortlistError("versionConflict", message);
+  }
+
+  if (message.includes("SHORTLIST_OWNER_SCOPE_INVALID")) {
+    return new ShortlistError("ownerScopeInvalid", message);
+  }
+
+  if (message.includes("SHORTLIST_OWNER_VALID")) {
+    return new ShortlistError("ownerValid", message);
+  }
+
+  if (message.includes("SHORTLIST_OWNER_INELIGIBLE")) {
+    return new ShortlistError("ownerIneligible", message);
+  }
+
   /* §17: «Se l'accesso cambia prima del commit, ricarica le opzioni e
      richiedi una scelta ancora valida senza allargare automaticamente lo
      scope.» */
@@ -178,6 +207,8 @@ export function classifyShortlistError(error: unknown): ShortlistError {
 
   if (
     message.includes("SHORTLIST_NOT_FOUND") ||
+    /* DAS-REV-27 §16: lista eliminata durante un comando — stessa superficie. */
+    message.includes("SHORTLIST_NOT_AVAILABLE") ||
     message.includes("APPLICATION_NOT_AVAILABLE")
   ) {
     return new ShortlistError("notFound", message);

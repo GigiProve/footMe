@@ -1,13 +1,23 @@
 import { useEffect, useState } from "react";
-import { Image, Modal, Pressable, SafeAreaView, StyleSheet, View } from "react-native";
+import { Modal, Pressable, SafeAreaView, StyleSheet, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { KeyboardAwareForm } from "../../../components/ui/keyboard-aware-form";
-import { AppText, Button, ConfirmModal, Divider, Input, ModalHeader, useToast } from "../../../ui";
+import { AppText, Avatar, Button, ConfirmModal, Input, useToast } from "../../../ui";
 import { colors, sizes, spacing } from "../../../theme/tokens";
 import { useSession } from "../../auth/use-session";
+import { useDashboardConnection } from "../../dashboard/state/use-dashboard-connection";
+import { ShortlistAccessFields } from "../../dashboard/shortlist/custom/components/ShortlistAccessFields";
+import {
+  CUSTOM_COPY,
+  accessSubmittable,
+  governanceErrorCopy,
+  reconcileSelection,
+  validateAccessDraft,
+} from "../../dashboard/shortlist/custom/custom-shortlist-presentation";
+import { fetchAllShareCandidateIds } from "../../dashboard/shortlist/custom/custom-shortlist-service";
+import type { AccessChoice } from "../../dashboard/shortlist/custom/custom-shortlist-types";
 import {
   SCOPE_UNSET,
   ShortlistScopeSheet,
@@ -41,7 +51,15 @@ import { useIntentKeys } from "../../dashboard/shortlist/profile/use-intent-key"
 import { ShortlistError } from "../../dashboard/shortlist/shortlist-types";
 
 /**
- * Form CUSTOM canonico (DAS-REV-24 §25, DAS-REV-26 §16-§19 — screen 07, 15).
+ * Form CUSTOM canonico (DAS-REV-24 §25, DAS-REV-26 §16-§19, DAS-REV-27 §10-§12
+ * — screen 02, 03 della 27; 07, 15 della 26).
+ *
+ * DAS-REV-27: «Accesso alla lista» diventa operativo con gli stessi campi di
+ * Gestisci accesso (`ShortlistAccessFields`): Solo io di default, oppure
+ * Condividi con persone specifiche eleggibili nell'ambito scelto. Il
+ * pannello di successo della 24 non esiste più: §10 — «Successo confermato
+ * apre la stessa nuova CUSTOM»; §24 — «Nessuna success screen celebrativa».
+ * Stesso header «Annulla | Nuova lista» per Centro e profilo.
  *
  * Un solo form per due ingressi: il centro Shortlist e il profilo. §16 —
  * «Riutilizza il form CUSTOM canonico con una modalità di ingresso dal
@@ -74,6 +92,7 @@ type ProfileTarget = {
 };
 
 type SocietyLine = {
+  isVerified?: boolean;
   logoUrl: string | null;
   name: string;
 };
@@ -90,6 +109,7 @@ type CreateListModalProps = {
   /** Ingresso dal profilo: esito della creazione con inserimento (§19). */
   onProfileOutcome?: (outcome: CustomCreateOutcome) => void;
   society?: SocietyLine;
+  /** Storico: dalla 27 non esiste più un pannello di successo (§10, §24). */
   successMode?: "panel" | "skip";
   visible: boolean;
 };
@@ -113,18 +133,16 @@ export function CreateListModal({
   onProfileOutcome,
   profileTarget,
   society,
-  successMode = "panel",
   visible,
 }: CreateListModalProps) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { profile } = useSession();
   const actorId = profile?.id ?? "";
   const withProfile = !!profileTarget;
   const keys = useIntentKeys(`shortlist-create:${clubId}`);
+  const { connection } = useDashboardConnection();
 
-  const [step, setStep] = useState<"form" | "success">("form");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [scope, setScope] = useState<string>(SCOPE_UNSET);
@@ -133,7 +151,11 @@ export function CreateListModal({
   const [exitOpen, setExitOpen] = useState(false);
   const [errors, setErrors] = useState<ListFormErrors>(NO_ERRORS);
   const [banner, setBanner] = useState<string | null>(null);
-  const [created, setCreated] = useState<CustomCreateOutcome | null>(null);
+  /* §10: «Default accesso Solo io». */
+  const [access, setAccess] = useState<AccessChoice>("owner_only");
+  const [shares, setShares] = useState<string[]>([]);
+  const [accessTouched, setAccessTouched] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   const optionsQuery = useQuery({
     enabled: visible && !!clubId && !!actorId,
@@ -145,7 +167,6 @@ export function CreateListModal({
 
   useEffect(() => {
     if (!visible) {
-      setStep("form");
       setName("");
       setDescription("");
       setScope(SCOPE_UNSET);
@@ -154,7 +175,10 @@ export function CreateListModal({
       setExitOpen(false);
       setErrors(NO_ERRORS);
       setBanner(null);
-      setCreated(null);
+      setAccess("owner_only");
+      setShares([]);
+      setAccessTouched(false);
+      setAccessError(null);
     }
   }, [visible]);
 
@@ -174,14 +198,22 @@ export function CreateListModal({
     name: errors.name ?? liveErrors.name,
     scope: errors.scope,
   };
+  const accessDraft = { choice: access, selected: shares };
+  const accessInline = accessTouched ? validateAccessDraft(accessDraft) : null;
   const dirty =
-    name.trim().length > 0 || description.trim().length > 0 || scopeTouched;
+    name.trim().length > 0 ||
+    description.trim().length > 0 ||
+    scopeTouched ||
+    access !== "owner_only" ||
+    shares.length > 0;
 
   const signature = JSON.stringify([
     name.trim(),
     description.trim(),
     selectedOption?.teamId ?? null,
     profileTarget?.personId ?? null,
+    access,
+    access === "shared" ? [...shares].sort() : [],
   ]);
 
   const reconcile = () => {
@@ -199,9 +231,11 @@ export function CreateListModal({
         idempotencyKey: keys.key(signature),
         name: name.trim(),
         personId: profileTarget?.personId ?? null,
+        accessMode: access,
+        shareIds: access === "shared" ? shares : [],
         teamId: selectedOption?.teamId ?? null,
       }),
-    onError: (error) => {
+    onError: async (error) => {
       const kind = error instanceof ShortlistError ? error.kind : "network";
 
       /* §19: «Un timeout non dimostra che la lista non esista.» Dopo un
@@ -209,6 +243,26 @@ export function CreateListModal({
          stessa operazione, e il server restituisce la stessa lista. */
       if (isDefinitiveFailure(kind)) {
         keys.settle(signature);
+      }
+
+      if (kind === "shareEmpty" || kind === "shareIneligible") {
+        /* §11, Q27-09: elenco riletto, scelte ancora valide conservate,
+           nuovo invio esplicito. Nessuna lista creata. */
+        if (kind === "shareIneligible") {
+          try {
+            const eligible = await fetchAllShareCandidateIds({
+              clubId,
+              shortlistId: null,
+              teamId: selectedOption?.teamId ?? null,
+            });
+            setShares((prev) => reconcileSelection(prev, eligible));
+          } catch {
+            /* Rilettura fallita: le scelte restano. */
+          }
+          void queryClient.invalidateQueries({ queryKey: ["society-shortlist-share-candidates"] });
+        }
+        setAccessError(governanceErrorCopy(kind, "create", false));
+        return;
       }
 
       const fields = createErrorFields(kind);
@@ -226,7 +280,11 @@ export function CreateListModal({
         name: fields.name ?? null,
         scope: fields.scope ?? null,
       });
-      setBanner(fields.banner ?? null);
+      setBanner(
+        fields.banner && kind === "network" && connection === "offline"
+          ? CUSTOM_COPY.offline
+          : fields.banner ?? null,
+      );
     },
     onSuccess: (outcome) => {
       keys.settle(signature);
@@ -237,25 +295,20 @@ export function CreateListModal({
         return;
       }
 
-      if (successMode === "skip") {
-        if (onCreated) {
-          onCreated(outcome.shortlistId);
-        } else {
-          /* Il centro passa solo `onClose`: senza questa chiusura il form
-             resterebbe aperto sopra la lista appena creata. */
-          showToast({ id: "shortlist-list-created", message: "Lista creata." });
-          onClose();
-        }
-        return;
+      /* §10: «Successo confermato apre la stessa nuova CUSTOM». Il chiamante
+         naviga; senza `onCreated` resta un esito discreto e la chiusura. */
+      if (onCreated) {
+        onCreated(outcome.shortlistId);
+      } else {
+        showToast({ id: "shortlist-list-created", message: "Lista creata." });
+        onClose();
       }
-
-      setCreated(outcome);
-      setStep("success");
     },
   });
 
   const submittable =
     listFormSubmittable({ description, name, scopeChosen }) && !mutation.isPending;
+  const accessOk = accessSubmittable(accessDraft);
 
   const requestClose = () => {
     if (mutation.isPending) {
@@ -264,7 +317,7 @@ export function CreateListModal({
 
     /* §16: «Annulla/back con modifiche non salvate segue la conferma
        comune.» Senza modifiche si torna subito indietro. */
-    if (step === "form" && dirty) {
+    if (dirty) {
       setExitOpen(true);
       return;
     }
@@ -275,6 +328,15 @@ export function CreateListModal({
   const submit = () => {
     setErrors(NO_ERRORS);
     setBanner(null);
+    setAccessTouched(true);
+    setAccessError(null);
+
+    /* §11: SHARED senza persone resta un errore inline, mai una
+       conversione silenziosa a Solo io (Q27-07). */
+    if (!accessOk) {
+      return;
+    }
+
     mutation.mutate();
   };
 
@@ -290,226 +352,182 @@ export function CreateListModal({
       visible={visible}
     >
       <SafeAreaView style={styles.root}>
-        {step === "form" ? (
-          <>
-            {withProfile ? (
-              /* Screen 07: «Header Annulla | Nuova lista.» Nessuna bottom
-                 navigation nel form focalizzato (§4). */
-              <View style={styles.header}>
-                <Pressable
-                  accessibilityRole="button"
-                  hitSlop={8}
-                  onPress={requestClose}
-                  style={styles.headerAction}
-                  testID="create-list-cancel"
-                >
-                  <AppText color="accent" variant="actionLabel">
-                    {PROFILE_SHORTLIST_COPY.formCancel}
-                  </AppText>
-                </Pressable>
-                <AppText accessibilityRole="header" color="neutral" variant="titleMd">
-                  {PROFILE_SHORTLIST_COPY.formTitle}
-                </AppText>
-                <View style={styles.headerAction} />
-              </View>
-            ) : (
-              <ModalHeader onClose={requestClose} title="Crea lista" />
-            )}
+        {/* Screen 02/03 (27) e 07 (26): «Header Annulla | Nuova lista». Nessuna
+            bottom navigation nel form focalizzato (§4). */}
+        <View style={styles.header}>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={requestClose}
+            style={styles.headerAction}
+            testID="create-list-cancel"
+          >
+            <AppText color="accent" variant="actionLabel">
+              {PROFILE_SHORTLIST_COPY.formCancel}
+            </AppText>
+          </Pressable>
+          <AppText accessibilityRole="header" color="neutral" variant="titleMd">
+            {PROFILE_SHORTLIST_COPY.formTitle}
+          </AppText>
+          <View style={styles.headerAction} />
+        </View>
 
-            <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
-              {withProfile && society ? (
-                <View style={styles.society}>
-                  {society.logoUrl ? (
-                    <Image source={{ uri: society.logoUrl }} style={styles.logo} />
-                  ) : (
-                    <Ionicons color={colors.textNeutralMuted} name="shield-outline" size={20} />
-                  )}
-                  <View style={styles.societyText}>
-                    <AppText color="neutral" variant="bodyLg">
-                      {society.name}
-                    </AppText>
-                    <AppText color="neutralMuted" variant="meta">
-                      {formIntentLine(profileTarget.fullName)}
-                    </AppText>
-                  </View>
+        <KeyboardAwareForm contentContainerStyle={styles.scrollContent}>
+          {/* §10: «Society corrente chiara e non alterabile implicitamente». */}
+          {society ? (
+            <View style={styles.society}>
+              <Avatar name={society.name} size="sm" square tone="ink" uri={society.logoUrl ?? undefined} />
+              <View style={styles.societyText}>
+                <View style={styles.societyName}>
+                  <AppText color="neutral" style={styles.strong} variant="bodySm">
+                    {society.name}
+                  </AppText>
+                  {society.isVerified ? (
+                    <Ionicons
+                      accessibilityLabel="Società verificata"
+                      color={colors.accent}
+                      name="checkmark-circle"
+                      size={14}
+                    />
+                  ) : null}
                 </View>
-              ) : null}
-
-              {banner ? (
-                <AppText accessibilityLiveRegion="polite" color="danger" variant="bodySm">
-                  {banner}
-                </AppText>
-              ) : null}
-
-              <Input
-                accessibilityHint={shownErrors.name ?? undefined}
-                error={!!shownErrors.name}
-                helperText={shownErrors.name ?? undefined}
-                label={PROFILE_SHORTLIST_COPY.formName}
-                onChangeText={(value) => {
-                  setName(value);
-                  setErrors((prev) => ({ ...prev, name: null }));
-                }}
-                placeholder="Es. Osservati settembre"
-                testID="create-list-name"
-                value={name}
-              />
-              <Input
-                error={!!shownErrors.description}
-                helperText={shownErrors.description ?? undefined}
-                label={PROFILE_SHORTLIST_COPY.formDescription}
-                multiline
-                onChangeText={(value) => {
-                  setDescription(value);
-                  setErrors((prev) => ({ ...prev, description: null }));
-                }}
-                placeholder={PROFILE_SHORTLIST_COPY.formDescriptionPlaceholder}
-                testID="create-list-description"
-                value={description}
-              />
-
-              <View style={styles.group}>
-                <AppText color="neutral" variant="metaStrong">
-                  {PROFILE_SHORTLIST_COPY.formScope}
-                </AppText>
-                <Pressable
-                  accessibilityHint={shownErrors.scope ?? undefined}
-                  accessibilityLabel={`${PROFILE_SHORTLIST_COPY.formScope}: ${
-                    selectedOption?.label ?? PROFILE_SHORTLIST_COPY.formScopePlaceholder
-                  }`}
-                  accessibilityRole="button"
-                  disabled={options.length === 0}
-                  onPress={() => setScopeOpen(true)}
-                  style={[styles.selectRow, shownErrors.scope ? styles.selectRowError : null]}
-                  testID="create-list-scope"
-                >
-                  <AppText
-                    color={selectedOption ? "neutral" : "neutralMuted"}
-                    style={styles.selectValue}
-                    variant="bodyLg"
-                  >
-                    {selectedOption?.label ?? PROFILE_SHORTLIST_COPY.formScopePlaceholder}
-                  </AppText>
-                  <Ionicons color={colors.textNeutralSoft} name="chevron-forward" size={18} />
-                </Pressable>
-                {shownErrors.scope ? (
-                  <AppText color="danger" variant="meta">
-                    {shownErrors.scope}
+                {profileTarget ? (
+                  <AppText color="neutralMuted" variant="meta">
+                    {formIntentLine(profileTarget.fullName)}
                   </AppText>
                 ) : null}
               </View>
-
-              {/* §18: informazione non interattiva — niente chevron né toggle
-                  finché la condivisione selettiva (27) non esiste. */}
-              <View style={styles.group}>
-                <AppText color="neutral" variant="metaStrong">
-                  {PROFILE_SHORTLIST_COPY.formAccess}
-                </AppText>
-                <View accessible style={styles.accessRow}>
-                  <Ionicons color={colors.textNeutral} name="lock-closed-outline" size={18} />
-                  <View style={styles.societyText}>
-                    <AppText color="neutral" variant="bodyLg">
-                      {PROFILE_SHORTLIST_COPY.formAccessValue}
-                    </AppText>
-                    <AppText color="neutralMuted" variant="meta">
-                      {PROFILE_SHORTLIST_COPY.formAccessHelper}
-                    </AppText>
-                  </View>
-                </View>
-              </View>
-
-              <AppText color="neutralSoft" variant="meta">
-                {`Nome fino a ${LIST_NAME_MAX_LENGTH} caratteri, descrizione fino a ${LIST_DESCRIPTION_MAX_LENGTH}.`}
-              </AppText>
-            </KeyboardAwareForm>
-
-            <View style={styles.footer}>
-              <Button
-                disabled={!submittable}
-                fullWidth
-                label={submitLabel}
-                loading={mutation.isPending}
-                onPress={submit}
-                size="lg"
-                testID="create-list-submit"
-                variant="primary"
-              />
             </View>
+          ) : null}
 
-            <ShortlistScopeSheet
-              onClose={() => setScopeOpen(false)}
-              onConfirm={(value) => {
-                setScope(value);
-                setScopeTouched(true);
-                setScopeOpen(false);
-                setErrors((prev) => ({ ...prev, scope: null }));
-              }}
-              options={options}
-              value={scope}
-              visible={scopeOpen}
-            />
+          {banner ? (
+            <AppText accessibilityLiveRegion="polite" color="danger" testID="create-list-banner" variant="bodySm">
+              {banner}
+            </AppText>
+          ) : null}
 
-            <ConfirmModal
-              cancelLabel={PROFILE_SHORTLIST_COPY.exitStay}
-              confirmLabel={PROFILE_SHORTLIST_COPY.exitLeave}
-              message={PROFILE_SHORTLIST_COPY.exitBody}
-              onCancel={() => setExitOpen(false)}
-              onConfirm={() => {
-                setExitOpen(false);
-                onClose();
-              }}
-              title={PROFILE_SHORTLIST_COPY.exitTitle}
-              visible={exitOpen}
-            />
-          </>
-        ) : (
-          <>
-            <ModalHeader onClose={onClose} title="Lista creata" />
-            <View style={styles.successContent}>
-              <Ionicons color={colors.textNeutral} name="checkmark-circle-outline" size={64} />
-              <AppText align="center" color="neutral" variant="headingSm">
-                Lista creata
+          <Input
+            accessibilityHint={shownErrors.name ?? undefined}
+            error={!!shownErrors.name}
+            helperText={shownErrors.name ?? undefined}
+            label={PROFILE_SHORTLIST_COPY.formName}
+            onChangeText={(value) => {
+              setName(value);
+              setErrors((prev) => ({ ...prev, name: null }));
+            }}
+            placeholder="Es. Osservati settembre"
+            testID="create-list-name"
+            value={name}
+          />
+          <Input
+            error={!!shownErrors.description}
+            helperText={shownErrors.description ?? undefined}
+            label={PROFILE_SHORTLIST_COPY.formDescription}
+            multiline
+            onChangeText={(value) => {
+              setDescription(value);
+              setErrors((prev) => ({ ...prev, description: null }));
+            }}
+            placeholder={PROFILE_SHORTLIST_COPY.formDescriptionPlaceholder}
+            testID="create-list-description"
+            value={description}
+          />
+
+          <View style={styles.group}>
+            <AppText color="neutral" variant="metaStrong">
+              {PROFILE_SHORTLIST_COPY.formScope}
+            </AppText>
+            <Pressable
+              accessibilityHint={shownErrors.scope ?? undefined}
+              accessibilityLabel={`${PROFILE_SHORTLIST_COPY.formScope}: ${
+                selectedOption?.label ?? PROFILE_SHORTLIST_COPY.formScopePlaceholder
+              }`}
+              accessibilityRole="button"
+              disabled={options.length === 0}
+              onPress={() => setScopeOpen(true)}
+              style={[styles.selectRow, shownErrors.scope ? styles.selectRowError : null]}
+              testID="create-list-scope"
+            >
+              <AppText
+                color={selectedOption ? "neutral" : "neutralMuted"}
+                style={styles.selectValue}
+                variant="bodyLg"
+              >
+                {selectedOption?.label ?? PROFILE_SHORTLIST_COPY.formScopePlaceholder}
               </AppText>
-              <AppText align="center" color="neutral" variant="titleMd">
-                {created?.name ?? name.trim()}
+              <Ionicons color={colors.textNeutralSoft} name="chevron-forward" size={18} />
+            </Pressable>
+            {shownErrors.scope ? (
+              <AppText color="danger" variant="meta">
+                {shownErrors.scope}
               </AppText>
-              <View style={styles.summaryCard}>
-                <View style={styles.summaryRow}>
-                  <AppText color="neutralMuted" variant="bodySm">
-                    {PROFILE_SHORTLIST_COPY.formScope}
-                  </AppText>
-                  <AppText color="neutral" variant="bodySm">
-                    {created?.scopeLabel ?? selectedOption?.label ?? ""}
-                  </AppText>
-                </View>
-                <Divider spacing={8} />
-                <View style={styles.summaryRow}>
-                  <AppText color="neutralMuted" variant="bodySm">
-                    {PROFILE_SHORTLIST_COPY.formAccess}
-                  </AppText>
-                  <View style={styles.lockRow}>
-                    <Ionicons color={colors.textNeutralMuted} name="lock-closed-outline" size={14} />
-                    <AppText color="neutral" variant="bodySm">
-                      {PROFILE_SHORTLIST_COPY.formAccessValue}
-                    </AppText>
-                  </View>
-                </View>
-              </View>
-              <Button
-                fullWidth
-                label="Aggiungi profili"
-                onPress={() => {
-                  onClose();
-                  if (created) {
-                    router.push(`/shortlist/${created.shortlistId}` as never);
-                  }
-                }}
-                variant="primary"
-              />
-              <Button fullWidth label="Torna a Shortlist" onPress={onClose} variant="link" />
-            </View>
-          </>
-        )}
+            ) : null}
+          </View>
+
+          {/* DAS-REV-27 §10, §11: accesso operativo, stessi campi di Gestisci
+              accesso. Le persone dipendono dall'ambito scelto. */}
+          <ShortlistAccessFields
+            actorId={actorId}
+            choice={access}
+            clubId={clubId}
+            disabled={mutation.isPending}
+            error={accessInline ?? accessError}
+            onChoice={(next) => {
+              setAccess(next);
+              setAccessError(null);
+            }}
+            onSelected={(ids) => {
+              setShares(ids);
+              setAccessError(null);
+            }}
+            selected={shares}
+            shortlistId={null}
+            teamId={selectedOption ? selectedOption.teamId : undefined}
+          />
+
+          <AppText color="neutralSoft" variant="meta">
+            {`Nome fino a ${LIST_NAME_MAX_LENGTH} caratteri, descrizione fino a ${LIST_DESCRIPTION_MAX_LENGTH}.`}
+          </AppText>
+        </KeyboardAwareForm>
+
+        <View style={styles.footer}>
+          <Button
+            disabled={!submittable}
+            fullWidth
+            label={submitLabel}
+            loading={mutation.isPending}
+            onPress={submit}
+            size="lg"
+            testID="create-list-submit"
+            variant="primary"
+          />
+        </View>
+
+        <ShortlistScopeSheet
+          onClose={() => setScopeOpen(false)}
+          onConfirm={(value) => {
+            setScope(value);
+            setScopeTouched(true);
+            setScopeOpen(false);
+            setErrors((prev) => ({ ...prev, scope: null }));
+          }}
+          options={options}
+          value={scope}
+          visible={scopeOpen}
+        />
+
+        <ConfirmModal
+          cancelLabel={PROFILE_SHORTLIST_COPY.exitStay}
+          confirmLabel={PROFILE_SHORTLIST_COPY.exitLeave}
+          message={PROFILE_SHORTLIST_COPY.exitBody}
+          onCancel={() => setExitOpen(false)}
+          onConfirm={() => {
+            setExitOpen(false);
+            onClose();
+          }}
+          title={PROFILE_SHORTLIST_COPY.exitTitle}
+          visible={exitOpen}
+        />
       </SafeAreaView>
     </Modal>
   );
@@ -517,7 +535,7 @@ export function CreateListModal({
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     flex: 1,
   },
   header: {
@@ -547,10 +565,13 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing[4],
   },
-  logo: {
-    borderRadius: 6,
-    height: 28,
-    width: 28,
+  societyName: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[6],
+  },
+  strong: {
+    fontWeight: "600",
   },
   group: {
     gap: spacing[8],
@@ -570,42 +591,11 @@ const styles = StyleSheet.create({
   selectValue: {
     flex: 1,
   },
-  accessRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[12],
-  },
   footer: {
     borderTopColor: colors.border,
     borderTopWidth: 1,
     paddingHorizontal: spacing[20],
     paddingVertical: spacing[12],
-  },
-  lockRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[6],
-  },
-  successContent: {
-    alignItems: "center",
-    flex: 1,
-    gap: spacing[16],
-    paddingHorizontal: spacing[24],
-    paddingTop: spacing[24],
-  },
-  summaryCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: spacing[8],
-    padding: spacing[16],
-    width: "100%",
-  },
-  summaryRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
   },
 });
 

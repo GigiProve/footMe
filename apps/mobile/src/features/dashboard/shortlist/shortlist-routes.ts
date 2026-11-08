@@ -20,14 +20,19 @@ export const SHORTLIST_HREFS = {
   position: (positionId: string) =>
     `${CENTER}/position/${encodeURIComponent(positionId)}`,
   /**
-   * Dettaglio di una lista personalizzata.
-   *
-   * §25: «tap CUSTOM → dettaglio canonico già esistente». La schermata è
-   * quella di RET-07, montata anche qui perché §31 chiede che la bottom
-   * navigation resti visibile: la route fuori dalle tab la perdeva.
+   * Dettaglio di una lista personalizzata (DAS-REV-27 §9): `CustomShortlistScreen`,
+   * dentro la tab Dashboard perché la bottom navigation resti visibile.
    */
   customList: (shortlistId: string) =>
     `${CENTER}/list/${encodeURIComponent(shortlistId)}`,
+  /**
+   * DAS-REV-27 §19: recupero amministrativo. Superficie focalizzata fuori
+   * dalle tab (§4: «I form di creazione/modifica/accessi/riassegnazione sono
+   * focalizzati e non mostrano bottom navigation»), nello Stack `/shortlist`.
+   */
+  recoveryList: () => "/shortlist/recovery",
+  recovery: (shortlistId: string) =>
+    `/shortlist/recovery/${encodeURIComponent(shortlistId)}`,
   /**
    * Scheda interna «Profilo in shortlist» (DAS-REV-25 §15, screen 05).
    *

@@ -267,19 +267,24 @@ export async function addProfileToShortlist(input: {
  * sono parametri: li stampa il server.
  */
 export async function createCustomShortlist(input: {
+  /** DAS-REV-27 §10: Solo io di default, oppure condivisione esplicita. */
+  accessMode?: "owner_only" | "shared";
   clubId: string;
   description: string;
   idempotencyKey: string;
   name: string;
   personId: string | null;
+  shareIds?: string[];
   teamId: string | null;
 }): Promise<CustomCreateOutcome> {
   const { data, error } = await supabase.rpc("create_custom_shortlist", {
+    p_access_mode: input.accessMode ?? "owner_only",
     p_club_id: input.clubId,
     p_description: input.description,
     p_idempotency_key: input.idempotencyKey,
     p_name: input.name,
     p_person_id: input.personId,
+    p_share_ids: input.accessMode === "shared" ? input.shareIds ?? [] : [],
     p_team_id: input.teamId,
   });
 

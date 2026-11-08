@@ -74,6 +74,33 @@ export const SHORTLIST_QK = {
   /** §17: ambiti autorizzati del form CUSTOM, per ingresso. */
   scopeOptions: (actorId: string, clubId: string, withAdd: boolean) =>
     ["society-shortlist-scope-options", actorId, clubId, withAdd ? "add" : "create"] as const,
+  /**
+   * DAS-REV-27 §23: «Chiavi almeno account/actor, società operativa,
+   * lista/persona, revisione di accesso, filtri e cursore». Ogni lettura di
+   * governo porta l'actor: due utenti della stessa Società non condividono
+   * mai dettaglio, accessi o stella di una CUSTOM.
+   */
+  customDetail: (actorId: string, shortlistId: string) =>
+    ["society-shortlist-custom-detail", actorId, shortlistId] as const,
+  /** Read model owner-only di Gestisci accesso (§13). */
+  customAccess: (actorId: string, shortlistId: string) =>
+    ["society-shortlist-custom-access", actorId, shortlistId] as const,
+  /** Persone eleggibili: per lista esistente o per il draft di creazione con il suo ambito (§11). */
+  shareCandidates: (actorId: string, clubId: string, shortlistId: string | null, teamId: string | null) =>
+    ["society-shortlist-share-candidates", actorId, clubId, shortlistId ?? "draft", teamId ?? "society"] as const,
+  /** Anteprima d'impatto del cambio ambito (§14). */
+  scopePreview: (actorId: string, shortlistId: string, teamId: string | null) =>
+    ["society-shortlist-scope-preview", actorId, shortlistId, teamId ?? "society"] as const,
+  /** Capability di recupero per il menu del Centro (§19). */
+  governanceCaps: (actorId: string, clubId: string) =>
+    ["society-shortlist-governance-caps", actorId, clubId] as const,
+  /** Liste da recuperare, metadati minimi (§19). */
+  recoverable: (actorId: string, clubId: string) =>
+    ["society-shortlist-recoverable", actorId, clubId] as const,
+  recovery: (actorId: string, shortlistId: string) =>
+    ["society-shortlist-recovery", actorId, shortlistId] as const,
+  ownerCandidates: (actorId: string, shortlistId: string) =>
+    ["society-shortlist-owner-candidates", actorId, shortlistId] as const,
 } as const;
 
 /**
@@ -94,6 +121,14 @@ export const SHORTLIST_QK_PREFIXES = [
   "society-shortlist-profile-memberships",
   "society-shortlist-profile-destinations",
   "society-shortlist-scope-options",
+  "society-shortlist-custom-detail",
+  "society-shortlist-custom-access",
+  "society-shortlist-share-candidates",
+  "society-shortlist-scope-preview",
+  "society-shortlist-governance-caps",
+  "society-shortlist-recoverable",
+  "society-shortlist-recovery",
+  "society-shortlist-owner-candidates",
 ] as const;
 
 /**

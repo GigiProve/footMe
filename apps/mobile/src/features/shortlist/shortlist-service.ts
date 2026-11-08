@@ -90,63 +90,11 @@ export async function fetchClubShortlists(
   return (data ?? []) as ClubShortlist[];
 }
 
-export async function createShortlist(
-  clubId: string,
-  createdByProfileId: string,
-  /**
-   * DAS-REV-24 §22: `teamId` è il perimetro reale; `null` significa
-   * «intera Società». La colonna `scope` resta al suo default per i lettori
-   * precedenti e non viene più scelta dall'utente (§26: le righe storiche
-   * conservano la loro etichetta, le nuove la derivano dalla squadra).
-   */
-  input: { name: string; description?: string; teamId: string | null },
-): Promise<string> {
-  const { data, error } = await supabase
-    .from("club_shortlists")
-    .insert({
-      club_id: clubId,
-      created_by_profile_id: createdByProfileId,
-      description: input.description?.trim() || null,
-      /* §23: «Il client non può aggiungere in payload campi protetti come
-         … tipo POSITION in una creazione CUSTOM.» La RLS lo rifiuterebbe
-         comunque; qui il tipo non viene nemmeno inviato. */
-      name: input.name.trim(),
-      team_id: input.teamId,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data.id as string;
-}
-
-export async function updateShortlist(
-  shortlistId: string,
-  patch: { name?: string; description?: string | null; team_id?: string | null },
-): Promise<void> {
-  const { error } = await supabase
-    .from("club_shortlists")
-    .update(patch)
-    .eq("id", shortlistId);
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function deleteShortlist(shortlistId: string): Promise<void> {
-  const { error } = await supabase
-    .from("club_shortlists")
-    .delete()
-    .eq("id", shortlistId);
-
-  if (error) {
-    throw error;
-  }
-}
+/* DAS-REV-27 §3: creazione, modifica ed eliminazione delle CUSTOM passano
+   soltanto dai comandi del server (`create_custom_shortlist`,
+   `update_custom_shortlist`, `delete_custom_shortlist`). Le scritture
+   PostgREST dirette che vivevano qui non hanno più una policy che le
+   autorizzi e sono state rimosse. */
 
 export async function fetchShortlistEntries(
   shortlistId: string,
