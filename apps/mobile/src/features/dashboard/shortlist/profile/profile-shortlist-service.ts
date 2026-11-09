@@ -233,6 +233,13 @@ export async function addProfileToShortlist(input: {
   clubId: string;
   idempotencyKey: string;
   personId: string;
+  /**
+   * DAS-REV-31 §11: l'evento del percorso partecipanti → profilo. È un
+   * contesto da validare, non un'origine dichiarata: enum, snapshot e
+   * autore li stampa il server, che rifiuta con
+   * SHORTLIST_EVENT_SOURCE_UNAVAILABLE invece di ricadere su PROFILE.
+   */
+  sourceEventId?: string | null;
   target: { positionId: string } | { shortlistId: string };
 }): Promise<ProfileAddOutcome> {
   const { data, error } = await supabase.rpc("add_profile_to_shortlist", {
@@ -241,6 +248,7 @@ export async function addProfileToShortlist(input: {
     p_person_id: input.personId,
     p_position_id: "positionId" in input.target ? input.target.positionId : null,
     p_shortlist_id: "shortlistId" in input.target ? input.target.shortlistId : null,
+    p_source_event_id: input.sourceEventId ?? null,
   });
 
   if (error) {
@@ -275,6 +283,8 @@ export async function createCustomShortlist(input: {
   name: string;
   personId: string | null;
   shareIds?: string[];
+  /** DAS-REV-31 §9: con `personId`, la entry iniziale nasce EVENT. */
+  sourceEventId?: string | null;
   teamId: string | null;
 }): Promise<CustomCreateOutcome> {
   const { data, error } = await supabase.rpc("create_custom_shortlist", {
@@ -285,6 +295,8 @@ export async function createCustomShortlist(input: {
     p_name: input.name,
     p_person_id: input.personId,
     p_share_ids: input.accessMode === "shared" ? input.shareIds ?? [] : [],
+    /* Senza persona non c'è entry iniziale, quindi nessuna provenienza. */
+    p_source_event_id: input.personId ? input.sourceEventId ?? null : null,
     p_team_id: input.teamId,
   });
 

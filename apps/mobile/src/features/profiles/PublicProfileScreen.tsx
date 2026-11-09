@@ -78,6 +78,10 @@ import {
 } from "../saved/saved-service";
 import { DashboardContext } from "../dashboard/identity/DashboardIdentityProvider";
 import { ProfileShortlistFlow } from "../dashboard/shortlist/profile/ProfileShortlistFlow";
+import {
+  eventSourceFromRoute,
+  type EventProfileParams,
+} from "../dashboard/shortlist/profile/profile-shortlist-presentation";
 import { starPresentation } from "../dashboard/shortlist/profile/profile-shortlist-presentation";
 import { fetchProfileShortlistState } from "../dashboard/shortlist/profile/profile-shortlist-service";
 import { SHORTLIST_QK } from "../dashboard/shortlist/shortlist-keys";
@@ -91,11 +95,13 @@ const noop = () => undefined;
 
 export function PublicProfileScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    id?: string | string[];
-    /** REV-PROF-19: deep link a una tab del Master Profile Tifoso. */
-    tab?: string | string[];
-  }>();
+  const params = useLocalSearchParams<
+    {
+      id?: string | string[];
+      /** REV-PROF-19: deep link a una tab del Master Profile Tifoso. */
+      tab?: string | string[];
+    } & EventProfileParams
+  >();
   const { isLoading: isSessionLoading, needsOnboarding, profile: viewerProfile, session } = useSession();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -156,6 +162,20 @@ export function PublicProfileScreen() {
   const operatingSociety =
     dashboardContext?.current?.kind === "society" ? dashboardContext.current : null;
   const actorId = viewerProfile?.id ?? currentUserId ?? "";
+
+  /* DAS-REV-31 §8: il contesto evento esiste solo se questa istanza della
+     route arriva dal centro partecipanti per **questa** persona e per la
+     Società operativa corrente. Entrare dal Cerca o aprire un'altra persona
+     crea un'istanza senza parametri; nessuno stato globale «lastEvent».
+     Un rifiuto del server lo spegne per il resto della visita (§11). */
+  const [eventSourceClosed, setEventSourceClosed] = useState(false);
+  const routeEventSource = eventSourceFromRoute({
+    params,
+    routePersonId: profileId ?? null,
+    societyId: operatingSociety?.id ?? null,
+    viewedPersonId: viewedProfileId,
+  });
+  const shortlistSourceEventId = eventSourceClosed ? null : routeEventSource;
 
   /* §26: chiave con actor, Società e persona — mai una stella globale per
      person_id. Loading ed errore non diventano ☆: `starPresentation` vede
@@ -821,6 +841,7 @@ export function PublicProfileScreen() {
           actorId={actorId}
           initialStep={shortlistFlow.initialStep}
           onClose={() => setShortlistFlow((prev) => ({ ...prev, open: false }))}
+          onEventSourceUnavailable={() => setEventSourceClosed(true)}
           open={shortlistFlow.open}
           person={{
             avatarUrl: completeProfile?.profile.avatar_url ?? null,
@@ -833,6 +854,7 @@ export function PublicProfileScreen() {
             logoUrl: operatingSociety.avatarUrl,
             name: operatingSociety.name,
           }}
+          sourceEventId={shortlistSourceEventId}
         />
       ) : null}
     </SafeAreaView>

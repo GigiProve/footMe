@@ -187,7 +187,11 @@ describe("destinatario dell'invito (§18, screen 07-09)", () => {
 
     expect(view.action).toBeNull();
     expect(view.secondaryAction).toBeNull();
-    expect(view.eventNotice?.title).toBe(DETAIL_COPY.completedTitle);
+    /* DAS-REV-31 §19, screen 12: lo stato dell'evento è la pillola sopra il
+       titolo; nessun «Sei stato invitato» né messaggio d'invito come attuali. */
+    expect(view.status).toBeNull();
+    expect(view.message).toBeNull();
+    expect(view.helper).toBeNull();
   });
 });
 
@@ -258,6 +262,21 @@ describe("Società (§8, screen 01)", () => {
 
     expect(actions.shareIsPrimary).toBe(true);
     expect(actions.inviteFullNotice).toBeNull();
+  });
+
+  it("DAS-REV-31 §15: evento iniziato, Condividi non è più la CTA primaria", () => {
+    const actions = societyActions(
+      mapDetail(
+        raw({}, {
+          lifecycle: { status: "published", is_started: true, completion_due_at: null, completed_at: null, cancelled_at: null },
+          management: management({ can_invite: false }),
+        }),
+      ),
+      "https://x/event/abc",
+    );
+
+    expect(actions.shareIsPrimary).toBe(false);
+    expect(actions.canShare).toBe(true);
   });
 
   it("pieno: nessun nuovo invito, spiegazione sobria", () => {

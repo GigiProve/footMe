@@ -32,15 +32,33 @@ export type ClubInviteLink = {
 };
 
 export type AppNotification = {
+  /**
+   * DAS-REV-31 §23–§24: chiave logica del gruppo (destinatario + Società +
+   * evento + tipo + finestra), null per le righe non aggregate.
+   */
+  aggregate_key: string | null;
   body: string | null;
   category?: string;
   created_at: string;
+  /**
+   * Payload jsonb. I valori sono per lo più stringhe; le notifiche
+   * aggregate della 31 portano anche numeri e `preview_names: string[]`,
+   * letti con i parser difensivi di `notifications-helpers`.
+   */
   data: Record<string, string>;
   id: string;
   is_read: boolean;
   recipient_profile_id: string;
+  /**
+   * DAS-REV-31 §24: cresce a ogni nuova risposta nel gruppo. `mark read`
+   * cita la revisione vista, così una risposta arrivata nel frattempo non
+   * viene marcata letta per errore.
+   */
+  revision: number;
   title: string;
   type: string;
+  /** DAS-REV-31: ultimo aggiornamento della riga (= created_at se non aggregata). */
+  updated_at: string;
 };
 
 export type ProfileSuggestion = {

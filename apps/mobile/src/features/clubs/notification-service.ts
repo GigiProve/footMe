@@ -8,10 +8,13 @@ export async function fetchNotifications(
   const { data, error } = await supabase
     .from("notifications")
     .select(
-      "id, recipient_profile_id, type, title, body, data, is_read, created_at, category",
+      "id, recipient_profile_id, type, title, body, data, is_read, created_at, updated_at, category, revision, aggregate_key",
     )
     .eq("recipient_profile_id", profileId)
-    .order("created_at", { ascending: false })
+    /* DAS-REV-31 §23: un gruppo aggiornato risale in cima. A parità di
+       istante l'id rende l'ordine stabile fra due letture. */
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit);
 
   if (error) {
@@ -21,19 +24,33 @@ export async function fetchNotifications(
   return (data ?? []) as AppNotification[];
 }
 
-export async function markNotificationRead(notificationId: string) {
-  const { error } = await supabase
-    .from("notifications")
-    .update({ is_read: true })
-    .eq("id", notificationId);
+/**
+ * DAS-REV-31 §24: marca letta la revisione **vista**. Restituisce false se
+ * nel frattempo il gruppo ha ricevuto una nuova risposta: la riga resta non
+ * letta e il chiamante rilegge il Centro.
+ */
+export async function markNotificationRead(
+  notificationId: string,
+  revision: number | null = null,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("mark_notification_read", {
+    p_notification_id: notificationId,
+    p_revision: revision,
+  });
 
   if (error) {
     throw error;
   }
+
+  return data === true;
 }
 
-export async function markAllNotificationsRead(): Promise<number> {
-  const { data, error } = await supabase.rpc("mark_all_notifications_read");
+/**
+ * DAS-REV-31 §24: `asOf` è l'aggiornamento più recente che il Centro ha
+ * mostrato. Un gruppo che riceve una risposta dopo resta non letto.
+ */
+export async function markAllNotificationsRead(asOf: string | null = null): Promise<number> {
+  const { data, error } = await supabase.rpc("mark_all_notifications_read", { p_as_of: asOf });
 
   if (error) {
     throw error;

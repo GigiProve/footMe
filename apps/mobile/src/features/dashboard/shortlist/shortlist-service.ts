@@ -31,6 +31,7 @@ import {
   type ShortlistPositionRow,
   type ShortlistPriority,
   type ShortlistRemoveOutcome,
+  type ShortlistSourceEvent,
 } from "./shortlist-types";
 
 type RawRecord = Record<string, unknown>;
@@ -87,7 +88,37 @@ function priority(value: unknown): ShortlistPriority | null {
 }
 
 function createdSource(value: unknown): ShortlistCreatedSource {
-  return value === "profile" || value === "application" ? value : "unknown";
+  return value === "profile" || value === "application" || value === "event"
+    ? value
+    : "unknown";
+}
+
+/**
+ * Snapshot dell'evento d'origine (DAS-REV-31 §10, §12).
+ *
+ * Senza titolo non c'è niente di storico da mostrare: la entry torna a
+ * comportarsi come un'origine senza metadato, invece di inventare un evento.
+ * `event_id` si legge così com'è — il server lo valorizza solo quando oggi
+ * l'actor può aprire il dettaglio, e il client non lo ricostruisce mai.
+ */
+export function sourceEvent(value: unknown): ShortlistSourceEvent | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const row = value as RawRecord;
+  const title = nullableText(row.title);
+
+  if (!title) {
+    return null;
+  }
+
+  return {
+    date: nullableText(row.date),
+    eventId: nullableText(row.event_id),
+    timezone: nullableText(row.timezone),
+    title,
+  };
 }
 
 /**
@@ -110,6 +141,13 @@ export function classifyShortlistError(error: unknown): ShortlistError {
 
   if (message.includes("APPLICATION_WITHDRAWN")) {
     return new ShortlistError("withdrawn", message);
+  }
+
+  /* DAS-REV-31 §11: «Se il contesto EVENT non è più autorizzato, non
+     trasformare silenziosamente il comando in PROFILE.» Un rifiuto proprio,
+     prima dei controlli generici su NOT_AVAILABLE. */
+  if (message.includes("SHORTLIST_EVENT_SOURCE_UNAVAILABLE")) {
+    return new ShortlistError("eventSourceUnavailable", message);
   }
 
   if (message.includes("REVISION_STALE") || message.includes("OPERATION_CONTENT_CHANGED")) {
@@ -533,6 +571,7 @@ export async function fetchShortlistEntry(
     scopeLabel: nullableText(row.scope_label),
     shortlistId: text(row.shortlist_id),
     situation: nullableText(row.situation),
+    sourceEvent: sourceEvent(row.source_event),
   };
 }
 

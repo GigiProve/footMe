@@ -271,24 +271,57 @@ describe("precedenza dello stato personale (§20)", () => {
     expect(view.message).toBeNull();
   });
 
-  it("evento annullato dominante, storico senza azioni (QA-105)", () => {
+  /* DAS-REV-31 §19, screen 12: lo stato dell'evento sta nella pillola sopra
+     il titolo (lifecyclePill); la vista personale non promette più
+     «Partecipazione confermata» e mostra solo il messaggio della Società. */
+  it("evento annullato dominante, nessuna azione né stato personale come promessa (QA-105)", () => {
     const view = personalView(
       detail(
         { status: "cancelled" },
         { lifecycle: "cancelled", public_state: "cancelled" },
-        { participation: participation({ status: "confirmed" }), capabilities: { withdraw: false } },
+        {
+          participation: participation({ status: "confirmed" }),
+          capabilities: { withdraw: false },
+          event_status: "cancelled",
+          cancellation_message: "L’evento è annullato per indisponibilità della struttura.",
+        },
       ),
     );
 
-    expect(view.eventNotice?.title).toBe(DETAIL_COPY.cancelledTitle);
-    expect(view.status?.title).toBe(DETAIL_COPY.confirmedTitle);
+    expect(view.status).toBeNull();
+    expect(view.eventNotice).toBeNull();
+    expect(view.action).toBeNull();
+    expect(view.secondaryAction).toBeNull();
+    expect(view.message).toEqual({
+      body: "L’evento è annullato per indisponibilità della struttura.",
+      title: "Messaggio di AC Como",
+    });
+  });
+
+  it("annullato senza messaggio: nessun blocco vuoto; un vecchio messaggio di invito non riaffiora", () => {
+    const view = personalView(
+      detail(
+        { status: "cancelled" },
+        { lifecycle: "cancelled", public_state: "cancelled" },
+        { participation: participation({ status: "invited", invitation_message: "Ti aspettiamo" }) },
+      ),
+    );
+
+    expect(view.message).toBeNull();
     expect(view.action).toBeNull();
   });
 
   it("evento concluso dominante (QA-106)", () => {
-    const view = personalView(detail({ status: "completed" }, { public_state: "completed" }));
+    const view = personalView(
+      detail(
+        { status: "completed" },
+        { public_state: "completed" },
+        { participation: participation({ status: "confirmed" }), cancellation_message: "ignorato" },
+      ),
+    );
 
-    expect(view.eventNotice?.title).toBe(DETAIL_COPY.completedTitle);
+    expect(view.status).toBeNull();
+    expect(view.message).toBeNull();
     expect(view.action).toBeNull();
   });
 });

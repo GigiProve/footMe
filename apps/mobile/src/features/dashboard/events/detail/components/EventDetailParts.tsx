@@ -22,13 +22,19 @@ import type { Notice } from "../event-detail-presentation";
 export function EventClubBar({
   isVerified,
   logoUrl,
+  menuLabel,
   name,
   onBack,
+  onMenu,
 }: {
   isVerified: boolean;
   logoUrl: string | null;
+  /** DAS-REV-31 §17–§18: etichetta accessibile del menu «Gestisci evento». */
+  menuLabel?: string;
   name: string;
   onBack?: () => void;
+  /** DAS-REV-31 screen 07–08: presente solo con almeno un'azione autorizzata. */
+  onMenu?: () => void;
 }) {
   return (
     <View style={styles.bar}>
@@ -64,6 +70,35 @@ export function EventClubBar({
           size={16}
         />
       ) : null}
+
+      {onMenu ? (
+        <Pressable
+          accessibilityLabel={menuLabel}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onMenu}
+          style={({ pressed }) => [styles.menu, pressed ? styles.pressed : null]}
+          testID="event-manage-menu"
+        >
+          <Ionicons color={colors.textNeutral} name="ellipsis-horizontal" size={22} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * DAS-REV-31 §5, §15, §19: stato testuale sobrio («Evento iniziato», «Evento
+ * concluso», «Evento annullato»). Pillola neutra: nessun verde per il
+ * concluso, nessun rosso per l'annullato, che non è un errore.
+ */
+export function EventStatusPill({ label, testID }: { label: string; testID?: string }) {
+  return (
+    <View accessible accessibilityLabel={label} accessibilityRole="text" style={styles.pill} testID={testID}>
+      <Ionicons color={colors.textNeutral} name="information-circle-outline" size={16} />
+      <AppText color="neutral" variant="meta">
+        {label}
+      </AppText>
     </View>
   );
 }
@@ -248,6 +283,24 @@ const styles = StyleSheet.create({
   infoBody: {
     flex: 1,
     gap: spacing[4],
+  },
+  menu: {
+    alignItems: "center",
+    height: sizes.touchTarget,
+    justifyContent: "center",
+    marginLeft: "auto",
+    marginRight: -spacing[12],
+    width: sizes.touchTarget,
+  },
+  pill: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: colors.surfaceNeutral,
+    borderRadius: radius.full,
+    flexDirection: "row",
+    gap: spacing[6],
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[6],
   },
   infoIcon: {
     marginTop: 1,

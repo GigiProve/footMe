@@ -20,10 +20,19 @@ import { DETAIL_COPY, participantsSummaryRows } from "../event-detail-presentati
 import type { ParticipantsSummary as Summary } from "../event-detail-types";
 
 export function ParticipantsSummary({
+  footnote = null,
+  manageLabel = DETAIL_COPY.manageParticipants,
   onManage,
   onOpen,
   summary,
 }: {
+  /**
+   * DAS-REV-31 §19, screen 10: nello storico i tre count restano gli stessi
+   * (non diventano presenti/assenti); la CTA diventa «Visualizza
+   * partecipanti» con la nota sullo storico.
+   */
+  footnote?: string | null;
+  manageLabel?: string;
   onManage: () => void;
   onOpen: (filter: "confirmed" | "pending" | "invited") => void;
   summary: Summary;
@@ -56,12 +65,18 @@ export function ParticipantsSummary({
 
       <Button
         fullWidth
-        label={DETAIL_COPY.manageParticipants}
+        label={manageLabel}
         onPress={onManage}
         size="lg"
         testID="event-manage-participants"
         variant="secondary"
       />
+
+      {footnote ? (
+        <AppText color="neutralMuted" testID="event-participants-footnote" variant="meta">
+          {footnote}
+        </AppText>
+      ) : null}
     </View>
   );
 }

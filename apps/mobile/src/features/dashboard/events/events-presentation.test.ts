@@ -13,6 +13,7 @@ import {
   eventRowLines,
   formatCivilDate,
   historyCountsLabel,
+  historyStatusLine,
   uniqueRows,
   upcomingCountsLabel,
   type SectionState,
@@ -62,14 +63,26 @@ describe("conteggi (§11)", () => {
     expect(upcomingCountsLabel(row({ confirmedCount: null, countsAvailable: false }))).toBeNull();
   });
 
-  it("QA-018: storico concluso con partecipanti finali, annullato senza conteggio", () => {
+  it("QA-018 + DAS-REV-31 screen 15: storico concluso con i confermati finali, annullato senza conteggio", () => {
     expect(historyCountsLabel(row({ confirmedCount: 47, status: "completed" }))).toBe(
-      "47 partecipanti",
+      "47 confermati",
     );
     expect(historyCountsLabel(row({ confirmedCount: 1, status: "completed" }))).toBe(
-      "1 partecipante",
+      "1 confermato",
     );
     expect(historyCountsLabel(row({ confirmedCount: 0, status: "cancelled" }))).toBeNull();
+  });
+
+  it("DAS-REV-31 screen 15: una riga «Concluso · 32 confermati» / «Annullato»", () => {
+    expect(historyStatusLine(row({ confirmedCount: 32, status: "completed" }))).toBe(
+      "Concluso · 32 confermati",
+    );
+    expect(historyStatusLine(row({ status: "cancelled" }))).toBe("Annullato");
+    /* §11: count ignoto non diventa «0 confermati». */
+    expect(
+      historyStatusLine(row({ confirmedCount: null, countsAvailable: false, status: "completed" })),
+    ).toBe("Concluso");
+    expect(historyStatusLine(row({ status: "published" }))).toBeNull();
   });
 });
 
@@ -112,9 +125,10 @@ describe("righe per sezione (§11)", () => {
   it("QA-019: storico con stato testuale e anno", () => {
     const lines = eventRowLines(row({ startDate: "2026-07-10", status: "cancelled" }), "history");
 
-    expect(lines.status).toBe("Annullato");
+    /* DAS-REV-31 screen 15: lo stato sta nella riga sotto la data. */
+    expect(lines.status).toBeNull();
     expect(lines.when).toBe("10 luglio 2026");
-    expect(lines.counts).toBeNull();
+    expect(lines.counts).toBe("Annullato");
   });
 });
 

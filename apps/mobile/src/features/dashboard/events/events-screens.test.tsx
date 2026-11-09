@@ -68,6 +68,19 @@ vi.mock("./events-service", async (importOriginal) => {
   return { ...actual, ...serviceMocks };
 });
 
+/* DAS-REV-31 §17: il wizard legge `can_delete_draft` dal dettaglio canonico
+   ed elimina con il comando dedicato. */
+const detailMocks = vi.hoisted(() => ({
+  deleteSelectionEventDraft: vi.fn(),
+  fetchSelectionEventDetail: vi.fn(),
+}));
+
+vi.mock("./detail/event-detail-service", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+
+  return { ...actual, ...detailMocks };
+});
+
 const LIMITS = {
   birthYearMax: 2026,
   birthYearMin: 1900,
@@ -178,6 +191,7 @@ beforeEach(() => {
   serviceMocks.fetchSelectionEventTeams.mockResolvedValue([
     { canCreate: true, canEdit: true, contextLabel: null, id: "t-prim", name: "Primavera" },
   ]);
+  detailMocks.fetchSelectionEventDetail.mockResolvedValue({ management: { canDeleteDraft: false } });
 });
 
 afterEach(() => {
@@ -202,8 +216,8 @@ describe("Centro (screen 01, 02, 03, 15, 16)", () => {
 
     expect(content).toContain("32 / 50 confermati · 8 in attesa");
     expect(content).toContain("Posti esauriti");
-    expect(content).toContain("47 partecipanti");
-    expect(content).toContain("Concluso");
+    /* DAS-REV-31 screen 15. */
+    expect(content).toContain("Concluso · 47 confermati");
     expect(content.some((text) => /0 in attesa/.test(text) && !/8 in attesa/.test(text))).toBe(false);
   });
 
@@ -359,6 +373,45 @@ describe("wizard (screen 04–12)", () => {
     expect(calls[0]).toMatchObject({ eventId: null, expectedVersion: null });
     expect(calls[1]).toMatchObject({ eventId: "e4", expectedVersion: 3 });
     expect(Object.keys(calls[1].patch)).not.toContain("team_id");
+  });
+
+  it("DAS-REV-31 §17: «Elimina bozza» solo con can_delete_draft", async () => {
+    routerMocks.params = { eventId: "e4" };
+    serviceMocks.fetchSelectionEventEditor.mockResolvedValue(editor());
+    const without = await render(<EventComposeScreen />);
+
+    expect(detailMocks.fetchSelectionEventDetail).toHaveBeenCalledWith({ eventId: "e4" });
+    expect(hasTestID(without, "event-delete-draft")).toBe(false);
+
+    detailMocks.fetchSelectionEventDetail.mockResolvedValue({ management: { canDeleteDraft: true } });
+    const allowed = await render(<EventComposeScreen />);
+
+    expect(hasTestID(allowed, "event-delete-draft")).toBe(true);
+  });
+
+  it("DAS-REV-31 screen 19: conferma, comando con chiave e ritorno al Centro", async () => {
+    routerMocks.params = { eventId: "e4" };
+    serviceMocks.fetchSelectionEventEditor.mockResolvedValue(editor());
+    detailMocks.fetchSelectionEventDetail.mockResolvedValue({ management: { canDeleteDraft: true } });
+    detailMocks.deleteSelectionEventDraft.mockResolvedValue({
+      eventId: "e4",
+      outcome: "deleted",
+      replayed: false,
+      status: null,
+    });
+    const tree = await render(<EventComposeScreen />);
+
+    await act(async () => byTestID(tree, "event-delete-draft").props.onPress());
+    expect(texts(tree)).toContain("Eliminare la bozza?");
+    expect(texts(tree)).toContain("Questa bozza verrà eliminata definitivamente.");
+
+    await act(async () => byTestID(tree, "event-delete-draft-sheet-confirm").props.onPress());
+    await flush();
+
+    expect(detailMocks.deleteSelectionEventDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ eventId: "e4", idempotencyKey: expect.any(String) }),
+    );
+    expect(routerMocks.back).toHaveBeenCalled();
   });
 
   it("QA-109: errore di pubblicazione conserva i dati e non dichiara successo", async () => {

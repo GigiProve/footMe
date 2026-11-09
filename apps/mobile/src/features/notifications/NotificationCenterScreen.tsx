@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Screen } from "../../components/ui/screen";
 import { useSession } from "../auth/use-session";
-import { SELECTION_EVENTS_HREFS } from "../dashboard/events/events-routes";
 import { ROLE_LINK_HREFS } from "../role-link/role-link-routes";
 import { colors, spacing } from "../../styles";
 import {
@@ -31,7 +30,10 @@ import {
   filterUnread,
   groupNotifications,
   groupNotificationsByTime,
+  isSelectionEventNotification,
+  latestUpdatedAt,
   NOTIFICATION_FILTERS,
+  selectionEventNotificationHref,
   type NotificationCategoryFilter,
 } from "./notifications-helpers";
 
@@ -53,9 +55,13 @@ export function NotificationCenterScreen() {
     enabled: !!profileId,
   });
 
+  /* DAS-REV-31 §24: si marca letta la revisione vista. Se il server
+     risponde false è arrivata una nuova risposta nel gruppo: si rilegge il
+     Centro, così la riga torna non letta con il conteggio aggiornato. */
   const markReadMutation = useMutation({
-    mutationFn: markNotificationRead,
-    onMutate: async (notificationId: string) => {
+    mutationFn: (item: Pick<AppNotification, "id" | "revision">) =>
+      markNotificationRead(item.id, item.revision ?? null),
+    onMutate: async (item) => {
       await queryClient.cancelQueries({ queryKey: ["notifications", profileId] });
       const previous = queryClient.getQueryData<AppNotification[]>([
         "notifications",
@@ -65,12 +71,17 @@ export function NotificationCenterScreen() {
         ["notifications", profileId],
         (old) =>
           (old ?? []).map((n) =>
-            n.id === notificationId ? { ...n, is_read: true } : n,
+            n.id === item.id ? { ...n, is_read: true } : n,
           ),
       );
       return { previous };
     },
-    onError: (_err, _id, context) => {
+    onSuccess: (marked) => {
+      if (!marked) {
+        queryClient.invalidateQueries({ queryKey: ["notifications", profileId] });
+      }
+    },
+    onError: (_err, _item, context) => {
       if (context?.previous) {
         queryClient.setQueryData(["notifications", profileId], context.previous);
       }
@@ -83,7 +94,7 @@ export function NotificationCenterScreen() {
   });
 
   const markAllReadMutation = useMutation({
-    mutationFn: markAllNotificationsRead,
+    mutationFn: (asOf: string | null) => markAllNotificationsRead(asOf),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications", profileId] });
       queryClient.invalidateQueries({
@@ -112,7 +123,7 @@ export function NotificationCenterScreen() {
 
   function handlePress(item: AppNotification) {
     if (!item.is_read) {
-      markReadMutation.mutate(item.id);
+      markReadMutation.mutate(item);
     }
 
     if (item.type === "content_tag") {
@@ -152,21 +163,15 @@ export function NotificationCenterScreen() {
       item.type === "application_status"
     ) {
       router.push("/(tabs)/announcements" as never);
-    } else if (
-      item.type === "selection_event_participation_confirmed" ||
-      item.type === "selection_event_participation_rejected" ||
-      /* DAS-REV-30 §18, §24, §25: invito ricevuto, ritirato, partecipazione
-         annullata. Stesso dettaglio, stato corrente; mai un'azione
-         automatica dalla notifica (§20). */
-      item.type === "selection_event_invitation_received" ||
-      item.type === "selection_event_invitation_revoked" ||
-      item.type === "selection_event_participation_removed"
-    ) {
+    } else if (isSelectionEventNotification(item)) {
       /* DAS-REV-29 §22: «Tap apre lo stesso evento con stato personale
-         corrente; non una chat.» Il dettaglio rilegge lo stato dal server. */
-      const eventId = item.data?.event_id;
-      if (typeof eventId === "string" && eventId) {
-        router.push(SELECTION_EVENTS_HREFS.detail(eventId) as never);
+         corrente; non una chat.» DAS-REV-30 §20: mai un'azione automatica
+         dalla notifica. DAS-REV-31 §25: le risposte aggregate aprono i
+         Partecipanti sul filtro del tipo, l'aggiornamento apre il dettaglio
+         con il banner. La destinazione rilegge stato e accesso dal server. */
+      const href = selectionEventNotificationHref(item);
+      if (href) {
+        router.push(href as never);
       }
     } else if (item.type === "society_invitation_created") {
       /* DAS-REV-19 §27: «La notifica apre lo stesso invitation_id. Il
@@ -241,7 +246,7 @@ export function NotificationCenterScreen() {
   }
 
   function handleMarkAllRead() {
-    markAllReadMutation.mutate();
+    markAllReadMutation.mutate(latestUpdatedAt(notifications));
   }
 
   function handleToggleUnreadOnly() {

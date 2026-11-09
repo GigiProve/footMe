@@ -21,14 +21,29 @@
  * Nessuna schermata di successo separata (§5): l'esito di un comando è lo
  * stato che il server restituisce, nello stesso dettaglio. Nessun optimistic
  * update (§23: «Non confermare posti optimistic senza commit affidabile»).
+ *
+ * DAS-REV-31 §15–§20 (screen 07–12, 18): menu «Gestisci evento» nella barra
+ * con le sole azioni lifecycle concesse dal server, conferme di conclusione
+ * e annullamento, pillola di stato sopra il titolo, storico in sola lettura
+ * con i count originali, messaggio di annullamento nella vista personale e
+ * banner «Informazioni aggiornate» quando si arriva dalla notifica.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import {
+  AppState,
+  InteractionManager,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, spacing } from "../../../../theme/tokens";
+import { colors, radius, spacing } from "../../../../theme/tokens";
 import { AppText, Button } from "../../../../ui";
 import { useToast } from "../../../../ui/Toast/ToastProvider";
 import { useSession } from "../../../auth/use-session";
@@ -43,9 +58,11 @@ import {
   EventFlyerImage,
   EventInfoRow,
   EventNoticeCard,
+  EventStatusPill,
   EventTextSection,
   EventUnavailableState,
 } from "./components/EventDetailParts";
+import { CancelEventSheet, CompleteEventSheet, ManageEventSheet } from "./components/EventLifecycleSheets";
 import { RegisterSheet, WithdrawSheet } from "./components/EventSheets";
 import { ParticipantsSummary } from "./components/ParticipantsSummary";
 import {
@@ -65,6 +82,8 @@ import {
   withdrawSheetCopy,
 } from "./event-detail-presentation";
 import {
+  cancelSelectionEvent,
+  completeSelectionEvent,
   fetchSelectionEventDetail,
   registerForSelectionEvent,
   respondToEventInvitation,
@@ -73,6 +92,20 @@ import {
 } from "./event-detail-service";
 import type { SelectionEventDetail } from "./event-detail-types";
 import { buildEventUrl, copyEventLink, shareEventLink } from "./event-link";
+import {
+  LIFECYCLE_COPY,
+  type ManageActionKind,
+  isTerminal,
+  lifecycleErrorCopy,
+  lifecycleOutcomeNotice,
+  lifecyclePill,
+  lifecycleSignature,
+  manageMenuActions,
+  normalizeCancellationMessage,
+  notOperationalCopy,
+  parseUpdatedParam,
+  showUpdatedBanner,
+} from "./event-lifecycle-presentation";
 
 /** §23: un confine temporale vicino aggiorna la disponibilità da solo. */
 const MAX_BOUNDARY_TIMER_MS = 6 * 60 * 60 * 1000;
@@ -85,8 +118,10 @@ export function SelectionEventDetailScreen() {
   const { profile } = useSession();
   const actorId = profile?.id ?? "";
   const { current } = useDashboardIdentity();
-  const params = useLocalSearchParams<{ eventId?: string }>();
+  const params = useLocalSearchParams<{ eventId?: string; updated?: string }>();
   const eventId = typeof params.eventId === "string" ? params.eventId : "";
+  /* DAS-REV-31 §20, screen 18: aperto dalla notifica di aggiornamento. */
+  const fromUpdate = parseUpdatedParam(params.updated);
 
   const detailQuery = useQuery({
     enabled: !!actorId && !!eventId,
@@ -206,6 +241,19 @@ export function SelectionEventDetailScreen() {
         setSheet("none");
       }
 
+      /* DAS-REV-31 §15: il motivo di NOT_OPERATIONAL si legge dallo stato
+         reale riletto, non dalla schermata che mostrava ancora la CTA. */
+      if (error instanceof SelectionEventsError && error.code === "SELECTION_EVENT_NOT_OPERATIONAL") {
+        invalidate();
+        const fresh = await refetchDetail();
+        showToast({
+          icon: "alert-circle-outline",
+          id: `event-${kind}-error`,
+          message: notOperationalCopy(fresh.data) ?? copy.message,
+        });
+        return;
+      }
+
       showToast({ icon: "alert-circle-outline", id: `event-${kind}-error`, message: copy.message });
 
       if (copy.refresh) {
@@ -268,6 +316,100 @@ export function SelectionEventDetailScreen() {
           }),
         )
       : undefined;
+
+  // ── Lifecycle della Società (DAS-REV-31 §17, §18) ────────────────────────
+  const [lifecycleSheet, setLifecycleSheet] = useState<"none" | "manage" | "complete" | "cancel">("none");
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  /* §18: «Il draft resta visibile in caso di errore»: il testo vive qui, non
+     nello sheet, e sopravvive a errori e chiusure fino al commit. */
+  const [cancelMessage, setCancelMessage] = useState("");
+  const pendingSheetRef = useRef<"complete" | "cancel" | null>(null);
+
+  const applyPendingSheet = () => {
+    const next = pendingSheetRef.current;
+
+    if (next) {
+      pendingSheetRef.current = null;
+      setLifecycleSheet(next);
+    }
+  };
+
+  const selectManageAction = (kind: ManageActionKind) => {
+    if (!detail) {
+      return;
+    }
+
+    if (kind === "edit") {
+      setLifecycleSheet("none");
+      router.push(SELECTION_EVENTS_HREFS.edit(detail.eventId) as never);
+
+      return;
+    }
+
+    /* Un modal alla volta, come AddToShortlistFlow: su iOS la conferma si
+       apre quando il menu ha finito di chiudersi (`onDismiss`). */
+    pendingSheetRef.current = kind;
+    setLifecycleSheet("none");
+
+    if (Platform.OS !== "ios") {
+      InteractionManager.runAfterInteractions(applyPendingSheet);
+    }
+  };
+
+  /**
+   * §17, §18, §28: la chiave è l'impronta dell'intento (evento, versione
+   * vista, messaggio): un retry dopo esito incerto riusa la stessa, un
+   * messaggio cambiato ne genera una nuova. Nessun cambio a schermo prima
+   * del commit; dopo, il dettaglio riletto mostra lo stato terminale.
+   */
+  const runLifecycle = async (kind: "complete" | "cancel") => {
+    if (!detail || lifecycleBusy) {
+      return;
+    }
+
+    const message = kind === "cancel" ? normalizeCancellationMessage(cancelMessage) : null;
+    const idempotencyKey = operationKeyOf(
+      nonce,
+      lifecycleSignature(kind, detail.eventId, detail.version, message),
+    );
+
+    setLifecycleBusy(true);
+
+    try {
+      const result =
+        kind === "complete"
+          ? await completeSelectionEvent({ eventId: detail.eventId, idempotencyKey })
+          : await cancelSelectionEvent({ eventId: detail.eventId, idempotencyKey, message });
+      const notice = lifecycleOutcomeNotice(kind, result);
+
+      setLifecycleSheet("none");
+      setCancelMessage("");
+
+      if (notice) {
+        showToast({ icon: "information-circle-outline", id: "event-lifecycle-outcome", message: notice });
+      }
+
+      invalidate();
+      await refetchDetail();
+    } catch (error) {
+      const copy = lifecycleErrorCopy(error, kind);
+
+      /* Lo stato reale è cambiato: lo sheet si chiude e il dettaglio si
+         riconcilia. Altrimenti resta aperto con il testo intatto. */
+      if (copy.refresh && !copy.uncertain) {
+        setLifecycleSheet("none");
+      }
+
+      showToast({ icon: "alert-circle-outline", id: `event-${kind}-error`, message: copy.message });
+
+      if (copy.refresh) {
+        invalidate();
+        void refetchDetail();
+      }
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
 
   // ── Condivisione (§9) ─────────────────────────────────────────────────────
   const url = detail?.publicId && detail.landingVisible ? buildEventUrl(detail.publicId) : null;
@@ -348,6 +490,13 @@ export function SelectionEventDetailScreen() {
   const title = detail.title ?? "";
   const withdrawCopy = participation ? withdrawSheetCopy(participation.status) : null;
   const flyerUri = flyerFailed ? null : (flyerQuery.data ?? null);
+  /* DAS-REV-31: menu e pillola dipendono dalla vista, non solo dal payload. */
+  const manageActions = societyView ? manageMenuActions(detail) : [];
+  const pill = lifecyclePill(detail, { society: societyView });
+  const terminal = isTerminal(detail.status);
+  /* DAS-REV-31 §19, screen 12: per la persona lo stato terminale è il
+     primo blocco, a tutta larghezza, prima di ogni dato dell'evento. */
+  const personalTerminal = terminal && !societyView;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -355,8 +504,10 @@ export function SelectionEventDetailScreen() {
         <EventClubBar
           isVerified={detail.club.isVerified}
           logoUrl={detail.club.logoUrl}
+          menuLabel={LIFECYCLE_COPY.manageTitle}
           name={detail.club.name}
           onBack={goBack}
+          onMenu={manageActions.length > 0 ? () => setLifecycleSheet("manage") : undefined}
         />
       </View>
 
@@ -371,6 +522,22 @@ export function SelectionEventDetailScreen() {
         }
         testID="event-detail-scroll"
       >
+        {/* DAS-REV-31 §20, screen 18: i dati mostrati sono già quelli attuali;
+            nessun diff tecnico, nessun nome di campo. */}
+        {showUpdatedBanner(detail, fromUpdate) ? (
+          <EventNoticeCard
+            notice={{ icon: "information-circle-outline", lines: [], title: LIFECYCLE_COPY.updatedBanner, tone: "neutral" }}
+            testID="event-updated-banner"
+          />
+        ) : null}
+
+        {personalTerminal && pill ? (
+          <EventNoticeCard
+            notice={{ icon: "information-circle-outline", lines: [], title: pill, tone: "neutral" }}
+            testID="event-terminal-notice"
+          />
+        ) : null}
+
         <EventFlyerImage
           height={detail.flyer?.height ?? null}
           onError={() => setFlyerFailed(true)}
@@ -378,6 +545,8 @@ export function SelectionEventDetailScreen() {
           uri={flyerUri}
           width={detail.flyer?.width ?? null}
         />
+
+        {pill && !personalTerminal ? <EventStatusPill label={pill} testID="event-lifecycle-pill" /> : null}
 
         <View style={styles.titleBlock}>
           <AppText accessibilityRole="header" color="neutral" variant="headingMd">
@@ -478,6 +647,10 @@ export function SelectionEventDetailScreen() {
             {/* §8: count privati solo con la lettura partecipanti. */}
             {detail.management?.participants ? (
               <ParticipantsSummary
+                /* DAS-REV-31 §19, screen 10: storico consultabile, nessuna
+                   gestione; i tre count restano quelli originali. */
+                footnote={terminal ? LIFECYCLE_COPY.historyFootnote : null}
+                manageLabel={terminal ? LIFECYCLE_COPY.viewParticipants : undefined}
                 onManage={() => router.push(SELECTION_EVENTS_HREFS.participants(detail.eventId) as never)}
                 onOpen={(filter) => router.push(SELECTION_EVENTS_HREFS.participants(detail.eventId, filter) as never)}
                 summary={detail.management.participants}
@@ -494,10 +667,12 @@ export function SelectionEventDetailScreen() {
 
             {view.message ? (
               <View style={styles.message} testID="event-club-message">
-                <AppText color="neutral" variant="metaStrong">
-                  {view.message.title}
-                </AppText>
-                <AppText color="neutralMuted" selectable variant="bodySm">
+                <View style={styles.messageHeader}>
+                  <AppText color="neutral" variant="metaStrong">
+                    {view.message.title}
+                  </AppText>
+                </View>
+                <AppText color="neutralMuted" selectable style={styles.messageBody} variant="bodySm">
                   {view.message.body}
                 </AppText>
               </View>
@@ -613,6 +788,34 @@ export function SelectionEventDetailScreen() {
           visible={sheet === "withdraw"}
         />
       ) : null}
+
+      {/* DAS-REV-31 screen 07–09, 11: menu e conferme lifecycle. */}
+      <ManageEventSheet
+        actions={manageActions}
+        onClose={() => {
+          pendingSheetRef.current = null;
+          setLifecycleSheet("none");
+        }}
+        onDismiss={applyPendingSheet}
+        onSelect={selectManageAction}
+        visible={societyView && lifecycleSheet === "manage"}
+      />
+
+      <CompleteEventSheet
+        busy={lifecycleBusy}
+        onCancel={() => setLifecycleSheet("none")}
+        onConfirm={() => void runLifecycle("complete")}
+        visible={societyView && lifecycleSheet === "complete"}
+      />
+
+      <CancelEventSheet
+        busy={lifecycleBusy}
+        message={cancelMessage}
+        onCancel={() => setLifecycleSheet("none")}
+        onChangeMessage={setCancelMessage}
+        onConfirm={() => void runLifecycle("cancel")}
+        visible={societyView && lifecycleSheet === "cancel"}
+      />
     </View>
   );
 }
@@ -687,8 +890,22 @@ const styles = StyleSheet.create({
   info: {
     gap: spacing[12],
   },
+  /* Screen 12: card del messaggio della Società, intestazione su fondo
+     neutro e corpo bianco; hairline del modulo, radius delle card. */
   message: {
-    gap: spacing[4],
+    borderColor: colors.border,
+    borderRadius: radius[16],
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  messageBody: {
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[12],
+  },
+  messageHeader: {
+    backgroundColor: colors.surfaceNeutral,
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[10],
   },
   mode: {
     paddingTop: spacing[4],

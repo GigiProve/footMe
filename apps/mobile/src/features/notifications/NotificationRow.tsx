@@ -8,7 +8,9 @@ import type { AppNotification } from "../clubs/membership-types";
 import {
   ctaLabelFor,
   iconNameForCategory,
+  notificationTimestamp,
   resolveNotificationCategory,
+  selectionEventResponseLines,
 } from "./notifications-helpers";
 
 type NotificationRowProps = {
@@ -22,9 +24,18 @@ export function NotificationRow({ notification, onPress }: NotificationRowProps)
     category,
   ) as keyof typeof Ionicons.glyphMap;
   const isUnread = !notification.is_read;
+  /* DAS-REV-31 screen 16: una riga aggregata è una sola unità di non letto;
+     titolo in grassetto per intero, evento e nomi come metadati. */
+  const response = selectionEventResponseLines(notification);
+  const time = formatRelativeTime(notificationTimestamp(notification));
 
   return (
     <Pressable
+      accessibilityLabel={
+        response
+          ? [notification.title, response.names, time].filter(Boolean).join(", ")
+          : undefined
+      }
       accessibilityRole="button"
       onPress={() => onPress(notification)}
       style={({ pressed }) => [
@@ -39,26 +50,40 @@ export function NotificationRow({ notification, onPress }: NotificationRowProps)
       <View style={styles.body}>
         <View style={styles.titleRow}>
           <AppText
-            numberOfLines={1}
+            numberOfLines={response ? 3 : 1}
             style={styles.title}
-            variant={isUnread ? "titleSm" : "bodyLg"}
+            variant={isUnread || response ? "titleSm" : "bodyLg"}
           >
             {notification.title}
           </AppText>
           {isUnread ? <View style={styles.dot} /> : null}
         </View>
-        {notification.body ? (
+        {response ? (
+          <>
+            {/* Il titolo del server nomina già l'evento («… a Open day
+                Primavera.», §23): una seconda riga lo ripeterebbe. */}
+            {response.names ? (
+              <AppText color="muted" numberOfLines={2} variant="bodySm">
+                {response.names}
+              </AppText>
+            ) : null}
+          </>
+        ) : notification.body ? (
           <AppText color="secondary" numberOfLines={2} variant="bodySm">
             {notification.body}
           </AppText>
         ) : null}
         <View style={styles.metaRow}>
           <AppText color="muted" variant="caption">
-            {formatRelativeTime(notification.created_at)}
+            {time}
           </AppText>
-          <AppText color="accent" variant="caption" style={styles.cta}>
-            {ctaLabelFor(notification)}
-          </AppText>
+          {response ? (
+            <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
+          ) : (
+            <AppText color="accent" variant="caption" style={styles.cta}>
+              {ctaLabelFor(notification)}
+            </AppText>
+          )}
         </View>
       </View>
     </Pressable>

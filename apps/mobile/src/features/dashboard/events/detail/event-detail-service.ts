@@ -19,6 +19,7 @@ import type {
   EventPublicProjection,
   EventPublicState,
   EventRequestDetail,
+  LifecycleCommandResult,
   MyParticipation,
   ParticipationCommandResult,
   ParticipationStatus,
@@ -201,9 +202,12 @@ function mapPersonal(value: unknown): PersonalState {
   const raw = obj(value) ?? {};
   const caps = obj(raw.capabilities) ?? {};
 
+  const eventStatus = raw.event_status;
+
   return {
     birthYear: int(raw.birth_year),
     birthYearMismatch: bool(raw.birth_year_mismatch),
+    cancellationMessage: text(raw.cancellation_message),
     capabilities: {
       accept: bool(caps.accept),
       acceptBlockedReason: caps.accept_blocked_reason === "full" ? "full" : null,
@@ -212,8 +216,29 @@ function mapPersonal(value: unknown): PersonalState {
       registerAgain: bool(caps.register_again),
       withdraw: bool(caps.withdraw),
     },
+    eventStatus:
+      eventStatus === "published" || eventStatus === "completed" || eventStatus === "cancelled"
+        ? eventStatus
+        : null,
     ineligibleReason: text(raw.ineligible_reason),
     participation: mapParticipation(raw.participation),
+  };
+}
+
+/**
+ * DAS-REV-31 §13: senza il blocco (server precedente) lo stato resta quello
+ * persistito e «iniziato» ricade sulla disponibilità già esposta dalla 29;
+ * nessun orologio locale.
+ */
+function mapLifecycle(value: unknown, status: unknown, startedFallback: boolean) {
+  const raw = obj(value) ?? {};
+
+  return {
+    cancelledAt: text(raw.cancelled_at),
+    completedAt: text(raw.completed_at),
+    completionDueAt: text(raw.completion_due_at),
+    isStarted: raw.is_started === undefined ? startedFallback : bool(raw.is_started),
+    status: lifecycle(raw.status ?? status),
   };
 }
 
@@ -232,15 +257,21 @@ export function mapDetail(value: unknown): SelectionEventDetail {
     ...base,
     clubId: text(raw.club_id) ?? "",
     landingVisible: bool(raw.landing_visible),
+    lifecycle: mapLifecycle(raw.lifecycle, raw.status, base.availability.started),
     management: management
       ? {
+          canCancel: bool(management.can_cancel),
+          canComplete: bool(management.can_complete),
           canDecide: bool(management.can_decide),
+          canDeleteDraft: bool(management.can_delete_draft),
           canEdit: bool(management.can_edit),
           canInvite: bool(management.can_invite),
           canManageParticipants: bool(management.can_manage_participants),
           canReadParticipants: bool(management.can_read_participants),
           canShare: bool(management.can_share),
+          cancellationMessage: text(management.cancellation_message),
           confirmedCount: int(management.confirmed_count) ?? 0,
+          finalConfirmedCount: int(management.final_confirmed_count),
           inviteBlockedReason: management.invite_blocked_reason === "full" ? "full" : null,
           /* §8: i count esistono solo con la lettura partecipanti; senza,
              il blocco è null e la sezione non compare (mai «0» inventati). */
@@ -501,6 +532,77 @@ export async function rejectEventParticipation(input: {
       p_idempotency_key: input.idempotencyKey,
       p_message: input.message,
       p_participation_id: input.participationId,
+    }),
+  );
+}
+
+// ── Società: lifecycle (DAS-REV-31 §17, §18) ───────────────────────────────
+
+export function mapLifecycleCommand(value: unknown): LifecycleCommandResult {
+  const raw = obj(value) ?? {};
+  const outcome = text(raw.outcome);
+  const status = text(raw.status);
+
+  return {
+    eventId: text(raw.event_id),
+    outcome:
+      outcome === "completed" ||
+      outcome === "already_completed" ||
+      outcome === "cancelled" ||
+      outcome === "already_cancelled" ||
+      outcome === "deleted"
+        ? outcome
+        : null,
+    replayed: bool(raw.replayed),
+    status: status ? lifecycle(status) : null,
+  };
+}
+
+/**
+ * §17: conclusione manuale dopo l'inizio. Nessuno stato inviato: il server
+ * decide la transizione e risponde `already_completed` se il worker è
+ * arrivato prima.
+ */
+export async function completeSelectionEvent(input: {
+  eventId: string;
+  idempotencyKey: string;
+}): Promise<LifecycleCommandResult> {
+  return mapLifecycleCommand(
+    await selectionEventsRpc<unknown>("complete_selection_event", {
+      p_event_id: input.eventId,
+      p_idempotency_key: input.idempotencyKey,
+    }),
+  );
+}
+
+/**
+ * §18: annullamento con messaggio facoltativo in testo semplice. Il server lo
+ * normalizza e applica il limite; `outcome = completed` significa che la
+ * scadenza era già passata e l'evento è stato concluso invece che annullato.
+ */
+export async function cancelSelectionEvent(input: {
+  eventId: string;
+  idempotencyKey: string;
+  message: string | null;
+}): Promise<LifecycleCommandResult> {
+  return mapLifecycleCommand(
+    await selectionEventsRpc<unknown>("cancel_selection_event", {
+      p_event_id: input.eventId,
+      p_idempotency_key: input.idempotencyKey,
+      p_message: input.message,
+    }),
+  );
+}
+
+/** §17: solo DRAFT; il server rivalida stato e permessi al commit. */
+export async function deleteSelectionEventDraft(input: {
+  eventId: string;
+  idempotencyKey: string;
+}): Promise<LifecycleCommandResult> {
+  return mapLifecycleCommand(
+    await selectionEventsRpc<unknown>("delete_selection_event_draft", {
+      p_event_id: input.eventId,
+      p_idempotency_key: input.idempotencyKey,
     }),
   );
 }

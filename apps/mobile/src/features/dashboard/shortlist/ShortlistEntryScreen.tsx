@@ -17,9 +17,14 @@
  * lettura resta il solo «Apri profilo completo», che diventa la primaria:
  * §4 — «In sola lettura, quando è l'unica azione principale, Apri profilo
  * completo è blu piena.»
+ *
+ * DAS-REV-31 §12 (screen 05, 20): un'entry nata da evento mostra, dopo la
+ * valutazione, lo snapshot storico «Aggiunto da evento» con «Apri evento»
+ * solo quando il server concede oggi il dettaglio.
  */
 import { useCallback, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,6 +35,7 @@ import { useSession } from "../../auth/use-session";
 import { formatRole } from "../../profiles/profile-display-helpers";
 import { getPlayerPositionLabel } from "../../profiles/player-sports";
 import { APPLICATIONS_HREFS } from "../applications/applications-routes";
+import { SELECTION_EVENTS_HREFS } from "../events/events-routes";
 import { STALE_MS } from "../cache/freshness-policy";
 import {
   DashboardGlobalEmpty,
@@ -50,6 +56,7 @@ import {
   EVALUATION_LABELS,
   SHORTLIST_COPY,
   addedByLine,
+  entryEventOrigin,
   evaluationLine,
   originAuditLabel,
   priorityLabel,
@@ -264,7 +271,10 @@ export function ShortlistEntryScreen({ entryId }: Props) {
     .join(" · ");
 
   const canEdit = entry.canEditStatus || entry.canEditNote;
-  const origin = originAuditLabel(entry.createdSource);
+  /* DAS-REV-31 §12: con lo snapshot dell'evento l'origine ha il suo
+     metadato dedicato, e la riga «Origine» non la ripete. */
+  const eventOrigin = entryEventOrigin(entry);
+  const origin = eventOrigin ? null : originAuditLabel(entry.createdSource);
   const added = addedByLine({
     addedByName: entry.addedByName,
     createdAtLabel: formatShortDate(entry.createdAt),
@@ -353,6 +363,59 @@ export function ShortlistEntryScreen({ entryId }: Props) {
             <AppText color="neutralMuted" variant="meta">
               {SHORTLIST_COPY.entryNoteHelper}
             </AppText>
+          </View>
+        ) : null}
+
+        {/* DAS-REV-31 §12, screen 05 e 20: metadato leggero dopo la
+            valutazione, non una card e non un EventPreview. Il link esiste
+            solo se il server concede oggi il dettaglio; altrimenti niente
+            chevron e la nota dello stato 20. */}
+        {eventOrigin ? (
+          <View style={styles.block} testID="shortlist-entry-event-origin">
+            <AppText variant="eyebrow">{eventOrigin.label}</AppText>
+
+            <View style={styles.eventRow}>
+              <Ionicons
+                color={colors.textNeutralMuted}
+                name="calendar-outline"
+                size={18}
+                style={styles.eventIcon}
+              />
+
+              <View style={styles.eventText}>
+                <AppText color="neutral" variant="bodySm">
+                  {eventOrigin.title}
+                </AppText>
+
+                {eventOrigin.dateLabel ? (
+                  <AppText color="neutralMuted" variant="meta">
+                    {eventOrigin.dateLabel}
+                  </AppText>
+                ) : null}
+              </View>
+            </View>
+
+            {eventOrigin.eventId ? (
+              <AppText
+                accessibilityHint="Apre il dettaglio dell'evento"
+                accessibilityRole="link"
+                color="accent"
+                onPress={() =>
+                  router.push(
+                    SELECTION_EVENTS_HREFS.detail(eventOrigin.eventId as string) as never,
+                  )
+                }
+                style={styles.link}
+                testID="shortlist-entry-open-event"
+                variant="bodySm"
+              >
+                {SHORTLIST_COPY.openEvent}
+              </AppText>
+            ) : (
+              <AppText color="neutralMuted" variant="meta">
+                {eventOrigin.unavailableNote}
+              </AppText>
+            )}
           </View>
         ) : null}
 
@@ -497,6 +560,16 @@ const styles = StyleSheet.create({
   },
   link: {
     paddingVertical: spacing[4],
+  },
+  eventRow: {
+    flexDirection: "row",
+    gap: spacing[8],
+  },
+  eventIcon: {
+    paddingTop: 2,
+  },
+  eventText: {
+    flex: 1,
   },
   actions: {
     gap: spacing[8],

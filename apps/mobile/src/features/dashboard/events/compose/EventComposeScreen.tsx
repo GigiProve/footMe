@@ -15,6 +15,10 @@
  * Le chiavi idempotenti sono derivate (nonce di sessione + impronta della
  * richiesta), come nel composer Posizioni: un retry della stessa richiesta
  * riusa la chiave e il server lo riconosce, una richiesta diversa no.
+ *
+ * DAS-REV-31 §17, §20 (screen 19): «Elimina bozza» per una bozza salvata,
+ * dietro la capability del server; l'edit di un evento già iniziato,
+ * concluso o annullato viene rifiutato dal server e spiegato nel banner.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -51,7 +55,17 @@ import {
   PARTICIPATION_LABELS,
   VALIDATION_COPY,
 } from "../events-copy";
-import { signFlyerUrl } from "../detail/event-detail-service";
+import { DeleteDraftSheet } from "../detail/components/EventLifecycleSheets";
+import {
+  deleteSelectionEventDraft,
+  fetchSelectionEventDetail,
+  signFlyerUrl,
+} from "../detail/event-detail-service";
+import {
+  LIFECYCLE_COPY,
+  lifecycleErrorCopy,
+  lifecycleSignature,
+} from "../detail/event-lifecycle-presentation";
 import { SELECTION_EVENTS_QK, SELECTION_EVENTS_QK_PREFIXES } from "../events-keys";
 import { formatCivilDate } from "../events-presentation";
 import { SELECTION_EVENTS_HREFS } from "../events-routes";
@@ -145,7 +159,12 @@ export function EventComposeScreen() {
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
-  const [exitWith, setExitWith] = useState<"saved" | "published" | "updated" | "revoked" | null>(null);
+  const [exitWith, setExitWith] = useState<
+    "saved" | "published" | "updated" | "revoked" | "deleted" | null
+  >(null);
+  /* DAS-REV-31 §17, screen 19: conferma ed esecuzione di «Elimina bozza». */
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   /**
    * DAS-REV-29 §8: gli asset locandina noti a questo form (salvato e appena
    * caricati), con l'anteprima locale di quelli nuovi. Il form conserva solo
@@ -183,6 +202,22 @@ export function EventComposeScreen() {
 
   const center = centerQuery.data ?? null;
   const editor = editorQuery.data ?? null;
+
+  /**
+   * DAS-REV-31 §17: «Elimina bozza» segue la capability `can_delete_draft`
+   * che il server espone sul dettaglio canonico (draft ∧ create|manage).
+   * L'editor non la porta e dedurla da `can_edit` ricostruirebbe un
+   * permesso nel client: si legge il dettaglio, solo per le bozze.
+   */
+  const draftDetailQuery = useQuery({
+    enabled: !!actorId && editor?.status === "draft",
+    queryFn: () => fetchSelectionEventDetail({ eventId: editor?.id ?? "" }),
+    queryKey: SELECTION_EVENTS_QK.detail(actorId, editor?.id ?? ""),
+    retry: false,
+    staleTime: 0,
+  });
+  const canDeleteDraft =
+    editor?.status === "draft" && !!draftDetailQuery.data?.management?.canDeleteDraft;
   const limits = center?.limits;
   const timeZone = editor?.timezone ?? center?.timezone ?? "Europe/Rome";
 
@@ -255,7 +290,15 @@ export function EventComposeScreen() {
   /* L'uscita dopo un comando riuscito aspetta il render in cui il form non è
      più sporco, così il guard non chiede conferma per dati appena salvati. */
   useEffect(() => {
-    if (exitWith === null || (dirty && exitWith !== "revoked")) {
+    if (exitWith === null || (dirty && exitWith !== "revoked" && exitWith !== "deleted")) {
+      return;
+    }
+
+    /* DAS-REV-31 §17: la bozza non esiste più; si torna al Centro senza
+       chiedere di salvare modifiche a un record eliminato. */
+    if (exitWith === "deleted") {
+      leave();
+
       return;
     }
 
@@ -365,6 +408,20 @@ export function EventComposeScreen() {
         return;
       }
 
+      /* DAS-REV-31 §15, §20: l'edit si chiude all'inizio; un evento concluso
+         o annullato non si modifica. Stato di dominio, non errore di rete:
+         il form resta con i dati, il banner dice perché. */
+      if (
+        error.code === "SELECTION_EVENT_STARTED" ||
+        error.code === "SELECTION_EVENT_COMPLETED" ||
+        error.code === "SELECTION_EVENT_CANCELLED"
+      ) {
+        setBanner(lifecycleErrorCopy(error, "delete").message);
+        void editorQuery.refetch();
+
+        return;
+      }
+
       if (error.fields.length > 0) {
         const fieldErrors = errorsFromCodes(error.fields);
 
@@ -383,7 +440,7 @@ export function EventComposeScreen() {
             : EVENTS_COPY.saveError,
       );
     },
-    [actorId, centerQuery, eventId, invalidateCenter, queryClient, step, teamsQuery],
+    [actorId, centerQuery, editorQuery, eventId, invalidateCenter, queryClient, step, teamsQuery],
   );
 
   /** Persiste il form come bozza; restituisce ID e versione correnti. */
@@ -656,6 +713,48 @@ export function EventComposeScreen() {
   }, [clubId, flyerUploading, limits, update]);
 
   // ── Stati della schermata ─────────────────────────────────────────────────
+
+  /**
+   * DAS-REV-31 §17, screen 19: eliminazione della bozza salvata. Chiave
+   * dall'impronta (bozza, versione vista): un retry dopo esito incerto non
+   * diventa un secondo intento. Se nel frattempo la bozza è stata pubblicata
+   * il server rifiuta (LIFECYCLE_CONFLICT) e il form si riallinea.
+   */
+  const deleteDraft = async () => {
+    const id = editor?.id;
+
+    if (!id || deleting) {
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      await deleteSelectionEventDraft({
+        eventId: id,
+        idempotencyKey: operationKeyOf(nonce, lifecycleSignature("delete", id, version ?? editor.version)),
+      });
+      setDeleteOpen(false);
+      invalidateCenter();
+      setExitWith("deleted");
+    } catch (error) {
+      const copy = lifecycleErrorCopy(error, "delete");
+
+      if (!copy.uncertain) {
+        setDeleteOpen(false);
+      }
+
+      showToast({ message: copy.message, tone: "neutral" });
+
+      if (copy.refresh) {
+        invalidateCenter();
+        void editorQuery.refetch();
+        void draftDetailQuery.refetch();
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const shell = (content: React.ReactNode) => (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -1093,6 +1192,23 @@ export function EventComposeScreen() {
             </View>
           </View>
         ) : null}
+
+        {/* DAS-REV-31 §17, screen 19: solo per una bozza salvata e solo con
+            la capability del server. Azione secondaria distruttiva, in
+            fondo al form: non compete con Continua / Pubblica. */}
+        {canDeleteDraft && !editingPublished ? (
+          <View style={styles.deleteDraft}>
+            <Button
+              destructive
+              disabled={busy !== null || deleting}
+              label={LIFECYCLE_COPY.deleteDraft}
+              onPress={() => setDeleteOpen(true)}
+              size="md"
+              testID="event-delete-draft"
+              variant="link"
+            />
+          </View>
+        ) : null}
       </ScrollView>
 
       {editingPublished ? (
@@ -1134,6 +1250,13 @@ export function EventComposeScreen() {
         secondaryTestID="event-step-back"
       />
       )}
+
+      <DeleteDraftSheet
+        busy={deleting}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void deleteDraft()}
+        visible={deleteOpen}
+      />
 
       <ComposerOptionSheet
         emptyMessage=""
@@ -1248,6 +1371,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing[32],
     paddingHorizontal: spacing[20],
     paddingTop: spacing[8],
+  },
+  deleteDraft: {
+    alignItems: "center",
+    paddingTop: spacing[24],
   },
   group: {
     paddingTop: spacing[16],

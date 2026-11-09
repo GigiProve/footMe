@@ -1,4 +1,121 @@
 import type { AppNotification } from "../clubs/membership-types";
+import { SELECTION_EVENTS_HREFS } from "../dashboard/events/events-routes";
+import type { ParticipantsFilter } from "../dashboard/events/participants/participants-types";
+
+/**
+ * DAS-REV-31 §21, §25: risposte della persona che la Società riceve
+ * aggregate, ciascuna con il filtro del centro Partecipanti che apre.
+ * «Il filtro mostra lo stato attuale della lista, non una lista artificiale
+ * delle sole persone del gruppo.»
+ */
+export const SELECTION_EVENT_RESPONSE_FILTERS: Readonly<Record<string, ParticipantsFilter>> = {
+  selection_event_invitation_accepted: "confirmed",
+  selection_event_invitation_declined: "declined",
+  selection_event_participation_withdrawn: "withdrawn",
+};
+
+/** Tipi che aprono il dettaglio evento corrente (29, 30, 31). */
+const SELECTION_EVENT_DETAIL_TYPES: readonly string[] = [
+  "selection_event_participation_confirmed",
+  "selection_event_participation_rejected",
+  "selection_event_invitation_received",
+  "selection_event_invitation_revoked",
+  "selection_event_participation_removed",
+  /* DAS-REV-31 §25: annullato → dettaglio corrente CANCELLED. */
+  "selection_event_cancelled",
+  /* DAS-REV-31 §20: aggiornato → dettaglio attuale con il banner. */
+  "selection_event_updated",
+];
+
+export function isSelectionEventNotification(item: Pick<AppNotification, "type">): boolean {
+  return (
+    SELECTION_EVENT_DETAIL_TYPES.includes(item.type) ||
+    item.type in SELECTION_EVENT_RESPONSE_FILTERS
+  );
+}
+
+function dataValue(item: Pick<AppNotification, "data">, key: string): unknown {
+  return (item.data as Record<string, unknown> | null | undefined)?.[key];
+}
+
+function dataText(item: Pick<AppNotification, "data">, key: string): string | null {
+  const value = dataValue(item, key);
+
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+/**
+ * DAS-REV-31 §25: la destinazione del tap. Null quando manca l'evento: la
+ * riga si marca letta e basta, senza aprire un fallback inventato. La
+ * destinazione rivalida accesso e stato (§25: «Rivalida sessione,
+ * Società/actor context, scope e risorsa al tap»).
+ */
+export function selectionEventNotificationHref(
+  item: Pick<AppNotification, "data" | "type">,
+): string | null {
+  const eventId = dataText(item, "event_id");
+
+  if (!eventId) {
+    return null;
+  }
+
+  const filter = SELECTION_EVENT_RESPONSE_FILTERS[item.type];
+
+  if (filter) {
+    return SELECTION_EVENTS_HREFS.participants(eventId, filter, { asSociety: dataText(item, "club_id") });
+  }
+
+  if (item.type === "selection_event_updated") {
+    return SELECTION_EVENTS_HREFS.detail(eventId, { updated: true });
+  }
+
+  return SELECTION_EVENT_DETAIL_TYPES.includes(item.type) ? SELECTION_EVENTS_HREFS.detail(eventId) : null;
+}
+
+/**
+ * DAS-REV-31 screen 16: una riga aggregata mostra il titolo (già scritto
+ * dal server: «12 profili hanno accettato l’invito a …»), il titolo
+ * dell'evento e l'anteprima dei nomi («Mario Rossi, Luca Bianchi e altri
+ * 10», che il server mette nel body solo per i gruppi). Null per le altre
+ * notifiche.
+ */
+export function selectionEventResponseLines(
+  item: Pick<AppNotification, "body" | "data" | "type">,
+): { eventTitle: string | null; names: string | null } | null {
+  if (!(item.type in SELECTION_EVENT_RESPONSE_FILTERS)) {
+    return null;
+  }
+
+  return {
+    eventTitle: dataText(item, "event_title"),
+    names: item.body?.trim() ? item.body : null,
+  };
+}
+
+/** DAS-REV-31 §23: l'istante che ordina e data la riga è l'ultimo aggiornamento. */
+export function notificationTimestamp(item: Pick<AppNotification, "created_at" | "updated_at">): string {
+  return item.updated_at || item.created_at;
+}
+
+/**
+ * DAS-REV-31 §24: l'ultimo aggiornamento mostrato dal Centro, per
+ * «Segna tutte come lette». Null con la lista vuota (nessun limite).
+ */
+export function latestUpdatedAt(
+  items: Pick<AppNotification, "created_at" | "updated_at">[],
+): string | null {
+  let latest: string | null = null;
+
+  for (const item of items) {
+    const at = notificationTimestamp(item);
+
+    if (!latest || Date.parse(at) > Date.parse(latest)) {
+      latest = at;
+    }
+  }
+
+  return latest;
+}
 
 export type NotificationCategory =
   | "richieste"
@@ -60,7 +177,9 @@ export function resolveNotificationCategory(
     /* DAS-REV-30: stessa scala del trigger per invito, revoca e rimozione. */
     item.type === "selection_event_invitation_received" ||
     item.type === "selection_event_invitation_revoked" ||
-    item.type === "selection_event_participation_removed"
+    item.type === "selection_event_participation_removed" ||
+    /* DAS-REV-31 §21: annullamento, aggiornamento e risposte aggregate. */
+    isSelectionEventNotification(item)
   ) {
     return "candidature";
   }
@@ -119,7 +238,7 @@ export function groupNotificationsByTime(
   };
 
   notifications.forEach((item) => {
-    buckets[timeBucketFor(item.created_at, now)].push(item);
+    buckets[timeBucketFor(notificationTimestamp(item), now)].push(item);
   });
 
   return (["oggi", "ieri", "precedenti"] as TimeBucket[])
@@ -192,6 +311,12 @@ export function ctaLabelFor(item: AppNotification): string {
   if (item.type.startsWith("role_link_")) return "Vedi rapporto";
   if (item.type === "new_follower") return "Vedi profilo";
   if (item.type === "content_tag") return "Apri contenuto";
+  /* DAS-REV-31 §25: le risposte aprono i Partecipanti, annullamento e
+     aggiornamento il dettaglio evento. */
+  if (item.type in SELECTION_EVENT_RESPONSE_FILTERS) return "Vedi partecipanti";
+  if (item.type === "selection_event_cancelled" || item.type === "selection_event_updated") {
+    return "Vedi evento";
+  }
   if (category === "richieste") return "Gestisci richiesta";
   if (category === "candidature") return "Vedi candidatura";
   if (category === "store") return "Vedi ordine";

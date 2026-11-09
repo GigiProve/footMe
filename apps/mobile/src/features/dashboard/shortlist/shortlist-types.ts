@@ -14,7 +14,7 @@
  *   | ShortlistEntry    | `club_shortlist_entries`                 |
  *   | person_id         | `player_profile_id`                      |
  *   | application_id    | `application_id` → `recruiting_applications` |
- *   | origine creazione | `created_source` (profile/application/unknown) |
+ *   | origine creazione | `created_source` (profile/application/event/unknown) |
  *   | Society           | `clubs`                                  |
  *   | Position          | `recruiting_ads`                         |
  *
@@ -37,8 +37,27 @@ export type ShortlistEvaluationStatus =
 /** §17: tre valori **oppure non impostata**. */
 export type ShortlistPriority = "alta" | "media" | "bassa";
 
-/** §19: origine di nascita, distinta dalla relazione Application corrente. */
-export type ShortlistCreatedSource = "profile" | "application" | "unknown";
+/**
+ * §19: origine di nascita, distinta dalla relazione Application corrente.
+ * DAS-REV-31 §10: `event` si aggiunge alle origini esistenti — la entry è
+ * nata dal percorso partecipanti → profilo di un evento della Società.
+ */
+export type ShortlistCreatedSource = "profile" | "application" | "event" | "unknown";
+
+/**
+ * Snapshot storico dell'evento d'origine (DAS-REV-31 §10, §12).
+ *
+ * Titolo e data sono quelli **della creazione** e non si aggiornano più.
+ * `eventId` arriva soltanto se oggi l'actor può aprire il dettaglio
+ * dell'evento: lo snapshot non concede accesso all'evento (§12).
+ */
+export type ShortlistSourceEvent = {
+  /** Giorno civile dell'evento, `YYYY-MM-DD`, già nel suo fuso. */
+  date: string | null;
+  eventId: string | null;
+  timezone: string | null;
+  title: string;
+};
 
 /**
  * Capacità effettive dell'actor sulla Society operativa (§5, §22).
@@ -219,6 +238,8 @@ export type ShortlistEntryDetail = {
   createdAt: string | null;
   createdSource: ShortlistCreatedSource;
   situation: string | null;
+  /** DAS-REV-31 §12: presente solo per le entry nate da evento. */
+  sourceEvent: ShortlistSourceEvent | null;
   entryId: string;
   evaluationStatus: ShortlistEvaluationStatus;
   isClosed: boolean;
@@ -280,6 +301,8 @@ export type ShortlistMembership = {
 export type ShortlistErrorKind =
   | "conflict"
   | "descriptionTooLong"
+  /* DAS-REV-31 §11: il contesto evento non è più una provenienza valida. */
+  | "eventSourceUnavailable"
   | "gone"
   | "nameRequired"
   | "nameTooLong"

@@ -148,8 +148,10 @@ export function upcomingCountsLabel(
 }
 
 /**
- * Conteggio finale dello storico (§11). «N partecipanti» non certifica
- * presenza fisica; un Annullato lo omette.
+ * Conteggio finale dello storico (§11). Un Annullato lo omette.
+ *
+ * DAS-REV-31 §19, screen 15: «32 confermati» — lo stato storico della
+ * partecipazione, non una presenza certificata (mai presenti/assenti).
  */
 export function historyCountsLabel(
   row: Pick<SelectionEventRow, "confirmedCount" | "countsAvailable" | "status">,
@@ -158,7 +160,7 @@ export function historyCountsLabel(
     return null;
   }
 
-  return `${row.confirmedCount} ${plural(row.confirmedCount, "partecipante", "partecipanti")}`;
+  return `${row.confirmedCount} ${plural(row.confirmedCount, "confermato", "confermati")}`;
 }
 
 export function historyStatusLabel(row: Pick<SelectionEventRow, "status">): string | null {
@@ -167,6 +169,20 @@ export function historyStatusLabel(row: Pick<SelectionEventRow, "status">): stri
     : row.status === "cancelled"
       ? EVENTS_COPY.cancelled
       : null;
+}
+
+/**
+ * DAS-REV-31 screen 15: una sola riga di stato sotto la data,
+ * «Concluso · 32 confermati» oppure «Annullato». Testo discreto, nessuna
+ * pillola e nessun colore di stato (§5, §11 della 28).
+ */
+export function historyStatusLine(
+  row: Pick<SelectionEventRow, "confirmedCount" | "countsAvailable" | "status">,
+): string | null {
+  const status = historyStatusLabel(row);
+  const counts = historyCountsLabel(row);
+
+  return status ? [status, counts].filter(Boolean).join(" · ") : null;
 }
 
 /**
@@ -207,9 +223,11 @@ export function eventRowLines(
   if (section === "history") {
     return {
       context,
-      counts: historyCountsLabel(row),
+      /* DAS-REV-31 screen 15: stato e count finale in una riga sotto la
+         data, non più una parola isolata a destra. */
+      counts: historyStatusLine(row),
       full: false,
-      status: historyStatusLabel(row),
+      status: null,
       title,
       /* Lo storico porta sempre l'anno: §11 «data», e nel PNG «18 luglio
          2026». Senza data — record storici — la riga resta leggibile. */

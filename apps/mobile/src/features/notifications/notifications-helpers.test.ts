@@ -8,14 +8,21 @@ import {
   groupNotifications,
   groupNotificationsByTime,
   iconNameForCategory,
+  isSelectionEventNotification,
   NOTIFICATION_FILTERS,
+  notificationTimestamp,
   resolveNotificationCategory,
+  latestUpdatedAt,
+  selectionEventNotificationHref,
+  selectionEventResponseLines,
   timeBucketFor,
 } from "./notifications-helpers";
 
 function makeNotification(
   overrides: Partial<AppNotification> = {},
 ): AppNotification {
+  const createdAt = overrides.created_at ?? "2026-07-17T10:00:00.000Z";
+
   return {
     id: "notif-1",
     recipient_profile_id: "profile-1",
@@ -24,8 +31,12 @@ function makeNotification(
     body: "In un post",
     data: {},
     is_read: false,
-    created_at: "2026-07-17T10:00:00.000Z",
+    created_at: createdAt,
     category: "attivita",
+    aggregate_key: null,
+    revision: 1,
+    /* Righe non aggregate: updated_at = created_at (contratto DAS-REV-31). */
+    updated_at: createdAt,
     ...overrides,
   };
 }
@@ -236,5 +247,127 @@ describe("NOTIFICATION_FILTERS", () => {
       { label: "Store", value: "store" },
       { label: "Sistema", value: "sistema" },
     ]);
+  });
+});
+
+/* DAS-REV-31 §21–§25, screen 16–18: notifiche raggruppate e deep link. */
+describe("DAS-REV-31 notifiche evento", () => {
+  const group = (type: string, data: Record<string, unknown> = {}) =>
+    makeNotification({
+      aggregate_key: `${type}:e1`,
+      body: "Mario Rossi, Luca Bianchi e altri 10",
+      category: "candidature",
+      data: {
+        event_id: "e1",
+        event_title: "Open day Primavera",
+        preview_names: ["Mario Rossi", "Luca Bianchi"],
+        distinct_person_count: 12,
+        ...data,
+      } as unknown as Record<string, string>,
+      revision: 3,
+      title: "12 profili hanno accettato l’invito a Open day Primavera.",
+      type,
+    });
+
+  it("§25: ogni risposta apre il proprio filtro dei Partecipanti", () => {
+    expect(selectionEventNotificationHref(group("selection_event_invitation_accepted"))).toBe(
+      "/(tabs)/dashboard/events/participants/e1?filter=confirmed",
+    );
+    expect(selectionEventNotificationHref(group("selection_event_invitation_declined"))).toBe(
+      "/(tabs)/dashboard/events/participants/e1?filter=declined",
+    );
+    expect(selectionEventNotificationHref(group("selection_event_participation_withdrawn"))).toBe(
+      "/(tabs)/dashboard/events/participants/e1?filter=withdrawn",
+    );
+  });
+
+  it("§25: annullato apre il dettaglio, aggiornato il dettaglio con il banner", () => {
+    const data = { event_id: "e1" };
+
+    expect(
+      selectionEventNotificationHref(makeNotification({ data, type: "selection_event_cancelled" })),
+    ).toBe("/(tabs)/dashboard/events/e1");
+    expect(
+      selectionEventNotificationHref(makeNotification({ data, type: "selection_event_updated" })),
+    ).toBe("/(tabs)/dashboard/events/e1?updated=1");
+    /* Le notifiche 29/30 restano sul dettaglio semplice. */
+    expect(
+      selectionEventNotificationHref(
+        makeNotification({ data, type: "selection_event_invitation_received" }),
+      ),
+    ).toBe("/(tabs)/dashboard/events/e1");
+  });
+
+  it("senza event_id nessuna destinazione inventata; tipi estranei esclusi", () => {
+    expect(
+      selectionEventNotificationHref(makeNotification({ data: {}, type: "selection_event_cancelled" })),
+    ).toBeNull();
+    expect(
+      selectionEventNotificationHref(makeNotification({ data: { event_id: "e1" }, type: "content_tag" })),
+    ).toBeNull();
+    expect(isSelectionEventNotification({ type: "content_tag" })).toBe(false);
+    expect(isSelectionEventNotification({ type: "selection_event_updated" })).toBe(true);
+  });
+
+  it("§21: i cinque tipi nuovi stanno in Candidature anche senza colonna category", () => {
+    for (const type of [
+      "selection_event_cancelled",
+      "selection_event_updated",
+      "selection_event_invitation_accepted",
+      "selection_event_invitation_declined",
+      "selection_event_participation_withdrawn",
+    ]) {
+      expect(resolveNotificationCategory(makeNotification({ category: undefined, type }))).toBe(
+        "candidature",
+      );
+    }
+  });
+
+  it("screen 16: riga di gruppo = titolo, evento e nomi; CTA verso i partecipanti", () => {
+    const item = group("selection_event_invitation_accepted");
+
+    expect(selectionEventResponseLines(item)).toEqual({
+      eventTitle: "Open day Primavera",
+      names: "Mario Rossi, Luca Bianchi e altri 10",
+    });
+    expect(ctaLabelFor(item)).toBe("Vedi partecipanti");
+    /* Singola: body null, nessuna riga di nomi vuota. */
+    expect(selectionEventResponseLines({ ...item, body: null })?.names).toBeNull();
+    expect(selectionEventResponseLines(makeNotification())).toBeNull();
+    expect(ctaLabelFor(makeNotification({ type: "selection_event_cancelled" }))).toBe("Vedi evento");
+  });
+
+  it("§23: ordine e fascia temporale seguono l'ultimo aggiornamento del gruppo", () => {
+    const now = new Date(2026, 9, 1, 12, 0, 0);
+    const item = group("selection_event_invitation_accepted", {});
+    const refreshed = {
+      ...item,
+      created_at: new Date(2026, 8, 20, 9, 0, 0).toISOString(),
+      updated_at: new Date(2026, 9, 1, 10, 0, 0).toISOString(),
+    };
+
+    expect(notificationTimestamp(refreshed)).toBe(refreshed.updated_at);
+    expect(groupNotificationsByTime([refreshed], now)[0]?.title).toBe("Oggi");
+  });
+});
+
+describe("DAS-REV-31 — segna tutte e Società della notifica", () => {
+  it("latestUpdatedAt prende l’aggiornamento più recente mostrato", () => {
+    expect(
+      latestUpdatedAt([
+        { created_at: "2026-11-01T10:00:00Z", updated_at: "2026-11-01T10:00:00Z" },
+        { created_at: "2026-11-01T09:00:00Z", updated_at: "2026-11-02T08:00:00Z" },
+      ]),
+    ).toBe("2026-11-02T08:00:00Z");
+    expect(latestUpdatedAt([])).toBeNull();
+  });
+
+  it("le risposte aggregate aprono i Partecipanti nella Società della notifica", () => {
+    expect(
+      selectionEventNotificationHref({
+        data: { club_id: "club-1", event_id: "ev-1" },
+        type: "selection_event_invitation_declined",
+      }),
+    ).toBe("/(tabs)/dashboard/events/participants/ev-1?filter=declined&asSociety=club-1");
   });
 });

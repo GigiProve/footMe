@@ -30,6 +30,7 @@ import { DashboardSkeleton } from "../../components/DashboardStates";
 import { useDashboardIdentity } from "../../identity/use-dashboard-identity";
 import { createSessionNonce, operationKeyOf } from "../../positions/compose/compose-operation-key";
 import { ProfileShortlistFlow } from "../../shortlist/profile/ProfileShortlistFlow";
+import { eventProfileHref } from "../../shortlist/profile/profile-shortlist-presentation";
 import { EventClubBar, EventUnavailableState } from "../detail/components/EventDetailParts";
 import {
   DETAIL_COPY,
@@ -81,10 +82,26 @@ export function EventParticipantsScreen() {
   const { showToast } = useToast();
   const { profile } = useSession();
   const actorId = profile?.id ?? "";
-  const { current } = useDashboardIdentity();
-  const params = useLocalSearchParams<{ eventId?: string; filter?: string }>();
+  const { current, identities, selectIdentity } = useDashboardIdentity();
+  const params = useLocalSearchParams<{ asSociety?: string; eventId?: string; filter?: string }>();
   const eventId = typeof params.eventId === "string" ? params.eventId : "";
   const society = current?.kind === "society" ? current : null;
+  /* DAS-REV-31 §25: dalla notifica della Società si passa alla sua identità
+     con il percorso canonico del selector, una volta sola e solo se l'actor
+     la possiede: un'identità non autorizzata non esiste in `identities`, e
+     la vista resta «Contenuto non disponibile». */
+  const wanted = identities.find(
+    (identity) => identity.kind === "society" && identity.id === params.asSociety,
+  );
+  const switchPending = !!wanted && current?.id !== wanted.id;
+  const switchedRef = useRef(false);
+
+  useEffect(() => {
+    if (switchPending && wanted && !switchedRef.current) {
+      switchedRef.current = true;
+      selectIdentity(wanted.id);
+    }
+  }, [selectIdentity, switchPending, wanted]);
   const clubId = society?.id ?? "";
 
   const [filter, setFilter] = useState<ParticipantsFilter>(() => parseFilter(params.filter));
@@ -244,9 +261,18 @@ export function EventParticipantsScreen() {
     }
   };
 
+  /* DAS-REV-31 §8: nome/avatar/chevron aprono il profilo live con il
+     contesto evento legato a **questa** persona e a questa Società, nei
+     parametri della route — mai uno stato globale. Il push tiene montata
+     questa schermata: al ritorno filtro, query e scroll sono quelli di
+     prima. */
   const openProfile = (row: ParticipantRow) => {
     setSelected(null);
-    router.push(`/profile/${row.personId}` as never);
+    router.push(
+      (clubId
+        ? eventProfileHref({ clubId, eventId, personId: row.personId })
+        : `/profile/${encodeURIComponent(row.personId)}`) as never,
+    );
   };
 
   const goBack = () => {
@@ -288,9 +314,10 @@ export function EventParticipantsScreen() {
   );
 
   const unavailable =
-    (detailQuery.error instanceof SelectionEventsError && detailQuery.error.isAuthorization) ||
+    !switchPending &&
+    ((detailQuery.error instanceof SelectionEventsError && detailQuery.error.isAuthorization) ||
     (!!detail && !contextOk) ||
-    (listQuery.error instanceof SelectionEventsError && listQuery.error.isAuthorization);
+    (listQuery.error instanceof SelectionEventsError && listQuery.error.isAuthorization));
 
   if (unavailable) {
     return (
@@ -510,7 +537,9 @@ export function EventParticipantsScreen() {
       />
 
       {/* §26: la stella riusa il flusso canonico della 26/27, senza
-          collegarlo al lifecycle dell'evento. */}
+          collegarlo al lifecycle dell'evento. DAS-REV-31 §8, §11: il nuovo
+          add porta questo evento come provenienza; il server lo rivalida e,
+          se non vale più, il flusso si chiude senza ricadere su PROFILE. */}
       {starFor && society && actorId ? (
         <ProfileShortlistFlow
           actorId={actorId}
@@ -527,6 +556,7 @@ export function EventParticipantsScreen() {
             logoUrl: society.avatarUrl,
             name: society.name,
           }}
+          sourceEventId={eventId || null}
         />
       ) : null}
     </View>

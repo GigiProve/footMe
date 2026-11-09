@@ -130,7 +130,14 @@ export type PersonalCapabilities = {
 export type PersonalState = {
   birthYear: number | null;
   birthYearMismatch: boolean;
+  /**
+   * DAS-REV-31 §19: messaggio della Società sull'annullamento, solo per chi
+   * era attivo (confermato, in attesa, invitato) al commit. Null altrove.
+   */
+  cancellationMessage: string | null;
   capabilities: PersonalCapabilities;
+  /** DAS-REV-31 §19: lo stato dell'evento visto dalla proiezione personale. */
+  eventStatus: "published" | "completed" | "cancelled" | null;
   /** `not_sports_profile`, `blocked`, `no_profile` o null. */
   ineligibleReason: string | null;
   participation: MyParticipation | null;
@@ -144,23 +151,68 @@ export type ParticipantsSummary = {
 };
 
 export type EventManagement = {
+  /**
+   * DAS-REV-31 §15, §17, §18: azioni lifecycle risolte dal server.
+   * `canComplete` solo dopo l'inizio, `canCancel` prima della scadenza di
+   * completamento, `canDeleteDraft` solo su DRAFT. La UI non le ricostruisce
+   * da ruolo o orologio locale.
+   */
+  canCancel: boolean;
+  canComplete: boolean;
   canDecide: boolean;
+  canDeleteDraft: boolean;
+  /** DAS-REV-31 §15: false dopo l'inizio. */
   canEdit: boolean;
   /** DAS-REV-30 §8: nuovi inviti (operativo, non pieno, capability). */
   canInvite: boolean;
   canManageParticipants: boolean;
   canReadParticipants: boolean;
   canShare: boolean;
+  /** DAS-REV-31 §18: il messaggio salvato con l'annullamento, o null. */
+  cancellationMessage: string | null;
   confirmedCount: number;
+  /** DAS-REV-31 §19: i confermati alla conclusione, o null. */
+  finalConfirmedCount: number | null;
   /** «full» quando l'invito manca solo per la capienza (§8). */
   inviteBlockedReason: "full" | null;
   participants: ParticipantsSummary | null;
   pendingRequestsCount: number | null;
 };
 
+/**
+ * DAS-REV-31 §13–§14: lo stato persistente più le condizioni derivate dal
+ * server. «Evento iniziato» è una label di `isStarted`, mai uno stato.
+ */
+export type EventLifecycle = {
+  cancelledAt: string | null;
+  completedAt: string | null;
+  completionDueAt: string | null;
+  isStarted: boolean;
+  status: SelectionEventStatus;
+};
+
+/**
+ * DAS-REV-31 §17–§18: esito dei comandi lifecycle. `completed` su un
+ * annullamento = la scadenza era già passata e il server ha concluso
+ * l'evento invece di annullarlo.
+ */
+export type LifecycleCommandResult = {
+  eventId: string | null;
+  outcome:
+    | "completed"
+    | "already_completed"
+    | "cancelled"
+    | "already_cancelled"
+    | "deleted"
+    | null;
+  replayed: boolean;
+  status: SelectionEventStatus | null;
+};
+
 export type SelectionEventDetail = EventPublicProjection & {
   clubId: string;
   landingVisible: boolean;
+  lifecycle: EventLifecycle;
   management: EventManagement | null;
   participationMode: ParticipationMode | null;
   personal: PersonalState;

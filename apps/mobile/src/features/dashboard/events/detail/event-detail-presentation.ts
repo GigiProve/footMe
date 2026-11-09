@@ -219,6 +219,12 @@ export function venueLines(event: Pick<EventPublicProjection, "venueAddress" | "
  *     count senza limite (§11: niente «illimitati»).
  */
 export function capacityLine(detail: SelectionEventDetail): string | null {
+  /* DAS-REV-31 §19, screen 10/12: sull'evento terminato i numeri storici
+     stanno nel riepilogo Partecipanti; «32 / 50» non è più una capienza. */
+  if (detail.status === "completed" || detail.status === "cancelled") {
+    return null;
+  }
+
   if (detail.management) {
     const confirmed = detail.management.confirmedCount;
 
@@ -261,7 +267,9 @@ export type NoticeIcon =
   | "alert-circle-outline"
   | "flag-outline"
   | "person-outline"
-  | "mail-outline";
+  | "mail-outline"
+  /* DAS-REV-31 screen 18: «Informazioni aggiornate». */
+  | "information-circle-outline";
 
 export type Notice = {
   icon: NoticeIcon;
@@ -470,9 +478,21 @@ function personalViewFor(detail: SelectionEventDetail): PersonalView {
     : null;
   const none = { helper: null, secondaryAction: null } as const;
 
-  // 1. Evento terminato: dominante, storico personale senza azioni.
+  /* 1. Evento terminato: dominante, senza azioni. DAS-REV-31 §19, screen 12:
+     lo stato dell'evento sta nella pillola sopra il titolo; lo stato
+     personale non compare come promessa attuale («Partecipazione
+     confermata») e l'unico messaggio è quello dell'annullamento, se il
+     server lo rende leggibile. */
   if (terminal) {
-    return { ...none, action: null, eventNotice: terminal, message, modeLine: null, status };
+    const cancellation =
+      detail.status === "cancelled" && detail.personal.cancellationMessage
+        ? {
+            body: detail.personal.cancellationMessage,
+            title: DETAIL_COPY.clubMessageTitle(detail.club.name),
+          }
+        : null;
+
+    return { ...none, action: null, eventNotice: null, message: cancellation, modeLine: null, status: null };
   }
 
   // 2a. DAS-REV-30 §18: invito corrente. Accetta e Rifiuta, mai Iscriviti.
@@ -627,7 +647,14 @@ export function societyActions(detail: SelectionEventDetail, url: string | null)
     canInvite,
     /** Spiegazione sobria quando l'invito manca solo per la capienza. */
     inviteFullNotice: management?.inviteBlockedReason === "full" ? DETAIL_COPY.inviteFullNotice : null,
-    shareIsPrimary: !canInvite,
+    /* DAS-REV-31 §15, §19, screen 08–10: dopo l'inizio e nello storico la
+       condivisione resta (QA-039 della 29) ma non è più la CTA primaria —
+       la normale gestione non è più operativa. */
+    shareIsPrimary:
+      !canInvite &&
+      !detail.lifecycle.isStarted &&
+      detail.status !== "completed" &&
+      detail.status !== "cancelled",
     canShare: !!management?.canShare && !!url,
     /* §9: per lo storico pubblico wording neutro; nessuna promessa di
        iscrizioni nel messaggio condiviso. */

@@ -6,7 +6,7 @@
  * (§11, §14), la validazione del form CUSTOM (§16) e la destinazione dopo
  * una rimozione (§21). Le schermate leggono, non decidono.
  */
-import { EVALUATION_LABELS, priorityLabel } from "../shortlist-presentation";
+import { EVALUATION_LABELS, SHORTLIST_COPY, priorityLabel } from "../shortlist-presentation";
 import type { ShortlistErrorKind } from "../shortlist-types";
 import type {
   ProfileDestination,
@@ -312,14 +312,29 @@ export function createErrorFields(kind: ShortlistErrorKind): Partial<ListFormErr
       return { description: `Massimo ${LIST_DESCRIPTION_MAX_LENGTH} caratteri.` };
     case "scopeInvalid":
       return { scope: PROFILE_SHORTLIST_COPY.scopeInvalid };
+    /* DAS-REV-31 §9: «se il contesto perde validità, rivalida e interrompi
+       l'add». Nulla è stato creato; il form non riprova da solo. */
+    case "eventSourceUnavailable":
+      return { banner: SHORTLIST_COPY.eventSourceUnavailable };
     default:
       return { banner: PROFILE_SHORTLIST_COPY.createError };
   }
 }
 
-/** §27: copy di un errore di aggiunta. */
-export function addFailureCopy(kind: ShortlistErrorKind): string {
+/**
+ * §27: copy di un errore di aggiunta.
+ *
+ * DAS-REV-31 §28: un add con provenienza evento usa la copy della 31 per
+ * l'errore generico, e §11 dà al contesto evento non più valido una copy
+ * propria — mai la ricaduta silenziosa su un add dal profilo.
+ */
+export function addFailureCopy(
+  kind: ShortlistErrorKind,
+  options: { fromEvent?: boolean } = {},
+): string {
   switch (kind) {
+    case "eventSourceUnavailable":
+      return SHORTLIST_COPY.eventSourceUnavailable;
     case "notFound":
     case "gone":
     case "notAuthorized":
@@ -327,8 +342,90 @@ export function addFailureCopy(kind: ShortlistErrorKind): string {
          a un'altra Società o è stata resa riservata. */
       return PROFILE_SHORTLIST_COPY.unavailable;
     default:
-      return PROFILE_SHORTLIST_COPY.addError;
+      return options.fromEvent ? SHORTLIST_COPY.addError : PROFILE_SHORTLIST_COPY.addError;
   }
+}
+
+/**
+ * Intento di un add (DAS-REV-26 §25 + DAS-REV-31 §11).
+ *
+ * La provenienza fa parte dell'intento: lo stesso add verso la stessa
+ * destinazione da evento e dal profilo sono **due** operazioni, con due
+ * chiavi idempotenti — una ricevuta EVENT non risponde mai a un add PROFILE
+ * e viceversa. Il retry dopo un errore di rete conserva la provenienza
+ * perché rigenera lo stesso intento.
+ */
+export function addIntent(destination: string, sourceEventId: string | null): string {
+  return `add:${sourceEventId ? `event:${sourceEventId}` : "profile"}:${destination}`;
+}
+
+/** Parametri del profilo che portano il contesto evento (DAS-REV-31 §8). */
+export type EventProfileParams = {
+  sourceClubId?: string | string[];
+  sourceEventId?: string | string[];
+  sourcePersonId?: string | string[];
+};
+
+/**
+ * Il profilo live aperto dal centro partecipanti (DAS-REV-31 §8).
+ *
+ * «Conserva contesto evento, persona e Società nell'origine della
+ * navigazione.» Il contesto vive nei parametri di **questa** istanza della
+ * route, legato alla persona: aprire un'altra persona, o entrare dal Cerca,
+ * crea un'istanza senza parametri. Nessuna variabile globale lastEvent.
+ */
+export function eventProfileHref(input: {
+  clubId: string;
+  eventId: string;
+  personId: string;
+}): string {
+  const person = encodeURIComponent(input.personId);
+  const query = [
+    `sourceEventId=${encodeURIComponent(input.eventId)}`,
+    `sourceClubId=${encodeURIComponent(input.clubId)}`,
+    `sourcePersonId=${person}`,
+  ].join("&");
+
+  return `/profile/${person}?${query}`;
+}
+
+function single(value: string | string[] | undefined): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
+/**
+ * L'evento da usare come provenienza dalla stella del profilo (DAS-REV-31
+ * §8), oppure null.
+ *
+ * Vale solo se il percorso esplicito è intatto: parametri presenti, persona
+ * mostrata = persona del percorso, Società operativa = Società del
+ * percorso. Un cambio di Società o una persona diversa lo spengono — il
+ * vecchio contesto non si propaga. Il server rivalida tutto comunque (§11).
+ */
+export function eventSourceFromRoute(input: {
+  params: EventProfileParams;
+  routePersonId: string | null;
+  societyId: string | null;
+  viewedPersonId: string | null;
+}): string | null {
+  const eventId = single(input.params.sourceEventId);
+  const clubId = single(input.params.sourceClubId);
+  const personId = single(input.params.sourcePersonId);
+
+  if (!eventId || !clubId || !personId) {
+    return null;
+  }
+
+  if (!input.societyId || clubId !== input.societyId) {
+    return null;
+  }
+
+  if (personId !== input.routePersonId || personId !== input.viewedPersonId) {
+    return null;
+  }
+
+  return eventId;
 }
 
 /** §27: un errore definitivo non va riprovato con la stessa chiave. */

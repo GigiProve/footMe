@@ -55,6 +55,12 @@ export type SelectionEventsErrorCode =
   | "SELECTION_EVENT_PARTICIPATION_CHANGED"
   /* DAS-REV-30: sorgente Shortlist revocata, anti-abuso tecnico (§14, §27). */
   | "SHORTLIST_SOURCE_NOT_AVAILABLE"
+  /* DAS-REV-31 §15, §17, §18: guard temporali e lifecycle. */
+  | "SELECTION_EVENT_NOT_STARTED"
+  | "SELECTION_EVENT_STARTED"
+  | "SELECTION_EVENT_COMPLETED"
+  | "SELECTION_EVENT_CANCELLED"
+  | "SELECTION_EVENT_MESSAGE_TOO_LONG"
   | "RATE_LIMIT"
   | "NETWORK"
   | "TIMEOUT"
@@ -82,6 +88,13 @@ const SERVER_CODES: readonly SelectionEventsErrorCode[] = [
   "SELECTION_EVENT_NOT_OPERATIONAL",
   "SELECTION_EVENT_PARTICIPATION_CHANGED",
   "SHORTLIST_SOURCE_NOT_AVAILABLE",
+  /* «…_NOT_STARTED» non contiene «…_STARTED» come sottostringa: l'ordine fra
+     i due non conta. */
+  "SELECTION_EVENT_NOT_STARTED",
+  "SELECTION_EVENT_STARTED",
+  "SELECTION_EVENT_COMPLETED",
+  "SELECTION_EVENT_CANCELLED",
+  "SELECTION_EVENT_MESSAGE_TOO_LONG",
   "RATE_LIMIT",
 ] as const;
 

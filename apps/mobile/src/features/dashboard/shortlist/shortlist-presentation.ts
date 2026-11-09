@@ -14,7 +14,9 @@ import type {
   ShortlistFilters,
   ShortlistPriority,
   ShortlistPriorityFilter,
+  ShortlistSourceEvent,
 } from "./shortlist-types";
+import { formatCivilDate } from "../events/events-presentation";
 
 /** §30: stringhe localizzate in un posto solo. */
 export const SHORTLIST_COPY = {
@@ -75,6 +77,12 @@ export const SHORTLIST_COPY = {
   /** §14, metadati leggeri del pool. */
   fromApplication: "Da candidatura",
   fromProfile: "Aggiunto dal profilo",
+  /** DAS-REV-31 §12: l'origine EVENT, nel pool e nel dettaglio. */
+  fromEvent: "Aggiunto da evento",
+  openEvent: "Apri evento",
+  eventUnavailable: "Dettaglio evento non disponibile.",
+  /** DAS-REV-31 §11, contratto: il contesto evento non vale più. */
+  eventSourceUnavailable: "L’evento non è più disponibile come provenienza.",
 
   /* ----- DAS-REV-25 ----------------------------------------------------
      §4: «Centralizza le stringhe localizzate.» Tutto ciò che la 25 mostra
@@ -279,19 +287,17 @@ export function originLine(input: {
     return SHORTLIST_COPY.entryApplicationWithdrawn;
   }
 
-  if (input.applicationState === "active" && input.createdSource === "profile") {
+  /* DAS-REV-31 §10: «un'Application collegata successivamente non cambia
+     created_source» — e come per PROFILE la riga dice la candidatura
+     arrivata dopo, non un'origine che la nasconde. */
+  if (
+    input.applicationState === "active" &&
+    (input.createdSource === "profile" || input.createdSource === "event")
+  ) {
     return SHORTLIST_COPY.entryApplicationReceived;
   }
 
-  if (input.createdSource === "application") {
-    return SHORTLIST_COPY.fromApplication;
-  }
-
-  if (input.createdSource === "profile") {
-    return SHORTLIST_COPY.fromProfile;
-  }
-
-  return null;
+  return originAuditLabel(input.createdSource);
 }
 
 /**
@@ -604,7 +610,55 @@ export function originAuditLabel(
     return SHORTLIST_COPY.fromProfile;
   }
 
+  if (createdSource === "event") {
+    return SHORTLIST_COPY.fromEvent;
+  }
+
   return null;
+}
+
+export type EntryEventOrigin = {
+  /** «30 settembre 2026», o null se lo snapshot non ha una data leggibile. */
+  dateLabel: string | null;
+  /** Destinazione del link «Apri evento»; null = nessun link né chevron. */
+  eventId: string | null;
+  label: string;
+  /** Meta testuale dello stato 20, solo senza link. */
+  unavailableNote: string | null;
+  title: string;
+};
+
+/**
+ * Il metadato «Aggiunto da evento» del dettaglio (DAS-REV-31 §12, screen
+ * 05 e 20).
+ *
+ * Esiste soltanto per un'origine EVENT con snapshot: un add già soddisfatto
+ * o una persona che oggi è partecipante non producono questa dicitura
+ * («non dedurre una nuova origine perché la persona è oggi partecipante»).
+ * Il link dipende dal solo `eventId` che il server concede oggi; senza, lo
+ * snapshot resta metadato interno con «Dettaglio evento non disponibile.»,
+ * mai un errore globale della Shortlist.
+ *
+ * La data è un giorno civile nel fuso dell'evento: si formatta, non si
+ * converte (nessun `new Date` su `YYYY-MM-DD`).
+ */
+export function entryEventOrigin(input: {
+  createdSource: ShortlistCreatedSource;
+  sourceEvent: ShortlistSourceEvent | null;
+}): EntryEventOrigin | null {
+  if (input.createdSource !== "event" || !input.sourceEvent) {
+    return null;
+  }
+
+  const { date, eventId, title } = input.sourceEvent;
+
+  return {
+    dateLabel: formatCivilDate(date, { withYear: true }),
+    eventId,
+    label: SHORTLIST_COPY.fromEvent,
+    title,
+    unavailableNote: eventId ? null : SHORTLIST_COPY.eventUnavailable,
+  };
 }
 
 /**

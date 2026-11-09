@@ -89,6 +89,12 @@ import { ShortlistError } from "../../dashboard/shortlist/shortlist-types";
 type ProfileTarget = {
   fullName: string;
   personId: string;
+  /**
+   * DAS-REV-31 §9: «Crea nuova lista … Conserva il contesto EVENT durante il
+   * passaggio.» Parte dell'impronta idempotente: la stessa lista creata da
+   * evento e dal profilo sono due intenti.
+   */
+  sourceEventId?: string | null;
 };
 
 type SocietyLine = {
@@ -108,6 +114,8 @@ type CreateListModalProps = {
   profileTarget?: ProfileTarget;
   /** Ingresso dal profilo: esito della creazione con inserimento (§19). */
   onProfileOutcome?: (outcome: CustomCreateOutcome) => void;
+  /** DAS-REV-31 §11: il contesto evento di `profileTarget` non vale più. */
+  onEventSourceUnavailable?: () => void;
   society?: SocietyLine;
   /** Storico: dalla 27 non esiste più un pannello di successo (§10, §24). */
   successMode?: "panel" | "skip";
@@ -130,6 +138,7 @@ export function CreateListModal({
   onClose,
   onCreated,
   onDismiss,
+  onEventSourceUnavailable,
   onProfileOutcome,
   profileTarget,
   society,
@@ -212,6 +221,7 @@ export function CreateListModal({
     description.trim(),
     selectedOption?.teamId ?? null,
     profileTarget?.personId ?? null,
+    profileTarget?.sourceEventId ?? null,
     access,
     access === "shared" ? [...shares].sort() : [],
   ]);
@@ -231,6 +241,7 @@ export function CreateListModal({
         idempotencyKey: keys.key(signature),
         name: name.trim(),
         personId: profileTarget?.personId ?? null,
+        sourceEventId: profileTarget?.sourceEventId ?? null,
         accessMode: access,
         shareIds: access === "shared" ? shares : [],
         teamId: selectedOption?.teamId ?? null,
@@ -262,6 +273,13 @@ export function CreateListModal({
           void queryClient.invalidateQueries({ queryKey: ["society-shortlist-share-candidates"] });
         }
         setAccessError(governanceErrorCopy(kind, "create", false));
+        return;
+      }
+
+      /* DAS-REV-31 §9, §11: nulla è stato creato e il comando non ricade su
+         un add dal profilo. Chi ha aperto il form chiude il contesto evento. */
+      if (kind === "eventSourceUnavailable" && onEventSourceUnavailable) {
+        onEventSourceUnavailable();
         return;
       }
 

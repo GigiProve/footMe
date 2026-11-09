@@ -25,6 +25,11 @@
  * form si apre soltanto a pannello chiuso: due Modal RN in transizione
  * contemporanea sono il guasto noto di iOS che `AddToShortlistFlow` (RET-07)
  * aveva già documentato. Lo stesso handoff qui.
+ *
+ * DAS-REV-31 §8, §9, §11: con `sourceEventId` ogni add — diretto, Crea e
+ * aggiungi, Riprova aggiunta — porta il contesto evento al server, ed è un
+ * intento distinto dall'add dal profilo. Un contesto rifiutato chiude il
+ * flusso con feedback; non diventa mai un add PROFILE.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -61,6 +66,7 @@ import { ProfileShortlistSummary } from "./components/ProfileShortlistSummary";
 import {
   PROFILE_SHORTLIST_COPY,
   addFailureCopy,
+  addIntent,
   afterRemove,
   isDefinitiveFailure,
   membershipLines,
@@ -84,15 +90,36 @@ import { useIntentKeys } from "./use-intent-key";
 
 export type ProfileShortlistStep = "selector" | "summary" | "actions" | "recovery";
 
-type Recovery = { name: string; scopeLabel: string; shortlistId: string };
+/* DAS-REV-31 §9: il recupero «Riprova aggiunta» conserva la provenienza con
+   cui la lista è stata creata, anche se nel frattempo il chiamante l'ha
+   spenta: è lo stesso intento, non uno nuovo. */
+type Recovery = {
+  name: string;
+  scopeLabel: string;
+  shortlistId: string;
+  sourceEventId: string | null;
+};
+
+type AddVariables = { row: ProfileDestination; sourceEventId: string | null };
 
 type Props = {
   actorId: string;
   initialStep: "selector" | "summary";
   onClose: () => void;
+  /**
+   * DAS-REV-31 §11: il server ha rifiutato il contesto evento. Il chiamante
+   * lo spegne; il flusso mostra il feedback e si chiude, senza ripetere
+   * l'add come PROFILE.
+   */
+  onEventSourceUnavailable?: () => void;
   open: boolean;
   person: ProfileShortlistPerson;
   society: ProfileShortlistSociety;
+  /**
+   * DAS-REV-31 §8: l'evento del percorso esplicito partecipanti → profilo
+   * di **questa** persona. Assente per ogni altro ingresso.
+   */
+  sourceEventId?: string | null;
 };
 
 function kindOf(error: unknown): ShortlistErrorKind {
@@ -103,9 +130,11 @@ export function ProfileShortlistFlow({
   actorId,
   initialStep,
   onClose,
+  onEventSourceUnavailable,
   open,
   person,
   society,
+  sourceEventId = null,
 }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -251,28 +280,46 @@ export function ProfileShortlistFlow({
     }
   };
 
+  /* DAS-REV-31 §11: «Se il contesto EVENT non è più autorizzato, non
+     trasformare silenziosamente il comando in PROFILE. Mostra feedback
+     controllato e preserva solo le superfici ancora lecite.» Il contesto si
+     spegne dal chiamante; un nuovo add volontario sarà un intento nuovo. */
+  const endEventSource = (error: unknown) => {
+    failureToast(error, addFailureCopy("eventSourceUnavailable"));
+    onEventSourceUnavailable?.();
+    reconcile();
+    onClose();
+  };
+
   /* ---------------------------- add (§13) ---------------------------- */
 
   const add = useMutation({
-    mutationFn: (row: ProfileDestination) =>
+    mutationFn: ({ row, sourceEventId: source }: AddVariables) =>
       addProfileToShortlist({
         clubId: society.id,
-        idempotencyKey: keys.key(`add:${destinationKey(row)}`),
+        idempotencyKey: keys.key(addIntent(destinationKey(row), source)),
         personId: person.id,
+        sourceEventId: source,
         target:
           row.kind === "position" && row.positionId
             ? { positionId: row.positionId }
             : { shortlistId: row.shortlistId ?? "" },
       }),
-    onError: (error, row) => {
+    onError: (error, { row, sourceEventId: source }) => {
       const kind = kindOf(error);
 
       if (isDefinitiveFailure(kind)) {
-        keys.settle(`add:${destinationKey(row)}`);
+        keys.settle(addIntent(destinationKey(row), source));
       }
 
       setPendingKey(null);
-      failureToast(error, addFailureCopy(kind));
+
+      if (kind === "eventSourceUnavailable") {
+        endEventSource(error);
+        return;
+      }
+
+      failureToast(error, addFailureCopy(kind, { fromEvent: !!source }));
 
       /* §27: «Destinazione non più disponibile: … Aggiorna le destinazioni e
          le azioni.» */
@@ -281,9 +328,9 @@ export function ProfileShortlistFlow({
         void customQuery.refetch();
       }
     },
-    onMutate: (row) => setPendingKey(destinationKey(row)),
-    onSuccess: (outcome, row) => {
-      keys.settle(`add:${destinationKey(row)}`);
+    onMutate: ({ row }) => setPendingKey(destinationKey(row)),
+    onSuccess: (outcome, { row, sourceEventId: source }) => {
+      keys.settle(addIntent(destinationKey(row), source));
       reportSuccess();
       setPendingKey(null);
       reconcile();
@@ -432,31 +479,49 @@ export function ProfileShortlistFlow({
       return;
     }
 
-    /* Lista confermata, membership iniziale non attiva: screen 16. */
+    /* Lista confermata, membership iniziale non attiva: screen 16. La
+       provenienza è quella con cui il form ha creato la lista. */
     setRecovery({
       name: outcome.name,
       scopeLabel: outcome.scopeLabel,
       shortlistId: outcome.shortlistId,
+      sourceEventId,
     });
     setStep("recovery");
+  };
+
+  /* DAS-REV-31 §9: creazione rifiutata per contesto evento non valido —
+     nulla è stato creato, il form si chiude con il feedback controllato. */
+  const onCreateEventSourceUnavailable = () => {
+    setCreateOpen(false);
+    endEventSource(new ShortlistError("eventSourceUnavailable"));
   };
 
   const retryAdd = useMutation({
     mutationFn: (target: Recovery) =>
       addProfileToShortlist({
         clubId: society.id,
-        idempotencyKey: keys.key(`add:c:${target.shortlistId}`),
+        idempotencyKey: keys.key(addIntent(`c:${target.shortlistId}`, target.sourceEventId)),
         personId: person.id,
+        sourceEventId: target.sourceEventId,
         target: { shortlistId: target.shortlistId },
       }),
     onError: (error, target) => {
       const kind = kindOf(error);
 
       if (isDefinitiveFailure(kind)) {
-        keys.settle(`add:c:${target.shortlistId}`);
+        keys.settle(addIntent(`c:${target.shortlistId}`, target.sourceEventId));
       }
 
-      failureToast(error, addFailureCopy(kind));
+      /* §9: «se il contesto perde validità, rivalida e interrompi l'add. Una
+         lista già creata resta gestita dalle regole del suo dominio.» */
+      if (kind === "eventSourceUnavailable") {
+        setRecovery(null);
+        endEventSource(error);
+        return;
+      }
+
+      failureToast(error, addFailureCopy(kind, { fromEvent: !!target.sourceEventId }));
 
       /* §19: «Se la lista è stata eliminata o l'accesso revocato durante il
          recupero, non ricrearla automaticamente. Chiudi i controlli non
@@ -467,7 +532,7 @@ export function ProfileShortlistFlow({
       }
     },
     onSuccess: (_outcome, target) => {
-      keys.settle(`add:c:${target.shortlistId}`);
+      keys.settle(addIntent(`c:${target.shortlistId}`, target.sourceEventId));
       reportSuccess();
       reconcile();
       setRecovery(null);
@@ -541,7 +606,7 @@ export function ProfileShortlistFlow({
         onCreate={() => handoff(() => setCreateOpen(true))}
         onPick={(row) => {
           if (!add.isPending) {
-            add.mutate(row);
+            add.mutate({ row, sourceEventId });
           }
         }}
         pendingKey={pendingKey}
@@ -653,8 +718,9 @@ export function ProfileShortlistFlow({
           setCreateOpen(false);
           setSheetHidden(false);
         }}
+        onEventSourceUnavailable={onCreateEventSourceUnavailable}
         onProfileOutcome={onCreateOutcome}
-        profileTarget={{ fullName: person.fullName, personId: person.id }}
+        profileTarget={{ fullName: person.fullName, personId: person.id, sourceEventId }}
         society={{ logoUrl: society.logoUrl, name: society.name }}
         visible={open && createOpen}
       />

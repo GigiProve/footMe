@@ -25,8 +25,9 @@ type Props = {
  * un errore tecnico. Evita icone ripetitive su ogni metadato.»
  *
  * Da qui: testo nero per il titolo, grigio neutro per i metadati, nessun
- * colore di stato. Lo stato dello storico è una parola a destra, non una
- * pillola.
+ * colore di stato. Lo stato dello storico è testo, non una pillola:
+ * DAS-REV-31 screen 15 lo porta sotto la data come «Concluso · 32
+ * confermati» / «Annullato» (riga `counts` di `eventRowLines`).
  *
  * §27: «Riga evento come unità tappabile quando la destinazione è
  * disponibile, non solo chevron.» Senza destinazione — eventi in programma
