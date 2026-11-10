@@ -12,9 +12,18 @@ type MessageBubbleProps = {
   isOwnMessage: boolean;
   message: ConversationMessage;
   onCopyContactPhone: (phone: string) => void;
+  /** Solo nei GROUP e solo per le bolle altrui (DAS-REV-32 §25, PNG 14). */
+  senderName?: string;
 };
 
-export function MessageBubble({ isOwnMessage, message, onCopyContactPhone }: MessageBubbleProps) {
+export function MessageBubble({
+  isOwnMessage,
+  message,
+  onCopyContactPhone,
+  senderName,
+}: MessageBubbleProps) {
+  const visibleSenderName = !isOwnMessage && senderName ? senderName : null;
+
   if (
     message.message_kind === "contact_card" &&
     message.shared_contact_name &&
@@ -36,6 +45,11 @@ export function MessageBubble({ isOwnMessage, message, onCopyContactPhone }: Mes
 
   return (
     <View style={[styles.wrapper, isOwnMessage ? styles.alignEnd : styles.alignStart]}>
+      {visibleSenderName ? (
+        <AppText color="muted" numberOfLines={1} style={styles.senderName} variant="caption">
+          {visibleSenderName}
+        </AppText>
+      ) : null}
       <View
         style={[
           styles.bubble,
@@ -184,6 +198,9 @@ const styles = StyleSheet.create({
     height: 200,
     justifyContent: "center",
     width: 200,
+  },
+  senderName: {
+    marginBottom: spacing[4],
   },
   text: {
     fontWeight: "400",

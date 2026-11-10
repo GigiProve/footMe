@@ -91,6 +91,11 @@ export default function DashboardLayout() {
             screen 21 mostra la bottom navigation con Dashboard selezionata.
             Il dettaglio del singolo incarico (screen 22), il form condiviso
             e le conferme sono flussi focalizzati in app/role-link/. */}
+        {/* DAS-REV-32 §5: Centro Gruppi e dettaglio amministrativo sono pagine
+            della Dashboard (bottom navigation, Dashboard selezionata). Il
+            wizard sta in app/group-compose/; la chat resta in app/messages/. */}
+        <Stack.Screen name="groups/index" />
+        <Stack.Screen name="groups/[conversationId]" />
         <Stack.Screen name="people/index" />
         <Stack.Screen name="people/[profileId]" />
         {/* DAS-REV-22 §11: «Bottom navigation canonica Home | Cerca |

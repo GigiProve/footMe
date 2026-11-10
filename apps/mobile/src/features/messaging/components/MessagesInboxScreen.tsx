@@ -17,6 +17,9 @@ import { getUnreadCount } from "../../clubs/notification-service";
 import { formatRelativeTime } from "../../../lib/relative-time";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button, EmptyState, HeaderBell, ScreenHeader } from "../../../ui";
+import { GROUPS_QK } from "../../dashboard/groups/groups-keys";
+import { GROUPS_HREFS } from "../../dashboard/groups/groups-routes";
+import { fetchGroupCreateContexts } from "../../dashboard/groups/groups-service";
 import {
   fetchCommunications,
   type CommunicationSummary,
@@ -27,6 +30,7 @@ import {
   type InboxConversation,
 } from "../messaging-service";
 import {
+  buildConversationPreview,
   buildSearchSections,
   filterCommunications,
   filterConversations,
@@ -40,6 +44,7 @@ import { ConversationRow } from "./ConversationRow";
 import { InboxActionsSheet } from "./InboxActionsSheet";
 import { InboxSearchBar } from "./InboxSearchBar";
 import { InboxTabBar, type InboxTab } from "./InboxTabBar";
+import { NewConversationSheet } from "./NewConversationSheet";
 
 function conversationTimestamp(conversation: InboxConversation): string {
   return conversation.last_message_sent_at
@@ -59,6 +64,15 @@ export function MessagesInboxScreen() {
     useState<CommunicationFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isActionsSheetVisible, setIsActionsSheetVisible] = useState(false);
+  const [isLauncherVisible, setIsLauncherVisible] = useState(false);
+
+  // DAS-REV-32 §12: «Crea gruppo» esiste solo con almeno un contesto Società
+  // in cui la create è consentita. Finché carica o se fallisce resta nascosto.
+  const createContextsQuery = useQuery({
+    enabled: !!profileId,
+    queryFn: fetchGroupCreateContexts,
+    queryKey: GROUPS_QK.contexts(profileId),
+  });
 
   const conversationsQuery = useQuery({
     enabled: !!profileId,
@@ -115,6 +129,21 @@ export function MessagesInboxScreen() {
     });
   }
 
+  const createContexts = createContextsQuery.data ?? [];
+
+  function handleNewMessage() {
+    // Nessun selettore destinatari: la chat diretta parte da un profilo.
+    router.push("/search/profiles");
+  }
+
+  function handleCreateGroup() {
+    // Una sola Società: impostata direttamente. Più Società: il wizard apre il
+    // selector «Crea gruppo per».
+    const clubId = createContexts.length === 1 ? createContexts[0].clubId : null;
+
+    router.push(GROUPS_HREFS.create("messages", clubId) as never);
+  }
+
   function handleOpenCommunication(communication: CommunicationSummary) {
     router.push({
       params: { communicationId: communication.communication_id },
@@ -136,6 +165,15 @@ export function MessagesInboxScreen() {
           action={
             <View style={styles.headerActions}>
               <HeaderBell count={unreadCount} onPress={() => router.push("/notifications")} />
+              <Pressable
+                accessibilityLabel="Nuova conversazione"
+                accessibilityRole="button"
+                onPress={() => setIsLauncherVisible(true)}
+                style={styles.actionsButton}
+                testID="inbox-new-conversation"
+              >
+                <Ionicons color={colors.textMuted} name="create-outline" size={20} />
+              </Pressable>
               <Pressable
                 accessibilityLabel="Gestisci messaggi"
                 accessibilityRole="button"
@@ -171,6 +209,7 @@ export function MessagesInboxScreen() {
             onOpenCommunication={handleOpenCommunication}
             onOpenConversation={handleOpenConversation}
             query={searchQuery}
+            viewerProfileId={profileId}
           />
         ) : isFullyEmpty ? (
           <EmptyState
@@ -191,6 +230,7 @@ export function MessagesInboxScreen() {
             filter={chatFilter}
             onChangeFilter={setChatFilter}
             onOpenConversation={handleOpenConversation}
+            viewerProfileId={profileId}
           />
         ) : (
           <CommunicationsTabContent
@@ -207,6 +247,14 @@ export function MessagesInboxScreen() {
         onMarkAllRead={() => markAllReadMutation.mutate()}
         visible={isActionsSheetVisible}
       />
+
+      <NewConversationSheet
+        canCreateGroup={createContexts.length > 0}
+        onClose={() => setIsLauncherVisible(false)}
+        onCreateGroup={handleCreateGroup}
+        onNewMessage={handleNewMessage}
+        visible={isLauncherVisible}
+      />
     </Screen>
   );
 }
@@ -216,11 +264,13 @@ function ChatTabContent({
   filter,
   onChangeFilter,
   onOpenConversation,
+  viewerProfileId,
 }: {
   conversations: InboxConversation[];
   filter: ChatFilter;
   onChangeFilter: (filter: ChatFilter) => void;
   onOpenConversation: (conversation: InboxConversation) => void;
+  viewerProfileId: string;
 }) {
   const filtered = filterConversations(conversations, filter);
 
@@ -238,12 +288,12 @@ function ChatTabContent({
           renderItem={({ item }) => (
             <ConversationRow
               avatarUrl={item.avatar_url}
+              groupAvatarPath={item.group_avatar_path}
               isGroup={item.conversation_type === "group"}
-              lastMessage={item.last_message_body ?? "Apri la chat per iniziare."}
+              lastMessage={buildConversationPreview(item, viewerProfileId)}
               name={item.display_title}
               onPress={() => onOpenConversation(item)}
               timestamp={conversationTimestamp(item)}
-              typeLabel={item.conversation_type === "group" ? "Gruppo" : "Diretta"}
               unreadCount={item.unread_count}
             />
           )}
@@ -297,12 +347,14 @@ function SearchResults({
   onOpenCommunication,
   onOpenConversation,
   query,
+  viewerProfileId,
 }: {
   communications: CommunicationSummary[];
   conversations: InboxConversation[];
   onOpenCommunication: (communication: CommunicationSummary) => void;
   onOpenConversation: (conversation: InboxConversation) => void;
   query: string;
+  viewerProfileId: string;
 }) {
   const { chatResults, communicationResults } = buildSearchSections(
     conversations,
@@ -326,13 +378,13 @@ function SearchResults({
           {chatResults.map((conversation) => (
             <ConversationRow
               avatarUrl={conversation.avatar_url}
+              groupAvatarPath={conversation.group_avatar_path}
               isGroup={conversation.conversation_type === "group"}
               key={conversation.conversation_id}
-              lastMessage={conversation.last_message_body ?? "Apri la chat per iniziare."}
+              lastMessage={buildConversationPreview(conversation, viewerProfileId)}
               name={conversation.display_title}
               onPress={() => onOpenConversation(conversation)}
               timestamp={conversationTimestamp(conversation)}
-              typeLabel={conversation.conversation_type === "group" ? "Gruppo" : "Diretta"}
               unreadCount={conversation.unread_count}
             />
           ))}

@@ -176,6 +176,8 @@ export type InboxConversation = {
   unread_count: number;
   archived: boolean;
   blocked_by_me: boolean;
+  /** DAS-REV-32 §5: path privato dell'immagine dei gruppi organizzativi, altrimenti null. */
+  group_avatar_path: string | null;
 };
 
 export async function fetchInboxConversations(
@@ -249,6 +251,65 @@ export async function fetchDirectConversationMeta(
   }
 
   return (data?.[0] ?? null) as DirectConversationMeta | null;
+}
+
+export type ConversationType = "direct" | "group";
+
+/**
+ * Tipo della conversazione, letto dalla riga che la RLS rende visibile ai soli
+ * partecipanti. Serve alla chat per scegliere quale meta chiedere senza
+ * provocare un errore sul ramo sbagliato. Null se la riga non è visibile.
+ */
+export async function fetchConversationType(
+  conversationId: string,
+): Promise<ConversationType | null> {
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("conversation_type")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const type = data?.conversation_type;
+
+  return type === "group" || type === "direct" ? type : null;
+}
+
+export type GroupConversationMeta = {
+  title: string;
+  avatarUrl: string | null;
+  avatarPath: string | null;
+  clubName: string | null;
+  peopleCount: number;
+  myRole: "admin" | "member";
+};
+
+/** DAS-REV-32 §25: testata della chat di gruppo. Errore se non è un gruppo del viewer. */
+export async function fetchGroupConversationMeta(
+  conversationId: string,
+): Promise<GroupConversationMeta> {
+  const { data, error } = await supabase.rpc("fetch_group_conversation_meta", {
+    p_conversation_id: conversationId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const text = (value: unknown) => (typeof value === "string" && value ? value : null);
+
+  return {
+    avatarPath: text(raw.avatar_path),
+    avatarUrl: text(raw.avatar_url),
+    clubName: text(raw.club_name),
+    myRole: raw.my_role === "admin" ? "admin" : "member",
+    peopleCount: typeof raw.people_count === "number" ? raw.people_count : 0,
+    title: text(raw.title) ?? "",
+  };
 }
 
 export async function blockUser(targetProfileId: string) {

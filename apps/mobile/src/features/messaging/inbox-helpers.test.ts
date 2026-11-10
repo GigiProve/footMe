@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CommunicationSummary } from "./communications-service";
 import {
+  buildConversationPreview,
   buildSearchSections,
   categoryLabel,
   CHAT_FILTERS,
@@ -28,6 +29,7 @@ const directConversation: InboxConversation = {
   unread_count: 0,
   archived: false,
   blocked_by_me: false,
+  group_avatar_path: null,
 };
 
 const groupConversation: InboxConversation = {
@@ -45,6 +47,7 @@ const groupConversation: InboxConversation = {
   unread_count: 3,
   archived: false,
   blocked_by_me: false,
+  group_avatar_path: null,
 };
 
 const conversations: InboxConversation[] = [directConversation, groupConversation];
@@ -103,6 +106,30 @@ describe("filterConversations", () => {
     expect(filterConversations(conversations, "unread")).toEqual([
       groupConversation,
     ]);
+  });
+});
+
+describe("buildConversationPreview", () => {
+  it("prefixes the sender name on group rows", () => {
+    expect(buildConversationPreview(groupConversation, "me")).toBe(
+      "Coach Bianchi: Allenamento spostato",
+    );
+  });
+
+  it("keeps the plain body when the viewer wrote the last group message", () => {
+    expect(buildConversationPreview(groupConversation, "profile-2")).toBe(
+      "Allenamento spostato",
+    );
+  });
+
+  it("never prefixes direct rows", () => {
+    expect(buildConversationPreview(directConversation, "me")).toBe("Ci vediamo domani");
+  });
+
+  it("falls back to the empty prompt when there is no message", () => {
+    expect(
+      buildConversationPreview({ ...groupConversation, last_message_body: null }, "me"),
+    ).toBe("Apri la chat per iniziare.");
   });
 });
 

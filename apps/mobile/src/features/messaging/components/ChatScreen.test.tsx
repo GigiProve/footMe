@@ -1,9 +1,13 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ConversationMessage, DirectConversationMeta } from "../messaging-service";
+import type {
+  ConversationMessage,
+  DirectConversationMeta,
+  GroupConversationMeta,
+} from "../messaging-service";
 
 const backMock = vi.fn();
 const pushMock = vi.fn();
@@ -41,9 +45,17 @@ vi.mock("../../auth/use-session", () => ({
   useSession: sessionMocks.useSession,
 }));
 
+// GroupAvatar (header) pulls the signed-URL helper from groups-service, whose
+// import chain reaches the supabase client.
+vi.mock("../../dashboard/groups/groups-service", () => ({
+  fetchGroupAvatarUrl: vi.fn().mockResolvedValue(null),
+}));
+
 const serviceMocks = vi.hoisted(() => ({
   blockUser: vi.fn(),
+  fetchConversationType: vi.fn(),
   fetchDirectConversationMeta: vi.fn(),
+  fetchGroupConversationMeta: vi.fn(),
   getConversationMessages: vi.fn(),
   getShareablePhoneContact: vi.fn(),
   markConversationRead: vi.fn(),
@@ -62,7 +74,9 @@ vi.mock("../messaging-service", () => {
   return {
     getChatMediaSignedUrl: vi.fn(),
     blockUser: serviceMocks.blockUser,
+    fetchConversationType: serviceMocks.fetchConversationType,
     fetchDirectConversationMeta: serviceMocks.fetchDirectConversationMeta,
+    fetchGroupConversationMeta: serviceMocks.fetchGroupConversationMeta,
     getConversationMessages: serviceMocks.getConversationMessages,
     getShareablePhoneContact: serviceMocks.getShareablePhoneContact,
     markConversationRead: serviceMocks.markConversationRead,
@@ -89,6 +103,14 @@ let ChatScreen: typeof import("./ChatScreen").ChatScreen;
 let ToastProvider: typeof import("../../../ui").ToastProvider;
 let AppText: typeof import("../../../ui").AppText;
 
+/* Gli alberi dei test precedenti vanno smontati: le loro query pendenti
+   altrimenti chiamano i mock durante il test successivo. */
+const mounted: TestRenderer.ReactTestRenderer[] = [];
+
+afterEach(() => {
+  mounted.splice(0).forEach((tree) => act(() => tree.unmount()));
+});
+
 beforeEach(async () => {
   vi.clearAllMocks();
 
@@ -97,6 +119,7 @@ beforeEach(async () => {
   serviceMocks.markConversationRead.mockResolvedValue(undefined);
   serviceMocks.getConversationMessages.mockResolvedValue([]);
   serviceMocks.fetchDirectConversationMeta.mockResolvedValue(null);
+  serviceMocks.fetchConversationType.mockResolvedValue("direct");
   serviceMocks.sendMessage.mockResolvedValue(undefined);
 
   sessionMocks.useSession.mockReturnValue({
@@ -169,7 +192,17 @@ function buildMessage(overrides: Partial<ConversationMessage> = {}): Conversatio
   };
 }
 
+const groupMeta: GroupConversationMeta = {
+  avatarPath: null,
+  avatarUrl: null,
+  clubName: "AC Como",
+  myRole: "admin",
+  peopleCount: 4,
+  title: "Staff Primavera",
+};
+
 async function renderScreen(seed?: {
+  groupMeta?: GroupConversationMeta;
   messages?: ConversationMessage[];
   meta?: DirectConversationMeta;
 }) {
@@ -182,6 +215,10 @@ async function renderScreen(seed?: {
   queryClient.setQueryData(["conversation-messages", "conv-1"], seed?.messages ?? []);
   if (seed?.meta) {
     queryClient.setQueryData(["conversation-meta", "conv-1"], seed.meta);
+  }
+  if (seed?.groupMeta) {
+    queryClient.setQueryData(["conversation-type", "conv-1"], "group");
+    queryClient.setQueryData(["group-conversation-meta", "conv-1"], seed.groupMeta);
   }
 
   let tree!: TestRenderer.ReactTestRenderer;
@@ -198,6 +235,7 @@ async function renderScreen(seed?: {
     await Promise.resolve();
   });
 
+  mounted.push(tree);
   return tree;
 }
 
@@ -214,6 +252,42 @@ describe("ChatScreen", () => {
       .flat();
 
     expect(texts).toContain("Vi seguite reciprocamente");
+  });
+
+  it("renders the group header, the ready state and no direct-only UI", async () => {
+    serviceMocks.fetchConversationType.mockResolvedValue("group");
+    serviceMocks.fetchGroupConversationMeta.mockResolvedValue(groupMeta);
+
+    const tree = await renderScreen({ groupMeta, messages: [] });
+
+    const texts = tree.root
+      .findAllByType(AppText)
+      .map((node) => node.props.children)
+      .flat();
+
+    expect(texts).toContain("AC Como · 4 persone");
+    expect(texts).toContain("Staff Primavera è pronto");
+    expect(texts).toContain("Ora puoi iniziare a scrivere al gruppo.");
+    expect(tree.root.findAllByProps({ accessibilityLabel: "Apri profilo" })).toHaveLength(0);
+    expect(serviceMocks.fetchDirectConversationMeta).not.toHaveBeenCalled();
+  });
+
+  it("shows the sender name above other people's group messages", async () => {
+    serviceMocks.fetchConversationType.mockResolvedValue("group");
+    serviceMocks.fetchGroupConversationMeta.mockResolvedValue(groupMeta);
+
+    const tree = await renderScreen({
+      groupMeta,
+      messages: [buildMessage({ sender_full_name: "Mister Bianchi" })],
+    });
+
+    const texts = tree.root
+      .findAllByType(AppText)
+      .map((node) => node.props.children)
+      .flat();
+
+    expect(texts).toContain("Mister Bianchi");
+    expect(texts).not.toContain("Staff Primavera è pronto");
   });
 
   it("calls sendMessage with the drafted body when the composer sends", async () => {

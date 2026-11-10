@@ -24,6 +24,34 @@ export function filterConversations(
   }
 }
 
+const EMPTY_PREVIEW = "Apri la chat per iniziare.";
+
+/**
+ * Anteprima della riga Inbox (DAS-REV-32 §12). Nei GROUP il mittente è una
+ * PERSON e precede il testo («Mister Bianchi: Domani alle 18:00»); se l'ultimo
+ * mittente sono io, o il nome manca, resta il solo testo. Le DIRECT non
+ * cambiano e non portano alcuna label tecnica.
+ */
+export function buildConversationPreview(
+  conversation: InboxConversation,
+  viewerProfileId: string,
+): string {
+  const body = conversation.last_message_body;
+
+  if (!body) {
+    return EMPTY_PREVIEW;
+  }
+
+  const senderName = conversation.last_message_sender_name?.trim();
+  const isOwn = conversation.last_message_sender_profile_id === viewerProfileId;
+
+  if (conversation.conversation_type === "group" && senderName && !isOwn) {
+    return `${senderName}: ${body}`;
+  }
+
+  return body;
+}
+
 export function filterCommunications(
   list: CommunicationSummary[],
   filter: CommunicationFilter,

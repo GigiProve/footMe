@@ -3,9 +3,15 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, sizes, spacing } from "../../../theme/tokens";
 import { AppText, Avatar, Input } from "../../../ui";
+import { GroupAvatar } from "../../dashboard/groups/components/GroupAvatar";
 
 type ChatHeaderProps = {
   avatarUrl?: string | null;
+  /*
+    DAS-REV-32 §25: in un GROUP l'identità è il gruppo (avatar con iniziali di
+    fallback), non esiste un profilo da aprire: niente azione «Apri profilo».
+  */
+  group?: { avatarPath: string | null } | null;
   isSearchMode: boolean;
   name: string;
   onBack: () => void;
@@ -20,6 +26,7 @@ type ChatHeaderProps = {
 
 export function ChatHeader({
   avatarUrl,
+  group = null,
   isSearchMode,
   name,
   onBack,
@@ -52,8 +59,12 @@ export function ChatHeader({
           ) : null}
         </View>
       ) : (
-        <Pressable onPress={onOpenProfile} style={styles.identity}>
-          <Avatar name={name} size="sm" uri={avatarUrl} />
+        <Pressable disabled={!!group} onPress={onOpenProfile} style={styles.identity}>
+          {group ? (
+            <GroupAvatar name={name} path={group.avatarPath} size="sm" />
+          ) : (
+            <Avatar name={name} size="sm" uri={avatarUrl} />
+          )}
           <View style={styles.textBlock}>
             <AppText numberOfLines={1} style={styles.name} variant="titleSm">
               {name}
@@ -74,9 +85,11 @@ export function ChatHeader({
           </Pressable>
         ) : (
           <>
-            <Pressable accessibilityLabel="Apri profilo" accessibilityRole="button" onPress={onOpenProfile}>
-              <Ionicons color={colors.textPrimary} name="information-circle-outline" size={22} />
-            </Pressable>
+            {group ? null : (
+              <Pressable accessibilityLabel="Apri profilo" accessibilityRole="button" onPress={onOpenProfile}>
+                <Ionicons color={colors.textPrimary} name="information-circle-outline" size={22} />
+              </Pressable>
+            )}
             <Pressable accessibilityLabel="Azioni chat" accessibilityRole="button" onPress={onOpenActions}>
               <Ionicons color={colors.textPrimary} name="ellipsis-vertical" size={20} />
             </Pressable>

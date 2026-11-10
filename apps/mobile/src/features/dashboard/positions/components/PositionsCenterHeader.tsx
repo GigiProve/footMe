@@ -9,7 +9,8 @@ type Props = {
   logoUrl: string | null;
   name: string;
   onBack: () => void;
-  title: string;
+  /** Assente nei dettagli che portano il proprio titolo (DAS-REV-32 §11). */
+  title?: string;
 };
 
 /**
@@ -80,14 +81,16 @@ export function PositionsCenterHeader({
         ) : null}
       </View>
 
-      <AppText
-        accessibilityRole="header"
-        color="neutral"
-        style={styles.title}
-        variant="screenTitle"
-      >
-        {title}
-      </AppText>
+      {title ? (
+        <AppText
+          accessibilityRole="header"
+          color="neutral"
+          style={styles.title}
+          variant="screenTitle"
+        >
+          {title}
+        </AppText>
+      ) : null}
     </View>
   );
 }

@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   blockUser,
+  fetchConversationType,
   fetchDirectConversationMeta,
+  fetchGroupConversationMeta,
   fetchInboxConversations,
   getChatMediaSignedUrl,
   markInboxAllRead,
@@ -183,6 +185,84 @@ describe("openDirectConversation", () => {
     await expect(openDirectConversation("profile-1")).rejects.toThrow(
       "Non puoi avviare una conversazione con te stesso",
     );
+  });
+});
+
+describe("fetchGroupConversationMeta", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+  });
+
+  it("maps the jsonb payload to the typed meta", async () => {
+    rpcMock.mockResolvedValue({
+      data: {
+        avatar_path: "groups/a.jpg",
+        avatar_url: null,
+        club_name: "AC Como",
+        conversation_id: "conversation-1",
+        my_role: "admin",
+        people_count: 4,
+        title: "Staff Primavera",
+      },
+      error: null,
+    });
+
+    const result = await fetchGroupConversationMeta("conversation-1");
+
+    expect(rpcMock).toHaveBeenCalledWith("fetch_group_conversation_meta", {
+      p_conversation_id: "conversation-1",
+    });
+    expect(result).toEqual({
+      avatarPath: "groups/a.jpg",
+      avatarUrl: null,
+      clubName: "AC Como",
+      myRole: "admin",
+      peopleCount: 4,
+      title: "Staff Primavera",
+    });
+  });
+
+  it("defaults the role to member", async () => {
+    rpcMock.mockResolvedValue({ data: { people_count: 2, title: "Gruppo" }, error: null });
+
+    const result = await fetchGroupConversationMeta("conversation-1");
+
+    expect(result.myRole).toBe("member");
+    expect(result.clubName).toBeNull();
+  });
+
+  it("throws when the conversation is not a group of the viewer", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: new Error("Conversazione non trovata") });
+
+    await expect(fetchGroupConversationMeta("conversation-1")).rejects.toThrow(
+      "Conversazione non trovata",
+    );
+  });
+});
+
+describe("fetchConversationType", () => {
+  function mockTypeRow(result: { data: unknown; error: unknown }) {
+    const eq = vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue(result) }));
+    const select = vi.fn(() => ({ eq }));
+
+    fromMock.mockReturnValueOnce({ select } as never);
+
+    return { eq, select };
+  }
+
+  it("reads the type from the conversations row", async () => {
+    const { eq, select } = mockTypeRow({ data: { conversation_type: "group" }, error: null });
+
+    await expect(fetchConversationType("conversation-1")).resolves.toBe("group");
+    expect(fromMock).toHaveBeenCalledWith("conversations");
+    expect(select).toHaveBeenCalledWith("conversation_type");
+    expect(eq).toHaveBeenCalledWith("id", "conversation-1");
+  });
+
+  it("returns null when the row is not visible", async () => {
+    mockTypeRow({ data: null, error: null });
+
+    await expect(fetchConversationType("conversation-1")).resolves.toBeNull();
   });
 });
 

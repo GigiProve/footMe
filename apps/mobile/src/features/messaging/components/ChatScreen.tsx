@@ -17,9 +17,12 @@ import {
   filterMessagesForSearch,
   resolveChatBanners,
 } from "../chat-helpers";
+import { GROUPS_COPY } from "../../dashboard/groups/groups-copy";
 import {
   blockUser,
+  fetchConversationType,
   fetchDirectConversationMeta,
+  fetchGroupConversationMeta,
   getConversationMessages,
   getShareablePhoneContact,
   markConversationRead,
@@ -39,6 +42,7 @@ import { ChatContextCard } from "./ChatContextCard";
 import { ChatHeader } from "./ChatHeader";
 import { ChatRelationshipNote } from "./ChatRelationshipNote";
 import { ChatSoftNotice } from "./ChatSoftNotice";
+import { GroupChatEmptyState } from "./GroupChatEmptyState";
 import { InlineSafetyRow } from "./InlineSafetyRow";
 import { MessageList } from "./MessageList";
 import { ReportConversationModal } from "./ReportConversationModal";
@@ -72,10 +76,30 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     queryKey: ["conversation-messages", conversationId],
   });
 
-  const metaQuery = useQuery({
+  /*
+    DAS-REV-32 §25: la testata dipende dal tipo. Il tipo si legge prima, così
+    il meta sbagliato non viene mai chiesto (fetch_direct_conversation_meta
+    rifiuta i gruppi, fetch_group_conversation_meta le chat dirette). Se la
+    lettura del tipo fallisce si resta sul ramo diretto, come prima.
+  */
+  const typeQuery = useQuery({
     enabled: !!conversationId,
+    queryFn: () => fetchConversationType(conversationId),
+    queryKey: ["conversation-type", conversationId],
+    staleTime: Infinity,
+  });
+  const isGroup = typeQuery.data === "group";
+
+  const metaQuery = useQuery({
+    enabled: !!conversationId && !isGroup && !typeQuery.isPending,
     queryFn: () => fetchDirectConversationMeta(conversationId),
     queryKey: ["conversation-meta", conversationId],
+  });
+
+  const groupMetaQuery = useQuery({
+    enabled: !!conversationId && isGroup,
+    queryFn: () => fetchGroupConversationMeta(conversationId),
+    queryKey: ["group-conversation-meta", conversationId],
   });
 
   useEffect(() => {
@@ -191,10 +215,15 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     },
   });
 
-  const meta = metaQuery.data ?? null;
+  const meta = isGroup ? null : (metaQuery.data ?? null);
+  const groupMeta = isGroup ? (groupMetaQuery.data ?? null) : null;
   const messages = messagesQuery.data ?? [];
-  const displayName = meta?.other_full_name || initialName;
-  const subtitle = meta ? buildChatSubtitle(meta) : undefined;
+  const displayName = groupMeta?.title || meta?.other_full_name || initialName;
+  const subtitle = groupMeta
+    ? GROUPS_COPY.chatSubtitle(groupMeta.clubName, groupMeta.peopleCount)
+    : meta
+      ? buildChatSubtitle(meta)
+      : undefined;
   const banners = meta ? resolveChatBanners(meta) : null;
   const isSearching = isSearchMode && searchQuery.trim().length >= 2;
   const displayedMessages = isSearching ? filterMessagesForSearch(messages, searchQuery) : messages;
@@ -382,6 +411,7 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     <SafeAreaView style={styles.root}>
       <ChatHeader
         avatarUrl={meta?.other_avatar_url}
+        group={isGroup ? { avatarPath: groupMeta?.avatarPath ?? null } : null}
         isSearchMode={isSearchMode}
         name={displayName}
         onBack={() => router.back()}
@@ -419,9 +449,15 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
         ) : null}
 
         <MessageList
+          emptyState={
+            isGroup && messagesQuery.isSuccess && messages.length === 0 && !isSearchMode ? (
+              <GroupChatEmptyState title={displayName} />
+            ) : undefined
+          }
           items={items}
           myProfileId={myProfileId}
           onCopyContactPhone={handleCopyContactPhone}
+          showSenderNames={isGroup}
         />
 
         {banners?.showInlineSafetyRow ? (
@@ -433,6 +469,7 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
         ) : null}
 
         <ChatComposer
+          allowContactShare={!isGroup}
           blocked={meta?.blocked_by_me ?? false}
           draft={draft}
           isSending={sendMutation.isPending}
@@ -448,6 +485,7 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
       <ChatActionsSheet
         isArchived={meta?.archived ?? false}
         isBlocked={meta?.blocked_by_me ?? false}
+        isGroup={isGroup}
         onArchiveToggle={() => archiveMutation.mutate(!(meta?.archived ?? false))}
         onBlockToggle={() => {
           // Without meta (e.g. a group conversation) there is no one to block.

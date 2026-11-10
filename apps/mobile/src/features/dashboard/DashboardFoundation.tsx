@@ -149,6 +149,8 @@ import {
   shouldAutoRetry,
   BACKOFF_BASE_MS,
 } from "./state/retry-policy";
+import { GROUPS_COPY } from "./groups/groups-copy";
+import { GROUPS_HREFS } from "./groups/groups-routes";
 import { useAccessWindow } from "./state/use-access-window";
 import { useDashboardConnection } from "./state/use-dashboard-connection";
 
@@ -1310,6 +1312,9 @@ function moduleRowCounts(input: {
       ? (society.applicationsPreview?.length ?? 0)
       : null,
     society_areas: society ? 1 : null,
+    // DAS-REV-32 §9: una riga di navigazione, sempre presente quando il
+    // modulo è eleggibile; non dipende dal payload della Società.
+    society_messaging: 1,
     society_drafts: society ? (society.draftsPreview?.length ?? 0) : null,
     // DAS-REV-07 §14: il modulo esiste quando almeno un aggregato è
     // consultabile. Un aggregato `null` non è uno zero da disegnare.
@@ -2265,6 +2270,29 @@ function ModuleRenderer({
           ))}
         </DataModule>
       );
+
+    case "society_messaging": {
+      /**
+       * DAS-REV-32 §9: una sola riga, Gruppi, con la descrizione della task.
+       * Nessun conteggio, nessuna preview di messaggi.
+       */
+      return (
+        <DashboardSection title={title}>
+          <DashboardAreaRows
+            items={[
+              {
+                count: null,
+                icon: "people-outline",
+                id: "groups",
+                onPress: () => onNavigate(moduleId, GROUPS_HREFS.center()),
+                subtitle: GROUPS_COPY.dashboardRowBody,
+                title: GROUPS_COPY.dashboardRowTitle,
+              },
+            ]}
+          />
+        </DashboardSection>
+      );
+    }
 
     case "society_areas": {
       /**

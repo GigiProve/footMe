@@ -26,6 +26,7 @@ export type DashboardFeatureKey =
   | "society_applications"
   | "society_content_create"
   | "society_drafts"
+  | "society_groups"
   | "society_article_composer"
   | "society_invites"
   | "society_join_links"
@@ -74,6 +75,12 @@ export const DASHBOARD_FEATURES: Record<DashboardFeatureKey, FeatureConfig> = {
    * gestione» si accende con questo flag e con `selection_events_view`.
    */
   society_selection_events: { available: true },
+  /**
+   * DAS-REV-32: Centro Gruppi, dettaglio amministrativo e wizard di
+   * creazione esistono su dati reali. La gestione successiva (DAS-REV-33),
+   * gli archivi e le Comunicazioni no: le loro CTA restano assenti.
+   */
+  society_groups: { available: true },
   /**
    * DAS-REV-19: il centro "Inviti e richieste" esiste
    * (`app/(tabs)/dashboard/invites`), con le due tab, il filtro

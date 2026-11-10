@@ -24,6 +24,7 @@ export const DASHBOARD_MODULE_IDS = [
   "society_applications",
   "society_areas",
   "society_invites",
+  "society_messaging",
   "society_positions",
   "society_teams",
   "society_drafts",
@@ -228,6 +229,25 @@ export const MODULE_REGISTRY: Record<DashboardModuleId, ModuleDefinition> = {
     order: 40,
     schemaVersion: 1,
     title: "Squadre del club",
+  },
+  /**
+   * DAS-REV-32 §9: «Nella Dashboard Society integra Gruppi nella sezione
+   * Messaggi e comunicazioni.» La riga deriva dall’accesso amministrativo
+   * (`groups_view`), mai dall’essere membri di un gruppo. Nessuna preview,
+   * unread o badge: la Dashboard non diventa una seconda Inbox. La riga
+   * Comunicazioni non esiste ancora (DAS-REV-36) e non viene disegnata.
+   */
+  society_messaging: {
+    capabilitiesAll: ["groups_view"],
+    capabilitiesAny: [],
+    countsAsContent: false,
+    emptyPolicy: "hide",
+    feature: "society_groups",
+    id: "society_messaging",
+    kinds: ["society"],
+    order: 35,
+    schemaVersion: 1,
+    title: "Messaggi e comunicazioni",
   },
   society_drafts: {
     capabilitiesAll: ["content_view"],

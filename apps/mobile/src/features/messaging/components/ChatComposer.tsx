@@ -6,6 +6,8 @@ import { colors, radius, sizes, spacing } from "../../../theme/tokens";
 import { ActionSheet, AppText } from "../../../ui";
 
 type ChatComposerProps = {
+  /** DAS-REV-32 §25: nei GROUP la condivisione contatto non esiste (il server la rifiuta). */
+  allowContactShare?: boolean;
   blocked?: boolean;
   draft: string;
   isSending: boolean;
@@ -18,6 +20,7 @@ type ChatComposerProps = {
 };
 
 export function ChatComposer({
+  allowContactShare = true,
   blocked = false,
   draft,
   isSending,
@@ -98,11 +101,15 @@ export function ChatComposer({
             label: "Documento",
             onPress: onPickDocument,
           },
-          {
-            icon: "call-outline",
-            label: "Condividi contatto",
-            onPress: onShareContact,
-          },
+          ...(allowContactShare
+            ? [
+                {
+                  icon: "call-outline" as const,
+                  label: "Condividi contatto",
+                  onPress: onShareContact,
+                },
+              ]
+            : []),
         ]}
         onClose={() => setIsAttachSheetVisible(false)}
         title="Allega"

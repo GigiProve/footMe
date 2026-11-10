@@ -3,26 +3,32 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, spacing, typography } from "../../../theme/tokens";
 import { AppText, Avatar } from "../../../ui";
+import { GroupAvatar } from "../../dashboard/groups/components/GroupAvatar";
 
+/*
+  DAS-REV-32 §12: nessuna label tecnica «Diretta»/«Gruppo» sulla riga; il tipo
+  si legge dall'avatar. I gruppi organizzativi con immagine usano GroupAvatar
+  (URL firmato da bucket privato), tutte le altre righe restano invariate.
+*/
 type ConversationRowProps = {
   avatarUrl?: string | null;
+  groupAvatarPath?: string | null;
   isGroup?: boolean;
   lastMessage: string;
   name: string;
   onPress: () => void;
   timestamp: string;
-  typeLabel: string;
   unreadCount: number;
 };
 
 export function ConversationRow({
   avatarUrl,
+  groupAvatarPath = null,
   isGroup = false,
   lastMessage,
   name,
   onPress,
   timestamp,
-  typeLabel,
   unreadCount,
 }: ConversationRowProps) {
   const hasUnread = unreadCount > 0;
@@ -39,7 +45,11 @@ export function ConversationRow({
       ]}
     >
       <View style={styles.avatarWrapper}>
-        <Avatar name={name} size="lg" square={isGroup} uri={avatarUrl} />
+        {isGroup && groupAvatarPath ? (
+          <GroupAvatar name={name} path={groupAvatarPath} size="lg" />
+        ) : (
+          <Avatar name={name} size="lg" square={isGroup} uri={avatarUrl} />
+        )}
         {isGroup ? (
           <View style={styles.overlayBadge}>
             <Ionicons color={colors.inkInvert} name="people" size={10} />
@@ -70,13 +80,7 @@ export function ConversationRow({
                 {unreadCount > 99 ? "99+" : String(unreadCount)}
               </AppText>
             </View>
-          ) : (
-            <View style={styles.typeTag}>
-              <AppText color="secondary" style={styles.typeTagText} variant="overline">
-                {typeLabel}
-              </AppText>
-            </View>
-          )}
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -155,15 +159,5 @@ const styles = StyleSheet.create({
   unreadText: {
     fontSize: typography.fontSize[11],
     lineHeight: 14,
-  },
-  typeTag: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 4,
-    paddingHorizontal: spacing[6],
-    paddingVertical: 2,
-  },
-  typeTagText: {
-    fontSize: typography.fontSize[10],
-    lineHeight: 12,
   },
 });

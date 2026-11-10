@@ -122,6 +122,10 @@ export const DASHBOARD_CAPABILITIES = [
   "selection_events_view",
   "selection_events_create",
   "selection_events_manage",
+  // DAS-REV-32 §8: consultare i gruppi della Società non è crearne; nessuna
+  // delle due dà accesso alle conversazioni, che dipende dalla membership.
+  "groups_view",
+  "groups_create",
 ] as const;
 
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];
