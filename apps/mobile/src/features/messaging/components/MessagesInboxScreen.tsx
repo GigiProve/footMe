@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -24,14 +24,19 @@ import {
   fetchCommunications,
   type CommunicationSummary,
 } from "../communications-service";
+import { toMembershipPeriodChange } from "../group-chat-presentation";
+import { MESSAGING_QK } from "../messaging-keys";
 import {
   fetchInboxConversations,
   markInboxAllRead,
+  subscribeToMyGroupPeriods,
+  unsubscribeFromConversation,
   type InboxConversation,
 } from "../messaging-service";
 import {
   buildConversationPreview,
   buildSearchSections,
+  conversationStatusLabel,
   filterCommunications,
   filterConversations,
   type ChatFilter,
@@ -77,7 +82,7 @@ export function MessagesInboxScreen() {
   const conversationsQuery = useQuery({
     enabled: !!profileId,
     queryFn: () => fetchInboxConversations(),
-    queryKey: ["inbox-conversations", profileId],
+    queryKey: MESSAGING_QK.inbox(profileId),
   });
 
   const communicationsQuery = useQuery({
@@ -98,15 +103,39 @@ export function MessagesInboxScreen() {
         return;
       }
 
-      queryClient.invalidateQueries({ queryKey: ["inbox-conversations", profileId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(profileId) });
       queryClient.invalidateQueries({ queryKey: ["communications", profileId] });
     }, [profileId, queryClient]),
   );
 
+  /*
+    DAS-REV-33 §26: la fine di un periodo del viewer toglie il gruppo
+    dall'Inbox senza aspettare il prossimo focus. Solo la lista: la cache
+    della chat è di competenza della chat aperta (revoca lì).
+  */
+  useEffect(() => {
+    if (!profileId) {
+      return undefined;
+    }
+
+    const channel = subscribeToMyGroupPeriods("inbox", profileId, (record) => {
+      const change = toMembershipPeriodChange(record);
+
+      // Qualunque periodo che si chiude può togliere una riga: il server filtra.
+      if (change?.endedAt && change.profileId === profileId) {
+        queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(profileId) });
+      }
+    });
+
+    return () => {
+      void unsubscribeFromConversation(channel);
+    };
+  }, [profileId, queryClient]);
+
   const markAllReadMutation = useMutation({
     mutationFn: markInboxAllRead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inbox-conversations", profileId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(profileId) });
       queryClient.invalidateQueries({ queryKey: ["communications", profileId] });
     },
   });
@@ -293,6 +322,7 @@ function ChatTabContent({
               lastMessage={buildConversationPreview(item, viewerProfileId)}
               name={item.display_title}
               onPress={() => onOpenConversation(item)}
+              statusLabel={conversationStatusLabel(item)}
               timestamp={conversationTimestamp(item)}
               unreadCount={item.unread_count}
             />
@@ -384,6 +414,7 @@ function SearchResults({
               lastMessage={buildConversationPreview(conversation, viewerProfileId)}
               name={conversation.display_title}
               onPress={() => onOpenConversation(conversation)}
+              statusLabel={conversationStatusLabel(conversation)}
               timestamp={conversationTimestamp(conversation)}
               unreadCount={conversation.unread_count}
             />

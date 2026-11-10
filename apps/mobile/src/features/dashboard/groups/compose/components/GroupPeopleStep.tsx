@@ -26,6 +26,13 @@ type Props = {
   bulkPending: boolean;
   fetchingNext: boolean;
   hasError: boolean;
+  /**
+   * Riga di aiuto sotto la ricerca. Il wizard (32) dice che il creator entra
+   * come amministratore; l'aggiunta a un gruppo esistente (DAS-REV-33 §13)
+   * non ha nulla da dire e passa `null`. Il selector è uno solo: cambia il
+   * contesto, non il componente.
+   */
+  helpText?: string | null;
   loading: boolean;
   onEndReached: () => void;
   onRetry: () => void;
@@ -46,6 +53,7 @@ export function GroupPeopleStep({
   bulkPending,
   fetchingNext,
   hasError,
+  helpText = GROUPS_COPY.creatorHelp,
   loading,
   onEndReached,
   onRetry,
@@ -74,9 +82,11 @@ export function GroupPeopleStep({
         testID="group-people-search"
         value={search}
       />
-      <AppText color="neutralMuted" variant="meta">
-        {GROUPS_COPY.creatorHelp}
-      </AppText>
+      {helpText ? (
+        <AppText color="neutralMuted" variant="meta">
+          {helpText}
+        </AppText>
+      ) : null}
       {bulkError ? <GroupNotice testID="group-people-bulk-error" text={bulkError} /> : null}
     </View>
   );
@@ -123,7 +133,7 @@ export function GroupPeopleStep({
       onEndReached={onEndReached}
       onEndReachedThreshold={0.4}
       renderItem={({ item }) => (
-        <PersonRow checked={selected.includes(item.profileId)} onToggle={onToggle} person={item} />
+        <PersonCheckRow checked={selected.includes(item.profileId)} onToggle={onToggle} person={item} />
       )}
       renderSectionHeader={({ section }) =>
         section.title ? (
@@ -160,14 +170,21 @@ function Separator() {
   return <View style={styles.separator} />;
 }
 
+/** Ciò che una riga selezionabile mostra: eleggibili (32, 33 §13) e candidati alla successione (33 §19). */
+export type SelectablePerson = Pick<EligiblePerson, "avatarUrl" | "fullName" | "profileId" | "roleLabel">;
+
 type RowProps = {
   checked: boolean;
   onToggle: (id: string) => void;
-  person: EligiblePerson;
+  person: SelectablePerson;
 };
 
-/** L'intera riga seleziona (§18): mai apre il profilo al posto della selezione. */
-function PersonRow({ checked, onToggle, person }: RowProps) {
+/**
+ * L'intera riga seleziona (§18): mai apre il profilo al posto della selezione.
+ * Riusata dall'aggiunta a un gruppo esistente e dalla successione dell'ultimo
+ * amministratore (DAS-REV-33): una sola riga con check, nessun chip.
+ */
+export function PersonCheckRow({ checked, onToggle, person }: RowProps) {
   return (
     <Pressable
       accessibilityLabel={person.roleLabel ? `${person.fullName}, ${person.roleLabel}` : person.fullName}
@@ -179,11 +196,11 @@ function PersonRow({ checked, onToggle, person }: RowProps) {
     >
       <Avatar name={person.fullName} size="md" uri={person.avatarUrl ?? undefined} />
       <View style={styles.rowText}>
-        <AppText color="neutral" numberOfLines={1} variant="titleSm">
+        <AppText color="neutral" numberOfLines={2} variant="titleSm">
           {person.fullName}
         </AppText>
         {person.roleLabel ? (
-          <AppText color="neutralMuted" numberOfLines={1} variant="meta">
+          <AppText color="neutralMuted" numberOfLines={3} variant="meta">
             {person.roleLabel}
           </AppText>
         ) : null}

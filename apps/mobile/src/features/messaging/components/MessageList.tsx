@@ -5,6 +5,7 @@ import { colors, spacing } from "../../../theme/tokens";
 import type { ChatListItem } from "../chat-helpers";
 import { DateSeparator } from "./DateSeparator";
 import { MessageBubble } from "./MessageBubble";
+import { SystemEventMessage } from "./SystemEventMessage";
 
 type MessageListProps = {
   /** Mostrato al posto della lista quando non c'è alcun messaggio (non è un messaggio). */
@@ -35,18 +36,25 @@ export function MessageList({
       data={items}
       inverted
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) =>
-        item.type === "separator" ? (
-          <DateSeparator label={item.label} />
-        ) : (
+      renderItem={({ item }) => {
+        if (item.type === "separator") {
+          return <DateSeparator label={item.label} />;
+        }
+
+        // DAS-REV-33 §24: l'evento di sistema non è una bolla.
+        if (item.message.message_kind === "system_event") {
+          return <SystemEventMessage message={item.message} />;
+        }
+
+        return (
           <MessageBubble
             isOwnMessage={item.message.sender_profile_id === myProfileId}
             message={item.message}
             onCopyContactPhone={onCopyContactPhone}
-            senderName={showSenderNames ? item.message.sender_full_name : undefined}
+            senderName={showSenderNames ? (item.message.sender_full_name ?? undefined) : undefined}
           />
-        )
-      }
+        );
+      }}
       style={styles.list}
     />
   );

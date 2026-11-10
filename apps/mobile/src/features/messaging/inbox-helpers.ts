@@ -2,6 +2,7 @@ import type {
   CommunicationCategory,
   CommunicationSummary,
 } from "./communications-service";
+import { formatSystemEvent, GROUP_CHAT_COPY } from "./group-chat-presentation";
 import type { InboxConversation } from "./messaging-service";
 
 export type ChatFilter = "all" | "direct" | "group" | "unread";
@@ -27,6 +28,28 @@ export function filterConversations(
 const EMPTY_PREVIEW = "Apri la chat per iniziare.";
 
 /**
+ * Tipo e payload, se il server li manda; altrimenti il body se non è vuoto;
+ * altrimenti il testo neutro. Mai una riga vuota.
+ */
+function buildSystemEventPreview(conversation: InboxConversation): string {
+  if (conversation.last_message_system_event_type) {
+    return formatSystemEvent(
+      conversation.last_message_system_event_type,
+      conversation.last_message_system_payload,
+    );
+  }
+
+  return conversation.last_message_body?.trim() || GROUP_CHAT_COPY.eventFallback;
+}
+
+/** DAS-REV-33 §21: metadata neutro della riga di un gruppo archiviato, altrimenti null. */
+export function conversationStatusLabel(conversation: InboxConversation): string | null {
+  return conversation.conversation_type === "group" && conversation.group_status === "archived"
+    ? GROUP_CHAT_COPY.archivedLabel
+    : null;
+}
+
+/**
  * Anteprima della riga Inbox (DAS-REV-32 §12). Nei GROUP il mittente è una
  * PERSON e precede il testo («Mister Bianchi: Domani alle 18:00»); se l'ultimo
  * mittente sono io, o il nome manca, resta il solo testo. Le DIRECT non
@@ -36,6 +59,12 @@ export function buildConversationPreview(
   conversation: InboxConversation,
   viewerProfileId: string,
 ): string {
+  // DAS-REV-33 §24: l'evento di sistema non ha autore e non è testo scritto da
+  // una persona; l'anteprima lo formatta dal tipo/payload.
+  if (conversation.last_message_kind === "system_event") {
+    return buildSystemEventPreview(conversation);
+  }
+
   const body = conversation.last_message_body;
 
   if (!body) {

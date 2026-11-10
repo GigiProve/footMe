@@ -7,6 +7,7 @@ import {
   categoryLabel,
   CHAT_FILTERS,
   COMMUNICATION_FILTERS,
+  conversationStatusLabel,
   filterCommunications,
   filterConversations,
   matchesCommunicationQuery,
@@ -130,6 +131,72 @@ describe("buildConversationPreview", () => {
     expect(
       buildConversationPreview({ ...groupConversation, last_message_body: null }, "me"),
     ).toBe("Apri la chat per iniziare.");
+  });
+
+  describe("system events (DAS-REV-33 §24)", () => {
+    const eventRow: InboxConversation = {
+      ...groupConversation,
+      last_message_body: "",
+      last_message_kind: "system_event",
+      last_message_sender_name: null,
+      last_message_sender_profile_id: null,
+    };
+
+    it("formats from type and payload, without a sender prefix", () => {
+      expect(
+        buildConversationPreview(
+          {
+            ...eventRow,
+            last_message_system_event_type: "GROUP_MEMBER_ADDED",
+            last_message_system_payload: { name: "Riccardo Riva" },
+          },
+          "me",
+        ),
+      ).toBe("Riccardo Riva è stato aggiunto al gruppo.");
+    });
+
+    it("falls back to a non-empty body, then to the neutral copy", () => {
+      expect(
+        buildConversationPreview({ ...eventRow, last_message_body: "Il gruppo è stato archiviato." }, "me"),
+      ).toBe("Il gruppo è stato archiviato.");
+      expect(buildConversationPreview(eventRow, "me")).toBe("Il gruppo è stato aggiornato.");
+      expect(buildConversationPreview({ ...eventRow, last_message_body: null }, "me")).toBe(
+        "Il gruppo è stato aggiornato.",
+      );
+    });
+
+    it("never prefixes a sender even if a name leaks into the row", () => {
+      expect(
+        buildConversationPreview(
+          {
+            ...eventRow,
+            last_message_sender_name: "Coach Bianchi",
+            last_message_system_event_type: "GROUP_ARCHIVED",
+          },
+          "me",
+        ),
+      ).toBe("Il gruppo è stato archiviato.");
+    });
+  });
+});
+
+describe("conversationStatusLabel (DAS-REV-33 §21)", () => {
+  it("labels only archived groups", () => {
+    expect(conversationStatusLabel({ ...groupConversation, group_status: "archived" })).toBe(
+      "Archiviato",
+    );
+    expect(conversationStatusLabel({ ...groupConversation, group_status: "active" })).toBeNull();
+    expect(conversationStatusLabel({ ...groupConversation, group_status: null })).toBeNull();
+    expect(conversationStatusLabel(groupConversation)).toBeNull();
+    expect(
+      conversationStatusLabel({ ...directConversation, group_status: "archived" }),
+    ).toBeNull();
+  });
+
+  it("does not alter the unread logic", () => {
+    const archived = { ...groupConversation, group_status: "archived" as const };
+
+    expect(filterConversations([archived], "unread")).toEqual([archived]);
   });
 });
 

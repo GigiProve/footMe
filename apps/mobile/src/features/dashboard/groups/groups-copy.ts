@@ -139,3 +139,136 @@ export const GROUPS_COPY = {
   chatSubtitle: (clubName: string | null, people: number) =>
     [clubName, people === 1 ? "1 persona" : `${people} persone`].filter(Boolean).join(" · "),
 } as const;
+
+/**
+ * Copy di gestione e lifecycle (DAS-REV-33). I testi tra virgolette basse nella
+ * task sono alla lettera; il paragrafo è accanto a ciascuno. Il copy non
+ * contiene mai codici, HTTP o ID (§27).
+ */
+export const GROUP_MANAGE_COPY = {
+  // §9 — Info gruppo
+  titleInfo: "Info gruppo",
+  titleManage: "Gestisci gruppo",
+  manageGroup: "Gestisci gruppo",
+  team: "Squadra",
+  people: "Persone",
+  teamNone: "Nessuna squadra",
+  peopleAndAdmins: (people: number, admins: number) =>
+    `${people === 1 ? "1 persona" : `${people} persone`} · ${admins === 1 ? "1 amministratore" : `${admins} amministratori`}`,
+  createdLine: (date: string, status: "active" | "archived") =>
+    `Creato il ${date} · ${status === "active" ? "Attivo" : "Archiviato"}`,
+  actionsTitle: "Azioni gruppo",
+
+  // §10 — nome e immagine
+  editName: "Modifica nome gruppo",
+  editImage: "Modifica immagine gruppo",
+  save: "Salva",
+  cancel: "Annulla",
+  nameSaveFailed: "Non è stato possibile salvare il nome. Riprova.",
+  imageSheetTitle: "Immagine gruppo",
+  takePhoto: "Scatta foto",
+  chooseFromLibrary: "Scegli dalla libreria",
+  removeImage: "Rimuovi immagine",
+  imageUpdateFailed: "Non è stato possibile aggiornare l'immagine. Riprova.",
+  cameraPermission: "Consenti l'accesso alla fotocamera per scattare una foto.",
+
+  // §11 — Squadra
+  teamUnavailable: "La squadra selezionata non è più disponibile. Scegline un'altra.",
+  teamSaveFailed: "Non è stato possibile cambiare la squadra. Riprova.",
+
+  // §12 — Persone
+  peopleTitle: "Persone",
+  searchPeople: "Cerca persone",
+  addPeople: "+ Aggiungi persone",
+  adminsSection: (count: number | null) => (count === null ? "Amministratori" : `Amministratori · ${count}`),
+  othersSection: (count: number | null) => (count === null ? "Altre persone" : `Altre persone · ${count}`),
+  adminLabel: "Amministratore",
+  you: "Tu",
+  peopleLoadError: "Non è stato possibile caricare le persone. Riprova.",
+  peopleSearchEmpty: "Nessuna persona trovata",
+  peopleSearchEmptyBody: "Modifica o cancella la ricerca.",
+  peopleEmpty: "Nessuna persona nel gruppo",
+  manageNotAllowed: "Questa azione non è più disponibile.",
+
+  // §13 — aggiunta
+  addPeopleTitle: "Aggiungi persone",
+  addCta: (count: number) => (count > 0 ? `Aggiungi · ${count}` : "Aggiungi"),
+  peopleUnavailable: "Alcune persone selezionate non sono più disponibili. Controlla e riprova.",
+  addFailed: "Non è stato possibile aggiungere le persone. Riprova.",
+
+  // §14, §15 — ruoli e rimozione
+  openProfile: "Apri profilo",
+  makeAdmin: "Rendi amministratore",
+  removeAdmin: "Rimuovi ruolo di amministratore",
+  removeFromGroup: "Rimuovi dal gruppo",
+  removeTitle: (name: string) => `Rimuovere ${name} dal gruppo?`,
+  removeBody: "Non potrà più partecipare alla conversazione.",
+  remove: "Rimuovi",
+  lastAdmin: "Aggiungi prima un altro amministratore al gruppo.",
+  roleFailed: "Non è stato possibile aggiornare il ruolo. Riprova.",
+  removeFailed: "Non è stato possibile rimuovere la persona. Riprova.",
+  periodEnded: "La persona non fa più parte del gruppo.",
+
+  // §18 — uscita ordinaria
+  leave: "Lascia gruppo",
+  leaveTitle: "Lasciare il gruppo?",
+  leaveBody: "Non potrai più accedere alla conversazione.",
+  leaveReentry: "Se verrai aggiunto di nuovo, vedrai i contenuti dal nuovo ingresso.",
+  leaveFailed: "Non è stato possibile lasciare il gruppo. Riprova.",
+
+  // §19 — ultimo amministratore
+  handoverTitle: "Prima di lasciare il gruppo",
+  handoverBody: "Sei l'unico amministratore. Seleziona almeno una persona che diventerà amministratore prima della tua uscita.",
+  handoverCta: "Nomina amministratori e lascia",
+  handoverFailed: "Non è stato possibile completare l'uscita. Riprova.",
+  handoverEmpty: "Nessuna persona può diventare amministratore.",
+  stateChanged: "Lo stato del gruppo è cambiato. Controlla e riprova.",
+  onlyPerson: "Aggiungi almeno una persona al gruppo prima di lasciare.",
+  addPeopleCta: "Aggiungi persone",
+
+  // §21 — archiviazione
+  archive: "Archivia gruppo",
+  archiveTitle: "Archiviare il gruppo?",
+  archiveBody:
+    "La conversazione diventerà di sola lettura e non sarà più mostrata tra i gruppi attivi. Potrai riattivarla in seguito.",
+  archiveFailed: "Non è stato possibile archiviare il gruppo. Riprova.",
+  archivedNotice: "Questo gruppo è archiviato.",
+  archivedGroupsTitle: "Gruppi archiviati",
+  archivedGroupsRow: "Gruppi archiviati",
+  archivedEmptyTitle: "Nessun gruppo archiviato",
+  archivedEmptyBody: "I gruppi archiviati della Società compariranno qui.",
+  archivedLoadError: "Non è stato possibile caricare i gruppi archiviati. Riprova.",
+  archivedStatus: "Archiviato",
+  archivedNeedsAdmin: "Archiviato · Serve un amministratore",
+
+  // §22 — riattivazione e recupero
+  reactivate: "Riattiva gruppo",
+  reactivateFailed: "Non è stato possibile riattivare il gruppo. Riprova.",
+  needsAdmin: "Serve un amministratore per riattivare il gruppo.",
+  managePeople: "Gestisci persone",
+
+  // §23 — eliminazione
+  delete: "Elimina gruppo",
+  deleteTitle: "Eliminare definitivamente il gruppo?",
+  deleteBody: "Il gruppo, i messaggi e i file condivisi verranno eliminati per tutti. Questa azione non può essere annullata.",
+  deleteConfirm: "Elimina definitivamente",
+  deleteArchiveInstead: "Archivia",
+  deleteFailed: "Non è stato possibile eliminare il gruppo. Riprova.",
+
+  // §26, §27 — stati
+  infoLoadError: "Non è stato possibile caricare il gruppo. Riprova.",
+  infoNotFoundTitle: "Gruppo non disponibile",
+  infoNotFoundBody: "Il gruppo non esiste o non rientra più nel tuo ambito.",
+  conflict: "Il gruppo è stato modificato da un'altra persona. Controlla e riprova.",
+  forbidden: "Non hai più l'autorizzazione per questa azione.",
+  archivedStale: "Questo gruppo è archiviato.",
+  notMember: "Non fai più parte di questo gruppo.",
+  deleted: "Il gruppo è stato eliminato.",
+  offline: "Connessione assente. Riprova quando sei online.",
+  verifying: "Stiamo verificando l'esito. Riprova.",
+  generic: "Operazione non riuscita. Riprova.",
+  retry: "Riprova",
+  back: "Indietro",
+  loading: "Caricamento…",
+  refreshFailed: "Aggiornamento non riuscito. Stai vedendo gli ultimi dati disponibili.",
+} as const;

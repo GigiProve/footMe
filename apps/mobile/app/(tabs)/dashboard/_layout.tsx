@@ -96,6 +96,12 @@ export default function DashboardLayout() {
             wizard sta in app/group-compose/; la chat resta in app/messages/. */}
         <Stack.Screen name="groups/index" />
         <Stack.Screen name="groups/[conversationId]" />
+        {/* DAS-REV-33 §6, §21: «Gruppi archiviati» è una pagina della Dashboard
+            (bottom navigation, Dashboard selezionata). «Gestisci gruppo»,
+            Persone, Aggiungi e successione sono flussi focalizzati senza
+            bottom navigation, in app/group-info/ (con ?origin=dashboard),
+            condivisi con l'ingresso da Messaggi. */}
+        <Stack.Screen name="groups/archived" />
         <Stack.Screen name="people/index" />
         <Stack.Screen name="people/[profileId]" />
         {/* DAS-REV-22 §11: «Bottom navigation canonica Home | Cerca |

@@ -11,7 +11,11 @@ type ChatHeaderProps = {
     DAS-REV-32 §25: in un GROUP l'identità è il gruppo (avatar con iniziali di
     fallback), non esiste un profilo da aprire: niente azione «Apri profilo».
   */
-  group?: { avatarPath: string | null } | null;
+  /*
+    DAS-REV-33 §5: toccare l'identità del gruppo apre Info gruppo. Senza
+    `onOpenInfo` (route non ancora disponibile) l'identità non è un controllo.
+  */
+  group?: { avatarPath: string | null; onOpenInfo?: () => void } | null;
   isSearchMode: boolean;
   name: string;
   onBack: () => void;
@@ -21,6 +25,8 @@ type ChatHeaderProps = {
   onSearchQueryChange: (value: string) => void;
   resultsCount: number | null;
   searchQuery: string;
+  /** DAS-REV-33 §21: etichetta neutra di stato («Archiviato») sotto il sottotitolo. */
+  statusLabel?: string;
   subtitle?: string;
 };
 
@@ -36,6 +42,7 @@ export function ChatHeader({
   onSearchQueryChange,
   resultsCount,
   searchQuery,
+  statusLabel,
   subtitle,
 }: ChatHeaderProps) {
   return (
@@ -59,7 +66,12 @@ export function ChatHeader({
           ) : null}
         </View>
       ) : (
-        <Pressable disabled={!!group} onPress={onOpenProfile} style={styles.identity}>
+        <Pressable
+          accessibilityRole={group?.onOpenInfo ? "button" : undefined}
+          disabled={group ? !group.onOpenInfo : false}
+          onPress={group ? group.onOpenInfo : onOpenProfile}
+          style={styles.identity}
+        >
           {group ? (
             <GroupAvatar name={name} path={group.avatarPath} size="sm" />
           ) : (
@@ -72,6 +84,11 @@ export function ChatHeader({
             {subtitle ? (
               <AppText color="muted" numberOfLines={1} variant="caption">
                 {subtitle}
+              </AppText>
+            ) : null}
+            {statusLabel ? (
+              <AppText color="muted" numberOfLines={1} variant="caption">
+                {statusLabel}
               </AppText>
             ) : null}
           </View>
@@ -113,8 +130,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: spacing[12],
-    height: sizes.chatHeaderHeight,
+    // minHeight: con la riga di stato («Archiviato») la testata cresce.
+    minHeight: sizes.chatHeaderHeight,
     paddingHorizontal: spacing[16],
+    paddingVertical: spacing[4],
   },
   identity: {
     alignItems: "center",

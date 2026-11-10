@@ -185,6 +185,38 @@ describe("filterMessagesForSearch", () => {
   it("filters case-insensitively on the message body", () => {
     expect(filterMessagesForSearch(messages, "DOMANI")).toEqual([messages[0]]);
   });
+
+  it("never matches system events (DAS-REV-33 §24)", () => {
+    const event = message({
+      body: "domani",
+      message_id: "evt",
+      message_kind: "system_event",
+      sender_profile_id: null,
+    });
+
+    expect(filterMessagesForSearch([event, ...messages], "domani")).toEqual([messages[0]]);
+  });
+});
+
+describe("buildChatListItems ordering by seq (DAS-REV-33 §17)", () => {
+  it("orders same-transaction rows by seq, not by their equal sent_at", () => {
+    const sentAt = "2026-07-01T10:00:00.000Z";
+    const items = buildChatListItems([
+      message({ message_id: "text", seq: 12, sent_at: sentAt }),
+      message({
+        message_id: "event",
+        message_kind: "system_event",
+        sender_profile_id: null,
+        seq: 10,
+        sent_at: sentAt,
+      }),
+    ]);
+
+    expect(items.filter((item) => item.type === "message").map((item) => item.id)).toEqual([
+      "text",
+      "event",
+    ]);
+  });
 });
 
 describe("resolveChatBanners", () => {

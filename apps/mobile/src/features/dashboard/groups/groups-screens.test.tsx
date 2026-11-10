@@ -239,9 +239,27 @@ describe("Dettaglio amministrativo (screen 03, 04)", () => {
     expect(texts(tree)).toContain("Prima squadra");
   });
 
-  it("Gestisci gruppo assente (QA-010)", async () => {
-    const content = texts(await render(<GroupDetailScreen />));
-    expect(content.some((text) => /Gestisci gruppo|archiviat|Comunicazioni/i.test(text))).toBe(false);
+  it("Gestisci gruppo assente senza can_manage (DAS-REV-33 §5: nascosto, non disabilitato)", async () => {
+    const tree = await render(<GroupDetailScreen />);
+    expect(hasTestID(tree, "group-manage")).toBe(false);
+    expect(texts(tree).some((text) => /Gestisci gruppo|Comunicazioni/i.test(text))).toBe(false);
+  });
+
+  it("con can_manage: Gestisci gruppo apre la gestione dalla Dashboard, Apri conversazione resta l'unica primaria", async () => {
+    serviceMocks.fetchSocietyGroupDetail.mockResolvedValue(detail({ canManage: true }));
+    const tree = await render(<GroupDetailScreen />);
+
+    expect(texts(tree)).toContain("Gestisci gruppo");
+    await act(async () => pressable(tree, "group-manage").props.onPress());
+    expect(routerMocks.push).toHaveBeenCalledWith("/group-info/g1?origin=dashboard");
+  });
+
+  it("manager non membro con can_manage: Gestisci gruppo è la CTA, senza Apri conversazione", async () => {
+    serviceMocks.fetchSocietyGroupDetail.mockResolvedValue(detail({ canManage: true, canOpenConversation: false }));
+    const tree = await render(<GroupDetailScreen />);
+
+    expect(hasTestID(tree, "group-manage")).toBe(true);
+    expect(hasTestID(tree, "group-open-conversation")).toBe(false);
   });
 
   it("gruppo societario: Squadra mostra «Società», nessuna squadra inventata (QA-005)", async () => {

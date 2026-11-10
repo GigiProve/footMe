@@ -199,9 +199,14 @@ describe("fetchGroupConversationMeta", () => {
         avatar_path: "groups/a.jpg",
         avatar_url: null,
         club_name: "AC Como",
+        can_send: false,
         conversation_id: "conversation-1",
+        group_version: 5,
         my_role: "admin",
         people_count: 4,
+        period_id: "period-1",
+        period_version: 2,
+        status: "archived",
         title: "Staff Primavera",
       },
       error: null,
@@ -215,11 +220,39 @@ describe("fetchGroupConversationMeta", () => {
     expect(result).toEqual({
       avatarPath: "groups/a.jpg",
       avatarUrl: null,
+      canSend: false,
       clubName: "AC Como",
+      groupVersion: 5,
       myRole: "admin",
       peopleCount: 4,
+      periodId: "period-1",
+      periodVersion: 2,
+      status: "archived",
       title: "Staff Primavera",
     });
+  });
+
+  it("falls back to an active, writable group when the server sends no lifecycle fields", async () => {
+    rpcMock.mockResolvedValue({ data: { people_count: 2, title: "Gruppo" }, error: null });
+
+    const result = await fetchGroupConversationMeta("conversation-1");
+
+    expect(result).toMatchObject({
+      canSend: true,
+      groupVersion: null,
+      periodId: null,
+      periodVersion: null,
+      status: "active",
+    });
+  });
+
+  it("trusts the server canSend over the status", async () => {
+    rpcMock.mockResolvedValue({
+      data: { can_send: false, people_count: 2, status: "active", title: "Gruppo" },
+      error: null,
+    });
+
+    expect((await fetchGroupConversationMeta("conversation-1")).canSend).toBe(false);
   });
 
   it("defaults the role to member", async () => {

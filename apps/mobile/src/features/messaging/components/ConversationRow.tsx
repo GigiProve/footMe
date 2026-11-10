@@ -17,6 +17,8 @@ type ConversationRowProps = {
   lastMessage: string;
   name: string;
   onPress: () => void;
+  /** DAS-REV-33 §21: metadata neutro («Archiviato») di un gruppo archiviato; non tocca gli unread. */
+  statusLabel?: string | null;
   timestamp: string;
   unreadCount: number;
 };
@@ -28,6 +30,7 @@ export function ConversationRow({
   lastMessage,
   name,
   onPress,
+  statusLabel = null,
   timestamp,
   unreadCount,
 }: ConversationRowProps) {
@@ -62,7 +65,7 @@ export function ConversationRow({
             {name}
           </AppText>
           <AppText variant="caption" color="muted" style={styles.timestamp}>
-            {timestamp}
+            {statusLabel ? `${statusLabel} · ${timestamp}` : timestamp}
           </AppText>
         </View>
         <View style={styles.bottomLine}>

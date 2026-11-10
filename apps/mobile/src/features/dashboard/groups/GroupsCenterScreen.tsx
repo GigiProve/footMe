@@ -33,10 +33,10 @@ import { PositionsCenterHeader } from "../positions/components/PositionsCenterHe
 import { useDashboardConnection } from "../state/use-dashboard-connection";
 import { GroupAvatar } from "./components/GroupAvatar";
 import { trackGroupsCenterOpened, trackGroupsSearchCompleted } from "./groups-analytics";
-import { GROUPS_COPY, GROUPS_MODULE_TITLE } from "./groups-copy";
+import { GROUP_MANAGE_COPY, GROUPS_COPY, GROUPS_MODULE_TITLE } from "./groups-copy";
 import { GROUPS_QK } from "./groups-keys";
 import { centerBodyOf, groupRowMeta, uniqueById } from "./groups-presentation";
-import { GROUPS_HREFS } from "./groups-routes";
+import { GROUP_MANAGE_HREFS, GROUPS_HREFS } from "./groups-routes";
 import { GroupsError, fetchSocietyGroupsPage } from "./groups-service";
 import type { SocietyGroupRow, SocietyGroupsPage } from "./groups-types";
 
@@ -65,6 +65,27 @@ function GroupRow({ onPress, row, showDivider }: { onPress: () => void; row: Soc
           {meta}
         </AppText>
       </View>
+      <Ionicons color={colors.textNeutralMuted} name="chevron-forward" size={CHEVRON_SIZE} />
+    </Pressable>
+  );
+}
+
+/**
+ * DAS-REV-33 §21: la lista archiviati è una destinazione reale, raggiunta da
+ * qui. Una riga leggera, non un tab: la lista attiva resta la pagina.
+ */
+function ArchivedLink({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.archivedLink, pressed ? styles.pressed : null]}
+      testID="groups-archived-link"
+    >
+      <Ionicons color={colors.textNeutral} name="archive-outline" size={18} />
+      <AppText color="neutral" style={styles.archivedLinkText} variant="bodyLg">
+        {GROUP_MANAGE_COPY.archivedGroupsRow}
+      </AppText>
       <Ionicons color={colors.textNeutralMuted} name="chevron-forward" size={CHEVRON_SIZE} />
     </Pressable>
   );
@@ -169,6 +190,10 @@ export function GroupsCenterScreen() {
     router.push(GROUPS_HREFS.create("dashboard", clubId) as never);
   };
 
+  const openArchived = () => {
+    router.push(GROUP_MANAGE_HREFS.archived() as never);
+  };
+
   const header = (
     <View style={styles.navWrap}>
       <PositionsCenterHeader
@@ -255,6 +280,7 @@ export function GroupsCenterScreen() {
           }}
           onAction={canCreate ? startCreate : null}
         />
+        <ArchivedLink onPress={openArchived} />
       </View>,
     );
   }
@@ -283,6 +309,8 @@ export function GroupsCenterScreen() {
         testID="groups-search"
         value={search}
       />
+
+      <ArchivedLink onPress={openArchived} />
 
       {body === "loading" ? <DashboardSkeleton /> : null}
 
@@ -364,6 +392,15 @@ export function GroupsCenterScreen() {
 }
 
 const styles = StyleSheet.create({
+  archivedLink: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[12],
+    minHeight: 48,
+  },
+  archivedLinkText: {
+    flex: 1,
+  },
   clear: {
     alignSelf: "flex-start",
     marginTop: spacing[12],

@@ -53,9 +53,16 @@ function dateSeparatorLabel(iso: string): string {
 export function buildChatListItems(
   messages: ConversationMessage[],
 ): ChatListItem[] {
-  const ascending = [...messages].sort(
-    (a, b) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime(),
-  );
+  // DAS-REV-33 §17: `sent_at` è l'inizio transazione, due righe della stessa
+  // transazione (evento di ingresso + primo messaggio) sono pari. Quando il
+  // server manda `seq`, quello è l'ordine; altrimenti resta `sent_at`.
+  const ascending = [...messages].sort((a, b) => {
+    if (a.seq !== undefined && b.seq !== undefined) {
+      return a.seq - b.seq;
+    }
+
+    return new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime();
+  });
 
   const items: ChatListItem[] = [];
   let previousDayKey: string | null = null;
@@ -122,7 +129,11 @@ export function filterMessagesForSearch(
 
   const needle = trimmed.toLowerCase();
 
-  return messages.filter((message) => message.body.toLowerCase().includes(needle));
+  // Gli eventi di sistema non sono contenuto scritto da una persona (§24).
+  return messages.filter(
+    (message) =>
+      message.message_kind !== "system_event" && message.body.toLowerCase().includes(needle),
+  );
 }
 
 export type ChatBanners = {

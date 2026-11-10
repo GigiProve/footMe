@@ -19,6 +19,15 @@ import {
 } from "../chat-helpers";
 import { GROUPS_COPY } from "../../dashboard/groups/groups-copy";
 import {
+  GROUP_CHAT_COPY,
+  isAccessLostError,
+  isGroupComposerAvailable,
+  systemEventAffectsGroupMeta,
+} from "../group-chat-presentation";
+import { MESSAGING_QK } from "../messaging-keys";
+import { GROUP_INFO_AVAILABLE, groupInfoRoute } from "../messaging-routes";
+import { useGroupAccessSignals, useGroupChatAccess } from "../use-group-chat-access";
+import {
   blockUser,
   fetchConversationType,
   fetchDirectConversationMeta,
@@ -42,6 +51,7 @@ import { ChatContextCard } from "./ChatContextCard";
 import { ChatHeader } from "./ChatHeader";
 import { ChatRelationshipNote } from "./ChatRelationshipNote";
 import { ChatSoftNotice } from "./ChatSoftNotice";
+import { GroupArchivedNotice } from "./GroupArchivedNotice";
 import { GroupChatEmptyState } from "./GroupChatEmptyState";
 import { InlineSafetyRow } from "./InlineSafetyRow";
 import { MessageList } from "./MessageList";
@@ -70,10 +80,17 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
   const [shareablePhone, setShareablePhone] = useState("");
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
+  /*
+    DAS-REV-33 §23/§26: a revoca avvenuta ogni query della conversazione si
+    spegne, così nessuna risposta tardiva né un re-render la ripopola.
+  */
+  const access = useGroupChatAccess({ conversationId, myProfileId });
+  const { isRevoked } = access;
+
   const messagesQuery = useQuery({
-    enabled: !!conversationId,
+    enabled: !!conversationId && !isRevoked,
     queryFn: () => getConversationMessages(conversationId),
-    queryKey: ["conversation-messages", conversationId],
+    queryKey: MESSAGING_QK.conversationMessages(conversationId),
   });
 
   /*
@@ -83,58 +100,82 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     lettura del tipo fallisce si resta sul ramo diretto, come prima.
   */
   const typeQuery = useQuery({
-    enabled: !!conversationId,
+    enabled: !!conversationId && !isRevoked,
     queryFn: () => fetchConversationType(conversationId),
-    queryKey: ["conversation-type", conversationId],
+    queryKey: MESSAGING_QK.conversationType(conversationId),
     staleTime: Infinity,
   });
   const isGroup = typeQuery.data === "group";
 
   const metaQuery = useQuery({
-    enabled: !!conversationId && !isGroup && !typeQuery.isPending,
+    enabled: !!conversationId && !isRevoked && !isGroup && !typeQuery.isPending,
     queryFn: () => fetchDirectConversationMeta(conversationId),
-    queryKey: ["conversation-meta", conversationId],
+    queryKey: MESSAGING_QK.conversationMeta(conversationId),
   });
 
   const groupMetaQuery = useQuery({
-    enabled: !!conversationId && isGroup,
+    enabled: !!conversationId && !isRevoked && isGroup,
     queryFn: () => fetchGroupConversationMeta(conversationId),
-    queryKey: ["group-conversation-meta", conversationId],
+    queryKey: MESSAGING_QK.groupMeta(conversationId),
+    // Accesso perso: ritentare ritarda soltanto la revoca.
+    retry: (failureCount, error) => !isAccessLostError(error) && failureCount < 3,
+  });
+
+  useGroupAccessSignals({
+    conversationId,
+    isGroup,
+    isRevoked,
+    metaError: groupMetaQuery.error,
+    myProfileId,
+    periodId: groupMetaQuery.data?.periodId ?? null,
+    revoke: access.revoke,
   });
 
   useEffect(() => {
-    if (!conversationId) {
+    if (!conversationId || isRevoked) {
       return undefined;
     }
 
-    const channel = subscribeToConversation(conversationId, () => {
-      queryClient.invalidateQueries({ queryKey: ["conversation-messages", conversationId] });
+    const channel = subscribeToConversation(conversationId, (change) => {
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMessages(conversationId) });
       // i_have_sent/other_has_sent drive the notices: refresh them too.
-      queryClient.invalidateQueries({ queryKey: ["conversation-meta", conversationId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
+
+      // DAS-REV-33 §24: archivia/riattiva/rinomina e le variazioni di persone
+      // cambiano la testata del gruppo.
+      if (systemEventAffectsGroupMeta(change?.systemEventType)) {
+        queryClient.invalidateQueries({ queryKey: MESSAGING_QK.groupMeta(conversationId) });
+      }
     });
 
     return () => {
       void unsubscribeFromConversation(channel);
     };
-  }, [conversationId, queryClient]);
+  }, [conversationId, isRevoked, queryClient]);
 
   useEffect(() => {
-    if (!conversationId || !messagesQuery.dataUpdatedAt) {
+    if (!conversationId || isRevoked || !messagesQuery.dataUpdatedAt) {
       return;
     }
 
     markConversationRead(conversationId)
       .then(() => {
-        queryClient.invalidateQueries({ queryKey: ["inbox-conversations", myProfileId] });
+        queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(myProfileId) });
       })
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, messagesQuery.dataUpdatedAt]);
+  }, [conversationId, isRevoked, messagesQuery.dataUpdatedAt]);
 
   const sendMutation = useMutation({
     mutationFn: (body: string) =>
       sendMessage({ body, conversationId, senderProfileId: myProfileId }),
     onError: (error: unknown, body) => {
+      // DAS-REV-33 §21/§23: invio rifiutato per gruppo archiviato o accesso
+      // perso. La chat cambia stato (o si chiude): niente bozza da ripristinare.
+      if (isGroup && access.handleAccessError(error)) {
+        return;
+      }
+
       setDraft(body);
       showToast({
         message:
@@ -143,8 +184,8 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["conversation-messages", conversationId] });
-      queryClient.invalidateQueries({ queryKey: ["conversation-meta", conversationId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMessages(conversationId) });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
     },
   });
 
@@ -159,8 +200,8 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     onSuccess: () => {
       setIsBlockConfirmVisible(false);
       showToast({ message: "Utente bloccato.", tone: "success" });
-      queryClient.invalidateQueries({ queryKey: ["conversation-meta", conversationId] });
-      queryClient.invalidateQueries({ queryKey: ["inbox-conversations", myProfileId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(myProfileId) });
       router.back();
     },
   });
@@ -174,7 +215,7 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["conversation-meta", conversationId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
     },
   });
 
@@ -187,8 +228,8 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
       });
     },
     onSuccess: (_data, archived) => {
-      queryClient.invalidateQueries({ queryKey: ["inbox-conversations", myProfileId] });
-      queryClient.invalidateQueries({ queryKey: ["conversation-meta", conversationId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(myProfileId) });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
 
       if (archived) {
         showToast({ message: "Chat archiviata.", tone: "success" });
@@ -224,6 +265,9 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     : meta
       ? buildChatSubtitle(meta)
       : undefined;
+  // DAS-REV-33 §21: stato e scrittura arrivano dal server.
+  const isGroupArchived = groupMeta?.status === "archived";
+  const showComposer = !isGroup || isGroupComposerAvailable(groupMeta);
   const banners = meta ? resolveChatBanners(meta) : null;
   const isSearching = isSearchMode && searchQuery.trim().length >= 2;
   const displayedMessages = isSearching ? filterMessagesForSearch(messages, searchQuery) : messages;
@@ -302,9 +346,13 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
         mediaPath: path,
         senderProfileId: myProfileId,
       });
-      queryClient.invalidateQueries({ queryKey: ["conversation-messages", conversationId] });
-      queryClient.invalidateQueries({ queryKey: ["conversation-meta", conversationId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMessages(conversationId) });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
     } catch (error) {
+      if (isGroup && access.handleAccessError(error)) {
+        return;
+      }
+
       showToast({
         message: error instanceof Error ? error.message : "Caricamento del file non riuscito.",
         tone: "neutral",
@@ -345,9 +393,13 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
         mediaPath: path,
         senderProfileId: myProfileId,
       });
-      queryClient.invalidateQueries({ queryKey: ["conversation-messages", conversationId] });
-      queryClient.invalidateQueries({ queryKey: ["conversation-meta", conversationId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMessages(conversationId) });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
     } catch (error) {
+      if (isGroup && access.handleAccessError(error)) {
+        return;
+      }
+
       showToast({
         message: error instanceof Error ? error.message : "Caricamento del documento non riuscito.",
         tone: "neutral",
@@ -394,8 +446,8 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
         senderProfileId: myProfileId,
       });
       setIsShareModalVisible(false);
-      queryClient.invalidateQueries({ queryKey: ["conversation-messages", conversationId] });
-      queryClient.invalidateQueries({ queryKey: ["conversation-meta", conversationId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMessages(conversationId) });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
     } catch (error) {
       showToast({
         message:
@@ -411,7 +463,16 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     <SafeAreaView style={styles.root}>
       <ChatHeader
         avatarUrl={meta?.other_avatar_url}
-        group={isGroup ? { avatarPath: groupMeta?.avatarPath ?? null } : null}
+        group={
+          isGroup
+            ? {
+                avatarPath: groupMeta?.avatarPath ?? null,
+                onOpenInfo: GROUP_INFO_AVAILABLE
+                  ? () => router.push(groupInfoRoute(conversationId) as never)
+                  : undefined,
+              }
+            : null
+        }
         isSearchMode={isSearchMode}
         name={displayName}
         onBack={() => router.back()}
@@ -424,6 +485,7 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
         onSearchQueryChange={setSearchQuery}
         resultsCount={resultsCount}
         searchQuery={searchQuery}
+        statusLabel={isGroupArchived ? GROUP_CHAT_COPY.archivedLabel : undefined}
         subtitle={subtitle}
       />
 
@@ -450,7 +512,11 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
 
         <MessageList
           emptyState={
-            isGroup && messagesQuery.isSuccess && messages.length === 0 && !isSearchMode ? (
+            isGroup &&
+            !isGroupArchived &&
+            messagesQuery.isSuccess &&
+            messages.length === 0 &&
+            !isSearchMode ? (
               <GroupChatEmptyState title={displayName} />
             ) : undefined
           }
@@ -468,18 +534,22 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
           />
         ) : null}
 
-        <ChatComposer
-          allowContactShare={!isGroup}
-          blocked={meta?.blocked_by_me ?? false}
-          draft={draft}
-          isSending={sendMutation.isPending}
-          isUploading={isUploadingMedia}
-          onChangeDraft={setDraft}
-          onPickDocument={() => void handlePickDocument()}
-          onPickMedia={() => void handlePickMedia()}
-          onSend={handleSend}
-          onShareContact={() => void handleOpenShareContact()}
-        />
+        {showComposer ? (
+          <ChatComposer
+            allowContactShare={!isGroup}
+            blocked={meta?.blocked_by_me ?? false}
+            draft={draft}
+            isSending={sendMutation.isPending}
+            isUploading={isUploadingMedia}
+            onChangeDraft={setDraft}
+            onPickDocument={() => void handlePickDocument()}
+            onPickMedia={() => void handlePickMedia()}
+            onSend={handleSend}
+            onShareContact={() => void handleOpenShareContact()}
+          />
+        ) : (
+          <GroupArchivedNotice />
+        )}
       </KeyboardAvoidingView>
 
       <ChatActionsSheet

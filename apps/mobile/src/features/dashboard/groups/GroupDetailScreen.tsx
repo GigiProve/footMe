@@ -7,9 +7,14 @@
  *
  * «Apri conversazione» esiste solo se il viewer è partecipante adesso, ed è
  * rivalidata al tap (§11, QA-028). Il manager non membro vede la stessa
- * pagina senza CTA: nessun avviso, nessuna promessa di accesso (QA-022).
- * Gestisci gruppo non è disponibile in questa release e non viene disegnato
- * (§2, QA-010).
+ * pagina senza «Apri conversazione»: nessun avviso, nessuna promessa di
+ * accesso (QA-022).
+ *
+ * DAS-REV-33 §9: «Gestisci gruppo» compare solo con `can_manage` dal server
+ * (nascosto, mai disabilitato, §5) e apre la gestione completa, la stessa Info
+ * gruppo che si raggiunge da Messaggi. Questa pagina resta l'anteprima
+ * amministrativa. Una sola primaria: «Apri conversazione» se c'è, altrimenti
+ * «Gestisci gruppo»; con entrambe, la seconda è secondaria.
  */
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -27,9 +32,9 @@ import { useDashboardIdentity } from "../identity/use-dashboard-identity";
 import { PositionsCenterHeader } from "../positions/components/PositionsCenterHeader";
 import { GroupAvatar } from "./components/GroupAvatar";
 import { trackGroupDetailOpened, trackGroupOpenConversation } from "./groups-analytics";
-import { GROUPS_COPY } from "./groups-copy";
+import { GROUP_MANAGE_COPY, GROUPS_COPY } from "./groups-copy";
 import { GROUPS_QK } from "./groups-keys";
-import { GROUPS_HREFS } from "./groups-routes";
+import { GROUP_MANAGE_HREFS, GROUPS_HREFS } from "./groups-routes";
 import { GroupsError, fetchSocietyGroupDetail } from "./groups-service";
 
 const isAuthorizationError = (error: unknown) => error instanceof GroupsError && error.isAuthorization;
@@ -199,6 +204,18 @@ export function GroupDetailScreen() {
           variant="primary"
         />
       ) : null}
+
+      {detail.canManage ? (
+        <Button
+          fullWidth
+          label={GROUP_MANAGE_COPY.manageGroup}
+          onPress={() => router.push(GROUP_MANAGE_HREFS.info(detail.conversationId, "dashboard") as never)}
+          size="md"
+          style={detail.canOpenConversation ? styles.secondaryCta : styles.cta}
+          testID="group-manage"
+          variant={detail.canOpenConversation ? "neutralOutline" : "primary"}
+        />
+      ) : null}
     </ScrollView>,
   );
 }
@@ -248,6 +265,9 @@ const styles = StyleSheet.create({
   rows: {
     borderTopColor: colors.divider,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  secondaryCta: {
+    marginTop: spacing[12],
   },
   state: {
     paddingHorizontal: spacing[20],

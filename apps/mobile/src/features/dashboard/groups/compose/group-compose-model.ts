@@ -6,7 +6,7 @@
  * immagine e come si accumulano le persone note per il riepilogo. Testato in
  * `group-compose-model.test.ts` senza renderizzare nulla.
  */
-import { GROUPS_COPY } from "../groups-copy";
+import { GROUP_MANAGE_COPY, GROUPS_COPY } from "../groups-copy";
 import type { GroupAvatarErrorCode } from "../groups-service";
 import type { EligiblePerson, GroupComposeOrigin, GroupCreateContext } from "../groups-types";
 
@@ -98,6 +98,8 @@ export function avatarErrorMessage(code: GroupAvatarErrorCode | null): string {
   switch (code) {
     case "permission_denied":
       return GROUPS_COPY.imagePermission;
+    case "camera_denied":
+      return GROUP_MANAGE_COPY.cameraPermission;
     case "avatar_format":
       return GROUPS_COPY.imageFormat;
     case "avatar_too_large":

@@ -29,6 +29,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors, sizes, spacing } from "../../../../theme/tokens";
 import { ActionSheet, AppText, Button } from "../../../../ui";
 import { useSession } from "../../../auth/use-session";
+import { MESSAGING_QK } from "../../../messaging/messaging-keys";
 import { useUnsavedChangesGuard } from "../../../profiles/edit/use-unsaved-changes-guard";
 import { useDashboardIdentity } from "../../identity/use-dashboard-identity";
 import { newInviteSessionNonce, operationKeyOf } from "../../invites/operation-key";
@@ -620,7 +621,7 @@ function GroupWizard({ creator, leave, origin, society }: WizardProps) {
       GROUPS_QK_PREFIXES.forEach((prefix) => {
         void queryClient.invalidateQueries({ queryKey: [prefix] });
       });
-      void queryClient.invalidateQueries({ queryKey: ["inbox-conversations", actorId] });
+      void queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(actorId) });
       setDone({ conversationId: result.conversationId, title: input.name });
     } catch (error) {
       applyFailure(error, input);

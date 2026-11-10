@@ -1,6 +1,7 @@
 import { RealtimeChannel } from "@supabase/supabase-js";
 
 import { supabase } from "../../lib/supabase";
+import type { GroupStatus } from "./group-chat-presentation";
 
 export type ConversationSummary = {
   conversation_id: string;
@@ -16,7 +17,13 @@ export type ConversationSummary = {
   unread_count: number;
 };
 
-export type MessageKind = "text" | "contact_card" | "image" | "video" | "document";
+export type MessageKind =
+  | "text"
+  | "contact_card"
+  | "image"
+  | "video"
+  | "document"
+  | "system_event";
 
 export type ConversationMessage = {
   message_id: string;
@@ -27,8 +34,13 @@ export type ConversationMessage = {
   read_at: string | null;
   shared_contact_name: string | null;
   shared_contact_phone: string | null;
-  sender_profile_id: string;
-  sender_full_name: string;
+  /** DAS-REV-33 §24: null solo per i SYSTEM_EVENT (nessun autore PERSON). */
+  sender_profile_id: string | null;
+  sender_full_name: string | null;
+  system_event_type?: string | null;
+  system_payload?: Record<string, unknown> | null;
+  /** Ordine server della timeline (§17); assente sui payload precedenti a DAS-REV-33. */
+  seq?: number;
 };
 
 export async function getConversationSummaries() {
@@ -136,9 +148,13 @@ export async function getShareablePhoneContact(profileId: string) {
   };
 }
 
+/**
+ * `onChange` riceve il tipo dell'evento di sistema quando il cambio è un
+ * SYSTEM_EVENT (DAS-REV-33 §24): la chat ricarica la testata del gruppo.
+ */
 export function subscribeToConversation(
   conversationId: string,
-  onChange: () => void,
+  onChange: (change?: { systemEventType: string | null }) => void,
 ) {
   const channel: RealtimeChannel = supabase
     .channel(`conversation:${conversationId}`)
@@ -150,7 +166,42 @@ export function subscribeToConversation(
         schema: "public",
         table: "messages",
       },
-      () => onChange(),
+      (payload) => {
+        const type = (payload.new as { system_event_type?: unknown } | null)?.system_event_type;
+
+        onChange({ systemEventType: typeof type === "string" ? type : null });
+      },
+    )
+    .subscribe();
+
+  return channel;
+}
+
+/**
+ * DAS-REV-33 §26: fine di un periodo di appartenenza del viewer. La RLS
+ * mostra solo i propri periodi; il filtro per profilo evita il rumore.
+ * `scope` distingue il canale della chat da quello dell'Inbox (due canali con
+ * lo stesso topic non convivono). `onChange` riceve la riga grezza: la
+ * decisione è in group-chat-presentation.
+ */
+export function subscribeToMyGroupPeriods(
+  scope: string,
+  profileId: string,
+  onChange: (record: unknown) => void,
+) {
+  const channel: RealtimeChannel = supabase
+    .channel(`group-periods:${scope}:${profileId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        filter: `profile_id=eq.${profileId}`,
+        schema: "public",
+        // Vista-tabella `society_group_member_access`: solo le righe proprie,
+        // con id periodo, ended_at e revoked_kind. La tabella dei periodi è chiusa.
+        table: "society_group_member_access",
+      },
+      (payload) => onChange(payload.new),
     )
     .subscribe();
 
@@ -178,6 +229,14 @@ export type InboxConversation = {
   blocked_by_me: boolean;
   /** DAS-REV-32 §5: path privato dell'immagine dei gruppi organizzativi, altrimenti null. */
   group_avatar_path: string | null;
+  /** DAS-REV-33 §21: null per le non-gruppo e i gruppi legacy. */
+  group_status?: GroupStatus | null;
+  /**
+   * DAS-REV-33 §24: colonne opzionali per formattare l'anteprima di un
+   * SYSTEM_EVENT; se il server non le manda, l'anteprima usa il body.
+   */
+  last_message_system_event_type?: string | null;
+  last_message_system_payload?: Record<string, unknown> | null;
 };
 
 export async function fetchInboxConversations(
@@ -285,6 +344,12 @@ export type GroupConversationMeta = {
   clubName: string | null;
   peopleCount: number;
   myRole: "admin" | "member";
+  /** DAS-REV-33 §21: stato, scrittura e versioni arrivano dal server, mai derivati. */
+  status: GroupStatus;
+  canSend: boolean;
+  groupVersion: number | null;
+  periodId: string | null;
+  periodVersion: number | null;
 };
 
 /** DAS-REV-32 §25: testata della chat di gruppo. Errore se non è un gruppo del viewer. */
@@ -301,13 +366,21 @@ export async function fetchGroupConversationMeta(
 
   const raw = (data ?? {}) as Record<string, unknown>;
   const text = (value: unknown) => (typeof value === "string" && value ? value : null);
+  const num = (value: unknown) => (typeof value === "number" ? value : null);
+  const status: GroupStatus = raw.status === "archived" ? "archived" : "active";
 
   return {
     avatarPath: text(raw.avatar_path),
     avatarUrl: text(raw.avatar_url),
+    // Server precedente a DAS-REV-33: senza `can_send` vale lo stato.
+    canSend: typeof raw.can_send === "boolean" ? raw.can_send : status === "active",
     clubName: text(raw.club_name),
+    groupVersion: num(raw.group_version),
     myRole: raw.my_role === "admin" ? "admin" : "member",
     peopleCount: typeof raw.people_count === "number" ? raw.people_count : 0,
+    periodId: text(raw.period_id),
+    periodVersion: num(raw.period_version),
+    status,
     title: text(raw.title) ?? "",
   };
 }
