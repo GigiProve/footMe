@@ -9,7 +9,19 @@
 
 import { supabase } from "../../lib/supabase";
 import {
+  asFeedContentType,
+  readAuthorMeta,
+  readCapabilities,
+  readCount,
+  readIdentityType,
+  readLinkPreview,
+  readMedia,
+  readMentions,
+  readTagged,
+} from "./feed-post-mapper";
+import {
   FEED_ITEM_TYPES,
+  type FeedContentType,
   type FeedCursor,
   type FeedItem,
   type FeedItemRow,
@@ -18,6 +30,7 @@ import {
   type FeedNavKind,
   type FeedPage,
   type FeedPageParam,
+  type FeedPostItem,
   type FeedReasonKey,
   type FeedScope,
   type MediaContentType,
@@ -89,13 +102,6 @@ function readNumber(data: Record<string, unknown> | null, key: string): number |
 
 function readBoolean(data: Record<string, unknown> | null, key: string): boolean {
   return data?.[key] === true;
-}
-
-function readMediaType(
-  data: Record<string, unknown> | null,
-): "image" | "video" | null {
-  const value = data?.["media_type"];
-  return value === "image" || value === "video" ? value : null;
 }
 
 function buildNav(
@@ -195,27 +201,48 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
     };
   }
 
-  const contentType = asContentType(row.data?.["content_type"]);
   const postId = readString(row.data, "post_id");
-  if (!contentType || !postId) {
-    return null;
-  }
 
   if (type === "post") {
+    const postType = asFeedContentType(row.data?.["content_type"]);
+    if (!postType || !postId) {
+      return null;
+    }
+
+    // §14: il testo completo arriva in `data.body`; `excerpt` (280) resta per
+    // i server pre-HOM-02.
+    const body = readString(row.data, "body");
     return {
       ...envelope,
       type,
       title: row.title,
       payload: {
-        contentType,
+        contentType: postType,
         postId,
         kindLabel: readString(row.data, "kind_label"),
         text: row.excerpt,
+        body,
         isTruncated: readBoolean(row.data, "is_truncated"),
-        imageUrl: row.thumbnail_url,
-        mediaType: readMediaType(row.data),
+        authorIdentityType: readIdentityType(row.data, row.author_kind, row.author_source_kind),
+        authorMeta: readAuthorMeta(row.data),
+        media: readMedia(row.data, row.item_uid, {
+          thumbnailUrl: row.thumbnail_url,
+          durationSeconds: readNumber(row.data, "duration_seconds"),
+        }),
+        mentions: readMentions(row.data, body),
+        tagged: readTagged(row.data),
+        linkPreview: readLinkPreview(row.data),
+        likesCount: readCount(row.data, "likes_count"),
+        commentsCount: readCount(row.data, "comments_count"),
+        isLiked: readBoolean(row.data, "is_liked"),
+        capabilities: readCapabilities(row.data, postType),
       },
     };
+  }
+
+  const contentType = asContentType(row.data?.["content_type"]);
+  if (!contentType || !postId) {
+    return null;
   }
 
   return {
@@ -320,4 +347,135 @@ export function resolveFeedAuthorHref(item: FeedItem): string | null {
   return item.author.kind === "club"
     ? `/club/${item.author.id}`
     : `/profile/${item.author.id}`;
+}
+
+/**
+ * HOM-02 §53, §83: Mi piace come STATO desiderato, non come toggle. Due tap
+ * ravvicinati diventano "true" poi "false" e il risultato finale è quello
+ * dell'ultimo, anche se una richiesta viene ripetuta. Il server restituisce il
+ * conteggio reale, che sostituisce quello ottimistico.
+ */
+export async function setPostLike(
+  contentType: FeedContentType,
+  postId: string,
+  liked: boolean,
+): Promise<{ likesCount: number; isLiked: boolean }> {
+  const { data, error } = await supabase.rpc("set_content_like", {
+    p_content_type: contentType,
+    p_liked: liked,
+    p_post_id: postId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { likes_count?: unknown; is_liked?: unknown }
+    | null
+    | undefined;
+
+  // Una risposta senza conteggio non è uno stato: meglio l’errore (e il
+  // ritorno all’ultimo stato confermato) che un "0" inventato.
+  if (!row || typeof row.likes_count !== "number" || typeof row.is_liked !== "boolean") {
+    throw new Error("set_content_like: risposta senza stato");
+  }
+
+  return { likesCount: row.likes_count, isLiked: row.is_liked };
+}
+
+/** HOM-02 §19, §22: mention e tag aprono l'identità per id, mai per nome. */
+export function resolveIdentityHref(target: {
+  identityType: "profile" | "club" | "team";
+  identityId: string;
+}): string {
+  switch (target.identityType) {
+    case "club":
+      return `/club/${target.identityId}`;
+    case "team":
+      return `/club/team/${target.identityId}`;
+    default:
+      return `/profile/${target.identityId}`;
+  }
+}
+
+/**
+ * HOM-02 §35 (Luigi 2026-11-11: niente viewer nuovo): il tap su un media apre
+ * il dettaglio del contenuto con l'indice selezionato.
+ */
+export function resolvePostMediaHref(item: FeedPostItem, index: number): string {
+  return `/content/${item.payload.contentType}/${item.payload.postId}?media=${index}`;
+}
+
+type ProfilePostDetailJson = {
+  post_id?: unknown;
+  published_at?: unknown;
+  author?: {
+    id?: unknown;
+    name?: unknown;
+    avatar_url?: unknown;
+    is_verified?: unknown;
+    source_kind?: unknown;
+  } | null;
+  data?: Record<string, unknown> | null;
+};
+
+/**
+ * HOM-02 §109: il dettaglio di un post persona usa lo stesso `data` del Feed e
+ * passa dallo stesso `mapFeedRow`, così Feed e dettaglio non possono divergere.
+ * `null` quando il post non è leggibile (RLS, nascosto, autore bloccato).
+ */
+export async function fetchProfilePostDetail(postId: string): Promise<FeedPostItem | null> {
+  const { data, error } = await supabase.rpc("fetch_profile_post_detail", {
+    p_post_id: postId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return mapProfilePostDetail(data as ProfilePostDetailJson | null);
+}
+
+export function mapProfilePostDetail(json: ProfilePostDetailJson | null): FeedPostItem | null {
+  if (!json || typeof json.post_id !== "string" || !json.author) {
+    return null;
+  }
+
+  const author = json.author;
+  const postId = json.post_id;
+  const row: FeedItemRow = {
+    item_uid: `profile_post:${postId}`,
+    item_type: "post",
+    rank_position: 0,
+    rank_bucket: 0,
+    layout_hint: "standard",
+    component_version: 1,
+    title: null,
+    excerpt: null,
+    thumbnail_url: null,
+    published_at: typeof json.published_at === "string" ? json.published_at : null,
+    author_kind: "profile",
+    author_id: typeof author.id === "string" ? author.id : null,
+    author_name: typeof author.name === "string" ? author.name : null,
+    author_avatar_url: typeof author.avatar_url === "string" ? author.avatar_url : null,
+    author_source_kind: typeof author.source_kind === "string" ? author.source_kind : null,
+    author_is_verified: author.is_verified === true,
+    is_seen: true,
+    is_saved: false,
+    is_following_author: false,
+    suggestion_reason_key: null,
+    suggestion_reason_label: null,
+    nav_kind: "content",
+    nav_params: { content_type: "profile_post", post_id: postId },
+    data: { ...(json.data ?? {}), content_type: "profile_post", post_id: postId },
+    as_of: new Date(0).toISOString(),
+    next_cursor_bucket: null,
+    next_cursor_published_at: null,
+    next_cursor_uid: null,
+    is_last_page: true,
+  };
+
+  const item = mapFeedRow(row);
+  return item?.type === "post" ? item : null;
 }

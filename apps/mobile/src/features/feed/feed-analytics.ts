@@ -3,8 +3,8 @@
  *
  * La union tipizzata è il punto: aggiungere un evento senza dichiararlo qui non
  * compila, e il test associato verifica la corrispondenza 1:1 con l'elenco del
- * §25. Nessun evento per Mi piace / Commenta / Condividi: quelle azioni sono
- * solo visive in questo blocco e il §25 non le elenca.
+ * §25. Da HOM-02 §89 ci sono anche gli eventi del Post
+ * (autore, testo, mention, tag, media, Mi piace, Commenta, Condividi, link).
  *
  * `feed_save_tap` e `feed_item_menu_open` vanno oltre il minimo del §25: il
  * segnalibro è l'unica azione realmente funzionante sulle card e il menu ⋯ è
@@ -13,7 +13,7 @@
  */
 
 import { trackEvent, type AnalyticsProps } from "../../lib/analytics";
-import type { FeedItemType, FeedScope } from "./feed-types";
+import type { FeedIdentityType, FeedItemType, FeedScope } from "./feed-types";
 
 export type FeedAnalyticsEvent =
   | { name: "home_open" }
@@ -56,7 +56,23 @@ export type FeedAnalyticsEvent =
   // un'impression degli elementi: quelle restano `feed_item_impression`,
   // registrate solo quando gli elementi sono davvero a schermo.
   | { name: "feed_new_content_available"; scope: FeedScope; count: number }
-  | { name: "feed_new_content_tap"; scope: FeedScope };
+  | { name: "feed_new_content_tap"; scope: FeedScope }
+  // HOM-02 §89: eventi minimi del Post. L’impression resta
+  // `feed_item_impression` (§90: montare il componente non è un’impression), il
+  // menu resta `feed_item_menu_open`. La logica completa di Like, commenti e
+  // condivisione si consolida in HOM-07/08/09.
+  | { name: "feed_post_author_open"; itemId: string; identityType: FeedIdentityType }
+  | { name: "feed_post_text_expand"; itemId: string }
+  | { name: "feed_post_text_collapse"; itemId: string }
+  | { name: "feed_post_mention_open"; itemId: string; identityType: "profile" | "club" }
+  | { name: "feed_post_tagged_list_open"; itemId: string; count: number }
+  | { name: "feed_post_media_open"; itemId: string; index: number; mediaType: "image" | "video" }
+  | { name: "feed_post_gallery_open"; itemId: string; count: number }
+  | { name: "feed_post_video_select"; itemId: string; index: number }
+  | { name: "feed_post_like_tap"; itemId: string; liked: boolean }
+  | { name: "feed_post_comment_tap"; itemId: string }
+  | { name: "feed_post_share_tap"; itemId: string }
+  | { name: "feed_post_link_preview_open"; itemId: string; domain: string };
 
 export function trackFeed(event: FeedAnalyticsEvent): void {
   const { name, ...rest } = event;

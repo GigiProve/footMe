@@ -6,6 +6,7 @@ import {
   mergeFeedPages,
   prependNewItems,
 } from "./feed-arrange";
+import { makePostPayload } from "./feed-post-fixtures";
 import { isDiscoveryItem, type FeedItem, type FeedPage } from "./feed-types";
 
 /**
@@ -52,15 +53,7 @@ function makePost(id: string, authorId = `author-${id}`): FeedItem {
     type: "post",
     author: author(authorId),
     title: `Post ${id}`,
-    payload: {
-      contentType: "club_media",
-      postId: id,
-      kindLabel: null,
-      text: "Testo",
-      isTruncated: false,
-      imageUrl: null,
-      mediaType: null,
-    },
+    payload: makePostPayload({ postId: id, text: "Testo" }),
   };
 }
 

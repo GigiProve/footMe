@@ -63,4 +63,5 @@ export { StatCard } from "./StatCard/StatCard";
 export { TabBar, type TabBarItem } from "./TabBar/TabBar";
 export { Toggle } from "./Toggle/Toggle";
 export { TopBar } from "./TopBar/TopBar";
+export { VERIFIED_CHECK_LABEL, VerifiedCheck } from "./VerifiedCheck/VerifiedCheck";
 export { Icon, type IconName } from "./icons";

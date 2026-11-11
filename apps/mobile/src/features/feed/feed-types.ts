@@ -211,15 +211,119 @@ export type FeedPage = {
 // Payload per tipo
 // ────────────────────────────────────────────────────────────────
 
+/**
+ * Sorgenti di un Post nel Feed. Le cinque di CER-05 più `profile_post`
+ * (HOM-02, Luigi 2026-11-11): i post di Calciatori, Allenatori, Staff,
+ * Procuratori e Dirigenti, che prima non potevano pubblicare. `profile_post`
+ * vive solo in Feed e dettaglio: la ricerca Media (CER-05) non lo conosce, per
+ * questo non entra in `MediaContentType`.
+ */
+export type FeedContentType = MediaContentType | "profile_post";
+
+/**
+ * HOM-02 §80: chi pubblica è un'identità, non un utente. La Società resta
+ * l'autore anche quando scrive un suo admin (§110): l'acting user non arriva
+ * mai al client (§111).
+ */
+export type FeedIdentityType = "person" | "society" | "media";
+
+/**
+ * Dati grezzi per la seconda riga dell'header (§9). Il server manda i valori,
+ * il client sceglie quali mostrare e li formatta con gli helper condivisi:
+ * mai ruolo, Società, categoria, città e regione tutti insieme.
+ */
+export type FeedAuthorMeta = {
+  role: string | null;
+  primaryPosition: string | null;
+  clubName: string | null;
+  teamLabel: string | null;
+  clubCategory: string | null;
+  mediaKind: string | null;
+};
+
+/** §24: un elemento della media collection unica, foto e video insieme. */
+export type FeedMediaItem = {
+  id: string;
+  type: "image" | "video";
+  position: number;
+  url: string | null;
+  thumbnailUrl: string | null;
+  width: number | null;
+  height: number | null;
+  /** width/height quando entrambi noti, altrimenti null (il renderer usa un default). */
+  aspectRatio: number | null;
+  durationSeconds: number | null;
+  altText: string | null;
+  processingState: "ready" | "processing" | "failed";
+  availability: "available" | "unavailable";
+};
+
+/**
+ * §18: mention strutturata. `start`/`end` sono offset UTF-16 (indici di
+ * stringa JS) dentro `body`, `end` escluso. Il tap apre l'identità per id,
+ * mai una ricerca per nome (§19).
+ */
+export type FeedMention = {
+  identityId: string;
+  identityType: "profile" | "club";
+  displayName: string;
+  start: number;
+  end: number;
+};
+
+/** §20: identità taggata, anche se non menzionata nel testo. */
+export type FeedTaggedIdentity = {
+  identityId: string;
+  identityType: "profile" | "club" | "team";
+  displayName: string;
+  avatarUrl: string | null;
+};
+
+/** §43: niente URL lungo, solo dominio. La validazione del target è HOM-06.1. */
+export type FeedLinkPreview = {
+  url: string;
+  title: string | null;
+  description: string | null;
+  domain: string;
+  thumbnailUrl: string | null;
+};
+
+/**
+ * §81: calcolate dal server, mai dedotte dal tipo autore. Le azioni che le
+ * usano (menu, insights) appartengono alle task successive.
+ */
+export type FeedPostCapabilities = {
+  canLike: boolean;
+  canComment: boolean;
+  canShare: boolean;
+  canSave: boolean;
+  canReport: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canViewInsights: boolean;
+};
+
 export type FeedPostPayload = {
-  contentType: MediaContentType;
+  contentType: FeedContentType;
   postId: string;
   kindLabel: string | null;
+  /** Estratto legacy a 280 caratteri: usato solo se `body` manca. */
   text: string | null;
+  /** Testo completo (§14–16): "Mostra altro" espande senza un'altra richiesta. */
+  body: string | null;
   isTruncated: boolean;
-  imageUrl: string | null;
-  mediaType: "image" | "video" | null;
+  authorIdentityType: FeedIdentityType;
+  authorMeta: FeedAuthorMeta;
+  media: FeedMediaItem[];
+  mentions: FeedMention[];
+  tagged: FeedTaggedIdentity[];
+  linkPreview: FeedLinkPreview | null;
+  likesCount: number;
+  commentsCount: number;
+  isLiked: boolean;
+  capabilities: FeedPostCapabilities;
 };
+
 
 export type FeedEditorialPayload = {
   contentType: MediaContentType;

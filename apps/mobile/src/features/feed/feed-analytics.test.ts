@@ -88,6 +88,18 @@ describe("trackFeed", () => {
     { name: "home_personalization_skipped" },
     { count: 3, name: "feed_new_content_available", scope: "per_te" },
     { name: "feed_new_content_tap", scope: "per_te" },
+    { identityType: "person", itemId: "p:1", name: "feed_post_author_open" },
+    { itemId: "p:1", name: "feed_post_text_expand" },
+    { itemId: "p:1", name: "feed_post_text_collapse" },
+    { identityType: "profile", itemId: "p:1", name: "feed_post_mention_open" },
+    { count: 3, itemId: "p:1", name: "feed_post_tagged_list_open" },
+    { index: 0, itemId: "p:1", mediaType: "image", name: "feed_post_media_open" },
+    { count: 7, itemId: "p:1", name: "feed_post_gallery_open" },
+    { index: 1, itemId: "p:1", name: "feed_post_video_select" },
+    { itemId: "p:1", liked: true, name: "feed_post_like_tap" },
+    { itemId: "p:1", name: "feed_post_comment_tap" },
+    { itemId: "p:1", name: "feed_post_share_tap" },
+    { domain: "example.com", itemId: "p:1", name: "feed_post_link_preview_open" },
   ];
 
   it.each(cases.map((event) => [event.name, event] as const))(
@@ -124,19 +136,25 @@ describe("trackFeed", () => {
       "home_personalization_skipped",
       "feed_new_content_available",
       "feed_new_content_tap",
+      // HOM-02 §89 (impression e menu restano feed_item_impression e feed_item_menu_open)
+      "feed_item_menu_open",
+      "feed_post_author_open",
+      "feed_post_text_expand",
+      "feed_post_text_collapse",
+      "feed_post_mention_open",
+      "feed_post_tagged_list_open",
+      "feed_post_media_open",
+      "feed_post_gallery_open",
+      "feed_post_video_select",
+      "feed_post_like_tap",
+      "feed_post_comment_tap",
+      "feed_post_share_tap",
+      "feed_post_link_preview_open",
     ];
 
     const covered = new Set(cases.map((event) => event.name));
     for (const name of required) {
       expect(covered.has(name as FeedAnalyticsEvent["name"])).toBe(true);
     }
-  });
-
-  it("non prevede eventi per Mi piace, commenti o condivisione", () => {
-    // Sono nelle esclusioni del §29 e non compaiono nell'elenco del §25.
-    const names = cases.map((event) => String(event.name));
-    expect(names.some((name) => name.includes("like"))).toBe(false);
-    expect(names.some((name) => name.includes("comment"))).toBe(false);
-    expect(names.some((name) => name.includes("share"))).toBe(false);
   });
 });

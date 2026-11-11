@@ -14,6 +14,7 @@
 
 import type {
   FeedItem,
+  FeedPostItem,
   FeedSuggestedClubRow,
   FeedSuggestedProfileRow,
 } from "../feed-types";
@@ -45,10 +46,25 @@ export type FeedModulesState = {
   onToggleFollowClub: (row: FeedSuggestedClubRow) => void;
 };
 
+export type FeedIdentityTarget = {
+  identityType: "profile" | "club" | "team";
+  identityId: string;
+};
+
 export type FeedItemHandlers = {
   onOpenItem: (item: FeedItem) => void;
   onOpenAuthor: (item: FeedItem) => void;
   onToggleSaved: (item: FeedItem) => void;
+  // HOM-02: i punti d’ingresso del Post. Navigazione, scrittura e analytics
+  // stanno in FeedPane; il componente chiama e basta.
+  onToggleLike: (item: FeedPostItem) => void;
+  /** §35: il media apre il dettaglio contenuto con l’indice selezionato. */
+  onOpenMedia: (item: FeedPostItem, index: number) => void;
+  /** §19, §22: mention e tag aprono l’identità per id, mai per nome. */
+  onOpenIdentity: (item: FeedPostItem, target: FeedIdentityTarget) => void;
+  onOpenLink: (item: FeedPostItem) => void;
+  onComment: (item: FeedPostItem) => void;
+  onShare: (item: FeedPostItem) => void;
 };
 
 type FeedItemRendererProps = {
@@ -66,6 +82,12 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
           onPress={() => handlers.onOpenItem(item)}
           onPressAuthor={() => handlers.onOpenAuthor(item)}
           onToggleSaved={() => handlers.onToggleSaved(item)}
+          onToggleLike={() => handlers.onToggleLike(item)}
+          onOpenMedia={(index) => handlers.onOpenMedia(item, index)}
+          onOpenIdentity={(target) => handlers.onOpenIdentity(item, target)}
+          onOpenLink={() => handlers.onOpenLink(item)}
+          onComment={() => handlers.onComment(item)}
+          onShare={() => handlers.onShare(item)}
         />
       );
 

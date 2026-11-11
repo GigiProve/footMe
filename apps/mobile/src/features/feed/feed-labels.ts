@@ -108,11 +108,24 @@ export const FEED_ACTION_SHARE = "Condividi";
 export const FEED_SOON_MESSAGES = {
   comment: "I commenti arriveranno presto.",
   hide: "Questa azione arriverà presto.",
-  like: "Le reazioni arriveranno presto.",
+  like: "Il Mi piace su questo contenuto arriverà presto.",
   notInterested: "Questa azione arriverà presto.",
   report: "Le segnalazioni arriveranno presto.",
   share: "La condivisione arriverà presto.",
   unfollow: "Questa azione arriverà presto.",
+} as const;
+
+// ── Post (HOM-02) ───────────────────────────────────────────────
+export const FEED_POST_SHOW_MORE = "Mostra altro";
+export const FEED_POST_SHOW_LESS = "Mostra meno";
+export const FEED_POST_TAGGED_LEAD = "Con";
+export const FEED_POST_TAGGED_SHEET_HINT = "Mostra tutti i profili taggati";
+export const FEED_POST_OPEN_AUTHOR_HINT = "Apre il profilo";
+/** §41: gli stati media che HOM-04 gestirà per intero; qui solo il rendering. */
+export const FEED_MEDIA_STATE_LABELS = {
+  imageUnavailable: "Immagine non disponibile",
+  videoProcessing: "Video in elaborazione",
+  videoUnavailable: "Video non disponibile",
 } as const;
 
 // ── Menu contestuale (§20) ──────────────────────────────────────

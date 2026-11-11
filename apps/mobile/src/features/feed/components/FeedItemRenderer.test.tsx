@@ -15,8 +15,14 @@ import {
 import { FeedItemRenderer } from "./FeedItemRenderer";
 
 const handlers = {
+  onComment: vi.fn(),
   onOpenAuthor: vi.fn(),
+  onOpenIdentity: vi.fn(),
   onOpenItem: vi.fn(),
+  onOpenLink: vi.fn(),
+  onOpenMedia: vi.fn(),
+  onShare: vi.fn(),
+  onToggleLike: vi.fn(),
   onToggleSaved: vi.fn(),
 };
 

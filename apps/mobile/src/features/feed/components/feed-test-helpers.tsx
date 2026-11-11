@@ -2,7 +2,14 @@ import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 
 import { ToastProvider } from "../../../ui";
-import type { FeedItem, FeedSuggestedClubRow, FeedSuggestedProfileRow } from "../feed-types";
+import type {
+  FeedItem,
+  FeedMediaItem,
+  FeedPostItem,
+  FeedPostPayload,
+  FeedSuggestedClubRow,
+  FeedSuggestedProfileRow,
+} from "../feed-types";
 import type { FeedModulesState } from "./FeedItemRenderer";
 
 /**
@@ -60,6 +67,37 @@ export function press(tree: TestRenderer.ReactTestRenderer, accessibilityLabel: 
   });
 }
 
+/**
+ * Come `press`, ma per le etichette che contengono parti variabili (l'autore
+ * del Post dice anche "pubblicato 2 ore fa"): si seleziona per espressione.
+ */
+export function pressMatching(tree: TestRenderer.ReactTestRenderer, pattern: RegExp) {
+  const target = tree.root
+    .findAll(
+      (node) =>
+        typeof node.type === "string" &&
+        typeof node.props?.accessibilityLabel === "string" &&
+        pattern.test(node.props.accessibilityLabel) &&
+        typeof node.props?.onPress === "function",
+    )
+    .at(0);
+
+  if (!target) {
+    throw new Error(`Nessun elemento premibile con label che soddisfa ${pattern}`);
+  }
+
+  act(() => {
+    target.props.onPress();
+  });
+}
+
+/** Nodi host con un dato accessibilityLabel esatto (per contare i controlli). */
+export function findByLabel(tree: TestRenderer.ReactTestRenderer, label: string) {
+  return tree.root.findAll(
+    (node) => typeof node.type === "string" && node.props?.accessibilityLabel === label,
+  );
+}
+
 let counter = 0;
 
 function envelope(id: string) {
@@ -88,23 +126,79 @@ const author = {
   isVerified: true,
 };
 
-export function makePostItem(overrides: Partial<FeedItem> = {}): FeedItem {
+/** Un elemento della media collection (HOM-02 §24), pronto, con url e miniatura. */
+export function makeMediaItem(
+  position: number,
+  overrides: Partial<FeedMediaItem> = {},
+): FeedMediaItem {
+  return {
+    altText: null,
+    aspectRatio: null,
+    availability: "available",
+    durationSeconds: null,
+    height: null,
+    id: `media-${position}`,
+    position,
+    processingState: "ready",
+    thumbnailUrl: `https://cdn.test/${position}-thumb.jpg`,
+    type: "image",
+    url: `https://cdn.test/${position}.jpg`,
+    width: null,
+    ...overrides,
+  };
+}
+
+/**
+ * Il payload di default è un Post di sola persona senza media né conteggi:
+ * ogni test dichiara solo ciò che gli serve. `payloadOverrides` si fonde nel
+ * payload invece di sostituirlo.
+ */
+export function makePostItem(
+  overrides: Partial<FeedPostItem> = {},
+  payloadOverrides: Partial<FeedPostPayload> = {},
+): FeedPostItem {
   return {
     ...envelope("club_media:p1"),
     type: "post",
     author,
     title: "Buon lavoro, ragazzi!",
     payload: {
+      authorIdentityType: "person",
+      authorMeta: {
+        clubCategory: null,
+        clubName: null,
+        mediaKind: null,
+        primaryPosition: null,
+        role: null,
+        teamLabel: null,
+      },
+      body: "Testo del post.",
+      capabilities: {
+        canComment: true,
+        canDelete: false,
+        canEdit: false,
+        canLike: true,
+        canReport: true,
+        canSave: true,
+        canShare: true,
+        canViewInsights: false,
+      },
+      commentsCount: 0,
       contentType: "club_media",
-      postId: "p1",
-      kindLabel: "Highlights",
-      text: "Testo del post.",
+      isLiked: false,
       isTruncated: false,
-      imageUrl: null,
-      mediaType: null,
+      kindLabel: "Highlights",
+      likesCount: 0,
+      linkPreview: null,
+      media: [],
+      mentions: [],
+      postId: "p1",
+      tagged: [],
+      text: "Testo del post.",
+      ...payloadOverrides,
     },
     ...overrides,
-  } as FeedItem;
+  };
 }
 
 export function makeArticleItem(): FeedItem {

@@ -11,40 +11,56 @@
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { formatRelativeTime } from "../../../../lib/relative-time";
-import { colors, spacing } from "../../../../theme/tokens";
-import { AppText, Avatar } from "../../../../ui";
+import { spacing } from "../../../../theme/tokens";
+import { AppText, Avatar, VerifiedCheck } from "../../../../ui";
 import type { FeedItem } from "../../feed-types";
 
 type FeedItemHeaderProps = {
   item: FeedItem;
   /** Tipologia del contenuto ("Articolo", "Video") quando serve dirla (§61). */
   kindLabel?: string | null;
+  /**
+   * HOM-02 §9: il Post compone da sé la seconda riga (ruolo · Società · tempo,
+   * senza motivo di suggerimento). Se passata sostituisce quella predefinita,
+   * che resta per gli elementi editoriali.
+   */
+  metaLine?: string | null;
+  /** HOM-02 §75: etichetta parlata completa dell'autore. */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
   onPressAuthor?: () => void;
   right?: React.ReactNode;
 };
 
-export function FeedItemHeader({ item, kindLabel, onPressAuthor, right }: FeedItemHeaderProps) {
+export function FeedItemHeader({
+  item,
+  kindLabel,
+  metaLine,
+  accessibilityLabel,
+  accessibilityHint,
+  onPressAuthor,
+  right,
+}: FeedItemHeaderProps) {
   const author = item.author;
 
   if (!author) {
     return null;
   }
 
-  const meta = [
-    item.publishedAt ? formatRelativeTime(item.publishedAt) : null,
-    kindLabel,
-    item.reasonLabel,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const meta =
+    metaLine !== undefined
+      ? (metaLine ?? "")
+      : [item.publishedAt ? formatRelativeTime(item.publishedAt) : null, kindLabel, item.reasonLabel]
+          .filter(Boolean)
+          .join(" · ");
 
   return (
     <View style={styles.row}>
       <Pressable
-        accessibilityLabel={`Apri ${author.name}`}
+        accessibilityHint={accessibilityHint}
+        accessibilityLabel={accessibilityLabel ?? `Apri ${author.name}`}
         accessibilityRole="button"
         disabled={!onPressAuthor}
         onPress={onPressAuthor}
@@ -61,14 +77,7 @@ export function FeedItemHeader({ item, kindLabel, onPressAuthor, right }: FeedIt
             <AppText numberOfLines={1} style={styles.name} variant="titleMd">
               {author.name}
             </AppText>
-            {author.isVerified ? (
-              <Ionicons
-                accessibilityLabel="Verificato"
-                color={colors.accent}
-                name="checkmark-circle"
-                size={15}
-              />
-            ) : null}
+            {author.isVerified ? <VerifiedCheck /> : null}
           </View>
           {meta ? (
             <AppText color="muted" numberOfLines={1} variant="feedMeta">

@@ -9,18 +9,26 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, View, type FlatList } from "react-native";
+import { Linking, StyleSheet, View, type FlatList } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { spacing } from "../../../theme/tokens";
+import { useToast } from "../../../ui";
 import { trackFeed } from "../feed-analytics";
 import type { CachedFeed } from "../feed-cache";
 import { FEED_QK } from "../feed-keys";
 import { fetchHomeFollowingState } from "../feed-meta-service";
-import { resolveFeedAuthorHref, resolveFeedItemHref } from "../feed-service";
+import { FEED_SOON_MESSAGES } from "../feed-labels";
+import {
+  resolveFeedAuthorHref,
+  resolveFeedItemHref,
+  resolveIdentityHref,
+  resolvePostMediaHref,
+} from "../feed-service";
 import type {
   FeedItem,
+  FeedPostItem,
   FeedScope,
   FeedSuggestedClubRow,
   FeedSuggestedProfileRow,
@@ -32,12 +40,13 @@ import {
   useToggleFollowSuggestion,
   useToggleSavedFeedItem,
 } from "../use-feed-item-actions";
+import { useToggleFeedPostLike } from "../use-feed-post-like";
 import { useFeedNewContent } from "../use-feed-new-content";
 import { useFeedScrollRestore } from "../use-feed-scroll-restore";
 import { useFeedSessionSeen } from "../use-feed-session-seen";
 import { useSuggestedClubs, useSuggestedProfiles } from "../use-feed-suggestions";
 import { FeedList } from "./FeedList";
-import type { FeedModulesState } from "./FeedItemRenderer";
+import type { FeedIdentityTarget, FeedModulesState } from "./FeedItemRenderer";
 import {
   FeedErrorState,
   FeedOfflineNotice,
@@ -74,6 +83,8 @@ export function FeedPane({
   const clubsQuery = useSuggestedClubs(profileId);
   const toggleSaved = useToggleSavedFeedItem({ profileId, scope });
   const toggleFollow = useToggleFollowSuggestion({ profileId, scope });
+  const toggleLike = useToggleFeedPostLike({ profileId });
+  const { showToast } = useToast();
 
   const cachedScope = cache?.scopes[scope];
   const seen = useFeedSessionSeen({
@@ -137,7 +148,16 @@ export function FeedPane({
       }
       openHref(resolveFeedItemHref(item));
     },
-    onOpenAuthor: (item: FeedItem) => openHref(resolveFeedAuthorHref(item)),
+    onOpenAuthor: (item: FeedItem) => {
+      if (item.type === "post" && item.author) {
+        trackFeed({
+          identityType: item.payload.authorIdentityType,
+          itemId: item.id,
+          name: "feed_post_author_open",
+        });
+      }
+      openHref(resolveFeedAuthorHref(item));
+    },
     onToggleSaved: (item: FeedItem) => {
       if (
         item.type === "suggested_position" ||
@@ -147,14 +167,67 @@ export function FeedPane({
         return;
       }
 
+      // I post persona non hanno ancora un salvataggio (Centro Salvati, HOM-07):
+      // `capabilities.canSave` è false e il menu non mostra la voce.
+      const contentType = item.payload.contentType;
+      if (contentType === "profile_post") {
+        return;
+      }
+
       toggleSaved.mutate({
-        contentType: item.payload.contentType,
+        contentType,
         isSaved: item.isSaved,
         itemId: item.id,
         postId: item.payload.postId,
       });
     },
+    onToggleLike: toggleLike,
+    onOpenMedia: (item: FeedPostItem, index: number) => {
+      const media = item.payload.media[index];
+      if (!media) {
+        return;
+      }
+      trackFeed({
+        index,
+        itemId: item.id,
+        mediaType: media.type,
+        name: "feed_post_media_open",
+      });
+      openHref(resolvePostMediaHref(item, index));
+    },
+    onOpenIdentity: (item: FeedPostItem, target: FeedIdentityTarget) => {
+      if (target.identityType !== "team") {
+        trackFeed({
+          identityType: target.identityType,
+          itemId: item.id,
+          name: "feed_post_mention_open",
+        });
+      }
+      openHref(resolveIdentityHref(target));
+    },
+    onOpenLink: (item: FeedPostItem) => {
+      const preview = item.payload.linkPreview;
+      // §45: solo target https già validati dal server (HOM-06.1).
+      if (!preview || !/^https:\/\//i.test(preview.url)) {
+        return;
+      }
+      trackFeed({
+        domain: preview.domain,
+        itemId: item.id,
+        name: "feed_post_link_preview_open",
+      });
+      void Linking.openURL(preview.url).catch(() => undefined);
+    },
+    onComment: (item: FeedPostItem) => {
+      trackFeed({ itemId: item.id, name: "feed_post_comment_tap" });
+      showToast({ message: FEED_SOON_MESSAGES.comment });
+    },
+    onShare: (item: FeedPostItem) => {
+      trackFeed({ itemId: item.id, name: "feed_post_share_tap" });
+      showToast({ message: FEED_SOON_MESSAGES.share });
+    },
   };
+
 
   const followProfileRow = (row: FeedSuggestedProfileRow) => {
     setPendingFollowId(row.entity_id);

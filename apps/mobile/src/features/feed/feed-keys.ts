@@ -19,4 +19,6 @@ export const FEED_QK = {
     ["feed-suggested-profiles", profileId] as const,
   updates: (scope: FeedScope, profileId: string) =>
     ["feed-updates", scope, profileId] as const,
+  /** HOM-02: il dettaglio di un post persona, patchato insieme al Feed dal Like. */
+  postDetail: (postId: string) => ["feed-post-detail", postId] as const,
 };

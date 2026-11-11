@@ -112,11 +112,15 @@ Il messaggio di commit usa il codice task: `DAS-REV-25 - Shortlist Position: agg
 
 ### Backlog attivo — altre aree
 
-- **Home / feed social** — HOM-02..15 praticamente tutto da fare: post
-  standard, feed video, creazione post e bozze, like/salvataggi, commenti,
-  condivisione, repost, segnalazioni, blocco profilo, ranking e discovery,
-  notifiche social. Solo HOM-01 (struttura/spina del feed) è chiusa;
-  HOM-01.1 è il consolidamento UI.
+- **Home / feed social** — HOM-01 (spina), HOM-01.1 (UI) e HOM-02 (Post
+  standard) in codice. HOM-02 ha introdotto i post persona (`profile_posts`,
+  content type `profile_post`, solo Feed e dettaglio: CER-05 non li indicizza),
+  la media collection polimorfica `content_post_media`, `content_post_extras`
+  (mention, link preview) e `set_content_like` (Mi piace reale su club_media,
+  fan_media, profile_post). Da fare: feed video, creazione post e bozze
+  (HOM-06.1 scriverà su quelle tabelle), salvataggi dei post persona,
+  commenti, condivisione, repost, segnalazioni, blocco profilo, ranking e
+  discovery, notifiche social.
 - **Messaggi** — MES-03.1 (consolidamento Centro Notifiche, allineato a
   HOM-14), MES-04 (consolidamento messaggistica + identità Società),
   MES-05 (condivisione contatti).

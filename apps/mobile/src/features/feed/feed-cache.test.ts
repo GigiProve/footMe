@@ -8,6 +8,7 @@ import {
   saveFeedCacheMeta,
   saveFeedCacheScope,
 } from "./feed-cache";
+import { makePostPayload } from "./feed-post-fixtures";
 import type { FeedItem } from "./feed-types";
 
 const PROFILE = "profile-1";
@@ -36,15 +37,7 @@ function makePost(id: string): FeedItem {
     isFollowingAuthor: false,
     nav: null,
     title: "Titolo",
-    payload: {
-      contentType: "club_media",
-      postId: id,
-      kindLabel: null,
-      text: null,
-      isTruncated: false,
-      imageUrl: null,
-      mediaType: null,
-    },
+    payload: makePostPayload({ postId: id }),
   };
 }
 
@@ -78,6 +71,23 @@ describe("loadFeedCache", () => {
       type: "tipo_dal_futuro",
       rank: 2,
       payload: {},
+    });
+    await AsyncStorage.setItem(KEY, JSON.stringify(raw));
+
+    const cache = await loadFeedCache(PROFILE);
+
+    expect(cache?.scopes.per_te.items.map((item) => item.id)).toEqual(["a"]);
+  });
+
+  it("scarta un Post salvato prima di HOM-02 (senza media né capability)", async () => {
+    await saveFeedCacheScope(PROFILE, "per_te", { items: [makePost("a")] });
+
+    const raw = JSON.parse((await AsyncStorage.getItem(KEY)) as string);
+    raw.scopes.per_te.items.push({
+      id: "vecchio",
+      type: "post",
+      rank: 2,
+      payload: { contentType: "club_media", postId: "x", imageUrl: null, mediaType: null },
     });
     await AsyncStorage.setItem(KEY, JSON.stringify(raw));
 

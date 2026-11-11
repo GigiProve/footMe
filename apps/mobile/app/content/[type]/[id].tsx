@@ -32,6 +32,7 @@ import {
   fetchFanMediaPostDetail,
   type FanMediaPost,
 } from "../../../src/features/profiles/fan-media-service";
+import { ProfilePostDetail } from "../../../src/features/feed/components/ProfilePostDetail";
 import { FanContentBody } from "../../../src/features/profiles/FanContentBody";
 import { MediaContentInteractions } from "../../../src/features/profiles/media/MediaContentInteractions";
 import { MediaTribunaBody } from "../../../src/features/profiles/media/MediaTribunaBody";
@@ -266,7 +267,27 @@ function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentVi
   };
 }
 
-export default function ContentDetailScreen() {
+/**
+ * HOM-02: i post persona (`profile_post`) usano il Post component del Feed
+ * (§109); le cinque sorgenti CER-05 restano sul dettaglio storico qui sotto.
+ */
+export default function ContentDetailRoute() {
+  const { id, media, type } = useLocalSearchParams<{ id: string; media?: string; type: string }>();
+
+  if (type === "profile_post" && id) {
+    const mediaIndex = Number(media);
+    return (
+      <ProfilePostDetail
+        initialMediaIndex={Number.isInteger(mediaIndex) && mediaIndex >= 0 ? mediaIndex : null}
+        postId={id}
+      />
+    );
+  }
+
+  return <ContentDetailScreen />;
+}
+
+function ContentDetailScreen() {
   const { id, type } = useLocalSearchParams<{ id: string; type: string }>();
   const { profile } = useSession();
   const router = useRouter();

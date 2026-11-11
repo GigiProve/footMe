@@ -3,7 +3,8 @@
  *
  * Ricalcano i componenti aperti: niente più card, ogni blocco sta nella stessa
  * `FeedItemFrame` dei contenuti veri, così l'arrivo dei dati non sposta nulla.
- *  • post: avatar, due righe di testo, media 16:9, riga interazioni (§53);
+ *  • post: avatar, riga nome, righe di testo, media 16:9, tre aree azioni
+ *    bilanciate (§53; HOM-02 §77);
  *  • posizione: kicker, poi logo, titolo, due metadata e CTA testuale (§54);
  *  • discovery: intestazione e righe avatar + testo + azione (§55).
  *
@@ -51,11 +52,17 @@ export function PostSkeleton() {
       <Skeleton.Row />
       <Skeleton.Row style={styles.w70} />
       <View style={styles.media} />
+      {/* HOM-02 §77: tre aree uguali come la riga azioni vera, niente quarto segnalibro. */}
       <View style={styles.actions}>
-        <View style={styles.icon} />
-        <View style={styles.icon} />
-        <View style={styles.icon} />
-        <View style={[styles.icon, styles.pushRight]} />
+        <View style={styles.actionCell}>
+          <View style={styles.icon} />
+        </View>
+        <View style={styles.actionCell}>
+          <View style={styles.icon} />
+        </View>
+        <View style={styles.actionCell}>
+          <View style={styles.icon} />
+        </View>
       </View>
     </FeedItemFrame>
   );
@@ -92,10 +99,14 @@ export function FeedSkeleton() {
 }
 
 const styles = StyleSheet.create({
+  actionCell: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
   actions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: spacing[36],
     height: 44,
     marginTop: spacing[4],
   },
@@ -151,9 +162,6 @@ const styles = StyleSheet.create({
     borderRadius: radius[8],
     marginTop: spacing[8],
     width: "100%",
-  },
-  pushRight: {
-    marginLeft: "auto",
   },
   sectionTitle: {
     marginBottom: spacing[8],

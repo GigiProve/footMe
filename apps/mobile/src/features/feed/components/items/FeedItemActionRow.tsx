@@ -1,6 +1,10 @@
 /**
  * Riga interazioni di un elemento del Feed (HOM-01.1 §10, §17).
  *
+ * Da HOM-02 il Post NON usa più questa riga (ha `PostActionRow`: tre aree
+ * uguali, conteggi integrati, nessun segnalibro, §62). Resta per gli elementi
+ * editoriali, il cui segnalibro visibile appartiene a HOM-03 (§63).
+ *
  * Icone sole, azioni a sinistra e salva a destra, rail fisso a 44px. Il
  * visual master mostra numeri accanto alle icone, ma il Feed non ha contatori
  * di interazione e Mi piace / Commenti / Repost / Condivisione sono fuori

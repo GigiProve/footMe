@@ -99,7 +99,12 @@ function isFeedItem(value: unknown): value is FeedItem {
     typeof value.type === "string" &&
     FEED_ITEM_TYPES.includes(value.type as FeedItemType) &&
     typeof value.rank === "number" &&
-    isRecord(value.payload)
+    isRecord(value.payload) &&
+    // HOM-02: un Post salvato da un client pre-HOM-02 non ha la media
+    // collection né le capability. Si scarta quel solo elemento (il Feed lo
+    // ricarica dalla rete) invece di renderizzarlo a metà.
+    (value.type !== "post" ||
+      (Array.isArray(value.payload.media) && isRecord(value.payload.capabilities)))
   );
 }
 
