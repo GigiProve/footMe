@@ -1,15 +1,12 @@
 /**
- * Modulo "Persone che potresti conoscere" (§11).
+ * Modulo "Persone che potresti conoscere" (HOM-01.1 §19–§21).
  *
- * Massimo tre righe compatte, titolo con azione "Vedi tutti". Le entità arrivano
- * da una query propria: se quella fallisce, questo slot mostra la sua riga di
- * errore con "Riprova" e il resto della Home non se ne accorge (§23).
+ * Alleggerito: niente card attorno, intestazione testuale con "Vedi tutte" e
+ * al massimo tre righe compatte senza card individuali. Le entità arrivano da
+ * una query propria: se fallisce, lo slot mostra la riga di retry locale e il
+ * resto della Home non se ne accorge (§57).
  */
 
-import { StyleSheet, View } from "react-native";
-
-import { colors, radius, spacing } from "../../../../theme/tokens";
-import { AppText, Button } from "../../../../ui";
 import {
   FEED_SEE_ALL,
   FEED_SUGGESTED_PROFILES_TITLE,
@@ -19,6 +16,8 @@ import { FEED_SUGGESTION_ROWS } from "../../feed-suggestions-service";
 import type { FeedSuggestedProfileRow } from "../../feed-types";
 import { FeedModuleError } from "../modules/FeedModuleError";
 import { SuggestedProfilesSkeleton } from "../skeletons/FeedSkeleton";
+import { FeedItemFrame } from "./FeedItemFrame";
+import { FeedSectionHeader } from "./FeedSectionHeader";
 import { SuggestedEntityRow } from "./SuggestedEntityRow";
 
 type SuggestedProfilesFeedItemProps = {
@@ -47,25 +46,29 @@ export function SuggestedProfilesFeedItem({
   }
 
   if (isError) {
-    return <FeedModuleError onRetry={onRetry} title={FEED_SUGGESTED_PROFILES_TITLE} />;
+    return (
+      <FeedItemFrame>
+        <FeedModuleError onRetry={onRetry} title={FEED_SUGGESTED_PROFILES_TITLE} />
+      </FeedItemFrame>
+    );
   }
 
   const visible = (rows ?? []).slice(0, FEED_SUGGESTION_ROWS);
 
+  // Nessuna riga: lo slot sparisce del tutto, cornice compresa (§57).
   if (visible.length === 0) {
     return null;
   }
 
   return (
-    <View style={styles.card} testID="feed-suggested-profiles">
-      <View style={styles.header}>
-        <AppText style={styles.title} variant="titleSm">
-          {FEED_SUGGESTED_PROFILES_TITLE}
-        </AppText>
-        <Button label={FEED_SEE_ALL} onPress={onSeeAll} size="sm" variant="link" />
-      </View>
+    <FeedItemFrame testID="feed-suggested-profiles">
+      <FeedSectionHeader
+        actionLabel={FEED_SEE_ALL}
+        onAction={onSeeAll}
+        title={FEED_SUGGESTED_PROFILES_TITLE}
+      />
 
-      {visible.map((row, index) => (
+      {visible.map((row) => (
         <SuggestedEntityRow
           avatarUrl={row.avatar_url}
           isBusy={pendingId === row.entity_id}
@@ -75,28 +78,8 @@ export function SuggestedProfilesFeedItem({
           name={row.full_name}
           onPress={() => onPressProfile(row)}
           onToggleFollow={() => onToggleFollow(row)}
-          showDivider={index < visible.length - 1}
         />
       ))}
-    </View>
+    </FeedItemFrame>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[12],
-    borderWidth: 1,
-    paddingHorizontal: spacing[14],
-    paddingVertical: spacing[10],
-  },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  title: {
-    flex: 1,
-  },
-});

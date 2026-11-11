@@ -1,27 +1,33 @@
 /**
- * Contenitore base "Articolo o video" (§12).
+ * Articolo o video nel Feed (HOM-01.1 §13, §17, §18).
  *
- * Anteprima editoriale compatta: logo/avatar della fonte, nome fonte,
- * tipologia, tempo dalla pubblicazione, titolo, breve introduzione (poche
- * righe), miniatura e CTA coerente — "Leggi articolo" oppure "Guarda video".
- * Il tap apre il dettaglio contenuto già esistente; l'articolo intero non
- * compare mai nel Feed.
+ * Stesso linguaggio del post: autore → testo → media → interazioni. In HOM-01
+ * era una card con miniatura laterale e un bottone "Leggi articolo"; il visual
+ * master lo tratta come qualunque altro contenuto, con il media grande (§64) e
+ * nessun bottone in più (§60). L'intero elemento apre il dettaglio, e la
+ * tipologia resta detta a parole nella riga meta (§61) e, per i video, dal
+ * segno play.
  *
- * Non si riusa `MediaContentPreview` (CER-05): quella anteprima esclude di
- * proposito l'introduzione e la CTA, che qui sono richieste. Si condividono
- * invece le proporzioni della miniatura, così le due superfici restano coerenti.
+ * L'introduzione compare solo quando manca il titolo: il titolo è già la riga
+ * di testo che il visual master mostra, e ripeterla con l'intro allungherebbe
+ * l'elemento senza dire di più.
+ *
+ * Non si riusa `MediaContentPreview` (CER-05): è una riga di risultato, non un
+ * elemento di Feed. Si condivide invece `formatVideoDuration`.
  */
 
-import { Image, Pressable, StyleSheet, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Pressable, StyleSheet } from "react-native";
 
-import { colors, radius, spacing } from "../../../../theme/tokens";
-import { AppText, Button } from "../../../../ui";
+import { spacing } from "../../../../theme/tokens";
+import { AppText } from "../../../../ui";
 import { formatVideoDuration } from "../../../search/media/media-labels";
 import { editorialCta } from "../../feed-labels";
 import type { FeedEditorialItem } from "../../feed-types";
+import { FeedItemActionRow } from "./FeedItemActionRow";
+import { FeedItemFrame } from "./FeedItemFrame";
 import { FeedItemHeader } from "./FeedItemHeader";
 import { FeedItemMenu } from "./FeedItemMenu";
+import { FeedMedia } from "./FeedMedia";
 
 type EditorialFeedItemProps = {
   item: FeedEditorialItem;
@@ -37,12 +43,15 @@ export function EditorialFeedItem({
   onToggleSaved,
 }: EditorialFeedItemProps) {
   const { intro, kindLabel, thumbnailUrl, durationSeconds } = item.payload;
-  const duration = formatVideoDuration(durationSeconds);
+  const isVideo = item.type === "video";
+  const text = item.title ?? intro;
+  const cta = editorialCta(item);
 
   return (
-    <View style={styles.card} testID="feed-editorial">
+    <FeedItemFrame testID="feed-editorial">
       <FeedItemHeader
         item={item}
+        kindLabel={kindLabel ?? (isVideo ? "Video" : "Articolo")}
         onPressAuthor={onPressAuthor}
         right={
           <FeedItemMenu
@@ -55,132 +64,36 @@ export function EditorialFeedItem({
         }
       />
 
-      <Pressable accessibilityRole="button" onPress={onPress} style={styles.body}>
-        <AppText color="muted" variant="overline">
-          {kindLabel ?? (item.type === "video" ? "Video" : "Articolo")}
-        </AppText>
+      {text ? (
+        <Pressable
+          accessibilityHint={cta}
+          accessibilityRole="button"
+          onPress={onPress}
+          style={styles.body}
+        >
+          <AppText numberOfLines={3} variant="feedBody">
+            {text}
+          </AppText>
+        </Pressable>
+      ) : null}
 
-        <View style={styles.preview}>
-          <View style={styles.previewText}>
-            {item.title ? (
-              <AppText numberOfLines={2} variant="titleSm">
-                {item.title}
-              </AppText>
-            ) : null}
-            {intro ? (
-              <AppText color="secondary" numberOfLines={3} variant="bodySm">
-                {intro}
-              </AppText>
-            ) : null}
-          </View>
+      {thumbnailUrl ? (
+        <FeedMedia
+          accessibilityLabel={cta}
+          duration={isVideo ? formatVideoDuration(durationSeconds) : null}
+          isVideo={isVideo}
+          onPress={onPress}
+          uri={thumbnailUrl}
+        />
+      ) : null}
 
-          <View style={styles.thumb}>
-            {thumbnailUrl ? (
-              <Image
-                accessibilityIgnoresInvertColors
-                resizeMode="cover"
-                source={{ uri: thumbnailUrl }}
-                style={styles.thumbImage}
-              />
-            ) : (
-              <View style={styles.thumbFallback}>
-                <Ionicons
-                  color={colors.textMuted}
-                  name={item.type === "video" ? "videocam-outline" : "document-text-outline"}
-                  size={20}
-                />
-              </View>
-            )}
-
-            {item.type === "video" ? (
-              <View style={styles.playBadge}>
-                <Ionicons color={colors.inkInvert} name="play" size={12} />
-              </View>
-            ) : null}
-
-            {duration ? (
-              <View style={styles.durationBadge}>
-                <AppText color="inverse" variant="caption">
-                  {duration}
-                </AppText>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </Pressable>
-
-      <Button
-        label={editorialCta(item)}
-        onPress={onPress}
-        size="sm"
-        style={styles.cta}
-        variant="secondary"
-      />
-    </View>
+      <FeedItemActionRow isSaved={item.isSaved} onToggleSaved={onToggleSaved} />
+    </FeedItemFrame>
   );
 }
 
 const styles = StyleSheet.create({
   body: {
-    gap: spacing[4],
-    marginTop: spacing[10],
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[12],
-    borderWidth: 1,
-    padding: spacing[14],
-  },
-  cta: {
-    alignSelf: "flex-start",
-    marginTop: spacing[10],
-  },
-  durationBadge: {
-    backgroundColor: colors.surfaceOverlay,
-    borderBottomRightRadius: radius[8],
-    borderTopLeftRadius: radius[4],
-    bottom: 0,
-    paddingHorizontal: spacing[4],
-    position: "absolute",
-    right: 0,
-  },
-  playBadge: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceOverlay,
-    borderRadius: radius.full,
-    height: 24,
-    justifyContent: "center",
-    left: "50%",
-    marginLeft: -12,
-    marginTop: -12,
-    position: "absolute",
-    top: "50%",
-    width: 24,
-  },
-  preview: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: spacing[12],
-  },
-  previewText: {
-    flex: 1,
-    gap: spacing[4],
-  },
-  thumb: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    height: 74,
-    overflow: "hidden",
-    width: 112,
-  },
-  thumbFallback: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-  },
-  thumbImage: {
-    height: "100%",
-    width: "100%",
+    marginTop: spacing[12],
   },
 });

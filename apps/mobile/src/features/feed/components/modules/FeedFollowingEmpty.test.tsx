@@ -2,22 +2,25 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  FEED_FOLLOWING_EMPTY_BODY,
   FEED_FOLLOWING_EMPTY_CTA,
   FEED_FOLLOWING_EMPTY_TITLE,
-  FEED_FOLLOWING_QUIET_TITLE,
   FEED_SUGGESTIONS_TITLE,
 } from "../../feed-labels";
-import { makeProfileRow, render, textOf } from "../feed-test-helpers";
+import { makeClubRow, makeProfileRow, press, render, textOf } from "../feed-test-helpers";
 import { FeedFollowingEmpty } from "./FeedFollowingEmpty";
 
 function setup(overrides: Partial<React.ComponentProps<typeof FeedFollowingEmpty>> = {}) {
   const props = {
+    clubs: [makeClubRow()],
     onDiscover: vi.fn(),
+    onPressClub: vi.fn(),
     onPressProfile: vi.fn(),
-    onToggleFollow: vi.fn(),
+    onToggleFollowClub: vi.fn(),
+    onToggleFollowProfile: vi.fn(),
     pendingId: null,
+    profiles: [makeProfileRow()],
     reason: "no_follows" as const,
-    suggestions: [makeProfileRow()],
     ...overrides,
   };
 
@@ -25,64 +28,88 @@ function setup(overrides: Partial<React.ComponentProps<typeof FeedFollowingEmpty
 }
 
 describe("FeedFollowingEmpty", () => {
-  it("mostra titolo, CTA principale e i suggerimenti", () => {
+  it("mostra il copy del §35 e i suggerimenti del §37", () => {
     const { tree } = setup();
     const json = textOf(tree);
 
     expect(json).toContain(FEED_FOLLOWING_EMPTY_TITLE);
+    expect(json).toContain(FEED_FOLLOWING_EMPTY_BODY);
     expect(json).toContain(FEED_FOLLOWING_EMPTY_CTA);
     expect(json).toContain(FEED_SUGGESTIONS_TITLE);
+  });
+
+  it("propone insieme Società e persone, Società per prima", () => {
+    const json = textOf(setup().tree);
+
+    expect(json).toContain("AC Milan");
     expect(json).toContain("Lorenzo Colombo");
+    expect(json.indexOf("AC Milan")).toBeLessThan(json.indexOf("Lorenzo Colombo"));
+  });
+
+  it("non supera quattro righe di suggerimenti", () => {
+    const profiles = ["a", "b", "c"].map((id) =>
+      makeProfileRow({ entity_id: id, full_name: `Persona ${id}` }),
+    );
+    const clubs = ["x", "y", "z"].map((id) => makeClubRow({ entity_id: id, name: `Società ${id}` }));
+    const { tree } = setup({ clubs, profiles });
+
+    const follows = tree.root.findAll(
+      (node) =>
+        typeof node.type === "string" &&
+        typeof node.props?.accessibilityLabel === "string" &&
+        node.props.accessibilityLabel.startsWith("Segui "),
+    );
+
+    expect(follows).toHaveLength(4);
   });
 
   /**
-   * §14 contiene una correzione grafica esplicita: nessun grande campo
-   * illustrato, nessuna area vuota eccessiva. `EmptyState` porterebbe un
-   * cerchio con icona, quindi non va usato qui.
+   * §34: niente grande illustrazione. L'unica icona è quella nel cerchio del
+   * visual master; il resto sono le righe.
    */
-  it("non usa illustrazioni né icone decorative", () => {
-    const { tree } = setup();
+  it("non usa illustrazioni: al massimo l'icona del cerchio", () => {
+    const { tree } = setup({ clubs: [], profiles: [] });
 
+    const images = tree.root.findAll(
+      (node) => typeof node.type === "string" && String(node.type) === "Image",
+    );
     const icons = tree.root.findAll(
       (node) => typeof node.type === "string" && String(node.type) === "Ionicons",
     );
 
-    expect(icons).toHaveLength(0);
+    expect(images).toHaveLength(0);
+    expect(icons.length).toBeLessThanOrEqual(1);
   });
 
-  it("collega la CTA a Scopri profili da seguire", () => {
+  it("Scopri chi seguire apre la discovery", () => {
     const { props, tree } = setup();
 
-    const cta = tree.root
-      .findAll(
-        (node) =>
-          typeof node.type === "string" &&
-          node.props?.accessibilityLabel === FEED_FOLLOWING_EMPTY_CTA,
-      )
-      .at(0);
-
-    cta?.props.onPress();
+    press(tree, FEED_FOLLOWING_EMPTY_CTA);
 
     expect(props.onDiscover).toHaveBeenCalledTimes(1);
   });
 
-  it("con follow presenti ma nessun contenuto cambia il titolo", () => {
-    const { tree } = setup({ reason: "no_content" });
+  it("Segui usa il follow globale del tipo giusto", () => {
+    const { props, tree } = setup();
 
-    expect(textOf(tree)).toContain(FEED_FOLLOWING_QUIET_TITLE);
+    press(tree, "Segui AC Milan");
+    press(tree, "Segui Lorenzo Colombo");
+
+    expect(props.onToggleFollowClub).toHaveBeenCalledTimes(1);
+    expect(props.onToggleFollowProfile).toHaveBeenCalledTimes(1);
   });
 
-  it("con follow presenti NON propone il blocco discovery (§5)", () => {
-    // L'utente ha già scelto chi seguire: suggerirgli altri profili qui
-    // contraddirebbe la promessa della tab.
+  it("con follow presenti NON propone suggerimenti (§25)", () => {
+    // L'utente ha già scelto chi seguire: Seguiti non mostra moduli discovery.
     const { tree } = setup({ reason: "no_content" });
 
+    expect(textOf(tree)).toContain(FEED_FOLLOWING_EMPTY_TITLE);
     expect(textOf(tree)).not.toContain(FEED_SUGGESTIONS_TITLE);
     expect(textOf(tree)).not.toContain("Lorenzo Colombo");
   });
 
   it("regge l'assenza di suggerimenti", () => {
-    const { tree } = setup({ suggestions: undefined });
+    const { tree } = setup({ clubs: undefined, profiles: undefined });
 
     expect(textOf(tree)).toContain(FEED_FOLLOWING_EMPTY_CTA);
     expect(textOf(tree)).not.toContain(FEED_SUGGESTIONS_TITLE);

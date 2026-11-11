@@ -12,7 +12,7 @@
  *    Native solleva "Changing onViewableItemsChanged on the fly is not
  *    supported" se la funzione cambia tra due render.
  *  • Le chrome che devono scorrere col contenuto (modulo di primo accesso,
- *    helper Seguiti, avviso offline, stato vuoto) vivono in
+ *    avviso offline, stato vuoto) vivono in
  *    `ListHeaderComponent`/`ListEmptyComponent`. Header e tab della Home invece
  *    sono fuori dalla lista, perché devono restare visibili sempre.
  */
@@ -119,9 +119,7 @@ export function FeedList({
       onViewableItemsChanged={viewabilityHandlerRef.current}
       refreshing={isRefreshing}
       renderItem={({ item }) => (
-        <View style={styles.itemSpacing}>
-          <FeedItemRenderer handlers={handlers} item={item} modules={modules} />
-        </View>
+        <FeedItemRenderer handlers={handlers} item={item} modules={modules} />
       )}
       scrollEventThrottle={250}
       showsVerticalScrollIndicator={false}
@@ -164,15 +162,14 @@ function FeedListFooter({
 }
 
 const styles = StyleSheet.create({
+  // HOM-01.1 §11: 16px di margine pagina. Gli elementi non hanno spaziatura
+  // esterna: il ritmo verticale e il divider stanno in `FeedItemFrame`.
   content: {
     paddingBottom: spacing[24],
-    paddingHorizontal: spacing[12],
+    paddingHorizontal: spacing[16],
   },
   footer: {
     alignItems: "center",
     paddingVertical: spacing[16],
-  },
-  itemSpacing: {
-    paddingTop: spacing[12],
   },
 });

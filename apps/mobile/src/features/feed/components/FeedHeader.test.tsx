@@ -9,7 +9,6 @@ function setup(overrides: Partial<React.ComponentProps<typeof FeedHeader>> = {})
   const props = {
     hasUnreadNotifications: false,
     onOpenComposer: vi.fn(),
-    onOpenMenu: vi.fn(),
     onOpenNotifications: vi.fn(),
     ...overrides,
   };
@@ -61,16 +60,26 @@ describe("FeedHeader", () => {
     ).toBe(1); // solo "PROLINK"
   });
 
-  it("collega campanella, + e menu ai rispettivi handler", () => {
+  it("collega campanella e + ai rispettivi handler", () => {
     const { props, tree } = setup();
 
     press(tree, "Notifiche");
     press(tree, "Crea contenuto");
-    press(tree, "Apri menu laterale");
 
     expect(props.onOpenNotifications).toHaveBeenCalledTimes(1);
     expect(props.onOpenComposer).toHaveBeenCalledTimes(1);
-    expect(props.onOpenMenu).toHaveBeenCalledTimes(1);
+  });
+
+  // HOM-01.1 §4: a sinistra solo il wordmark, nessuna icona menu.
+  it("non ha un'icona menu a sinistra di PROLINK", () => {
+    const { tree } = setup();
+
+    const menu = tree.root.findAll(
+      (node) =>
+        typeof node.type === "string" && node.props?.accessibilityLabel === "Apri menu laterale",
+    );
+
+    expect(menu).toHaveLength(0);
   });
 
   it("non mostra una casella di ricerca", () => {

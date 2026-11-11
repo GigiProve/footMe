@@ -26,7 +26,6 @@ import { SafeAreaView, StyleSheet, View, type FlatList } from "react-native";
 import { useRouter } from "expo-router";
 
 import { colors } from "../../../theme/tokens";
-import { AppSidebar } from "../../../ui/sidebar";
 import { useSession } from "../../auth/use-session";
 import { useUnreadNotificationsCount } from "../../notifications/use-unread-notifications-count";
 import { trackFeed } from "../feed-analytics";
@@ -46,7 +45,6 @@ export function FeedScreen() {
 
   const [scope, setScope] = useState<FeedScope>("per_te");
   const [hasVisitedSeguiti, setHasVisitedSeguiti] = useState(false);
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isComposerOpen, setComposerOpen] = useState(false);
 
   const perTeListRef = useRef<FlatList<FeedItem> | null>(null);
@@ -98,7 +96,6 @@ export function FeedScreen() {
       <FeedHeader
         hasUnreadNotifications={unreadCount > 0}
         onOpenComposer={() => setComposerOpen(true)}
-        onOpenMenu={() => setSidebarOpen(true)}
         onOpenNotifications={() => router.push("/notifications")}
       />
 
@@ -108,6 +105,7 @@ export function FeedScreen() {
         <View style={[styles.pane, scope !== "per_te" ? styles.paneHidden : null]}>
           <FeedPane
             cache={cache}
+            isActive={scope === "per_te"}
             isCacheReady={cacheQuery.isFetched}
             listRef={perTeListRef}
             profileId={profileId}
@@ -119,6 +117,7 @@ export function FeedScreen() {
           <View style={[styles.pane, scope !== "seguiti" ? styles.paneHidden : null]}>
             <FeedPane
               cache={cache}
+              isActive={scope === "seguiti"}
               isCacheReady={cacheQuery.isFetched}
               listRef={seguitiListRef}
               profileId={profileId}
@@ -127,8 +126,6 @@ export function FeedScreen() {
           </View>
         ) : null}
       </View>
-
-      <AppSidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <FeedComposerEntry
         onClose={() => setComposerOpen(false)}
@@ -154,8 +151,9 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
   },
+  // HOM-01.1 §9: superficie aperta bianca come header e tab, senza stacco.
   root: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     flex: 1,
   },
 });

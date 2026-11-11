@@ -1,24 +1,28 @@
 /**
- * Contenitore base "Posizione per te" (§9), nella forma del modulo standard
- * (§1a del design "ProLink UI Upgrade").
+ * Posizione suggerita nel Feed (HOM-01.1 §14–§16, §76).
  *
- * Mostra: eyebrow "Per te" con nota "In base al tuo profilo", logo società,
- * ruolo cercato, squadra, località e l'azione "Apri posizione" nel rail. Il tap
- * sull'intero componente o sull'azione apre il dettaglio posizione esistente.
+ * Molto più leggera di HOM-01: un kicker testuale "Per te · In base al tuo
+ * profilo" e sotto un solo contenitore a bordo leggero e radius moderato
+ * (§62), con logo Società, ruolo (il dato principale), Team · Società,
+ * categoria · località e la CTA testuale "Apri posizione →" — mai un bottone
+ * pieno (§15). L'intero blocco apre la posizione.
  *
- * Porta la barra blu di personalizzazione: è contenuto scelto per l'utente, il
- * solo caso in cui quel segno è ammesso.
+ * Il kicker basta a dire perché il blocco è lì: la barra blu laterale di
+ * HOM-01 non compare nel visual master e il §61 chiede che la tipologia
+ * emerga da testo e struttura, non da un segno colorato.
  *
- * NON mostra, per esplicito divieto del §9: candidatura diretta, requisiti
- * completi, descrizioni lunghe, scadenza, percentuali di compatibilità. Il tipo
- * `FeedPositionPayload` non porta nemmeno quei campi, quindi non c'è modo di
- * mostrarli per distrazione.
+ * NON mostra scadenza, Candidati, requisiti, descrizione, score o
+ * compatibilità (§16): `FeedPositionPayload` non porta nemmeno quei campi.
+ * Righe e formato sono quelli dell'anteprima di Cerca (CER-04, §74). La
+ * distanza non è nel payload del Feed, quindi non si mostra (§14: "se
+ * disponibile").
  */
 
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { spacing } from "../../../../theme/tokens";
-import { AppText, Avatar, Badge, ContentModule } from "../../../../ui";
+import { colors, radius, spacing, typography } from "../../../../theme/tokens";
+import { AppText, Avatar } from "../../../../ui";
 import {
   FEED_POSITION_CTA,
   FEED_POSITION_HELPER,
@@ -28,6 +32,7 @@ import {
   positionTeamLine,
 } from "../../feed-labels";
 import type { FeedPositionItem } from "../../feed-types";
+import { FeedItemFrame } from "./FeedItemFrame";
 
 type SuggestedPositionFeedItemProps = {
   item: FeedPositionItem;
@@ -39,60 +44,90 @@ export function SuggestedPositionFeedItem({
   onPress,
 }: SuggestedPositionFeedItemProps) {
   const { payload } = item;
+  const role = positionHeadline(payload, null);
   const team = positionTeamLine(payload);
   const location = positionLocationLine(payload);
 
   return (
-    <ContentModule
-      actions={[{ label: FEED_POSITION_CTA, onPress }]}
-      eyebrow={FEED_POSITION_OVERLINE}
-      eyebrowNote={FEED_POSITION_HELPER}
-      onPress={onPress}
-      personalized
-      testID="feed-suggested-position"
-    >
-      <View style={styles.row}>
-        <Avatar
-          name={payload.clubName ?? ""}
-          size="md"
-          square
-          tone="ink"
-          uri={payload.clubLogoUrl ?? undefined}
-        />
-        <View style={styles.body}>
-          <AppText numberOfLines={1} variant="titleMd">
-            {positionHeadline(payload, null)}
-          </AppText>
-          {team ? (
-            <AppText color="secondary" numberOfLines={1} variant="meta">
-              {team}
-            </AppText>
-          ) : null}
-        </View>
-      </View>
+    <FeedItemFrame testID="feed-suggested-position">
+      <AppText color="muted" style={styles.kicker} variant="feedMeta">
+        <AppText color="secondary" style={styles.kickerLead} variant="feedMeta">
+          {FEED_POSITION_OVERLINE}
+        </AppText>
+        {` · ${FEED_POSITION_HELPER}`}
+      </AppText>
 
-      {location ? (
-        <View style={styles.chips}>
-          <Badge label={location} />
+      <Pressable
+        accessibilityHint={FEED_POSITION_CTA}
+        accessibilityLabel={[role, team, location].filter(Boolean).join(", ")}
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.box, pressed ? styles.pressed : null]}
+      >
+        <View style={styles.row}>
+          <Avatar
+            name={payload.clubName ?? ""}
+            size="md"
+            square
+            uri={payload.clubLogoUrl ?? undefined}
+          />
+          <View style={styles.body}>
+            <AppText numberOfLines={2} variant="titleMd">
+              {role}
+            </AppText>
+            {team ? (
+              <AppText color="secondary" numberOfLines={1} variant="feedMeta">
+                {team}
+              </AppText>
+            ) : null}
+            {location ? (
+              <AppText color="muted" numberOfLines={1} variant="feedMeta">
+                {location}
+              </AppText>
+            ) : null}
+          </View>
         </View>
-      ) : null}
-    </ContentModule>
+
+        <View style={styles.cta}>
+          <AppText color="accent" variant="feedMeta">
+            {FEED_POSITION_CTA}
+          </AppText>
+          <Ionicons color={colors.accent} name="arrow-forward" size={14} />
+        </View>
+      </Pressable>
+    </FeedItemFrame>
   );
 }
 
 const styles = StyleSheet.create({
   body: {
     flex: 1,
+  },
+  box: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius[16],
+    borderWidth: 1,
+    gap: spacing[8],
+    padding: spacing[14],
+  },
+  cta: {
+    alignItems: "center",
+    alignSelf: "flex-end",
+    flexDirection: "row",
     gap: spacing[4],
   },
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[6],
-    marginTop: spacing[10],
+  kicker: {
+    marginBottom: spacing[10],
+  },
+  kickerLead: {
+    fontWeight: typography.fontWeight.semibold,
+  },
+  pressed: {
+    backgroundColor: colors.surfaceMuted,
   },
   row: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
     gap: spacing[12],
   },

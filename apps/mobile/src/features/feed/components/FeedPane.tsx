@@ -19,7 +19,6 @@ import type { CachedFeed } from "../feed-cache";
 import { FEED_QK } from "../feed-keys";
 import { fetchHomeFollowingState } from "../feed-meta-service";
 import { resolveFeedAuthorHref, resolveFeedItemHref } from "../feed-service";
-import { shouldShowFollowingHint } from "../feed-scroll-rules";
 import type {
   FeedItem,
   FeedScope,
@@ -41,12 +40,9 @@ import { FeedList } from "./FeedList";
 import type { FeedModulesState } from "./FeedItemRenderer";
 import {
   FeedErrorState,
-  FeedFollowingHint,
-  FeedNewContentBanner,
   FeedOfflineNotice,
   FeedPerTeEmpty,
-  FeedRefreshingPill,
-  FeedResumeBanner,
+  NewContentPill,
 } from "./modules/FeedBanners";
 import { FeedFollowingEmpty } from "./modules/FeedFollowingEmpty";
 import { FeedPersonalizeModule } from "./modules/FeedPersonalizeModule";
@@ -54,6 +50,8 @@ import { FeedSkeleton } from "./skeletons/FeedSkeleton";
 
 type FeedPaneProps = {
   scope: FeedScope;
+  /** La tab visibile: l'altra resta montata ma nascosta (vedi FeedScreen). */
+  isActive: boolean;
   profileId: string;
   cache: CachedFeed | null | undefined;
   isCacheReady: boolean;
@@ -62,6 +60,7 @@ type FeedPaneProps = {
 
 export function FeedPane({
   scope,
+  isActive,
   profileId,
   cache,
   isCacheReady,
@@ -88,7 +87,6 @@ export function FeedPane({
     itemCount: feed.items.length,
     listRef,
     profileId,
-    resumeBannerShownAt: cache?.resumeBannerShownAt ?? null,
     savedScroll: feed.savedScroll,
     scope,
   });
@@ -230,6 +228,24 @@ export function FeedPane({
     scope,
   ]);
 
+  // HOM-01.1 §70: "nuovi contenuti disponibili" una volta per comparsa della
+  // pill, non a ogni poll che ne aggiorna il conteggio. Solo nella tab attiva:
+  // il pane nascosto resta montato e poll-a, ma la sua pill non si vede.
+  const showNewContent = isActive && newContent.isVisible;
+  const newContentTrackedRef = useRef(false);
+  useEffect(() => {
+    if (!showNewContent) {
+      newContentTrackedRef.current = false;
+      return;
+    }
+    if (newContentTrackedRef.current) {
+      return;
+    }
+
+    newContentTrackedRef.current = true;
+    trackFeed({ count: newContent.count, name: "feed_new_content_available", scope });
+  }, [newContent.count, scope, showNewContent]);
+
   // §16: skeleton solo quando non c'è davvero nulla. Con contenuti in cache la
   // schermata non viene mai sostituita da un loader.
   if (feed.isInitialLoading) {
@@ -247,6 +263,7 @@ export function FeedPane({
     return <FeedErrorState detail={feed.error?.message ?? null} onRetry={feed.retry} />;
   }
 
+  // HOM-01.1 §24: Seguiti non ha più un helper sotto le tab.
   const header = (
     <View>
       {connectivity.isOffline ? <FeedOfflineNotice /> : null}
@@ -260,18 +277,14 @@ export function FeedPane({
           />
         </View>
       ) : null}
-      {scope === "seguiti" &&
-      shouldShowFollowingHint(cache?.firstAccess.followingHintShownCount ?? 0) ? (
-        <FeedFollowingHint />
-      ) : null}
     </View>
   );
 
+  // §36: Cerca → Profili, la discovery già esistente.
   const discoverProfiles = () => {
     trackFeed({ name: "feed_discover_profiles_tap", scope });
     openHref("/search/profiles");
   };
-
 
   const emptyComponent =
     scope === "per_te" ? (
@@ -281,12 +294,15 @@ export function FeedPane({
       <FeedPerTeEmpty onDiscover={discoverProfiles} />
     ) : !feed.isInitialLoading ? (
       <FeedFollowingEmpty
+        clubs={clubsQuery.data}
         onDiscover={discoverProfiles}
-        onPressProfile={(row) => openHref(`/profile/${row.entity_id}`)}
-        onToggleFollow={followProfileRow}
+        onPressClub={modules.onPressSuggestedClub}
+        onPressProfile={modules.onPressSuggestedProfile}
+        onToggleFollowClub={followClubRow}
+        onToggleFollowProfile={followProfileRow}
         pendingId={pendingFollowId}
+        profiles={profilesQuery.data}
         reason={followingState.data?.followsNobody === false ? "no_content" : "no_follows"}
-        suggestions={profilesQuery.data}
       />
     ) : null;
 
@@ -323,22 +339,21 @@ export function FeedPane({
         showInlineRetry={feed.isError && feed.items.length > 0}
       />
 
+      {/* HOM-01.1 §43–47: nessuna pill di refresh e nessun banner di
+          ripristino. L'unico elemento sovrapposto è "Nuovi contenuti". */}
       <View pointerEvents="box-none" style={styles.overlay}>
-        {feed.isRefreshing ? <FeedRefreshingPill /> : null}
-        {newContent.isVisible ? (
-          <FeedNewContentBanner
-            count={newContent.count}
+        {showNewContent ? (
+          <NewContentPill
             onPress={() => {
-              // §19: prima si torna in cima, POI si caricano i nuovi elementi.
-              // Mai il contrario, altrimenti la lista salta sotto il dito.
+              // §41: prima si torna in cima, POI si caricano i nuovi elementi.
+              // Mai il contrario, altrimenti la lista salta sotto il dito. La
+              // dedup per id di `mergeFeedPages` evita i duplicati.
+              trackFeed({ name: "feed_new_content_tap", scope });
               scroll.scrollToTop(true);
               newContent.dismiss();
               feed.refresh("new_content_banner");
             }}
           />
-        ) : null}
-        {scroll.resumeBannerVisible ? (
-          <FeedResumeBanner onDismiss={scroll.dismissResumeBanner} />
         ) : null}
       </View>
     </View>
@@ -361,6 +376,6 @@ const styles = StyleSheet.create({
   },
   padded: {
     flex: 1,
-    paddingHorizontal: spacing[12],
+    paddingHorizontal: spacing[16],
   },
 });

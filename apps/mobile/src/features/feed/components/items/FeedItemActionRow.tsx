@@ -1,27 +1,26 @@
 /**
- * Riga azioni del post (§10): Mi piace · Commenta · Condividi, più il
- * segnalibro.
+ * Riga interazioni di un elemento del Feed (HOM-01.1 §10, §17).
  *
- * Il §29 esclude da questo blocco il sistema Mi piace, i commenti e la
- * condivisione, ma il §10 chiede che la riga sia presente e leggibile. La
- * soluzione: controlli pienamente visibili e attivi, il cui tap risponde con un
- * messaggio esplicito ("I commenti arriveranno presto."). Niente contatori,
- * niente reaction picker, niente share sheet, nessuna scrittura.
+ * Icone sole, azioni a sinistra e salva a destra, rail fisso a 44px. Il
+ * visual master mostra numeri accanto alle icone, ma il Feed non ha contatori
+ * di interazione e Mi piace / Commenti / Repost / Condivisione sono fuori
+ * scope (§80): un mockup non introduce un contatore, quindi qui non ce ne
+ * sono.
  *
- * Il segnalibro nella stessa riga FUNZIONA davvero e si colora di accent quando
- * è attivo, così la riga ha almeno un'azione reale e la differenza tra "in
- * arrivo" e "operativo" è visibile.
+ * Senza hairline sopra: nel visual master la riga chiude il post e la linea
+ * che segue è il divider fra elementi (§10, §63) — due hairline a 44px di
+ * distanza disegnerebbero di nuovo una card.
  *
- * Scartate: disabilitare i controlli con opacità ridotta (in QA si legge come un
- * difetto) e navigare al dettaglio (il tap farebbe una cosa diversa
- * dall'etichetta).
+ * I tre controlli "in arrivo" restano attivi e rispondono con un messaggio
+ * esplicito, come in HOM-01: nessun tap morto, nessuna scrittura. Il
+ * segnalibro funziona davvero e si colora di accent quando è attivo.
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, sizes, spacing } from "../../../../theme/tokens";
-import { AppText, useToast } from "../../../../ui";
+import { useToast } from "../../../../ui";
 import {
   FEED_ACTION_COMMENT,
   FEED_ACTION_LIKE,
@@ -40,7 +39,7 @@ export function FeedItemActionRow({ isSaved, onToggleSaved }: FeedItemActionRowP
   return (
     <View style={styles.row}>
       <Action
-        icon="thumbs-up-outline"
+        icon="heart-outline"
         label={FEED_ACTION_LIKE}
         onPress={() => showToast({ message: FEED_SOON_MESSAGES.like })}
       />
@@ -59,14 +58,13 @@ export function FeedItemActionRow({ isSaved, onToggleSaved }: FeedItemActionRowP
         accessibilityLabel={isSaved ? "Rimuovi dai salvati" : "Salva contenuto"}
         accessibilityRole="button"
         accessibilityState={{ selected: isSaved }}
-        hitSlop={10}
         onPress={onToggleSaved}
-        style={styles.bookmark}
+        style={[styles.action, styles.bookmark]}
       >
         <Ionicons
-          color={isSaved ? colors.accent : colors.textMuted}
+          color={isSaved ? colors.accent : colors.textSecondary}
           name={isSaved ? "bookmark" : "bookmark-outline"}
-          size={18}
+          size={20}
         />
       </Pressable>
     </View>
@@ -86,48 +84,36 @@ function Action({
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
-      hitSlop={6}
       onPress={onPress}
       style={({ pressed }) => [styles.action, pressed ? styles.pressed : null]}
     >
-      <Ionicons color={colors.textSecondary} name={icon} size={15} />
-      <AppText color="secondary" style={styles.actionLabel} variant="meta">
-        {label}
-      </AppText>
+      <Ionicons color={colors.textSecondary} name={icon} size={20} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  // Ogni icona ha un'area di tocco 44×44 (§67), anche se ne disegna 20.
   action: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[6],
-    height: "100%",
-  },
-  actionLabel: {
-    fontWeight: "600",
+    height: sizes.touchTarget,
+    justifyContent: "center",
+    width: sizes.touchTarget,
   },
   bookmark: {
-    alignItems: "center",
-    height: "100%",
-    justifyContent: "center",
     marginLeft: "auto",
   },
   pressed: {
     opacity: 0.6,
   },
-  /**
-   * Il rail del design (§1a): 44px fissi, hairline sopra, azioni a sinistra e
-   * salva a destra. Stessa altezza e stessa posizione in ogni pagina.
-   */
+  // L'area di tocco sporge di 12px oltre l'icona: il margine negativo
+  // riallinea la prima e l'ultima icona al bordo del testo.
   row: {
     alignItems: "center",
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
     flexDirection: "row",
-    gap: spacing[22],
+    gap: spacing[16],
     height: sizes.actionRail,
-    paddingHorizontal: spacing[16],
+    marginHorizontal: -12,
+    marginTop: spacing[4],
   },
 });

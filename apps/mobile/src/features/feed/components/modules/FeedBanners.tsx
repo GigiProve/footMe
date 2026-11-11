@@ -1,112 +1,82 @@
 /**
- * Banner e avvisi sovrapposti al Feed.
+ * Avvisi del Feed: pill "Nuovi contenuti", offline, errore, stato vuoto Per
+ * te, fine lista e retry in coda.
  *
- * Vivono tutti in un contenitore `pointerEvents="box-none"` posizionato in
- * assoluto: il §18 chiede che il banner "non copra il contenuto", e il §15 che
- * il refresh non sostituisca la schermata. Sovrapporsi senza intercettare i
- * tocchi è il compromesso che soddisfa entrambi.
- *
- * Nessun indicatore rosso da prototipo (§28): l'unico colore d'accento è
- * `colors.accent`.
+ * HOM-01.1 ha tolto da qui tre elementi di HOM-01, e non vanno reintrodotti:
+ *  • la pill "Aggiornamento Feed…" (§43): il pull-to-refresh usa solo
+ *    l'indicatore nativo e il Feed resta visibile;
+ *  • il banner "Riprendi da dove eri" (§45–47): se il ripristino funziona
+ *    deve essere invisibile. La logica di restore resta intatta;
+ *  • l'helper "Solo contenuti dei profili e delle società che segui" sotto le
+ *    tab (§24): la label "Seguiti" basta.
  */
 
-import { Pressable, StyleSheet, View } from "react-native";
+import { useEffect } from "react";
+import { AccessibilityInfo, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, shadows, spacing } from "../../../../theme/tokens";
+import { colors, radius, shadows, spacing, typography } from "../../../../theme/tokens";
 import { AppText, Button } from "../../../../ui";
 import {
   FEED_END_OF_LIST,
   FEED_ERROR_BODY,
   FEED_ERROR_TITLE,
   FEED_FOLLOWING_EMPTY_CTA,
-  FEED_FOLLOWING_HINT,
+  FEED_NEW_CONTENT,
   FEED_OFFLINE,
   FEED_PER_TE_EMPTY_BODY,
   FEED_PER_TE_EMPTY_TITLE,
-  FEED_REFRESHING,
-  FEED_RESUME,
   FEED_RETRY,
-  newContentLabel,
 } from "../../feed-labels";
 
-/** §15: indicatore compatto, i contenuti sotto restano percepibili. */
-export function FeedRefreshingPill() {
-  return (
-    <View style={[styles.pill, styles.pillNeutral]} testID="feed-refreshing">
-      <AppText color="secondary" variant="caption">
-        {FEED_REFRESHING}
-      </AppText>
-    </View>
-  );
-}
+/**
+ * HOM-01.1 §40–§41: piccola pill sotto le tab, mai uno scroll automatico. Al
+ * tap chi la usa porta la lista in cima e carica i nuovi elementi.
+ *
+ * Bianca con testo accent e nessun numero: discreta, non una CTA piena. È
+ * l'unico elemento davvero sovrapposto al Feed, quindi è l'unico a usare
+ * `shadows.overlay`. Annunciata agli screen reader quando compare (§67): una
+ * sola volta, con `announceForAccessibility` e senza live region, che su
+ * Android la farebbe leggere due volte. Chi la usa la monta solo nella tab
+ * attiva, così non si annuncia una tab che l'utente non sta guardando.
+ */
+export function NewContentPill({ onPress }: { onPress: () => void }) {
+  useEffect(() => {
+    AccessibilityInfo.announceForAccessibility?.(`${FEED_NEW_CONTENT} disponibili`);
+  }, []);
 
-/** §19: al tap si torna in cima e si caricano i nuovi elementi. Mai da solo. */
-export function FeedNewContentBanner({
-  count,
-  onPress,
-}: {
-  count: number;
-  onPress: () => void;
-}) {
   return (
     <Pressable
+      accessibilityHint="Torna all'inizio del Feed e mostra i nuovi contenuti"
+      accessibilityLabel={FEED_NEW_CONTENT}
       accessibilityRole="button"
+      hitSlop={8}
       onPress={onPress}
-      style={[styles.pill, styles.pillAccent]}
+      style={({ pressed }) => [styles.pill, pressed ? styles.pillPressed : null]}
       testID="feed-new-content"
     >
-      <Ionicons color={colors.inkInvert} name="arrow-up" size={14} />
-      <AppText color="inverse" variant="caption">
-        {newContentLabel(count)}
+      <Ionicons color={colors.accent} name="arrow-up" size={15} />
+      <AppText color="accent" style={styles.pillLabel} variant="feedMeta">
+        {FEED_NEW_CONTENT}
       </AppText>
     </Pressable>
   );
 }
 
-/** §18: piccolo, chiudibile, si dissolve da solo, non copre il contenuto. */
-export function FeedResumeBanner({ onDismiss }: { onDismiss: () => void }) {
-  return (
-    <View style={[styles.pill, styles.pillNeutral]} testID="feed-resume">
-      <Ionicons color={colors.accent} name="bookmark" size={14} />
-      <AppText color="secondary" variant="caption">
-        {FEED_RESUME}
-      </AppText>
-      <Pressable
-        accessibilityLabel="Chiudi"
-        accessibilityRole="button"
-        hitSlop={10}
-        onPress={onDismiss}
-      >
-        <Ionicons color={colors.textMuted} name="close" size={14} />
-      </Pressable>
-    </View>
-  );
-}
-
-/** §24: avviso discreto, i contenuti in cache restano visibili. */
+/** §58: avviso discreto in testa al Feed, i contenuti in cache restano. */
 export function FeedOfflineNotice() {
   return (
-    <View style={styles.notice} testID="feed-offline">
-      <Ionicons color={colors.textMuted} name="cloud-offline-outline" size={14} />
-      <AppText color="muted" style={styles.noticeText} variant="caption">
+    <View accessibilityRole="alert" style={styles.notice} testID="feed-offline">
+      <Ionicons color={colors.textMuted} name="cloud-offline-outline" size={15} />
+      <AppText color="muted" style={styles.noticeText} variant="feedMeta">
         {FEED_OFFLINE}
       </AppText>
     </View>
   );
 }
 
-/** §13: helper discreto, mostrato solo nei primi accessi. */
-export function FeedFollowingHint() {
-  return (
-    <AppText align="center" color="muted" style={styles.hint} variant="caption">
-      {FEED_FOLLOWING_HINT}
-    </AppText>
-  );
-}
-
 /**
- * §23: schermata d'errore, usata SOLO quando non c'è alcun contenuto da
+ * §56: schermata d'errore, usata SOLO quando non c'è alcun contenuto da
  * mostrare. Con elementi in cache si tengono i contenuti e si mostra il retry
  * in fondo alla lista.
  *
@@ -124,11 +94,11 @@ export function FeedErrorState({
   onRetry: () => void;
 }) {
   return (
-    <View style={styles.error} testID="feed-error">
-      <AppText align="center" variant="titleMd">
+    <View style={styles.centered} testID="feed-error">
+      <AppText align="center" variant="headingSm">
         {FEED_ERROR_TITLE}
       </AppText>
-      <AppText align="center" color="secondary" variant="bodySm">
+      <AppText align="center" color="secondary" variant="feedMeta">
         {FEED_ERROR_BODY}
       </AppText>
       <Button label={FEED_RETRY} onPress={onRetry} />
@@ -147,11 +117,11 @@ export function FeedErrorState({
  */
 export function FeedPerTeEmpty({ onDiscover }: { onDiscover: () => void }) {
   return (
-    <View style={styles.empty} testID="feed-per-te-empty">
-      <AppText align="center" variant="titleMd">
+    <View style={styles.centered} testID="feed-per-te-empty">
+      <AppText align="center" variant="headingSm">
         {FEED_PER_TE_EMPTY_TITLE}
       </AppText>
-      <AppText align="center" color="secondary" variant="bodySm">
+      <AppText align="center" color="secondary" variant="feedMeta">
         {FEED_PER_TE_EMPTY_BODY}
       </AppText>
       <Button label={FEED_FOLLOWING_EMPTY_CTA} onPress={onDiscover} />
@@ -159,10 +129,10 @@ export function FeedPerTeEmpty({ onDiscover }: { onDiscover: () => void }) {
   );
 }
 
-/** §17: messaggio discreto, non una grande schermata finale. */
+/** §51: solo testo discreto, nessuna card, icona o illustrazione. */
 export function FeedEndOfList() {
   return (
-    <AppText align="center" color="muted" style={styles.end} variant="caption">
+    <AppText align="center" color="muted" style={styles.end} variant="feedMeta">
       {FEED_END_OF_LIST}
     </AppText>
   );
@@ -172,34 +142,24 @@ export function FeedEndOfList() {
 export function FeedInlineRetry({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={styles.inlineRetry} testID="feed-inline-retry">
-      <AppText color="muted" variant="caption">
+      <AppText color="muted" variant="feedMeta">
         {FEED_ERROR_BODY}
       </AppText>
-      <Button label={FEED_RETRY} onPress={onRetry} size="sm" variant="link" />
+      <Button hitSlop={6} label={FEED_RETRY} onPress={onRetry} size="sm" variant="link" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  centered: {
+    alignItems: "center",
+    gap: spacing[12],
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[32],
+  },
   end: {
     paddingBottom: spacing[8],
-    paddingTop: spacing[16],
-  },
-  empty: {
-    alignItems: "center",
-    gap: spacing[12],
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[32],
-  },
-  error: {
-    alignItems: "center",
-    gap: spacing[12],
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[32],
-  },
-  hint: {
-    paddingBottom: spacing[4],
-    paddingTop: spacing[12],
+    paddingTop: spacing[20],
   },
   inlineRetry: {
     alignItems: "center",
@@ -208,13 +168,11 @@ const styles = StyleSheet.create({
   },
   notice: {
     alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
+    borderBottomColor: colors.divider,
+    borderBottomWidth: 1,
     flexDirection: "row",
-    gap: spacing[6],
-    marginTop: spacing[12],
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[8],
+    gap: spacing[8],
+    paddingVertical: spacing[10],
   },
   noticeText: {
     flex: 1,
@@ -222,19 +180,20 @@ const styles = StyleSheet.create({
   pill: {
     alignItems: "center",
     alignSelf: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.accentSoftBorder,
     borderRadius: radius.full,
+    borderWidth: 1,
     flexDirection: "row",
     gap: spacing[6],
-    paddingHorizontal: spacing[14],
-    paddingVertical: spacing[8],
-    ...shadows.card,
+    minHeight: 36,
+    paddingHorizontal: spacing[16],
+    ...shadows.overlay,
   },
-  pillAccent: {
-    backgroundColor: colors.accent,
+  pillLabel: {
+    fontWeight: typography.fontWeight.semibold,
   },
-  pillNeutral: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
+  pillPressed: {
+    backgroundColor: colors.accentSoft,
   },
 });

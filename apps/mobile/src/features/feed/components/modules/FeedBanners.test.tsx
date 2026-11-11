@@ -4,13 +4,16 @@ import { describe, expect, it, vi } from "vitest";
 import {
   FEED_ERROR_BODY,
   FEED_ERROR_TITLE,
+  FEED_END_OF_LIST,
   FEED_FOLLOWING_EMPTY_CTA,
+  FEED_NEW_CONTENT,
   FEED_PER_TE_EMPTY_BODY,
   FEED_PER_TE_EMPTY_TITLE,
   FEED_RETRY,
 } from "../../feed-labels";
 import { press, render, textOf } from "../feed-test-helpers";
-import { FeedErrorState, FeedPerTeEmpty } from "./FeedBanners";
+import * as Banners from "./FeedBanners";
+import { FeedEndOfList, FeedErrorState, FeedPerTeEmpty, NewContentPill } from "./FeedBanners";
 
 describe("FeedErrorState", () => {
   it("mostra titolo, testo e riprova", () => {
@@ -84,5 +87,48 @@ describe("FeedPerTeEmpty", () => {
     press(tree, FEED_FOLLOWING_EMPTY_CTA);
 
     expect(onDiscover).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("NewContentPill (HOM-01.1 §40–§41)", () => {
+  it("dice solo «Nuovi contenuti», senza numeri", () => {
+    const json = textOf(render(<NewContentPill onPress={vi.fn()} />));
+
+    expect(json).toContain(FEED_NEW_CONTENT);
+    expect(json).not.toMatch(/Nuovi contenuti · \d/);
+  });
+
+  it("al tap delega a chi la usa", () => {
+    const onPress = vi.fn();
+    const tree = render(<NewContentPill onPress={onPress} />);
+
+    press(tree, FEED_NEW_CONTENT);
+
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("fine Feed e componenti rimossi", () => {
+  it("la fine del Feed è il solo testo «Sei aggiornato» (§51)", () => {
+    const tree = render(<FeedEndOfList />);
+
+    expect(textOf(tree)).toContain(FEED_END_OF_LIST);
+    expect(
+      tree.root.findAll(
+        (node) => typeof node.type === "string" && String(node.type) === "Ionicons",
+      ),
+    ).toHaveLength(0);
+  });
+
+  /**
+   * §24, §43, §45: helper Seguiti, pill di refresh e banner di ripristino non
+   * devono tornare. Se qualcuno li riesporta, questo test lo segnala.
+   */
+  it("non esporta più helper Seguiti, pill di refresh o banner di ripristino", () => {
+    const names = Object.keys(Banners);
+
+    expect(names).not.toContain("FeedFollowingHint");
+    expect(names).not.toContain("FeedRefreshingPill");
+    expect(names).not.toContain("FeedResumeBanner");
   });
 });

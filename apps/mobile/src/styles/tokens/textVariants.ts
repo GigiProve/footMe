@@ -100,6 +100,21 @@ export const textVariants = {
     fontWeight: typography.fontWeight.semibold,
     lineHeight: typography.lineHeight[19],
   },
+  /**
+   * HOM-01.1 §12: nel Feed il corpo di un post si legge, non si scorre — 15px
+   * contro i 13,5 di `bodyLg`, che resta la misura delle schermate dense.
+   */
+  feedBody: {
+    fontSize: typography.fontSize[15],
+    fontWeight: typography.fontWeight.regular,
+    lineHeight: typography.lineHeight[22],
+  },
+  /** HOM-01.1 §12: metadata del Feed «almeno 13 px» (tempo, ruolo, società). */
+  feedMeta: {
+    fontSize: typography.fontSize[13],
+    fontWeight: typography.fontWeight.regular,
+    lineHeight: typography.lineHeight[18],
+  },
   caption: {
     fontSize: typography.fontSize[11],
     fontWeight: typography.fontWeight.regular,

@@ -1,43 +1,49 @@
 /**
- * Skeleton del caricamento iniziale (§16).
+ * Skeleton del caricamento iniziale (HOM-01.1 §52–§55).
+ *
+ * Ricalcano i componenti aperti: niente più card, ogni blocco sta nella stessa
+ * `FeedItemFrame` dei contenuti veri, così l'arrivo dei dati non sposta nulla.
+ *  • post: avatar, due righe di testo, media 16:9, riga interazioni (§53);
+ *  • posizione: kicker, poi logo, titolo, due metadata e CTA testuale (§54);
+ *  • discovery: intestazione e righe avatar + testo + azione (§55).
  *
  * Composti SOLO da `Skeleton.Row` e `Skeleton.Circle` già esistenti, che non
- * sono animati: "non lampeggiare" e "nessuna animazione eccessiva" vengono
- * quindi gratis, senza un solo `Animated`. Nessun testo fittizio: solo barre.
- *
- * Le altezze rispecchiano quelle dei componenti reali, così quando i dati
- * arrivano la lista non fa un salto. La sequenza è fissa e non casuale:
- * posizione, post, modulo profili, contenuto editoriale, post — la stessa
- * alternanza che il Feed vero produce.
- *
+ * sono animati: niente lampeggi, nessun `Animated`. Nessun testo fittizio.
  * Header, tab e bottom navigation restano visibili perché vivono fuori dalla
- * lista: questi skeleton sono solo il contenuto.
+ * lista.
  */
 
 import { StyleSheet, View } from "react-native";
 
 import { colors, radius, spacing } from "../../../../theme/tokens";
 import { Skeleton } from "../../../../ui";
+import { FeedItemFrame } from "../items/FeedItemFrame";
 
 export function PositionSkeleton() {
   return (
-    <View style={styles.row} testID="feed-skeleton-position">
-      <View style={styles.square} />
-      <View style={styles.rowBody}>
-        <Skeleton.Row style={styles.w60} />
-        <Skeleton.Row style={styles.w40} />
-        <Skeleton.Row style={styles.w30} />
+    <FeedItemFrame testID="feed-skeleton-position">
+      <Skeleton.Row style={styles.w40} />
+      <View style={styles.box}>
+        <View style={styles.boxRow}>
+          <View style={styles.logo} />
+          <View style={styles.grow}>
+            <Skeleton.Row style={styles.w60} />
+            <Skeleton.Row style={styles.w50} />
+            <Skeleton.Row style={styles.w70} />
+          </View>
+        </View>
+        <Skeleton.Row style={[styles.w30, styles.end]} />
       </View>
-    </View>
+    </FeedItemFrame>
   );
 }
 
 export function PostSkeleton() {
   return (
-    <View style={styles.card} testID="feed-skeleton-post">
+    <FeedItemFrame testID="feed-skeleton-post">
       <View style={styles.header}>
         <Skeleton.Circle style={styles.avatar} />
-        <View style={styles.headerText}>
+        <View style={styles.grow}>
           <Skeleton.Row style={styles.w50} />
           <Skeleton.Row style={styles.w30} />
         </View>
@@ -46,52 +52,40 @@ export function PostSkeleton() {
       <Skeleton.Row style={styles.w70} />
       <View style={styles.media} />
       <View style={styles.actions}>
-        <View style={styles.pill} />
-        <View style={styles.pill} />
-        <View style={styles.pill} />
+        <View style={styles.icon} />
+        <View style={styles.icon} />
+        <View style={styles.icon} />
+        <View style={[styles.icon, styles.pushRight]} />
       </View>
-    </View>
+    </FeedItemFrame>
   );
 }
 
 export function SuggestedProfilesSkeleton() {
   return (
-    <View style={styles.card} testID="feed-skeleton-profiles">
-      <Skeleton.Row style={styles.w40} />
+    <FeedItemFrame testID="feed-skeleton-profiles">
+      <Skeleton.Row style={[styles.w50, styles.sectionTitle]} />
       {[0, 1, 2].map((index) => (
         <View key={index} style={styles.suggestionRow}>
-          <Skeleton.Circle style={styles.avatarSm} />
-          <View style={styles.rowBody}>
+          <Skeleton.Circle style={styles.avatar} />
+          <View style={styles.grow}>
             <Skeleton.Row style={styles.w50} />
             <Skeleton.Row style={styles.w40} />
           </View>
           <View style={styles.followPill} />
         </View>
       ))}
-    </View>
+    </FeedItemFrame>
   );
 }
 
-export function EditorialSkeleton() {
-  return (
-    <View style={styles.row} testID="feed-skeleton-editorial">
-      <View style={styles.thumb} />
-      <View style={styles.rowBody}>
-        <Skeleton.Row style={styles.w30} />
-        <Skeleton.Row />
-        <Skeleton.Row style={styles.w60} />
-      </View>
-    </View>
-  );
-}
-
+/** Stessa alternanza che il Feed vero produce: posizione, post, persone, post. */
 export function FeedSkeleton() {
   return (
-    <View style={styles.container} testID="feed-skeleton">
+    <View testID="feed-skeleton">
       <PositionSkeleton />
       <PostSkeleton />
       <SuggestedProfilesSkeleton />
-      <EditorialSkeleton />
       <PostSkeleton />
     </View>
   );
@@ -99,35 +93,39 @@ export function FeedSkeleton() {
 
 const styles = StyleSheet.create({
   actions: {
+    alignItems: "center",
     flexDirection: "row",
-    gap: spacing[12],
+    gap: spacing[36],
+    height: 44,
     marginTop: spacing[4],
   },
   avatar: {
-    height: 40,
-    width: 40,
+    height: 32,
+    width: 32,
   },
-  avatarSm: {
-    height: 36,
-    width: 36,
-  },
-  card: {
-    backgroundColor: colors.surface,
+  box: {
     borderColor: colors.border,
-    borderRadius: radius[12],
+    borderRadius: radius[16],
     borderWidth: 1,
-    gap: spacing[4],
+    gap: spacing[8],
+    marginTop: spacing[10],
     padding: spacing[14],
   },
-  container: {
+  boxRow: {
+    flexDirection: "row",
     gap: spacing[12],
-    paddingTop: spacing[12],
+  },
+  end: {
+    alignSelf: "flex-end",
   },
   followPill: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.full,
-    height: 28,
+    height: 32,
     width: 64,
+  },
+  grow: {
+    flex: 1,
   },
   header: {
     alignItems: "center",
@@ -135,51 +133,36 @@ const styles = StyleSheet.create({
     gap: spacing[10],
     marginBottom: spacing[8],
   },
-  headerText: {
-    flex: 1,
-  },
-  media: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    height: 160,
-    marginTop: spacing[4],
-  },
-  pill: {
+  icon: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.full,
     height: 20,
-    width: 72,
+    width: 20,
   },
-  row: {
-    alignItems: "flex-start",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[12],
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing[12],
-    padding: spacing[14],
-  },
-  rowBody: {
-    flex: 1,
-  },
-  square: {
+  logo: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius[8],
-    height: 48,
-    width: 48,
+    height: 44,
+    width: 44,
+  },
+  media: {
+    aspectRatio: 16 / 9,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius[8],
+    marginTop: spacing[8],
+    width: "100%",
+  },
+  pushRight: {
+    marginLeft: "auto",
+  },
+  sectionTitle: {
+    marginBottom: spacing[8],
   },
   suggestionRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: spacing[10],
-    paddingVertical: spacing[8],
-  },
-  thumb: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius[8],
-    height: 56,
-    width: 84,
+    gap: spacing[12],
+    paddingVertical: spacing[10],
   },
   w30: { width: "30%" },
   w40: { width: "40%" },

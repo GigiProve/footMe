@@ -19,7 +19,8 @@ import { AppText, Icon, type IconName } from "../../src/ui";
 
 /**
  * Radici delle tab su cui compare il menu laterale flottante. La Home non
- * c'è: integra il menu nel proprio header.
+ * c'è: il pulsante coprirebbe il wordmark PROLINK, e da HOM-01.1 §4 il suo
+ * header non ha più un'icona menu (la sidebar si apre dalle altre tab).
  */
 const TAB_ROOTS = ["/cerca", "/dashboard", "/messages", "/profile"];
 
@@ -29,9 +30,9 @@ export default function TabsLayout() {
   const pathname = usePathname();
   const profileId = profile?.id ?? "";
 
-  // La Home ha un header proprio con "PROLINK" in alto a sinistra e integra il
-  // menu come primo elemento della barra: il pulsante flottante si
-  // sovrapporrebbe esattamente al nome. Sulle altre tab resta com'era.
+  // La Home ha un header proprio con "PROLINK" in alto a sinistra: il pulsante
+  // flottante si sovrapporrebbe esattamente al nome. Sulle altre tab resta
+  // com'era.
   //
   // Dalle schermate **annidate** dentro una tab il menu sparisce: hanno un
   // back nello stesso angolo (DAS-REV-08 §4, Centro Squadre), e due bersagli

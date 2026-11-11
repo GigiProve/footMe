@@ -46,6 +46,7 @@ export type CachedFeedScope = {
 export type CachedFeedFirstAccess = {
   personalizeCompletedAt: string | null;
   personalizeDismissedAt: string | null;
+  /** Non più letto né scritto da HOM-01.1 §24 (helper Seguiti rimosso). Resta per non cambiare lo schema v1. */
   followingHintShownCount: number;
 };
 
@@ -54,6 +55,7 @@ export type CachedFeed = {
   activeScope: FeedScope;
   scopes: Record<FeedScope, CachedFeedScope>;
   firstAccess: CachedFeedFirstAccess;
+  /** Non più letto né scritto da HOM-01.1 §45 (banner rimosso). Resta per non cambiare lo schema v1. */
   resumeBannerShownAt: string | null;
 };
 

@@ -46,7 +46,17 @@ export type FeedAnalyticsEvent =
   | { name: "feed_empty_state_shown"; scope: FeedScope; reason: "no_follows" | "no_content" }
   | { name: "feed_discover_profiles_tap"; scope: FeedScope }
   | { name: "feed_save_tap"; itemId: string; saved: boolean }
-  | { name: "feed_item_menu_open"; itemType: FeedItemType };
+  | { name: "feed_item_menu_open"; itemType: FeedItemType }
+  // HOM-01.1 §69: il prompt di primo accesso. Nessuna proprietà: non serve
+  // altro per contare impression, aperture e rinvii.
+  | { name: "home_personalization_prompt_impression" }
+  | { name: "home_personalization_opened" }
+  | { name: "home_personalization_skipped" }
+  // HOM-01.1 §70: la pill "Nuovi contenuti". La disponibilità NON è
+  // un'impression degli elementi: quelle restano `feed_item_impression`,
+  // registrate solo quando gli elementi sono davvero a schermo.
+  | { name: "feed_new_content_available"; scope: FeedScope; count: number }
+  | { name: "feed_new_content_tap"; scope: FeedScope };
 
 export function trackFeed(event: FeedAnalyticsEvent): void {
   const { name, ...rest } = event;

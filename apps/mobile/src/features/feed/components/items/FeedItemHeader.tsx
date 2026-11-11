@@ -1,6 +1,10 @@
 /**
- * Intestazione di una card: avatar/logo, nome, verifica, tempo dalla
- * pubblicazione, menu ⋯ (§10).
+ * Intestazione autore di un elemento del Feed (HOM-01.1 §17, §18, §75).
+ *
+ * Avatar/logo, nome, check di verifica, metadata sintetico e menu ⋯. Persona,
+ * Società e Media usano la stessa riga: cambia solo l'avatar (quadrato per le
+ * Società) e il testo, mai un fondo, un badge o "Profilo ufficiale". La
+ * verifica è sempre lo stesso piccolo check accanto al nome.
  *
  * `formatRelativeTime` è già in src/lib: non si reimplementa il calcolo del
  * tempo relativo.
@@ -16,11 +20,13 @@ import type { FeedItem } from "../../feed-types";
 
 type FeedItemHeaderProps = {
   item: FeedItem;
+  /** Tipologia del contenuto ("Articolo", "Video") quando serve dirla (§61). */
+  kindLabel?: string | null;
   onPressAuthor?: () => void;
   right?: React.ReactNode;
 };
 
-export function FeedItemHeader({ item, onPressAuthor, right }: FeedItemHeaderProps) {
+export function FeedItemHeader({ item, kindLabel, onPressAuthor, right }: FeedItemHeaderProps) {
   const author = item.author;
 
   if (!author) {
@@ -29,6 +35,7 @@ export function FeedItemHeader({ item, onPressAuthor, right }: FeedItemHeaderPro
 
   const meta = [
     item.publishedAt ? formatRelativeTime(item.publishedAt) : null,
+    kindLabel,
     item.reasonLabel,
   ]
     .filter(Boolean)
@@ -51,20 +58,20 @@ export function FeedItemHeader({ item, onPressAuthor, right }: FeedItemHeaderPro
         />
         <View style={styles.identityText}>
           <View style={styles.nameRow}>
-            <AppText numberOfLines={1} style={styles.name} variant="titleSm">
+            <AppText numberOfLines={1} style={styles.name} variant="titleMd">
               {author.name}
             </AppText>
             {author.isVerified ? (
               <Ionicons
-                accessibilityLabel="Profilo verificato"
+                accessibilityLabel="Verificato"
                 color={colors.accent}
                 name="checkmark-circle"
-                size={14}
+                size={15}
               />
             ) : null}
           </View>
           {meta ? (
-            <AppText color="muted" numberOfLines={1} variant="caption">
+            <AppText color="muted" numberOfLines={1} variant="feedMeta">
               {meta}
             </AppText>
           ) : null}

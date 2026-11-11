@@ -1,78 +1,68 @@
 /**
- * Header compatto e fisso della Home (§2).
+ * Header compatto e fisso della Home (HOM-01.1 §4, §5).
  *
- * A sinistra il solo nome testuale PROLINK: il §2 vieta esplicitamente di
- * generare o introdurre un logo provvisorio, perché quello definitivo non è
- * ancora approvato. Non si riusa `TopBar`, che ha un riquadro con la lettera "F"
- * e una finta casella di ricerca — entrambi fuori specifica qui.
+ * A sinistra il solo wordmark testuale PROLINK: nessun logo provvisorio,
+ * simbolo, badge o payoff. A destra campanella e "+", icone semplici senza
+ * cerchi né bottoni pieni, ognuna con un'area di tocco di 44pt.
  *
- * A destra campanella e "+". La campanella mostra un indicatore piccolo quando
- * ci sono notifiche non lette: il §2 vieta numeri grandi e badge invasivi,
- * quindi un punto e non un contatore.
+ * Niente più icona menu: §4 e il visual master vogliono a sinistra solo
+ * PROLINK. La sidebar resta raggiungibile dal pulsante flottante delle altre
+ * tab, che sulla Home non compare perché coprirebbe il wordmark (decisione
+ * confermata da Luigi il 2026-11-11).
  *
- * L'icona menu a sinistra è l'accesso alla sidebar: il pulsante flottante del
- * layout tabs viene nascosto sulla Home perché si sovrapporrebbe a PROLINK.
+ * Le notifiche non lette sono un punto piccolo, mai un numero (§5).
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, sizes, spacing } from "../../../theme/tokens";
+import { colors, sizes, spacing } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
 import { FEED_BRAND } from "../feed-labels";
 
 type FeedHeaderProps = {
   hasUnreadNotifications: boolean;
-  onOpenMenu: () => void;
   onOpenNotifications: () => void;
   onOpenComposer: () => void;
 };
 
 export function FeedHeader({
   hasUnreadNotifications,
-  onOpenMenu,
   onOpenNotifications,
   onOpenComposer,
 }: FeedHeaderProps) {
   return (
     <View style={styles.bar} testID="feed-header">
-      <Pressable
-        accessibilityLabel="Apri menu laterale"
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={onOpenMenu}
-        style={styles.iconButton}
+      <AppText
+        accessibilityRole="header"
+        numberOfLines={1}
+        style={styles.brand}
+        variant="heroName"
       >
-        <Ionicons color={colors.textPrimary} name="menu-outline" size={22} />
-      </Pressable>
-
-      <AppText style={styles.brand} variant="heroName">
         {FEED_BRAND}
       </AppText>
 
       <Pressable
-        accessibilityLabel="Notifiche"
+        accessibilityLabel={
+          hasUnreadNotifications ? "Notifiche, ci sono notifiche non lette" : "Notifiche"
+        }
         accessibilityRole="button"
-        hitSlop={8}
         onPress={onOpenNotifications}
         style={styles.iconButton}
       >
-        <Ionicons color={colors.textPrimary} name="notifications-outline" size={22} />
+        <Ionicons color={colors.textPrimary} name="notifications-outline" size={23} />
         {hasUnreadNotifications ? (
           <View style={styles.dot} testID="feed-header-unread-dot" />
         ) : null}
       </Pressable>
 
-      {/* Unica azione piena della testata: creare contenuto è la CTA della
-          Home, e nel design è un cerchio blu (§1b). */}
       <Pressable
         accessibilityLabel="Crea contenuto"
         accessibilityRole="button"
-        hitSlop={8}
         onPress={onOpenComposer}
-        style={styles.composerButton}
+        style={styles.iconButton}
       >
-        <Ionicons color={colors.inkInvert} name="add" size={20} />
+        <Ionicons color={colors.textPrimary} name="add" size={27} />
       </Pressable>
     </View>
   );
@@ -82,37 +72,25 @@ const styles = StyleSheet.create({
   bar: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
     flexDirection: "row",
-    gap: spacing[4],
-    paddingHorizontal: spacing[12],
-    paddingVertical: spacing[10],
+    paddingLeft: spacing[16],
+    paddingRight: spacing[6],
+    paddingVertical: spacing[4],
   },
   brand: {
     flex: 1,
     fontSize: 19,
-    paddingLeft: spacing[4],
-  },
-  composerButton: {
-    alignItems: "center",
-    backgroundColor: colors.accent,
-    borderRadius: radius.full,
-    height: 36,
-    justifyContent: "center",
-    marginLeft: spacing[4],
-    width: 36,
   },
   dot: {
     backgroundColor: colors.accent,
     borderColor: colors.surface,
-    borderRadius: 5,
+    borderRadius: 4.5,
     borderWidth: 1.5,
-    height: 10,
+    height: 9,
     position: "absolute",
-    right: spacing[8],
-    top: spacing[8],
-    width: 10,
+    right: 11,
+    top: 10,
+    width: 9,
   },
   iconButton: {
     alignItems: "center",

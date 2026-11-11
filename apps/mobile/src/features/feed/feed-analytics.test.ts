@@ -83,6 +83,11 @@ describe("trackFeed", () => {
     { name: "feed_discover_profiles_tap", scope: "seguiti" },
     { name: "feed_save_tap", itemId: "club_media:1", saved: true },
     { name: "feed_item_menu_open", itemType: "post" },
+    { name: "home_personalization_prompt_impression" },
+    { name: "home_personalization_opened" },
+    { name: "home_personalization_skipped" },
+    { count: 3, name: "feed_new_content_available", scope: "per_te" },
+    { name: "feed_new_content_tap", scope: "per_te" },
   ];
 
   it.each(cases.map((event) => [event.name, event] as const))(
@@ -113,6 +118,12 @@ describe("trackFeed", () => {
       "feed_page_load",
       "feed_empty_state_shown",
       "feed_discover_profiles_tap",
+      // HOM-01.1 §69–§70
+      "home_personalization_prompt_impression",
+      "home_personalization_opened",
+      "home_personalization_skipped",
+      "feed_new_content_available",
+      "feed_new_content_tap",
     ];
 
     const covered = new Set(cases.map((event) => event.name));

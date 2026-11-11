@@ -28,12 +28,19 @@ export const FEED_TAB_LABELS: Record<FeedScope, string> = {
   seguiti: "Seguiti",
 };
 
-// ── Modulo di primo accesso (§6) ────────────────────────────────
-export const FEED_INTRO_TITLE = "Personalizza il tuo Feed";
+// ── Modulo di primo accesso (HOM-01.1 §28) ──────────────────────
+export const FEED_INTRO_TITLE = "Personalizza ciò che vuoi vedere";
 export const FEED_INTRO_BODY =
+  "Dicci cosa ti interessa per rendere il Feed ancora più rilevante.";
+export const FEED_INTRO_PRIMARY_CTA = "Personalizza";
+export const FEED_INTRO_SECONDARY_CTA = "Non ora";
+/**
+ * Il foglio che «Personalizza» apre (§30): riusa le quattro opzioni e il
+ * salvataggio di HOM-01, cambia solo il punto d'accesso.
+ */
+export const FEED_INTRO_SHEET_BODY =
   "PROLINK utilizzerà il tuo ruolo, le aree di interesse e i profili che segui per mostrarti contenuti più rilevanti.";
-export const FEED_INTRO_PRIMARY_CTA = "Personalizza Feed";
-export const FEED_INTRO_SECONDARY_CTA = "Lo farò più tardi";
+export const FEED_INTRO_SHEET_SAVE = "Salva preferenze";
 
 // ── Posizione suggerita (§9) ────────────────────────────────────
 export const FEED_POSITION_OVERLINE = "Per te";
@@ -43,19 +50,24 @@ export const FEED_POSITION_CTA = "Apri posizione";
 // ── Moduli discovery (§11) ──────────────────────────────────────
 export const FEED_SUGGESTED_PROFILES_TITLE = "Persone che potresti conoscere";
 export const FEED_SUGGESTED_CLUBS_TITLE = "Società che potresti seguire";
-export const FEED_SEE_ALL = "Vedi tutti";
+export const FEED_SEE_ALL = "Vedi tutte";
 export const FEED_FOLLOW_CTA = "Segui";
-export const FEED_FOLLOWING_LABEL = "Già seguito";
+/**
+ * HOM-01.1 §21: «Segui già o equivalente previsto dal sistema Follow
+ * definitivo». L'equivalente in uso ovunque (Cerca, profili, Società) è
+ * "Seguito": la Home si allinea invece di avere un'etichetta sua.
+ */
+export const FEED_FOLLOWING_LABEL = "Seguito";
 
-// ── Tab Seguiti (§13, §14) ──────────────────────────────────────
-export const FEED_FOLLOWING_HINT =
-  "Solo contenuti dei profili e delle società che segui.";
-export const FEED_FOLLOWING_EMPTY_TITLE =
-  "Qui vedrai i contenuti dei profili e delle società che segui";
-export const FEED_FOLLOWING_EMPTY_CTA = "Scopri profili da seguire";
-export const FEED_FOLLOWING_QUIET_TITLE =
-  "I profili che segui non hanno ancora pubblicato";
+// ── Tab Seguiti (HOM-01.1 §24, §35) ─────────────────────────────
+// Nessun helper permanente sotto le tab (§24): la label "Seguiti" basta.
+export const FEED_FOLLOWING_EMPTY_TITLE = "Ancora nessun contenuto";
+export const FEED_FOLLOWING_EMPTY_BODY =
+  "Segui profili, società e Media per vedere qui i loro aggiornamenti.";
+export const FEED_FOLLOWING_EMPTY_CTA = "Scopri chi seguire";
 export const FEED_SUGGESTIONS_TITLE = "Suggerimenti per iniziare";
+/** §37: «massimo 3–4 righe». */
+export const FEED_FOLLOWING_SUGGESTION_ROWS = 4;
 
 // ── Tab Per te senza contenuti ──────────────────────────────────
 /**
@@ -69,11 +81,11 @@ export const FEED_PER_TE_EMPTY_TITLE = "Non ci sono ancora contenuti da mostrare
 export const FEED_PER_TE_EMPTY_BODY =
   "Appena società, profili e testate inizieranno a pubblicare, li troverai qui.";
 
-// ── Aggiornamento, paginazione, banner (§15, §17, §18, §19) ─────
-export const FEED_REFRESHING = "Aggiornamento Feed…";
+// ── Paginazione e nuovi contenuti (HOM-01.1 §40, §51) ───────────
+// Niente "Aggiornamento Feed…" (§43) e niente "Riprendi da dove eri" (§45):
+// il refresh usa l'indicatore nativo e il ripristino è invisibile.
 export const FEED_END_OF_LIST = "Sei aggiornato";
 export const FEED_NEW_CONTENT = "Nuovi contenuti";
-export const FEED_RESUME = "Riprendi da dove eri";
 
 // ── Errore e offline (§23, §24) ─────────────────────────────────
 export const FEED_ERROR_TITLE = "Non è stato possibile aggiornare la Home";
@@ -136,14 +148,19 @@ export function positionHeadline(
   return fallbackTitle ?? "Posizione aperta";
 }
 
-/** es. "Prima squadra · Serie B". */
+/**
+ * es. "Prima squadra · Parma Calcio". HOM-01.1 §76: la squadra accompagna la
+ * Società e non la sostituisce. Stesso formato di `teamMetaLine` in Cerca
+ * (CER-04), come chiede il §74.
+ */
 export function positionTeamLine(payload: FeedPositionPayload): string {
-  return [payload.teamName, payload.category].filter(Boolean).join(" · ");
+  return [payload.teamName, payload.clubName].filter(Boolean).join(" · ");
 }
 
-/** es. "Parma, Emilia-Romagna". */
+/** es. "Serie B · Parma, Emilia-Romagna" — come `locationMetaLine` in Cerca. */
 export function positionLocationLine(payload: FeedPositionPayload): string {
-  return [payload.city, payload.region].filter(Boolean).join(", ");
+  const place = [payload.city, payload.region].filter(Boolean).join(", ");
+  return [payload.category, place].filter(Boolean).join(" · ");
 }
 
 /** Riga secondaria di un profilo suggerito: ruolo + informazione essenziale (§11). */
@@ -160,13 +177,4 @@ export function suggestedProfileMetaLine(row: FeedSuggestedProfileRow): string {
 export function suggestedClubMetaLine(row: FeedSuggestedClubRow): string {
   const place = [row.city, row.region].filter(Boolean).join(", ");
   return [row.category, place].filter(Boolean).join(" · ");
-}
-
-/** §17: "Nuovi contenuti" senza numeri invasivi, ma il conteggio aiuta. */
-export function newContentLabel(count: number): string {
-  if (count <= 0) {
-    return FEED_NEW_CONTENT;
-  }
-
-  return count > 99 ? `${FEED_NEW_CONTENT} · 99+` : `${FEED_NEW_CONTENT} · ${count}`;
 }

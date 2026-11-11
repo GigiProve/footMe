@@ -10,11 +10,15 @@
  *    > 0) e non in un effect di mount: al mount la lista non ha ancora
  *    contenuto misurabile e `scrollToOffset` non avrebbe effetto.
  *
- * Le condizioni per applicare l'offset e per mostrare il banner vivono in
- * feed-scroll-rules.ts, testate senza renderer.
+ * La condizione per applicare l'offset vive in feed-scroll-rules.ts, testata
+ * senza renderer.
+ *
+ * HOM-01.1 §45–47: il ripristino non mostra più alcun banner "Riprendi da dove
+ * eri". Se funziona deve essere invisibile: stessa tab, stessa posizione,
+ * nessuna spiegazione.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useFocusEffect } from "expo-router";
 import type {
   FlatList,
@@ -22,22 +26,11 @@ import type {
   NativeSyntheticEvent,
 } from "react-native";
 
-import { saveFeedCacheMeta, saveFeedCacheScope, type FeedScrollState } from "./feed-cache";
-import {
-  shouldRestoreOffset,
-  shouldShowResumeBanner,
-} from "./feed-scroll-rules";
+import { saveFeedCacheScope, type FeedScrollState } from "./feed-cache";
+import { shouldRestoreOffset } from "./feed-scroll-rules";
 import type { FeedItem, FeedScope } from "./feed-types";
 
 const PERSIST_DEBOUNCE_MS = 800;
-const RESUME_BANNER_AUTO_DISMISS_MS = 5000;
-
-/**
- * Una comparsa per sessione JS e per tab. Vive a livello di modulo perché deve
- * sopravvivere a cambi tab e remount: uno stato di componente si azzererebbe e
- * il banner tornerebbe, che è esattamente ciò che il §18 vieta.
- */
-const shownThisSession = new Set<FeedScope>();
 
 export function useFeedScrollRestore({
   scope,
@@ -46,7 +39,6 @@ export function useFeedScrollRestore({
   itemCount,
   hydratedFromCache,
   savedScroll,
-  resumeBannerShownAt,
 }: {
   scope: FeedScope;
   profileId: string;
@@ -54,12 +46,10 @@ export function useFeedScrollRestore({
   itemCount: number;
   hydratedFromCache: boolean;
   savedScroll: FeedScrollState | null;
-  resumeBannerShownAt: string | null;
 }) {
   const offsetRef = useRef(0);
   const hasRestoredRef = useRef(false);
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [resumeBannerVisible, setResumeBannerVisible] = useState(false);
 
   const persist = useCallback(() => {
     if (!profileId) {
@@ -126,51 +116,9 @@ export function useFeedScrollRestore({
       const target = Math.max(0, Math.min(savedScroll?.offset ?? 0, height));
       offsetRef.current = target;
       listRef.current?.scrollToOffset({ animated: false, offset: target });
-
-      const visible = shouldShowResumeBanner({
-        alreadyShownThisSession: shownThisSession.has(scope),
-        bannerShownAt: resumeBannerShownAt,
-        now: Date.now(),
-        restoredOffset: target,
-        savedAt: savedScroll?.savedAt ?? null,
-      });
-
-      if (!visible) {
-        return;
-      }
-
-      shownThisSession.add(scope);
-      setResumeBannerVisible(true);
-      if (profileId) {
-        void saveFeedCacheMeta(profileId, {
-          resumeBannerShownAt: new Date().toISOString(),
-        });
-      }
     },
-    [
-      hydratedFromCache,
-      itemCount,
-      listRef,
-      profileId,
-      resumeBannerShownAt,
-      savedScroll,
-      scope,
-    ],
+    [hydratedFromCache, itemCount, listRef, savedScroll],
   );
-
-  // Il §18 chiede che il banner "sparisca automaticamente".
-  useEffect(() => {
-    if (!resumeBannerVisible) {
-      return;
-    }
-
-    const timer = setTimeout(
-      () => setResumeBannerVisible(false),
-      RESUME_BANNER_AUTO_DISMISS_MS,
-    );
-
-    return () => clearTimeout(timer);
-  }, [resumeBannerVisible]);
 
   const scrollToTop = useCallback(
     (animated = true) => {
@@ -181,15 +129,8 @@ export function useFeedScrollRestore({
   );
 
   return {
-    dismissResumeBanner: () => setResumeBannerVisible(false),
     onContentSizeChange,
     onScroll,
-    resumeBannerVisible,
     scrollToTop,
   };
-}
-
-/** Solo per i test: azzera il registro delle comparse di sessione. */
-export function resetResumeBannerSession(): void {
-  shownThisSession.clear();
 }

@@ -8,7 +8,7 @@
 
 import { StyleSheet, View } from "react-native";
 
-import { colors, radius, spacing } from "../../../../theme/tokens";
+import { spacing } from "../../../../theme/tokens";
 import { AppText, Button } from "../../../../ui";
 import { FEED_RETRY } from "../../feed-labels";
 
@@ -20,10 +20,10 @@ type FeedModuleErrorProps = {
 export function FeedModuleError({ title, onRetry }: FeedModuleErrorProps) {
   return (
     <View style={styles.row} testID="feed-module-error">
-      <AppText color="muted" numberOfLines={1} style={styles.label} variant="bodySm">
+      <AppText color="muted" numberOfLines={2} style={styles.label} variant="feedMeta">
         {title} non disponibile
       </AppText>
-      <Button label={FEED_RETRY} onPress={onRetry} size="sm" variant="link" />
+      <Button hitSlop={6} label={FEED_RETRY} onPress={onRetry} size="sm" variant="link" />
     </View>
   );
 }
@@ -32,15 +32,11 @@ const styles = StyleSheet.create({
   label: {
     flex: 1,
   },
+  // HOM-01.1 §57: una riga dentro la cornice dell'elemento, senza card.
   row: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[12],
-    borderWidth: 1,
     flexDirection: "row",
     gap: spacing[8],
-    paddingHorizontal: spacing[14],
-    paddingVertical: spacing[8],
+    paddingBottom: spacing[8],
   },
 });
