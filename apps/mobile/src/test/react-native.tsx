@@ -289,6 +289,8 @@ export const useWindowDimensions = () => ({
  */
 export const AccessibilityInfo = {
   addEventListener: () => ({ remove: () => {} }),
+  // HOM-04 §111: il foglio azioni annuncia «Azioni contenuto» all'apertura.
+  announceForAccessibility: () => {},
   isReduceMotionEnabled: () => Promise.resolve(false),
 };
 

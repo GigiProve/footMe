@@ -349,6 +349,8 @@ export type FeedPostPayload = {
   commentsCount: number;
   isLiked: boolean;
   capabilities: FeedPostCapabilities;
+  /** HOM-04 §73: `updated_at` del contenuto, passato alla modifica. Null se il server non lo manda. */
+  version: string | null;
 };
 
 /**
@@ -377,6 +379,8 @@ export type FeedEditorialPayload = {
   commentsCount: number;
   isLiked: boolean;
   capabilities: FeedPostCapabilities;
+  /** HOM-04 §73: vedi `FeedPostPayload.version`. */
+  version: string | null;
 };
 
 export type FeedPositionPayload = {

@@ -42,20 +42,29 @@ export function ConfirmModal({
   confirmVariant = "primary",
   children,
 }: ConfirmModalProps) {
+  // HOM-04 §110: con una richiesta in corso un dismiss (fondale, Back) sarebbe
+  // ambiguo — chiuderebbe il dialogo senza fermare l'operazione. Si ignora.
+  const dismiss = isBusy ? undefined : onCancel;
+
   return (
     <Modal
       animationType="fade"
-      onRequestClose={onCancel}
+      onRequestClose={dismiss}
       transparent
       visible={visible}
     >
       <Pressable
         accessibilityLabel="Chiudi"
-        onPress={onCancel}
+        accessibilityRole="button"
+        onPress={dismiss}
         style={styles.backdrop}
       />
       <View style={styles.centeredWrapper} pointerEvents="box-none">
-        <View style={styles.card}>
+        {/* HOM-04 §113: `accessibilityViewIsModal` tiene il focus dei lettori di
+            schermo dentro il dialogo (titolo, testo, bottoni) e fuori dal
+            contenuto oscurato sotto. Il contenitore non è `accessible`: lo
+            sarebbe a scapito dei bottoni. */}
+        <View accessibilityViewIsModal style={styles.card}>
           <View style={styles.body}>
             <AppText variant="headingSm" align="center">
               {title}

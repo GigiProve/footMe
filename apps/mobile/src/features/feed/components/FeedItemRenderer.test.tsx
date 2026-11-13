@@ -1,7 +1,9 @@
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { FEED_ITEM_TYPES, type FeedItem } from "../feed-types";
+import { buildManageTarget } from "../content-actions-presentation";
+import type { ContentManagement } from "../content-management-types";
+import { FEED_ITEM_TYPES, type FeedContentItem, type FeedItem } from "../feed-types";
 import {
   countTestId,
   makeArticleItem,
@@ -112,6 +114,48 @@ describe("FeedItemRenderer", () => {
     expect(handlers.onOpenItem).toHaveBeenCalledWith(item);
     expect(handlers.onToggleLike).toHaveBeenCalledWith(item);
     expect(handlers.onToggleSaved).toHaveBeenCalledWith(item);
+  });
+
+  it("HOM-04 §17–19: la gestione arriva da getManagement e il copy segue il tipo visibile", () => {
+    const manage = (item: FeedContentItem): ContentManagement => ({
+      capabilities: { canDelete: true, canEdit: true, canViewInsights: true },
+      onDelete: async () => "removed",
+      onEdit: vi.fn(),
+      onInsights: vi.fn(),
+      target: buildManageTarget(item, "HOME_PER_TE"),
+    });
+    const withManagement = { ...handlers, getManagement: (item: FeedContentItem) => manage(item) };
+    const render = (item: FeedItem) =>
+      JSON.stringify(
+        renderWithToast(
+          <FeedItemRenderer handlers={withManagement} item={item} modules={makeModules()} />,
+        ).toJSON(),
+      );
+
+    const article = render(makeArticleItem());
+    expect(article).toContain("Modifica articolo");
+    expect(article).toContain("Elimina articolo");
+    expect(article).not.toContain("Elimina post");
+
+    const video = render(makeVideoItem());
+    expect(video).toContain("Modifica contenuto");
+    expect(video).toContain("Elimina contenuto");
+
+    // Un Post (anche con un video social) usa il copy Post.
+    const post = render(makePostItem());
+    expect(post).toContain("Modifica post");
+    expect(post).toContain("Elimina post");
+  });
+
+  it("senza getManagement i contenuti non mostrano azioni di gestione", () => {
+    const json = JSON.stringify(
+      renderWithToast(
+        <FeedItemRenderer handlers={handlers} item={makePostItem()} modules={makeModules()} />,
+      ).toJSON(),
+    );
+
+    expect(json).not.toContain("Elimina post");
+    expect(json).not.toContain("Dettagli e statistiche");
   });
 
   it("degrada a null su un tipo sconosciuto invece di sollevare", () => {

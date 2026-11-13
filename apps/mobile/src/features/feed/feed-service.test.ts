@@ -13,7 +13,7 @@ import {
   resolveFeedAuthorHref,
   resolveFeedItemHref,
 } from "./feed-service";
-import type { FeedItemRow } from "./feed-types";
+import type { FeedContentItem, FeedItemRow } from "./feed-types";
 
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
@@ -796,11 +796,35 @@ describe("resolveFeedItemHref — editoriali HOM-03 §49", () => {
       }),
     );
 
-    expect(resolveFeedItemHref(article!)).toBe("/content/media_profile/a-1?origin=feed&position=7");
+    // HOM-04 §122: la provenienza è tipata (la tab), non più la stringa «feed».
+    expect(resolveFeedItemHref(article!, "HOME_PER_TE")).toBe(
+      "/content/media_profile/a-1?origin=HOME_PER_TE&position=7",
+    );
   });
 
-  it("lascia invariato l'href del Post", () => {
+  it("lascia invariato l'href del Post senza origine", () => {
     expect(resolveFeedItemHref(mapFeedRow(makeRow())!)).toBe("/content/club_media/post-1");
+  });
+
+  it("HOM-04 §122: anche il Post porta la provenienza della tab", () => {
+    const post = mapFeedRow(makeRow())!;
+
+    expect(resolveFeedItemHref(post, "HOME_SEGUITI")).toBe("/content/club_media/post-1?origin=HOME_SEGUITI");
+    expect(resolvePostMediaHref(post as FeedContentItem, 1, "HOME_PER_TE")).toBe(
+      "/content/club_media/post-1?media=1&origin=HOME_PER_TE",
+    );
+  });
+
+  it("HOM-04 §73: il payload porta `version` dal server, altrimenti null", () => {
+    const withVersion = mapFeedRow(
+      makeRow({
+        data: { content_type: "club_media", post_id: "post-1", version: "2026-11-12T10:00:00+00:00" },
+      }),
+    );
+    const without = mapFeedRow(makeRow());
+
+    expect(withVersion?.type === "post" ? withVersion.payload.version : undefined).toBe("2026-11-12T10:00:00+00:00");
+    expect(without?.type === "post" ? without.payload.version : undefined).toBeNull();
   });
 });
 

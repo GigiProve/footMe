@@ -50,6 +50,7 @@ export function makePostPayload(overrides: Partial<FeedPostPayload> = {}): FeedP
     commentsCount: 0,
     isLiked: false,
     capabilities: { ...CAPABILITIES },
+    version: null,
     ...overrides,
   };
 }
@@ -73,6 +74,7 @@ export function makeEditorialPayload(
     commentsCount: 0,
     isLiked: false,
     capabilities: { ...CAPABILITIES },
+    version: null,
     ...overrides,
   };
 }

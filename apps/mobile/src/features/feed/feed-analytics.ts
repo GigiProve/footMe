@@ -15,7 +15,8 @@
  */
 
 import { trackEvent, type AnalyticsProps } from "../../lib/analytics";
-import type { FeedIdentityType, FeedItemType, FeedScope } from "./feed-types";
+import type { ContentOrigin } from "./content-routes";
+import type { FeedContentType, FeedIdentityType, FeedItemType, FeedScope } from "./feed-types";
 
 export type FeedAnalyticsEvent =
   | { name: "home_open" }
@@ -87,7 +88,25 @@ export type FeedAnalyticsEvent =
   | { name: "feed_video_error"; itemId: string; mediaId: string }
   | { name: "feed_video_retry"; itemId: string; mediaId: string }
   | { name: "feed_article_impression"; itemId: string }
-  | { name: "feed_article_open"; itemId: string; origin: FeedOpenOrigin; position: number };
+  | { name: "feed_article_open"; itemId: string; origin: FeedOpenOrigin; position: number }
+  // HOM-04 §134–135: gestione del contenuto. Solo id, tipo, tipo identità
+  // autrice e provenienza: mai il testo del Post.
+  | ({ name: "content_menu_open" } & ContentAnalyticsProps)
+  | ({ name: "edit_selected" } & ContentAnalyticsProps)
+  | ({ name: "insights_selected" } & ContentAnalyticsProps)
+  | ({ name: "delete_selected" } & ContentAnalyticsProps)
+  | ({ name: "delete_cancelled" } & ContentAnalyticsProps)
+  | ({ name: "delete_confirmed" } & ContentAnalyticsProps)
+  | ({ name: "delete_success" } & ContentAnalyticsProps)
+  | ({ name: "delete_failed" } & ContentAnalyticsProps);
+
+/** HOM-04 §135: le sole proprietà ammesse sugli eventi di gestione. */
+export type ContentAnalyticsProps = {
+  contentId: string;
+  contentType: FeedContentType;
+  authorIdentityType: FeedIdentityType;
+  origin: ContentOrigin | null;
+};
 
 /** Dove gira il player: il Feed o il dettaglio del contenuto. */
 export type FeedVideoSurface = "feed" | "detail";

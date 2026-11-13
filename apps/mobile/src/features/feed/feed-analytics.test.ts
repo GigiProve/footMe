@@ -50,6 +50,13 @@ describe("trackEvent", () => {
   });
 });
 
+const CONTENT_PROPS = {
+  authorIdentityType: "society",
+  contentId: "p-1",
+  contentType: "club_media",
+  origin: "HOME_PER_TE",
+} as const;
+
 describe("trackFeed", () => {
   /**
    * Copertura 1:1 dell'elenco del §25. Se un evento richiesto sparisce dalla
@@ -112,6 +119,15 @@ describe("trackFeed", () => {
     { itemId: "p:1", mediaId: "m-1", name: "feed_video_retry" },
     { itemId: "a:1", name: "feed_article_impression" },
     { itemId: "a:1", name: "feed_article_open", origin: "feed", position: 4 },
+    // HOM-04 §134–135: solo id, tipo, identità autrice e origine
+    { ...CONTENT_PROPS, name: "content_menu_open" },
+    { ...CONTENT_PROPS, name: "edit_selected" },
+    { ...CONTENT_PROPS, name: "insights_selected" },
+    { ...CONTENT_PROPS, name: "delete_selected" },
+    { ...CONTENT_PROPS, name: "delete_cancelled" },
+    { ...CONTENT_PROPS, name: "delete_confirmed" },
+    { ...CONTENT_PROPS, name: "delete_success" },
+    { ...CONTENT_PROPS, name: "delete_failed" },
   ];
 
   it.each(cases.map((event) => [event.name, event] as const))(
@@ -126,6 +142,19 @@ describe("trackFeed", () => {
       expect(events[0].props).not.toHaveProperty("name");
     },
   );
+
+  it("gli eventi di gestione portano solo le quattro proprietà del §135", () => {
+    const events = collect();
+
+    trackFeed({ ...CONTENT_PROPS, name: "delete_success" });
+
+    expect(Object.keys(events[0].props ?? {}).sort()).toEqual([
+      "authorIdentityType",
+      "contentId",
+      "contentType",
+      "origin",
+    ]);
+  });
 
   it("copre tutti gli eventi richiesti dal §25", () => {
     const required = [
@@ -173,6 +202,15 @@ describe("trackFeed", () => {
       "feed_video_retry",
       "feed_article_impression",
       "feed_article_open",
+      // HOM-04 §134
+      "content_menu_open",
+      "edit_selected",
+      "insights_selected",
+      "delete_selected",
+      "delete_cancelled",
+      "delete_confirmed",
+      "delete_success",
+      "delete_failed",
     ];
 
     const covered = new Set(cases.map((event) => event.name));

@@ -12,6 +12,7 @@
  */
 
 import { supabase } from "../../lib/supabase";
+import { contentDetailHref, type ContentOrigin } from "./content-routes";
 import {
   asFeedContentType,
   readAuthorMeta,
@@ -242,6 +243,7 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
         commentsCount: readCount(row.data, "comments_count"),
         isLiked: readBoolean(row.data, "is_liked"),
         capabilities: readCapabilities(row.data, postType),
+        version: readString(row.data, "version"),
       },
     };
   }
@@ -289,6 +291,7 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
       commentsCount: readCount(row.data, "comments_count"),
       isLiked: readBoolean(row.data, "is_liked"),
       capabilities: readCapabilities(row.data, contentType),
+      version: readString(row.data, "version"),
     },
   };
 }
@@ -356,7 +359,10 @@ export async function fetchHomeFeedPage({
  * li renderebbe impossibili da rinominare. Stesso principio di
  * `resolveMediaContentHref`.
  */
-export function resolveFeedItemHref(item: FeedItem): string | null {
+export function resolveFeedItemHref(
+  item: FeedItem,
+  origin: ContentOrigin | null = null,
+): string | null {
   if (!item.nav) {
     return null;
   }
@@ -372,12 +378,13 @@ export function resolveFeedItemHref(item: FeedItem): string | null {
     return null;
   }
 
-  const href = `/content/${contentType}/${postId}`;
-  // HOM-03 §49: il dettaglio editoriale riceve origine e posizione nel Feed.
-  // Parametri additivi: il dettaglio che non li legge apre lo stesso contenuto.
-  return item.type === "article" || item.type === "video"
-    ? `${href}?origin=feed&position=${item.rank}`
-    : href;
+  // HOM-04 §122: ogni apertura dal Feed porta la provenienza (la tab). HOM-03
+  // §49: il dettaglio editoriale riceve anche la posizione. Parametri additivi:
+  // il dettaglio che non li legge apre lo stesso contenuto.
+  return contentDetailHref(contentType as FeedContentType, postId, {
+    origin,
+    position: item.type === "article" || item.type === "video" ? item.rank : undefined,
+  });
 }
 
 /** Autore/fonte -> profilo pubblico o scheda società. */
@@ -550,8 +557,12 @@ export function resolveIdentityHref(target: {
  * HOM-02 §35 (Luigi 2026-11-11: niente viewer nuovo): il tap su un media apre
  * il dettaglio del contenuto con l'indice selezionato.
  */
-export function resolvePostMediaHref(item: FeedContentItem, index: number): string {
-  return `/content/${item.payload.contentType}/${item.payload.postId}?media=${index}`;
+export function resolvePostMediaHref(
+  item: FeedContentItem,
+  index: number,
+  origin: ContentOrigin | null = null,
+): string {
+  return contentDetailHref(item.payload.contentType, item.payload.postId, { media: index, origin });
 }
 
 type ProfilePostDetailJson = {

@@ -237,6 +237,7 @@ export function makePostItem(
       postId: "p1",
       tagged: [],
       text: "Testo del post.",
+      version: null,
       ...payloadOverrides,
     },
     ...overrides,
@@ -278,6 +279,7 @@ function makeEditorialPayload(
     postId: "a1",
     summary: null,
     thumbnailUrl: null,
+    version: null,
     ...overrides,
   };
 }

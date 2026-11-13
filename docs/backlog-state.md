@@ -124,7 +124,15 @@ Il messaggio di commit usa il codice task: `DAS-REV-25 - Shortlist Position: agg
   un video alla volta, pausa su viewport/tab/blur/background); Mi piace reale
   anche su `media_profile` (`media_profile_post_likes`); poll centrale con
   backoff (`fetch_content_media_states`) per i media in elaborazione;
-  `variants`/`captions` predisposti senza pipeline. Da fare: creazione post e bozze
+  `variants`/`captions` predisposti senza pipeline. HOM-04: menu ••• guidato da
+  capability server (`footme_content_rights`/`content_manage_capabilities`;
+  Società via le chiavi di catalogo `content_edit`/`content_delete`/
+  `content_insights`, area `published_content`), soft delete con stato
+  `deleted` solo tramite `delete_content` (idempotente, audit in
+  `content_management_audit`, DELETE diretto chiuso), stato generico
+  «Contenuto non disponibile» distinto dall'errore di rete, `ContentOrigin`
+  nei link del Feed. Modifica e Dettagli e statistiche rispondono «in arrivo»
+  finché HOM-06.1/06.2 e HOM-05 non esistono (`content-routes.ts`). Da fare: creazione post e bozze
   (HOM-06.1 scriverà su quelle tabelle), salvataggi dei post persona,
   commenti, condivisione, repost, segnalazioni, blocco profilo, ranking e
   discovery, notifiche social.

@@ -12,6 +12,7 @@
  * nulla invece di far crashare la Home su un client vecchio.
  */
 
+import type { ContentManagement } from "../content-management-types";
 import type {
   FeedEditorialItem,
   FeedItem,
@@ -73,6 +74,8 @@ export type FeedItemHandlers = {
   onOpenLink: (item: FeedPostItem) => void;
   onComment: (item: FeedInteractiveItem) => void;
   onShare: (item: FeedInteractiveItem) => void;
+  /** HOM-04: azioni di gestione per il menu •••, dalle capability dell'elemento. */
+  getManagement?: (item: FeedInteractiveItem) => ContentManagement | undefined;
 };
 
 type FeedItemRendererProps = {
@@ -87,6 +90,7 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
       return (
         <PostFeedItem
           item={item}
+          management={handlers.getManagement?.(item)}
           onPress={() => handlers.onOpenItem(item)}
           onPressAuthor={() => handlers.onOpenAuthor(item)}
           onToggleSaved={() => handlers.onToggleSaved(item)}
@@ -105,6 +109,7 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
       return (
         <ArticleFeedPreview
           item={item}
+          management={handlers.getManagement?.(item)}
           onComment={() => handlers.onComment(item)}
           onPress={() => handlers.onOpenItem(item)}
           onPressAuthor={() => handlers.onOpenAuthor(item)}
@@ -118,6 +123,7 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
       return (
         <EditorialVideoFeedItem
           item={item}
+          management={handlers.getManagement?.(item)}
           onComment={() => handlers.onComment(item)}
           onPress={() => handlers.onOpenItem(item)}
           onPressAuthor={() => handlers.onOpenAuthor(item)}

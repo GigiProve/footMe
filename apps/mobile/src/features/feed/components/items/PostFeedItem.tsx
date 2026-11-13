@@ -31,6 +31,7 @@ import {
   postBodyText,
   summarizeTagged,
 } from "../../feed-post-presentation";
+import type { ContentManagement } from "../../content-management-types";
 import { FEED_POST_OPEN_AUTHOR_HINT } from "../../feed-labels";
 import type { FeedPostItem } from "../../feed-types";
 import type { FeedIdentityTarget } from "../FeedItemRenderer";
@@ -61,6 +62,8 @@ type PostFeedItemProps = {
   onMediaLayout?: (index: number, y: number) => void;
   /** HOM-03: nel dettaglio, il video toccato nel Feed parte inline, una volta sola. */
   autoStartMediaIndex?: number | null;
+  /** HOM-04: azioni di gestione dal server, per il menu •••. Assente = nessuna. */
+  management?: ContentManagement;
 };
 
 export function PostFeedItem({
@@ -77,6 +80,7 @@ export function PostFeedItem({
   mediaVariant = "grid",
   onMediaLayout,
   autoStartMediaIndex = null,
+  management,
 }: PostFeedItemProps) {
   const { payload } = item;
   const body = postBodyText(payload);
@@ -109,6 +113,7 @@ export function PostFeedItem({
             canSave={payload.capabilities.canSave}
             isSaved={item.isSaved}
             itemType={item.type}
+            management={management}
             onToggleSaved={onToggleSaved}
           />
         }

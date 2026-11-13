@@ -12,6 +12,7 @@
 import { StyleSheet, View } from "react-native";
 
 import { spacing } from "../../../../theme/tokens";
+import type { ContentManagement } from "../../content-management-types";
 import { FEED_POST_OPEN_AUTHOR_HINT } from "../../feed-labels";
 import {
   buildEditorialAccessibilityLabel,
@@ -26,9 +27,16 @@ type EditorialHeaderProps = {
   item: FeedEditorialItem;
   onPressAuthor: () => void;
   onToggleSaved: () => void;
+  /** HOM-04: azioni di gestione dal server (Articolo → «articolo», video → «contenuto»). */
+  management?: ContentManagement;
 };
 
-export function EditorialHeader({ item, onPressAuthor, onToggleSaved }: EditorialHeaderProps) {
+export function EditorialHeader({
+  item,
+  management,
+  onPressAuthor,
+  onToggleSaved,
+}: EditorialHeaderProps) {
   const line = { publishedAt: item.publishedAt, type: item.type };
 
   return (
@@ -56,6 +64,7 @@ export function EditorialHeader({ item, onPressAuthor, onToggleSaved }: Editoria
             canSave={false}
             isSaved={item.isSaved}
             itemType={item.type}
+            management={management}
             onToggleSaved={onToggleSaved}
           />
         </View>

@@ -34,7 +34,14 @@ import {
 } from "../../../src/features/profiles/fan-media-service";
 import { ContentDetailMedia } from "../../../src/features/feed/components/detail/ContentDetailMedia";
 import { ContentLikeControl } from "../../../src/features/feed/components/detail/ContentLikeControl";
+import {
+  ContentLoadErrorState,
+  ContentUnavailableState,
+} from "../../../src/features/feed/components/ContentUnavailableState";
 import { ProfilePostDetail } from "../../../src/features/feed/components/ProfilePostDetail";
+import { classifyContentError } from "../../../src/features/feed/content-availability-presentation";
+import { parseContentOrigin, type ContentOrigin } from "../../../src/features/feed/content-routes";
+import { useBackToFeed } from "../../../src/features/feed/use-back-to-feed";
 import { createFeedVideoController } from "../../../src/features/feed/feed-video-controller";
 import { legacyVideoMedia } from "../../../src/features/feed/feed-video-presentation";
 import type { FeedContentType, FeedMediaItem } from "../../../src/features/feed/feed-types";
@@ -327,14 +334,22 @@ function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentVi
  * (§109); le cinque sorgenti CER-05 restano sul dettaglio storico qui sotto.
  */
 export default function ContentDetailRoute() {
-  const { id, media, type } = useLocalSearchParams<{ id: string; media?: string; type: string }>();
+  const { id, media, origin, type } = useLocalSearchParams<{
+    id: string;
+    media?: string;
+    origin?: string;
+    type: string;
+  }>();
   // `Number("")` è 0: un `?media=` vuoto non è un tap su un media.
   const mediaIndex = media ? Number(media) : Number.NaN;
+  // HOM-04 §122: la provenienza passata dal Feed; assente = ci si affida al Back.
+  const contentOrigin = parseContentOrigin(origin);
 
   if (type === "profile_post" && id) {
     return (
       <ProfilePostDetail
         initialMediaIndex={Number.isInteger(mediaIndex) && mediaIndex >= 0 ? mediaIndex : null}
+        origin={contentOrigin}
         postId={id}
       />
     );
@@ -342,11 +357,20 @@ export default function ContentDetailRoute() {
 
   // §35: `?media=N` dal Feed = tap già avvenuto sul video, parte una volta sola.
   return (
-    <ContentDetailScreen autoStartVideo={Number.isInteger(mediaIndex) && mediaIndex >= 0} />
+    <ContentDetailScreen
+      autoStartVideo={Number.isInteger(mediaIndex) && mediaIndex >= 0}
+      origin={contentOrigin}
+    />
   );
 }
 
-function ContentDetailScreen({ autoStartVideo }: { autoStartVideo: boolean }) {
+function ContentDetailScreen({
+  autoStartVideo,
+  origin,
+}: {
+  autoStartVideo: boolean;
+  origin: ContentOrigin | null;
+}) {
   // Controller locale al dettaglio: un solo video alla volta, pausa su
   // background e uscita dalla schermata.
   const [videoController] = useState(createFeedVideoController);
@@ -354,12 +378,18 @@ function ContentDetailScreen({ autoStartVideo }: { autoStartVideo: boolean }) {
 
   return (
     <FeedVideoProvider controller={videoController}>
-      <ContentDetailBody autoStartVideo={autoStartVideo} />
+      <ContentDetailBody autoStartVideo={autoStartVideo} origin={origin} />
     </FeedVideoProvider>
   );
 }
 
-function ContentDetailBody({ autoStartVideo }: { autoStartVideo: boolean }) {
+function ContentDetailBody({
+  autoStartVideo,
+  origin,
+}: {
+  autoStartVideo: boolean;
+  origin: ContentOrigin | null;
+}) {
   const { id, type } = useLocalSearchParams<{ id: string; type: string }>();
   const { profile } = useSession();
   const router = useRouter();
@@ -376,7 +406,9 @@ function ContentDetailBody({ autoStartVideo }: { autoStartVideo: boolean }) {
   const [mediaTribunaPost, setMediaTribunaPost] =
     useState<MediaTribunaPost | null>(null);
   const [isLoading, setLoading] = useState(true);
+  const [failure, setFailure] = useState<"unavailable" | "error" | null>(null);
   const [isManageOpen, setManageOpen] = useState(false);
+  const backToFeed = useBackToFeed(origin);
 
   const contentType = type as ContentDetailType;
   const taggableType = asTaggedContentType(contentType);
@@ -389,6 +421,7 @@ function ContentDetailBody({ autoStartVideo }: { autoStartVideo: boolean }) {
     }
 
     setLoading(true);
+    setFailure(null);
     setMediaPost(null);
     setMediaTribunaPost(null);
 
@@ -418,7 +451,10 @@ function ContentDetailBody({ autoStartVideo }: { autoStartVideo: boolean }) {
         setMediaPost(post);
         setContent(post ? mapMediaProfile(post, viewerId) : null);
       }
-    } catch {
+    } catch (error) {
+      // HOM-04 §66–68: un guasto di rete NON è «contenuto non disponibile».
+      // Solo una risposta definitiva lo è; il resto offre «Riprova».
+      setFailure(classifyContentError(error));
       setContent(null);
       setFanPost(null);
       setMediaPost(null);
@@ -482,12 +518,11 @@ function ContentDetailBody({ autoStartVideo }: { autoStartVideo: boolean }) {
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
       ) : !content ? (
-        <View style={styles.centered}>
-          <AppText color="secondary" variant="bodyLg">
-            Contenuto non disponibile.
-          </AppText>
-          <Button label="Torna indietro" onPress={() => router.back()} variant="secondary" />
-        </View>
+        failure === "error" ? (
+          <ContentLoadErrorState onRetry={load} />
+        ) : (
+          <ContentUnavailableState onBackToFeed={backToFeed} />
+        )
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
           {content.video || content.coverUrl ? (

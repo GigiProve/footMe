@@ -38,6 +38,7 @@ import {
 } from "../../feed-video-presentation";
 import type { FeedArticleItem } from "../../feed-types";
 import { PostActionRow } from "../post/PostActionRow";
+import type { ContentManagement } from "../../content-management-types";
 import { EditorialHeader } from "./EditorialHeader";
 import { FeedItemFrame } from "./FeedItemFrame";
 
@@ -49,10 +50,12 @@ type ArticleFeedPreviewProps = {
   onToggleLike: () => void;
   onComment: () => void;
   onShare: () => void;
+  management?: ContentManagement;
 };
 
 export function ArticleFeedPreview({
   item,
+  management,
   onPress,
   onPressAuthor,
   onToggleSaved,
@@ -84,6 +87,7 @@ export function ArticleFeedPreview({
     <FeedItemFrame testID="feed-article">
       <EditorialHeader
         item={item}
+        management={management}
         onPressAuthor={onPressAuthor}
         onToggleSaved={onToggleSaved}
       />

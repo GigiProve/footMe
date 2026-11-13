@@ -50,6 +50,8 @@ import {
   useToggleFollowSuggestion,
   useToggleSavedFeedItem,
 } from "../use-feed-item-actions";
+import { originForScope } from "../content-routes";
+import { useContentManagement } from "../use-content-management";
 import { useToggleFeedPostLike } from "../use-feed-post-like";
 import { useFeedNewContent } from "../use-feed-new-content";
 import { useFeedScrollRestore } from "../use-feed-scroll-restore";
@@ -98,6 +100,7 @@ export function FeedPane({
   const toggleSaved = useToggleSavedFeedItem({ profileId, scope });
   const toggleFollow = useToggleFollowSuggestion({ profileId, scope });
   const toggleLike = useToggleFeedPostLike({ profileId });
+  const manageContent = useContentManagement({ profileId });
   const videoController = useFeedVideoController();
   const mediaProcessing = useFeedMediaProcessing({ enabled: isActive, profileId });
   const { showToast } = useToast();
@@ -171,7 +174,7 @@ export function FeedPane({
           position: item.rank,
         });
       }
-      openHref(resolveFeedItemHref(item));
+      openHref(resolveFeedItemHref(item, originForScope(scope)));
     },
     onOpenAuthor: (item: FeedItem) => {
       if (item.type === "post" && item.author) {
@@ -207,6 +210,8 @@ export function FeedPane({
       });
     },
     onToggleLike: toggleLike,
+    // HOM-04: le capability di gestione arrivano dal server, mai dal ruolo.
+    getManagement: (item: FeedInteractiveItem) => manageContent(item, originForScope(scope)),
     onOpenMedia: (item: FeedPostItem, index: number) => {
       const media = item.payload.media[index];
       if (!media) {
@@ -218,7 +223,7 @@ export function FeedPane({
         mediaType: media.type,
         name: "feed_post_media_open",
       });
-      openHref(resolvePostMediaHref(item, index));
+      openHref(resolvePostMediaHref(item, index, originForScope(scope)));
     },
     onOpenIdentity: (item: FeedPostItem, target: FeedIdentityTarget) => {
       if (target.identityType !== "team") {

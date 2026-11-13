@@ -26,9 +26,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Screen } from "../../../components/ui/screen";
 import { useSession } from "../../auth/use-session";
 import { colors, spacing } from "../../../theme/tokens";
-import { AppText, Button, useToast } from "../../../ui";
+import { AppText, useToast } from "../../../ui";
+import { normalizeContentAvailability } from "../content-availability-presentation";
+import type { ContentManagement } from "../content-management-types";
+import type { ContentOrigin } from "../content-routes";
 import { FEED_QK } from "../feed-keys";
-import { FEED_ERROR_BODY, FEED_RETRY, FEED_SOON_MESSAGES } from "../feed-labels";
+import { FEED_SOON_MESSAGES } from "../feed-labels";
+import { useBackToFeed } from "../use-back-to-feed";
+import { useContentManagement } from "../use-content-management";
 import {
   fetchProfilePostDetail,
   resolveFeedAuthorHref,
@@ -38,20 +43,42 @@ import { createFeedVideoController } from "../feed-video-controller";
 import { useToggleFeedPostLike } from "../use-feed-post-like";
 import { FeedVideoProvider } from "../use-feed-video";
 import { useFeedVideoLifecycle } from "../use-feed-video-lifecycle";
+import { ContentLoadErrorState, ContentUnavailableState } from "./ContentUnavailableState";
 import { PostFeedItem } from "./items/PostFeedItem";
+
+/**
+ * HOM-04 §47: eliminato dal dettaglio, il contenuto non c'è più nella superficie
+ * corrente — si esce dalla schermata invece di lasciare uno stato vuoto.
+ */
+function detailManagement(management: ContentManagement, leave: () => void): ContentManagement {
+  return {
+    ...management,
+    onDelete: async () => {
+      const outcome = await management.onDelete();
+      if (outcome === "removed") {
+        leave();
+      }
+      return outcome;
+    },
+  };
+}
 
 export function ProfilePostDetail({
   postId,
   initialMediaIndex = null,
+  origin = null,
 }: {
   postId: string;
   /** §35: il media toccato nel Feed, portato in vista una sola volta. */
   initialMediaIndex?: number | null;
+  /** HOM-04 §122: da dove si è aperto il dettaglio. Assente = si affida al Back. */
+  origin?: ContentOrigin | null;
 }) {
   const router = useRouter();
   const { profile } = useSession();
   const { showToast } = useToast();
   const toggleLike = useToggleFeedPostLike({ profileId: profile?.id ?? "" });
+  const manageContent = useContentManagement({ profileId: profile?.id ?? "" });
   const [videoController] = useState(createFeedVideoController);
   useFeedVideoLifecycle(videoController);
   const scrollRef = useRef<ScrollView>(null);
@@ -63,6 +90,12 @@ export function ProfilePostDetail({
     queryKey: FEED_QK.postDetail(postId),
   });
   const item = query.data ?? null;
+  const availability = normalizeContentAvailability({
+    data: query.data,
+    error: query.error,
+    isError: query.isError,
+  });
+  const backToFeed = useBackToFeed(origin);
 
   return (
     <FeedVideoProvider controller={videoController}>
@@ -87,27 +120,20 @@ export function ProfilePostDetail({
           <View style={styles.centered}>
             <ActivityIndicator color={colors.accent} size="large" />
           </View>
-        ) : query.isError ? (
-          // Un errore di rete non è un contenuto sparito: si offre il riprova.
-          <View style={styles.centered}>
-            <AppText color="secondary" variant="bodyLg">
-              {FEED_ERROR_BODY}
-            </AppText>
-            <Button label={FEED_RETRY} onPress={() => void query.refetch()} variant="secondary" />
-          </View>
-        ) : !item ? (
-          // §78: un contenuto non più disponibile non si mostra come normale Post.
-          <View style={styles.centered}>
-            <AppText color="secondary" variant="bodyLg">
-              Contenuto non disponibile.
-            </AppText>
-            <Button label="Torna indietro" onPress={() => router.back()} variant="secondary" />
-          </View>
+        ) : availability.status === "error" ? (
+          // HOM-04 §67–68: un errore di rete non è un contenuto sparito.
+          <ContentLoadErrorState onRetry={() => void query.refetch()} />
+        ) : availability.status === "unavailable" || !item ? (
+          // §78, HOM-04 §55: un contenuto non più disponibile non si mostra come Post.
+          <ContentUnavailableState onBackToFeed={backToFeed} />
         ) : (
           <ScrollView contentContainerStyle={styles.scroll} ref={scrollRef}>
             <PostFeedItem
               autoStartMediaIndex={initialMediaIndex}
               item={item}
+              management={detailManagement(manageContent(item, origin ?? "DEEP_LINK"), () =>
+                router.back(),
+              )}
               mediaVariant="list"
               onComment={() => showToast({ message: FEED_SOON_MESSAGES.comment })}
               onMediaLayout={(index, y) => {

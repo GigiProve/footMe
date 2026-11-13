@@ -26,6 +26,7 @@ import {
 import type { FeedVideoItem } from "../../feed-types";
 import { PostActionRow } from "../post/PostActionRow";
 import { VideoMedia } from "../video/VideoMedia";
+import type { ContentManagement } from "../../content-management-types";
 import { EditorialHeader } from "./EditorialHeader";
 import { FeedItemFrame } from "./FeedItemFrame";
 
@@ -37,10 +38,12 @@ type EditorialVideoFeedItemProps = {
   onToggleLike: () => void;
   onComment: () => void;
   onShare: () => void;
+  management?: ContentManagement;
 };
 
 export function EditorialVideoFeedItem({
   item,
+  management,
   onPress,
   onPressAuthor,
   onToggleSaved,
@@ -57,6 +60,7 @@ export function EditorialVideoFeedItem({
     <FeedItemFrame testID="feed-editorial-video">
       <EditorialHeader
         item={item}
+        management={management}
         onPressAuthor={onPressAuthor}
         onToggleSaved={onToggleSaved}
       />
