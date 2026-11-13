@@ -10,6 +10,8 @@ import {
   type TargetType,
 } from "./content-tag-service";
 import type { MediaContentItem } from "../profiles/career/MediaTabContent";
+import { contentDetailHref } from "../feed/content-routes";
+import type { FeedContentType } from "../feed/feed-types";
 
 /**
  * Shared shape returned by the paginated tagged-content hooks: the flattened,
@@ -181,7 +183,12 @@ function useOpenTaggedItem() {
 
   return useCallback(
     (ref: { contentType: string; postId: string }) => {
-      router.push(`/content/${ref.contentType}/${ref.postId}` as never);
+      // HOM-05 D4: la provenienza Profilo, per la source degli eventi.
+      router.push(
+        contentDetailHref(ref.contentType as FeedContentType, ref.postId, {
+          origin: "PROFILE",
+        }) as never,
+      );
     },
     [router],
   );

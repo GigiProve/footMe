@@ -428,11 +428,11 @@ describe("resolveGlobalSearchHref", () => {
       resolveGlobalSearchHref(
         makeGlobalRow({ target_type: "club_media", target_id: "m1" }),
       ),
-    ).toBe("/content/club_media/m1");
+    ).toBe("/content/club_media/m1?origin=SEARCH");
     expect(
       resolveGlobalSearchHref(
         makeGlobalRow({ target_type: "fan_tribuna", target_id: "f1" }),
       ),
-    ).toBe("/content/fan_tribuna/f1");
+    ).toBe("/content/fan_tribuna/f1?origin=SEARCH");
   });
 });

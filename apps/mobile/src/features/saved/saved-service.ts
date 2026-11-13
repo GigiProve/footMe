@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { contentDetailHref } from "../feed/content-routes";
 import { toggleSavedAd } from "../recruiting/recruiting-service";
 import { toggleSavedMediaTribuna } from "../profiles/media-tribuna-service";
 import { toggleSavedClubMedia } from "../clubs/club-media-service";
@@ -341,7 +342,8 @@ export function resolveSavedItemHref(item: SavedItem): string | null {
       return `/club/team/${item.entity_id}`;
     case "content":
       return item.content_type && ROUTABLE_CONTENT_TYPES.has(item.content_type)
-        ? `/content/${item.content_type}/${item.entity_id}`
+        ? // HOM-05 D4: la provenienza Salvati, per la source degli eventi (→ OTHER).
+          contentDetailHref(item.content_type, item.entity_id, { origin: "SAVED" })
         : null;
     case "position":
     default:

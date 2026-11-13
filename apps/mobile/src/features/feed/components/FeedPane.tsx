@@ -23,6 +23,15 @@ import { useQuery } from "@tanstack/react-query";
 
 import { spacing } from "../../../theme/tokens";
 import { useToast } from "../../../ui";
+import {
+  authorOpenEventType,
+  identityOpenEvent,
+  sourceForScope,
+} from "../../content-insights/content-events-presentation";
+import {
+  emitContentEvent,
+  rememberContentSource,
+} from "../../content-insights/content-events-service";
 import { trackFeed } from "../feed-analytics";
 import type { CachedFeed } from "../feed-cache";
 import { FEED_QK } from "../feed-keys";
@@ -34,12 +43,13 @@ import {
   resolveIdentityHref,
   resolvePostMediaHref,
 } from "../feed-service";
-import type {
-  FeedItem,
-  FeedPostItem,
-  FeedScope,
-  FeedSuggestedClubRow,
-  FeedSuggestedProfileRow,
+import {
+  isContentItem,
+  type FeedItem,
+  type FeedPostItem,
+  type FeedScope,
+  type FeedSuggestedClubRow,
+  type FeedSuggestedProfileRow,
 } from "../feed-types";
 import { useFeed } from "../use-feed";
 import { useFeedMediaProcessing } from "../use-feed-media-processing";
@@ -177,6 +187,16 @@ export function FeedPane({
       openHref(resolveFeedItemHref(item, originForScope(scope)));
     },
     onOpenAuthor: (item: FeedItem) => {
+      // HOM-05 §55: l'apertura dell'autore dal contenuto; una Società è
+      // `society_open`, un profilo `author_profile_open`.
+      if (isContentItem(item) && item.author) {
+        emitContentEvent({
+          contentType: item.payload.contentType,
+          eventType: authorOpenEventType(item.author.kind),
+          postId: item.payload.postId,
+          source: sourceForScope(scope),
+        });
+      }
       if (item.type === "post" && item.author) {
         trackFeed({
           identityType: item.payload.authorIdentityType,
@@ -226,6 +246,15 @@ export function FeedPane({
       openHref(resolvePostMediaHref(item, index, originForScope(scope)));
     },
     onOpenIdentity: (item: FeedPostItem, target: FeedIdentityTarget) => {
+      // HOM-05 §56: mention e tag; una Società aperta è `society_open`.
+      const opened = identityOpenEvent(target.identityType);
+      emitContentEvent({
+        contentType: item.payload.contentType,
+        eventType: opened.eventType,
+        postId: item.payload.postId,
+        props: opened.props,
+        source: sourceForScope(scope),
+      });
       if (target.identityType !== "team") {
         trackFeed({
           identityType: target.identityType,
@@ -425,7 +454,28 @@ export function FeedPane({
         onEndReached={feed.loadNextPage}
         onItemsViewed={(visible) => {
           for (const item of visible) {
+            // HOM-05 §146: la source di ogni contenuto a schermo, anche se già
+            // visto, serve agli eventi successivi (video) che non conoscono la tab.
+            if (isContentItem(item)) {
+              rememberContentSource(
+                item.payload.contentType,
+                item.payload.postId,
+                sourceForScope(scope),
+              );
+            }
+
             if (seen.markSeen(item.id)) {
+              // HOM-05 §32–33: la stessa impression (≥50%, ≥350ms) va al server;
+              // il server deduplica per finestra, il registro di sessione resta.
+              if (isContentItem(item)) {
+                emitContentEvent({
+                  contentType: item.payload.contentType,
+                  eventType: "impression",
+                  postId: item.payload.postId,
+                  source: sourceForScope(scope),
+                });
+              }
+
               trackFeed({
                 itemId: item.id,
                 itemType: item.type,

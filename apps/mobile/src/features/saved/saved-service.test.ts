@@ -91,27 +91,27 @@ describe("resolveSavedItemHref", () => {
       resolveSavedItemHref(
         makeItem({ kind: "content", content_type: "club_media", entity_id: "x" }),
       ),
-    ).toBe("/content/club_media/x");
+    ).toBe("/content/club_media/x?origin=SAVED");
     expect(
       resolveSavedItemHref(
         makeItem({ kind: "content", content_type: "fan_tribuna", entity_id: "y" }),
       ),
-    ).toBe("/content/fan_tribuna/y");
+    ).toBe("/content/fan_tribuna/y?origin=SAVED");
     expect(
       resolveSavedItemHref(
         makeItem({ kind: "content", content_type: "media_tribuna", entity_id: "z" }),
       ),
-    ).toBe("/content/media_tribuna/z");
+    ).toBe("/content/media_tribuna/z?origin=SAVED");
     expect(
       resolveSavedItemHref(
         makeItem({ kind: "content", content_type: "media_profile", entity_id: "w" }),
       ),
-    ).toBe("/content/media_profile/w");
+    ).toBe("/content/media_profile/w?origin=SAVED");
     expect(
       resolveSavedItemHref(
         makeItem({ kind: "content", content_type: "fan_media", entity_id: "v" }),
       ),
-    ).toBe("/content/fan_media/v");
+    ).toBe("/content/fan_media/v?origin=SAVED");
   });
 
   it("returns null for content without a type and for saved positions", () => {

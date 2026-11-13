@@ -27,6 +27,13 @@ import { Screen } from "../../../components/ui/screen";
 import { useSession } from "../../auth/use-session";
 import { colors, spacing } from "../../../theme/tokens";
 import { AppText, useToast } from "../../../ui";
+import {
+  authorOpenEventType,
+  identityOpenEvent,
+  sourceForOrigin,
+} from "../../content-insights/content-events-presentation";
+import { emitContentEvent } from "../../content-insights/content-events-service";
+import { useContentDetailEvents } from "../../content-insights/use-content-detail-events";
 import { normalizeContentAvailability } from "../content-availability-presentation";
 import type { ContentManagement } from "../content-management-types";
 import type { ContentOrigin } from "../content-routes";
@@ -97,6 +104,16 @@ export function ProfilePostDetail({
   });
   const backToFeed = useBackToFeed(origin);
 
+  // HOM-05 §146: l'apertura del dettaglio è un'impression con la source della
+  // provenienza; solo a contenuto davvero mostrato.
+  useContentDetailEvents({
+    contentType: "profile_post",
+    isArticle: false,
+    isReady: !!item && availability.status === "ready",
+    origin,
+    postId,
+  });
+
   return (
     <FeedVideoProvider controller={videoController}>
       <Screen>
@@ -142,7 +159,18 @@ export function ProfilePostDetail({
                   scrollRef.current?.scrollTo({ animated: false, y: Math.max(0, y - spacing[16]) });
                 }
               }}
-              onOpenIdentity={(target) => router.push(resolveIdentityHref(target) as never)}
+              onOpenIdentity={(target) => {
+                // HOM-05 §56: mention e tag; una Società è `society_open`.
+                const opened = identityOpenEvent(target.identityType);
+                emitContentEvent({
+                  contentType: "profile_post",
+                  eventType: opened.eventType,
+                  postId,
+                  props: opened.props,
+                  source: sourceForOrigin(origin),
+                });
+                router.push(resolveIdentityHref(target) as never);
+              }}
               onOpenLink={() => {
                 const url = item.payload.linkPreview?.url;
                 if (url && /^https:\/\//i.test(url)) {
@@ -154,6 +182,15 @@ export function ProfilePostDetail({
               onOpenMedia={() => undefined}
               onPress={() => undefined}
               onPressAuthor={() => {
+                if (item.author) {
+                  // HOM-05 §55.
+                  emitContentEvent({
+                    contentType: "profile_post",
+                    eventType: authorOpenEventType(item.author.kind),
+                    postId,
+                    source: sourceForOrigin(origin),
+                  });
+                }
                 const href = resolveFeedAuthorHref(item);
                 if (href) {
                   router.push(href as never);

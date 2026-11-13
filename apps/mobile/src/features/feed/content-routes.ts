@@ -2,10 +2,10 @@
  * Destinazioni e provenienza dei contenuti (HOM-04 §34–37, §122–127).
  *
  * Un file solo per le destinazioni di gestione (Luigi 2026-11-13): Modifica
- * (HOM-06.1 / HOM-06.2) e Dettagli e statistiche (HOM-05) non esistono ancora,
- * quindi oggi la destinazione è `null` e il chiamante risponde «in arrivo».
- * Quando le schermate esistono si cambia solo questo file: i parametri (§34,
- * §37) sono già preparati. Nessuna schermata segnaposto.
+ * (HOM-06.1 / HOM-06.2) non esiste ancora, quindi la destinazione è `null` e il
+ * chiamante risponde «in arrivo». Dettagli e statistiche (HOM-05) esiste: la sua
+ * href vive in `content-insights/insights-routes.ts`. Nessuna schermata
+ * segnaposto.
  *
  * `ContentOrigin` è il contesto di navigazione che ogni apertura porta con sé
  * (§122). Il Feed lo passa per ogni elemento; le altre superfici non lo
@@ -13,6 +13,7 @@
  * modificano le ~20 superfici che aprono `/content/...`.
  */
 
+import { contentInsightsHref } from "../content-insights/insights-routes";
 import type { FeedContentType, FeedIdentityType, FeedScope } from "./feed-types";
 
 export const CONTENT_ORIGINS = [
@@ -78,10 +79,13 @@ export function editContentHref(params: ContentManageParams): string | null {
   return null;
 }
 
-/** Destinazione di Dettagli e statistiche (HOM-05): non esiste ancora. */
-export function viewInsightsHref(params: ContentManageParams): string | null {
-  void params;
-  return null;
+/**
+ * Destinazione di Dettagli e statistiche (HOM-05 §3, §10): la route radice
+ * `/content/insights/[type]/[id]` con la provenienza, perché il Back torni
+ * alla superficie di partenza. Il permesso lo rivalida il server (§5).
+ */
+export function viewInsightsHref(params: ContentManageParams): string {
+  return contentInsightsHref(params.content_type, params.content_id, params.origin);
 }
 
 /** Il dettaglio contenuto con la provenienza (§122). */

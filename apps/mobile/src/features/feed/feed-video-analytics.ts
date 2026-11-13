@@ -12,8 +12,14 @@
  *
  * Una sessione per montaggio del player: rimontarlo (Riprova, ritorno nel
  * viewport dopo uno smontaggio) è una sessione nuova.
+ *
+ * HOM-05 §93–95, §147: gli stessi punti emettono anche gli eventi per contenuto
+ * verso il server (`video_play`, `video_progress` ai quartili e 100 al
+ * completamento, `video_watch` coi secondi attivi), con la source ricordata per
+ * il contenuto (vedi content-events-service.ts). La thumbnail non conta (§94).
  */
 
+import { emitContentEventForKey } from "../content-insights/content-events-service";
 import { trackFeed, type FeedVideoSurface } from "./feed-analytics";
 
 /** Oltre questo salto tra due letture di `currentTime` è un seek, non visione. */
@@ -64,6 +70,7 @@ export function createVideoAnalyticsSession(args: {
     watched = 0;
     if (seconds > 0) {
       trackFeed({ itemId, mediaId, name: "feed_video_watch", seconds });
+      emitContentEventForKey(itemId, "video_watch", { props: { mediaId, seconds } });
     }
   };
 
@@ -72,6 +79,7 @@ export function createVideoAnalyticsSession(args: {
       if (!started) {
         started = true;
         trackFeed({ itemId, mediaId, name: "feed_video_play", surface });
+        emitContentEventForKey(itemId, "video_play", { props: { mediaId } });
       }
       playing = true;
     },
@@ -101,6 +109,9 @@ export function createVideoAnalyticsSession(args: {
           sentQuartiles.add(quartile);
           if (watchedThrough) {
             trackFeed({ itemId, mediaId, name: "feed_video_progress", percent: quartile });
+            emitContentEventForKey(itemId, "video_progress", {
+              props: { mediaId, percent: quartile },
+            });
           }
         }
       }
@@ -114,6 +125,7 @@ export function createVideoAnalyticsSession(args: {
       if (started && !completed) {
         completed = true;
         trackFeed({ itemId, mediaId, name: "feed_video_complete" });
+        emitContentEventForKey(itemId, "video_progress", { props: { mediaId, percent: 100 } });
       }
     },
     onError() {

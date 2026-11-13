@@ -4,6 +4,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing, typography } from "../../../theme/tokens";
 import { AppText, Button, EmptyState } from "../../../ui";
+import { contentDetailHref } from "../../feed/content-routes";
+import type { FeedContentType } from "../../feed/feed-types";
 import type { TargetType } from "../content-tag-service";
 import { useTaggedContentForTarget } from "../use-tagged-content";
 
@@ -77,8 +79,13 @@ export function TaggedContentGrid({
             key={item.id}
             onPress={() => {
               if (item.taggedRef) {
+                // HOM-05 D4: la provenienza Profilo, per la source degli eventi.
                 router.push(
-                  `/content/${item.taggedRef.contentType}/${item.taggedRef.postId}` as never,
+                  contentDetailHref(
+                    item.taggedRef.contentType as FeedContentType,
+                    item.taggedRef.postId,
+                    { origin: "PROFILE" },
+                  ) as never,
                 );
               }
             }}

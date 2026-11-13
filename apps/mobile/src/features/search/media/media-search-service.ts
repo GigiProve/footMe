@@ -1,5 +1,6 @@
 import { supabase } from "../../../lib/supabase";
 import { followClub, unfollowClub } from "../../clubs/club-service";
+import { contentDetailHref } from "../../feed/content-routes";
 import { toggleSavedClubMedia } from "../../clubs/club-media-service";
 import {
   followProfile,
@@ -205,7 +206,8 @@ export function resolveMediaContentHref(row: {
   content_type: MediaContentType;
   post_id: string;
 }): string {
-  return `/content/${row.content_type}/${row.post_id}`;
+  // HOM-05 D4: la provenienza Cerca, per la source degli eventi.
+  return contentDetailHref(row.content_type, row.post_id, { origin: "SEARCH" });
 }
 
 export function resolveMediaPublisherHref(row: {

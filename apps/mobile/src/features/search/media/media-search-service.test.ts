@@ -232,12 +232,12 @@ describe("href resolvers", () => {
   it("sends every content type to the existing detail route", () => {
     expect(
       resolveMediaContentHref({ content_type: "club_media", post_id: "p1" }),
-    ).toBe("/content/club_media/p1");
+    ).toBe("/content/club_media/p1?origin=SEARCH");
     expect(
       resolveMediaContentHref({ content_type: "media_tribuna", post_id: "p2" }),
-    ).toBe("/content/media_tribuna/p2");
+    ).toBe("/content/media_tribuna/p2?origin=SEARCH");
     expect(resolveMediaContentHref({ content_type: "fan_media", post_id: "p3" })).toBe(
-      "/content/fan_media/p3",
+      "/content/fan_media/p3?origin=SEARCH",
     );
   });
 

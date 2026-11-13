@@ -10,6 +10,7 @@
 
 import type { InfiniteData } from "@tanstack/react-query";
 
+import { INSIGHTS_ROOT_KEY } from "../content-insights/insights-keys";
 import type { ContentManageCapabilities } from "./content-actions-presentation";
 import {
   isContentItem,
@@ -80,4 +81,6 @@ export const CONTENT_DELETE_INVALIDATIONS: readonly (readonly string[])[] = [
   ["search-media-content"],
   ["search-media-sources"],
   ["search-media-count"],
+  // HOM-05 §140–141: le statistiche di un contenuto eliminato non restano in cache.
+  [INSIGHTS_ROOT_KEY],
 ];

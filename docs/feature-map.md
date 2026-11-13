@@ -26,6 +26,7 @@ docs/                  questa documentazione
 | `app/(auth)/*` | `features/auth` | welcome, sign-in, sign-up, forgot-password |
 | `app/(onboarding)/profile.tsx` | `features/onboarding` | un solo entry point, rami per ruolo |
 | `app/(tabs)/index.tsx` | `features/feed` | Home |
+| `app/content/insights/[type]/[id]` | `features/content-insights` | Dettagli e statistiche di un contenuto (HOM-05), fuori dalle tab; nello stesso modulo la coda eventi `content-events-*` che alimenta `record_content_events` |
 | `app/(tabs)/cerca.tsx`, `app/search/*` | `features/search` | profili, società, posizioni, media |
 | `app/(tabs)/dashboard/*` | `features/dashboard` | area più grande del repo |
 | `app/(tabs)/messages.tsx`, `app/messages/*`, `app/comunicazioni/*` | `features/messaging` | |

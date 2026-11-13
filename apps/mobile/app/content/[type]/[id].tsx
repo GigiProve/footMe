@@ -59,6 +59,14 @@ import { ContentTaggedHeader } from "../../../src/features/content/components/Co
 import { TagManageSheet } from "../../../src/features/content/components/TagManageSheet";
 import type { ContentTaggedTarget } from "../../../src/features/content/components/TaggedProfilesSheet";
 import type { TaggedContentType } from "../../../src/features/content/content-tag-service";
+import {
+  authorOpenEventType,
+  identityOpenEvent,
+  isClubMediaArticle,
+  sourceForOrigin,
+} from "../../../src/features/content-insights/content-events-presentation";
+import { emitContentEvent } from "../../../src/features/content-insights/content-events-service";
+import { useContentDetailEvents } from "../../../src/features/content-insights/use-content-detail-events";
 import { colors, radius, spacing } from "../../../src/theme/tokens";
 import { AppText, Button } from "../../../src/ui";
 
@@ -72,6 +80,13 @@ type ContentView = {
   displayMode: "full" | "preview";
   excerpt: string | null;
   externalUrl: string | null;
+  /**
+   * HOM-05 §101–§103: Articolo secondo la stessa regola del server
+   * (`feed_content_index.content_format` → `footme_feed_item_type`), così
+   * `article_open`/`article_read` partono per tutti i contenuti che le
+   * statistiche classificano come Articolo.
+   */
+  isArticle: boolean;
   publishedAt: string | null;
   publisherId: string;
   publisherKind: "club" | "profile";
@@ -140,6 +155,7 @@ function mapClubMedia(post: ClubMediaPost, viewerId: string | null): ContentView
     displayMode: "full",
     excerpt: post.excerpt ?? null,
     externalUrl: null,
+    isArticle: isClubMediaArticle(post.visual_type, post.body),
     publishedAt: null,
     publisherId: post.club_id,
     publisherKind: "club",
@@ -187,6 +203,7 @@ function mapMediaProfile(
     displayMode: post.display_mode,
     excerpt: post.excerpt ?? null,
     externalUrl: post.external_url,
+    isArticle: !isVideo,
     publishedAt: post.published_at ?? post.created_at,
     publisherId: post.media_profile_id,
     publisherKind: "profile",
@@ -238,6 +255,7 @@ function mapFanTribuna(
     displayMode: "full",
     excerpt: null,
     externalUrl: null,
+    isArticle: false,
     publishedAt: post.published_at ?? post.created_at,
     publisherId: post.profile_id,
     publisherKind: "profile",
@@ -282,6 +300,7 @@ function mapMediaTribuna(
     displayMode: "full",
     excerpt: null,
     externalUrl: null,
+    isArticle: false,
     publishedAt: post.published_at ?? post.created_at,
     publisherId: post.media_profile_id,
     publisherKind: "profile",
@@ -307,6 +326,7 @@ function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentVi
     displayMode: "full",
     excerpt: post.description,
     externalUrl: null,
+    isArticle: false,
     publishedAt: post.published_at ?? post.created_at,
     publisherId: post.profile_id,
     publisherKind: "profile",
@@ -468,7 +488,30 @@ function ContentDetailBody({
     load();
   }, [load]);
 
+  // HOM-05 §146, §103: impression all'apertura e, per l'Articolo (stessa regola
+  // di `footme_feed_item_type`, vedi `ContentView.isArticle`), apertura e lettura attiva.
+  const isArticle = !!content && content.isArticle;
+  useContentDetailEvents({
+    contentType,
+    isArticle,
+    isReady: !!content && !!id,
+    origin,
+    postId: id,
+  });
+
+  /** HOM-05 §55–56: un solo evento per tap, con la source della provenienza. */
+  function emitFromContent(
+    eventType: Parameters<typeof emitContentEvent>[0]["eventType"],
+    props?: Parameters<typeof emitContentEvent>[0]["props"],
+  ) {
+    if (id) {
+      emitContentEvent({ contentType, eventType, postId: id, props, source: sourceForOrigin(origin) });
+    }
+  }
+
   function openTarget(target: TaggedEntry) {
+    const opened = identityOpenEvent(target.target_type);
+    emitFromContent(opened.eventType, opened.props);
     if (target.target_type === "club") {
       router.push({ params: { id: target.target_id }, pathname: "/club/[id]" });
     } else if (target.target_type === "team") {
@@ -485,6 +528,7 @@ function ContentDetailBody({
     if (!content) {
       return;
     }
+    emitFromContent(authorOpenEventType(content.publisherKind));
     if (content.publisherKind === "club") {
       router.push({ params: { id: content.publisherId }, pathname: "/club/[id]" });
     } else {
@@ -582,6 +626,7 @@ function ContentDetailBody({
               ) : null}
               {content.externalUrl ? (
                 <SourceLinkCard
+                  onOpen={isArticle ? () => emitFromContent("article_link_click") : undefined}
                   sourceName={content.sourceName}
                   title="Leggi l'articolo completo sul sito"
                   url={content.externalUrl}
@@ -597,6 +642,7 @@ function ContentDetailBody({
               ) : null}
               {content.externalUrl ? (
                 <SourceLinkCard
+                  onOpen={isArticle ? () => emitFromContent("article_link_click") : undefined}
                   sourceName={content.sourceName}
                   title="Leggi anche sul sito"
                   url={content.externalUrl}
@@ -674,10 +720,13 @@ function ContentDetailBody({
 }
 
 function SourceLinkCard({
+  onOpen,
   sourceName,
   title,
   url,
 }: {
+  /** HOM-05 §148: tap sul link dell'articolo. */
+  onOpen?: () => void;
   sourceName: string | null;
   title: string;
   url: string;
@@ -686,6 +735,7 @@ function SourceLinkCard({
     <Pressable
       accessibilityRole="link"
       onPress={() => {
+        onOpen?.();
         void Linking.openURL(url);
       }}
       style={styles.sourceCard}

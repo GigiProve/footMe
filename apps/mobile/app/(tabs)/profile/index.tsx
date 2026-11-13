@@ -13,6 +13,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { KeyboardAwareForm } from "../../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../../src/features/auth/use-session";
+import { contentDetailHref } from "../../../src/features/feed/content-routes";
+import type { FeedContentType } from "../../../src/features/feed/feed-types";
 import { type PublicClubProfile } from "../../../src/features/clubs/club-service";
 import { getUnreadCount } from "../../../src/features/clubs/notification-service";
 import {
@@ -474,7 +476,12 @@ export default function ProfileScreen() {
 
   /** Dettaglio condiviso del contenuto: una rotta sola per ogni tipologia. */
   function handleOpenContent(ref: { contentType: string; postId: string }) {
-    router.push(`/content/${ref.contentType}/${ref.postId}` as never);
+    // HOM-05 D4: la provenienza Profilo, per la source degli eventi.
+    router.push(
+      contentDetailHref(ref.contentType as FeedContentType, ref.postId, {
+        origin: "PROFILE",
+      }) as never,
+    );
   }
 
   /**

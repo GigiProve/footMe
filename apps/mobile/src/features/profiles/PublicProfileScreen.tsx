@@ -10,6 +10,8 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { contentDetailHref } from "../feed/content-routes";
+import type { FeedContentType } from "../feed/feed-types";
 
 import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
 import { useSession } from "../auth/use-session";
@@ -579,7 +581,12 @@ export function PublicProfileScreen() {
 
   /** Dettaglio condiviso del contenuto: una rotta sola per ogni tipologia. */
   function handleOpenContent(ref: { contentType: string; postId: string }) {
-    router.push(`/content/${ref.contentType}/${ref.postId}` as never);
+    // HOM-05 D4: la provenienza Profilo, per la source degli eventi.
+    router.push(
+      contentDetailHref(ref.contentType as FeedContentType, ref.postId, {
+        origin: "PROFILE",
+      }) as never,
+    );
   }
 
   if (!isSessionLoading && !session?.user) {

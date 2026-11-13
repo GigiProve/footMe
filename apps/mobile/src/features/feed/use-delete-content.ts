@@ -18,6 +18,7 @@
 import { useRef } from "react";
 import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 
+import { isInsightsKeyFor } from "../content-insights/insights-keys";
 import { useToast } from "../../ui";
 import {
   CONTENT_KIND_COPY,
@@ -70,6 +71,11 @@ export function useDeleteContent({ profileId }: { profileId: string }) {
     queryClient.setQueryData<FeedPostItem | null>(FEED_QK.postDetail(target.contentId), null);
     queryClient.removeQueries({
       queryKey: FEED_QK.interaction(target.contentType, target.contentId),
+    });
+    // HOM-05 §141: nessun KPI stale di un contenuto che non c'è più.
+    queryClient.removeQueries({
+      predicate: (query) =>
+        isInsightsKeyFor(query.queryKey, target.contentType, target.contentId),
     });
     for (const queryKey of CONTENT_DELETE_INVALIDATIONS) {
       void queryClient.invalidateQueries({ queryKey: [...queryKey] });

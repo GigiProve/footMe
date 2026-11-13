@@ -131,8 +131,17 @@ Il messaggio di commit usa il codice task: `DAS-REV-25 - Shortlist Position: agg
   `deleted` solo tramite `delete_content` (idempotente, audit in
   `content_management_audit`, DELETE diretto chiuso), stato generico
   «Contenuto non disponibile» distinto dall'errore di rete, `ContentOrigin`
-  nei link del Feed. Modifica e Dettagli e statistiche rispondono «in arrivo»
-  finché HOM-06.1/06.2 e HOM-05 non esistono (`content-routes.ts`). Da fare: creazione post e bozze
+  nei link del Feed. Modifica risponde «in arrivo» finché HOM-06.1/06.2 non
+  esistono (`content-routes.ts`). HOM-05 (Dettagli e statistiche) in codice:
+  modulo `features/content-insights`, route `app/content/insights/[type]/[id]`
+  fuori dalle tab (niente bottom nav, decisione Luigi). Primo tracking server:
+  tabella chiusa `content_events` (viewer conservato senza retention, mai
+  esposto), ingestion `record_content_events` da una coda client dedicata
+  (svuotata a logout/fine sessione), letture `fetch_content_insights` e
+  `fetch_content_insights_trend` con accesso rivalidato (42501 = permesso
+  revocato), parametri centrali `content_insights.*` in `app_policy_settings`.
+  I dati partono dal deploy (`tracking_started_at`); Condivisioni e Repost
+  restano `null` finché HOM-09/HOM-10 non esistono. Da fare: creazione post e bozze
   (HOM-06.1 scriverà su quelle tabelle), salvataggi dei post persona,
   commenti, condivisione, repost, segnalazioni, blocco profilo, ranking e
   discovery, notifiche social.

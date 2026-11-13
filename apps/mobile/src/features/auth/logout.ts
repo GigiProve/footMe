@@ -1,5 +1,6 @@
 import { queryClient } from "../../lib/query-client";
 import { supabase } from "../../lib/supabase";
+import { drainContentEventsForSignOut } from "../content-insights/content-events-service";
 import { clearDashboardCache } from "../dashboard/cache/dashboard-cache";
 import { saveLastAccountProfile } from "./last-account";
 
@@ -31,6 +32,9 @@ export async function logout(options?: LogoutOptions) {
     // chiamata di rete.
     await clearDashboardCache({ actorId: options.profileId });
   }
+
+  // HOM-05: gli eventi analytics in coda sono dell'utente che esce.
+  await drainContentEventsForSignOut();
 
   const { error } = await supabase.auth.signOut();
 

@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { contentDetailHref } from "../feed/content-routes";
 import { isProfileFiltersEmpty } from "./search-filters";
 import type {
   ClubSearchFilters,
@@ -283,7 +284,8 @@ export function resolveGlobalSearchHref(row: GlobalSearchRow): string {
       return `/position/${row.target_id}`;
     case "club_media":
     case "fan_tribuna":
-      return `/content/${row.target_type}/${row.target_id}`;
+      // HOM-05 D4: la provenienza Cerca, per la source degli eventi.
+      return contentDetailHref(row.target_type, row.target_id, { origin: "SEARCH" });
     default: {
       const _exhaustive: never = row.target_type;
       throw new Error(`Unknown target_type: ${String(_exhaustive)}`);
