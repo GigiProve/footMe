@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  CONTENT_MEDIA_STATES_LIMIT,
+  fetchContentInteractionState,
+  fetchContentMediaStates,
   fetchHomeFeedPage,
   mapFeedRow,
   mapProfilePostDetail,
@@ -540,7 +543,8 @@ describe("mapFeedRow — Post HOM-02", () => {
     if (item?.type !== "post") throw new Error("atteso un post");
 
     expect(item.payload.authorIdentityType).toBe("media");
-    expect(item.payload.capabilities.canLike).toBe(false);
+    // HOM-03 §104: media_profile ha ora la sua tabella dei Mi piace.
+    expect(item.payload.capabilities.canLike).toBe(true);
   });
 
   it("non accetta profile_post come tipo editoriale", () => {
@@ -619,5 +623,268 @@ describe("setPostLike — risposta malformata", () => {
     mocks.rpc.mockResolvedValue({ data: null, error: null });
 
     await expect(setPostLike("club_media", "post-1", true)).rejects.toThrow();
+  });
+});
+
+describe("mapFeedRow — editoriali HOM-03", () => {
+  const editorialData = {
+    content_type: "media_profile",
+    post_id: "vid-1",
+    kind_label: "Video",
+    duration_seconds: 95,
+    summary: "Le parole del mister dopo la vittoria.",
+    author_identity_type: "media",
+    author_meta: { media_kind: "testata" },
+    media: [
+      {
+        media_id: "media_profile:vid-1:0",
+        media_type: "video",
+        position: 0,
+        url: "https://x.test/v.m3u8",
+        thumbnail_url: "https://x.test/v.jpg",
+        width: 1280,
+        height: 720,
+        duration_seconds: 95,
+        alt_text: "Conferenza stampa",
+        processing_state: "ready",
+        availability: "available",
+        created_at: "2026-11-12T08:00:00.000Z",
+        variants: [
+          { url: "https://x.test/v-720.mp4", mime_type: "video/mp4", width: 1280, height: 720, bitrate: 2500000 },
+          { mime_type: "video/mp4" },
+        ],
+        captions: [
+          { url: "https://x.test/it.vtt", language: "it", kind: "subtitles", label: "Italiano" },
+          { url: "https://x.test/x.vtt", kind: "karaoke" },
+        ],
+      },
+    ],
+    likes_count: 12,
+    comments_count: 3,
+    is_liked: true,
+    capabilities: { can_like: true, can_comment: true, can_save: true, can_share: true },
+  };
+
+  function editorialRow(overrides: Partial<FeedItemRow> = {}) {
+    return makeRow({
+      author_kind: "profile",
+      author_source_kind: "testata",
+      data: editorialData,
+      item_type: "video",
+      item_uid: "media_profile:vid-1",
+      nav_params: { content_type: "media_profile", post_id: "vid-1" },
+      title: "Conferenza stampa",
+      ...overrides,
+    });
+  }
+
+  it("legge sommario, identità, media, conteggi e capability come il Post", () => {
+    const item = mapFeedRow(editorialRow());
+    if (item?.type !== "video") throw new Error("atteso un video");
+
+    expect(item.title).toBe("Conferenza stampa");
+    expect(item.payload).toMatchObject({
+      commentsCount: 3,
+      contentType: "media_profile",
+      intro: "Estratto",
+      isLiked: true,
+      likesCount: 12,
+      postId: "vid-1",
+      summary: "Le parole del mister dopo la vittoria.",
+      authorIdentityType: "media",
+    });
+    expect(item.payload.authorMeta.mediaKind).toBe("testata");
+    expect(item.payload.capabilities).toMatchObject({ canComment: true, canLike: true, canSave: true });
+    expect(item.payload.media).toHaveLength(1);
+  });
+
+  it("legge created_at, varianti e captions del media scartando quelle inutilizzabili", () => {
+    const item = mapFeedRow(editorialRow());
+    if (item?.type !== "video") throw new Error("atteso un video");
+
+    const [video] = item.payload.media;
+    expect(video.createdAt).toBe("2026-11-12T08:00:00.000Z");
+    expect(video.variants).toEqual([
+      { bitrate: 2500000, height: 720, mimeType: "video/mp4", url: "https://x.test/v-720.mp4", width: 1280 },
+    ]);
+    expect(video.captions).toEqual([
+      { kind: "subtitles", label: "Italiano", language: "it", url: "https://x.test/it.vtt" },
+    ]);
+  });
+
+  it("conserva 'uploaded' e tratta uno stato ignoto come pronto", () => {
+    const media = (state: unknown) => ({
+      ...editorialData,
+      media: [{ ...editorialData.media[0], processing_state: state }],
+    });
+
+    const uploaded = mapFeedRow(editorialRow({ data: media("uploaded") }));
+    const unknown = mapFeedRow(editorialRow({ data: media("transcoding") }));
+
+    expect(uploaded?.type === "video" ? uploaded.payload.media[0].processingState : null).toBe("uploaded");
+    expect(unknown?.type === "video" ? unknown.payload.media[0].processingState : null).toBe("ready");
+  });
+
+  it("senza summary il sommario ricade sull'estratto", () => {
+    const item = mapFeedRow(editorialRow({ data: { ...editorialData, summary: null } }));
+
+    expect(item?.type === "video" ? item.payload.summary : null).toBe("Estratto");
+  });
+
+  it("riga pre-HOM-03: la cover legacy diventa il media singolo con il tipo dell'elemento", () => {
+    const legacy = { content_type: "media_profile", post_id: "a-1", duration_seconds: null };
+
+    const article = mapFeedRow(makeRow({ data: { ...legacy, media_type: "video" }, item_type: "article" }));
+    const video = mapFeedRow(makeRow({ data: { ...legacy, duration_seconds: 30 }, item_type: "video" }));
+
+    if (article?.type !== "article" || video?.type !== "video") throw new Error("attesi editoriali");
+    expect(article.payload.media).toEqual([
+      expect.objectContaining({ captions: [], createdAt: null, type: "image", url: "https://example.test/img.jpg", variants: [] }),
+    ]);
+    // Trappola: per il video editoriale la colonna thumbnail_url è l'URL del video.
+    expect(video.payload.media).toEqual([
+      expect.objectContaining({ durationSeconds: 30, thumbnailUrl: null, type: "video", url: "https://example.test/img.jpg" }),
+    ]);
+    expect(video.payload.thumbnailUrl).toBeNull();
+    expect(article.payload.thumbnailUrl).toBe("https://example.test/img.jpg");
+    expect(article.payload).toMatchObject({ commentsCount: 0, isLiked: false, likesCount: 0 });
+    // Il default per sorgente: media_profile ha il Like (HOM-03), mai modifica.
+    expect(article.payload.capabilities).toMatchObject({ canEdit: false, canLike: true, canSave: true });
+    expect(article.payload.authorIdentityType).toBe("society");
+  });
+
+  it("video editoriale: l'URL video della riga non diventa mai una thumbnail", () => {
+    const item = mapFeedRow(
+      editorialRow({
+        data: { ...editorialData, media: [{ ...editorialData.media[0], thumbnail_url: null, duration_seconds: null }] },
+        thumbnail_url: "https://x.test/v.m3u8",
+      }),
+    );
+    if (item?.type !== "video") throw new Error("atteso un video");
+
+    expect(item.payload.thumbnailUrl).toBeNull();
+    expect(item.payload.media[0]).toMatchObject({ durationSeconds: null, thumbnailUrl: null });
+  });
+
+  it("video editoriale con thumbnail nel media: il payload la riprende da media[]", () => {
+    const item = mapFeedRow(editorialRow({ thumbnail_url: "https://x.test/v.m3u8" }));
+
+    expect(item?.type === "video" ? item.payload.thumbnailUrl : null).toBe("https://x.test/v.jpg");
+  });
+
+  it("riga pre-HOM-03 senza cover: nessun media", () => {
+    const item = mapFeedRow(
+      makeRow({
+        data: { content_type: "media_profile", post_id: "a-1" },
+        item_type: "article",
+        thumbnail_url: null,
+      }),
+    );
+
+    expect(item?.type === "article" ? item.payload.media : null).toEqual([]);
+  });
+});
+
+describe("resolveFeedItemHref — editoriali HOM-03 §49", () => {
+  it("aggiunge origine e posizione per Articolo e video editoriale", () => {
+    const article = mapFeedRow(
+      makeRow({
+        data: { content_type: "media_profile", post_id: "a-1" },
+        item_type: "article",
+        nav_params: { content_type: "media_profile", post_id: "a-1" },
+        rank_position: 7,
+      }),
+    );
+
+    expect(resolveFeedItemHref(article!)).toBe("/content/media_profile/a-1?origin=feed&position=7");
+  });
+
+  it("lascia invariato l'href del Post", () => {
+    expect(resolveFeedItemHref(mapFeedRow(makeRow())!)).toBe("/content/club_media/post-1");
+  });
+});
+
+describe("fetchContentMediaStates", () => {
+  it("non chiama la RPC senza coppie", async () => {
+    await expect(fetchContentMediaStates([])).resolves.toEqual([]);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("oltre 20 coppie spezza in blocchi da 20 (la RPC solleva oltre il tetto)", async () => {
+    mocks.rpc.mockResolvedValue({ data: [], error: null });
+    const pairs = Array.from({ length: 45 }, (_, index) => ({
+      contentType: "club_media" as const,
+      postId: `c-${index}`,
+    }));
+
+    await fetchContentMediaStates(pairs);
+
+    const sizes = mocks.rpc.mock.calls.map(
+      (call) => (call[1] as { p_post_ids: string[] }).p_post_ids.length,
+    );
+    expect(sizes).toEqual([20, 20, 5]);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(CONTENT_MEDIA_STATES_LIMIT);
+  });
+
+  it("una chiamata per 20 coppie, con il media nello stesso formato del Feed", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [
+        {
+          content_type: "profile_post",
+          post_id: "pp-1",
+          media: [
+            { media_id: "m-1", media_type: "video", position: 0, url: "https://x.test/v.mp4", processing_state: "ready", availability: "available" },
+          ],
+        },
+        { content_type: "sconosciuto", post_id: "x", media: [] },
+      ],
+      error: null,
+    });
+    const pairs = Array.from({ length: 20 }, (_, index) => ({
+      contentType: "profile_post" as const,
+      postId: `pp-${index}`,
+    }));
+
+    const result = await fetchContentMediaStates(pairs);
+
+    const args = mocks.rpc.mock.calls[0][1] as { p_content_types: string[]; p_post_ids: string[] };
+    expect(mocks.rpc.mock.calls[0][0]).toBe("fetch_content_media_states");
+    expect(args.p_post_ids).toHaveLength(CONTENT_MEDIA_STATES_LIMIT);
+    expect(args.p_content_types).toHaveLength(CONTENT_MEDIA_STATES_LIMIT);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ contentType: "profile_post", postId: "pp-1" });
+    expect(result[0].media[0]).toMatchObject({ id: "m-1", processingState: "ready", variants: [] });
+  });
+
+  it("propaga l'errore della RPC", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: new Error("boom") });
+
+    await expect(fetchContentMediaStates([{ contentType: "club_media", postId: "c-1" }])).rejects.toThrow("boom");
+  });
+});
+
+describe("fetchContentInteractionState", () => {
+  it("legge conteggi, stato e capability del dettaglio", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [{ can_like: true, comments_count: 4, is_liked: false, likes_count: 9 }],
+      error: null,
+    });
+
+    await expect(fetchContentInteractionState("media_profile", "a-1")).resolves.toEqual({
+      canLike: true,
+      commentsCount: 4,
+      isLiked: false,
+      likesCount: 9,
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith("fetch_content_interaction_state", {
+      p_content_type: "media_profile",
+      p_post_id: "a-1",
+    });
+  });
+
+  it("nessuna riga: contenuto non leggibile, null e non un Like a zero", async () => {
+    mocks.rpc.mockResolvedValue({ data: [], error: null });
+
+    await expect(fetchContentInteractionState("media_profile", "a-1")).resolves.toBeNull();
   });
 });

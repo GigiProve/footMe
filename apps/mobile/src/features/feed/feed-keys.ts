@@ -7,7 +7,7 @@
  * sostituire quella esistente, e la lista lampeggerebbe a ogni aggiornamento.
  */
 
-import type { FeedScope } from "./feed-types";
+import type { FeedContentType, FeedScope } from "./feed-types";
 
 export const FEED_QK = {
   cache: (profileId: string) => ["feed-cache", profileId] as const,
@@ -21,4 +21,10 @@ export const FEED_QK = {
     ["feed-updates", scope, profileId] as const,
   /** HOM-02: il dettaglio di un post persona, patchato insieme al Feed dal Like. */
   postDetail: (postId: string) => ["feed-post-detail", postId] as const,
+  /**
+   * HOM-03 §104: Mi piace e commenti del dettaglio `/content/[type]/[id]`.
+   * Tipo e id insieme: lo stesso uuid non identifica un contenuto da solo.
+   */
+  interaction: (contentType: FeedContentType, postId: string) =>
+    ["feed-interaction", contentType, postId] as const,
 };

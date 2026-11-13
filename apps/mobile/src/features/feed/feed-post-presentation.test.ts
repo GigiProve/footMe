@@ -34,6 +34,8 @@ function media(position: number, overrides: Partial<FeedMediaItem> = {}): FeedMe
     altText: null,
     aspectRatio: null,
     availability: "available",
+    captions: [],
+    createdAt: null,
     durationSeconds: null,
     height: null,
     id: `m${position}`,
@@ -42,6 +44,7 @@ function media(position: number, overrides: Partial<FeedMediaItem> = {}): FeedMe
     thumbnailUrl: `https://cdn.test/${position}-thumb.jpg`,
     type: "image",
     url: `https://cdn.test/${position}.jpg`,
+    variants: [],
     width: null,
     ...overrides,
   };

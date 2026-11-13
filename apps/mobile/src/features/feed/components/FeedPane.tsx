@@ -6,6 +6,14 @@
  * contenuti, registro delle impression) e gli hook non si possono chiamare
  * condizionalmente. Un componente per tab, entrambi montati, è ciò che dà
  * gratuitamente le posizioni di scroll separate richieste dal §18.
+ *
+ * HOM-03: qui si cablano anche il Video e l'Articolo. Gli elementi in vista
+ * (soglia unica del controller) vanno al controller video, che mette in pausa
+ * il video che esce (§19), e al poll dei media in elaborazione (§66); solo la
+ * tab attiva riferisce al controller, perché il pane nascosto non ha una
+ * viewport vera. Like, Salva e apertura valgono per Post, Articolo e Video
+ * editoriale con gli stessi handler (§52, §95, §104); l'apertura di un Articolo
+ * traccia `feed_article_open` (§102).
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -34,6 +42,8 @@ import type {
   FeedSuggestedProfileRow,
 } from "../feed-types";
 import { useFeed } from "../use-feed";
+import { useFeedMediaProcessing } from "../use-feed-media-processing";
+import { useFeedVideoController } from "../use-feed-video";
 import { useFeedConnectivity } from "../use-feed-connectivity";
 import { useFeedFirstAccess } from "../use-feed-first-access";
 import {
@@ -46,7 +56,11 @@ import { useFeedScrollRestore } from "../use-feed-scroll-restore";
 import { useFeedSessionSeen } from "../use-feed-session-seen";
 import { useSuggestedClubs, useSuggestedProfiles } from "../use-feed-suggestions";
 import { FeedList } from "./FeedList";
-import type { FeedIdentityTarget, FeedModulesState } from "./FeedItemRenderer";
+import type {
+  FeedIdentityTarget,
+  FeedInteractiveItem,
+  FeedModulesState,
+} from "./FeedItemRenderer";
 import {
   FeedErrorState,
   FeedOfflineNotice,
@@ -84,6 +98,8 @@ export function FeedPane({
   const toggleSaved = useToggleSavedFeedItem({ profileId, scope });
   const toggleFollow = useToggleFollowSuggestion({ profileId, scope });
   const toggleLike = useToggleFeedPostLike({ profileId });
+  const videoController = useFeedVideoController();
+  const mediaProcessing = useFeedMediaProcessing({ enabled: isActive, profileId });
   const { showToast } = useToast();
 
   const cachedScope = cache?.scopes[scope];
@@ -144,6 +160,15 @@ export function FeedPane({
           itemType: item.type,
           name: "feed_content_open",
           scope,
+        });
+      }
+
+      if (item.type === "article") {
+        trackFeed({
+          itemId: item.id,
+          name: "feed_article_open",
+          origin: "feed",
+          position: item.rank,
         });
       }
       openHref(resolveFeedItemHref(item));
@@ -218,11 +243,11 @@ export function FeedPane({
       });
       void Linking.openURL(preview.url).catch(() => undefined);
     },
-    onComment: (item: FeedPostItem) => {
+    onComment: (item: FeedInteractiveItem) => {
       trackFeed({ itemId: item.id, name: "feed_post_comment_tap" });
       showToast({ message: FEED_SOON_MESSAGES.comment });
     },
-    onShare: (item: FeedPostItem) => {
+    onShare: (item: FeedInteractiveItem) => {
       trackFeed({ itemId: item.id, name: "feed_post_share_tap" });
       showToast({ message: FEED_SOON_MESSAGES.share });
     },
@@ -403,8 +428,22 @@ export function FeedPane({
                 position: item.rank,
                 scope,
               });
+
+              // §102: l'impression dell'Articolo è un evento suo, una volta per
+              // sessione come l'impression generica (HOME-05 aggrega).
+              if (item.type === "article") {
+                trackFeed({ itemId: item.id, name: "feed_article_impression" });
+              }
             }
           }
+        }}
+        onVisibleItemsChange={(visible) => {
+          // Il pane nascosto non ha viewport: non deve mettere in pausa il
+          // video della tab attiva (vedi il commento in testa al file).
+          if (isActive) {
+            videoController.reportVisibleItems(new Set(visible.map((item) => item.id)));
+          }
+          mediaProcessing.reportVisibleItems(visible);
         }}
         onRefresh={() => feed.refresh("pull")}
         onRetry={feed.retry}

@@ -89,6 +89,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/** I tipi che portano media collection e capability (Post, Articolo, video editoriale). */
+const CONTENT_TYPES_WITH_MEDIA: readonly string[] = ["post", "article", "video"];
+
 function isFeedItem(value: unknown): value is FeedItem {
   if (!isRecord(value)) {
     return false;
@@ -102,10 +105,36 @@ function isFeedItem(value: unknown): value is FeedItem {
     isRecord(value.payload) &&
     // HOM-02: un Post salvato da un client pre-HOM-02 non ha la media
     // collection né le capability. Si scarta quel solo elemento (il Feed lo
-    // ricarica dalla rete) invece di renderizzarlo a metà.
-    (value.type !== "post" ||
+    // ricarica dalla rete) invece di renderizzarlo a metà. HOM-03: la stessa
+    // regola vale per Articolo e video editoriale, che ora hanno lo stesso
+    // payload del Post.
+    (!CONTENT_TYPES_WITH_MEDIA.includes(value.type) ||
       (Array.isArray(value.payload.media) && isRecord(value.payload.capabilities)))
   );
+}
+
+/**
+ * HOM-03 §71, §84: un media scritto in cache da HOM-02 non ha `createdAt`,
+ * `variants` e `captions`. Mancano solo campi additivi, quindi si completano
+ * con i default invece di scartare il Post: il Feed resta pieno al primo avvio
+ * dopo l'aggiornamento.
+ */
+function withMediaDefaults(item: FeedItem): FeedItem {
+  if (item.type !== "post" && item.type !== "article" && item.type !== "video") {
+    return item;
+  }
+
+  const media = item.payload.media.map((entry) => {
+    const raw = entry as Partial<typeof entry>;
+    return {
+      ...entry,
+      createdAt: typeof raw.createdAt === "string" ? raw.createdAt : null,
+      variants: Array.isArray(raw.variants) ? raw.variants : [],
+      captions: Array.isArray(raw.captions) ? raw.captions : [],
+    };
+  });
+
+  return { ...item, payload: { ...item.payload, media } } as FeedItem;
 }
 
 function isScrollState(value: unknown): value is FeedScrollState {
@@ -124,7 +153,7 @@ function parseScope(value: unknown): CachedFeedScope {
   }
 
   const items = Array.isArray(value.items)
-    ? value.items.filter(isFeedItem).slice(0, FEED_CACHE_ITEM_CAP)
+    ? value.items.filter(isFeedItem).slice(0, FEED_CACHE_ITEM_CAP).map(withMediaDefaults)
     : [];
   const updatedAt =
     typeof value.updatedAt === "string" ? value.updatedAt : new Date(0).toISOString();

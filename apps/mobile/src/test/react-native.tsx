@@ -273,6 +273,15 @@ export const Platform = {
     options.ios ?? options.default ?? options.native,
 };
 export const findNodeHandle = () => 1;
+// Dimensioni di un iPhone standard con font al 100%: i componenti che adattano il
+// layout a Dynamic Type (ArticleFeedPreview, HOM-03) leggono `fontScale` da qui.
+// Un test che ne vuole un altro rimpiazza l'hook con `vi.mock("react-native")`.
+export const useWindowDimensions = () => ({
+  fontScale: 1,
+  height: 812,
+  scale: 3,
+  width: 390,
+});
 
 /**
  * `useReduceMotion` interroga AccessibilityInfo al mount: senza questo doppio

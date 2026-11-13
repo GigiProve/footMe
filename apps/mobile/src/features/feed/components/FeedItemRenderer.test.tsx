@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { FEED_ITEM_TYPES, type FeedItem } from "../feed-types";
 import {
+  countTestId,
   makeArticleItem,
   makeModules,
   makePositionItem,
@@ -10,9 +11,15 @@ import {
   makeSuggestedClubsItem,
   makeSuggestedProfilesItem,
   makeVideoItem,
+  pressTestId,
   renderWithToast,
 } from "./feed-test-helpers";
 import { FeedItemRenderer } from "./FeedItemRenderer";
+
+// Il video editoriale monta `VideoMedia`, che importa il player nativo e il
+// binding del controller (che aggancia il blur della schermata).
+vi.mock("expo-video", () => import("../../../test/expo-video"));
+vi.mock("expo-router", () => ({ useFocusEffect: () => undefined }));
 
 const handlers = {
   onComment: vi.fn(),
@@ -51,6 +58,60 @@ describe("FeedItemRenderer", () => {
     // Se un tipo viene aggiunto a FEED_ITEM_TYPES senza un componente, questo
     // test lo segnala prima che degradi silenziosamente a null in produzione.
     expect(Object.keys(byType).sort()).toEqual([...FEED_ITEM_TYPES].sort());
+  });
+
+  it("mappa l'Articolo sull'unica preview, il video editoriale sul suo componente, il Post sul Post (HOM-03 §39, §96)", () => {
+    const render = (item: FeedItem) =>
+      renderWithToast(<FeedItemRenderer handlers={handlers} item={item} modules={makeModules()} />);
+
+    const article = render(makeArticleItem());
+    expect(countTestId(article, "feed-article")).toBe(1);
+    expect(countTestId(article, "feed-editorial-video")).toBe(0);
+    expect(countTestId(article, "feed-post")).toBe(0);
+
+    const video = render(makeVideoItem());
+    expect(countTestId(video, "feed-editorial-video")).toBe(1);
+    expect(countTestId(video, "feed-article")).toBe(0);
+    expect(countTestId(video, "feed-post")).toBe(0);
+
+    const post = render(makePostItem());
+    expect(countTestId(post, "feed-post")).toBe(1);
+    expect(countTestId(post, "feed-article")).toBe(0);
+    expect(countTestId(post, "feed-editorial-video")).toBe(0);
+  });
+
+  it("Mi piace, Commenta, Condividi e Salva dell'Articolo passano dagli handler del Feed con l'elemento", () => {
+    const item = makeArticleItem();
+    const tree = renderWithToast(
+      <FeedItemRenderer handlers={handlers} item={item} modules={makeModules()} />,
+    );
+
+    pressTestId(tree, "feed-post-action-like");
+    pressTestId(tree, "feed-post-action-comment");
+    pressTestId(tree, "feed-post-action-share");
+    pressTestId(tree, "feed-bookmark");
+    pressTestId(tree, "feed-article-body");
+
+    expect(handlers.onToggleLike).toHaveBeenCalledWith(item);
+    expect(handlers.onComment).toHaveBeenCalledWith(item);
+    expect(handlers.onShare).toHaveBeenCalledWith(item);
+    expect(handlers.onToggleSaved).toHaveBeenCalledWith(item);
+    expect(handlers.onOpenItem).toHaveBeenCalledWith(item);
+  });
+
+  it("il video editoriale apre il dettaglio dal titolo e passa Like e Salva con l'elemento", () => {
+    const item = makeVideoItem();
+    const tree = renderWithToast(
+      <FeedItemRenderer handlers={handlers} item={item} modules={makeModules()} />,
+    );
+
+    pressTestId(tree, "feed-editorial-video-title");
+    pressTestId(tree, "feed-post-action-like");
+    pressTestId(tree, "feed-bookmark");
+
+    expect(handlers.onOpenItem).toHaveBeenCalledWith(item);
+    expect(handlers.onToggleLike).toHaveBeenCalledWith(item);
+    expect(handlers.onToggleSaved).toHaveBeenCalledWith(item);
   });
 
   it("degrada a null su un tipo sconosciuto invece di sollevare", () => {

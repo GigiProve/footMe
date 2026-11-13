@@ -11,6 +11,9 @@
  * con mention → riga «Con …» → rich link preview → media collection → riga
  * azioni. L'ordine non cambia da un autore all'altro.
  *
+ * HOM-03: il Video social è questo stesso componente (§2–3). Un Post con un solo
+ * video lo riproduce inline nella media collection; nessun `VideoPost`.
+ *
  * Il tap su avatar e nome apre l'autore e basta (§7): il corpo apre il
  * contenuto, le mention aprono la loro identità senza risalire al corpo. Tutti
  * gli effetti — Like, apertura media/identità/link, commenti, condivisione —
@@ -56,6 +59,8 @@ type PostFeedItemProps = {
   /** Il dettaglio mostra l’intera collezione (`list`), il Feed la griglia. */
   mediaVariant?: "grid" | "list";
   onMediaLayout?: (index: number, y: number) => void;
+  /** HOM-03: nel dettaglio, il video toccato nel Feed parte inline, una volta sola. */
+  autoStartMediaIndex?: number | null;
 };
 
 export function PostFeedItem({
@@ -71,6 +76,7 @@ export function PostFeedItem({
   onShare,
   mediaVariant = "grid",
   onMediaLayout,
+  autoStartMediaIndex = null,
 }: PostFeedItemProps) {
   const { payload } = item;
   const body = postBodyText(payload);
@@ -142,6 +148,7 @@ export function PostFeedItem({
       ) : null}
 
       <PostMediaCollection
+        autoStartIndex={autoStartMediaIndex}
         itemId={item.id}
         media={payload.media}
         onOpenMedia={onOpenMedia}

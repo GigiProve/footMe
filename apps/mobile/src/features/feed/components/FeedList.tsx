@@ -8,9 +8,14 @@
  *    `RefreshControl`: quel componente non è esportato dallo stub di
  *    react-native usato nei test, quindi importarlo romperebbe ogni test che
  *    renda questa lista. Il comportamento è identico.
- *  • `onViewableItemsChanged` è tenuto in un ref con identità stabile: React
- *    Native solleva "Changing onViewableItemsChanged on the fly is not
- *    supported" se la funzione cambia tra due render.
+ *  • La visibilità si legge con `viewabilityConfigCallbackPairs`, tenute in un
+ *    ref con identità stabile: React Native solleva "Changing
+ *    onViewableItemsChanged on the fly is not supported" se cambiano tra due
+ *    render. Le coppie sono due, con soglie diverse perché rispondono a domande
+ *    diverse: l'impression (50%, 350ms: «l'utente ha visto questo elemento») e
+ *    il video (HOM-03 §19: soglia unica `FEED_VIDEO_VISIBLE_PERCENT`, nessun
+ *    ritardo: un video che esce dalla viewport va in pausa subito, e il poll dei
+ *    media in elaborazione guarda solo ciò che è davvero in vista).
  *  • Le chrome che devono scorrere col contenuto (modulo di primo accesso,
  *    avviso offline, stato vuoto) vivono in
  *    `ListHeaderComponent`/`ListEmptyComponent`. Header e tab della Home invece
@@ -29,6 +34,7 @@ import {
 } from "react-native";
 
 import { colors, spacing } from "../../../theme/tokens";
+import { FEED_VIDEO_VISIBLE_PERCENT } from "../feed-video-controller";
 import type { FeedItem } from "../feed-types";
 import {
   FeedEndOfList,
@@ -53,6 +59,12 @@ type FeedListProps = {
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onContentSizeChange: (width: number, height: number) => void;
   onItemsViewed: (items: FeedItem[]) => void;
+  /**
+   * HOM-03: l'insieme COMPLETO degli elementi in vista (anche vuoto), a ogni
+   * variazione. Serve a mettere in pausa il video che esce (§19) e a limitare il
+   * poll dei media in elaborazione a ciò che si vede (§66).
+   */
+  onVisibleItemsChange: (items: FeedItem[]) => void;
 };
 
 export function FeedList({
@@ -72,27 +84,35 @@ export function FeedList({
   onScroll,
   onContentSizeChange,
   onItemsViewed,
+  onVisibleItemsChange,
 }: FeedListProps) {
   // Identità stabile obbligatoria: vedi il commento in testa al file.
   const onItemsViewedRef = useRef(onItemsViewed);
   onItemsViewedRef.current = onItemsViewed;
+  const onVisibleItemsChangeRef = useRef(onVisibleItemsChange);
+  onVisibleItemsChangeRef.current = onVisibleItemsChange;
 
-  const viewabilityHandlerRef = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const visible = viewableItems
-        .map((token) => token.item as FeedItem | undefined)
-        .filter((item): item is FeedItem => !!item);
+  const viewabilityPairsRef = useRef([
+    {
+      onViewableItemsChanged: ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+        const visible = itemsOf(viewableItems);
 
-      if (visible.length > 0) {
-        onItemsViewedRef.current(visible);
-      }
+        if (visible.length > 0) {
+          onItemsViewedRef.current(visible);
+        }
+      },
+      viewabilityConfig: { itemVisiblePercentThreshold: 50, minimumViewTime: 350 },
     },
-  );
-
-  const viewabilityConfigRef = useRef({
-    itemVisiblePercentThreshold: 50,
-    minimumViewTime: 350,
-  });
+    {
+      onViewableItemsChanged: ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+        onVisibleItemsChangeRef.current(itemsOf(viewableItems));
+      },
+      viewabilityConfig: {
+        itemVisiblePercentThreshold: FEED_VIDEO_VISIBLE_PERCENT,
+        minimumViewTime: 0,
+      },
+    },
+  ]);
 
   return (
     <FlatList
@@ -116,16 +136,21 @@ export function FeedList({
       onEndReachedThreshold={0.4}
       onRefresh={onRefresh}
       onScroll={onScroll}
-      onViewableItemsChanged={viewabilityHandlerRef.current}
       refreshing={isRefreshing}
       renderItem={({ item }) => (
         <FeedItemRenderer handlers={handlers} item={item} modules={modules} />
       )}
       scrollEventThrottle={250}
       showsVerticalScrollIndicator={false}
-      viewabilityConfig={viewabilityConfigRef.current}
+      viewabilityConfigCallbackPairs={viewabilityPairsRef.current}
     />
   );
+}
+
+function itemsOf(viewableItems: ViewToken[]): FeedItem[] {
+  return viewableItems
+    .map((token) => token.item as FeedItem | undefined)
+    .filter((item): item is FeedItem => !!item);
 }
 
 function FeedListFooter({

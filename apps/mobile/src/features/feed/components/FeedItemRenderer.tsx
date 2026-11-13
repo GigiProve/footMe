@@ -13,12 +13,14 @@
  */
 
 import type {
+  FeedEditorialItem,
   FeedItem,
   FeedPostItem,
   FeedSuggestedClubRow,
   FeedSuggestedProfileRow,
 } from "../feed-types";
-import { EditorialFeedItem } from "./items/EditorialFeedItem";
+import { ArticleFeedPreview } from "./items/ArticleFeedPreview";
+import { EditorialVideoFeedItem } from "./items/EditorialVideoFeedItem";
 import { PostFeedItem } from "./items/PostFeedItem";
 import { SuggestedClubsFeedItem } from "./items/SuggestedClubsFeedItem";
 import { SuggestedPositionFeedItem } from "./items/SuggestedPositionFeedItem";
@@ -51,20 +53,26 @@ export type FeedIdentityTarget = {
   identityId: string;
 };
 
+/**
+ * HOM-03 §52, §104: Mi piace, Commenta e Condividi sono la stessa riga per il
+ * Post e per gli elementi editoriali: stessi handler, stessa entity.
+ */
+export type FeedInteractiveItem = FeedPostItem | FeedEditorialItem;
+
 export type FeedItemHandlers = {
   onOpenItem: (item: FeedItem) => void;
   onOpenAuthor: (item: FeedItem) => void;
   onToggleSaved: (item: FeedItem) => void;
   // HOM-02: i punti d’ingresso del Post. Navigazione, scrittura e analytics
   // stanno in FeedPane; il componente chiama e basta.
-  onToggleLike: (item: FeedPostItem) => void;
+  onToggleLike: (item: FeedInteractiveItem) => void;
   /** §35: il media apre il dettaglio contenuto con l’indice selezionato. */
   onOpenMedia: (item: FeedPostItem, index: number) => void;
   /** §19, §22: mention e tag aprono l’identità per id, mai per nome. */
   onOpenIdentity: (item: FeedPostItem, target: FeedIdentityTarget) => void;
   onOpenLink: (item: FeedPostItem) => void;
-  onComment: (item: FeedPostItem) => void;
-  onShare: (item: FeedPostItem) => void;
+  onComment: (item: FeedInteractiveItem) => void;
+  onShare: (item: FeedInteractiveItem) => void;
 };
 
 type FeedItemRendererProps = {
@@ -91,13 +99,30 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
         />
       );
 
+    // HOM-03 §39, §96: un solo Articolo nel Feed, e il video editoriale come
+    // Post con una gerarchia in più. Nessun componente per variante.
     case "article":
-    case "video":
       return (
-        <EditorialFeedItem
+        <ArticleFeedPreview
           item={item}
+          onComment={() => handlers.onComment(item)}
           onPress={() => handlers.onOpenItem(item)}
           onPressAuthor={() => handlers.onOpenAuthor(item)}
+          onShare={() => handlers.onShare(item)}
+          onToggleLike={() => handlers.onToggleLike(item)}
+          onToggleSaved={() => handlers.onToggleSaved(item)}
+        />
+      );
+
+    case "video":
+      return (
+        <EditorialVideoFeedItem
+          item={item}
+          onComment={() => handlers.onComment(item)}
+          onPress={() => handlers.onOpenItem(item)}
+          onPressAuthor={() => handlers.onOpenAuthor(item)}
+          onShare={() => handlers.onShare(item)}
+          onToggleLike={() => handlers.onToggleLike(item)}
           onToggleSaved={() => handlers.onToggleSaved(item)}
         />
       );

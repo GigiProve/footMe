@@ -10,6 +10,11 @@
  * i contatori valgono 0 e le capability seguono la sorgente. Un elemento
  * malformato in un array viene scartato da solo, senza far cadere il Post
  * (§87–88: un media rotto non rompe il Post).
+ *
+ * HOM-03: gli stessi lettori servono anche Articolo e video editoriale (§38,
+ * stesso interaction system) e il poll del processing (§65, stesso `media[]`).
+ * Il media porta in più `created_at`, `variants` e `captions` (§71, §84) e lo
+ * stato `uploaded` (§64).
  */
 
 import type {
@@ -17,7 +22,10 @@ import type {
   FeedContentType,
   FeedIdentityType,
   FeedLinkPreview,
+  FeedMediaCaption,
   FeedMediaItem,
+  FeedMediaProcessingState,
+  FeedMediaVariant,
   FeedMention,
   FeedPostCapabilities,
   FeedTaggedIdentity,
@@ -34,8 +42,29 @@ const FEED_CONTENT_TYPES: readonly FeedContentType[] = [
   "profile_post",
 ];
 
-/** Sorgenti con una tabella dei Mi piace (club_media_likes, fan_media_likes, profile_post_likes). */
-const LIKEABLE: readonly FeedContentType[] = ["club_media", "fan_media", "profile_post"];
+/**
+ * Sorgenti con una tabella dei Mi piace (club_media_likes, fan_media_likes,
+ * profile_post_likes e, da HOM-03 §104, media_profile_post_likes).
+ */
+const LIKEABLE: readonly FeedContentType[] = [
+  "club_media",
+  "fan_media",
+  "profile_post",
+  "media_profile",
+];
+
+const PROCESSING_STATES: readonly FeedMediaProcessingState[] = [
+  "uploaded",
+  "processing",
+  "ready",
+  "failed",
+];
+
+const CAPTION_KINDS: readonly FeedMediaCaption["kind"][] = [
+  "captions",
+  "subtitles",
+  "transcript",
+];
 
 /** Le cinque sorgenti CER-05 hanno commenti e salvati; `profile_post` no (HOM-07/08). */
 const LEGACY_ONLY: readonly FeedContentType[] = [
@@ -136,22 +165,81 @@ function readMediaItem(
     aspectRatio: width && height ? width / height : null,
     durationSeconds: positiveInt(raw, "duration_seconds"),
     altText: str(raw, "alt_text"),
-    processingState:
-      processing === "processing" || processing === "failed" ? processing : "ready",
+    // Uno stato ignoto vale "ready": l'URL resta l'arbitro della disponibilità.
+    processingState: PROCESSING_STATES.includes(processing as FeedMediaProcessingState)
+      ? (processing as FeedMediaProcessingState)
+      : "ready",
     availability:
       availability === "unavailable" || !url ? "unavailable" : "available",
+    createdAt: str(raw, "created_at"),
+    variants: readVariants(raw),
+    captions: readCaptions(raw),
   };
+}
+
+/** I campi HOM-03 di un media che il server non ha mandato (righe legacy). */
+function legacyMediaFields(): Pick<FeedMediaItem, "createdAt" | "variants" | "captions"> {
+  return { createdAt: null, variants: [], captions: [] };
+}
+
+/** §72: una variante senza URL non è riproducibile e si scarta. */
+function readVariants(raw: Record<string, unknown>): FeedMediaVariant[] {
+  return array(raw, "variants").flatMap((variant): FeedMediaVariant[] => {
+    const url = str(variant, "url");
+    if (!url) {
+      return [];
+    }
+    return [
+      {
+        url,
+        mimeType: str(variant, "mime_type"),
+        width: positiveInt(variant, "width"),
+        height: positiveInt(variant, "height"),
+        bitrate: positiveInt(variant, "bitrate"),
+      },
+    ];
+  });
+}
+
+/** §84: solo i tre tipi previsti; un tipo ignoto non è usabile dal player. */
+function readCaptions(raw: Record<string, unknown>): FeedMediaCaption[] {
+  return array(raw, "captions").flatMap((caption): FeedMediaCaption[] => {
+    const url = str(caption, "url");
+    const kind = caption["kind"];
+    if (!url || !CAPTION_KINDS.includes(kind as FeedMediaCaption["kind"])) {
+      return [];
+    }
+    return [
+      {
+        url,
+        language: str(caption, "language"),
+        kind: kind as FeedMediaCaption["kind"],
+        label: str(caption, "label"),
+      },
+    ];
+  });
 }
 
 /**
  * §23–25: la collection è unica e ordinata. Il server manda già l'ordine;
  * l'ordinamento qui è solo una difesa contro un array arrivato in disordine.
  * Senza `media` (server pre-HOM-02) si usa il media singolo legacy.
+ *
+ * HOM-03: `legacy.type` forza il tipo del media singolo quando il chiamante lo
+ * conosce meglio di `data.media_type` (la cover di un Articolo è un'immagine).
+ * `legacy.videoUrl` è per il video editoriale (`media_profile`), dove la
+ * colonna `thumbnail_url` della riga contiene l'URL del VIDEO e non
+ * un'immagine: diventa `url`, e la thumbnail resta null (placeholder).
  */
 export function readMedia(
   data: Data,
   postKey: string,
-  legacy: { thumbnailUrl: string | null; durationSeconds: number | null },
+  legacy: {
+    thumbnailUrl: string | null;
+    durationSeconds: number | null;
+    type?: FeedMediaItem["type"];
+    videoUrl?: string | null;
+  },
 ): FeedMediaItem[] {
   if (Array.isArray(data?.["media"])) {
     return array(data, "media")
@@ -160,18 +248,21 @@ export function readMedia(
       .sort((a, b) => a.position - b.position);
   }
 
-  if (!legacy.thumbnailUrl) {
+  const url = legacy.videoUrl ?? legacy.thumbnailUrl;
+  if (!url) {
     return [];
   }
 
-  const type = data?.["media_type"] === "video" ? "video" : "image";
+  const type = legacy.videoUrl
+    ? "video"
+    : (legacy.type ?? (data?.["media_type"] === "video" ? "video" : "image"));
   return [
     {
       id: `${postKey}:0`,
       type,
       position: 0,
-      url: legacy.thumbnailUrl,
-      thumbnailUrl: legacy.thumbnailUrl,
+      url,
+      thumbnailUrl: legacy.videoUrl ? null : legacy.thumbnailUrl,
       width: null,
       height: null,
       aspectRatio: null,
@@ -179,6 +270,7 @@ export function readMedia(
       altText: null,
       processingState: "ready",
       availability: "available",
+      ...legacyMediaFields(),
     },
   ];
 }

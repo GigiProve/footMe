@@ -7,13 +7,18 @@
  * risponde con il messaggio "in arrivo", come gli altri controlli non ancora
  * attivi: nessun tap morto, nessuna scrittura.
  *
+ * HOM-03 §104 (Luigi 2026-11-12): anche Articoli e video editoriali
+ * (`media_profile`) hanno il Like reale. Stessa entità ovunque: il toggle del
+ * Feed e quello del dettaglio `/content/[type]/[id]` (use-content-interaction)
+ * passano dalla stessa coda e dallo stesso tracker, e scrivono nelle stesse
+ * cache — le due tab, il dettaglio post, lo stato interazioni del dettaglio.
+ *
  * Tre regole, tutte per §83 (niente doppi eventi):
  *  • si invia lo stato desiderato (`liked`), mai "inverti": la RPC è idempotente;
- *  • le richieste sullo stesso Post sono serializzate, così l'ultima scelta
- *    dell'utente è anche l'ultima ad arrivare al server;
- *  • la patch ottimistica tocca solo quel Post, in entrambe le tab e nel
- *    dettaglio; le risposte arrivano alla UI solo quando non ci sono altre
- *    richieste in volo (vedi `createLikeTracker`).
+ *  • le richieste sullo stesso contenuto sono serializzate, così l'ultima
+ *    scelta dell'utente è anche l'ultima ad arrivare al server;
+ *  • la patch ottimistica tocca solo quel contenuto; le risposte arrivano alla
+ *    UI solo quando non ci sono altre richieste in volo (`createLikeTracker`).
  */
 
 import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
@@ -22,16 +27,25 @@ import { useToast } from "../../ui";
 import { trackFeed } from "./feed-analytics";
 import { FEED_QK } from "./feed-keys";
 import { FEED_SOON_MESSAGES } from "./feed-labels";
-import { setPostLike } from "./feed-service";
-import type { FeedItem, FeedPage, FeedPageParam, FeedPostItem, FeedScope } from "./feed-types";
+import { setPostLike, type ContentInteractionState } from "./feed-service";
+import {
+  isContentItem,
+  type FeedContentItem,
+  type FeedContentType,
+  type FeedItem,
+  type FeedPage,
+  type FeedPageParam,
+  type FeedPostItem,
+  type FeedScope,
+} from "./feed-types";
 
 type FeedData = InfiniteData<FeedPage, FeedPageParam>;
 
-type LikeState = { likesCount: number; isLiked: boolean };
+export type LikeState = { likesCount: number; isLiked: boolean };
 
 const SCOPES: readonly FeedScope[] = ["per_te", "seguiti"];
 
-/** Una coda per Post: la richiesta successiva parte quando la precedente è finita. */
+/** Una coda per contenuto: la richiesta successiva parte quando la precedente è finita. */
 const queues = new Map<string, Promise<unknown>>();
 
 function enqueue<T>(key: string, run: () => Promise<T>): Promise<T> {
@@ -47,7 +61,7 @@ function enqueue<T>(key: string, run: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Richieste in volo per Post. Finché ce n’è più d’una, nessuna risposta
+ * Richieste in volo per contenuto. Finché ce n’è più d’una, nessuna risposta
  * tocca la UI: resta lo stato ottimistico dell’ultimo tap. Quando l’ultima
  * si chiude si scrive l’ultimo stato CONFERMATO dal server — o, se nessuna
  * è andata a buon fine, quello di prima del primo tap. Così un Mi piace
@@ -87,7 +101,10 @@ export function createLikeTracker() {
 
 const tracker = createLikeTracker();
 
-/** Scrive lo stato Like di UN Post in una pagina di Feed. Pura, testata. */
+/**
+ * Scrive lo stato Like di UN contenuto (Post, Articolo o video editoriale) in
+ * una pagina di Feed. Pura, testata.
+ */
 export function patchPostLike(
   data: FeedData | undefined,
   itemId: string,
@@ -102,8 +119,8 @@ export function patchPostLike(
     pages: data.pages.map((page) => ({
       ...page,
       items: page.items.map((item): FeedItem =>
-        item.id === itemId && item.type === "post"
-          ? { ...item, payload: { ...item.payload, ...state } }
+        item.id === itemId && isContentItem(item)
+          ? ({ ...item, payload: { ...item.payload, ...state } } as FeedItem)
           : item,
       ),
     })),
@@ -119,58 +136,94 @@ export function nextLikeState(current: LikeState): LikeState {
   };
 }
 
-type LikeTarget = { item: FeedPostItem; next: LikeState };
+/**
+ * Il contenuto da mettere (o togliere) Mi piace, indipendente dalla superficie.
+ * `itemId` è la chiave globale `<content_type>:<post_id>` del Feed.
+ */
+export type LikeTarget = {
+  itemId: string;
+  contentType: FeedContentType;
+  postId: string;
+  current: LikeState;
+  canLike: boolean;
+};
 
-export function useToggleFeedPostLike({ profileId }: { profileId: string }) {
+export function likeItemId(contentType: FeedContentType, postId: string): string {
+  return `${contentType}:${postId}`;
+}
+
+/**
+ * Il motore condiviso da Feed e dettaglio: coda, tracker, patch ovunque.
+ * Restituisce il toggle per un `LikeTarget`.
+ */
+export function useContentLikeToggle({ profileId }: { profileId: string }) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  // §38: Feed e dettaglio mostrano lo stesso stato al ritorno, senza reload.
-  const writeEverywhere = (item: FeedPostItem, state: LikeState) => {
+  // HOM-02 §38, HOM-03 §104: Feed e dettaglio mostrano lo stesso stato, senza reload.
+  const writeEverywhere = (target: LikeTarget, state: LikeState) => {
     for (const scope of SCOPES) {
       queryClient.setQueryData<FeedData>(FEED_QK.feed(scope, profileId), (data) =>
-        patchPostLike(data, item.id, state),
+        patchPostLike(data, target.itemId, state),
       );
     }
     queryClient.setQueryData<FeedPostItem | null>(
-      FEED_QK.postDetail(item.payload.postId),
-      (detail) => (detail ? { ...detail, payload: { ...detail.payload, ...state } } : detail),
+      FEED_QK.postDetail(target.postId),
+      (detail) =>
+        detail && detail.id === target.itemId
+          ? { ...detail, payload: { ...detail.payload, ...state } }
+          : detail,
+    );
+    queryClient.setQueryData<ContentInteractionState | null>(
+      FEED_QK.interaction(target.contentType, target.postId),
+      (interaction) => (interaction ? { ...interaction, ...state } : interaction),
     );
   };
 
   const mutation = useMutation({
-    mutationFn: ({ item, next }: LikeTarget) =>
-      enqueue(item.id, () =>
-        setPostLike(item.payload.contentType, item.payload.postId, next.isLiked),
-      ),
-    onMutate: ({ item, next }) => {
-      writeEverywhere(item, next);
+    mutationFn: ({ target, next }: { target: LikeTarget; next: LikeState }) =>
+      enqueue(target.itemId, () => setPostLike(target.contentType, target.postId, next.isLiked)),
+    onMutate: ({ target, next }) => {
+      writeEverywhere(target, next);
     },
-    onError: (_error, { item }) => {
-      const settled = tracker.settle(item.id, null);
+    onError: (_error, { target }) => {
+      const settled = tracker.settle(target.itemId, null);
       if (settled) {
-        writeEverywhere(item, settled);
+        writeEverywhere(target, settled);
       }
       showToast({ message: "Non è stato possibile aggiornare il Mi piace." });
     },
-    onSuccess: (server, { item }) => {
-      const settled = tracker.settle(item.id, server);
+    onSuccess: (server, { target }) => {
+      const settled = tracker.settle(target.itemId, server);
       if (settled) {
-        writeEverywhere(item, settled);
+        writeEverywhere(target, settled);
       }
     },
   });
 
-  return (item: FeedPostItem) => {
-    if (!item.payload.capabilities.canLike) {
+  return (target: LikeTarget) => {
+    if (!target.canLike) {
       showToast({ message: FEED_SOON_MESSAGES.like });
       return;
     }
 
-    const current = { isLiked: item.payload.isLiked, likesCount: item.payload.likesCount };
-    const next = nextLikeState(current);
-    trackFeed({ itemId: item.id, liked: next.isLiked, name: "feed_post_like_tap" });
-    tracker.begin(item.id, current);
-    mutation.mutate({ item, next });
+    const next = nextLikeState(target.current);
+    trackFeed({ itemId: target.itemId, liked: next.isLiked, name: "feed_post_like_tap" });
+    tracker.begin(target.itemId, target.current);
+    mutation.mutate({ next, target });
   };
+}
+
+/** Il toggle del Feed: Post, Articolo o video editoriale (HOM-03 §104). */
+export function useToggleFeedPostLike({ profileId }: { profileId: string }) {
+  const toggle = useContentLikeToggle({ profileId });
+
+  return (item: FeedContentItem) =>
+    toggle({
+      canLike: item.payload.capabilities.canLike,
+      contentType: item.payload.contentType,
+      current: { isLiked: item.payload.isLiked, likesCount: item.payload.likesCount },
+      itemId: item.id,
+      postId: item.payload.postId,
+    });
 }

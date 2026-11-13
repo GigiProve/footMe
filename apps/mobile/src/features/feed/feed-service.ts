@@ -5,6 +5,10 @@
  * discriminata che i componenti consumano. Scarta (restituendo null) le righe
  * di tipo sconosciuto invece di sollevare: un client vecchio davanti a un
  * server nuovo deve degradare, non crashare.
+ *
+ * HOM-03: Articolo e video editoriale passano dagli stessi lettori del Post
+ * (§38, §104), più due letture leggere: lo stato dei media in elaborazione
+ * (§65–66) e lo stato Mi piace del dettaglio legacy (§104).
  */
 
 import { supabase } from "../../lib/supabase";
@@ -21,12 +25,14 @@ import {
 } from "./feed-post-mapper";
 import {
   FEED_ITEM_TYPES,
+  type FeedContentItem,
   type FeedContentType,
   type FeedCursor,
   type FeedItem,
   type FeedItemRow,
   type FeedItemType,
   type FeedLayoutHint,
+  type FeedMediaItem,
   type FeedNavKind,
   type FeedPage,
   type FeedPageParam,
@@ -245,6 +251,23 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
     return null;
   }
 
+  const durationSeconds = readNumber(row.data, "duration_seconds");
+  const intro = row.excerpt;
+  const isVideo = type === "video";
+
+  // HOM-03: stesso payload d'autore, media e interazioni del Post. Senza le
+  // chiavi HOM-03 (server vecchio) la riga legacy diventa il media singolo.
+  // Trappola del video editoriale: la colonna `thumbnail_url` della riga
+  // contiene l'URL del VIDEO, non un'immagine. Per un video la thumbnail si
+  // legge solo da `media[]`; senza, resta null e la UI mostra il placeholder.
+  const media = readMedia(
+    row.data,
+    row.item_uid,
+    isVideo
+      ? { durationSeconds, thumbnailUrl: null, videoUrl: row.thumbnail_url }
+      : { durationSeconds, thumbnailUrl: row.thumbnail_url, type: "image" },
+  );
+
   return {
     ...envelope,
     type,
@@ -253,9 +276,19 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
       contentType,
       postId,
       kindLabel: readString(row.data, "kind_label"),
-      intro: row.excerpt,
-      thumbnailUrl: row.thumbnail_url,
-      durationSeconds: readNumber(row.data, "duration_seconds"),
+      intro,
+      summary: readString(row.data, "summary") ?? intro,
+      thumbnailUrl: isVideo
+        ? (media.find((entry) => entry.type === "video")?.thumbnailUrl ?? null)
+        : row.thumbnail_url,
+      durationSeconds,
+      authorIdentityType: readIdentityType(row.data, row.author_kind, row.author_source_kind),
+      authorMeta: readAuthorMeta(row.data),
+      media,
+      likesCount: readCount(row.data, "likes_count"),
+      commentsCount: readCount(row.data, "comments_count"),
+      isLiked: readBoolean(row.data, "is_liked"),
+      capabilities: readCapabilities(row.data, contentType),
     },
   };
 }
@@ -335,7 +368,16 @@ export function resolveFeedItemHref(item: FeedItem): string | null {
 
   const contentType = item.nav.params.content_type;
   const postId = item.nav.params.post_id;
-  return contentType && postId ? `/content/${contentType}/${postId}` : null;
+  if (!contentType || !postId) {
+    return null;
+  }
+
+  const href = `/content/${contentType}/${postId}`;
+  // HOM-03 §49: il dettaglio editoriale riceve origine e posizione nel Feed.
+  // Parametri additivi: il dettaglio che non li legge apre lo stesso contenuto.
+  return item.type === "article" || item.type === "video"
+    ? `${href}?origin=feed&position=${item.rank}`
+    : href;
 }
 
 /** Autore/fonte -> profilo pubblico o scheda società. */
@@ -384,6 +426,111 @@ export async function setPostLike(
   return { likesCount: row.likes_count, isLiked: row.is_liked };
 }
 
+/** HOM-03 §66: tetto per chiamata, lo stesso che applica la RPC. */
+export const CONTENT_MEDIA_STATES_LIMIT = 20;
+
+export type ContentMediaStates = {
+  contentType: FeedContentType;
+  postId: string;
+  media: FeedMediaItem[];
+};
+
+/**
+ * HOM-03 §65–66: lo stato corrente dei media di pochi contenuti, nello stesso
+ * formato `media[]` del Feed. Solo i contenuti leggibili tornano indietro:
+ * uno assente non si tocca (nessuno stato inventato).
+ *
+ * La RPC solleva oltre 20 coppie ("Al massimo 20 contenuti per richiesta"):
+ * qui si spezza in blocchi da 20, in parallelo. Il poll ne manda già al
+ * massimo 20, quindi in pratica è una chiamata sola.
+ */
+export async function fetchContentMediaStates(
+  pairs: readonly { contentType: FeedContentType; postId: string }[],
+): Promise<ContentMediaStates[]> {
+  const batches: { contentType: FeedContentType; postId: string }[][] = [];
+  for (let start = 0; start < pairs.length; start += CONTENT_MEDIA_STATES_LIMIT) {
+    batches.push(pairs.slice(start, start + CONTENT_MEDIA_STATES_LIMIT));
+  }
+
+  const results = await Promise.all(batches.map(fetchContentMediaStatesBatch));
+  return results.flat();
+}
+
+async function fetchContentMediaStatesBatch(
+  batch: readonly { contentType: FeedContentType; postId: string }[],
+): Promise<ContentMediaStates[]> {
+  const { data, error } = await supabase.rpc("fetch_content_media_states", {
+    p_content_types: batch.map((pair) => pair.contentType),
+    p_post_ids: batch.map((pair) => pair.postId),
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (Array.isArray(data) ? data : []) as {
+    content_type?: unknown;
+    post_id?: unknown;
+    media?: unknown;
+  }[];
+
+  return rows.flatMap((row): ContentMediaStates[] => {
+    const contentType = asFeedContentType(row.content_type);
+    if (!contentType || typeof row.post_id !== "string") {
+      return [];
+    }
+    return [
+      {
+        contentType,
+        postId: row.post_id,
+        media: readMedia(
+          { media: Array.isArray(row.media) ? row.media : [] },
+          `${contentType}:${row.post_id}`,
+          { durationSeconds: null, thumbnailUrl: null },
+        ),
+      },
+    ];
+  });
+}
+
+export type ContentInteractionState = {
+  likesCount: number;
+  commentsCount: number;
+  isLiked: boolean;
+  canLike: boolean;
+};
+
+/**
+ * HOM-03 §104: lo stato Mi piace del dettaglio `/content/[type]/[id]`, la
+ * stessa entità del Feed. `null` quando il contenuto non è leggibile: nessun
+ * Like da mostrare, non un Like a zero.
+ */
+export async function fetchContentInteractionState(
+  contentType: FeedContentType,
+  postId: string,
+): Promise<ContentInteractionState | null> {
+  const { data, error } = await supabase.rpc("fetch_content_interaction_state", {
+    p_content_type: contentType,
+    p_post_id: postId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null | undefined;
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  return {
+    likesCount: readCount(row, "likes_count"),
+    commentsCount: readCount(row, "comments_count"),
+    isLiked: row.is_liked === true,
+    canLike: row.can_like === true,
+  };
+}
+
 /** HOM-02 §19, §22: mention e tag aprono l'identità per id, mai per nome. */
 export function resolveIdentityHref(target: {
   identityType: "profile" | "club" | "team";
@@ -403,7 +550,7 @@ export function resolveIdentityHref(target: {
  * HOM-02 §35 (Luigi 2026-11-11: niente viewer nuovo): il tap su un media apre
  * il dettaglio del contenuto con l'indice selezionato.
  */
-export function resolvePostMediaHref(item: FeedPostItem, index: number): string {
+export function resolvePostMediaHref(item: FeedContentItem, index: number): string {
   return `/content/${item.payload.contentType}/${item.payload.postId}?media=${index}`;
 }
 

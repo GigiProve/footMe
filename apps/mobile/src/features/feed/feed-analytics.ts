@@ -10,6 +10,8 @@
  * segnalibro è l'unica azione realmente funzionante sulle card e il menu ⋯ è
  * l'unico punto d'accesso alle azioni future, quindi misurarli da subito costa
  * nulla e dice qualcosa.
+ *
+ * HOM-03 §99–102 aggiunge gli eventi del player e dell'Articolo.
  */
 
 import { trackEvent, type AnalyticsProps } from "../../lib/analytics";
@@ -72,7 +74,26 @@ export type FeedAnalyticsEvent =
   | { name: "feed_post_like_tap"; itemId: string; liked: boolean }
   | { name: "feed_post_comment_tap"; itemId: string }
   | { name: "feed_post_share_tap"; itemId: string }
-  | { name: "feed_post_link_preview_open"; itemId: string; domain: string };
+  | { name: "feed_post_link_preview_open"; itemId: string; domain: string }
+  // HOM-03 §99–102: la thumbnail a schermo NON è un play (§99). Play, quartili,
+  // completamento e tempo di visione sono eventi grezzi per HOME-05: nessuna
+  // statistica calcolata qui (§101). Vedi feed-video-analytics.ts.
+  | { name: "feed_video_play"; itemId: string; mediaId: string; surface: FeedVideoSurface }
+  | { name: "feed_video_progress"; itemId: string; mediaId: string; percent: 25 | 50 | 75 }
+  | { name: "feed_video_complete"; itemId: string; mediaId: string }
+  | { name: "feed_video_watch"; itemId: string; mediaId: string; seconds: number }
+  | { name: "feed_video_mute"; itemId: string; muted: boolean }
+  | { name: "feed_video_fullscreen"; itemId: string }
+  | { name: "feed_video_error"; itemId: string; mediaId: string }
+  | { name: "feed_video_retry"; itemId: string; mediaId: string }
+  | { name: "feed_article_impression"; itemId: string }
+  | { name: "feed_article_open"; itemId: string; origin: FeedOpenOrigin; position: number };
+
+/** Dove gira il player: il Feed o il dettaglio del contenuto. */
+export type FeedVideoSurface = "feed" | "detail";
+
+/** §49: da dove arriva l'apertura di un Articolo. Oggi solo il Feed. */
+export type FeedOpenOrigin = "feed";
 
 export function trackFeed(event: FeedAnalyticsEvent): void {
   const { name, ...rest } = event;

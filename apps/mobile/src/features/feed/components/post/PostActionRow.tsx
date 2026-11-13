@@ -16,7 +16,10 @@
  * Nessun segnalibro: Salva sta solo nel menu ••• (§62). Mi piace attivo =
  * stesso controllo con icona piena, accent e `selected` (§52). Il tap chiama
  * sempre l'handler: se il Like non è disponibile se ne occupa chi lo riceve.
- * Gli elementi editoriali (HOM-03, §63) usano `FeedItemActionRow` col segnalibro.
+ * HOM-03 §52–59: Articolo e Video editoriale usano QUESTA riga, identica; il
+ * segnalibro sta nell'header (`EditorialHeader`), mai come quarta azione.
+ * `PostActionButton` è esportato per il dettaglio storico, che mostra il solo
+ * Mi piace perché i commenti vivono già nella sua sezione.
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
@@ -45,7 +48,14 @@ type ActionProps = {
   testID: string;
 };
 
-function Action({ icon, text, accessibilityLabel, active, onPress, testID }: ActionProps) {
+export function PostActionButton({
+  icon,
+  text,
+  accessibilityLabel,
+  active,
+  onPress,
+  testID,
+}: ActionProps) {
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
@@ -84,7 +94,7 @@ export function PostActionRow({
 
   return (
     <View style={styles.row}>
-      <Action
+      <PostActionButton
         accessibilityLabel={model.like.accessibilityLabel}
         active={model.like.selected}
         icon={model.like.selected ? "thumbs-up" : "thumbs-up-outline"}
@@ -92,14 +102,14 @@ export function PostActionRow({
         testID="feed-post-action-like"
         text={model.like.text}
       />
-      <Action
+      <PostActionButton
         accessibilityLabel={model.comment.accessibilityLabel}
         icon="chatbubble-outline"
         onPress={onComment}
         testID="feed-post-action-comment"
         text={model.comment.text}
       />
-      <Action
+      <PostActionButton
         accessibilityLabel={model.share.accessibilityLabel}
         icon="arrow-redo-outline"
         onPress={onShare}

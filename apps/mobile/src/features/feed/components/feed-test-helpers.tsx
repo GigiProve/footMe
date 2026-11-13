@@ -3,12 +3,15 @@ import TestRenderer, { act } from "react-test-renderer";
 
 import { ToastProvider } from "../../../ui";
 import type {
+  FeedArticleItem,
+  FeedEditorialPayload,
   FeedItem,
   FeedMediaItem,
   FeedPostItem,
   FeedPostPayload,
   FeedSuggestedClubRow,
   FeedSuggestedProfileRow,
+  FeedVideoItem,
 } from "../feed-types";
 import type { FeedModulesState } from "./FeedItemRenderer";
 
@@ -91,6 +94,28 @@ export function pressMatching(tree: TestRenderer.ReactTestRenderer, pattern: Reg
   });
 }
 
+/** Nodi host con un dato testID. */
+export function hostByTestId(tree: TestRenderer.ReactTestRenderer, testID: string) {
+  return tree.root.findAll(
+    (node) => typeof node.type === "string" && node.props?.testID === testID,
+  );
+}
+
+/** Preme il primo nodo host con quel testID che abbia un `onPress`. */
+export function pressTestId(tree: TestRenderer.ReactTestRenderer, testID: string) {
+  const target = hostByTestId(tree, testID).find(
+    (node) => typeof node.props.onPress === "function",
+  );
+
+  if (!target) {
+    throw new Error(`Nessun elemento premibile con testID "${testID}"`);
+  }
+
+  act(() => {
+    target.props.onPress();
+  });
+}
+
 /** Nodi host con un dato accessibilityLabel esatto (per contare i controlli). */
 export function findByLabel(tree: TestRenderer.ReactTestRenderer, label: string) {
   return tree.root.findAll(
@@ -135,6 +160,8 @@ export function makeMediaItem(
     altText: null,
     aspectRatio: null,
     availability: "available",
+    captions: [],
+    createdAt: null,
     durationSeconds: null,
     height: null,
     id: `media-${position}`,
@@ -143,9 +170,24 @@ export function makeMediaItem(
     thumbnailUrl: `https://cdn.test/${position}-thumb.jpg`,
     type: "image",
     url: `https://cdn.test/${position}.jpg`,
+    variants: [],
     width: null,
     ...overrides,
   };
+}
+
+/** Un video pronto (HOM-03): url, miniatura e durata di 48 secondi. */
+export function makeVideoMedia(
+  position = 0,
+  overrides: Partial<FeedMediaItem> = {},
+): FeedMediaItem {
+  return makeMediaItem(position, {
+    durationSeconds: 48,
+    id: `video-${position}`,
+    type: "video",
+    url: `https://cdn.test/${position}.mp4`,
+    ...overrides,
+  });
 }
 
 /**
@@ -201,37 +243,81 @@ export function makePostItem(
   };
 }
 
-export function makeArticleItem(): FeedItem {
+/** Payload editoriale (HOM-03): stessa forma per Articolo e Video, con like e capabilities. */
+function makeEditorialPayload(
+  overrides: Partial<FeedEditorialPayload> = {},
+): FeedEditorialPayload {
+  return {
+    authorIdentityType: "media",
+    authorMeta: {
+      clubCategory: null,
+      clubName: null,
+      mediaKind: null,
+      primaryPosition: null,
+      role: null,
+      teamLabel: null,
+    },
+    capabilities: {
+      canComment: true,
+      canDelete: false,
+      canEdit: false,
+      canLike: true,
+      canReport: true,
+      canSave: true,
+      canShare: true,
+      canViewInsights: false,
+    },
+    commentsCount: 0,
+    contentType: "media_profile",
+    durationSeconds: null,
+    intro: null,
+    isLiked: false,
+    kindLabel: null,
+    likesCount: 0,
+    media: [],
+    postId: "a1",
+    summary: null,
+    thumbnailUrl: null,
+    ...overrides,
+  };
+}
+
+export function makeArticleItem(
+  overrides: Partial<FeedArticleItem> = {},
+  payloadOverrides: Partial<FeedEditorialPayload> = {},
+): FeedArticleItem {
   return {
     ...envelope("media_profile:a1"),
     type: "article",
     author,
     title: "Il calcio italiano e i giovani talenti",
-    payload: {
-      contentType: "media_profile",
-      postId: "a1",
-      kindLabel: "Articolo",
+    payload: makeEditorialPayload({
       intro: "Analisi sui protagonisti emergenti.",
-      thumbnailUrl: null,
-      durationSeconds: null,
-    },
+      kindLabel: "Articolo",
+      summary: "Analisi sui protagonisti emergenti.",
+      ...payloadOverrides,
+    }),
+    ...overrides,
   };
 }
 
-export function makeVideoItem(): FeedItem {
+export function makeVideoItem(
+  overrides: Partial<FeedVideoItem> = {},
+  payloadOverrides: Partial<FeedEditorialPayload> = {},
+): FeedVideoItem {
   return {
-    ...envelope("club_media:v1"),
+    ...envelope("media_profile:v1"),
     type: "video",
     author,
     title: "Gli highlights della partita",
-    payload: {
-      contentType: "club_media",
-      postId: "v1",
-      kindLabel: "Highlights",
-      intro: null,
-      thumbnailUrl: null,
+    payload: makeEditorialPayload({
       durationSeconds: 95,
-    },
+      kindLabel: "Video",
+      media: [makeVideoMedia(0, { durationSeconds: 95 })],
+      postId: "v1",
+      ...payloadOverrides,
+    }),
+    ...overrides,
   };
 }
 

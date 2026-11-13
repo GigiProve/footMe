@@ -39,6 +39,8 @@ type SavedTarget = {
   isSaved: boolean;
 };
 
+const SCOPES: readonly FeedScope[] = ["per_te", "seguiti"];
+
 function patchSavedFlag(
   data: InfiniteData<FeedPage, FeedPageParam> | undefined,
   itemId: string,
@@ -59,36 +61,49 @@ function patchSavedFlag(
   };
 }
 
+/**
+ * HOM-03 §37, §51, §95: un solo Saved per tutta l'app. Lo stesso contenuto può
+ * stare in entrambe le tab, quindi la patch le tocca tutte e due; dopo la
+ * scrittura si invalidano anche le liste e i contatori dei Salvati (come fa
+ * Cerca → Media e contenuti), così "Salvato in Home" è salvato anche lì.
+ *
+ * `scope` resta nella firma per i chiamanti esistenti: la patch non dipende più
+ * dalla tab da cui parte il tap.
+ */
 export function useToggleSavedFeedItem({
   profileId,
-  scope,
 }: {
   profileId: string;
-  scope: FeedScope;
+  scope?: FeedScope;
 }) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const queryKey = FEED_QK.feed(scope, profileId);
+
+  const writeSaved = (itemId: string, isSaved: boolean) => {
+    for (const scope of SCOPES) {
+      queryClient.setQueryData<InfiniteData<FeedPage, FeedPageParam>>(
+        FEED_QK.feed(scope, profileId),
+        (data) => patchSavedFlag(data, itemId, isSaved),
+      );
+    }
+  };
 
   return useMutation({
     mutationFn: (target: SavedTarget) =>
       toggleSavedContent(profileId, target.contentType, target.postId, !target.isSaved),
     onMutate: async (target) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous =
-        queryClient.getQueryData<InfiniteData<FeedPage, FeedPageParam>>(queryKey);
-
-      queryClient.setQueryData<InfiniteData<FeedPage, FeedPageParam>>(queryKey, (data) =>
-        patchSavedFlag(data, target.itemId, !target.isSaved),
+      await Promise.all(
+        SCOPES.map((scope) =>
+          queryClient.cancelQueries({ queryKey: FEED_QK.feed(scope, profileId) }),
+        ),
       );
-
+      writeSaved(target.itemId, !target.isSaved);
       trackFeed({ itemId: target.itemId, name: "feed_save_tap", saved: !target.isSaved });
-      return { previous };
     },
-    onError: (_error, _target, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKey, context.previous);
-      }
+    onError: (_error, target) => {
+      // Si torna allo stato di prima del tap su quel solo elemento: ripristinare
+      // l'intera pagina cancellerebbe un Mi piace arrivato nel frattempo.
+      writeSaved(target.itemId, target.isSaved);
       showToast({ message: "Non è stato possibile aggiornare i salvati." });
     },
     onSuccess: (_result, target) => {
@@ -97,6 +112,10 @@ export function useToggleSavedFeedItem({
         message: target.isSaved ? "Rimosso dai salvati." : "Salvato.",
         tone: "success",
       });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["saved-items"] });
+      void queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
     },
   });
 }

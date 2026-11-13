@@ -32,7 +32,14 @@ import {
   fetchFanMediaPostDetail,
   type FanMediaPost,
 } from "../../../src/features/profiles/fan-media-service";
+import { ContentDetailMedia } from "../../../src/features/feed/components/detail/ContentDetailMedia";
+import { ContentLikeControl } from "../../../src/features/feed/components/detail/ContentLikeControl";
 import { ProfilePostDetail } from "../../../src/features/feed/components/ProfilePostDetail";
+import { createFeedVideoController } from "../../../src/features/feed/feed-video-controller";
+import { legacyVideoMedia } from "../../../src/features/feed/feed-video-presentation";
+import type { FeedContentType, FeedMediaItem } from "../../../src/features/feed/feed-types";
+import { FeedVideoProvider } from "../../../src/features/feed/use-feed-video";
+import { useFeedVideoLifecycle } from "../../../src/features/feed/use-feed-video-lifecycle";
 import { FanContentBody } from "../../../src/features/profiles/FanContentBody";
 import { MediaContentInteractions } from "../../../src/features/profiles/media/MediaContentInteractions";
 import { MediaTribunaBody } from "../../../src/features/profiles/media/MediaTribunaBody";
@@ -53,6 +60,8 @@ type TaggedEntry = ContentTaggedTarget;
 type ContentView = {
   authorName: string | null;
   body: string | null;
+  /** HOM-03 §50: cover ampia dell'Articolo, valorizzata solo qui e non nel Feed. */
+  coverUrl: string | null;
   displayMode: "full" | "preview";
   excerpt: string | null;
   externalUrl: string | null;
@@ -66,8 +75,16 @@ type ContentView = {
   thumbnailUrl: string | null;
   title: string;
   typeLabel: string;
+  /** HOM-03 §35: video del contenuto, riprodotto inline con lo stesso player del Feed. */
+  video: FeedMediaItem | null;
   viewerTagged: boolean;
 };
+
+/**
+ * HOM-03 §104: i tipi su cui il Mi piace è reale, gli stessi di `set_content_like`.
+ * `media_tribuna` e `fan_tribuna` non hanno l'entity di like.
+ */
+const LIKEABLE: ContentDetailType[] = ["club_media", "media_profile", "fan_media"];
 
 /**
  * Tutte le superfici contenuto apribili in dettaglio. `media_tribuna` e
@@ -107,9 +124,12 @@ function clubMediaTypeLabel(kind: ClubMediaPost["kind"]): string {
 }
 
 function mapClubMedia(post: ClubMediaPost, viewerId: string | null): ContentView {
+  const isVideo = post.visual_type === "video" && Boolean(post.visual_url);
+
   return {
     authorName: null,
     body: post.body ?? post.excerpt ?? null,
+    coverUrl: isVideo ? null : (post.visual_url ?? post.thumbnail_url),
     displayMode: "full",
     excerpt: post.excerpt ?? null,
     externalUrl: null,
@@ -129,6 +149,14 @@ function mapClubMedia(post: ClubMediaPost, viewerId: string | null): ContentView
     thumbnailUrl: post.thumbnail_url ?? post.visual_url,
     title: post.title,
     typeLabel: clubMediaTypeLabel(post.kind),
+    video: isVideo
+      ? legacyVideoMedia({
+          durationSeconds: post.video_duration_seconds,
+          id: post.id,
+          thumbnailUrl: post.thumbnail_url,
+          url: post.visual_url,
+        })
+      : null,
     viewerTagged:
       !!viewerId &&
       post.tagged_profiles.some(
@@ -143,9 +171,12 @@ function mapMediaProfile(
   post: MediaProfilePost,
   viewerId: string | null,
 ): ContentView {
+  const isVideo = post.cover_type === "video" && Boolean(post.cover_url);
+
   return {
     authorName: post.author_name,
     body: post.body ?? post.excerpt ?? null,
+    coverUrl: isVideo ? null : post.cover_url,
     displayMode: post.display_mode,
     excerpt: post.excerpt ?? null,
     externalUrl: post.external_url,
@@ -165,6 +196,14 @@ function mapMediaProfile(
     thumbnailUrl: post.cover_url,
     title: post.title,
     typeLabel: post.kind === "news" ? "News" : "Articolo",
+    video: isVideo
+      ? legacyVideoMedia({
+          durationSeconds: null,
+          id: post.id,
+          thumbnailUrl: null,
+          url: post.cover_url,
+        })
+      : null,
     viewerTagged:
       !!viewerId &&
       post.tagged_targets.some(
@@ -188,6 +227,7 @@ function mapFanTribuna(
   return {
     authorName: null,
     body: post.body ?? null,
+    coverUrl: null,
     displayMode: "full",
     excerpt: null,
     externalUrl: null,
@@ -207,6 +247,8 @@ function mapFanTribuna(
     thumbnailUrl: post.thumbnail_url ?? null,
     title: post.title,
     typeLabel: fanTribunaTypeLabel(post.kind),
+    // Il corpo (FanContentBody) mostra già foto/video della Tribuna.
+    video: null,
     viewerTagged:
       !!viewerId &&
       post.tagged_targets.some(
@@ -229,6 +271,7 @@ function mapMediaTribuna(
   return {
     authorName: null,
     body: post.body ?? null,
+    coverUrl: null,
     displayMode: "full",
     excerpt: null,
     externalUrl: null,
@@ -242,14 +285,18 @@ function mapMediaTribuna(
     thumbnailUrl: null,
     title: post.title,
     typeLabel: mediaTribunaTypeLabel(post.kind),
+    video: null,
     viewerTagged: false,
   };
 }
 
 function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentView {
+  const isVideo = post.visual_type === "video" && Boolean(post.visual_url);
+
   return {
     authorName: null,
     body: null,
+    coverUrl: null,
     displayMode: "full",
     excerpt: post.description,
     externalUrl: null,
@@ -263,6 +310,14 @@ function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentVi
     thumbnailUrl: post.thumbnail_url ?? post.visual_url,
     title: post.description,
     typeLabel: post.visual_type === "video" ? "Video" : "Foto",
+    video: isVideo
+      ? legacyVideoMedia({
+          durationSeconds: null,
+          id: post.id,
+          thumbnailUrl: post.thumbnail_url,
+          url: post.visual_url,
+        })
+      : null,
     viewerTagged: false,
   };
 }
@@ -273,9 +328,10 @@ function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentVi
  */
 export default function ContentDetailRoute() {
   const { id, media, type } = useLocalSearchParams<{ id: string; media?: string; type: string }>();
+  // `Number("")` è 0: un `?media=` vuoto non è un tap su un media.
+  const mediaIndex = media ? Number(media) : Number.NaN;
 
   if (type === "profile_post" && id) {
-    const mediaIndex = Number(media);
     return (
       <ProfilePostDetail
         initialMediaIndex={Number.isInteger(mediaIndex) && mediaIndex >= 0 ? mediaIndex : null}
@@ -284,10 +340,26 @@ export default function ContentDetailRoute() {
     );
   }
 
-  return <ContentDetailScreen />;
+  // §35: `?media=N` dal Feed = tap già avvenuto sul video, parte una volta sola.
+  return (
+    <ContentDetailScreen autoStartVideo={Number.isInteger(mediaIndex) && mediaIndex >= 0} />
+  );
 }
 
-function ContentDetailScreen() {
+function ContentDetailScreen({ autoStartVideo }: { autoStartVideo: boolean }) {
+  // Controller locale al dettaglio: un solo video alla volta, pausa su
+  // background e uscita dalla schermata.
+  const [videoController] = useState(createFeedVideoController);
+  useFeedVideoLifecycle(videoController);
+
+  return (
+    <FeedVideoProvider controller={videoController}>
+      <ContentDetailBody autoStartVideo={autoStartVideo} />
+    </FeedVideoProvider>
+  );
+}
+
+function ContentDetailBody({ autoStartVideo }: { autoStartVideo: boolean }) {
   const { id, type } = useLocalSearchParams<{ id: string; type: string }>();
   const { profile } = useSession();
   const router = useRouter();
@@ -418,11 +490,31 @@ function ContentDetailScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
-          <CompactContentModule
-            thumbnailUrl={content.thumbnailUrl}
-            title={content.title}
-            typeLabel={content.typeLabel}
-          />
+          {content.video || content.coverUrl ? (
+            // HOM-03 §35, §50: video inline o cover ampia in testa; il titolo
+            // segue come testata, senza la miniatura che la cover già mostra.
+            <>
+              <ContentDetailMedia
+                autoStart={autoStartVideo}
+                coverUrl={content.coverUrl}
+                itemId={`${contentType}:${id}`}
+                title={content.title}
+                video={content.video}
+              />
+              <View style={styles.headline}>
+                <AppText color="secondary" variant="eyebrow">
+                  {content.typeLabel}
+                </AppText>
+                <AppText variant="headingMd">{content.title}</AppText>
+              </View>
+            </>
+          ) : (
+            <CompactContentModule
+              thumbnailUrl={content.thumbnailUrl}
+              title={content.title}
+              typeLabel={content.typeLabel}
+            />
+          )}
 
           <ContentTaggedHeader
             authorName={content.authorName}
@@ -477,6 +569,15 @@ function ContentDetailScreen() {
               ) : null}
             </>
           )}
+
+          {/* HOM-03 §104: il Mi piace è la stessa entity del Feed. */}
+          {viewerId && id && LIKEABLE.includes(contentType) ? (
+            <ContentLikeControl
+              contentType={contentType as FeedContentType}
+              postId={id}
+              profileId={viewerId}
+            />
+          ) : null}
 
           {/*
             REV-PROF-21: Salva e commenti dei contenuti Media/Creator. Prima
@@ -573,6 +674,9 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing[16],
     justifyContent: "center",
+  },
+  headline: {
+    gap: spacing[4],
   },
   scroll: {
     gap: spacing[16],

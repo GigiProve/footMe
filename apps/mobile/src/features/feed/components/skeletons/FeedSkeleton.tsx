@@ -5,6 +5,9 @@
  * `FeedItemFrame` dei contenuti veri, così l'arrivo dei dati non sposta nulla.
  *  • post: avatar, riga nome, righe di testo, media 16:9, tre aree azioni
  *    bilanciate (§53; HOM-02 §77);
+ *  • video: autore, una riga di caption, area media 16:9, azioni (HOM-03 §123–124);
+ *  • articolo: autore, righe di titolo, miniatura piccola a destra come la
+ *    preview vera (96pt, 4:5), azioni (HOM-03 §125);
  *  • posizione: kicker, poi logo, titolo, due metadata e CTA testuale (§54);
  *  • discovery: intestazione e righe avatar + testo + azione (§55).
  *
@@ -18,6 +21,7 @@ import { StyleSheet, View } from "react-native";
 
 import { colors, radius, spacing } from "../../../../theme/tokens";
 import { Skeleton } from "../../../../ui";
+import { ARTICLE_THUMBNAIL_RATIO, ARTICLE_THUMBNAIL_WIDTH } from "../../feed-video-presentation";
 import { FeedItemFrame } from "../items/FeedItemFrame";
 
 export function PositionSkeleton() {
@@ -39,31 +43,73 @@ export function PositionSkeleton() {
   );
 }
 
+function SkeletonHeader() {
+  return (
+    <View style={styles.header}>
+      <Skeleton.Circle style={styles.avatar} />
+      <View style={styles.grow}>
+        <Skeleton.Row style={styles.w50} />
+        <Skeleton.Row style={styles.w30} />
+      </View>
+    </View>
+  );
+}
+
+/** HOM-02 §77: tre aree uguali come la riga azioni vera, niente quarto segnalibro. */
+function SkeletonActions() {
+  return (
+    <View style={styles.actions}>
+      <View style={styles.actionCell}>
+        <View style={styles.icon} />
+      </View>
+      <View style={styles.actionCell}>
+        <View style={styles.icon} />
+      </View>
+      <View style={styles.actionCell}>
+        <View style={styles.icon} />
+      </View>
+    </View>
+  );
+}
+
 export function PostSkeleton() {
   return (
     <FeedItemFrame testID="feed-skeleton-post">
-      <View style={styles.header}>
-        <Skeleton.Circle style={styles.avatar} />
-        <View style={styles.grow}>
-          <Skeleton.Row style={styles.w50} />
-          <Skeleton.Row style={styles.w30} />
-        </View>
-      </View>
+      <SkeletonHeader />
       <Skeleton.Row />
       <Skeleton.Row style={styles.w70} />
       <View style={styles.media} />
-      {/* HOM-02 §77: tre aree uguali come la riga azioni vera, niente quarto segnalibro. */}
-      <View style={styles.actions}>
-        <View style={styles.actionCell}>
-          <View style={styles.icon} />
+      <SkeletonActions />
+    </FeedItemFrame>
+  );
+}
+
+/** HOM-03 §124: autore, una riga di caption, area media, azioni. */
+export function VideoPostSkeleton() {
+  return (
+    <FeedItemFrame testID="feed-skeleton-video">
+      <SkeletonHeader />
+      <Skeleton.Row style={styles.w70} />
+      <View style={styles.media} />
+      <SkeletonActions />
+    </FeedItemFrame>
+  );
+}
+
+/** HOM-03 §125: autore, righe di titolo, miniatura piccola, azioni. */
+export function ArticleSkeleton() {
+  return (
+    <FeedItemFrame testID="feed-skeleton-article">
+      <SkeletonHeader />
+      <View style={styles.articleBody}>
+        <View style={styles.grow}>
+          <Skeleton.Row />
+          <Skeleton.Row style={styles.w70} />
+          <Skeleton.Row style={styles.w50} />
         </View>
-        <View style={styles.actionCell}>
-          <View style={styles.icon} />
-        </View>
-        <View style={styles.actionCell}>
-          <View style={styles.icon} />
-        </View>
+        <View style={styles.thumbnail} />
       </View>
+      <SkeletonActions />
     </FeedItemFrame>
   );
 }
@@ -86,14 +132,18 @@ export function SuggestedProfilesSkeleton() {
   );
 }
 
-/** Stessa alternanza che il Feed vero produce: posizione, post, persone, post. */
+/**
+ * Stessa alternanza che il Feed vero produce: posizione, post, video, persone,
+ * articolo (HOM-03 §123: video e articolo fanno parte della sequenza).
+ */
 export function FeedSkeleton() {
   return (
     <View testID="feed-skeleton">
       <PositionSkeleton />
       <PostSkeleton />
+      <VideoPostSkeleton />
       <SuggestedProfilesSkeleton />
-      <PostSkeleton />
+      <ArticleSkeleton />
     </View>
   );
 }
@@ -109,6 +159,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     height: 44,
     marginTop: spacing[4],
+  },
+  articleBody: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: spacing[12],
+    marginTop: spacing[8],
   },
   avatar: {
     height: 32,
@@ -171,6 +227,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing[12],
     paddingVertical: spacing[10],
+  },
+  thumbnail: {
+    aspectRatio: ARTICLE_THUMBNAIL_RATIO,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius[8],
+    width: ARTICLE_THUMBNAIL_WIDTH,
   },
   w30: { width: "30%" },
   w40: { width: "40%" },

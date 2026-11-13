@@ -447,13 +447,22 @@ export function buildMediaLayout(media: readonly FeedMediaItem[]): MediaLayout {
 export type MediaCellState = "ready" | "processing" | "unavailable";
 
 /**
+ * HOM-03 §64, §114: `uploaded` e `processing` sono per l'utente lo stesso stato
+ * («Video in elaborazione»): il client non mostra mai l'enum tecnico. Prende una
+ * stringa per non dipendere da quali valori il tipo del payload ammette.
+ */
+export function isProcessingState(state: string): boolean {
+  return state === "processing" || state === "uploaded";
+}
+
+/**
  * §41, §87–88: stato di una singola cella. Una cella fallita non fa fallire il
  * Post. Per un video la miniatura che non carica non lo rende "non
  * disponibile": il video resta riproducibile, manca solo l'anteprima.
  */
 export function mediaCellState(item: FeedMediaItem, imageFailed = false): MediaCellState {
   if (item.type === "video") {
-    if (item.processingState === "processing") {
+    if (isProcessingState(item.processingState)) {
       return "processing";
     }
 

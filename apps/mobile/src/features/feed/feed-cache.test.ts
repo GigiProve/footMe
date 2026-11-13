@@ -8,7 +8,7 @@ import {
   saveFeedCacheMeta,
   saveFeedCacheScope,
 } from "./feed-cache";
-import { makePostPayload } from "./feed-post-fixtures";
+import { makeEditorialItem, makeFeedMedia, makePostPayload } from "./feed-post-fixtures";
 import type { FeedItem } from "./feed-types";
 
 const PROFILE = "profile-1";
@@ -205,5 +205,52 @@ describe("clearFeedCache", () => {
     await clearFeedCache(PROFILE);
 
     expect(await loadFeedCache(PROFILE)).toBeNull();
+  });
+});
+
+describe("loadFeedCache — HOM-03", () => {
+  async function pushRaw(item: Record<string, unknown>) {
+    await saveFeedCacheScope(PROFILE, "per_te", { items: [makePost("a")] });
+    const raw = JSON.parse((await AsyncStorage.getItem(KEY)) as string);
+    raw.scopes.per_te.items.push(item);
+    await AsyncStorage.setItem(KEY, JSON.stringify(raw));
+  }
+
+  it("scarta un Articolo o un video editoriale salvato prima di HOM-03", async () => {
+    await pushRaw({
+      id: "media_profile:old",
+      type: "article",
+      rank: 2,
+      payload: { contentType: "media_profile", postId: "old", intro: null, thumbnailUrl: null, durationSeconds: null },
+    });
+
+    const cache = await loadFeedCache(PROFILE);
+
+    expect(cache?.scopes.per_te.items.map((item) => item.id)).toEqual(["a"]);
+  });
+
+  it("conserva un editoriale HOM-03 completo", async () => {
+    await saveFeedCacheScope(PROFILE, "per_te", {
+      items: [makeEditorialItem("media_profile:v-1", "video", { media: [makeFeedMedia()] })],
+    });
+
+    const cache = await loadFeedCache(PROFILE);
+
+    expect(cache?.scopes.per_te.items.map((item) => item.type)).toEqual(["video"]);
+  });
+
+  it("completa i media scritti da HOM-02 con i default invece di scartare il Post", async () => {
+    const { createdAt: _c, variants: _v, captions: _k, ...hom02Media } = makeFeedMedia();
+    await pushRaw({ ...makePost("b"), payload: makePostPayload({ postId: "b", media: [hom02Media as never] }) });
+
+    const cache = await loadFeedCache(PROFILE);
+    const post = cache?.scopes.per_te.items[1];
+
+    expect(post?.id).toBe("b");
+    expect(post?.type === "post" ? post.payload.media[0] : null).toMatchObject({
+      captions: [],
+      createdAt: null,
+      variants: [],
+    });
   });
 });

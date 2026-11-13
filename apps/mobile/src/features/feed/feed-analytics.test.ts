@@ -100,6 +100,18 @@ describe("trackFeed", () => {
     { itemId: "p:1", name: "feed_post_comment_tap" },
     { itemId: "p:1", name: "feed_post_share_tap" },
     { domain: "example.com", itemId: "p:1", name: "feed_post_link_preview_open" },
+    // HOM-03 §99–102
+    { itemId: "p:1", mediaId: "m-1", name: "feed_video_play", surface: "feed" },
+    { itemId: "p:1", mediaId: "m-1", name: "feed_video_play", surface: "detail" },
+    { itemId: "p:1", mediaId: "m-1", name: "feed_video_progress", percent: 25 },
+    { itemId: "p:1", mediaId: "m-1", name: "feed_video_complete" },
+    { itemId: "p:1", mediaId: "m-1", name: "feed_video_watch", seconds: 12 },
+    { itemId: "p:1", muted: true, name: "feed_video_mute" },
+    { itemId: "p:1", name: "feed_video_fullscreen" },
+    { itemId: "p:1", mediaId: "m-1", name: "feed_video_error" },
+    { itemId: "p:1", mediaId: "m-1", name: "feed_video_retry" },
+    { itemId: "a:1", name: "feed_article_impression" },
+    { itemId: "a:1", name: "feed_article_open", origin: "feed", position: 4 },
   ];
 
   it.each(cases.map((event) => [event.name, event] as const))(
@@ -150,6 +162,17 @@ describe("trackFeed", () => {
       "feed_post_comment_tap",
       "feed_post_share_tap",
       "feed_post_link_preview_open",
+      // HOM-03 §99–102: play, progress e completion distinti dall'impression
+      "feed_video_play",
+      "feed_video_progress",
+      "feed_video_complete",
+      "feed_video_watch",
+      "feed_video_mute",
+      "feed_video_fullscreen",
+      "feed_video_error",
+      "feed_video_retry",
+      "feed_article_impression",
+      "feed_article_open",
     ];
 
     const covered = new Set(cases.map((event) => event.name));

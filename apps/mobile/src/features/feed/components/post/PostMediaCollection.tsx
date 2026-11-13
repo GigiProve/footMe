@@ -13,10 +13,23 @@
  * l'indice; apertura del dettaglio e analytics del media sono di FeedPane. Qui
  * si traccia solo ciò che nasce nel componente: la selezione di un video (§36)
  * e l'apertura della galleria dalla cella +N (§32).
+ *
+ * HOM-03 (Luigi 2026-11-12): un Post con UN solo media video lo riproduce
+ * inline nel Feed con `VideoMedia` (Play → player nella stessa area, stati
+ * «in elaborazione»/«non disponibile» come riga compatta); le gallery con più
+ * media tengono le celle e il tap apre il dettaglio. Nel dettaglio (`list`)
+ * ogni video è un `VideoMedia`, e quello toccato nel Feed (`autoStartIndex`)
+ * parte una volta sola.
  */
 
 import { useRef } from "react";
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import {
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
 import { colors, radius, spacing } from "../../../../theme/tokens";
 import { trackFeed } from "../../feed-analytics";
@@ -27,6 +40,7 @@ import {
   type MediaCellPlan,
 } from "../../feed-post-presentation";
 import type { FeedMediaItem } from "../../feed-types";
+import { VideoMedia } from "../video/VideoMedia";
 import { PostMediaCell } from "./PostMediaCell";
 
 type PostMediaCollectionProps = {
@@ -41,6 +55,8 @@ type PostMediaCollectionProps = {
   variant?: "grid" | "list";
   /** Solo `list`: posizione verticale di ogni media, per portare in vista quello scelto. */
   onMediaLayout?: (index: number, y: number) => void;
+  /** Solo `list`: indice del video da avviare subito, una volta sola (`?media=N`). */
+  autoStartIndex?: number | null;
 };
 
 export function PostMediaCollection({
@@ -49,6 +65,7 @@ export function PostMediaCollection({
   onOpenMedia,
   variant = "grid",
   onMediaLayout,
+  autoStartIndex = null,
 }: PostMediaCollectionProps) {
   const layoutRef = useRef<{ listY: number | null; items: Map<number, number> }>({
     items: new Map(),
@@ -80,24 +97,42 @@ export function PostMediaCollection({
         style={styles.list}
         testID="feed-post-media-list"
       >
-        {orderMedia(media).map((item, index) => (
-          <View
-            key={`${item.id}:${index}`}
-            onLayout={(event) => {
-              layoutRef.current.items.set(index, event.nativeEvent.layout.y);
-              emit(index);
-            }}
-            style={[styles.listItem, { aspectRatio: singleMediaAspectRatio(item) }]}
-          >
-            <PostMediaCell
-              cell={{ index, item, overflowCount: null }}
-              compact={false}
-              onPress={(cell) => onOpenMedia(cell.index)}
-              preferFull
-              total={media.length}
-            />
-          </View>
-        ))}
+        {orderMedia(media).map((item, index) => {
+          const handleLayout = (event: LayoutChangeEvent) => {
+            layoutRef.current.items.set(index, event.nativeEvent.layout.y);
+            emit(index);
+          };
+
+          // Un video ha la sua area (miniatura o riga di stato) e il suo player.
+          if (item.type === "video") {
+            return (
+              <View key={`${item.id}:${index}`} onLayout={handleLayout}>
+                <VideoMedia
+                  autoStart={autoStartIndex === index}
+                  itemId={itemId}
+                  media={item}
+                  surface="detail"
+                />
+              </View>
+            );
+          }
+
+          return (
+            <View
+              key={`${item.id}:${index}`}
+              onLayout={handleLayout}
+              style={[styles.listItem, { aspectRatio: singleMediaAspectRatio(item) }]}
+            >
+              <PostMediaCell
+                cell={{ index, item, overflowCount: null }}
+                compact={false}
+                onPress={(cell) => onOpenMedia(cell.index)}
+                preferFull
+                total={media.length}
+              />
+            </View>
+          );
+        })}
       </View>
     );
   }
@@ -131,6 +166,19 @@ export function PostMediaCollection({
 
   switch (layout.kind) {
     case "single":
+      // Un solo video: area propria e player inline (HOM-03). Il «+N» non può
+      // esistere con un solo media, quindi la cella è sempre il video stesso.
+      if (first.item.type === "video") {
+        return (
+          <VideoMedia
+            itemId={itemId}
+            media={first.item}
+            style={styles.single}
+            surface="feed"
+          />
+        );
+      }
+
       return (
         <View style={[styles.frame, ratio]} testID="feed-post-media">
           {renderCell(first, false)}
@@ -202,6 +250,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     gap: spacing[4],
+  },
+  single: {
+    marginTop: spacing[12],
   },
   trioMain: {
     flex: 2,

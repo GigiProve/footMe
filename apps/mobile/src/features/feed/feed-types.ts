@@ -241,6 +241,29 @@ export type FeedAuthorMeta = {
   mediaKind: string | null;
 };
 
+/**
+ * HOM-03 §64: i quattro stati del media. `uploaded` vale come `processing` in
+ * ogni derivazione UI: l'enum non arriva mai a schermo (§114).
+ */
+export type FeedMediaProcessingState = "uploaded" | "processing" | "ready" | "failed";
+
+/** HOM-03 §71–72: variante di stream (predisposizione, nessuna pipeline ancora). */
+export type FeedMediaVariant = {
+  url: string;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  bitrate: number | null;
+};
+
+/** HOM-03 §84: captions, sottotitoli e trascrizione, se il backend li fornisce. */
+export type FeedMediaCaption = {
+  url: string;
+  language: string | null;
+  kind: "captions" | "subtitles" | "transcript";
+  label: string | null;
+};
+
 /** §24: un elemento della media collection unica, foto e video insieme. */
 export type FeedMediaItem = {
   id: string;
@@ -254,8 +277,12 @@ export type FeedMediaItem = {
   aspectRatio: number | null;
   durationSeconds: number | null;
   altText: string | null;
-  processingState: "ready" | "processing" | "failed";
+  processingState: FeedMediaProcessingState;
   availability: "available" | "unavailable";
+  /** HOM-03 §71: istante di caricamento, null per le righe legacy. */
+  createdAt: string | null;
+  variants: FeedMediaVariant[];
+  captions: FeedMediaCaption[];
 };
 
 /**
@@ -324,14 +351,32 @@ export type FeedPostPayload = {
   capabilities: FeedPostCapabilities;
 };
 
-
+/**
+ * HOM-03: Articolo e video editoriale. Stesso payload d'autore, media e
+ * interazioni del Post (§38: "entrambi condividono author header, player,
+ * interaction system"), più la gerarchia editoriale: il titolo vive
+ * nell'envelope, `summary` è il sommario breve (§34, §45).
+ *
+ * `intro`, `thumbnailUrl` e `durationSeconds` sono i campi legacy delle righe
+ * pre-HOM-03: restano perché `summary` e `media` ricadono su di loro.
+ */
 export type FeedEditorialPayload = {
   contentType: MediaContentType;
   postId: string;
   kindLabel: string | null;
   intro: string | null;
+  /** `data.summary` del server, altrimenti `intro`. Il client lo taglia a 2 righe. */
+  summary: string | null;
   thumbnailUrl: string | null;
   durationSeconds: number | null;
+  authorIdentityType: FeedIdentityType;
+  authorMeta: FeedAuthorMeta;
+  /** Articolo: la cover (position 0) se presente. Video editoriale: il video. */
+  media: FeedMediaItem[];
+  likesCount: number;
+  commentsCount: number;
+  isLiked: boolean;
+  capabilities: FeedPostCapabilities;
 };
 
 export type FeedPositionPayload = {
@@ -418,6 +463,16 @@ export type FeedItem =
   | FeedSuggestedClubsItem;
 
 export type FeedEditorialItem = FeedArticleItem | FeedVideoItem;
+
+/**
+ * HOM-03: gli elementi con media collection, conteggi e capability: il Post e
+ * i due editoriali. Mi piace, processing e Saved lavorano su questa union.
+ */
+export type FeedContentItem = FeedPostItem | FeedEditorialItem;
+
+export function isContentItem(item: FeedItem): item is FeedContentItem {
+  return item.type === "post" || item.type === "article" || item.type === "video";
+}
 
 export function isDiscoveryItem(
   item: FeedItem,

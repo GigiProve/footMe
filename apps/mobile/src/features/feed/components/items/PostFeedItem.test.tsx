@@ -3,6 +3,7 @@ import type TestRenderer from "react-test-renderer";
 import { act } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { videoMock } from "../../../../test/expo-video";
 import { FEED_POST_SHOW_LESS, FEED_POST_SHOW_MORE } from "../../feed-labels";
 import type {
   FeedAuthorMeta,
@@ -17,6 +18,7 @@ import {
   findByLabel,
   makeMediaItem,
   makePostItem,
+  makeVideoMedia,
   press,
   pressMatching,
   renderWithToast,
@@ -24,9 +26,14 @@ import {
 } from "../feed-test-helpers";
 import { PostFeedItem } from "./PostFeedItem";
 
+// Il video singolo monta `VideoMedia`: player nativo e binding del controller.
+vi.mock("expo-video", () => import("../../../../test/expo-video"));
+vi.mock("expo-router", () => ({ useFocusEffect: () => undefined }));
+
 const NOW = new Date("2026-07-31T12:00:00.000Z");
 
 beforeEach(() => {
+  videoMock.reset();
   // Solo `Date`: il tempo relativo dell'header deve essere deterministico
   // (la fixture è pubblicata alle 10:00), i timer reali restano intatti.
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -534,7 +541,7 @@ describe("PostFeedItem — media collection", () => {
 
     expect(json).toContain('"0:48"');
     expect(json).toContain('"name":"play"');
-    expect(findByLabel(tree, "Video, durata 48 secondi")).toHaveLength(1);
+    expect(findByLabel(tree, "Riproduci video, durata 48 secondi")).toHaveLength(1);
   });
 
   it("foto + video: il video mostra durata, la foto no, e l'ordine è quello dell'autore", () => {
@@ -644,6 +651,124 @@ describe("PostFeedItem — media collection", () => {
     const { tree } = setup({ media: [makeMediaItem(0, { altText: "Esultanza dopo il gol" })] });
 
     expect(findByLabel(tree, "Esultanza dopo il gol")).toHaveLength(1);
+  });
+});
+
+describe("PostFeedItem — Video social (HOM-03)", () => {
+  it("è lo stesso Post: nessuna label VIDEO, nessun titolo editoriale, stessa riga azioni (§7, §38)", () => {
+    const { tree } = setup(
+      { media: [makeVideoMedia(0)] },
+      { title: null },
+    );
+    const json = textOf(tree);
+
+    expect(countTestId(tree, "feed-post")).toBe(1);
+    expect(json).not.toMatch(/"VIDEO"|Video ·/);
+    expect(countTestIdPrefix(tree, "feed-post-action-")).toBe(3);
+    expect(findByLabel(tree, "Salva contenuto")).toHaveLength(0);
+  });
+
+  it("con caption: header → caption → video → azioni; senza caption: header → video → azioni (§8)", () => {
+    const withCaption = textOf(setup({ media: [makeVideoMedia(0)] }).tree);
+    const order = ["Como 1907", "Testo del post.", "feed-video-media", "feed-post-action-like"].map(
+      (marker) => withCaption.indexOf(marker),
+    );
+
+    expect(order.every((position) => position >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+
+    const withoutCaption = setup({ body: null, media: [makeVideoMedia(0)], text: null }, { title: null }).tree;
+
+    expect(countTestId(withoutCaption, "feed-post-body")).toBe(0);
+    expect(countTestId(withoutCaption, "feed-video-media")).toBe(1);
+    expect(countTestId(withoutCaption, "feed-post-action-like")).toBe(1);
+  });
+
+  it("un solo video: area VideoMedia, non la cella della gallery", () => {
+    const { tree } = setup({ media: [makeVideoMedia(0)] });
+
+    expect(countTestId(tree, "feed-video-media")).toBe(1);
+    expect(countTestId(tree, "feed-post-media")).toBe(0);
+    expect(countTestIdPrefix(tree, "feed-post-media-cell-")).toBe(0);
+  });
+
+  it("il Play avvia inline: non apre il dettaglio né il fullscreen (§12)", () => {
+    const { props, tree } = setup({ media: [makeVideoMedia(0)] });
+
+    pressTestId(tree, "feed-video-play");
+
+    expect(countTestId(tree, "feed-video-player")).toBe(1);
+    expect(props.onOpenMedia).not.toHaveBeenCalled();
+    expect(props.onPress).not.toHaveBeenCalled();
+    expect(videoMock.fullscreenEnters).toBe(0);
+    expect(videoMock.last.playing).toBe(true);
+  });
+
+  it("non parte nulla all'ingresso (§16) e non si crea un player per i video solo visibili (§73)", () => {
+    setup({ media: [makeVideoMedia(0)] });
+
+    expect(videoMock.players).toHaveLength(0);
+  });
+
+  it("video in elaborazione: il Post resta intero, con la riga compatta e senza Play (§63)", () => {
+    const { tree } = setup({
+      media: [makeVideoMedia(0, { processingState: "processing", thumbnailUrl: null, url: null })],
+    });
+    const json = textOf(tree);
+
+    expect(json).toContain("Video in elaborazione");
+    expect(json).toContain("Il video sarà disponibile a breve.");
+    expect(json).toContain("Testo del post.");
+    expect(countTestId(tree, "feed-video-play")).toBe(0);
+    expect(countTestIdPrefix(tree, "feed-post-action-")).toBe(3);
+  });
+
+  it("video non disponibile: stato dedicato, il Post non sparisce (§68)", () => {
+    const { tree } = setup({ media: [makeVideoMedia(0, { availability: "unavailable" })] });
+    const json = textOf(tree);
+
+    expect(json).toContain("Video non disponibile");
+    expect(json).toContain("Il contenuto non è al momento accessibile.");
+    expect(json).toContain("Como 1907");
+  });
+
+  it("gallery mista: il tap su una cella video apre il dettaglio sull'indice, senza player (§24–26)", () => {
+    const { props, tree } = setup({
+      media: [makeMediaItem(0), makeVideoMedia(1), makeMediaItem(2)],
+    });
+
+    pressTestId(tree, "feed-post-media-cell-1");
+
+    expect(props.onOpenMedia).toHaveBeenCalledWith(1);
+    expect(videoMock.players).toHaveLength(0);
+    expect(countTestId(tree, "feed-video-media")).toBe(0);
+  });
+
+  it("nel dettaglio (list) ogni video è un VideoMedia; solo quello toccato nel Feed parte (§29)", () => {
+    const props = {
+      onComment: vi.fn(),
+      onOpenIdentity: vi.fn(),
+      onOpenLink: vi.fn(),
+      onOpenMedia: vi.fn(),
+      onPress: vi.fn(),
+      onPressAuthor: vi.fn(),
+      onShare: vi.fn(),
+      onToggleLike: vi.fn(),
+      onToggleSaved: vi.fn(),
+    };
+    const item = makePostItem(
+      {},
+      { media: [makeVideoMedia(0, { id: "a" }), makeMediaItem(1), makeVideoMedia(2, { id: "b" })] },
+    );
+    const tree = renderWithToast(
+      <PostFeedItem autoStartMediaIndex={2} item={item} mediaVariant="list" {...props} />,
+    );
+
+    expect(countTestId(tree, "feed-video-media")).toBe(2);
+    // Il primo video resta in miniatura con il suo Play, il terzo è già in riproduzione.
+    expect(countTestId(tree, "feed-video-play")).toBe(1);
+    expect(countTestId(tree, "feed-video-player")).toBe(1);
+    expect(videoMock.players).toHaveLength(1);
   });
 });
 

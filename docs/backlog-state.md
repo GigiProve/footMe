@@ -112,12 +112,19 @@ Il messaggio di commit usa il codice task: `DAS-REV-25 - Shortlist Position: agg
 
 ### Backlog attivo — altre aree
 
-- **Home / feed social** — HOM-01 (spina), HOM-01.1 (UI) e HOM-02 (Post
-  standard) in codice. HOM-02 ha introdotto i post persona (`profile_posts`,
+- **Home / feed social** — HOM-01 (spina), HOM-01.1 (UI), HOM-02 (Post
+  standard) e HOM-03 (Feed video) in codice. HOM-02 ha introdotto i post persona (`profile_posts`,
   content type `profile_post`, solo Feed e dettaglio: CER-05 non li indicizza),
   la media collection polimorfica `content_post_media`, `content_post_extras`
   (mention, link preview) e `set_content_like` (Mi piace reale su club_media,
-  fan_media, profile_post). Da fare: feed video, creazione post e bozze
+  fan_media, profile_post). HOM-03: i video di Società e tifosi sono Post
+  (`footme_feed_item_type(content_type, content_format)`), video editoriale =
+  solo `media_profile` con video, Articolo = una sola preview compatta;
+  player inline unico (`components/video/`, controller `feed-video-controller`:
+  un video alla volta, pausa su viewport/tab/blur/background); Mi piace reale
+  anche su `media_profile` (`media_profile_post_likes`); poll centrale con
+  backoff (`fetch_content_media_states`) per i media in elaborazione;
+  `variants`/`captions` predisposti senza pipeline. Da fare: creazione post e bozze
   (HOM-06.1 scriverà su quelle tabelle), salvataggi dei post persona,
   commenti, condivisione, repost, segnalazioni, blocco profilo, ranking e
   discovery, notifiche social.

@@ -13,7 +13,6 @@
 import { formatRole } from "../profiles/profile-display-helpers";
 import { getPlayerPositionLabel } from "../profiles/player-sports";
 import type {
-  FeedEditorialItem,
   FeedPositionPayload,
   FeedScope,
   FeedSuggestedClubRow,
@@ -121,11 +120,23 @@ export const FEED_POST_SHOW_LESS = "Mostra meno";
 export const FEED_POST_TAGGED_LEAD = "Con";
 export const FEED_POST_TAGGED_SHEET_HINT = "Mostra tutti i profili taggati";
 export const FEED_POST_OPEN_AUTHOR_HINT = "Apre il profilo";
+// ── Video e Articolo (HOM-03) ───────────────────────────────────
+/** §113: copy definitivo degli stati video. Mai enum o codici tecnici (§114). */
+export const VIDEO_PROCESSING_TITLE = "Video in elaborazione";
+export const VIDEO_PROCESSING_HELPER = "Il video sarà disponibile a breve.";
+export const VIDEO_UNAVAILABLE_TITLE = "Video non disponibile";
+export const VIDEO_UNAVAILABLE_HELPER = "Il contenuto non è al momento accessibile.";
+/** §115: errore temporaneo del player, non "non disponibile". */
+export const VIDEO_PLAY_ERROR = "Non è stato possibile riprodurre il video.";
+export const VIDEO_RETRY = "Riprova";
+/** §47: micro-CTA discreta; l'intera preview resta tappabile. */
+export const ARTICLE_CTA = "Leggi articolo";
+
 /** §41: gli stati media che HOM-04 gestirà per intero; qui solo il rendering. */
 export const FEED_MEDIA_STATE_LABELS = {
   imageUnavailable: "Immagine non disponibile",
-  videoProcessing: "Video in elaborazione",
-  videoUnavailable: "Video non disponibile",
+  videoProcessing: VIDEO_PROCESSING_TITLE,
+  videoUnavailable: VIDEO_UNAVAILABLE_TITLE,
 } as const;
 
 // ── Menu contestuale (§20) ──────────────────────────────────────
@@ -139,11 +150,6 @@ export const FEED_MENU_LABELS = {
 } as const;
 
 // ── Helper di etichetta ─────────────────────────────────────────
-
-/** §12: la CTA deve essere coerente con la tipologia. */
-export function editorialCta(item: FeedEditorialItem): string {
-  return item.type === "video" ? "Guarda video" : "Leggi articolo";
-}
 
 /**
  * Il ruolo è l'elemento più visibile del contenitore posizione (§9). Per i
