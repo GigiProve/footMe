@@ -2,7 +2,16 @@ import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 
-import { ConfirmModal } from "./ConfirmModal";
+import { ConfirmModal, shouldStackConfirmActions } from "./ConfirmModal";
+
+describe("ConfirmModal — etichette lunghe", () => {
+  it("le azioni si impilano solo con etichette che non stanno in mezza riga", () => {
+    expect(shouldStackConfirmActions("Annulla", "Conferma")).toBe(false);
+    expect(shouldStackConfirmActions("Annulla", "Elimina")).toBe(false);
+    expect(shouldStackConfirmActions("Continua a modificare", "Elimina")).toBe(true);
+    expect(shouldStackConfirmActions("Continua a modificare", "Annulla modifiche")).toBe(true);
+  });
+});
 
 function render(isBusy: boolean) {
   const onCancel = vi.fn();

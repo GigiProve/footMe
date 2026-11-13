@@ -29,6 +29,18 @@ export type ConfirmModalProps = {
   children?: ReactNode;
 };
 
+/**
+ * Mezza riga della card (~134pt a 360pt di larghezza) contiene ~13 caratteri di
+ * etichetta: oltre, il testo esce dalla pillola. Con etichette lunghe («Continua a
+ * modificare», «Annulla modifiche») le azioni si impilano; con quelle brevi la
+ * riga resta com'è per tutti gli altri dialoghi.
+ */
+export const CONFIRM_STACK_THRESHOLD = 13;
+
+export function shouldStackConfirmActions(cancelLabel: string, confirmLabel: string): boolean {
+  return Math.max(cancelLabel.length, confirmLabel.length) > CONFIRM_STACK_THRESHOLD;
+}
+
 export function ConfirmModal({
   visible,
   title,
@@ -45,6 +57,7 @@ export function ConfirmModal({
   // HOM-04 §110: con una richiesta in corso un dismiss (fondale, Back) sarebbe
   // ambiguo — chiuderebbe il dialogo senza fermare l'operazione. Si ignora.
   const dismiss = isBusy ? undefined : onCancel;
+  const stacked = shouldStackConfirmActions(cancelLabel, confirmLabel);
 
   return (
     <Modal
@@ -86,8 +99,8 @@ export function ConfirmModal({
           {/* Due `width: 100%` affiancati in una riga sforavano la card: il
               secondo bottone finiva fuori dal bordo (DAS-REV-26, screen 09).
               Ogni bottone occupa ora metà riga dentro il proprio slot. */}
-          <View style={styles.footer}>
-            <View style={styles.footerAction}>
+          <View style={[styles.footer, stacked ? styles.footerStacked : null]}>
+            <View style={stacked ? null : styles.footerAction}>
               <Button
                 fullWidth
                 label={cancelLabel}
@@ -97,7 +110,7 @@ export function ConfirmModal({
                 disabled={isBusy}
               />
             </View>
-            <View style={styles.footerAction}>
+            <View style={stacked ? null : styles.footerAction}>
               <Button
                 destructive={destructive}
                 fullWidth
@@ -159,5 +172,8 @@ const styles = StyleSheet.create({
   },
   footerAction: {
     flex: 1,
+  },
+  footerStacked: {
+    flexDirection: "column",
   },
 });

@@ -16,6 +16,7 @@ import {
   SELECTION_EVENTS_MODULE_DESCRIPTION,
   SELECTION_EVENTS_MODULE_TITLE,
 } from "../events/events-copy";
+import { composerHref } from "../../post-composer/composer-routes";
 import { SELECTION_EVENTS_HREFS } from "../events/events-routes";
 import { POSITIONS_HREFS } from "../positions/positions-routes";
 import { hasSomeCapability, type DashboardIdentity } from "../dashboard-types";
@@ -62,7 +63,14 @@ export const SOCIETY_HREFS = {
     adId
       ? `/(tabs)/dashboard/applications/position/${encodeURIComponent(adId)}`
       : "/(tabs)/dashboard/applications?from=dashboard",
+  /** Composer legacy dei contenuti editoriali Società («Nuovo articolo»). */
   contentComposer: "/(tabs)/profile?compose=club",
+  /**
+   * HOM-06.1 §4, §23: «Nuovo post» apre il composer Post con la Società come
+   * identità predefinita. Il ritorno è `router.back()`, quindi la Dashboard.
+   */
+  postComposer: (societyId: string) =>
+    composerHref({ identityId: societyId, origin: "SOCIETY_PROFILE" }),
   /** Centro Provini, stage e open day (DAS-REV-28 §7). */
   events: SELECTION_EVENTS_HREFS.center({ from: "dashboard" }),
   /**
@@ -426,6 +434,7 @@ export type FirstRunProposalSpec = {
  */
 export function societyFirstRunProposals(
   quickActions: QuickActionId[],
+  societyId: string,
 ): FirstRunProposalSpec[] {
   const proposals: FirstRunProposalSpec[] = [];
 
@@ -460,9 +469,9 @@ export function societyFirstRunProposals(
     // §18: «Con soli permessi editoriali proporre l'avvio di contenuti
     // attraverso il sistema condiviso, senza suggerire operazioni sportive.»
     proposals.push({
-      actionLabel: "Nuovo contenuto",
+      actionLabel: "Nuovo post",
       body: "Racconta la stagione del club con post e contenuti.",
-      href: SOCIETY_HREFS.contentComposer,
+      href: SOCIETY_HREFS.postComposer(societyId),
       icon: "create-outline",
       id: "first_content",
       title: "Pubblica il primo contenuto",

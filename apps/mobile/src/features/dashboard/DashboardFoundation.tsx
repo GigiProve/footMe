@@ -950,7 +950,7 @@ export function DashboardFoundation() {
      * riepilogo pieno di zeri sopra di esse.
      */
     const firstRun = isSociety
-      ? societyFirstRunProposals(composition.quickActions)
+      ? societyFirstRunProposals(composition.quickActions, current.id)
       : [];
 
     return (
@@ -1066,7 +1066,7 @@ export function DashboardFoundation() {
         }
       : null;
 
-  const quickActions = buildQuickActions(composition.quickActions, go);
+  const quickActions = buildQuickActions(composition.quickActions, go, current?.id ?? "");
 
   /**
    * §7 e §12: quando le candidature da gestire promuovono il proprio modulo a
@@ -1576,6 +1576,7 @@ function buildSocietySummary(
 function buildQuickActions(
   ids: QuickActionId[],
   go: (moduleId: string, href: string) => void,
+  societyId: string,
 ): QuickAction[] {
   return ids.map((id) => {
     switch (id) {
@@ -1614,15 +1615,14 @@ function buildQuickActions(
       case "society_new_post":
       default:
         // §17 chiede "Nuovo post" e "Nuovo articolo" con capability proprie.
-        // Il dominio editoriale della Società ha un composer solo e nessuna
-        // distinzione POST/ARTICLE (`club_media_posts.kind` è highlights,
-        // interview, market, …), quindi la label resta quella onesta finché
-        // HOM-06.1/06.2 non introducono le due tipologie.
+        // HOM-06.1 ha introdotto il Post (`club_media_posts.kind = 'post'`):
+        // l'azione apre il composer Post con la Società attiva come autore
+        // (§4, §23). L'Articolo resta sul composer legacy fino a HOM-06.2.
         return {
           icon: "create-outline" as const,
           id,
-          label: "Nuovo contenuto",
-          onPress: () => go(id, SOCIETY_HREFS.contentComposer),
+          label: "Nuovo post",
+          onPress: () => go(id, SOCIETY_HREFS.postComposer(societyId)),
         };
     }
   });

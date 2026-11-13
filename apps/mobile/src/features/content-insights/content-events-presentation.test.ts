@@ -74,6 +74,11 @@ describe("isClubMediaArticle (§101, stessa regola di feed_content_index)", () =
   it("conta i caratteri, non le unità UTF-16 (come length() in SQL)", () => {
     expect(isClubMediaArticle("image", "⚽".repeat(399))).toBe(false);
   });
+
+  it("HOM-06.1: il kind post resta Post anche con testo lungo", () => {
+    expect(isClubMediaArticle("image", "a".repeat(1000), "post")).toBe(false);
+    expect(isClubMediaArticle(null, "a".repeat(400), "interview")).toBe(true);
+  });
 });
 
 describe("parseContentKey", () => {

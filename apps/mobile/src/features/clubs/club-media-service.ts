@@ -157,6 +157,9 @@ export async function fetchClubMediaFeed(
     .select(POST_SELECT)
     .eq("club_id", clubId)
     .eq("status", "published")
+    // HOM-06.1: la tab Media della Società è editoriale; i Post (kind 'post')
+    // vivono nel Feed e nel dettaglio contenuto, come il conteggio dell'editor.
+    .neq("kind", "post")
     .order("published_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 

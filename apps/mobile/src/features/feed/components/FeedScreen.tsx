@@ -37,6 +37,12 @@ import { useRouter } from "expo-router";
 import { colors } from "../../../theme/tokens";
 import { useSession } from "../../auth/use-session";
 import { useUnreadNotificationsCount } from "../../notifications/use-unread-notifications-count";
+import {
+  composerFormatsForRole,
+  composerOriginForScope,
+  resolveComposerEntry,
+} from "../../post-composer/composer-entry";
+import { composerHref } from "../../post-composer/composer-routes";
 import { trackFeed } from "../feed-analytics";
 import { saveFeedCacheMeta } from "../feed-cache";
 import { createFeedVideoController } from "../feed-video-controller";
@@ -107,12 +113,27 @@ export function FeedScreen() {
     }
   }
 
+  // HOM-06.1 §2–3: il «+» non è «+ = Post». Chi può creare solo Post va dritto al
+  // composer (un tap, nessuna schermata intermedia); chi ha anche formati legacy
+  // vede il menu, con «Nuovo post» per primo. L'origin è la tab da cui si apre,
+  // così a pubblicazione fatta si torna qui (§123).
+  const composerOrigin = composerOriginForScope(scope);
+
+  function handleOpenComposer() {
+    if (resolveComposerEntry(composerFormatsForRole(profile?.role)) === "direct") {
+      router.push(composerHref({ origin: composerOrigin }) as never);
+      return;
+    }
+
+    setComposerOpen(true);
+  }
+
   return (
     <FeedVideoProvider controller={videoController}>
       <SafeAreaView style={styles.root}>
         <FeedHeader
           hasUnreadNotifications={unreadCount > 0}
-          onOpenComposer={() => setComposerOpen(true)}
+          onOpenComposer={handleOpenComposer}
           onOpenNotifications={() => router.push("/notifications")}
         />
 
@@ -150,6 +171,7 @@ export function FeedScreen() {
             setComposerOpen(false);
             router.push(href as never);
           }}
+          origin={composerOrigin}
           role={profile?.role}
           visible={isComposerOpen}
         />

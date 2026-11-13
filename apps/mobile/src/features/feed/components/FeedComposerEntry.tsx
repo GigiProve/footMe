@@ -1,93 +1,96 @@
 /**
- * Punto di accesso alla creazione contenuto dal "+" dell'header (§2).
+ * Menu di creazione dal "+" dell'header, per chi ha PIÙ di un formato (HOM-01.1
+ * §2, HOM-06.1 §2–3).
  *
- * Il §2 è netto: "Il pulsante apre il flusso di creazione contenuto già
- * previsto. Questa task deve implementare solamente il punto di accesso. Non
- * ridisegnare il composer o i flussi di pubblicazione."
+ * Chi può creare solo Post non vede mai questo menu: il «+» apre direttamente il
+ * composer (`resolveComposerEntry` → `direct`, decisione in FeedScreen). Qui
+ * arrivano i ruoli con formati legacy — Tifoso, Media, Società — e «Nuovo post» è
+ * la PRIMA voce (decisione Luigi 2026-11-13). Il vecchio avviso «non ancora
+ * attiva» non esiste più: ogni ruolo ha almeno il Post, e se non ha identity per
+ * pubblicarlo è il composer a dirlo (§172).
  *
- * Non esiste un composer globale: la creazione vive in modali locali dentro le
- * viste di profilo (FanProfileView, MediaProfileView) e nell'area contenuti
- * società (ClubMediaTabContent). Questo ActionSheet elenca quindi solo le
- * superfici che il ruolo può realmente usare e naviga alla vista che le ospita
- * con `?compose=`, che quella vista legge per aprire da sola il PROPRIO modal
- * già esistente. Zero composer nuovi, zero duplicazione.
+ * I formati legacy non hanno un composer globale: vivono in modali locali dentro
+ * le viste di profilo (FanProfileView, MediaProfileView) e nell'area contenuti
+ * società (ClubMediaTabContent). Le loro voci navigano alla vista che le ospita
+ * con `?compose=`, che quella vista legge per aprire da sola il PROPRIO modal già
+ * esistente. Zero composer nuovi, zero duplicazione; HOM-06.2 li riassorbirà.
  *
- * Per i ruoli che oggi non hanno alcuna superficie di pubblicazione non si
- * inventa nulla: si dice che non è disponibile.
+ * L'elenco delle voci segue `composerFormatsForRole`: una sola fonte di verità
+ * per «quali formati ha questo ruolo», la stessa che decide `direct` o `menu`.
  */
 
-import { ActionSheet, useToast, type ActionSheetAction } from "../../../ui";
+import { ActionSheet, type ActionSheetAction } from "../../../ui";
+import { composerFormatsForRole, type ComposerFormat } from "../../post-composer/composer-entry";
+import { composerHref } from "../../post-composer/composer-routes";
+import type { ComposerOrigin } from "../../post-composer/composer-types";
 
 /** Valori accettati dal param `compose` delle viste di profilo. */
 export type ComposeIntent = "fan" | "media" | "club";
 
 type FeedComposerEntryProps = {
   role: string | null | undefined;
+  /** La tab Home da cui si apre: diventa l'origin del composer (§5, §123). */
+  origin: ComposerOrigin;
   visible: boolean;
   onClose: () => void;
   onNavigate: (href: string) => void;
 };
 
-export function FeedComposerEntry({
-  role,
-  visible,
-  onClose,
-  onNavigate,
-}: FeedComposerEntryProps) {
-  const { showToast } = useToast();
+function legacyAction(format: ComposerFormat, onNavigate: (href: string) => void): ActionSheetAction | null {
+  switch (format) {
+    case "fan_post":
+      return {
+        icon: "create-outline",
+        label: "Post in bacheca",
+        onPress: () => onNavigate("/(tabs)/profile?compose=fan"),
+        subtitle: "Foto, video e opinioni dalla tua tribuna",
+      };
+    case "media_article":
+      return {
+        icon: "document-text-outline",
+        label: "Articolo",
+        onPress: () => onNavigate("/(tabs)/profile?compose=media"),
+        subtitle: "Pubblica un contenuto editoriale",
+      };
+    case "club_content":
+      return {
+        icon: "megaphone-outline",
+        label: "Contenuto della società",
+        onPress: () => onNavigate("/(tabs)/profile?compose=club"),
+        subtitle: "Highlights, interviste, comunicati",
+      };
+    case "open_position":
+      return {
+        icon: "briefcase-outline",
+        label: "Posizione aperta",
+        onPress: () => onNavigate("/(tabs)/announcements"),
+        subtitle: "Pubblica una ricerca",
+      };
+    case "post":
+      return null;
+  }
+}
+
+export function FeedComposerEntry({ role, origin, visible, onClose, onNavigate }: FeedComposerEntryProps) {
   const actions: ActionSheetAction[] = [];
 
-  if (role === "fan") {
-    actions.push({
-      icon: "create-outline",
-      label: "Post in bacheca",
-      onPress: () => onNavigate("/(tabs)/profile?compose=fan"),
-      subtitle: "Foto, video e opinioni dalla tua tribuna",
-    });
+  for (const format of composerFormatsForRole(role)) {
+    if (format === "post") {
+      actions.push({
+        icon: "create-outline",
+        label: "Nuovo post",
+        onPress: () => onNavigate(composerHref({ origin })),
+        subtitle: "Testo, foto, video e link",
+      });
+      continue;
+    }
+
+    const action = legacyAction(format, onNavigate);
+
+    if (action) {
+      actions.push(action);
+    }
   }
 
-  if (role === "media") {
-    actions.push({
-      icon: "document-text-outline",
-      label: "Articolo",
-      onPress: () => onNavigate("/(tabs)/profile?compose=media"),
-      subtitle: "Pubblica un contenuto editoriale",
-    });
-  }
-
-  if (role === "club_admin") {
-    actions.push({
-      icon: "megaphone-outline",
-      label: "Contenuto della società",
-      onPress: () => onNavigate("/(tabs)/profile?compose=club"),
-      subtitle: "Highlights, interviste, comunicati",
-    });
-    actions.push({
-      icon: "briefcase-outline",
-      label: "Posizione aperta",
-      onPress: () => onNavigate("/(tabs)/announcements"),
-      subtitle: "Pubblica una ricerca",
-    });
-  }
-
-  if (actions.length === 0) {
-    actions.push({
-      icon: "information-circle-outline",
-      label: "Nessuna pubblicazione disponibile",
-      onPress: () =>
-        showToast({
-          message: "La creazione di contenuti non è ancora attiva per il tuo profilo.",
-        }),
-      subtitle: "Il tuo profilo non pubblica contenuti in questa versione",
-    });
-  }
-
-  return (
-    <ActionSheet
-      actions={actions}
-      onClose={onClose}
-      title="Crea"
-      visible={visible}
-    />
-  );
+  return <ActionSheet actions={actions} onClose={onClose} title="Crea" visible={visible} />;
 }

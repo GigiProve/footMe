@@ -248,7 +248,7 @@ describe("societyFirstRunProposals", () => {
     const proposals = societyFirstRunProposals([
       "society_new_position",
       "society_invite_person",
-    ]);
+    ], "club-1");
 
     expect(proposals.map((proposal) => proposal.id)).toEqual([
       "first_position",
@@ -261,7 +261,7 @@ describe("societyFirstRunProposals", () => {
   it("shows only the authorized proposal", () => {
     // §18: «Mostrare soltanto le proposte autorizzate e tecnicamente
     // disponibili.» La seconda non diventa un pulsante disabilitato.
-    const proposals = societyFirstRunProposals(["society_new_position"]);
+    const proposals = societyFirstRunProposals(["society_new_position"], "club-1");
 
     expect(proposals.map((proposal) => proposal.id)).toEqual([
       "first_position",
@@ -272,7 +272,7 @@ describe("societyFirstRunProposals", () => {
     // §18: «Con soli permessi editoriali proporre l'avvio di contenuti […]
     // senza suggerire operazioni sportive.»
     expect(
-      societyFirstRunProposals(["society_new_post"]).map(
+      societyFirstRunProposals(["society_new_post"], "club-1").map(
         (proposal) => proposal.id,
       ),
     ).toEqual(["first_content"]);
@@ -281,14 +281,29 @@ describe("societyFirstRunProposals", () => {
       societyFirstRunProposals([
         "society_new_position",
         "society_new_post",
-      ]).map((proposal) => proposal.id),
+      ], "club-1").map((proposal) => proposal.id),
     ).toEqual(["first_position"]);
   });
 
   it("produces nothing for a read-only administrator", () => {
     // §18: «Con soli permessi di consultazione usare un empty state
     // informativo senza azioni non consentite.»
-    expect(societyFirstRunProposals([])).toEqual([]);
+    expect(societyFirstRunProposals([], "club-1")).toEqual([]);
+  });
+
+  it("HOM-06.1: la proposta contenuti apre il composer Post con la Società attiva", () => {
+    const [proposal] = societyFirstRunProposals(["society_new_post"], "club-1");
+
+    expect(proposal.actionLabel).toBe("Nuovo post");
+    expect(proposal.href).toBe("/post-compose?origin=SOCIETY_PROFILE&identity=club-1");
+  });
+});
+
+describe("SOCIETY_HREFS.postComposer (HOM-06.1 §4, §23)", () => {
+  it("porta l'origin Società e l'identità predefinita", () => {
+    expect(SOCIETY_HREFS.postComposer("club 1")).toBe(
+      "/post-compose?origin=SOCIETY_PROFILE&identity=club%201",
+    );
   });
 });
 

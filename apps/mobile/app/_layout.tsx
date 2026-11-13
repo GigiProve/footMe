@@ -24,7 +24,13 @@ export default function RootLayout() {
       <SessionProvider>
         <ToastProvider>
           <StatusBar style="dark" />
-          <Stack screenOptions={{ headerShown: false, gestureEnabled: false }} />
+          <Stack screenOptions={{ headerShown: false, gestureEnabled: false }}>
+            {/* HOM-06.1 §6: il composer Post è a schermo intero, senza bottom navigation. */}
+            <Stack.Screen
+              name="post-compose"
+              options={{ animation: "slide_from_bottom", presentation: "fullScreenModal" }}
+            />
+          </Stack>
         </ToastProvider>
       </SessionProvider>
     </QueryClientProvider>

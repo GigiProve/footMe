@@ -124,10 +124,9 @@ export function composeQuickActions(
     identity.capabilities.includes("content_create") &&
     isFeatureAvailable("society_content_create")
   ) {
-    // Il composer Società è uno solo: non si inventa una distinzione
-    // POST/ARTICLE che il dominio non ha. §17 mostra due pulsanti perché
-    // presuppone HOM-06.1 e HOM-06.2; qui ne esiste uno, e mostrarne due
-    // porterebbe alla stessa destinazione due volte.
+    // §17: «Nuovo post» apre il composer Post di HOM-06.1 (stessa capability
+    // `content_create`, che il server rivalida in `publish_post`). «Nuovo
+    // articolo» resta dietro il proprio flag fino a HOM-06.2.
     actions.push("society_new_post");
 
     if (isFeatureAvailable("society_article_composer")) {

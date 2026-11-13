@@ -14,6 +14,7 @@
  */
 
 import { contentInsightsHref } from "../content-insights/insights-routes";
+import { composerEditHref, isComposerEditableType } from "../post-composer/composer-routes";
 import type { FeedContentType, FeedIdentityType, FeedScope } from "./feed-types";
 
 export const CONTENT_ORIGINS = [
@@ -73,10 +74,16 @@ export function contentManageParams(target: ContentManageTarget): ContentManageP
   };
 }
 
-/** Destinazione della modifica (HOM-06.1 Post, HOM-06.2 Articolo): non esiste ancora. */
+/**
+ * Destinazione della modifica. HOM-06.1 §143: i Post aprono il composer in
+ * modalità Modifica. `ContentManageParams` non distingue un Post da un Articolo
+ * dentro `club_media` / `media_profile` (il `kind` non viaggia nel menu), quindi
+ * si costruisce la href per i tre tipi che ospitano Post e `fetch_post_for_edit`
+ * rifiuta ciò che non è un Post; la capability `canEdit` del menu resta il gate
+ * di visibilità. Articolo (HOM-06.2) e gli altri tipi: ancora `null` → «in arrivo».
+ */
 export function editContentHref(params: ContentManageParams): string | null {
-  void params;
-  return null;
+  return isComposerEditableType(params.content_type) ? composerEditHref(params) : null;
 }
 
 /**

@@ -25,8 +25,31 @@ describe("viewInsightsHref (HOM-05 §3, §10)", () => {
     );
   });
 
-  it("la modifica resta senza destinazione (HOM-06)", () => {
-    expect(editContentHref(contentManageParams(target))).toBeNull();
+  it("la modifica di un Post apre il composer con tipo, id, origin e versione (HOM-06.1 §143)", () => {
+    expect(editContentHref(contentManageParams({ ...target, version: "2026-11-13T10:00:00+00:00" }))).toBe(
+      "/post-compose/edit?type=profile_post&id=post-1&origin=HOME_PER_TE&version=2026-11-13T10%3A00%3A00%2B00%3A00",
+    );
+  });
+
+  it("senza versione la href non ha il parametro version", () => {
+    expect(editContentHref(contentManageParams(target))).toBe(
+      "/post-compose/edit?type=profile_post&id=post-1&origin=HOME_PER_TE",
+    );
+  });
+
+  it("club_media e media_profile aprono il composer (il server rifiuta ciò che non è un Post)", () => {
+    expect(editContentHref(contentManageParams({ ...target, contentType: "club_media" }))).toContain(
+      "/post-compose/edit?type=club_media",
+    );
+    expect(editContentHref(contentManageParams({ ...target, contentType: "media_profile" }))).toContain(
+      "/post-compose/edit?type=media_profile",
+    );
+  });
+
+  it("gli altri tipi restano senza destinazione (Articolo = HOM-06.2)", () => {
+    expect(editContentHref(contentManageParams({ ...target, contentType: "fan_tribuna" }))).toBeNull();
+    expect(editContentHref(contentManageParams({ ...target, contentType: "media_tribuna" }))).toBeNull();
+    expect(editContentHref(contentManageParams({ ...target, contentType: "fan_media" }))).toBeNull();
   });
 });
 

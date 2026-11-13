@@ -84,6 +84,8 @@ export type TaggedContentPageOptions = {
 export type TagSearchResult = {
   avatar_url: string | null;
   display_name: string;
+  /** HOM-06.1 §102–103: mandato dal server dopo la migrazione; assente sulle versioni precedenti. */
+  is_verified?: boolean;
   role_label: string;
   subtitle: string;
   target_id: string;
