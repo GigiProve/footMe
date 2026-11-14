@@ -46,6 +46,8 @@ import {
 } from "../club-media-service";
 import { useRouter } from "expo-router";
 
+import { articleNewHref } from "../../article-editor/article-routes";
+import { contentDetailHref } from "../../feed/content-routes";
 import { TaggableTargetPicker } from "../../content/components/TaggableTargetPicker";
 import { TaggedContentGrid } from "../../content/components/TaggedContentGrid";
 import { TagManageSheet } from "../../content/components/TagManageSheet";
@@ -85,6 +87,7 @@ type DraftState = {
 
 const FILTERS: { label: string; value: MediaFilter }[] = [
   { label: "Tutti", value: "all" },
+  { label: "Articoli", value: "article" },
   { label: "Highlights", value: "highlights" },
   { label: "Interviste", value: "interview" },
   { label: "Mercato", value: "market" },
@@ -147,6 +150,15 @@ const KIND_META: Record<
     softColor: string;
   }
 > = {
+  // HOM-06.2: l'Articolo editoriale si apre nel dettaglio condiviso, non nella
+  // modale storica di questa tab (che non sa rendere il documento strutturato).
+  article: {
+    color: colors.accent,
+    detailLabel: "Articolo",
+    icon: "newspaper-outline",
+    label: "Articoli",
+    softColor: colors.accentSoft,
+  },
   event: {
     // Colore identificativo della categoria "Evento": nessun token semantico
     // esistente corrisponde, da qui il token dedicato in styles/tokens/colors.
@@ -221,6 +233,7 @@ export function ClubMediaTabContent({
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [createKind, setCreateKind] = useState<ClubMediaKind | null>(null);
   const hasHandledComposeIntent = useRef(false);
+  const router = useRouter();
 
   // Il "+" della Home apre il menu di pubblicazione già esistente. Il ref evita
   // che si riapra finché il parametro resta nell'URL.
@@ -259,6 +272,12 @@ export function ClubMediaTabContent({
   );
 
   async function handleOpenPost(post: ClubMediaPost) {
+    if (post.kind === "article") {
+      // HOM-06.2 §7K: l'Articolo ha un solo dettaglio, quello condiviso.
+      router.push(contentDetailHref("club_media", post.id, { origin: "PROFILE" }) as never);
+      return;
+    }
+
     setSelectedPost(post);
     setIsDetailLoading(true);
 
@@ -463,6 +482,11 @@ export function ClubMediaTabContent({
 
       <CreateMenuSheet
         onClose={() => setIsCreateMenuOpen(false)}
+        onSelectArticle={() => {
+          // HOM-06.2: gli Articoli della Società nascono dal flusso editoriale.
+          setIsCreateMenuOpen(false);
+          router.push(articleNewHref("SOCIETY_PROFILE", club.id) as never);
+        }}
         onSelect={(kind) => {
           setIsCreateMenuOpen(false);
           setCreateKind(kind);
@@ -1012,10 +1036,12 @@ function DetailAction({
 function CreateMenuSheet({
   onClose,
   onSelect,
+  onSelectArticle,
   visible,
 }: {
   onClose: () => void;
   onSelect: (kind: ClubMediaKind) => void;
+  onSelectArticle: () => void;
   visible: boolean;
 }) {
   return (
@@ -1030,6 +1056,25 @@ function CreateMenuSheet({
         <AppText align="center" style={styles.sheetTitle} variant="titleSm">
           Pubblica contenuto
         </AppText>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onSelectArticle}
+          style={styles.createOption}
+          testID="club-media-create-option-article"
+        >
+          <View style={styles.createIcon}>
+            <Ionicons color={colors.accent} name="newspaper-outline" size={24} />
+          </View>
+          <View style={styles.createText}>
+            <AppText style={styles.createTitle} variant="bodySm">
+              Articolo
+            </AppText>
+            <AppText color="secondary" variant="caption">
+              Scrivi, collega o incolla un articolo
+            </AppText>
+          </View>
+          <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
+        </Pressable>
         {CREATE_OPTIONS.map((option) => (
           <Pressable
             accessibilityRole="button"
@@ -1434,6 +1479,7 @@ function normalizeExternalUrl(url: string) {
 }
 
 function clubMediaKindLabel(kind: ClubMediaKind) {
+  if (kind === "article") return "Articolo";
   if (kind === "highlights") return "Highlights";
   if (kind === "interview") return "Intervista";
   if (kind === "market") return "Mercato";

@@ -27,6 +27,8 @@ export const LIMITS: ComposerLimits = {
 
 export const PERSON: ComposerIdentity = {
   avatarUrl: null,
+  // HOM-06.2: la persona può programmare, la Società di test no (serve a provare §85).
+  canSchedule: true,
   contextLabel: "Profilo personale",
   id: "person-1",
   isVerified: true,
@@ -36,6 +38,7 @@ export const PERSON: ComposerIdentity = {
 
 export const SOCIETY: ComposerIdentity = {
   avatarUrl: null,
+  canSchedule: false,
   contextLabel: "Società",
   id: "society-1",
   isVerified: true,
@@ -45,6 +48,7 @@ export const SOCIETY: ComposerIdentity = {
 
 export const MEDIA_IDENTITY: ComposerIdentity = {
   avatarUrl: null,
+  canSchedule: false,
   contextLabel: "Media",
   id: "media-1",
   isVerified: false,

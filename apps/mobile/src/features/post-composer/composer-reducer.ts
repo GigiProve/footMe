@@ -19,17 +19,22 @@
  * composer-presentation.ts) perché dipende dal confronto con quanto caricato.
  */
 
+import { DEFAULT_SCHEDULE_POLICY } from "../publishing/publishing-presentation";
+import type { Publication, SchedulePolicy } from "../publishing/publishing-types";
 import {
   baselineOf,
   canPublish,
+  contentKey,
   firstEligibleUrl,
   applyMention,
   reconcileMentions,
   remainingMediaSlots,
+  sameIdentity,
   type ComposerBaseline,
 } from "./composer-presentation";
 import type {
-  ComposerErrorKind,
+  ComposerDraftForEditor,
+  ComposerDraftInfo,
   ComposerIdentity,
   ComposerLimits,
   ComposerLinkPreviewState,
@@ -41,15 +46,27 @@ import type {
   ComposerPostForEdit,
   ComposerPublishStatus,
   ComposerRecoverySnapshot,
+  ComposerSubmitErrorKind,
   ComposerTaggedIdentity,
   ComposerTextRange,
 } from "./composer-types";
+import { newComposerOperationKey } from "./operation-key";
 
 export type ComposerState = {
   mode: ComposerMode;
   origin: ComposerOrigin;
-  /** Chiave di idempotenza della sessione (§118): non cambia tra i tentativi. */
+  /** Chiave di idempotenza dell'INVIO della sessione (§118): non cambia tra i tentativi. */
   operationKey: string;
+  /**
+   * HOM-06.2: legame con la bozza server (§117–§132). La chiave di salvataggio
+   * bozza è distinta da `operationKey`: un retry del salvataggio e un retry
+   * dell'invio sono due operazioni diverse.
+   */
+  draft: ComposerDraftInfo;
+  /** HOM-06.2 §81–§102: «Ora» (default §87) o un istante futuro. */
+  publication: Publication;
+  /** HOM-06.2 §96: lead time e orizzonte dal server. */
+  schedule: SchedulePolicy;
   identity: ComposerIdentity | null;
   /** Solo identity con can_publish_post (§18); in Modifica la sola autrice. */
   identities: ComposerIdentity[];
@@ -78,8 +95,14 @@ export type ComposerUploadPatch = Partial<
 
 export type ComposerAction =
   | { type: "identityChanged"; identityId: string }
-  /** §28: rivalidazione delle capability; l'identity corrente non viene sostituita. */
-  | { type: "contextRefreshed"; identities: ComposerIdentity[]; limits: ComposerLimits }
+  /**
+   * §28: rivalidazione delle capability. L'identity corrente non viene sostituita
+   * da un'altra; se è ancora nell'elenco ne prende le capability aggiornate
+   * (HOM-06.2: `canSchedule`).
+   */
+  | { type: "contextRefreshed"; identities: ComposerIdentity[]; limits: ComposerLimits; schedule?: SchedulePolicy }
+  /** HOM-06.2 §86–§91: la scelta del foglio «Quando vuoi pubblicare?». */
+  | { type: "publicationChanged"; publication: Publication }
   | { type: "bodyChanged"; body: string }
   | { type: "mentionApplied"; range: ComposerTextRange; candidate: ComposerMentionCandidate }
   /** La selezione completa del selector Tagga (§104, §108), non un delta. */
@@ -99,7 +122,7 @@ export type ComposerAction =
   | { type: "linkRetried" }
   | { type: "linkDismissed" }
   | { type: "publishStarted" }
-  | { type: "publishFailed"; code: ComposerErrorKind }
+  | { type: "publishFailed"; code: ComposerSubmitErrorKind }
   | { type: "publishReset" }
   /**
    * `post_operation_conflict`: la chiave non è più utilizzabile (stesso key con
@@ -113,18 +136,34 @@ export type ComposerAction =
 /* Creazione dello stato                                               */
 /* ------------------------------------------------------------------ */
 
+/** Nessun legame con il server: contenuto nuovo (§117: la bozza nasce al primo salvataggio significativo). */
+function newDraftInfo(operationKey: string | undefined): ComposerDraftInfo {
+  return {
+    baselineKey: null,
+    initialPublication: null,
+    operationKey: operationKey ?? newComposerOperationKey(),
+    ref: null,
+    status: null,
+    version: null,
+  };
+}
+
 export function createComposerState(input: {
   origin: ComposerOrigin;
   identities: ComposerIdentity[];
   limits: ComposerLimits;
   identity: ComposerIdentity | null;
   operationKey: string;
+  /** HOM-06.2: assenti nei chiamanti di HOM-06.1 → default prudenti. */
+  schedule?: SchedulePolicy;
+  draftOperationKey?: string;
 }): ComposerState {
   return {
     baseline: null,
     body: "",
     canEdit: true,
     dismissedUrls: [],
+    draft: newDraftInfo(input.draftOperationKey),
     identities: input.identities,
     identity: input.identity,
     limits: input.limits,
@@ -134,9 +173,70 @@ export function createComposerState(input: {
     mode: { kind: "create" },
     operationKey: input.operationKey,
     origin: input.origin,
+    publication: { mode: "now" },
     publish: { status: "idle" },
+    schedule: input.schedule ?? DEFAULT_SCHEDULE_POLICY,
     tagged: [],
   };
+}
+
+/**
+ * HOM-06.2 §147–§148, §163–§164: riapre una bozza, un programmato o un fallito
+ * nello STESSO composer (nessun secondo editor, §83). A differenza della
+ * Modifica di un pubblicato i media restano editabili (§112–§114).
+ *
+ *  • bozza / fallito — autosave sulla stessa riga; un fallito riparte da «Ora»
+ *    se la data è passata (già deciso da `mapDraftForEditor`);
+ *  • programmato — nessun autosave, «Salva» esplicito che non tocca la data se
+ *    non la cambi (§166–§167): la chiave di base serve a sapere se è cambiato.
+ *
+ * L'identity è quella dell'elenco del server (capability fresche); se non c'è
+ * più, resta quella della bozza e `publishBlockReason` dice che il permesso è
+ * perso, senza trasferire l'ownership (§231).
+ */
+export function createDraftState(input: {
+  draft: ComposerDraftForEditor;
+  identities: ComposerIdentity[];
+  limits: ComposerLimits;
+  schedule: SchedulePolicy;
+  operationKey: string;
+  draftOperationKey?: string;
+  origin: ComposerOrigin;
+}): ComposerState {
+  const { draft } = input;
+  const identity = input.identities.find((candidate) => sameIdentity(candidate, draft.identity)) ?? draft.identity;
+  const scheduled = draft.status === "scheduled";
+  const stored = draft.hadLinkWithoutPreview ? firstEligibleUrl(draft.body) : null;
+
+  const state: ComposerState = {
+    baseline: null,
+    body: draft.body,
+    canEdit: draft.canEdit,
+    dismissedUrls: stored ? [stored.normalized] : [],
+    draft: {
+      ...newDraftInfo(input.draftOperationKey),
+      initialPublication: draft.publication,
+      ref: draft.ref,
+      status: draft.status,
+      version: draft.version,
+    },
+    identities: input.identities,
+    identity,
+    limits: input.limits,
+    link: draft.link ?? { status: "idle" },
+    media: draft.media,
+    mentions: draft.mentions,
+    mode: { kind: "create" },
+    operationKey: input.operationKey,
+    origin: input.origin,
+    // Un programmato conserva la propria data anche se l'identity ha perso la capability (§190): non si riscrive da sola.
+    publication: scheduled || identity.canSchedule ? draft.publication : { mode: "now" },
+    publish: { status: "idle" },
+    schedule: input.schedule,
+    tagged: draft.tagged,
+  };
+
+  return scheduled ? { ...state, draft: { ...state.draft, baselineKey: contentKey(state) } } : state;
 }
 
 /** §146: precarica identity, testo, mention, tag, link e media pubblicati (sola lettura). */
@@ -167,6 +267,8 @@ export function createEditState(input: {
     body: edit.body,
     canEdit: edit.canEdit,
     dismissedUrls: stored ? [stored.normalized] : [],
+    // Un Post pubblicato non ha bozza né programmazione: si salva solo con `update_post` (HOM-06.1).
+    draft: newDraftInfo(undefined),
     identities: [edit.author],
     identity: edit.author,
     limits: input.limits,
@@ -181,7 +283,9 @@ export function createEditState(input: {
     },
     operationKey: input.operationKey,
     origin: input.origin ?? "CONTENT_DETAIL",
+    publication: { mode: "now" },
     publish: { status: "idle" },
+    schedule: DEFAULT_SCHEDULE_POLICY,
     tagged: edit.tagged,
   };
 }
@@ -267,18 +371,57 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
     case "identityChanged": {
       const next = state.identities.find((identity) => identity.id === action.identityId);
 
-      if (!isCreate(state) || !next) {
+      if (!isCreate(state) || !next || state.draft.status === "scheduled" || state.draft.status === "publishing") {
         return state;
       }
 
       // §27: solo l'autore cambia; l'esito dell'invio precedente non vale più (§28).
-      return { ...state, identity: next, publish: { status: "idle" } };
+      // §85: senza `can_schedule_content` non c'è programmazione, si torna a «Ora».
+      return {
+        ...state,
+        identity: next,
+        publication: next.canSchedule ? state.publication : { mode: "now" },
+        publish: { status: "idle" },
+      };
     }
 
-    case "contextRefreshed":
-      return isCreate(state)
-        ? { ...state, identities: action.identities, limits: action.limits }
-        : { ...state, limits: action.limits };
+    case "contextRefreshed": {
+      const schedule = action.schedule ?? state.schedule;
+
+      if (!isCreate(state)) {
+        return { ...state, limits: action.limits, schedule };
+      }
+
+      // L'identity corrente non cambia: se è ancora in elenco ne prende le capability fresche (§28).
+      const refreshed = state.identity
+        ? action.identities.find((candidate) => sameIdentity(candidate, state.identity))
+        : undefined;
+      const identity = refreshed ?? state.identity;
+      // Un programmato non perde la sua data se la capability sparisce (§190): lo dice il server al Salva.
+      const keepsPublication = state.draft.status === "scheduled" || identity?.canSchedule === true;
+
+      return {
+        ...state,
+        identities: action.identities,
+        identity,
+        limits: action.limits,
+        publication: keepsPublication ? state.publication : { mode: "now" },
+        schedule,
+      };
+    }
+
+    case "publicationChanged": {
+      // Solo in creazione/bozza e solo con la capability (§84–§85).
+      if (!isCreate(state) || state.publish.status === "publishing" || !state.identity?.canSchedule) {
+        return state;
+      }
+
+      return {
+        ...state,
+        publication: action.publication,
+        publish: state.publish.status === "failed" ? { status: "idle" } : state.publish,
+      };
+    }
 
     case "bodyChanged": {
       const body = action.body.slice(0, state.limits.maxBodyLength);
@@ -410,16 +553,34 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
         ) ?? state.identity;
       const body = snapshot.body.slice(0, state.limits.maxBodyLength);
 
+      // HOM-06.2: la data salvata vale solo se l'identity può ancora programmare e l'istante è futuro (§85, §98).
+      const savedPublication = snapshot.publication;
+      const publication: Publication =
+        savedPublication?.mode === "scheduled" &&
+        identity?.canSchedule === true &&
+        new Date(savedPublication.scheduledAt).getTime() > Date.now()
+          ? savedPublication
+          : { mode: "now" };
+
       return {
         ...state,
         body,
         dismissedUrls: snapshot.dismissedUrls,
+        // Una bozza server riprende la STESSA riga e le STESSE chiavi: un crash non ne crea una seconda (§121, §127).
+        draft: {
+          ...state.draft,
+          operationKey: snapshot.draftOperationKey ?? state.draft.operationKey,
+          ref: snapshot.draftRef ?? null,
+          status: snapshot.draftRef ? "draft" : null,
+          version: snapshot.draftRef ? (snapshot.draftVersion ?? null) : null,
+        },
         identity,
         media: restoreMedia(snapshot.media, state.limits.maxMedia),
         mentions: snapshot.mentions.filter(
           (mention) => body.slice(mention.start, mention.end) === `@${mention.displayName}`,
         ),
         operationKey: snapshot.operationKey,
+        publication,
         tagged: dedupeTagged(snapshot.tagged, state.limits.maxTags),
       };
     }

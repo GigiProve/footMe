@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { KeyboardAwareForm } from "../../../src/components/ui/keyboard-aware-form";
 import { useSession } from "../../../src/features/auth/use-session";
+import { articleNewHref } from "../../../src/features/article-editor/article-routes";
 import { contentDetailHref } from "../../../src/features/feed/content-routes";
 import type { FeedContentType } from "../../../src/features/feed/feed-types";
 import { type PublicClubProfile } from "../../../src/features/clubs/club-service";
@@ -1259,6 +1260,12 @@ export default function ProfileScreen() {
               });
               setMoreMenuVisible(true);
             }}
+            onNewArticle={(handoff) =>
+              // HOM-06.2: gli Articoli Media nascono dal flusso `article-compose`.
+              router.push(
+                articleNewHref(handoff.origin, handoff.mediaProfileId) as never,
+              )
+            }
             onOpenClub={handleOpenAffiliateClub}
             onOpenContent={handleOpenContent}
             onOpenProfile={handleOpenProfile}

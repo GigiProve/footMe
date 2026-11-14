@@ -49,3 +49,24 @@ export async function fetchContentPublisher(
 
   return { avatarUrl: media?.logo_url ?? profile?.avatar_url ?? null, name };
 }
+
+/**
+ * HOM-06.2 §7D: il nome della Società che pubblica un Articolo, per
+ * «Condiviso da [Società]» e «Pubblicato da [Società]». Il dettaglio storico di
+ * `club_media` non lo porta (mostra «Società»). `null` se non leggibile: il
+ * chiamante ripiega sul nome che ha già, mai su un nome inventato.
+ */
+export async function fetchClubPublisherName(clubId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("clubs")
+    .select("name")
+    .eq("id", clubId)
+    .maybeSingle();
+
+  if (error) {
+    return null;
+  }
+
+  const name = (data as { name: string | null } | null)?.name?.trim();
+  return name ? name : null;
+}

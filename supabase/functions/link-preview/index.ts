@@ -12,6 +12,13 @@
  * da POST. La preview non blocca mai il publish (§89): il client tratta ogni
  * status diverso da 'ok' come «Anteprima non disponibile».
  *
+ * HOM-06.2 §7F–§7L: il body accetta anche `purpose` ('post' | 'article_source' |
+ * 'rich_link', default 'post' = comportamento di HOM-06.1). Con 'article_source'
+ * una pagina senza metadata produce comunque uno snapshot (titolo null, status
+ * 'ok'): il client chiede il titolo a mano. Lo snapshot porta anche URL
+ * canonico, autore e data di pubblicazione, e la risposta ok guadagna
+ * `normalized_url`, `canonical_url`, `author`, `published_time` (additivi).
+ *
  * Deploy: `supabase functions deploy link-preview` (verify_jwt resta attivo di
  * default; il JWT si ricontrolla comunque qui con auth.getUser).
  */
@@ -20,6 +27,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 import { guardedFetchHtml } from "./guarded-fetch.ts";
 import { parseLinkMeta } from "./html-meta.ts";
+import { parsePurpose, remembersNoMetadata, shouldPersistSnapshot } from "./purpose.ts";
 import { NegativeCache, SlidingWindowLimiter } from "./rate-limit.ts";
 import { displayDomain, normalizeUrl, parseHttpsUrl } from "./url-normalize.ts";
 
@@ -41,6 +49,7 @@ const FAILURE_TTL_MS = 60 * 1000;
 
 const attempts = new SlidingWindowLimiter(MAX_ATTEMPTS_PER_WINDOW, RATE_WINDOW_MS);
 const failures = new NegativeCache<"blocked" | "unavailable">(FAILURE_TTL_MS);
+const noMetadata = new NegativeCache<"unavailable">(FAILURE_TTL_MS);
 
 const CORS = {
   "access-control-allow-origin": "*",
@@ -63,6 +72,7 @@ async function resolveAll(hostname: string): Promise<string[]> {
 type SnapshotRow = {
   id: string;
   original_url: string;
+  normalized_url: string;
   final_url: string;
   title: string | null;
   description: string | null;
@@ -70,6 +80,9 @@ type SnapshotRow = {
   favicon_url: string | null;
   domain: string;
   site_name: string | null;
+  canonical_url: string | null;
+  author: string | null;
+  published_time: string | null;
 };
 
 function okResult(row: SnapshotRow, originalUrl: string) {
@@ -77,6 +90,7 @@ function okResult(row: SnapshotRow, originalUrl: string) {
     status: "ok" as const,
     snapshot_id: row.id,
     original_url: originalUrl,
+    normalized_url: row.normalized_url,
     final_url: row.final_url,
     title: row.title,
     description: row.description,
@@ -84,6 +98,9 @@ function okResult(row: SnapshotRow, originalUrl: string) {
     favicon_url: row.favicon_url,
     domain: row.domain,
     site_name: row.site_name,
+    canonical_url: row.canonical_url,
+    author: row.author,
+    published_time: row.published_time,
   };
 }
 
@@ -118,8 +135,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const userId = userData.user.id;
 
   let rawUrl: unknown;
+  let purpose = parsePurpose(undefined);
   try {
-    rawUrl = ((await request.json()) as { url?: unknown })?.url;
+    const body = (await request.json()) as { url?: unknown; purpose?: unknown };
+    rawUrl = body?.url;
+    purpose = parsePurpose(body?.purpose);
   } catch {
     return json({ status: "invalid", original_url: "", domain: null });
   }
@@ -152,7 +172,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const ttlHours = Number(ttlRow?.value ?? DEFAULT_TTL_HOURS);
   const since = new Date(Date.now() - (Number.isFinite(ttlHours) && ttlHours > 0 ? ttlHours : DEFAULT_TTL_HOURS) * 3_600_000);
 
-  const columns = "id, original_url, final_url, title, description, image_url, favicon_url, domain, site_name";
+  const columns =
+    "id, original_url, normalized_url, final_url, title, description, image_url, favicon_url, domain, site_name, canonical_url, author, published_time";
 
   // §80: niente scraping a ogni richiesta. Uno snapshot recente dello stesso URL
   // normalizzato si riusa (§88: stesso URL = stessa preview).
@@ -165,7 +186,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
     .limit(1)
     .maybeSingle();
   if (cached) {
-    return json(okResult(cached as SnapshotRow, original));
+    const row = cached as SnapshotRow;
+    // Uno snapshot senza metadata (creato per la fonte di un Articolo) non è una
+    // preview valida per un Post: stessa risposta di una pagina senza metadata.
+    if (purpose !== "article_source" && row.title === null && row.description === null && row.image_url === null) {
+      return json({ status: "unavailable", original_url: original, domain });
+    }
+    return json(okResult(row, original));
   }
 
   // Un URL che ha appena fallito non si rilancia (fetch + DNS) per qualche
@@ -173,6 +200,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const knownFailure = failures.get(normalized);
   if (knownFailure) {
     return json({ status: knownFailure, original_url: original, domain });
+  }
+  // «Pagina senza metadata» vale solo per gli scopi che non sanno cosa farne
+  // (una fonte di Articolo si salva comunque).
+  if (purpose !== "article_source" && noMetadata.get(normalized)) {
+    return json({ status: "unavailable", original_url: original, domain });
   }
 
   // Limite per utente (§77): oltre MAX_SNAPSHOTS_PER_WINDOW snapshot nuovi in
@@ -201,9 +233,12 @@ Deno.serve(async (request: Request): Promise<Response> => {
   }
 
   const meta = parseLinkMeta(fetched.html, fetched.finalUrl);
-  // Una pagina senza titolo, descrizione né immagine non ha niente da mostrare.
-  if (meta.title === null && meta.description === null && meta.imageUrl === null) {
-    failures.set(normalized, "unavailable");
+  // Una pagina senza titolo, descrizione né immagine non ha niente da mostrare
+  // in un Post; la fonte di un Articolo si salva comunque (destinazione validata).
+  if (!shouldPersistSnapshot(purpose, meta)) {
+    if (remembersNoMetadata(purpose)) {
+      noMetadata.set(normalized, "unavailable");
+    }
     return json({ status: "unavailable", original_url: original, domain });
   }
 
@@ -220,6 +255,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
       favicon_url: meta.faviconUrl,
       domain: finalDomain,
       site_name: meta.siteName,
+      canonical_url: meta.canonicalUrl,
+      author: meta.author,
+      published_time: meta.publishedTime,
       fetched_by: userId,
     })
     .select(columns)

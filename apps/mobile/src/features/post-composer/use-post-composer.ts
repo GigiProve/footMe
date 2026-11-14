@@ -31,6 +31,20 @@
  *  • Anteprima link (§73–98): la decide `linkFetchTarget` (rispetta le X
  *    esplicite §93 e la regola media+link §95); qui solo il debounce e la chiamata.
  *  • Analytics (§200–201): solo conteggi, tipi, esiti e dominio.
+ *
+ * HOM-06.2 (bozze e programmazione, §81–§136, §147, §163–§167, §203–§211) nello
+ * stesso hook, senza un secondo composer (§83):
+ *  • autosave su `save_content_draft` (`useAutosave`) dal primo contenuto
+ *    significativo; la copia locale resta `composer-recovery` e porta ref+versione
+ *    della bozza, così un crash riprende la STESSA riga;
+ *  • due chiavi di operazione per sessione: `draft.operationKey` (salvataggio
+ *    bozza) e `operationKey` (invio) — due operazioni, due retry indipendenti;
+ *  • l'invio di un Post nuovo/bozza è `submit_content`: prima si attende il
+ *    salvataggio in sospeso (`flush`), così una bozza in creazione non si
+ *    duplica; Pubblica = «Ora», Programma = data futura, `keep` su un programmato.
+ *    `publish_post`/`update_post` restano per la Modifica di un Post pubblicato;
+ *  • uscita a tre azioni: `keepDraft` (salva e conserva), `deleteDraft`
+ *    (elimina secondo la policy del server), nessuna delle due per un programmato.
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -38,6 +52,17 @@ import { AppState } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { FeedContentType } from "../feed/feed-types";
+import { trackPublishing } from "../publishing/publishing-analytics";
+import { publishingKeys } from "../publishing/publishing-keys";
+import { publishingErrorCopy } from "../publishing/publishing-presentation";
+import {
+  deleteContentDraft,
+  parsePublishingError,
+  PublishingRequestError,
+  submitContent,
+} from "../publishing/publishing-service";
+import type { ContentRef, Publication } from "../publishing/publishing-types";
+import { useAutosave } from "../publishing/use-autosave";
 import { domainOf, trackComposer, type PublishProps } from "./composer-analytics";
 import { applyEditToCaches, applyPublishToCaches, editPatchFromState } from "./composer-cache";
 import { composerKeys } from "./composer-keys";
@@ -47,35 +72,38 @@ import {
   firstEligibleUrl,
   hasFailedMedia,
   hasMeaningfulText,
+  hasSavableContent,
   hasUploadsInFlight,
   isDirty,
+  isEditingScheduled,
   isEmpty,
   linkFetchTarget,
   mentionQueryAt,
   remainingMediaSlots,
+  submitPublication,
   COMPOSER_MEDIA_LIMIT_COPY,
-  toWirePublishArgs,
+  toDraftContent,
+  toDraftPayload,
   toWireUpdateArgs,
 } from "./composer-presentation";
 import { clearRecovery, loadRecovery, saveRecovery } from "./composer-recovery";
 import { createComposerStore } from "./composer-store";
-import { createComposerState, createEditState, type ComposerState } from "./composer-reducer";
+import { createComposerState, createDraftState, createEditState, type ComposerState } from "./composer-reducer";
 import { parseComposerOrigin } from "./composer-routes";
 import {
   fetchComposerContext,
   fetchLinkPreview,
+  fetchPostDraftForEditor,
   fetchPostForEdit,
   parseComposerError,
-  publishPost,
   searchTagCandidates,
   updatePost,
 } from "./composer-service";
 import type {
-  ComposerErrorKind,
   ComposerIdentity,
   ComposerOrigin,
+  ComposerSubmitErrorKind,
   ComposerTaggedIdentity,
-  WirePublishPostResult,
   WireUpdatePostResult,
 } from "./composer-types";
 import { newComposerOperationKey } from "./operation-key";
@@ -106,21 +134,32 @@ export type ComposerSourceParams = {
   identityHint: string | null;
   /** Presente solo in Modifica. */
   edit: { contentType: FeedContentType; contentId: string; origin: string | null } | null;
+  /** HOM-06.2 §147: la bozza / il programmato / il fallito da riaprire (`draft_type` + `draft_id`). */
+  draftRef?: ContentRef | null;
 };
 
 export type ComposerSource =
   | { status: "loading" }
-  | { status: "error"; code: ComposerErrorKind; retry: () => void }
+  | { status: "error"; code: ComposerSubmitErrorKind; retry: () => void }
   | { status: "ready"; initialState: ComposerState };
+
+/** `content_not_found` non migliora al secondo tentativo: niente attesa inutile (§259). */
+function retryDraftFetch(count: number, error: unknown): boolean {
+  return count < 1 && !(error instanceof PublishingRequestError && error.parsed.kind === "content_not_found");
+}
 
 /**
  * §18, §61, §146. `staleTime: 0` + `gcTime: 0`: ogni apertura legge dal server, così
  * la versione di Modifica (§160) e le identity (§28) non vengono da una cache vecchia.
+ * HOM-06.2: con `draftRef` si legge anche la bozza (`fetch_content_for_editor`, §147–§148).
  */
 export function usePostComposerSource(params: ComposerSourceParams): ComposerSource {
   // La chiave di idempotenza nasce con l'apertura (§118) e sopravvive ai tentativi.
   const [operationKey] = useState(newComposerOperationKey);
+  // Quella del salvataggio bozza è un'altra operazione (§117): chiave propria per sessione.
+  const [draftOperationKey] = useState(newComposerOperationKey);
   const { edit, identityHint, origin, userId } = params;
+  const draftRef = edit ? null : (params.draftRef ?? null);
 
   const context = useQuery({
     enabled: userId.length > 0,
@@ -140,22 +179,35 @@ export function usePostComposerSource(params: ComposerSourceParams): ComposerSou
     staleTime: 0,
   });
 
-  const failure = (edit ? editQuery.error : null) ?? context.error;
+  const draftQuery = useQuery({
+    enabled: userId.length > 0 && draftRef !== null,
+    gcTime: 0,
+    queryFn: () => fetchPostDraftForEditor(draftRef as ContentRef),
+    queryKey: draftRef ? publishingKeys.editor(userId, draftRef) : [...publishingKeys.all, "editor", "none"],
+    retry: retryDraftFetch,
+    staleTime: 0,
+  });
+
+  const failure = (edit ? editQuery.error : null) ?? (draftRef ? draftQuery.error : null) ?? context.error;
 
   if (failure) {
     return {
-      code: parseComposerError(failure, edit ? "edit" : "publish"),
+      code:
+        failure instanceof PublishingRequestError ? failure.parsed.kind : parseComposerError(failure, edit ? "edit" : "publish"),
       retry: () => {
         void context.refetch();
         if (edit) {
           void editQuery.refetch();
+        }
+        if (draftRef) {
+          void draftQuery.refetch();
         }
       },
       status: "error",
     };
   }
 
-  if (!context.data || (edit && !editQuery.data)) {
+  if (!context.data || (edit && !editQuery.data) || (draftRef && !draftQuery.data)) {
     return { status: "loading" };
   }
 
@@ -171,13 +223,30 @@ export function usePostComposerSource(params: ComposerSourceParams): ComposerSou
     };
   }
 
+  if (draftRef && draftQuery.data) {
+    return {
+      initialState: createDraftState({
+        draft: draftQuery.data,
+        draftOperationKey,
+        identities: context.data.identities,
+        limits: context.data.limits,
+        operationKey,
+        origin,
+        schedule: context.data.schedule,
+      }),
+      status: "ready",
+    };
+  }
+
   return {
     initialState: createComposerState({
+      draftOperationKey,
       identities: context.data.identities,
       identity: defaultIdentity(origin, context.data.identities, identityHint),
       limits: context.data.limits,
       operationKey,
       origin,
+      schedule: context.data.schedule,
     }),
     status: "ready",
   };
@@ -211,9 +280,32 @@ function publishProps(state: ComposerState): PublishProps {
   };
 }
 
+/**
+ * L'errore di una RPC di HOM-06.2 è già classificato (`PublishingRequestError`);
+ * quello lanciato direttamente (rete caduta prima della risposta) passa dal
+ * classificatore di HOM-06.1, che riconosce rete e SQLSTATE.
+ */
+function submitErrorKind(error: unknown, context: "publish" | "edit"): ComposerSubmitErrorKind {
+  return error instanceof PublishingRequestError ? error.parsed.kind : parseComposerError(error, context);
+}
+
 function tagKey(identity: Pick<ComposerTaggedIdentity, "identityType" | "identityId">): string {
   return `${identity.identityType}:${identity.identityId}`;
 }
+
+/**
+ * Esito di un invio riuscito (§207–§211). `publication` è ciò che è partito:
+ * «Ora» → Post pubblicato (con «Visualizza»), data → «Post programmato per…»,
+ * `keep` → «Salva» su un programmato.
+ */
+export type ComposerPublishedResult = {
+  contentType: FeedContentType;
+  contentId: string;
+  status: "published" | "scheduled";
+  scheduledAt: string | null;
+  replayed: boolean;
+  publication: Publication | "keep";
+};
 
 export type UsePostComposerOptions = {
   initialState: ComposerState;
@@ -221,7 +313,7 @@ export type UsePostComposerOptions = {
   userId: string;
   /** Profilo che possiede le query del Feed (`FEED_QK`). */
   profileId: string;
-  onPublished: (result: WirePublishPostResult, state: ComposerState) => void;
+  onPublished: (result: ComposerPublishedResult, state: ComposerState) => void;
   onUpdated: (result: WireUpdatePostResult, state: ComposerState) => void;
 };
 
@@ -229,6 +321,39 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
   const queryClient = useQueryClient();
   const [store] = useState(() => createComposerStore(initialState));
   const state = useSyncExternalStore(store.subscribe, store.getState);
+
+  /* ---------------- bozza server e autosave (HOM-06.2 §116–§132) ---------------- */
+
+  // Autosave sulla stessa riga dal primo contenuto significativo (§117–§118). La copia locale resta
+  // `composer-recovery` (una sola, §125): `persistLocal: false`. Un programmato si salva solo con «Salva» (§167).
+  const autosaveEnabled = state.mode.kind === "create" && !isEditingScheduled(state) && state.draft.status !== "publishing";
+  const autosave = useAutosave({
+    enabled: autosaveEnabled,
+    format: "post",
+    identity: state.identity ? { id: state.identity.id, type: state.identity.type } : null,
+    initialRef: initialState.draft.ref,
+    initialVersion: initialState.draft.version,
+    operationKey: state.draft.operationKey,
+    // Durante l'invio i salvataggi a timer si fermano (la bozza non nasce dopo il contenuto); `flush` resta valido.
+    paused: state.publish.status === "publishing",
+    payload: toDraftPayload(state),
+    persistLocal: false,
+    significant: autosaveEnabled && hasSavableContent(state),
+    snapshot: null,
+    userId,
+  });
+  // Le funzioni asincrone sotto leggono sempre l'handle più recente, mai quello del render in cui sono nate.
+  const autosaveRef = useRef(autosave);
+  autosaveRef.current = autosave;
+
+  // Una bozza riaperta parte «già salvata»: senza questo il primo render la riscriverebbe identica, bumpando la versione.
+  useEffect(() => {
+    const { ref, version } = store.getState().draft;
+
+    if (ref && version !== null) {
+      autosaveRef.current.adopt(ref, version);
+    }
+  }, [store]);
 
   const [notice, setNotice] = useState<string | null>(null);
   const [selection, setSelection] = useState({ end: 0, start: 0 });
@@ -303,6 +428,11 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
       // §142: ripristino silenzioso, e mai sopra a ciò che l'utente ha già scritto.
       if (snapshot && isEmpty(store.getState())) {
         store.dispatch({ snapshot, type: "restored" });
+
+        // HOM-06.2 §121, §127: il crash riprende la STESSA bozza server, non ne crea una seconda.
+        if (snapshot.draftRef && typeof snapshot.draftVersion === "number") {
+          autosaveRef.current.adopt(snapshot.draftRef, snapshot.draftVersion);
+        }
       }
 
       recoveryRef.current.ready = true;
@@ -313,27 +443,42 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     };
   }, [store, userId]);
 
+  // La bozza server (ref + versione) viaggia nello snapshot: è l'unica copia locale (§125). Un programmato non ne ha (§167).
+  const savedRef = autosave.ref;
+  const savedVersion = autosave.version;
+
   useEffect(() => {
-    if (state.mode.kind !== "create") {
+    if (state.mode.kind !== "create" || isEditingScheduled(state)) {
       return;
     }
 
     const timer = setTimeout(() => {
       if (recoveryRef.current.ready && !recoveryRef.current.off) {
-        void saveRecovery(userId, store.getState());
+        void saveRecovery(
+          userId,
+          store.getState(),
+          savedRef && savedVersion !== null ? { ref: savedRef, version: savedVersion } : null,
+        );
       }
     }, RECOVERY_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [state, store, userId]);
+  }, [state, store, userId, savedRef, savedVersion]);
 
   // §135: l'app in background non deve aspettare il debounce.
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (next) => {
       const current = store.getState();
 
-      if (next !== "active" && current.mode.kind === "create" && recoveryRef.current.ready && !recoveryRef.current.off) {
-        void saveRecovery(userId, current);
+      if (
+        next !== "active" &&
+        current.mode.kind === "create" &&
+        !isEditingScheduled(current) &&
+        recoveryRef.current.ready &&
+        !recoveryRef.current.off
+      ) {
+        const handle = autosaveRef.current;
+        void saveRecovery(userId, current, handle.ref && handle.version !== null ? { ref: handle.ref, version: handle.version } : null);
       }
     });
 
@@ -441,7 +586,12 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
         staleTime: 0,
       });
 
-      store.dispatch({ identities: context.identities, limits: context.limits, type: "contextRefreshed" });
+      store.dispatch({
+        identities: context.identities,
+        limits: context.limits,
+        schedule: context.schedule,
+        type: "contextRefreshed",
+      });
     } catch {
       // Senza rete si resta sull'ultima lista nota: il server rivaluta comunque al publish (§30).
     }
@@ -634,7 +784,10 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     setTagOpen(false);
   }
 
-  /** §141, §205: «Elimina» e uscita a composer vuoto tolgono lo stato tecnico locale. */
+  /**
+   * §141, §205: «Elimina» e uscita a composer vuoto tolgono lo stato tecnico locale.
+   * Un programmato non scrive mai la copia locale: non si cancella quella di un altro lavoro.
+   */
   function discard() {
     recoveryRef.current.off = true;
 
@@ -642,7 +795,84 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
       uploaderRef.current?.cancel(item.localId);
     }
 
-    void clearRecovery(userId);
+    if (!isEditingScheduled(store.getState())) {
+      void clearRecovery(userId);
+    }
+  }
+
+  /* ---------------- bozza: scelta di pubblicazione, uscita (§81–§102, §133–§136) ---------------- */
+
+  /** Dopo ogni cambio sul server le liste Bozze/Programmati e i contatori del «+» si rileggono (§234). */
+  function invalidatePublishing() {
+    void queryClient.invalidateQueries({ queryKey: publishingKeys.lists(userId) });
+    void queryClient.invalidateQueries({ queryKey: publishingKeys.launcher(userId) });
+  }
+
+  /** §86–§91: la scelta del foglio «Quando vuoi pubblicare?». */
+  function setPublication(publication: Publication) {
+    store.dispatch({ publication, type: "publicationChanged" });
+    trackPublishing({ format: "post", name: publication.mode === "now" ? "schedule_now_selected" : "schedule_future_selected" });
+  }
+
+  /** Ref e versione più recenti della bozza server, dopo aver atteso ciò che era in sospeso (§121). */
+  async function flushDraft(): Promise<{ ref: ContentRef; version: number } | null> {
+    const saved = await autosaveRef.current.flush();
+
+    if (saved) {
+      return saved;
+    }
+
+    const handle = autosaveRef.current;
+    return handle.ref && handle.version !== null ? { ref: handle.ref, version: handle.version } : null;
+  }
+
+  /**
+   * §135 «Esci e conserva bozza»: salva e sincronizza. La copia locale cade solo se
+   * il server ha tutto; con rete assente (§126) o upload non finiti resta e si
+   * riprende alla prossima apertura (§127).
+   */
+  async function keepDraft(): Promise<void> {
+    const saved = await autosaveRef.current.flush();
+    const media = store.getState().media;
+
+    if (saved && !hasUploadsInFlight(media) && !hasFailedMedia(media)) {
+      recoveryRef.current.off = true;
+      await clearRecovery(userId);
+    }
+
+    invalidatePublishing();
+  }
+
+  /**
+   * §136 «Elimina bozza»: se esiste una bozza sul server la elimina secondo la sua
+   * policy (soft delete), poi toglie la copia locale. `content_not_found` vale
+   * «già eliminata». Con un altro errore la bozza resta e lo si dice (§233).
+   */
+  async function deleteDraft(): Promise<{ ok: true } | { ok: false; error: string }> {
+    const handle = autosaveRef.current;
+    let target = handle.ref && handle.version !== null ? { ref: handle.ref, version: handle.version } : null;
+
+    if (target) {
+      // La versione più recente: un salvataggio in volo l'avrebbe già spostata (§128).
+      target = (await handle.flush()) ?? target;
+
+      try {
+        await deleteContentDraft(target.ref, target.version);
+      } catch (error) {
+        const kind = parsePublishingError(error instanceof PublishingRequestError ? error.cause : error).kind;
+
+        if (kind !== "content_not_found") {
+          return { error: publishingErrorCopy(kind, "post"), ok: false };
+        }
+      }
+
+      trackPublishing({ format: "post", name: "draft_deleted" });
+    }
+
+    await handle.stop();
+    discard();
+    invalidatePublishing();
+    return { ok: true };
   }
 
   /* ---------------- pubblicazione e salvataggio ---------------- */
@@ -661,32 +891,64 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     const latest = store.getState();
 
     // §70: un upload fallito (o rimasto indietro) ferma l'invio. Niente Post senza quel media.
-    if (hasFailedMedia(latest.media) || hasUploadsInFlight(latest.media)) {
+    if (hasFailedMedia(latest.media) || hasUploadsInFlight(latest.media) || !latest.identity) {
       store.dispatch({ type: "publishReset" });
       return;
     }
 
+    const { identity } = latest;
+    const publication = submitPublication(latest);
+
     try {
-      const result = await publishPost(toWirePublishArgs(latest, latest.operationKey, latest.origin));
+      // §121: prima si salva ciò che è in attesa, così una bozza in creazione non si duplica.
+      const saved = await flushDraft();
+      const result = await submitContent({
+        expectedVersion: saved?.version ?? null,
+        format: "post",
+        identityId: identity.id,
+        identityType: identity.type,
+        operationKey: latest.operationKey,
+        origin: latest.origin,
+        payload: toDraftContent(latest),
+        publication,
+        ref: saved?.ref ?? null,
+      });
 
       recoveryRef.current.off = true;
       void clearRecovery(userId);
+      await autosaveRef.current.stop();
       applyPublishToCaches(queryClient, { profileId });
+      invalidatePublishing();
       trackComposer({
         ...publishProps(latest),
-        contentType: result.content_type,
+        contentType: result.ref.contentType,
         name: "publish_success",
         replayed: result.replayed,
       });
-      onPublished(result, latest);
+      if (result.status === "scheduled") {
+        trackPublishing({ format: "post", identityType: identity.type, name: "schedule_confirmed" });
+      }
+      onPublished(
+        {
+          contentId: result.ref.contentId,
+          contentType: result.ref.contentType,
+          publication,
+          replayed: result.replayed,
+          scheduledAt: result.scheduledAt,
+          status: result.status,
+        },
+        latest,
+      );
     } catch (error) {
-      const code = parseComposerError(error, "publish");
+      const kind = submitErrorKind(error, "publish");
+      // Per il composer «permesso perso» è una cosa sola, qualunque RPC l'abbia detta (§169–172).
+      const code: ComposerSubmitErrorKind = kind === "content_permission_denied" ? "post_permission_denied" : kind;
 
       store.dispatch({ code, type: "publishFailed" });
       trackComposer({ ...publishProps(latest), code, name: "publish_failure" });
 
       // La chiave non è più riusabile: nuova chiave, contenuto intatto, l'utente riprova (§118).
-      if (code === "post_operation_conflict") {
+      if (code === "post_operation_conflict" || code === "content_operation_conflict") {
         store.dispatch({ operationKey: newComposerOperationKey(), type: "operationKeyRotated" });
       }
 
@@ -758,8 +1020,10 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
       changeIdentity,
       closeTagSheet,
       confirmTags,
+      deleteDraft,
       discard,
       dismissLink,
+      keepDraft,
       moveMedia,
       openTagSheet,
       removeMedia,
@@ -768,11 +1032,16 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
       selectMention,
       setBody,
       setNotice,
+      setPublication,
       setSelection,
       setTagQuery,
       submit,
       toggleTag,
     },
+    /** Stato discreto dell'autosave (§119–§120): `idle` in Modifica e per i programmati. */
+    autosave: autosave.status,
+    /** Una bozza server esiste già: «Elimina bozza» ha qualcosa da eliminare lì (§136). */
+    hasServerDraft: autosave.ref !== null,
     isDirty: isDirty(state),
     mention: mentionState,
     notice,

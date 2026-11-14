@@ -3,9 +3,9 @@
  *
  * Restituisce, per un elemento, il `ContentManagement` che il menu ••• riceve:
  * le capability come le ha calcolate il server (§21, §96), gli handler di
- * Modifica e Dettagli e statistiche, e l'eliminazione. Modifica e Insights
- * oggi non hanno una destinazione (HOM-05, HOM-06.1/6.2: `content-routes.ts`):
- * rispondono «in arrivo», senza schermate segnaposto (Luigi 2026-11-13).
+ * Modifica e Dettagli e statistiche, e l'eliminazione. Le destinazioni sono in
+ * `content-routes.ts`; un tipo senza destinazione risponde «in arrivo», senza
+ * schermate segnaposto (Luigi 2026-11-13).
  */
 
 import { useRouter } from "expo-router";
@@ -43,7 +43,8 @@ export function useContentManagement({ profileId }: { profileId: string }) {
     return {
       capabilities: { canDelete, canEdit, canViewInsights },
       onDelete: () => deleteContent(target),
-      onEdit: () => open(editContentHref(params)),
+      // HOM-06.2 §217: l'Articolo apre l'editor Articolo, il Post il composer.
+      onEdit: () => open(editContentHref(params, target.visibleKind)),
       onInsights: () => open(viewInsightsHref(params)),
       target,
     };

@@ -28,7 +28,6 @@ import { trackProfileEvent } from "./profile-analytics";
 import type { CompleteProfessionalProfile } from "./profile-service";
 import { ProfileSectionError } from "./master/ProfileSectionBlock";
 import { ProfileSkeleton } from "./master/ProfileSkeleton";
-import { MediaPostComposer } from "./media-posts/MediaPostComposer";
 import {
   MEDIA_PROFILE_POST_PAGE_SIZE,
   fetchMediaProfileArticleCategories,
@@ -58,7 +57,10 @@ import {
   type MediaArticleViewModel,
 } from "./media/media-article-view-model";
 import { buildMediaChannelRows } from "./media/media-channel-view";
-import { buildMediaEditorialHandoff } from "./media/media-editorial-handoff";
+import {
+  buildMediaEditorialHandoff,
+  type MediaEditorialHandoff,
+} from "./media/media-editorial-handoff";
 import {
   MEDIA_PROFILE_INITIAL_TAB,
   MEDIA_PROFILE_NO_CAPABILITIES,
@@ -112,6 +114,11 @@ type MediaProfileViewProps = {
   onEditProfilePress?: () => void;
   onFollowPress?: () => void;
   onMorePress?: () => void;
+  /**
+   * HOM-06.2: "Nuovo articolo" consegna il contesto al flusso editoriale; la
+   * schermata contenitore lo apre (`articleNewHref("MEDIA_PROFILE", id)`).
+   */
+  onNewArticle?: (handoff: MediaEditorialHandoff) => void;
   onOpenClub?: (clubId: string) => void;
   /** Apre il dettaglio contenuto condiviso. */
   onOpenContent?: (ref: MediaContentRef) => void;
@@ -143,6 +150,7 @@ export function MediaProfileView({
   onEditProfilePress,
   onFollowPress,
   onMorePress,
+  onNewArticle,
   onOpenClub,
   onOpenContent,
   onOpenProfile,
@@ -514,9 +522,27 @@ export function MediaProfileView({
   const [isTribunaSheetOpen, setIsTribunaSheetOpen] = useState(false);
   const [tribunaComposerKind, setTribunaComposerKind] =
     useState<MediaTribunaKind | null>(null);
-  const [isEditorialComposerOpen, setIsEditorialComposerOpen] = useState(false);
   const [isMediaComposerOpen, setIsMediaComposerOpen] = useState(false);
   const hasHandledComposeIntent = useRef(false);
+  /*
+    HOM-06.2: dopo aver aperto il flusso Articolo l'elenco può essere indietro
+    di una pubblicazione. Al ritorno (la schermata contenitore alza
+    `refreshToken`) si rilegge, con il filtro «Tutti» perché il nuovo articolo
+    potrebbe non appartenere alla categoria selezionata.
+  */
+  const articlesStaleRef = useRef(false);
+  const seenRefreshTokenRef = useRef(refreshToken);
+
+  /**
+   * Consegna il contesto a HOM-06.2 — origine, realtà editoriale, destinazione
+   * di ritorno — e non sceglie la modalità di creazione: quella la risolve il
+   * flusso editoriale. Il composer legacy (`MediaPostComposer`) non è più
+   * raggiungibile da qui.
+   */
+  const startNewArticle = useCallback(() => {
+    articlesStaleRef.current = true;
+    onNewArticle?.(buildMediaEditorialHandoff(mediaProfileId));
+  }, [mediaProfileId, onNewArticle]);
 
   useEffect(() => {
     if (
@@ -529,14 +555,26 @@ export function MediaProfileView({
 
     hasHandledComposeIntent.current = true;
     goToTab("articles");
-    setIsEditorialComposerOpen(true);
-  }, [capabilities.canPublishArticle, goToTab, shouldOpenComposer]);
+    startNewArticle();
+  }, [capabilities.canPublishArticle, goToTab, shouldOpenComposer, startNewArticle]);
 
-  /**
-   * "Nuovo articolo" consegna il contesto a HOM-06.2 — origine, realtà
-   * editoriale, destinazione di ritorno — e non scegli la modalità di
-   * creazione: quella la risolve il flusso editoriale.
-   */
+  useEffect(() => {
+    if (seenRefreshTokenRef.current === refreshToken) {
+      return;
+    }
+
+    seenRefreshTokenRef.current = refreshToken;
+    if (!articlesStaleRef.current) {
+      return;
+    }
+
+    articlesStaleRef.current = false;
+    setActiveCategory(MEDIA_ARTICLE_FILTER_ALL);
+    void loadCategories();
+    void loadArticles(MEDIA_ARTICLE_FILTER_ALL);
+  }, [loadArticles, loadCategories, refreshToken]);
+
+  /** "Nuovo articolo": stesso gate di capability di prima, nuova destinazione. */
   function handleNewArticlePress() {
     if (!capabilities.canPublishArticle) {
       /*
@@ -557,21 +595,7 @@ export function MediaProfileView({
       source: handoff.origin,
       viewerMode: isOwner ? "owner" : "visitor",
     });
-    setIsEditorialComposerOpen(true);
-  }
-
-  /**
-   * Dopo una pubblicazione riuscita si resta sulla tab Articoli, il filtro
-   * torna a "Tutti" perché il nuovo articolo potrebbe non appartenere alla
-   * categoria selezionata, e la lista viene ricaricata dal backend: la
-   * posizione segue l'ordinamento reale invece di un'ipotesi del client.
-   */
-  function handleArticleCreated() {
-    setIsEditorialComposerOpen(false);
-    goToTab("articles");
-    setActiveCategory(MEDIA_ARTICLE_FILTER_ALL);
-    void loadCategories();
-    void loadArticles(MEDIA_ARTICLE_FILTER_ALL);
+    startNewArticle();
   }
 
   function handleTribunaCreated(post: MediaTribunaPost) {
@@ -937,19 +961,11 @@ export function MediaProfileView({
         visible={tribunaComposerKind !== null}
       />
       {/*
-        Il composer editoriale è quello che esiste già nel prodotto: REV-PROF-21
-        gli consegna origine e identità, non lo ridisegna e non anticipa
-        HOM-06.2.
+        HOM-06.2: gli Articoli si creano nel flusso `article-compose`
+        (`onNewArticle`); `MediaPostComposer` è stato ritirato e non è più
+        montato. Questo è il composer dei contenuti della tab Media (foto e
+        video), che resta.
       */}
-      <MediaPostComposer
-        defaultAuthorName={entityName ?? ""}
-        mediaProfileId={mediaProfileId}
-        onClose={() => setIsEditorialComposerOpen(false)}
-        onCreated={handleArticleCreated}
-        publisherName={entityName ?? ""}
-        userId={viewerProfileId ?? null}
-        visible={isEditorialComposerOpen}
-      />
       <MediaContentComposer
         entityName={entityName ?? "Redazione"}
         mediaProfileId={mediaProfileId}

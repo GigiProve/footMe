@@ -18,9 +18,12 @@
 
 import { supabase } from "../../lib/supabase";
 import { formatTargetRoleLabel, searchTagTargets, type TagSearchResult } from "../content/content-tag-service";
+import { fromWirePublication, fetchContentForEditor, mapSchedulePolicy, PublishingRequestError } from "../publishing/publishing-service";
+import type { ContentRef, SchedulePolicy } from "../publishing/publishing-types";
 import { normalizeUrl } from "./composer-presentation";
 import {
   COMPOSER_ERROR_CODES,
+  type ComposerDraftForEditor,
   type ComposerErrorCode,
   type ComposerErrorKind,
   type ComposerIdentity,
@@ -32,6 +35,7 @@ import {
   type WireComposerContext,
   type WireComposerIdentity,
   type WireComposerLimits,
+  type WireDraftPostEditor,
   type WireLinkPreviewResult,
   type WirePostForEdit,
   type WirePublishPostArgs,
@@ -53,6 +57,8 @@ function unwrapRow<T>(data: unknown): T | null {
 export function mapComposerIdentity(wire: WireComposerIdentity): ComposerIdentity {
   return {
     avatarUrl: wire.avatar_url,
+    // HOM-06.2 §84–§85: senza la capability dal server non c'è scheduling.
+    canSchedule: wire.can_schedule_content === true,
     contextLabel: wire.context_label,
     id: wire.identity_id,
     isVerified: wire.is_verified,
@@ -71,12 +77,100 @@ export function mapComposerLimits(wire: WireComposerLimits): ComposerLimits {
   };
 }
 
-export type ComposerContext = { identities: ComposerIdentity[]; limits: ComposerLimits };
+export type ComposerContext = { identities: ComposerIdentity[]; limits: ComposerLimits; schedule: SchedulePolicy };
 
 export function mapComposerContext(wire: WireComposerContext): ComposerContext {
   return {
     identities: (wire.identities ?? []).map(mapComposerIdentity),
     limits: mapComposerLimits(wire.limits),
+    schedule: mapSchedulePolicy(wire.schedule),
+  };
+}
+
+const HOST_OF_URL = /^https?:\/\/([^/?#]+)/i;
+
+/**
+ * HOM-06.2 §147–§148: `fetch_content_for_editor` (ramo Post) → dominio. A
+ * differenza di `mapPostForEdit` i media restano EDITABILI (§112–§114): nessuna
+ * `remoteMediaPosition`, `uploaded` con il loro `storagePath` così la bozza si
+ * ri-salva (anche con media caricati da un altro amministratore, §260).
+ * `null` se il contenuto non è un Post: lo schermo lo tratta come non disponibile.
+ */
+export function mapDraftForEditor(wire: WireDraftPostEditor, now: Date = new Date()): ComposerDraftForEditor | null {
+  if (wire.format !== "post" || !wire.post) {
+    return null;
+  }
+
+  const { post } = wire;
+  const link: ComposerDraftForEditor["link"] =
+    post.link && (post.link.snapshot_id || post.link.preview)
+      ? {
+          description: post.link.preview?.description ?? null,
+          domain: post.link.preview?.domain ?? HOST_OF_URL.exec(post.link.url)?.[1]?.toLowerCase() ?? "",
+          finalUrl: post.link.preview?.final_url ?? post.link.url,
+          imageUrl: post.link.preview?.image_url ?? null,
+          snapshotId: post.link.snapshot_id,
+          status: "ready",
+          title: post.link.preview?.title ?? null,
+          url: normalizeUrl(post.link.url) ?? post.link.url,
+        }
+      : null;
+
+  const media: ComposerMediaItem[] = [...post.media]
+    .sort((a, b) => a.position - b.position)
+    .map((item) => ({
+      altText: item.alt_text,
+      durationSeconds: item.duration_seconds,
+      errorCode: null,
+      height: item.height,
+      localId: `draft-${item.position}-${item.storage_path}`,
+      localUri: null,
+      mimeType: null,
+      processingState: item.processing_state,
+      remoteMediaPosition: null,
+      remoteUrl: item.url,
+      storagePath: item.storage_path,
+      thumbnailPath: item.thumbnail_path ?? null,
+      thumbnailUri: item.thumbnail_url,
+      type: item.media_type,
+      uploadProgress: null,
+      uploadStatus: "uploaded",
+      width: item.width,
+    }));
+
+  // Una data già passata (programmato fallito, bozza con data scaduta) non è riproponibile: si riparte da «Ora».
+  const saved = fromWirePublication(wire.publication);
+  const publication =
+    saved.mode === "scheduled" && new Date(saved.scheduledAt).getTime() <= now.getTime() ? ({ mode: "now" } as const) : saved;
+
+  return {
+    body: post.body,
+    canEdit: wire.capabilities.can_edit,
+    failureCode: wire.failure_code,
+    hadLinkWithoutPreview: post.link !== null && link === null,
+    identity: { ...mapComposerIdentity(wire.identity), canSchedule: wire.capabilities.can_schedule },
+    link,
+    media,
+    mentions: post.mentions.map((mention) => ({
+      displayName: mention.display_name,
+      end: mention.end,
+      identityId: mention.identity_id,
+      identityType: mention.identity_type,
+      start: mention.start,
+    })),
+    publication,
+    ref: { contentId: wire.content_id, contentType: wire.content_type },
+    status: wire.status,
+    tagged: post.tagged.map((tag) => ({
+      avatarUrl: tag.avatar_url,
+      displayName: tag.display_name,
+      identityId: tag.target_id,
+      identityType: tag.target_type,
+      isVerified: tag.is_verified,
+      subtitle: tag.subtitle,
+    })),
+    updatedAt: wire.updated_at,
+    version: wire.version,
   };
 }
 
@@ -294,6 +388,22 @@ export async function fetchPostForEdit(
   }
 
   return mapPostForEdit(wire);
+}
+
+/**
+ * HOM-06.2 §147–§148: riapre una bozza, un programmato o un fallito. Chi non ha
+ * accesso riceve `content_not_found`, identico a «non esiste» (§259): lo schermo
+ * mostra «Il contenuto non è più disponibile.»
+ */
+export async function fetchPostDraftForEditor(ref: ContentRef): Promise<ComposerDraftForEditor> {
+  const wire = await fetchContentForEditor<WireDraftPostEditor>(ref);
+  const mapped = mapDraftForEditor(wire);
+
+  if (!mapped) {
+    throw new PublishingRequestError(new Error("content_not_found"));
+  }
+
+  return mapped;
 }
 
 /** §155–161: la versione attesa fa rifiutare l'overwrite silenzioso. */

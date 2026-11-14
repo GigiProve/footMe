@@ -8,6 +8,10 @@
  * tolgono, gli spazi si comprimono e le lunghezze si troncano (§208). Gli URL
  * di immagine e favicon si risolvono rispetto al final_url e restano solo se
  * https (il client e il CHECK del database accettano solo https).
+ *
+ * HOM-06.2 §7H–§7I: in più l'URL canonico (rel=canonical / og:url, https, dello
+ * stesso sito), l'autore (testo, mai un URL) e la data di pubblicazione
+ * (article:published_time, ISO).
  */
 
 export type LinkMeta = {
@@ -16,11 +20,15 @@ export type LinkMeta = {
   imageUrl: string | null;
   faviconUrl: string | null;
   siteName: string | null;
+  canonicalUrl: string | null;
+  author: string | null;
+  publishedTime: string | null;
 };
 
 export const MAX_TITLE = 300;
 export const MAX_DESCRIPTION = 500;
 export const MAX_SITE_NAME = 100;
+export const MAX_AUTHOR = 200;
 
 const NAMED_ENTITIES: Record<string, string> = {
   amp: "&",
@@ -105,6 +113,77 @@ export function resolveHttpsUrl(value: string | null | undefined, baseUrl: strin
   }
 }
 
+const SECOND_LEVEL = new Set(["co", "com", "org", "net", "gov", "ac", "edu"]);
+
+/**
+ * Chiave di «stesso sito» di un hostname: gli ultimi due label (tre se il
+ * secondo è un second-level noto come co/com/gov, per `bbc.co.uk`). Approssima il
+ * dominio registrabile senza la Public Suffix List: basta a distinguere
+ * `amp.example.com` da `example.org`, che è ciò che serve al canonico.
+ */
+export function siteKey(hostname: string): string {
+  const labels = hostname.toLowerCase().replace(/\.$/, "").split(".");
+  const take = labels.length >= 3 && labels[labels.length - 1].length === 2 && SECOND_LEVEL.has(labels[labels.length - 2]) ? 3 : 2;
+  return labels.slice(-take).join(".");
+}
+
+/**
+ * Canonico (§7H): https, risolto rispetto al final_url, stesso sito del final_url
+ * (una pagina non può dichiararsi canonica di un altro sito: la deduplica degli
+ * Articoli lo userebbe come chiave), non la sola origine se la pagina ha un
+ * percorso (home dichiarata come canonico di tutto), senza fragment.
+ */
+export function resolveCanonicalUrl(value: string | null | undefined, baseUrl: string): string | null {
+  const resolved = resolveHttpsUrl(value, baseUrl);
+  if (!resolved) {
+    return null;
+  }
+  try {
+    const url = new URL(resolved);
+    const base = new URL(baseUrl);
+    if (url.port !== "" && url.port !== "443") {
+      return null;
+    }
+    if (!url.hostname.includes(".") || /^\d{1,3}(\.\d{1,3}){3}$/.test(url.hostname) || siteKey(url.hostname) !== siteKey(base.hostname)) {
+      return null;
+    }
+    // Un sito che dichiara la HOME come canonico di ogni pagina non può rendere
+    // ogni articolo duplicato di ogni altro (deduplica §7M): un canonico che è la
+    // sola origine, mentre la pagina vera ha un percorso o una query, non si usa.
+    const bare = (u: URL) => (u.pathname === "" || u.pathname === "/") && u.search === "";
+    if (bare(url) && !bare(base)) {
+      return null;
+    }
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Autore (§7I): testo, mai un URL (article:author è spesso il profilo Facebook dell'autore). */
+export function cleanAuthor(value: string | null | undefined): string | null {
+  const text = cleanText(value, MAX_AUTHOR);
+  if (text === null || /^[a-z][a-z0-9+.-]*:\/\//i.test(text) || /^www\./i.test(text)) {
+    return null;
+  }
+  return text;
+}
+
+/** article:published_time (§7I): solo un istante ISO valido, riscritto in UTC. */
+export function cleanPublishedTime(value: string | null | undefined): string | null {
+  const v = (value ?? "").trim();
+  if (v === "" || v.length > 64 || !/^\d{4}-\d{2}-\d{2}/.test(v)) {
+    return null;
+  }
+  const ms = Date.parse(v);
+  if (!Number.isFinite(ms)) {
+    return null;
+  }
+  const year = new Date(ms).getUTCFullYear();
+  return year >= 1990 && year <= 2200 ? new Date(ms).toISOString() : null;
+}
+
 /** Solo l'head: evita di scandire un body da 512 KB per tre tag. */
 function headOf(html: string): string {
   const end = html.search(/<\/head\s*>/i);
@@ -116,6 +195,7 @@ export function parseLinkMeta(html: string, baseUrl: string): LinkMeta {
   const head = headOf(html);
   const metas: Record<string, string> = {};
   const icons: Array<{ rel: string; href: string; sizes: string }> = [];
+  let canonicalHref: string | null = null;
 
   for (const tag of head.match(/<(?:meta|link)\b[^>]*>/gi) ?? []) {
     const attrs = parseAttributes(tag);
@@ -126,7 +206,12 @@ export function parseLinkMeta(html: string, baseUrl: string): LinkMeta {
         metas[key] = content;
       }
     } else if (attrs["href"] !== undefined && attrs["rel"] !== undefined) {
-      icons.push({ rel: attrs["rel"].toLowerCase(), href: attrs["href"], sizes: attrs["sizes"] ?? "" });
+      const rel = attrs["rel"].toLowerCase();
+      if (rel.split(/\s+/).includes("canonical")) {
+        canonicalHref ??= attrs["href"];
+      } else {
+        icons.push({ rel, href: attrs["href"], sizes: attrs["sizes"] ?? "" });
+      }
     }
   }
 
@@ -158,5 +243,17 @@ export function parseLinkMeta(html: string, baseUrl: string): LinkMeta {
     faviconUrl = resolveHttpsUrl("/favicon.ico", baseUrl);
   }
 
-  return { title, description, imageUrl, faviconUrl, siteName };
+  // Canonico: <link rel=canonical> vince su og:url; se il primo non passa il
+  // controllo (altro sito, http, ...) si prova il secondo.
+  const canonicalUrl =
+    resolveCanonicalUrl(canonicalHref, baseUrl) ?? resolveCanonicalUrl(metas["og:url"], baseUrl);
+
+  // Il primo candidato che passa la pulizia (un `author` che è un URL cede il
+  // posto a article:author testuale).
+  const author =
+    [metas["author"], metas["article:author"], metas["og:article:author"]].map(cleanAuthor).find((a) => a !== null) ?? null;
+  const publishedTime =
+    [metas["article:published_time"], metas["og:article:published_time"]].map(cleanPublishedTime).find((t) => t !== null) ?? null;
+
+  return { title, description, imageUrl, faviconUrl, siteName, canonicalUrl, author, publishedTime };
 }

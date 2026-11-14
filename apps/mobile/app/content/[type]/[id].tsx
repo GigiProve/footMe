@@ -9,8 +9,14 @@ import {
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useQuery } from "@tanstack/react-query";
 
 import { Screen } from "../../../src/components/ui/screen";
+import { trackArticle } from "../../../src/features/article-editor/article-analytics";
+import { articleKeys } from "../../../src/features/article-editor/article-keys";
+import { articleBodyKind } from "../../../src/features/article-editor/article-render";
+import { fetchArticleDetail } from "../../../src/features/article-editor/article-service";
+import { ArticleDetailBody } from "../../../src/features/article-editor/components/ArticleDetailBody";
 import { useSession } from "../../../src/features/auth/use-session";
 import {
   fetchClubMediaPostDetail,
@@ -51,6 +57,7 @@ import { FanContentBody } from "../../../src/features/profiles/FanContentBody";
 import { MediaContentInteractions } from "../../../src/features/profiles/media/MediaContentInteractions";
 import { MediaTribunaBody } from "../../../src/features/profiles/media/MediaTribunaBody";
 import {
+  fetchClubPublisherName,
   fetchContentPublisher,
   type ContentPublisher,
 } from "../../../src/features/content/content-publisher-service";
@@ -73,6 +80,12 @@ import { AppText, Button } from "../../../src/ui";
 type TaggedEntry = ContentTaggedTarget;
 
 type ContentView = {
+  /**
+   * HOM-06.2: il contenuto può avere un documento Articolo
+   * (`fetch_article_detail`): club_media con kind 'article', media_profile che
+   * non sia di tipo 'media'. Tutto il resto resta sul rendering storico.
+   */
+  articleCandidate: boolean;
   authorName: string | null;
   body: string | null;
   /** HOM-03 §50: cover ampia dell'Articolo, valorizzata solo qui e non nel Feed. */
@@ -136,6 +149,7 @@ function asTaggedContentType(value: ContentDetailType): TaggedContentType | null
 }
 
 function clubMediaTypeLabel(kind: ClubMediaPost["kind"]): string {
+  if (kind === "article") return "Articolo";
   if (kind === "highlights") return "Highlights";
   if (kind === "interview") return "Intervista";
   if (kind === "market") return "Mercato";
@@ -149,13 +163,16 @@ function mapClubMedia(post: ClubMediaPost, viewerId: string | null): ContentView
   const isVideo = post.visual_type === "video" && Boolean(post.visual_url);
 
   return {
+    articleCandidate: post.kind === "article",
     authorName: null,
     body: post.body ?? post.excerpt ?? null,
     coverUrl: isVideo ? null : (post.visual_url ?? post.thumbnail_url),
     displayMode: "full",
     excerpt: post.excerpt ?? null,
     externalUrl: null,
-    isArticle: isClubMediaArticle(post.visual_type, post.body),
+    // HOM-06.2: il kind entra nella regola, come in `footme_feed_item_type`:
+    // un 'post' lungo non è un Articolo, un 'article' breve sì.
+    isArticle: isClubMediaArticle(post.visual_type, post.body, post.kind),
     publishedAt: null,
     publisherId: post.club_id,
     publisherKind: "club",
@@ -197,6 +214,8 @@ function mapMediaProfile(
   const isVideo = post.cover_type === "video" && Boolean(post.cover_url);
 
   return {
+    // fetch_article_detail serve solo il kind «article»: news e legacy restano sul body (nessuno spinner inutile).
+    articleCandidate: !isVideo && post.kind === "article",
     authorName: post.author_name,
     body: post.body ?? post.excerpt ?? null,
     coverUrl: isVideo ? null : post.cover_url,
@@ -249,6 +268,7 @@ function mapFanTribuna(
   viewerId: string | null,
 ): ContentView {
   return {
+    articleCandidate: false,
     authorName: null,
     body: post.body ?? null,
     coverUrl: null,
@@ -294,6 +314,7 @@ function mapMediaTribuna(
   publisher: ContentPublisher,
 ): ContentView {
   return {
+    articleCandidate: false,
     authorName: null,
     body: post.body ?? null,
     coverUrl: null,
@@ -320,6 +341,7 @@ function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentVi
   const isVideo = post.visual_type === "video" && Boolean(post.visual_url);
 
   return {
+    articleCandidate: false,
     authorName: null,
     body: null,
     coverUrl: null,
@@ -499,6 +521,44 @@ function ContentDetailBody({
     postId: id,
   });
 
+  /*
+    HOM-06.2 §7K, §49, §216: documento, cover, fonte e attribuzione di un
+    Articolo. Un guasto non blocca la pagina: ripiega sul corpo storico. Mentre
+    carica, il corpo storico non compare (niente «Fonte: …» che poi cambia).
+  */
+  const articleType =
+    contentType === "club_media" || contentType === "media_profile" ? contentType : null;
+  const articleDetailQuery = useQuery({
+    enabled: !!content && !!id && content.articleCandidate && articleType !== null,
+    queryFn: () => fetchArticleDetail(articleType as FeedContentType, id as string),
+    queryKey: articleKeys.detail((articleType ?? "club_media") as FeedContentType, id ?? ""),
+  });
+  const articleDetail = articleDetailQuery.data ?? null;
+  const isArticleLoading = !!content && content.articleCandidate && articleDetailQuery.isLoading;
+  const articleBody = articleBodyKind(articleDetail);
+
+  // «Condiviso da [Società]»: il dettaglio storico di club_media non porta il nome.
+  const clubPublisherId =
+    content?.articleCandidate && content.publisherKind === "club" ? content.publisherId : null;
+  const clubNameQuery = useQuery({
+    enabled: clubPublisherId !== null,
+    queryFn: () => fetchClubPublisherName(clubPublisherId as string),
+    queryKey: ["content-publisher", "club", clubPublisherId],
+  });
+  const publisherName = clubNameQuery.data ?? content?.publisherName ?? "";
+  /*
+    §7J, §7K: in EXTERNAL_LINK l'immagine è quella della fonte, dentro la
+    card; una cover sopra la testata la duplicherebbe. Finché il documento non
+    c'è, nessuna cover: comparirebbe e poi sparirebbe.
+  */
+  const detailCoverUrl = !content
+    ? null
+    : content.articleCandidate
+      ? isArticleLoading || articleBody === "external"
+        ? null
+        : (articleDetail?.cover?.url ?? content.coverUrl)
+      : content.coverUrl;
+
   /** HOM-05 §55–56: un solo evento per tap, con la source della provenienza. */
   function emitFromContent(
     eventType: Parameters<typeof emitContentEvent>[0]["eventType"],
@@ -569,13 +629,13 @@ function ContentDetailBody({
         )
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
-          {content.video || content.coverUrl ? (
+          {content.video || detailCoverUrl ? (
             // HOM-03 §35, §50: video inline o cover ampia in testa; il titolo
             // segue come testata, senza la miniatura che la cover già mostra.
             <>
               <ContentDetailMedia
                 autoStart={autoStartVideo}
-                coverUrl={content.coverUrl}
+                coverUrl={detailCoverUrl}
                 itemId={`${contentType}:${id}`}
                 title={content.title}
                 video={content.video}
@@ -587,6 +647,15 @@ function ContentDetailBody({
                 <AppText variant="headingMd">{content.title}</AppText>
               </View>
             </>
+          ) : content.articleCandidate ? (
+            // HOM-06.2 §38, §7J: un Articolo senza cover non ha una miniatura
+            // segnaposto; la testata è solo testo.
+            <View style={styles.headline}>
+              <AppText color="secondary" variant="eyebrow">
+                {content.typeLabel}
+              </AppText>
+              <AppText variant="headingMd">{content.title}</AppText>
+            </View>
           ) : (
             <CompactContentModule
               thumbnailUrl={content.thumbnailUrl}
@@ -600,7 +669,7 @@ function ContentDetailBody({
             onOpenTarget={openTarget}
             onPressPublisher={openPublisher}
             publishedAt={content.publishedAt}
-            publisherName={content.publisherName}
+            publisherName={publisherName}
             readingLabel={content.readingLabel}
             tagged={content.tagged}
           />
@@ -616,6 +685,28 @@ function ContentDetailBody({
             <MediaTribunaBody
               post={mediaTribunaPost}
               viewerProfileId={viewerId}
+            />
+          ) : isArticleLoading ? (
+            <View style={styles.bodyLoading}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
+          ) : articleDetail && articleBody !== "none" ? (
+            /*
+              HOM-06.2 §7K, §73: documento (stesso renderer dell'Anteprima),
+              card della fonte esterna o attribuzione. Sostituisce il blocco
+              storico «Fonte: …», che qui sarebbe un doppione. L'URL esterno
+              non è mai nei props dell'evento (§257).
+            */
+            <ArticleDetailBody
+              detail={articleDetail}
+              headline={content.title}
+              onOpenSource={() => {
+                trackArticle({ name: "external_article_opened" });
+                if (isArticle) {
+                  emitFromContent("article_link_click");
+                }
+              }}
+              publisherName={publisherName}
             />
           ) : content.displayMode === "preview" ? (
             <>
@@ -754,6 +845,10 @@ function SourceLinkCard({
 }
 
 const styles = StyleSheet.create({
+  bodyLoading: {
+    alignItems: "center",
+    paddingVertical: spacing[24],
+  },
   centered: {
     alignItems: "center",
     flex: 1,

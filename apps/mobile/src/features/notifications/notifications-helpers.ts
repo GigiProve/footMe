@@ -1,6 +1,44 @@
 import type { AppNotification } from "../clubs/membership-types";
 import { SELECTION_EVENTS_HREFS } from "../dashboard/events/events-routes";
 import type { ParticipantsFilter } from "../dashboard/events/participants/participants-types";
+import { contentDetailHref } from "../feed/content-routes";
+import type { FeedContentType } from "../feed/feed-types";
+import { draftsHref } from "../publishing/publishing-routes";
+
+/**
+ * HOM-06.2 §199–§202: gli esiti di un contenuto programmato arrivano nel Centro
+ * Notifiche, mai nei Messaggi. Il testo lo scrive il server («Non è stato
+ * possibile pubblicare un contenuto programmato.», «Il contenuto programmato è
+ * stato pubblicato.»); qui solo categoria, CTA e destinazione.
+ */
+export const SCHEDULED_CONTENT_FAILED = "scheduled_content_failed";
+export const SCHEDULED_CONTENT_PUBLISHED = "scheduled_content_published";
+
+export function isScheduledContentNotification(item: Pick<AppNotification, "type">): boolean {
+  return item.type === SCHEDULED_CONTENT_FAILED || item.type === SCHEDULED_CONTENT_PUBLISHED;
+}
+
+/**
+ * §200–§201: il fallimento apre «Bozze e programmati» sulla tab Programmati, dove
+ * l'elemento fallito ha Riprova · Modifica · Sposta nelle bozze (§195); la
+ * pubblicazione riuscita apre il contenuto. Null quando manca l'id: la riga si
+ * marca letta e basta, senza una destinazione inventata. La destinazione
+ * rivalida accesso e stato (§259).
+ */
+export function scheduledContentNotificationHref(item: Pick<AppNotification, "data" | "type">): string | null {
+  if (item.type === SCHEDULED_CONTENT_FAILED) {
+    return draftsHref("scheduled");
+  }
+
+  if (item.type !== SCHEDULED_CONTENT_PUBLISHED) {
+    return null;
+  }
+
+  const contentType = dataText(item, "content_type");
+  const contentId = dataText(item, "content_id");
+
+  return contentType && contentId ? contentDetailHref(contentType as FeedContentType, contentId) : null;
+}
 
 /**
  * DAS-REV-31 §21, §25: risposte della persona che la Società riceve
@@ -184,6 +222,7 @@ export function resolveNotificationCategory(
     return "candidature";
   }
   if (item.type === "content_tag") return "attivita";
+  // HOM-06.2: i due esiti dei programmati sono di sistema (nessun toggle di preferenza): è il ripiego.
   if (item.type === "store_order") return "store";
 
   return "sistema";
@@ -311,6 +350,9 @@ export function ctaLabelFor(item: AppNotification): string {
   if (item.type.startsWith("role_link_")) return "Vedi rapporto";
   if (item.type === "new_follower") return "Vedi profilo";
   if (item.type === "content_tag") return "Apri contenuto";
+  /* HOM-06.2 §200–§201: il fallimento porta a Programmati, il successo al contenuto. */
+  if (item.type === SCHEDULED_CONTENT_FAILED) return "Vedi programmati";
+  if (item.type === SCHEDULED_CONTENT_PUBLISHED) return "Apri contenuto";
   /* DAS-REV-31 §25: le risposte aprono i Partecipanti, annullamento e
      aggiornamento il dettaglio evento. */
   if (item.type in SELECTION_EVENT_RESPONSE_FILTERS) return "Vedi partecipanti";

@@ -4,8 +4,9 @@
  * provano i test vitest.
  *
  * Specchio SQL: `public.footme_normalize_url` (migrazione
- * 20261120090000_home_post_composer.sql). Le due funzioni devono dare lo stesso
- * risultato per gli URL ASCII; l'IDN passa da `URL` (punycode) solo qui, e per
+ * 20261121090000_home_editorial_drafts_scheduling.sql, già in 20261120090000 con
+ * i soli utm_*). Le due funzioni devono dare lo stesso risultato per gli URL
+ * ASCII; l'IDN passa da `URL` (punycode) solo qui, e per
  * questo `publish_post` accetta uno snapshot anche quando coincide
  * `original_url` o `final_url` invece del solo `normalized_url`.
  */
@@ -61,9 +62,18 @@ export function parseHttpsUrl(raw: string): ParsedUrl {
 }
 
 /**
- * Chiave di deduplica (§88): schema e host minuscoli, niente fragment, niente
- * parametri `utm_*`, niente porta di default, path '/' se vuoto. L'ordine degli
- * altri parametri non cambia.
+ * HOM-06.2 §7H — parametri di TRACCIAMENTO noti, tolti dall'URL normalizzato.
+ * Solo quelli che non identificano la risorsa: `utm_*` e gli identificativi di
+ * click/campagna delle piattaforme. MAI i parametri funzionali (id, v, page, q,
+ * ref, ...): cambiano la pagina. Lo stesso elenco vive in SQL
+ * (footme_normalize_url).
+ */
+export const TRACKING_PARAM = /^(utm_[^=]*|fbclid|gclid|dclid|msclkid|mc_cid|mc_eid|igshid|_hsenc|_hsmi|ref_src)(=|$)/i;
+
+/**
+ * Chiave di deduplica (§88, §7H): schema e host minuscoli, niente fragment,
+ * niente parametri di tracciamento (`utm_*`, fbclid, gclid, ...), niente porta
+ * di default, path '/' se vuoto. L'ordine degli altri parametri non cambia.
  */
 export function normalizeUrl(raw: string): string | null {
   const parsed = parseHttpsUrl(raw);
@@ -75,7 +85,7 @@ export function normalizeUrl(raw: string): string | null {
   const kept: string[] = [];
   const search = url.search.startsWith("?") ? url.search.slice(1) : url.search;
   for (const part of search.split("&")) {
-    if (part !== "" && !/^utm_/i.test(part)) {
+    if (part !== "" && !TRACKING_PARAM.test(part)) {
       kept.push(part);
     }
   }

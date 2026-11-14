@@ -1,7 +1,13 @@
 import { notifyTaggedProfiles } from "../content/content-tag-service";
 import { supabase } from "../../lib/supabase";
 
+/**
+ * HOM-06.2: `article` è l'Articolo editoriale della Società (contratto §A2),
+ * creato dal flusso `article-compose` e letto qui solo per mostrarlo nella tab
+ * Media. Non è tra i tipi che il composer legacy di questa tab sa creare.
+ */
 export type ClubMediaKind =
+  | "article"
   | "highlights"
   | "interview"
   | "market"
@@ -1000,7 +1006,8 @@ function buildExcerpt(body: string | null) {
 }
 
 function normalizeKind(value: string): ClubMediaKind {
-  return value === "interview" ||
+  return value === "article" ||
+    value === "interview" ||
     value === "market" ||
     value === "statement" ||
     value === "training" ||

@@ -12,8 +12,9 @@
  * lì SOLO il tipo `ComposerState`.
  */
 
+import { primaryCtaLabel, publishingErrorCopy, toWirePublication } from "../publishing/publishing-presentation";
+import type { Publication } from "../publishing/publishing-types";
 import type {
-  ComposerErrorKind,
   ComposerIdentity,
   ComposerLimits,
   ComposerMediaItem,
@@ -21,6 +22,7 @@ import type {
   ComposerMentionCandidate,
   ComposerMentionQuery,
   ComposerOrigin,
+  ComposerSubmitErrorKind,
   ComposerTaggedIdentity,
   ComposerTextRange,
   ComposerUrlMatch,
@@ -93,15 +95,26 @@ export function defaultIdentity(
     case "HOME_PER_TE":
     case "HOME_SEGUITI":
     case "CONTENT_DETAIL":
+    // HOM-06.2: la bozza porta la propria identity (la sceglie `createDraftState`); qui è solo il ripiego.
+    case "DRAFTS":
+    case "NOTIFICATION":
       return byId ?? person ?? media ?? identities[0];
   }
 }
 
-/** §16: una sola identity → nessun selector, nessuna freccia. */
+/**
+ * §16: una sola identity → nessun selector, nessuna freccia. HOM-06.2: un
+ * programmato non cambia identity (il cambio di tabella è rifiutato dal server,
+ * `content_identity_change_requires_draft`): prima «Sposta nelle bozze».
+ */
 export function hasIdentityChoice(
-  state: Pick<ComposerState, "mode" | "identities" | "identity">,
+  state: Pick<ComposerState, "mode" | "identities" | "identity"> & Partial<Pick<ComposerState, "draft">>,
 ): boolean {
   if (state.mode.kind !== "create") {
+    return false;
+  }
+
+  if (state.draft?.status === "scheduled" || state.draft?.status === "publishing") {
     return false;
   }
 
@@ -376,8 +389,61 @@ export function canPublish(state: ComposerState): boolean {
     return false;
   }
 
-  // §158: Salva solo se c'è davvero una modifica.
-  return state.mode.kind === "edit" ? isDirty(state) : true;
+  // HOM-06.2 §107–§109: «Programma» non parte con un video ancora in elaborazione.
+  if (state.mode.kind === "create" && state.publication.mode === "scheduled" && hasProcessingVideo(state.media)) {
+    return false;
+  }
+
+  // §158: Salva solo se c'è davvero una modifica (anche per un programmato, §167).
+  return state.mode.kind === "edit" || isEditingScheduled(state) ? isDirty(state) : true;
+}
+
+/* ------------------------------------------------------------------ */
+/* Bozze e programmazione (HOM-06.2)                                    */
+/* ------------------------------------------------------------------ */
+
+export const COMPOSER_VIDEO_PREPARING_COPY = "Preparazione del video in corso"; // §108
+export const COMPOSER_UPLOAD_IN_PROGRESS_COPY = "Caricamento in corso";
+export const COMPOSER_DRAFT_NOT_AVAILABLE_COPY = "Il contenuto non è più disponibile."; // §259
+
+/** Un contenuto già programmato si modifica con «Salva» esplicito, senza autosave (§163–§167). */
+export function isEditingScheduled(state: Pick<ComposerState, "draft">): boolean {
+  return state.draft.status === "scheduled";
+}
+
+/** Un video riaperto da una bozza che il server sta ancora elaborando (§107–§108). */
+export function hasProcessingVideo(media: readonly ComposerMediaItem[]): boolean {
+  return media.some((item) => item.type === "video" && item.processingState != null && item.processingState !== "ready");
+}
+
+/**
+ * §105–§109: la data futura non si conferma finché un media non è pronto sul
+ * server. Un video in elaborazione o in caricamento dice «Preparazione del video
+ * in corso»; un altro upload in corso «Caricamento in corso». Si può sempre
+ * continuare a scrivere e salvare la bozza (§109).
+ */
+export function scheduleBlockReason(media: readonly ComposerMediaItem[]): string | null {
+  if (
+    hasProcessingVideo(media) ||
+    media.some((item) => item.type === "video" && (item.uploadStatus === "pending" || item.uploadStatus === "uploading"))
+  ) {
+    return COMPOSER_VIDEO_PREPARING_COPY;
+  }
+
+  return hasUploadsInFlight(media) ? COMPOSER_UPLOAD_IN_PROGRESS_COPY : null;
+}
+
+/**
+ * §117–§118: «significativo» come la pubblicabilità di HOM-06.1 (testo, media o
+ * link), ma con i soli media già CARICATI: una bozza senza testo e con un upload
+ * in corso non ha ancora nulla da mandare al server (`content_empty`).
+ */
+export function hasSavableContent(state: Pick<ComposerState, "body" | "mentions" | "media">): boolean {
+  return (
+    hasMeaningfulText(state) ||
+    state.media.some((item) => item.uploadStatus === "uploaded" && item.storagePath !== null) ||
+    firstEligibleUrl(state.body) !== null
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -461,6 +527,11 @@ export function dismissesStoredPreview(state: ComposerState): boolean {
  * quanto caricato (testo, mention, tag, preview inviata).
  */
 export function isDirty(state: ComposerState): boolean {
+  // HOM-06.2 §167: un programmato è «modificato» se contenuto o data differiscono da quando l'hai aperto.
+  if (isEditingScheduled(state)) {
+    return state.draft.baselineKey !== contentKey(state);
+  }
+
   if (state.mode.kind === "create" || !state.baseline) {
     return !isEmpty(state);
   }
@@ -789,7 +860,8 @@ function toWireMedia(media: readonly ComposerMediaItem[]): WirePublishMedia[] {
       height: item.height,
       media_type: item.type,
       storage_path: item.storagePath as string,
-      thumbnail_path: null,
+      // Solo per i media di una bozza riaperta (HOM-06.2): si rimanda ciò che il server ha dato.
+      thumbnail_path: item.thumbnailPath ?? null,
       width: item.width,
     }));
 }
@@ -851,14 +923,77 @@ export function toWireUpdateArgs(state: ComposerState): WireUpdatePostArgs {
 }
 
 /* ------------------------------------------------------------------ */
+/* Payload di bozza e invio (HOM-06.2 §116–§122, §203–§211)            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Il contenuto del Post nella forma wire di `save_content_draft` e
+ * `submit_content`: stessa serializzazione di `publish_post` (una sola). Solo i
+ * media caricati, con il loro `storage_path` (§44, §70).
+ */
+export function toDraftContent(state: ComposerState): {
+  body: string;
+  mentions: WireMention[];
+  tagged: WireTaggedIdentity[];
+  media: WirePublishMedia[];
+  link: WirePublishLink | null;
+} {
+  // Solo la coda: togliere spazi iniziali sposterebbe gli offset delle mention.
+  const body = state.body.trimEnd();
+
+  return {
+    body,
+    link: toWireLink({ ...state, body }),
+    media: toWireMedia(state.media),
+    mentions: toWireMentions(state.mentions, body.length),
+    tagged: toWireTagged(state.tagged),
+  };
+}
+
+/** `save_content_draft`: in bozza la `publication` è l'impostazione desiderata, senza cambiare stato (contratto §A6.4). */
+export function toDraftPayload(state: ComposerState): Record<string, unknown> {
+  return { ...toDraftContent(state), publication: toWirePublication(state.publication) };
+}
+
+/** Il contenuto + la data, per sapere se un programmato è cambiato dall'apertura (§167). */
+export function contentKey(state: ComposerState): string {
+  return JSON.stringify({ content: toDraftContent(state), publication: state.publication });
+}
+
+/**
+ * La publication che parte con l'invio. «Salva» di un programmato non tocca la
+ * data finché non la si cambia nel foglio (§166–§167): `keep`. Un'identity senza
+ * `can_schedule_content` pubblica sempre «Ora» (§85).
+ */
+export function submitPublication(state: ComposerState): Publication | "keep" {
+  if (isEditingScheduled(state)) {
+    return JSON.stringify(state.publication) === JSON.stringify(state.draft.initialPublication) ? "keep" : state.publication;
+  }
+
+  return state.identity?.canSchedule ? state.publication : { mode: "now" };
+}
+
+/** Il testo del bottone principale (§79, §88, §92, §167): riflette SEMPRE la pubblicazione scelta. */
+export function composerCtaLabel(state: ComposerState): string {
+  if (state.mode.kind === "edit") {
+    return "Salva";
+  }
+
+  return primaryCtaLabel(state.identity?.canSchedule ? state.publication : { mode: "now" }, {
+    editing: isEditingScheduled(state) ? "scheduled" : null,
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* Errori (§169–177)                                                   */
 /* ------------------------------------------------------------------ */
 
 /**
  * La copy per codice. In Modifica il generico è «salvare», non «pubblicare».
  * Rete assente e ignoti usano la copy §175: non si simula mai un successo (§177).
+ * I codici `content_*` / `schedule_*` di HOM-06.2 passano da `publishingErrorCopy`.
  */
-export function errorCopy(code: ComposerErrorKind, mode: "create" | "edit" = "create"): string {
+export function errorCopy(code: ComposerSubmitErrorKind, mode: "create" | "edit" = "create"): string {
   switch (code) {
     case "post_permission_denied":
       return COMPOSER_PERMISSION_LOST_COPY;
@@ -880,9 +1015,12 @@ export function errorCopy(code: ComposerErrorKind, mode: "create" | "edit" = "cr
       return "Il link non è valido. Controllalo e riprova.";
     // La chiave di idempotenza è già stata ruotata: «Riprova» è sicuro (§118).
     case "post_operation_conflict":
+    case "content_operation_conflict":
     case "post_invalid_content":
     case "network":
     case "unknown":
       return mode === "edit" ? COMPOSER_EDIT_ERROR_COPY : COMPOSER_PUBLISH_ERROR_COPY;
+    default:
+      return publishingErrorCopy(code, "post");
   }
 }

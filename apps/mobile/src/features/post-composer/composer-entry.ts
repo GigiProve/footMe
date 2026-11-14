@@ -1,54 +1,36 @@
 /**
- * Come il «+» della Home arriva al composer (HOM-06.1 §2–3, §25, §213, §261).
+ * Come il «+» della Home arriva al composer (HOM-06.1 §2–3, §25, §213, §261;
+ * HOM-06.2 §4–§10).
  *
- * Il «+» NON è cablato come «+ = Post» (§3): è una funzione dei formati di
- * creazione che il ruolo può usare.
- *  • solo Post → `direct`: un tap, il composer si apre subito, senza schermata
- *    intermedia con Post/Foto/Video (§2, §25);
- *  • Post + altri formati → `menu`: resta l'ActionSheet esistente, con «Nuovo
- *    post» come PRIMA voce (decisione Luigi 2026-11-13). HOM-06.2 aggiungerà
- *    qui Articolo & co. aggiungendo formati, senza toccare Home né composer.
+ * Il «+» NON è cablato come «+ = Post» né come «+ = Crea contenuto» (§4): è una
+ * funzione delle azioni realmente disponibili, che arrivano dal server
+ * (`fetch_content_launcher`, `features/publishing`). Chi decide è
+ * `resolveLauncherMode`:
+ *  • solo Post e nulla in sospeso → composer diretto, un tap (§5);
+ *  • altrimenti → foglio «Crea contenuto» (§6) con righe semplici (§10).
  *
- * Gli altri formati sono quelli LEGACY che oggi vivono in modali locali di
- * profilo/Società (vedi `FeedComposerEntry`): non si estendono (CLAUDE.md,
- * moduli legacy), si elencano soltanto.
+ * Questo file tiene ciò che il server NON sa: le azioni del launcher che non sono
+ * contenuti e dipendono dal ruolo del client, e l'origin del composer.
  *
- * Il Post è disponibile per ogni ruolo come punto d'ingresso: chi non ha
- * identity con `can_publish_post` arriva comunque al composer, che spiega
- * «Non hai profili con cui pubblicare un post» (§172) invece del vecchio avviso
- * «non ancora attiva». L'autorità sul permesso resta del server (§30).
+ * I formati LEGACY del vecchio menu «Crea» sono assorbiti (decisione Luigi
+ * 2026-11-13): `media_article` e `club_content` sono ora «Articolo»; `fan_post`
+ * è «Post» (il tifoso è una PERSON con il composer Post). Resta una sola azione
+ * che non è né Post né Articolo: «Posizione aperta», del club_admin, che continua
+ * ad aprire la stessa destinazione di prima (§4: azione reale, non un mockup).
  */
 
 import type { FeedScope } from "../feed/feed-types";
 import type { ComposerOrigin } from "./composer-types";
 
-export const COMPOSER_FORMATS = [
-  "post",
-  // Legacy, non estendere: vivono nelle viste di profilo/Società.
-  "fan_post",
-  "media_article",
-  "club_content",
-  "open_position",
-] as const;
+/** Le azioni extra del launcher oltre a Post, Articolo e Bozze. */
+export type LauncherExtraAction = "open_position";
 
-export type ComposerFormat = (typeof COMPOSER_FORMATS)[number];
+/** Destinazione di «Posizione aperta»: la stessa del vecchio menu (modulo legacy, non si estende). */
+export const OPEN_POSITION_HREF = "/(tabs)/announcements";
 
-export type ComposerEntryMode = "direct" | "menu";
-
-const LEGACY_FORMATS_BY_ROLE: Record<string, readonly ComposerFormat[]> = {
-  club_admin: ["club_content", "open_position"],
-  fan: ["fan_post"],
-  media: ["media_article"],
-};
-
-/** I formati di creazione disponibili al ruolo: sempre il Post, più gli eventuali legacy. */
-export function composerFormatsForRole(role: string | null | undefined): ComposerFormat[] {
-  return ["post", ...(role ? (LEGACY_FORMATS_BY_ROLE[role] ?? []) : [])];
-}
-
-/** `direct` se il Post è l'unico formato (o non ce n'è nessun altro), `menu` altrimenti. */
-export function resolveComposerEntry(formats: readonly ComposerFormat[]): ComposerEntryMode {
-  return formats.some((format) => format !== "post") ? "menu" : "direct";
+/** Le azioni extra per ruolo del client; le capability di Post/Articolo/Bozze sono del server. */
+export function launcherExtraActionsForRole(role: string | null | undefined): LauncherExtraAction[] {
+  return role === "club_admin" ? ["open_position"] : [];
 }
 
 /** §5, §123: la tab Home da cui si apre è la superficie a cui si torna. */

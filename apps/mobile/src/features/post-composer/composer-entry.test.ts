@@ -1,45 +1,52 @@
 import { describe, expect, it } from "vitest";
 
-import { composerFormatsForRole, composerOriginForScope, resolveComposerEntry } from "./composer-entry";
+import { resolveLauncherMode } from "../publishing/publishing-presentation";
+import type { ContentLauncherState } from "../publishing/publishing-types";
+import {
+  composerOriginForScope,
+  launcherExtraActionsForRole,
+  OPEN_POSITION_HREF,
+} from "./composer-entry";
 
-describe("resolveComposerEntry (§2–3, §213)", () => {
-  it("solo Post → apertura diretta, senza schermata intermedia", () => {
-    expect(resolveComposerEntry(["post"])).toBe("direct");
-  });
+const onlyPost: ContentLauncherState = {
+  canPublishArticle: false,
+  canPublishPost: true,
+  canViewDrafts: true,
+  draftsCount: 0,
+  failedCount: 0,
+  scheduledCount: 0,
+};
 
-  it("Post + altri formati → menu", () => {
-    expect(resolveComposerEntry(["post", "fan_post"])).toBe("menu");
-    expect(resolveComposerEntry(["post", "club_content", "open_position"])).toBe("menu");
-  });
-
-  it("nessun formato → diretto: il composer spiega l'assenza di identity (§172)", () => {
-    expect(resolveComposerEntry([])).toBe("direct");
-  });
-
-  it("un formato diverso dal Post senza il Post è comunque un menu", () => {
-    expect(resolveComposerEntry(["media_article"])).toBe("menu");
-  });
-});
-
-describe("composerFormatsForRole", () => {
-  it.each(["player", "coach", "staff", "director", "agent", "unknown", null, undefined])(
-    "%s → solo Post, un tap",
+describe("launcherExtraActionsForRole (§4: azioni reali, non voci di mockup)", () => {
+  it.each(["player", "coach", "staff", "director", "agent", "fan", "media", "unknown", null, undefined])(
+    "%s → nessuna azione extra: formati legacy assorbiti da Post e Articolo",
     (role) => {
-      const formats = composerFormatsForRole(role);
-
-      expect(formats).toEqual(["post"]);
-      expect(resolveComposerEntry(formats)).toBe("direct");
+      expect(launcherExtraActionsForRole(role)).toEqual([]);
     },
   );
 
-  it("fan, media e club_admin mantengono i formati legacy con «Post» per primo", () => {
-    expect(composerFormatsForRole("fan")).toEqual(["post", "fan_post"]);
-    expect(composerFormatsForRole("media")).toEqual(["post", "media_article"]);
-    expect(composerFormatsForRole("club_admin")).toEqual(["post", "club_content", "open_position"]);
+  it("solo il club_admin ha «Posizione aperta», nella stessa destinazione di prima", () => {
+    expect(launcherExtraActionsForRole("club_admin")).toEqual(["open_position"]);
+    expect(OPEN_POSITION_HREF).toBe("/(tabs)/announcements");
+  });
+});
 
-    for (const role of ["fan", "media", "club_admin"]) {
-      expect(resolveComposerEntry(composerFormatsForRole(role))).toBe("menu");
+describe("«+» (HOM-06.1 §2–3, HOM-06.2 §4–§6)", () => {
+  it("chi può solo Post e non ha nulla in sospeso → composer diretto, anche un Tifoso o un Media", () => {
+    for (const role of ["player", "fan", "media"]) {
+      expect(resolveLauncherMode(onlyPost, launcherExtraActionsForRole(role))).toBe("direct_post");
     }
+  });
+
+  it("senza lo stato (rete) il Post resta un tap; il club_admin ha comunque il foglio", () => {
+    expect(resolveLauncherMode(null, launcherExtraActionsForRole("player"))).toBe("direct_post");
+    expect(resolveLauncherMode(null, launcherExtraActionsForRole("club_admin"))).toBe("sheet");
+  });
+
+  it("Articolo, bozze o un'azione extra → foglio «Crea contenuto»", () => {
+    expect(resolveLauncherMode({ ...onlyPost, canPublishArticle: true })).toBe("sheet");
+    expect(resolveLauncherMode({ ...onlyPost, draftsCount: 1 })).toBe("sheet");
+    expect(resolveLauncherMode(onlyPost, launcherExtraActionsForRole("club_admin"))).toBe("sheet");
   });
 });
 

@@ -7,10 +7,11 @@
  * articolo". Quello che fa è consegnare il contesto — da dove si arriva,
  * quale realtà editoriale pubblica, dove tornare — a un punto solo.
  *
- * Finché HOM-06.2 non esiste, quel punto apre il composer editoriale che è
- * già nel prodotto, così la CTA non è un vicolo cieco e, quando il flusso
- * arriverà, cambierà soltanto questo modulo. Il contratto è già quello
- * definitivo: `origin`, identità della realtà, destinazione di ritorno.
+ * HOM-06.2 esiste: quel punto è il flusso `article-compose`
+ * (`articleNewHref("MEDIA_PROFILE", mediaProfileId)`), aperto dalla schermata
+ * che contiene il profilo. Il composer legacy `MediaPostComposer` è ritirato.
+ * Il contratto resta quello definitivo: `origin`, identità della realtà,
+ * destinazione di ritorno.
  */
 import type { MediaProfileTab } from "./media-master-profile";
 

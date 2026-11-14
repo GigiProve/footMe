@@ -30,9 +30,11 @@ import {
   filterUnread,
   groupNotifications,
   groupNotificationsByTime,
+  isScheduledContentNotification,
   isSelectionEventNotification,
   latestUpdatedAt,
   NOTIFICATION_FILTERS,
+  scheduledContentNotificationHref,
   selectionEventNotificationHref,
   type NotificationCategoryFilter,
 } from "./notifications-helpers";
@@ -134,6 +136,14 @@ export function NotificationCenterScreen() {
           pathname: "/content/[type]/[id]",
           params: { type: contentType, id: postId },
         });
+      }
+    } else if (isScheduledContentNotification(item)) {
+      /* HOM-06.2 §200–§201: «Tap notifica failure: apre l'elemento fallito» (la
+         lista Programmati, dove ha le sue azioni); il successo apre il contenuto
+         pubblicato. La destinazione rilegge accesso e stato dal server. */
+      const href = scheduledContentNotificationHref(item);
+      if (href) {
+        router.push(href as never);
       }
     } else if (item.type === "agent_representation_request") {
       const representationId = item.data?.representation_id;

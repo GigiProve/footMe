@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { displayDomain, normalizeUrl, parseHttpsUrl } from "./url-normalize.ts";
+import { displayDomain, normalizeUrl, parseHttpsUrl, TRACKING_PARAM } from "./url-normalize.ts";
 
 describe("parseHttpsUrl", () => {
   it("accetta https con host pubblico, porta 443 o assente", () => {
@@ -73,5 +73,33 @@ describe("displayDomain (§81)", () => {
   it("toglie www e porta a minuscolo", () => {
     expect(displayDomain("https://WWW.Gazzetta.it/a")).toBe("gazzetta.it");
     expect(displayDomain("niente")).toBe("");
+  });
+});
+
+describe("parametri di tracciamento (HOM-06.2 §7H)", () => {
+  it("toglie i parametri di tracciamento noti, in qualunque posizione e maiuscole", () => {
+    expect(
+      normalizeUrl(
+        "https://example.com/a?fbclid=AbC&id=7&gclid=1&dclid=2&msclkid=3&mc_cid=4&mc_eid=5&igshid=6&_hsenc=7&_hsmi=8&ref_src=twsrc&UTM_Source=x&FBCLID=Z",
+      ),
+    ).toBe("https://example.com/a?id=7");
+  });
+
+  it("NON toglie i parametri funzionali, nemmeno quelli che somigliano a un tracciamento", () => {
+    for (const q of ["ref=home", "v=abc", "page=2", "q=derby", "id=3", "fb=1", "utmx=1", "gclid_custom=1", "source=rss"]) {
+      expect(normalizeUrl(`https://example.com/a?${q}`), q).toBe(`https://example.com/a?${q}`);
+    }
+  });
+
+  it("senza altri parametri non resta il punto interrogativo; l'ordine dei funzionali è invariato", () => {
+    expect(normalizeUrl("https://example.com/a?fbclid=1&utm_term=x")).toBe("https://example.com/a");
+    expect(normalizeUrl("https://example.com/a?z=1&fbclid=1&a=2")).toBe("https://example.com/a?z=1&a=2");
+  });
+
+  it("parametro senza valore e nome esatto", () => {
+    expect(TRACKING_PARAM.test("fbclid")).toBe(true);
+    expect(TRACKING_PARAM.test("fbclid=")).toBe(true);
+    expect(TRACKING_PARAM.test("fbclidx=1")).toBe(false);
+    expect(TRACKING_PARAM.test("utm_campaign=a")).toBe(true);
   });
 });

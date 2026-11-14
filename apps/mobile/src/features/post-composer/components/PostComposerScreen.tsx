@@ -25,6 +25,15 @@
  * alla Home. Il feedback è un toast («Post pubblicato» + «Visualizza», «Post
  * aggiornato»): nessuna schermata di successo (§130). Il `ToastProvider` sta nel
  * layout radice, sopra lo Stack: il toast sopravvive alla chiusura del composer.
+ *
+ * HOM-06.2 (bozze e programmazione) nello STESSO composer, senza un secondo (§83):
+ *  • «Pubblicazione · Ora ›» sopra la toolbar, solo se l'identity ha
+ *    `can_schedule_content` (§84–§85); la CTA segue la scelta: Pubblica / Programma
+ *    (§79, §88, §92), «Salva» su un programmato (§167);
+ *  • «Bozza salvata» discreto accanto, mai un toast (§119–§120, §247);
+ *  • uscita a tre azioni per una bozza (§133–§136); un programmato o un Post
+ *    pubblicato conservano «Annullare le modifiche?» (nessuna bozza da eliminare);
+ *  • `?draft_type=&draft_id=` riapre una bozza, un programmato o un fallito (§147).
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -45,15 +54,27 @@ import { colors, spacing } from "../../../theme/tokens";
 import { AppText, Button, useToast } from "../../../ui";
 import { useSession } from "../../auth/use-session";
 import { contentDetailHref } from "../../feed/content-routes";
+import { AutosaveStatus } from "../../publishing/components/AutosaveStatus";
+import { ExitDraftDialog } from "../../publishing/components/ExitDraftDialog";
+import { PublicationRow } from "../../publishing/components/PublicationRow";
+import { PublicationSheet } from "../../publishing/components/PublicationSheet";
+import { trackPublishing } from "../../publishing/publishing-analytics";
+import { submitSuccessCopy } from "../../publishing/publishing-presentation";
+import { parseDraftRef } from "../../publishing/publishing-routes";
 import {
   canPublish,
+  composerCtaLabel,
   errorCopy,
   hasIdentityChoice,
+  hasProcessingVideo,
   identityAccessibilityLabel,
+  isEditingScheduled,
   mediaAccessibilityLabel,
+  scheduleBlockReason,
   shouldShowRichPreview,
   tagSummary,
   COMPOSER_NOT_FOUND_COPY,
+  COMPOSER_VIDEO_PREPARING_COPY,
 } from "../composer-presentation";
 import type { ComposerState } from "../composer-reducer";
 import {
@@ -63,8 +84,7 @@ import {
   parseComposerEditParams,
 } from "../composer-routes";
 import { composerStatus, exitDecision, type ExitDecision } from "../composer-status";
-import type { WirePublishPostResult } from "../composer-types";
-import { usePostComposer, usePostComposerSource } from "../use-post-composer";
+import { usePostComposer, usePostComposerSource, type ComposerPublishedResult } from "../use-post-composer";
 import { ComposerBodyInput } from "./ComposerBodyInput";
 import { ComposerHeader, type ComposerHeaderCtaState } from "./ComposerHeader";
 import { ComposerIdentityRow } from "./ComposerIdentityRow";
@@ -82,6 +102,8 @@ import { TagPeopleSheet } from "./TagPeopleSheet";
 export const COMPOSER_PUBLISHED_TOAST = "Post pubblicato"; // §128
 export const COMPOSER_VIEW_ACTION = "Visualizza"; // §128–129
 export const COMPOSER_UPDATED_TOAST = "Post aggiornato"; // §163
+/** HOM-06.2 §170: «Cambia data e ora» e «Salva» su un programmato con la data cambiata. */
+export const COMPOSER_RESCHEDULED_TOAST = "Programmazione aggiornata";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -141,6 +163,8 @@ export function PostComposerScreen({ kind, search }: PostComposerScreenProps) {
   const isBrokenEdit = kind === "edit" && editParams === null;
 
   const source = usePostComposerSource({
+    // §147: una bozza, un programmato o un fallito si riapre nello stesso composer di creazione.
+    draftRef: kind === "create" ? parseDraftRef(search) : null,
     edit: editParams
       ? { contentId: editParams.contentId, contentType: editParams.contentType, origin: editParams.origin }
       : null,
@@ -203,7 +227,11 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
   const { showToast } = useToast();
 
   const [publishAsOpen, setPublishAsOpen] = useState(false);
+  const [publicationOpen, setPublicationOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // §135–§136: «Esci e conserva» / «Elimina bozza» sono asincroni; il dialogo resta aperto e occupato.
+  const [exitBusy, setExitBusy] = useState(false);
+  const [exitError, setExitError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -273,17 +301,34 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
     });
   }, [navigation]);
 
-  function handlePublished(result: WirePublishPostResult, published: ComposerState) {
+  function handlePublished(result: ComposerPublishedResult, published: ComposerState) {
     // Un successo che arriva dopo che l'utente è già uscito non chiude niente: sarebbe un secondo back.
     if (mountedRef.current) {
       leave();
     }
+
+    // §209–§212: nessuna schermata celebrativa, solo un toast.
+    if (result.publication === "keep") {
+      showToast({ message: COMPOSER_UPDATED_TOAST, tone: "success" });
+      return;
+    }
+
+    if (result.status === "scheduled" && result.publication.mode === "scheduled") {
+      showToast({
+        message: isEditingScheduled(published)
+          ? COMPOSER_RESCHEDULED_TOAST
+          : submitSuccessCopy("post", result.publication),
+        tone: "success",
+      });
+      return;
+    }
+
     showToast({
       action: {
         label: COMPOSER_VIEW_ACTION,
         onPress: () =>
           router.push(
-            contentDetailHref(result.content_type, result.content_id, {
+            contentDetailHref(result.contentType, result.contentId, {
               origin: contentOriginForComposer(published.origin),
             }) as never,
           ),
@@ -310,11 +355,18 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
   const { actions, state } = composer;
 
   const isEdit = state.mode.kind === "edit";
+  const isScheduledEdit = isEditingScheduled(state);
   const isPublishing = state.publish.status === "publishing";
   const ctaState: ComposerHeaderCtaState = isPublishing ? "loading" : canPublish(state) ? "enabled" : "disabled";
   const status = composerStatus(state, composer.notice);
   const summary = tagSummary(state.tagged);
   const showPreview = shouldShowRichPreview(state);
+  // §84–§85: la riga Pubblicazione esiste solo con `can_schedule_content`; mai nella Modifica di un pubblicato (§83).
+  const showPublication = !isEdit && state.identity?.canSchedule === true;
+  // Una bozza (nuova, riaperta o fallita) ha l'uscita a tre azioni (§133–§136); un programmato e un Post pubblicato no.
+  const usesDraftExit = !isEdit && !isScheduledEdit;
+  const publicationNote =
+    state.publication.mode === "scheduled" && hasProcessingVideo(state.media) ? COMPOSER_VIDEO_PREPARING_COPY : null;
 
   const decision = exitDecision({ isDirty: composer.isDirty, isPublishing });
 
@@ -344,6 +396,46 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
     leave();
   }
 
+  /** §135 «Esci e conserva bozza». */
+  async function handleKeepDraft() {
+    setExitBusy(true);
+    setExitError(null);
+    await actions.keepDraft();
+
+    if (mountedRef.current) {
+      setExitBusy(false);
+      setConfirmOpen(false);
+    }
+
+    leave();
+  }
+
+  /** §136 «Elimina bozza»: se il server rifiuta, la bozza resta e lo si dice. */
+  async function handleDeleteDraft() {
+    setExitBusy(true);
+    setExitError(null);
+    const result = await actions.deleteDraft();
+
+    if (!mountedRef.current) {
+      return;
+    }
+
+    setExitBusy(false);
+
+    if (!result.ok) {
+      setExitError(result.error);
+      return;
+    }
+
+    setConfirmOpen(false);
+    leave();
+  }
+
+  function handleContinueEditing() {
+    setConfirmOpen(false);
+    setExitError(null);
+  }
+
   function handleDragActiveChange(active: boolean) {
     draggingRef.current = active;
     setDragging(active);
@@ -366,13 +458,13 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
     <SafeAreaView edges={keyboardOpen ? ["top"] : ["top", "bottom"]} style={styles.root}>
       <ComposerHeader
         cancelDisabled={isPublishing}
-        ctaLabel={isEdit ? "Salva" : "Pubblica"}
+        ctaLabel={composerCtaLabel(state)}
         ctaState={ctaState}
         onCancel={handleCancel}
         onSubmit={() => {
           void actions.submit();
         }}
-        title={isEdit ? "Modifica post" : "Nuovo post"}
+        title={isEdit || isScheduledEdit ? "Modifica post" : "Nuovo post"}
       />
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
@@ -440,6 +532,24 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
           onSelect={actions.selectMention}
         />
 
+        {showPublication ? (
+          <PublicationRow
+            disabled={isPublishing}
+            note={publicationNote}
+            onPress={() => {
+              trackPublishing({ format: "post", name: "schedule_opened" });
+              setPublicationOpen(true);
+            }}
+            publication={state.publication}
+          />
+        ) : null}
+
+        {usesDraftExit && composer.autosave.status !== "idle" ? (
+          <View style={styles.autosaveRow}>
+            <AutosaveStatus status={composer.autosave} />
+          </View>
+        ) : null}
+
         <ComposerToolbar
           mediaDisabled={isPublishing}
           onPressMedia={() => {
@@ -481,12 +591,43 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
         visible={composer.tag.open}
       />
 
-      <DiscardDraftDialog
-        mode={isEdit ? "edit" : "create"}
-        onContinue={() => setConfirmOpen(false)}
-        onDiscard={handleDiscard}
-        visible={confirmOpen}
-      />
+      {showPublication ? (
+        <PublicationSheet
+          blockedReason={scheduleBlockReason(state.media)}
+          futureOnly={isScheduledEdit}
+          onClose={() => setPublicationOpen(false)}
+          onConfirm={(publication) => {
+            actions.setPublication(publication);
+            setPublicationOpen(false);
+          }}
+          policy={state.schedule}
+          publication={state.publication}
+          visible={publicationOpen}
+        />
+      ) : null}
+
+      {usesDraftExit ? (
+        <ExitDraftDialog
+          busy={exitBusy}
+          canDelete
+          error={exitError}
+          onContinue={handleContinueEditing}
+          onDelete={() => {
+            void handleDeleteDraft();
+          }}
+          onKeep={() => {
+            void handleKeepDraft();
+          }}
+          visible={confirmOpen}
+        />
+      ) : (
+        <DiscardDraftDialog
+          mode="edit"
+          onContinue={() => setConfirmOpen(false)}
+          onDiscard={handleDiscard}
+          visible={confirmOpen}
+        />
+      )}
 
       <ComposerMediaPreview
         item={state.media.find((item) => item.localId === previewId) ?? null}
@@ -497,6 +638,11 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
 }
 
 const styles = StyleSheet.create({
+  autosaveRow: {
+    alignItems: "flex-start",
+    paddingHorizontal: spacing[16],
+    paddingVertical: spacing[6],
+  },
   centered: {
     alignItems: "center",
     flex: 1,

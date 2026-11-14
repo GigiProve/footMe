@@ -30,6 +30,13 @@ export default function RootLayout() {
               name="post-compose"
               options={{ animation: "slide_from_bottom", presentation: "fullScreenModal" }}
             />
+            {/* HOM-06.2 §28–§29: l'editor Articolo è a schermo intero, senza bottom navigation né chrome Home. */}
+            <Stack.Screen
+              name="article-compose"
+              options={{ animation: "slide_from_bottom", presentation: "fullScreenModal" }}
+            />
+            {/* HOM-06.2 §137: Bozze e programmati è una schermata fuori dalle tab, con il suo Indietro (anche a gesto). */}
+            <Stack.Screen name="drafts" options={{ gestureEnabled: true }} />
           </Stack>
         </ToastProvider>
       </SessionProvider>

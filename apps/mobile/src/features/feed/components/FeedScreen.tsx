@@ -32,17 +32,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SafeAreaView, StyleSheet, View, type FlatList } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 
 import { colors } from "../../../theme/tokens";
+import { articleNewHref } from "../../article-editor/article-routes";
 import { useSession } from "../../auth/use-session";
 import { useUnreadNotificationsCount } from "../../notifications/use-unread-notifications-count";
 import {
-  composerFormatsForRole,
   composerOriginForScope,
-  resolveComposerEntry,
+  launcherExtraActionsForRole,
+  OPEN_POSITION_HREF,
 } from "../../post-composer/composer-entry";
 import { composerHref } from "../../post-composer/composer-routes";
+import { CreateContentSheet } from "../../publishing/components/CreateContentSheet";
+import { trackPublishing } from "../../publishing/publishing-analytics";
+import { publishingKeys } from "../../publishing/publishing-keys";
+import {
+  draftsEntrySubtitle,
+  draftsEntryTab,
+  launcherRows,
+  resolveLauncherMode,
+  type LauncherRowId,
+} from "../../publishing/publishing-presentation";
+import { draftsHref } from "../../publishing/publishing-routes";
+import { fetchContentLauncher } from "../../publishing/publishing-service";
 import { trackFeed } from "../feed-analytics";
 import { saveFeedCacheMeta } from "../feed-cache";
 import { createFeedVideoController } from "../feed-video-controller";
@@ -50,20 +64,21 @@ import type { FeedItem, FeedScope } from "../feed-types";
 import { useFeedCache } from "../use-feed";
 import { FeedVideoProvider } from "../use-feed-video";
 import { useFeedVideoLifecycle } from "../use-feed-video-lifecycle";
-import { FeedComposerEntry } from "./FeedComposerEntry";
 import { FeedHeader } from "./FeedHeader";
 import { FeedPane } from "./FeedPane";
 import { FeedTabs } from "./FeedTabs";
 
 export function FeedScreen() {
   const router = useRouter();
-  const { profile } = useSession();
+  const { profile, session } = useSession();
   const profileId = profile?.id ?? "";
+  // Stessa chiave utente del composer e della lista Bozze: le invalidazioni dopo ogni azione le raggiungono tutte.
+  const publishingUserId = session?.user.id ?? profile?.id ?? "";
   const unreadCount = useUnreadNotificationsCount();
 
   const [scope, setScope] = useState<FeedScope>("per_te");
   const [hasVisitedSeguiti, setHasVisitedSeguiti] = useState(false);
-  const [isComposerOpen, setComposerOpen] = useState(false);
+  const [isLauncherOpen, setLauncherOpen] = useState(false);
   const [videoController] = useState(createFeedVideoController);
   useFeedVideoLifecycle(videoController);
 
@@ -113,19 +128,59 @@ export function FeedScreen() {
     }
   }
 
-  // HOM-06.1 §2–3: il «+» non è «+ = Post». Chi può creare solo Post va dritto al
-  // composer (un tap, nessuna schermata intermedia); chi ha anche formati legacy
-  // vede il menu, con «Nuovo post» per primo. L'origin è la tab da cui si apre,
-  // così a pubblicazione fatta si torna qui (§123).
+  // HOM-06.1 §2–3, HOM-06.2 §4–§10: il «+» non è «+ = Post» né «+ = Crea contenuto»:
+  // dipende dalle azioni realmente disponibili (`fetch_content_launcher`). Solo Post e
+  // nulla in sospeso → composer diretto, un tap (§5); altrimenti il foglio «Crea
+  // contenuto» (§6). Senza lo stato (rete) il Post resta un tap, come HOM-06.1.
+  // L'origin è la tab da cui si apre, così a pubblicazione fatta si torna qui (§123).
   const composerOrigin = composerOriginForScope(scope);
+  const extraActions = launcherExtraActionsForRole(profile?.role);
+
+  const launcherQuery = useQuery({
+    enabled: publishingUserId.length > 0,
+    queryFn: fetchContentLauncher,
+    queryKey: publishingKeys.launcher(publishingUserId),
+    // Un errore non blocca il «+»: senza stato il Post resta un tap (`resolveLauncherMode`).
+    retry: 1,
+    staleTime: 30_000,
+  });
+  const launcher = launcherQuery.data ?? null;
 
   function handleOpenComposer() {
-    if (resolveComposerEntry(composerFormatsForRole(profile?.role)) === "direct") {
+    if (resolveLauncherMode(launcher, extraActions) === "direct_post") {
       router.push(composerHref({ origin: composerOrigin }) as never);
       return;
     }
 
-    setComposerOpen(true);
+    trackPublishing({
+      canPublishArticle: launcher?.canPublishArticle ?? false,
+      name: "content_launcher_open",
+      pending: launcher ? launcher.draftsCount + launcher.scheduledCount + launcher.failedCount : 0,
+    });
+    setLauncherOpen(true);
+  }
+
+  function handleLauncherSelect(row: LauncherRowId) {
+    setLauncherOpen(false);
+
+    switch (row) {
+      case "post":
+        trackPublishing({ name: "post_selected" });
+        router.push(composerHref({ origin: composerOrigin }) as never);
+        break;
+      case "article":
+        trackPublishing({ name: "article_selected" });
+        router.push(articleNewHref(composerOrigin) as never);
+        break;
+      case "drafts":
+        trackPublishing({ from: "launcher", name: "drafts_scheduled_open" });
+        router.push(draftsHref(draftsEntryTab(launcher)) as never);
+        break;
+      case "open_position":
+        // Azione già offerta dal vecchio menu (modulo legacy, destinazione invariata).
+        router.push(OPEN_POSITION_HREF as never);
+        break;
+    }
   }
 
   return (
@@ -165,15 +220,12 @@ export function FeedScreen() {
           ) : null}
         </View>
 
-        <FeedComposerEntry
-          onClose={() => setComposerOpen(false)}
-          onNavigate={(href) => {
-            setComposerOpen(false);
-            router.push(href as never);
-          }}
-          origin={composerOrigin}
-          role={profile?.role}
-          visible={isComposerOpen}
+        <CreateContentSheet
+          draftsSubtitle={draftsEntrySubtitle(launcher)}
+          onClose={() => setLauncherOpen(false)}
+          onSelect={handleLauncherSelect}
+          rows={launcherRows(launcher, extraActions)}
+          visible={isLauncherOpen}
         />
       </SafeAreaView>
     </FeedVideoProvider>

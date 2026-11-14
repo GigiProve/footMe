@@ -145,6 +145,9 @@ export function contentOriginForComposer(origin: ComposerOrigin): ContentOrigin 
     case "MEDIA_PROFILE":
       return "PROFILE";
     case "CONTENT_DETAIL":
+    // HOM-06.2: dalla lista Bozze o da una notifica il dettaglio si affida al Back (§127).
+    case "DRAFTS":
+    case "NOTIFICATION":
       return null;
   }
 }

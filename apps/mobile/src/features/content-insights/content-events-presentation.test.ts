@@ -79,6 +79,16 @@ describe("isClubMediaArticle (§101, stessa regola di feed_content_index)", () =
     expect(isClubMediaArticle("image", "a".repeat(1000), "post")).toBe(false);
     expect(isClubMediaArticle(null, "a".repeat(400), "interview")).toBe(true);
   });
+
+  it("HOM-06.2: il kind article è sempre Articolo, anche con testo breve o assente", () => {
+    expect(isClubMediaArticle("image", "Breve comunicato", "article")).toBe(true);
+    expect(isClubMediaArticle(null, null, "article")).toBe(true);
+    expect(isClubMediaArticle("image", "a".repeat(10), "article")).toBe(true);
+  });
+
+  it("un kind diverso da article con testo breve non è Articolo", () => {
+    expect(isClubMediaArticle("image", "Breve", "statement")).toBe(false);
+  });
 });
 
 describe("parseContentKey", () => {

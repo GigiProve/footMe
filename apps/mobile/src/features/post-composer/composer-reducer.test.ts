@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { baseState, LIMITS, mediaItem, mention, PERSON, reduce, SOCIETY, tag, uploaded } from "./composer-fixtures";
-import { createEditState, type ComposerState } from "./composer-reducer";
-import { canPublish, linkFetchTarget, toWireUpdateArgs } from "./composer-presentation";
-import type { ComposerLinkPreviewState, ComposerPostForEdit, ComposerRecoverySnapshot } from "./composer-types";
+import { createDraftState, createEditState, type ComposerState } from "./composer-reducer";
+import { canPublish, isDirty, linkFetchTarget, toWireUpdateArgs } from "./composer-presentation";
+import type {
+  ComposerDraftForEditor,
+  ComposerLinkPreviewState,
+  ComposerPostForEdit,
+  ComposerRecoverySnapshot,
+} from "./composer-types";
 
 const ids = (state: ComposerState) => state.media.map((item) => item.localId);
 
@@ -406,5 +411,172 @@ describe("recovery (§135)", () => {
   it("se l'identity salvata non è più autorizzata resta quella corrente", () => {
     const after = reduce(baseState({ identities: [PERSON] }), { snapshot, type: "restored" });
     expect(after.identity).toBe(PERSON);
+  });
+
+  it("HOM-06.2: uno snapshot di HOM-06.1 (senza campi bozza) resta valido e non lega nessuna bozza", () => {
+    const after = reduce(baseState(), { snapshot, type: "restored" });
+
+    expect(after.draft.ref).toBeNull();
+    expect(after.draft.version).toBeNull();
+    expect(after.draft.status).toBeNull();
+    expect(after.publication).toEqual({ mode: "now" });
+  });
+
+  it("HOM-06.2: con la bozza server nello snapshot un crash riprende la stessa riga e le stesse chiavi (§121, §127)", () => {
+    const after = reduce(baseState(), {
+      snapshot: {
+        ...snapshot,
+        draftOperationKey: "draft-key-old",
+        draftRef: { contentId: "d1", contentType: "profile_post" },
+        draftVersion: 7,
+        identityId: PERSON.id,
+        identityType: "person",
+      },
+      type: "restored",
+    });
+
+    expect(after.draft).toMatchObject({
+      operationKey: "draft-key-old",
+      ref: { contentId: "d1", contentType: "profile_post" },
+      status: "draft",
+      version: 7,
+    });
+    expect(after.operationKey).toBe("op-old");
+  });
+
+  it("HOM-06.2: la data salvata torna solo se futura e con la capability; altrimenti «Ora» (§85, §98)", () => {
+    const future = { mode: "scheduled", scheduledAt: "2099-01-01T10:00:00.000Z", timezone: "UTC" } as const;
+    const past = { mode: "scheduled", scheduledAt: "2000-01-01T10:00:00.000Z", timezone: "UTC" } as const;
+    const asPerson = { ...snapshot, identityId: PERSON.id, identityType: "person" } as const;
+
+    expect(reduce(baseState(), { snapshot: { ...asPerson, publication: future }, type: "restored" }).publication).toEqual(future);
+    expect(reduce(baseState(), { snapshot: { ...asPerson, publication: past }, type: "restored" }).publication).toEqual({ mode: "now" });
+    // SOCIETY non può programmare.
+    expect(reduce(baseState(), { snapshot: { ...snapshot, publication: future }, type: "restored" }).publication).toEqual({
+      mode: "now",
+    });
+  });
+});
+
+describe("pubblicazione e capability di scheduling (HOM-06.2 §81–§102)", () => {
+  const future = { mode: "scheduled", scheduledAt: "2099-01-01T10:00:00.000Z", timezone: "UTC" } as const;
+
+  it("default «Ora» (§87)", () => {
+    expect(baseState().publication).toEqual({ mode: "now" });
+  });
+
+  it("la scelta del foglio entra solo con can_schedule_content (§84–§85)", () => {
+    expect(reduce(baseState(), { publication: future, type: "publicationChanged" }).publication).toEqual(future);
+    expect(
+      reduce(baseState({ identity: SOCIETY }), { publication: future, type: "publicationChanged" }).publication,
+    ).toEqual({ mode: "now" });
+  });
+
+  it("cambiare identity verso una senza la capability riporta a «Ora» e conserva il resto (§85)", () => {
+    const before = baseState({ body: "Ciao", publication: future });
+    const after = reduce(before, { identityId: SOCIETY.id, type: "identityChanged" });
+
+    expect(after.publication).toEqual({ mode: "now" });
+    expect(after.body).toBe("Ciao");
+  });
+
+  it("la rivalidazione toglie la data se la capability sparisce, e prende lo schedule del server (§28, §96)", () => {
+    const after = reduce(baseState({ publication: future }), {
+      identities: [{ ...PERSON, canSchedule: false }],
+      limits: LIMITS,
+      schedule: { maxHorizonDays: 30, minLeadMinutes: 10 },
+      type: "contextRefreshed",
+    });
+
+    expect(after.identity?.canSchedule).toBe(false);
+    expect(after.publication).toEqual({ mode: "now" });
+    expect(after.schedule).toEqual({ maxHorizonDays: 30, minLeadMinutes: 10 });
+  });
+
+  it("la scelta non cambia mentre si invia (§119)", () => {
+    const publishing = baseState({ body: "Ciao", publish: { status: "publishing" } });
+    expect(reduce(publishing, { publication: future, type: "publicationChanged" }).publication).toEqual({ mode: "now" });
+  });
+});
+
+describe("riapertura di una bozza / programmato (HOM-06.2 §147–§148, §163–§167)", () => {
+  const draft: ComposerDraftForEditor = {
+    body: "Allenamento",
+    canEdit: true,
+    failureCode: null,
+    hadLinkWithoutPreview: false,
+    identity: PERSON,
+    link: null,
+    media: [uploaded("a", { remoteUrl: "https://cdn.test/a" })],
+    mentions: [],
+    publication: { mode: "scheduled", scheduledAt: "2099-01-01T10:00:00.000Z", timezone: "UTC" },
+    ref: { contentId: "d1", contentType: "profile_post" },
+    status: "draft",
+    tagged: [tag("Anna")],
+    updatedAt: "2026-11-13T10:00:00Z",
+    version: 3,
+  };
+
+  const open = (overrides: Partial<ComposerDraftForEditor> = {}, identities = [PERSON, SOCIETY]) =>
+    createDraftState({
+      draft: { ...draft, ...overrides },
+      draftOperationKey: "dk",
+      identities,
+      limits: LIMITS,
+      operationKey: "op",
+      origin: "DRAFTS",
+      schedule: { maxHorizonDays: 365, minLeadMinutes: 5 },
+    });
+
+  it("una bozza si apre nel composer di creazione con i media editabili (§112–§114)", () => {
+    const state = open();
+
+    expect(state.mode).toEqual({ kind: "create" });
+    expect(state.draft).toMatchObject({ operationKey: "dk", ref: draft.ref, status: "draft", version: 3 });
+    expect(state.body).toBe("Allenamento");
+    expect(state.publication).toEqual(draft.publication);
+    // Editabili: si aggiunge, si toglie, si riordina (a differenza di un Post pubblicato).
+    expect(reduce(state, { localId: "a", type: "mediaRemoved" }).media).toEqual([]);
+    expect(isDirty(state)).toBe(true);
+  });
+
+  it("un programmato conserva la data anche senza capability, e «Salva» si accende solo se qualcosa cambia (§158, §190)", () => {
+    const noSchedule = { ...PERSON, canSchedule: false };
+    const state = open({ identity: noSchedule, status: "scheduled" }, [noSchedule, SOCIETY]);
+
+    expect(state.publication).toEqual(draft.publication);
+    expect(isDirty(state)).toBe(false);
+    expect(canPublish(state)).toBe(false);
+
+    const edited = reduce(state, { body: "Allenamento!", type: "bodyChanged" });
+    expect(isDirty(edited)).toBe(true);
+    expect(canPublish(edited)).toBe(true);
+  });
+
+  it("l'identity di un programmato non si cambia; quella di una bozza sì (§85, contratto A5)", () => {
+    expect(reduce(open({ status: "scheduled" }), { identityId: SOCIETY.id, type: "identityChanged" }).identity).toBe(PERSON);
+    expect(reduce(open(), { identityId: SOCIETY.id, type: "identityChanged" }).identity).toBe(SOCIETY);
+  });
+
+  it("senza la capability una bozza riparte da «Ora»; se l'identity non è più in elenco il permesso risulta perso (§231)", () => {
+    const noSchedule = { ...PERSON, canSchedule: false };
+    expect(open({ identity: noSchedule }, [noSchedule, SOCIETY]).publication).toEqual({ mode: "now" });
+
+    const lost = createDraftState({
+      draft,
+      draftOperationKey: "dk",
+      identities: [SOCIETY],
+      limits: LIMITS,
+      operationKey: "op",
+      origin: "DRAFTS",
+      schedule: { maxHorizonDays: 365, minLeadMinutes: 5 },
+    });
+    expect(lost.identity).toBe(draft.identity);
+    expect(canPublish(lost)).toBe(false);
+  });
+
+  it("un URL che aveva un link senza anteprima non la rigenera da solo (§93)", () => {
+    const state = open({ body: "Guarda https://a.com", hadLinkWithoutPreview: true, media: [] });
+    expect(linkFetchTarget(state)).toBeNull();
   });
 });

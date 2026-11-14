@@ -8,11 +8,13 @@ import {
   groupNotifications,
   groupNotificationsByTime,
   iconNameForCategory,
+  isScheduledContentNotification,
   isSelectionEventNotification,
   NOTIFICATION_FILTERS,
   notificationTimestamp,
   resolveNotificationCategory,
   latestUpdatedAt,
+  scheduledContentNotificationHref,
   selectionEventNotificationHref,
   selectionEventResponseLines,
   timeBucketFor,
@@ -369,5 +371,49 @@ describe("DAS-REV-31 — segna tutte e Società della notifica", () => {
         type: "selection_event_invitation_declined",
       }),
     ).toBe("/(tabs)/dashboard/events/participants/ev-1?filter=declined&asSociety=club-1");
+  });
+});
+
+describe("HOM-06.2 — contenuti programmati nel Centro Notifiche (§199–§202)", () => {
+  it("il fallimento apre Programmati, dove l'elemento fallito ha le sue azioni (§200)", () => {
+    const item = makeNotification({
+      data: { content_id: "c1", content_type: "club_media" },
+      type: "scheduled_content_failed",
+    });
+
+    expect(scheduledContentNotificationHref(item)).toBe("/drafts?tab=scheduled");
+    expect(isScheduledContentNotification(item)).toBe(true);
+    expect(ctaLabelFor(item)).toBe("Vedi programmati");
+  });
+
+  it("la pubblicazione riuscita apre il contenuto, con tipo e id del server (§201)", () => {
+    const item = makeNotification({
+      data: { content_id: "c1", content_type: "club_media" },
+      type: "scheduled_content_published",
+    });
+
+    expect(scheduledContentNotificationHref(item)).toBe("/content/club_media/c1");
+    expect(ctaLabelFor(item)).toBe("Apri contenuto");
+  });
+
+  it("senza tipo o id nessuna destinazione inventata; tipi estranei esclusi", () => {
+    expect(
+      scheduledContentNotificationHref(makeNotification({ data: {}, type: "scheduled_content_published" })),
+    ).toBeNull();
+    expect(
+      scheduledContentNotificationHref(
+        makeNotification({ data: { content_id: "c1", content_type: "club_media" }, type: "content_tag" }),
+      ),
+    ).toBeNull();
+    expect(isScheduledContentNotification({ type: "content_tag" })).toBe(false);
+  });
+
+  it("categoria di ripiego senza colonna: entrambi di sistema (non sono Messaggi, §202)", () => {
+    expect(
+      resolveNotificationCategory(makeNotification({ category: undefined, type: "scheduled_content_published" })),
+    ).toBe("sistema");
+    expect(
+      resolveNotificationCategory(makeNotification({ category: undefined, type: "scheduled_content_failed" })),
+    ).toBe("sistema");
   });
 });

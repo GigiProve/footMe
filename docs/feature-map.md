@@ -27,6 +27,9 @@ docs/                  questa documentazione
 | `app/(onboarding)/profile.tsx` | `features/onboarding` | un solo entry point, rami per ruolo |
 | `app/(tabs)/index.tsx` | `features/feed` | Home |
 | `app/content/insights/[type]/[id]` | `features/content-insights` | Dettagli e statistiche di un contenuto (HOM-05), fuori dalle tab; nello stesso modulo la coda eventi `content-events-*` che alimenta `record_content_events` |
+| `app/post-compose/*` | `features/post-composer` | Composer Post (HOM-06.1); da HOM-06.2 anche bozze (`?draft_type=&draft_id=`), riga Pubblicazione e autosave server |
+| `app/article-compose/*` | `features/article-editor` | Articolo (HOM-06.2): selector modalità, editor canonico (native e imported_text), Collega da un link, Incolla un articolo, Anteprima, `open` per ref. Documento strutturato in `article-document.ts` (mai HTML), parser degli appunti in `article-paste.ts`, renderer unico `ArticleDocumentView` usato anche dal dettaglio. Il composer Media legacy (`MediaPostComposer`) non è più raggiungibile |
+| `app/drafts` | `features/publishing` | Bozze e programmati (HOM-06.2), fuori dalle tab. Modulo condiviso Post + Articolo: launcher «+» (`fetch_content_launcher`, `CreateContentSheet`), scheduler unico (`PublicationSheet`), autosave (`use-autosave`, CAS su `content_version`), comandi di lifecycle. Bozze e programmati sono STATI delle righe esistenti (`draft/scheduled/publishing/failed`), worker SQL `run_scheduled_content_sweep` via pg_cron |
 | `app/(tabs)/cerca.tsx`, `app/search/*` | `features/search` | profili, società, posizioni, media |
 | `app/(tabs)/dashboard/*` | `features/dashboard` | area più grande del repo |
 | `app/(tabs)/messages.tsx`, `app/messages/*`, `app/comunicazioni/*` | `features/messaging` | |

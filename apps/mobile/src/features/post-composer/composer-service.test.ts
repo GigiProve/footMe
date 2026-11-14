@@ -3,16 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchComposerContext,
   fetchLinkPreview,
+  fetchPostDraftForEditor,
   fetchPostForEdit,
   linkStateFromResult,
   mapComposerContext,
+  mapDraftForEditor,
   mapPostForEdit,
   parseComposerError,
   publishPost,
   searchTagCandidates,
   updatePost,
 } from "./composer-service";
-import type { WireComposerContext, WirePostForEdit, WirePublishPostArgs } from "./composer-types";
+import type {
+  WireComposerContext,
+  WireDraftPostEditor,
+  WirePostForEdit,
+  WirePublishPostArgs,
+} from "./composer-types";
 
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), rpc: vi.fn() }));
 
@@ -48,6 +55,8 @@ describe("fetchComposerContext (§18, §61)", () => {
     expect(mocks.rpc).toHaveBeenCalledWith("fetch_post_composer_context");
     expect(context.identities[0]).toEqual({
       avatarUrl: null,
+      // HOM-06.2: il server di HOM-06.1 non manda `can_schedule_content` → niente scheduling.
+      canSchedule: false,
       contextLabel: "Profilo personale",
       id: "p1",
       isVerified: true,
@@ -75,6 +84,103 @@ describe("fetchComposerContext (§18, §61)", () => {
 
   it("mapComposerContext tollera identities mancanti", () => {
     expect(mapComposerContext({ ...CONTEXT, identities: undefined as never }).identities).toEqual([]);
+  });
+});
+
+describe("HOM-06.2 — scheduling nel contesto e riapertura di una bozza", () => {
+  it("can_schedule_content e schedule arrivano dal server; senza, default prudenti (§84–§85, §96)", () => {
+    const context = mapComposerContext({
+      ...CONTEXT,
+      identities: [{ ...CONTEXT.identities[0], can_schedule_content: true }],
+      schedule: { max_horizon_days: 90, min_lead_minutes: 15 },
+    });
+
+    expect(context.identities[0].canSchedule).toBe(true);
+    expect(context.schedule).toEqual({ maxHorizonDays: 90, minLeadMinutes: 15 });
+    expect(mapComposerContext(CONTEXT).identities[0].canSchedule).toBe(false);
+    expect(mapComposerContext(CONTEXT).schedule).toEqual({ maxHorizonDays: 365, minLeadMinutes: 5 });
+  });
+
+  const draft: WireDraftPostEditor = {
+    capabilities: { can_delete: true, can_edit: true, can_schedule: true },
+    content_id: "d1",
+    content_type: "profile_post",
+    failure_code: null,
+    format: "post",
+    identity: { ...CONTEXT.identities[0] },
+    post: {
+      body: "Ciao",
+      link: null,
+      media: [
+        {
+          alt_text: null,
+          duration_seconds: 12,
+          height: 10,
+          media_type: "video",
+          position: 1,
+          processing_state: "processing",
+          storage_path: "u/posts/b",
+          thumbnail_url: null,
+          url: null,
+          width: 10,
+        },
+        {
+          alt_text: null,
+          duration_seconds: null,
+          height: 10,
+          media_type: "image",
+          position: 0,
+          processing_state: "ready",
+          storage_path: "u/posts/a",
+          thumbnail_url: null,
+          url: "https://cdn.test/a",
+          width: 10,
+        },
+      ],
+      mentions: [],
+      tagged: [],
+    },
+    publication: { mode: "scheduled", scheduled_at: "2026-11-20T18:30:00Z", timezone: "Europe/Rome" },
+    status: "draft",
+    updated_at: "2026-11-13T10:00:00Z",
+    version: 3,
+  };
+
+  it("i media di una bozza restano editabili e conservano il path (§112–§114)", () => {
+    const mapped = mapDraftForEditor(draft, new Date("2026-11-13T12:00:00Z"));
+
+    expect(mapped?.media.map((item) => [item.storagePath, item.uploadStatus, item.remoteMediaPosition])).toEqual([
+      ["u/posts/a", "uploaded", null],
+      ["u/posts/b", "uploaded", null],
+    ]);
+    expect(mapped?.media[1].processingState).toBe("processing");
+    expect(mapped?.identity.canSchedule).toBe(true);
+    expect(mapped?.publication).toEqual({
+      mode: "scheduled",
+      scheduledAt: "2026-11-20T18:30:00Z",
+      timezone: "Europe/Rome",
+    });
+  });
+
+  it("una data già passata riparte da Ora", () => {
+    expect(mapDraftForEditor(draft, new Date("2026-12-01T00:00:00Z"))?.publication).toEqual({ mode: "now" });
+  });
+
+  it("un Articolo (o un ramo post vuoto) non è un Post da riaprire", () => {
+    expect(mapDraftForEditor({ ...draft, format: "article" })).toBeNull();
+    expect(mapDraftForEditor({ ...draft, post: null })).toBeNull();
+  });
+
+  it("fetchPostDraftForEditor: contenuto non Post → content_not_found", async () => {
+    mocks.rpc.mockResolvedValue({ data: { ...draft, post: null }, error: null });
+
+    await expect(fetchPostDraftForEditor({ contentId: "d1", contentType: "profile_post" })).rejects.toMatchObject({
+      parsed: { kind: "content_not_found" },
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith("fetch_content_for_editor", {
+      p_content_id: "d1",
+      p_content_type: "profile_post",
+    });
   });
 });
 

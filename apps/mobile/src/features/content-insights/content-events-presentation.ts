@@ -113,9 +113,16 @@ export const CLUB_MEDIA_ARTICLE_MIN_BODY = 400;
 export function isClubMediaArticle(
   visualType: string | null | undefined,
   body: string | null | undefined,
-  /** HOM-06.1: il kind 'post' è sempre Post, mai Articolo per lunghezza. */
+  /**
+   * HOM-06.1: il kind 'post' è sempre Post, mai Articolo per lunghezza.
+   * HOM-06.2: il kind 'article' è sempre Articolo, anche con un testo breve o
+   * senza cover (stessa regola di `footme_feed_item_type`, contratto §A2).
+   */
   kind?: string | null,
 ): boolean {
+  if (kind === "article") {
+    return true;
+  }
   if (visualType === "video" || kind === "post") {
     return false;
   }

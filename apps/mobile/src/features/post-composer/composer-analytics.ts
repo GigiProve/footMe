@@ -12,7 +12,7 @@
 
 import { trackEvent, type AnalyticsProps } from "../../lib/analytics";
 import type { FeedContentType, FeedIdentityType } from "../feed/feed-types";
-import type { ComposerErrorKind, ComposerOrigin } from "./composer-types";
+import type { ComposerErrorKind, ComposerOrigin, ComposerSubmitErrorKind } from "./composer-types";
 
 export const COMPOSER_ANALYTICS_EVENT_NAMES = [
   "composer_open",
@@ -61,7 +61,7 @@ export type ComposerAnalyticsEvent =
   | { name: "mention_added"; targetType: "profile" | "club" }
   | ({ name: "publish_attempt" } & PublishProps)
   | ({ name: "publish_success" } & PublishProps & { contentType: FeedContentType; replayed: boolean })
-  | ({ name: "publish_failure" } & PublishProps & { code: ComposerErrorKind })
+  | ({ name: "publish_failure" } & PublishProps & { code: ComposerSubmitErrorKind })
   | { name: "upload_retry"; mediaType: MediaKind }
   | ({ name: "edit_open" } & EditProps)
   | ({ name: "edit_success" } & EditProps)

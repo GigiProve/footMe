@@ -111,14 +111,6 @@ vi.mock("./career/MediaTabContent", () => ({
   },
 }));
 
-vi.mock("./media-posts/MediaPostComposer", () => ({
-  MediaPostComposer: (props: Record<string, unknown>) =>
-    React.createElement("mock-editorial-composer", {
-      testID: "editorial-composer",
-      visible: props.visible,
-    }),
-}));
-
 vi.mock("./media/MediaContentComposer", () => ({
   MediaContentComposer: (props: Record<string, unknown>) =>
     React.createElement("mock-media-composer", {
@@ -858,28 +850,51 @@ describe("MediaProfileView", () => {
       expect(queryByTestId(tree.root, "media-new-article-button")).toBeNull();
     });
 
-    it("consegna la creazione al flusso editoriale esistente", async () => {
+    it("consegna la creazione al flusso Articolo (HOM-06.2), senza composer legacy", async () => {
       publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
         buildPublicProfile({ mode: "owner" }),
       );
+      const onNewArticle = vi.fn();
 
       const tree = await renderAsync(
         <MediaProfileView
           completeProfile={buildCompleteProfile()}
           mode="owner"
+          onNewArticle={onNewArticle}
           viewerProfileId="media-1"
         />,
       );
 
-      expect(findByTestId(tree.root, "editorial-composer").props.visible).toBe(
-        false,
-      );
+      expect(onNewArticle).not.toHaveBeenCalled();
 
       pressByTestId(tree.root, "media-new-article-button");
 
-      expect(findByTestId(tree.root, "editorial-composer").props.visible).toBe(
-        true,
+      expect(onNewArticle).toHaveBeenCalledTimes(1);
+      expect(onNewArticle).toHaveBeenCalledWith({
+        mediaProfileId: "media-1",
+        origin: "MEDIA_PROFILE",
+        returnTab: "articles",
+      });
+    });
+
+    it("il punto d'ingresso della Home apre il flusso Articolo una sola volta", async () => {
+      publicProfileMocks.fetchPublicMediaProfile.mockResolvedValue(
+        buildPublicProfile({ mode: "owner" }),
       );
+      const onNewArticle = vi.fn();
+
+      await renderAsync(
+        <MediaProfileView
+          completeProfile={buildCompleteProfile()}
+          mode="owner"
+          onNewArticle={onNewArticle}
+          shouldOpenComposer
+          viewerProfileId="media-1"
+        />,
+      );
+      await flushPromises();
+
+      expect(onNewArticle).toHaveBeenCalledTimes(1);
     });
 
     it("pagina gli articoli senza ricaricare la pagina precedente", async () => {

@@ -14,6 +14,13 @@
  */
 
 import type { FeedContentType, FeedIdentityType } from "../feed/feed-types";
+import type {
+  ContentLifecycleState,
+  ContentRef,
+  Publication,
+  PublishingErrorKind,
+  WireSchedulePolicy,
+} from "../publishing/publishing-types";
 
 /* ------------------------------------------------------------------ */
 /* Identità e politiche                                                */
@@ -31,6 +38,8 @@ export type WireComposerIdentity = {
   is_verified: boolean;
   /** «Profilo personale» / «Società» / «Media» (§19). */
   context_label: string;
+  /** HOM-06.2 §84–§85: la riga Pubblicazione esiste solo se true. Assente su un server non aggiornato → false. */
+  can_schedule_content?: boolean;
 };
 
 /** §61: limiti da una sola source of truth (server, app_policy_settings). */
@@ -46,6 +55,8 @@ export type WireComposerLimits = {
 export type WireComposerContext = {
   identities: WireComposerIdentity[];
   limits: WireComposerLimits;
+  /** HOM-06.2 §96: lead time e orizzonte dal server, mai hardcodati. */
+  schedule?: WireSchedulePolicy;
 };
 
 export type ComposerIdentity = {
@@ -55,6 +66,8 @@ export type ComposerIdentity = {
   avatarUrl: string | null;
   isVerified: boolean;
   contextLabel: string;
+  /** HOM-06.2 §84–§85: con false niente riga Pubblicazione e CTA «Pubblica» standard. */
+  canSchedule: boolean;
 };
 
 export type ComposerLimits = {
@@ -69,7 +82,11 @@ export type ComposerLimits = {
 /* Origine e modalità                                                  */
 /* ------------------------------------------------------------------ */
 
-/** §5: ogni apertura trasmette un origin; il ritorno lo usa (§122–126). */
+/**
+ * §5: ogni apertura trasmette un origin; il ritorno lo usa (§122–126).
+ * HOM-06.2: `DRAFTS` (riapertura dalla lista Bozze e programmati, §147) e
+ * `NOTIFICATION` (tap sulla notifica di un contenuto programmato, §200).
+ */
 export const COMPOSER_ORIGINS = [
   "HOME_PER_TE",
   "HOME_SEGUITI",
@@ -77,6 +94,8 @@ export const COMPOSER_ORIGINS = [
   "SOCIETY_PROFILE",
   "MEDIA_PROFILE",
   "CONTENT_DETAIL",
+  "DRAFTS",
+  "NOTIFICATION",
 ] as const;
 
 export type ComposerOrigin = (typeof COMPOSER_ORIGINS)[number];
@@ -121,6 +140,18 @@ export type ComposerMediaItem = {
   uploadProgress: number | null;
   errorCode: string | null;
   altText: string | null;
+  /**
+   * HOM-06.2 §107–§109: stato di elaborazione server di un media di una bozza
+   * riaperta (`ready`, `processing`, …). Assente per i media appena caricati e
+   * per i Post pubblicati: lì decide il server alla conferma della data.
+   */
+  processingState?: string | null;
+  /**
+   * HOM-06.2: path della miniatura di un media di una bozza riaperta. Si rimanda
+   * invariato nel payload di salvataggio/invio, altrimenti la miniatura del video
+   * andrebbe persa. Assente per i media appena caricati.
+   */
+  thumbnailPath?: string | null;
 };
 
 /** Elemento di `p_media` per `publish_post`: l'ordine dell'array è la posizione (§44). */
@@ -329,11 +360,36 @@ export type ComposerErrorCode = (typeof COMPOSER_ERROR_CODES)[number];
 /** Esito classificato di un errore di rete/RPC: codice server, rete o ignoto. */
 export type ComposerErrorKind = ComposerErrorCode | "network" | "unknown";
 
+/**
+ * HOM-06.2: `submit_content` solleva i codici `content_*`, `schedule_*` di
+ * `publishing-types`, in più dei `post_*` di HOM-06.1. `errorCopy` li traduce
+ * tutti (i `post_*` sono gli stessi nei due elenchi).
+ */
+export type ComposerSubmitErrorKind = ComposerErrorKind | PublishingErrorKind;
+
 /** §119–120, §174: stato dell'invio. `failed` lascia il composer intatto. */
 export type ComposerPublishStatus =
   | { status: "idle" }
   | { status: "publishing" }
-  | { status: "failed"; code: ComposerErrorKind };
+  | { status: "failed"; code: ComposerSubmitErrorKind };
+
+/**
+ * HOM-06.2 §116–§132: ciò che lega il composer a una bozza sul server.
+ * `ref` e `version` sono quelli all'APERTURA (o ripristinati dal recovery): il
+ * valore corrente lo possiede `useAutosave`. `status` è lo stato server
+ * all'apertura, `null` per un contenuto nuovo.
+ */
+export type ComposerDraftInfo = {
+  /** Chiave di idempotenza del salvataggio bozza della sessione, DISTINTA da `operationKey` dell'invio (§117, §121). */
+  operationKey: string;
+  ref: ContentRef | null;
+  version: number | null;
+  status: ContentLifecycleState | null;
+  /** Publication all'apertura di un programmato: «Salva» invia `keep` finché non cambia (§166–§167). */
+  initialPublication: Publication | null;
+  /** Chiave del contenuto all'apertura di un programmato, per sapere se è cambiato qualcosa (§158 per analogia). */
+  baselineKey: string | null;
+};
 
 /** Chi/cosa viene proposto da `@` (§110–111): il minimo comune a mention e tag. */
 export type ComposerMentionCandidate = Pick<
@@ -387,4 +443,85 @@ export type ComposerRecoverySnapshot = {
   tagged: ComposerTaggedIdentity[];
   media: ComposerMediaItem[];
   dismissedUrls: string[];
+  /**
+   * HOM-06.2 §121, §125–§127. Opzionali: uno snapshot di HOM-06.1 non li ha e
+   * resta valido. Con la bozza server (ref + versione) un crash riprende la
+   * STESSA bozza invece di crearne una seconda.
+   */
+  draftOperationKey?: string;
+  draftRef?: ContentRef | null;
+  draftVersion?: number | null;
+  publication?: Publication;
+};
+
+/* ------------------------------------------------------------------ */
+/* Riapertura di una bozza / programmato / fallito (HOM-06.2 §147)      */
+/* ------------------------------------------------------------------ */
+
+/** Ramo `post` di `fetch_content_for_editor` (contratto §A6.6). */
+export type WireDraftPostEditor = {
+  content_type: FeedContentType;
+  content_id: string;
+  format: "post" | "article";
+  status: ContentLifecycleState;
+  version: number;
+  updated_at: string;
+  identity: WireComposerIdentity;
+  publication: { mode?: string | null; scheduled_at?: string | null; timezone?: string | null } | null;
+  capabilities: { can_edit: boolean; can_schedule: boolean; can_delete: boolean };
+  failure_code: string | null;
+  post: {
+    body: string;
+    mentions: WireMention[];
+    tagged: (WireTaggedIdentity & {
+      display_name: string;
+      avatar_url: string | null;
+      is_verified: boolean;
+      subtitle: string | null;
+    })[];
+    media: {
+      position: number;
+      storage_path: string;
+      media_type: ComposerMediaType;
+      url: string | null;
+      thumbnail_url: string | null;
+      thumbnail_path?: string | null;
+      width: number | null;
+      height: number | null;
+      duration_seconds: number | null;
+      alt_text: string | null;
+      processing_state: string | null;
+    }[];
+    link: {
+      url: string;
+      snapshot_id: string | null;
+      preview: {
+        final_url?: string | null;
+        title?: string | null;
+        description?: string | null;
+        image_url?: string | null;
+        domain?: string | null;
+      } | null;
+    } | null;
+  } | null;
+};
+
+/** `fetch_content_for_editor` (ramo Post) nel dominio del client. */
+export type ComposerDraftForEditor = {
+  ref: ContentRef;
+  status: ContentLifecycleState;
+  version: number;
+  updatedAt: string;
+  identity: ComposerIdentity;
+  publication: Publication;
+  canEdit: boolean;
+  failureCode: string | null;
+  body: string;
+  mentions: ComposerMention[];
+  tagged: ComposerTaggedIdentity[];
+  /** Editabili (§112–§114), con `storagePath` per ri-salvare la bozza. */
+  media: ComposerMediaItem[];
+  link: Extract<ComposerLinkPreviewState, { status: "ready" }> | null;
+  /** Il Post aveva un URL ma nessuna anteprima salvata: non si rigenera da sola (§93). */
+  hadLinkWithoutPreview: boolean;
 };

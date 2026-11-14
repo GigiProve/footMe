@@ -1,11 +1,11 @@
 /**
  * Destinazioni e provenienza dei contenuti (HOM-04 §34–37, §122–127).
  *
- * Un file solo per le destinazioni di gestione (Luigi 2026-11-13): Modifica
- * (HOM-06.1 / HOM-06.2) non esiste ancora, quindi la destinazione è `null` e il
- * chiamante risponde «in arrivo». Dettagli e statistiche (HOM-05) esiste: la sua
- * href vive in `content-insights/insights-routes.ts`. Nessuna schermata
- * segnaposto.
+ * Un file solo per le destinazioni di gestione (Luigi 2026-11-13): Modifica è
+ * il composer Post (HOM-06.1) o l'editor Articolo (HOM-06.2); per i tipi senza
+ * editor la destinazione è `null` e il chiamante risponde «in arrivo».
+ * Dettagli e statistiche (HOM-05): la sua href vive in
+ * `content-insights/insights-routes.ts`. Nessuna schermata segnaposto.
  *
  * `ContentOrigin` è il contesto di navigazione che ogni apertura porta con sé
  * (§122). Il Feed lo passa per ogni elemento; le altre superfici non lo
@@ -13,8 +13,10 @@
  * modificano le ~20 superfici che aprono `/content/...`.
  */
 
+import { articleEditHref, type ArticleOrigin } from "../article-editor/article-routes";
 import { contentInsightsHref } from "../content-insights/insights-routes";
 import { composerEditHref, isComposerEditableType } from "../post-composer/composer-routes";
+import type { ContentVisibleKind } from "./content-actions-presentation";
 import type { FeedContentType, FeedIdentityType, FeedScope } from "./feed-types";
 
 export const CONTENT_ORIGINS = [
@@ -74,15 +76,43 @@ export function contentManageParams(target: ContentManageTarget): ContentManageP
   };
 }
 
+/** I due tipi che ospitano Articoli (decisione 2026-11-13): Società e Media. */
+const ARTICLE_EDITABLE_TYPES: readonly FeedContentType[] = ["club_media", "media_profile"];
+
 /**
- * Destinazione della modifica. HOM-06.1 §143: i Post aprono il composer in
- * modalità Modifica. `ContentManageParams` non distingue un Post da un Articolo
- * dentro `club_media` / `media_profile` (il `kind` non viaggia nel menu), quindi
- * si costruisce la href per i tre tipi che ospitano Post e `fetch_post_for_edit`
- * rifiuta ciò che non è un Post; la capability `canEdit` del menu resta il gate
- * di visibilità. Articolo (HOM-06.2) e gli altri tipi: ancora `null` → «in arrivo».
+ * L'origin di navigazione di un contenuto → quello dell'editor Articolo. Solo
+ * la Home ha un'identità propria; ogni altra superficie (profilo, Cerca,
+ * Salvati, messaggio, deep link) rientra con `CONTENT_DETAIL`, il valore
+ * neutro: l'editor torna con `router.back()` alla superficie di partenza.
  */
-export function editContentHref(params: ContentManageParams): string | null {
+export function articleOriginForContent(origin: ContentOrigin): ArticleOrigin {
+  return origin === "HOME_PER_TE" || origin === "HOME_SEGUITI" ? origin : "CONTENT_DETAIL";
+}
+
+/**
+ * Destinazione della modifica, una sola per tipo di contenuto visibile.
+ *
+ *  • Articolo (HOM-06.2 §217–§218): `club_media` / `media_profile` con tipo
+ *    visibile `article` → editor Articolo (`/article-compose/open`, che risolve
+ *    la modalità dal contenuto). Il `ContentManageTarget` porta `visibleKind`
+ *    dal tipo di elemento del Feed, che il server classifica con la stessa
+ *    regola di `footme_feed_item_type`.
+ *  • Post (HOM-06.1 §143): composer in modalità Modifica. Per i tre tipi che
+ *    ospitano Post si costruisce la href anche senza `visibleKind` e
+ *    `fetch_post_for_edit` rifiuta ciò che non è un Post; la capability
+ *    `canEdit` del menu resta il gate di visibilità.
+ *  • Gli altri tipi: `null` → «in arrivo».
+ */
+export function editContentHref(
+  params: ContentManageParams,
+  visibleKind: ContentVisibleKind | null = null,
+): string | null {
+  if (visibleKind === "article" && ARTICLE_EDITABLE_TYPES.includes(params.content_type)) {
+    return articleEditHref(
+      { contentId: params.content_id, contentType: params.content_type },
+      articleOriginForContent(params.origin),
+    );
+  }
   return isComposerEditableType(params.content_type) ? composerEditHref(params) : null;
 }
 

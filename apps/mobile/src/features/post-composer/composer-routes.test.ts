@@ -110,5 +110,13 @@ describe("ritorno (§122–127)", () => {
     expect(contentOriginForComposer("HOME_SEGUITI")).toBe("HOME_SEGUITI");
     expect(contentOriginForComposer("PERSONAL_PROFILE")).toBe("PROFILE");
     expect(contentOriginForComposer("CONTENT_DETAIL")).toBeNull();
+    // HOM-06.2: dalla lista Bozze o da una notifica il dettaglio si affida al Back (§127).
+    expect(contentOriginForComposer("DRAFTS")).toBeNull();
+    expect(contentOriginForComposer("NOTIFICATION")).toBeNull();
+  });
+
+  it("HOM-06.2: DRAFTS e NOTIFICATION sono origin validi del composer (§147, §200)", () => {
+    expect(COMPOSER_ORIGINS).toEqual(expect.arrayContaining(["DRAFTS", "NOTIFICATION"]));
+    expect(parseComposerOrigin("DRAFTS")).toBe("DRAFTS");
   });
 });

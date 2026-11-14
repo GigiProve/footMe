@@ -7,13 +7,17 @@ import {
   COMPOSER_EDIT_PERMISSION_LOST_COPY,
   COMPOSER_PERMISSION_LOST_COPY,
   COMPOSER_PUBLISH_ERROR_COPY,
+  composerCtaLabel,
   defaultIdentity,
   errorCopy,
   extractUrls,
   firstEligibleUrl,
   hasIdentityChoice,
+  hasProcessingVideo,
+  hasSavableContent,
   identityAccessibilityLabel,
   isDirty,
+  isEditingScheduled,
   isEmpty,
   isIsolatedUrl,
   linkFetchTarget,
@@ -22,9 +26,13 @@ import {
   normalizeUrl,
   publishBlockReason,
   reconcileMentions,
+  scheduleBlockReason,
   selectPickedAssets,
   shouldShowRichPreview,
+  submitPublication,
   tagSummary,
+  toDraftContent,
+  toDraftPayload,
   toWirePublishArgs,
   toWireUpdateArgs,
 } from "./composer-presentation";
@@ -520,5 +528,124 @@ describe("HOM-06.1 review: link idoneo e cambio identity", () => {
     expect(hasIdentityChoice(baseState({ identities: [SOCIETY], identity: PERSON }))).toBe(true);
     expect(hasIdentityChoice(baseState({ identities: [PERSON], identity: PERSON }))).toBe(false);
     expect(hasIdentityChoice(baseState({ identities: [PERSON, SOCIETY], identity: PERSON }))).toBe(true);
+  });
+});
+
+describe("HOM-06.2 — bozza, programmazione, CTA (§79, §88, §92, §117–§118, §167)", () => {
+  const future = { mode: "scheduled", scheduledAt: "2099-01-01T10:00:00.000Z", timezone: "Europe/Rome" } as const;
+
+  it("la CTA riflette la pubblicazione scelta: Pubblica con Ora, Programma con una data, mai «Programma» con Ora (§80)", () => {
+    expect(composerCtaLabel(baseState({ body: "Ciao" }))).toBe("Pubblica");
+    expect(composerCtaLabel(baseState({ body: "Ciao", publication: future }))).toBe("Programma");
+  });
+
+  it("senza can_schedule_content la CTA resta «Pubblica» anche con una data in stato (§85)", () => {
+    expect(composerCtaLabel(baseState({ body: "Ciao", identity: SOCIETY, publication: future }))).toBe("Pubblica");
+  });
+
+  it("un programmato (e la Modifica di un pubblicato) hanno «Salva» (§167, §218)", () => {
+    const scheduled = baseState({
+      body: "Ciao",
+      draft: { ...baseState().draft, status: "scheduled" },
+      publication: future,
+    });
+
+    expect(composerCtaLabel(scheduled)).toBe("Salva");
+  });
+
+  it("submitPublication: Ora/data dallo stato; keep su un programmato finché la data non cambia (§166–§167)", () => {
+    expect(submitPublication(baseState())).toEqual({ mode: "now" });
+    expect(submitPublication(baseState({ publication: future }))).toEqual(future);
+    expect(submitPublication(baseState({ identity: SOCIETY, publication: future }))).toEqual({ mode: "now" });
+
+    const scheduled = (publication: typeof future | { mode: "now" }) =>
+      baseState({ draft: { ...baseState().draft, initialPublication: future, status: "scheduled" }, publication });
+
+    expect(submitPublication(scheduled(future))).toBe("keep");
+    expect(submitPublication(scheduled({ mode: "now" }))).toEqual({ mode: "now" });
+  });
+
+  it("significativo come la pubblicabilità, ma con i soli media caricati (§117–§118)", () => {
+    expect(hasSavableContent(baseState())).toBe(false);
+    expect(hasSavableContent(baseState({ body: "  " }))).toBe(false);
+    expect(hasSavableContent(baseState({ body: "Ciao" }))).toBe(true);
+    expect(hasSavableContent(baseState({ body: "https://example.com/x" }))).toBe(true);
+    expect(hasSavableContent(baseState({ media: [uploaded("a")] }))).toBe(true);
+    // Un upload in corso o fallito non ha ancora nulla da mandare al server.
+    expect(hasSavableContent(baseState({ media: [mediaItem({ uploadStatus: "uploading" })] }))).toBe(false);
+    expect(hasSavableContent(baseState({ media: [mediaItem({ uploadStatus: "failed" })] }))).toBe(false);
+    // Tag e mention da soli non bastano, come per Pubblica.
+    expect(hasSavableContent(baseState({ tagged: [tag("Marco")] }))).toBe(false);
+  });
+
+  it("il payload della bozza ha la stessa forma di publish_post, più la publication (contratto A6.4)", () => {
+    const state = baseState({
+      body: "Ciao @Marco   ",
+      media: [uploaded("a"), mediaItem({ localId: "pending", uploadStatus: "pending" })],
+      mentions: [mention("Marco", 5)],
+      publication: future,
+      tagged: [tag("Anna")],
+    });
+
+    const payload = toDraftPayload(state);
+    const legacy = toWirePublishArgs(state, "k", "HOME_PER_TE");
+
+    expect(payload).toEqual({
+      body: legacy.p_body,
+      link: legacy.p_link,
+      media: legacy.p_media,
+      mentions: legacy.p_mentions,
+      publication: { mode: "scheduled", scheduled_at: future.scheduledAt, timezone: "Europe/Rome" },
+      tagged: legacy.p_tagged,
+    });
+    // Solo i media caricati, con il path dello storage.
+    expect(legacy.p_media).toHaveLength(1);
+    expect(toDraftContent(state)).not.toHaveProperty("publication");
+  });
+
+  it("«Programma» non parte con un video in elaborazione (§107–§109), «Pubblica» sì (§110)", () => {
+    const processing = mediaItem({ processingState: "processing", storagePath: "u/v", type: "video" });
+
+    expect(canPublish(baseState({ body: "Ciao", media: [processing], publication: future }))).toBe(false);
+    expect(canPublish(baseState({ body: "Ciao", media: [processing] }))).toBe(true);
+    expect(canPublish(baseState({ body: "Ciao", media: [{ ...processing, processingState: "ready" }], publication: future }))).toBe(
+      true,
+    );
+  });
+
+  it("il foglio non conferma una data finché i media non sono pronti; il testo è quello della spec (§108)", () => {
+    expect(scheduleBlockReason([])).toBeNull();
+    expect(scheduleBlockReason([uploaded("a")])).toBeNull();
+    expect(scheduleBlockReason([mediaItem({ processingState: "processing", type: "video" })])).toBe("Preparazione del video in corso");
+    expect(scheduleBlockReason([mediaItem({ type: "video", uploadStatus: "uploading" })])).toBe("Preparazione del video in corso");
+    expect(scheduleBlockReason([mediaItem({ uploadStatus: "uploading" })])).toBe("Caricamento in corso");
+    expect(hasProcessingVideo([mediaItem({ processingState: "ready", type: "video" })])).toBe(false);
+  });
+
+  it("un programmato: identity bloccata, «Salva» solo con una modifica (§158, §167)", () => {
+    const scheduled = baseState({
+      body: "Ciao",
+      draft: { ...baseState().draft, status: "scheduled" },
+      identities: [PERSON, SOCIETY],
+    });
+
+    expect(isEditingScheduled(scheduled)).toBe(true);
+    expect(hasIdentityChoice(scheduled)).toBe(false);
+    expect(hasIdentityChoice(baseState({ identities: [PERSON, SOCIETY] }))).toBe(true);
+  });
+
+  it("i codici di HOM-06.2 hanno una copy non tecnica, anche quelli senza una voce propria (§233)", () => {
+    expect(errorCopy("schedule_media_not_ready")).toBe("Preparazione del video in corso");
+    expect(errorCopy("content_not_found")).toBe("Il contenuto non è più disponibile.");
+    expect(errorCopy("schedule_too_soon").length).toBeGreaterThan(0);
+    // La chiave è già ruotata: «Riprova» è sicuro, la copy è quella generica.
+    expect(errorCopy("content_operation_conflict")).toBe(COMPOSER_PUBLISH_ERROR_COPY);
+  });
+
+  it("origin DRAFTS e NOTIFICATION scelgono l'identity come la Home", () => {
+    const all = [SOCIETY, PERSON, MEDIA_IDENTITY];
+    expect(defaultIdentity("DRAFTS", all)).toBe(PERSON);
+    expect(defaultIdentity("NOTIFICATION", [SOCIETY, MEDIA_IDENTITY])).toBe(MEDIA_IDENTITY);
+    expect(defaultIdentity("DRAFTS", all, "society-1")).toBe(SOCIETY);
   });
 });

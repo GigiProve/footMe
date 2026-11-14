@@ -72,7 +72,9 @@ describe("parseRecoverySnapshot", () => {
   const now = new Date("2026-11-14T10:00:00Z");
 
   it("accetta uno snapshot valido", () => {
-    expect(parseRecoverySnapshot(valid(), now)).toEqual(valid());
+    // Una sola istanza: lo stato base genera una chiave di bozza casuale a ogni chiamata.
+    const snapshot = valid();
+    expect(parseRecoverySnapshot(snapshot, now)).toEqual(snapshot);
   });
 
   it("scarta versione diversa, forma sbagliata e snapshot scaduto", () => {
@@ -82,6 +84,70 @@ describe("parseRecoverySnapshot", () => {
     expect(parseRecoverySnapshot({ ...valid(), media: null }, now)).toBeNull();
     expect(parseRecoverySnapshot(null, now)).toBeNull();
     expect(parseRecoverySnapshot(valid(), new Date(Date.parse("2026-11-13T10:00:00Z") + RECOVERY_TTL_MS + 1))).toBeNull();
+  });
+});
+
+describe("HOM-06.2 — la bozza server nello snapshot (§121, §125–§127)", () => {
+  const draft = { ref: { contentId: "d1", contentType: "profile_post" as const }, version: 4 };
+  const at = new Date("2026-11-13T10:00:00Z");
+  const now = new Date("2026-11-14T10:00:00Z");
+
+  it("ref, versione, chiave di salvataggio e publication viaggiano con lo snapshot: un crash riprende la stessa bozza", () => {
+    const state = baseState({
+      body: "Ciao",
+      publication: { mode: "scheduled", scheduledAt: "2099-01-01T10:00:00.000Z", timezone: "UTC" },
+    });
+    const snapshot = toRecoverySnapshot(state, at, draft);
+
+    expect(snapshot).toMatchObject({
+      draftOperationKey: state.draft.operationKey,
+      draftRef: draft.ref,
+      draftVersion: 4,
+      operationKey: "op-1",
+      publication: state.publication,
+    });
+    // La chiave dell'invio e quella della bozza sono due cose diverse.
+    expect(snapshot?.draftOperationKey).not.toBe(snapshot?.operationKey);
+  });
+
+  it("senza bozza server (ancora da creare) il ref è null ma la chiave di salvataggio c'è già (§121)", () => {
+    const snapshot = toRecoverySnapshot(baseState({ body: "Ciao" }), at);
+
+    expect(snapshot?.draftRef).toBeNull();
+    expect(snapshot?.draftVersion).toBeNull();
+    expect(snapshot?.draftOperationKey).toBeTruthy();
+  });
+
+  it("un programmato non scrive la copia locale: si modifica con «Salva» e si riapre dal server (§167)", () => {
+    const scheduled = baseState({ body: "Ciao", draft: { ...baseState().draft, ref: draft.ref, status: "scheduled", version: 4 } });
+    expect(toRecoverySnapshot(scheduled, at, draft)).toBeNull();
+  });
+
+  it("uno snapshot senza i campi della bozza (HOM-06.1) resta valido", () => {
+    const old = { ...toRecoverySnapshot(baseState({ body: "x" }), at)! } as Record<string, unknown>;
+    delete old.draftOperationKey;
+    delete old.draftRef;
+    delete old.draftVersion;
+    delete old.publication;
+
+    expect(parseRecoverySnapshot(old, now)).not.toBeNull();
+  });
+
+  it("un ref malformato fa cadere solo il legame con la bozza, non il lavoro", () => {
+    const broken = { ...toRecoverySnapshot(baseState({ body: "x" }), at, draft)!, draftRef: { contentId: 5 } };
+    const parsed = parseRecoverySnapshot(broken, now);
+
+    expect(parsed?.body).toBe("x");
+    expect(parsed?.draftRef).toBeNull();
+    expect(parsed?.draftVersion).toBeNull();
+  });
+
+  it("salva e ricarica con il ref della bozza", async () => {
+    await saveRecovery("u1", baseState({ body: "Ciao" }), draft);
+
+    const loaded = await loadRecovery("u1");
+    expect(loaded?.draftRef).toEqual(draft.ref);
+    expect(loaded?.draftVersion).toBe(4);
   });
 });
 
