@@ -1,13 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  fetchSavedCounts,
-  fetchSavedItems,
+  fetchContentSaveState,
+  fetchSavedPage,
   fetchSavedProfileIds,
-  removeSavedItem,
-  resolveSavedItemHref,
-  saveProfile,
-  type SavedItem,
+  setSavedRemote,
 } from "./saved-service";
 
 const mocks = vi.hoisted(() => {
@@ -25,189 +22,128 @@ const mocks = vi.hoisted(() => {
     builder,
     from: vi.fn(() => builder),
     rpc: vi.fn(),
-    toggleSavedAd: vi.fn(() => Promise.resolve()),
-    toggleSavedMediaTribuna: vi.fn(() => Promise.resolve()),
-    toggleSavedClubMedia: vi.fn(() => Promise.resolve()),
-    toggleSavedFanMedia: vi.fn(() => Promise.resolve()),
-    toggleSavedFanTribuna: vi.fn(() => Promise.resolve()),
-    toggleSavedMediaProfilePost: vi.fn(() => Promise.resolve()),
   };
 });
 
 vi.mock("../../lib/supabase", () => ({
   supabase: { from: mocks.from, rpc: mocks.rpc },
 }));
-vi.mock("../recruiting/recruiting-service", () => ({
-  toggleSavedAd: mocks.toggleSavedAd,
-}));
-vi.mock("../profiles/media-tribuna-service", () => ({
-  toggleSavedMediaTribuna: mocks.toggleSavedMediaTribuna,
-}));
-vi.mock("../clubs/club-media-service", () => ({
-  toggleSavedClubMedia: mocks.toggleSavedClubMedia,
-}));
-vi.mock("../profiles/fan-tribuna-service", () => ({
-  toggleSavedFanTribuna: mocks.toggleSavedFanTribuna,
-}));
-vi.mock("../profiles/fan-media-service", () => ({
-  toggleSavedFanMedia: mocks.toggleSavedFanMedia,
-}));
-vi.mock("../profiles/media-profile-post-service", () => ({
-  toggleSavedMediaProfilePost: mocks.toggleSavedMediaProfilePost,
-}));
-
-function makeItem(overrides: Partial<SavedItem>): SavedItem {
-  return {
-    kind: "profile",
-    source_table: "saved_profiles",
-    entity_id: "entity-1",
-    content_type: null,
-    title: "Title",
-    subtitle: null,
-    thumbnail_url: null,
-    saved_at: "2026-06-27T00:00:00Z",
-    ...overrides,
-  };
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("resolveSavedItemHref", () => {
-  it("routes profiles and clubs to their detail screens", () => {
-    expect(resolveSavedItemHref(makeItem({ kind: "profile", entity_id: "p1" }))).toBe(
-      "/profile/p1",
-    );
-    expect(
-      resolveSavedItemHref(makeItem({ kind: "club", entity_id: "c1" })),
-    ).toBe("/club/c1");
-  });
+describe("setSavedRemote — HOM-07 §166–§167", () => {
+  it("una sola RPC con target_type e target_id espliciti; il content_type solo per i contenuti", async () => {
+    mocks.rpc.mockResolvedValue({ data: [{ is_saved: true }], error: null });
 
-  // CER-05 esteso `/content/[type]/[id]` a tutte e cinque le superfici
-  // contenuto, quindi ogni content_type è ora apribile.
-  it("routes every content type to the content detail route", () => {
-    expect(
-      resolveSavedItemHref(
-        makeItem({ kind: "content", content_type: "club_media", entity_id: "x" }),
-      ),
-    ).toBe("/content/club_media/x?origin=SAVED");
-    expect(
-      resolveSavedItemHref(
-        makeItem({ kind: "content", content_type: "fan_tribuna", entity_id: "y" }),
-      ),
-    ).toBe("/content/fan_tribuna/y?origin=SAVED");
-    expect(
-      resolveSavedItemHref(
-        makeItem({ kind: "content", content_type: "media_tribuna", entity_id: "z" }),
-      ),
-    ).toBe("/content/media_tribuna/z?origin=SAVED");
-    expect(
-      resolveSavedItemHref(
-        makeItem({ kind: "content", content_type: "media_profile", entity_id: "w" }),
-      ),
-    ).toBe("/content/media_profile/w?origin=SAVED");
-    expect(
-      resolveSavedItemHref(
-        makeItem({ kind: "content", content_type: "fan_media", entity_id: "v" }),
-      ),
-    ).toBe("/content/fan_media/v?origin=SAVED");
-  });
+    await setSavedRemote({ contentType: "club_media", id: "p1", type: "content" }, true);
+    await setSavedRemote({ id: "u1", type: "profile" }, false);
+    await setSavedRemote({ id: "c1", type: "society" }, true);
+    await setSavedRemote({ id: "t1", type: "team" }, true);
+    await setSavedRemote({ id: "a1", type: "position" }, true);
 
-  it("returns null for content without a type and for saved positions", () => {
-    expect(
-      resolveSavedItemHref(makeItem({ kind: "content", content_type: null })),
-    ).toBeNull();
-    expect(resolveSavedItemHref(makeItem({ kind: "position" }))).toBeNull();
-  });
-});
-
-describe("removeSavedItem", () => {
-  it("dispatches each source_table to the correct unsave path", async () => {
-    await removeSavedItem("owner", makeItem({ source_table: "saved_ads", entity_id: "ad1" }));
-    expect(mocks.toggleSavedAd).toHaveBeenCalledWith("owner", "ad1", false);
-
-    await removeSavedItem(
-      "owner",
-      makeItem({ source_table: "saved_media_tribuna", entity_id: "m1" }),
-    );
-    expect(mocks.toggleSavedMediaTribuna).toHaveBeenCalledWith("owner", "m1", false);
-
-    await removeSavedItem(
-      "owner",
-      makeItem({ source_table: "saved_club_media", entity_id: "cm1" }),
-    );
-    expect(mocks.toggleSavedClubMedia).toHaveBeenCalledWith("owner", "cm1", false);
-
-    await removeSavedItem(
-      "owner",
-      makeItem({ source_table: "saved_fan_tribuna", entity_id: "f1" }),
-    );
-    expect(mocks.toggleSavedFanTribuna).toHaveBeenCalledWith("owner", "f1", false);
-
-    await removeSavedItem(
-      "owner",
-      makeItem({ source_table: "saved_media_profile_posts", entity_id: "mp1" }),
-    );
-    expect(mocks.toggleSavedMediaProfilePost).toHaveBeenCalledWith("owner", "mp1", false);
-
-    await removeSavedItem(
-      "owner",
-      makeItem({ source_table: "saved_fan_media", entity_id: "fm1" }),
-    );
-    expect(mocks.toggleSavedFanMedia).toHaveBeenCalledWith("owner", "fm1", false);
-
-    await removeSavedItem(
-      "owner",
-      makeItem({ source_table: "saved_profiles", entity_id: "p1" }),
-    );
-    expect(mocks.from).toHaveBeenCalledWith("saved_profiles");
-
-    await removeSavedItem(
-      "owner",
-      makeItem({ source_table: "saved_clubs", kind: "club", entity_id: "c1" }),
-    );
-    expect(mocks.from).toHaveBeenCalledWith("saved_clubs");
-  });
-});
-
-describe("saveProfile", () => {
-  it("rejects when saving your own profile", async () => {
-    await expect(saveProfile("me", "me")).rejects.toThrow();
-  });
-});
-
-describe("rpc readers", () => {
-  it("fetchSavedItems forwards filter and pagination", async () => {
-    mocks.rpc.mockResolvedValue({ data: [makeItem({})], error: null });
-    const result = await fetchSavedItems("content", 2, 20);
-    expect(mocks.rpc).toHaveBeenCalledWith("fetch_saved_items", {
-      p_filter: "content",
-      p_limit: 20,
-      p_offset: 40,
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, "set_saved", {
+      p_content_type: "club_media",
+      p_saved: true,
+      p_target_id: "p1",
+      p_target_type: "content",
     });
-    expect(result).toHaveLength(1);
+    expect(mocks.rpc).toHaveBeenNthCalledWith(2, "set_saved", {
+      p_content_type: null,
+      p_saved: false,
+      p_target_id: "u1",
+      p_target_type: "profile",
+    });
+    expect(mocks.rpc.mock.calls.map((call) => call[1].p_target_type)).toEqual([
+      "content",
+      "profile",
+      "society",
+      "team",
+      "position",
+    ]);
   });
 
-  it("fetchSavedCounts coerces counts to numbers", async () => {
+  it("legge is_saved dalla riga, o ricade sul valore richiesto", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: [{ is_saved: false }], error: null });
+    expect(await setSavedRemote({ id: "u1", type: "profile" }, true)).toBe(false);
+
+    mocks.rpc.mockResolvedValueOnce({ data: [], error: null });
+    expect(await setSavedRemote({ id: "u1", type: "profile" }, true)).toBe(true);
+  });
+
+  it("l'errore del server risale: è il rollback a doverlo gestire", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: new Error("content_unavailable") });
+
+    await expect(setSavedRemote({ id: "u1", type: "profile" }, true)).rejects.toThrow(
+      "content_unavailable",
+    );
+  });
+});
+
+describe("fetchSavedPage — HOM-07 §120–§121, §160", () => {
+  it("passa categoria, cursore keyset e limite; ritorna righe tipizzate e il cursore", async () => {
     mocks.rpc.mockResolvedValue({
       data: [
         {
-          profiles_count: "3",
-          clubs_count: "1",
-          positions_count: "2",
-          contents_count: "5",
+          content_type: null,
+          next_cursor: { k: "profile:u2", ts: "2026-11-14T09:00:00Z" },
+          payload: { name: "Cesc Fàbregas", role: "coach", club_name: "AC Como" },
+          saved_at: "2026-11-14T09:00:00Z",
+          target_id: "u2",
+          target_type: "profile",
         },
       ],
       error: null,
     });
-    const counts = await fetchSavedCounts();
-    expect(counts).toEqual({
-      profiles_count: 3,
-      clubs_count: 1,
-      positions_count: 2,
-      contents_count: 5,
+
+    const page = await fetchSavedPage("profile", { k: "profile:u1", ts: "2026-11-14T10:00:00Z" }, 20);
+
+    expect(mocks.rpc).toHaveBeenCalledWith("list_saved", {
+      p_category: "profile",
+      p_cursor: { k: "profile:u1", ts: "2026-11-14T10:00:00Z" },
+      p_limit: 20,
     });
+    expect(page.rows).toHaveLength(1);
+    expect(page.rows[0]).toMatchObject({ kind: "profile", target: { id: "u2", type: "profile" } });
+    expect(page.nextCursor).toEqual({ k: "profile:u2", ts: "2026-11-14T09:00:00Z" });
+  });
+
+  it("la prima pagina parte senza cursore", async () => {
+    mocks.rpc.mockResolvedValue({ data: [], error: null });
+
+    const page = await fetchSavedPage("content", null);
+
+    expect(mocks.rpc).toHaveBeenCalledWith("list_saved", {
+      p_category: "content",
+      p_cursor: null,
+      p_limit: 20,
+    });
+    expect(page).toEqual({ fetchedAt: expect.any(Number), nextCursor: null, rows: [] });
+  });
+});
+
+describe("fetchContentSaveState", () => {
+  it("legge can_save e is_saved dalla RPC di stato; senza can_save non si salva", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: [{ can_save: true, is_saved: true }], error: null });
+    expect(await fetchContentSaveState("club_media", "p1")).toEqual({
+      canSave: true,
+      fetchedAt: expect.any(Number),
+      isSaved: true,
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith("fetch_content_interaction_state", {
+      p_content_type: "club_media",
+      p_post_id: "p1",
+    });
+
+    mocks.rpc.mockResolvedValueOnce({ data: [{ likes_count: 3 }], error: null });
+    expect(await fetchContentSaveState("club_media", "p1")).toEqual({
+      canSave: false,
+      fetchedAt: expect.any(Number),
+      isSaved: false,
+    });
+
+    mocks.rpc.mockResolvedValueOnce({ data: [], error: null });
+    expect(await fetchContentSaveState("club_media", "p1")).toBeNull();
   });
 });
 

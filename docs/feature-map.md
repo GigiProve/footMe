@@ -50,7 +50,8 @@ docs/                  questa documentazione
 | `app/role-link/*` | `features/role-link` | collegamento persona–società |
 | `app/representation/*`, `app/assistito-invite/*` | `features/relationships` | procuratore ↔ assistito |
 | `app/invite/*`, `app/invitation/*`, `app/*-invite/*` | `features/dashboard/invites`, `.../join-links` | |
-| `app/saved/*`, `app/following/*` | `features/saved`, `features/following` | |
+| `app/saved/*`, `app/following/*` | `features/saved`, `features/following` | Saved Center (HOM-07): Contenuti \| Profili \| Società (squadre incluse) \| Posizioni su `list_saved`, scrittura unica `set_saved`. Lo stato «salvato» di OGNI superficie (Feed, dettaglio, Cerca, profilo, Posizioni) vive in `saved-store.ts`, store normalizzato per target con regola di freschezza (`fetchedAt`): nessuna copia per schermata |
+| `app/likes/[type]/[id]` | `features/likes`, `features/interactions` | Lista Mi piace (HOM-07). Il Like è dell'identità di interazione (persona, Società, Media) in un'unica tabella `content_likes`; l'identità in Home è derivata senza selettore dall'ultima Dashboard (`use-interaction-identity`). Conteggi e stato in `like-store.ts`, stessa regola di freschezza dei Salvati |
 | `app/content/*` | `features/content` | contenuti e tag |
 | `app/(admin)/*` | `features/admin` | pannello interno |
 

@@ -37,6 +37,8 @@ export default function RootLayout() {
             />
             {/* HOM-06.2 §137: Bozze e programmati è una schermata fuori dalle tab, con il suo Indietro (anche a gesto). */}
             <Stack.Screen name="drafts" options={{ gestureEnabled: true }} />
+            {/* HOM-07 §45–§46, §54: la lista Mi piace è una pagina detail fuori dalle tab; il Back (anche a gesto) torna alla stessa lista e allo stesso scroll. */}
+            <Stack.Screen name="likes/[type]/[id]" options={{ gestureEnabled: true }} />
           </Stack>
         </ToastProvider>
       </SessionProvider>

@@ -73,11 +73,10 @@ import {
   followProfile,
   unfollowProfile,
 } from "./fan-media-service";
-import {
-  fetchProfileSaveState,
-  saveProfile,
-  unsaveProfile,
-} from "../saved/saved-service";
+import { setSavedTracked } from "../saved/saved-commands";
+import { SAVED_COPY, saveFailureMessage } from "../saved/saved-copy";
+import { fetchProfileSaveState } from "../saved/saved-service";
+import { useIsSaved } from "../saved/saved-store";
 import { DashboardContext } from "../dashboard/identity/DashboardIdentityProvider";
 import { ProfileShortlistFlow } from "../dashboard/shortlist/profile/ProfileShortlistFlow";
 import {
@@ -130,7 +129,13 @@ export function PublicProfileScreen() {
 
   // Follow / Save state for the viewed profile (visitor only).
   const [isFollowed, setIsFollowed] = useState(false);
-  const [isProfileSaved, setIsProfileSaved] = useState(false);
+  // HOM-07 §131, §133: il salvato del profilo è nello store Salvati; qui resta
+  // solo il seme letto dal server per questo profilo.
+  // HOM-07 §141: il seme porta l'istante della richiesta, così un dato più
+  // vecchio di ciò che lo store sa già (salvato altrove dopo) non lo sovrascrive.
+  const [profileSavedSeed, setProfileSavedSeed] = useState<
+    { value: boolean; at: number } | undefined
+  >(undefined);
   const [isFollowPending, setIsFollowPending] = useState(false);
   const [isSavePending, setIsSavePending] = useState(false);
   const [profileActionsVisible, setProfileActionsVisible] = useState(false);
@@ -151,6 +156,11 @@ export function PublicProfileScreen() {
   const viewedProfileId = completeProfile?.profile.id ?? null;
   const canFollowOrSave =
     !!currentUserId && !!viewedProfileId && currentUserId !== viewedProfileId;
+  const isProfileSaved = useIsSaved(
+    canFollowOrSave && viewedProfileId ? { id: viewedProfileId, type: "profile" } : null,
+    profileSavedSeed?.value,
+    profileSavedSeed?.at ?? 0,
+  );
 
   /**
    * DAS-REV-26 §8, §9: la stella è una proiezione **privata** dell'actor nel
@@ -408,20 +418,22 @@ export function PublicProfileScreen() {
   useEffect(() => {
     if (!canFollowOrSave || !currentUserId || !viewedProfileId) {
       setIsFollowed(false);
-      setIsProfileSaved(false);
+      setProfileSavedSeed(undefined);
       return;
     }
 
     let active = true;
+    const fetchedAt = Date.now();
     void Promise.all([
       fetchProfileFollowState(currentUserId, viewedProfileId).catch(() => false),
-      fetchProfileSaveState(currentUserId, viewedProfileId).catch(() => false),
+      // Un errore non è «non salvato»: nessun seme, lo store resta com'è.
+      fetchProfileSaveState(currentUserId, viewedProfileId).catch(() => null),
     ]).then(([followed, saved]) => {
       if (!active) {
         return;
       }
       setIsFollowed(followed);
-      setIsProfileSaved(saved);
+      setProfileSavedSeed(saved === null ? undefined : { at: fetchedAt, value: saved });
     });
 
     return () => {
@@ -465,24 +477,18 @@ export function PublicProfileScreen() {
     }
     const next = !isProfileSaved;
     setIsSavePending(true);
-    setIsProfileSaved(next);
     try {
-      if (next) {
-        await saveProfile(currentUserId, viewedProfileId);
-        showToast({ message: "Profilo salvato", tone: "success", icon: "bookmark" });
-      } else {
-        await unsaveProfile(currentUserId, viewedProfileId);
-        showToast({ message: "Elemento rimosso dai Salvati", tone: "neutral" });
-      }
+      // HOM-07 §94–§98: ottimistica sullo store, `set_saved`, rollback su errore.
+      await setSavedTracked({ id: viewedProfileId, type: "profile" }, next, "profile");
+      showToast(
+        next
+          ? { icon: "bookmark", message: "Profilo salvato", tone: "success" }
+          : { message: SAVED_COPY.removed, tone: "neutral" },
+      );
       queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
       queryClient.invalidateQueries({ queryKey: ["saved-items"] });
-    } catch (error) {
-      setIsProfileSaved(!next);
-      showToast({
-        message:
-          error instanceof Error ? error.message : "Operazione non riuscita.",
-        tone: "neutral",
-      });
+    } catch {
+      showToast({ message: saveFailureMessage("profile", next), tone: "neutral" });
     } finally {
       setIsSavePending(false);
     }
@@ -806,7 +812,7 @@ export function PublicProfileScreen() {
         actions={[
           {
             icon: isProfileSaved ? "bookmark" : "bookmark-outline",
-            label: isProfileSaved ? "Rimuovi dai Salvati" : "Salva profilo",
+            label: isProfileSaved ? "Rimuovi dai salvati" : "Salva profilo",
             subtitle: isProfileSaved ? undefined : "Ritrovalo nei tuoi Salvati.",
             onPress: handleToggleSaveProfile,
           },

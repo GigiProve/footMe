@@ -32,8 +32,12 @@ const AUTHOR_META = {
   mediaKind: null,
 };
 
+/** HOM-07: `isLiked: true` in una fixture vuol dire «una identità del viewer ha messo Mi piace». */
+const VIEWER_LIKE = [{ id: "viewer-1", type: "person" }] as const;
+
 export function makePostPayload(overrides: Partial<FeedPostPayload> = {}): FeedPostPayload {
   return {
+    likedAs: overrides.isLiked ? [...VIEWER_LIKE] : [],
     contentType: "club_media",
     postId: "post-1",
     kindLabel: null,
@@ -60,6 +64,7 @@ export function makeEditorialPayload(
   overrides: Partial<FeedEditorialPayload> = {},
 ): FeedEditorialPayload {
   return {
+    likedAs: overrides.isLiked ? [...VIEWER_LIKE] : [],
     contentType: "media_profile",
     postId: "ed-1",
     kindLabel: null,

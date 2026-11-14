@@ -1,15 +1,7 @@
 import { supabase } from "../../../lib/supabase";
 import { followClub, unfollowClub } from "../../clubs/club-service";
 import { contentDetailHref } from "../../feed/content-routes";
-import { toggleSavedClubMedia } from "../../clubs/club-media-service";
-import {
-  followProfile,
-  toggleSavedFanMedia,
-  unfollowProfile,
-} from "../../profiles/fan-media-service";
-import { toggleSavedFanTribuna } from "../../profiles/fan-tribuna-service";
-import { toggleSavedMediaProfilePost } from "../../profiles/media-profile-post-service";
-import { toggleSavedMediaTribuna } from "../../profiles/media-tribuna-service";
+import { followProfile, unfollowProfile } from "../../profiles/fan-media-service";
 import {
   isMediaFiltersEmpty,
 } from "./media-filter-helpers";
@@ -146,40 +138,6 @@ export async function fetchMediaSourcesDiscover(
   }
 
   return (data ?? []) as MediaSourceDiscoverRow[];
-}
-
-/**
- * Bookmark di un singolo contenuto. Ogni superficie ha la sua tabella
- * `saved_*`: si riusano i toggle già esistenti invece di duplicare la
- * scrittura, esattamente come fa `removeSavedItem` in saved-service.ts.
- */
-export async function toggleSavedContent(
-  profileId: string,
-  contentType: MediaContentType,
-  postId: string,
-  shouldSave: boolean,
-): Promise<void> {
-  switch (contentType) {
-    case "club_media":
-      await toggleSavedClubMedia(profileId, postId, shouldSave);
-      return;
-    case "media_profile":
-      await toggleSavedMediaProfilePost(profileId, postId, shouldSave);
-      return;
-    case "media_tribuna":
-      await toggleSavedMediaTribuna(profileId, postId, shouldSave);
-      return;
-    case "fan_tribuna":
-      await toggleSavedFanTribuna(profileId, postId, shouldSave);
-      return;
-    case "fan_media":
-      await toggleSavedFanMedia(profileId, postId, shouldSave);
-      return;
-    default: {
-      const exhaustive: never = contentType;
-      throw new Error(`Tipo di contenuto non gestito: ${String(exhaustive)}`);
-    }
-  }
 }
 
 /**

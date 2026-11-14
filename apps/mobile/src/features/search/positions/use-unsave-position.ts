@@ -1,8 +1,9 @@
 /**
  * Rimozione del salvataggio dalla lista Salvate (DAS-REV-05 §19).
  *
- * Riusa la mutazione Saved globale (`toggleSavedAd`): non esiste una seconda
- * relazione di salvataggio e questa superficie non ne introduce una.
+ * Riusa la mutazione Saved globale (`setSavedTracked` → `set_saved`, HOM-07): non
+ * esiste una seconda relazione di salvataggio e questa superficie non ne
+ * introduce una.
  *
  * Tre regole che è facile perdere:
  *
@@ -21,7 +22,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../../ui";
 import { useSession } from "../../auth/use-session";
 import { DASHBOARD_QK_PREFIXES } from "../../dashboard/dashboard-keys";
-import { toggleSavedAd } from "../../recruiting/recruiting-service";
+import { setSavedTracked } from "../../saved/saved-commands";
+import { SAVED_ERRORS } from "../../saved/saved-copy";
 import { POSITIONS_QK } from "./positions-criteria";
 import {
   removeAdFromPages,
@@ -49,7 +51,8 @@ export function useUnsavePosition() {
         throw new Error("Sessione non disponibile.");
       }
 
-      await toggleSavedAd(profileId, adId, false);
+      // HOM-07 §81, §130: stessa mutation e stesso store di ogni altra superficie.
+      await setSavedTracked({ id: adId, type: "position" }, false, "position");
     },
 
     onMutate: async (adId: string) => {
@@ -77,24 +80,19 @@ export function useUnsavePosition() {
       return { previous };
     },
 
-    onError: (error, _adId, context) => {
+    onError: (_error, _adId, context) => {
       for (const [key, data] of context?.previous ?? []) {
         if (data) {
           queryClient.setQueryData(key, data);
         }
       }
 
-      showToast({
-        message:
-          error instanceof Error
-            ? error.message
-            : "Impossibile aggiornare il salvataggio",
-        tone: "neutral",
-      });
+      // §98: errore di rimozione, con rollback.
+      showToast({ id: "saved-error", message: SAVED_ERRORS.remove, tone: "neutral" });
     },
 
     onSuccess: () => {
-      showToast({ message: "Rimosso dai Salvati", tone: "neutral" });
+      showToast({ message: "Rimosso dai salvati", tone: "neutral" });
     },
 
     onSettled: () => {

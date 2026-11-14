@@ -9,7 +9,6 @@ import {
   mapProfilePostDetail,
   resolveIdentityHref,
   resolvePostMediaHref,
-  setPostLike,
   resolveFeedAuthorHref,
   resolveFeedItemHref,
 } from "./feed-service";
@@ -417,6 +416,11 @@ describe("mapFeedRow — Post HOM-02", () => {
     likes_count: 146,
     comments_count: 18,
     is_liked: true,
+    liked_as: [
+      { type: "person", id: "viewer-1" },
+      { type: "society", id: "club-1" },
+      { type: "bogus", id: "x" },
+    ],
     capabilities: {
       can_like: true,
       can_comment: false,
@@ -489,6 +493,11 @@ describe("mapFeedRow — Post HOM-02", () => {
     if (item?.type !== "post") throw new Error("atteso un post");
 
     expect(item.payload).toMatchObject({ commentsCount: 18, isLiked: true, likesCount: 146 });
+    // HOM-07 §9–§10: solo le identità note del viewer; una voce sconosciuta si scarta.
+    expect(item.payload.likedAs).toEqual([
+      { id: "viewer-1", type: "person" },
+      { id: "club-1", type: "society" },
+    ]);
     expect(item.payload.capabilities).toEqual({
       canComment: false,
       canDelete: true,
@@ -521,7 +530,7 @@ describe("mapFeedRow — Post HOM-02", () => {
     expect(item.payload.media).toEqual([
       expect.objectContaining({ aspectRatio: null, durationSeconds: 48, type: "video", url: "https://example.test/img.jpg" }),
     ]);
-    expect(item.payload).toMatchObject({ commentsCount: 0, isLiked: false, likesCount: 0 });
+    expect(item.payload).toMatchObject({ commentsCount: 0, isLiked: false, likedAs: [], likesCount: 0 });
     expect(item.payload.authorIdentityType).toBe("society");
     expect(item.payload.capabilities).toMatchObject({
       canComment: true,
@@ -596,35 +605,8 @@ describe("href delle identità e dei media (HOM-02)", () => {
   });
 });
 
-describe("setPostLike", () => {
-  it("invia lo stato desiderato e restituisce il conteggio del server", async () => {
-    mocks.rpc.mockResolvedValue({ data: [{ is_liked: true, likes_count: 147 }], error: null });
-
-    await expect(setPostLike("club_media", "post-1", true)).resolves.toEqual({
-      isLiked: true,
-      likesCount: 147,
-    });
-    expect(mocks.rpc).toHaveBeenCalledWith("set_content_like", {
-      p_content_type: "club_media",
-      p_liked: true,
-      p_post_id: "post-1",
-    });
-  });
-
-  it("propaga l'errore della RPC", async () => {
-    mocks.rpc.mockResolvedValue({ data: null, error: new Error("boom") });
-
-    await expect(setPostLike("fan_media", "f-1", false)).rejects.toThrow("boom");
-  });
-});
-
-describe("setPostLike — risposta malformata", () => {
-  it("una risposta vuota è un errore, non uno stato a zero", async () => {
-    mocks.rpc.mockResolvedValue({ data: null, error: null });
-
-    await expect(setPostLike("club_media", "post-1", true)).rejects.toThrow();
-  });
-});
+// HOM-07: `setContentLike` (con l'identità) è testato in
+// `interactions/interaction-service.test.ts`.
 
 describe("mapFeedRow — editoriali HOM-03", () => {
   const editorialData = {
@@ -890,14 +872,25 @@ describe("fetchContentMediaStates", () => {
 describe("fetchContentInteractionState", () => {
   it("legge conteggi, stato e capability del dettaglio", async () => {
     mocks.rpc.mockResolvedValue({
-      data: [{ can_like: true, comments_count: 4, is_liked: false, likes_count: 9 }],
+      data: [
+        {
+          can_like: true,
+          comments_count: 4,
+          is_liked: true,
+          liked_as: [{ id: "club-1", type: "society" }],
+          likes_count: 9,
+        },
+      ],
       error: null,
     });
 
     await expect(fetchContentInteractionState("media_profile", "a-1")).resolves.toEqual({
       canLike: true,
       commentsCount: 4,
-      isLiked: false,
+      // HOM-07 §141: istante prima della richiesta, per lo store Mi piace.
+      fetchedAt: expect.any(Number),
+      isLiked: true,
+      likedAs: [{ id: "club-1", type: "society" }],
       likesCount: 9,
     });
     expect(mocks.rpc).toHaveBeenCalledWith("fetch_content_interaction_state", {

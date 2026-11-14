@@ -10,7 +10,6 @@ import {
   searchMediaSourcesPage,
   searchMediaSuggestions,
   toggleFollowSource,
-  toggleSavedContent,
 } from "./media-search-service";
 import type { MediaSuggestionRow } from "./media-search-types";
 
@@ -191,22 +190,6 @@ describe("fetchMediaForYou", () => {
     await fetchMediaForYou(4);
 
     expect(mocks.rpc).toHaveBeenCalledWith("fetch_media_for_you", { p_limit: 4 });
-  });
-});
-
-describe("toggleSavedContent", () => {
-  it("routes each content type to its own saved_* table helper", async () => {
-    await toggleSavedContent("u1", "club_media", "p1", true);
-    await toggleSavedContent("u1", "media_profile", "p2", true);
-    await toggleSavedContent("u1", "media_tribuna", "p3", false);
-    await toggleSavedContent("u1", "fan_tribuna", "p4", true);
-    await toggleSavedContent("u1", "fan_media", "p5", false);
-
-    expect(mocks.toggleSavedClubMedia).toHaveBeenCalledWith("u1", "p1", true);
-    expect(mocks.toggleSavedMediaProfilePost).toHaveBeenCalledWith("u1", "p2", true);
-    expect(mocks.toggleSavedMediaTribuna).toHaveBeenCalledWith("u1", "p3", false);
-    expect(mocks.toggleSavedFanTribuna).toHaveBeenCalledWith("u1", "p4", true);
-    expect(mocks.toggleSavedFanMedia).toHaveBeenCalledWith("u1", "p5", false);
   });
 });
 

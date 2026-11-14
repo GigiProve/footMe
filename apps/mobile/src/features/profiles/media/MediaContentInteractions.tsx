@@ -20,14 +20,11 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, spacing } from "../../../theme/tokens";
 import { AppText, Avatar, Button, Input } from "../../../ui";
-import {
-  addMediaProfilePostComment,
-  toggleSavedMediaProfilePost,
-} from "../media-profile-post-service";
-import {
-  addMediaTribunaComment,
-  toggleSavedMediaTribuna,
-} from "../media-tribuna-service";
+import { setSavedTracked } from "../../saved/saved-commands";
+import { saveFailureMessage } from "../../saved/saved-copy";
+import { contentSavedTarget, useIsSaved } from "../../saved/saved-store";
+import { addMediaProfilePostComment } from "../media-profile-post-service";
+import { addMediaTribunaComment } from "../media-tribuna-service";
 
 export type MediaInteractionComment = {
   author_avatar_url: string | null;
@@ -43,6 +40,8 @@ export type MediaContentInteractionsProps = {
   contentType: "media_profile" | "media_tribuna";
   initialComments: readonly MediaInteractionComment[];
   initialIsSaved: boolean;
+  /** HOM-07 §141: istante (ms) della richiesta che ha prodotto `initialIsSaved`; 0 = ignoto. */
+  initialIsSavedAt?: number;
   postId: string;
   viewerProfileId: string | null;
 };
@@ -51,13 +50,17 @@ export function MediaContentInteractions({
   contentType,
   initialComments,
   initialIsSaved,
+  initialIsSavedAt = 0,
   postId,
   viewerProfileId,
 }: MediaContentInteractionsProps) {
   const [comments, setComments] = useState<MediaInteractionComment[]>([
     ...initialComments,
   ]);
-  const [isSaved, setIsSaved] = useState(initialIsSaved);
+  // HOM-07 §133: il Salva è nello store Salvati, seminato dal payload del
+  // dettaglio; lo stesso contenuto salvato dal Feed o da Cerca compare qui.
+  const savedTarget = contentSavedTarget(contentType, postId);
+  const isSaved = useIsSaved(savedTarget, initialIsSaved, initialIsSavedAt);
   const [isSaving, setIsSaving] = useState(false);
   const [draft, setDraft] = useState("");
   const [isPosting, setIsPosting] = useState(false);
@@ -68,20 +71,14 @@ export function MediaContentInteractions({
       return;
     }
 
-    const nextSaved = !isSaved;
-    setIsSaved(nextSaved);
     setIsSaving(true);
 
     try {
-      if (contentType === "media_profile") {
-        await toggleSavedMediaProfilePost(viewerProfileId, postId, nextSaved);
-      } else {
-        await toggleSavedMediaTribuna(viewerProfileId, postId, nextSaved);
-      }
+      // Ottimistico con rollback sullo store: un salvataggio non riuscito non
+      // resta a schermo come fatto (§97–§98).
+      await setSavedTracked(savedTarget, !isSaved, "content_detail");
     } catch {
-      // Rollback: un salvataggio non riuscito non resta a schermo come fatto.
-      setIsSaved(!nextSaved);
-      Alert.alert("Errore", "Impossibile aggiornare il salvataggio.");
+      Alert.alert("Errore", saveFailureMessage("content", !isSaved));
     } finally {
       setIsSaving(false);
     }

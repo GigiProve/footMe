@@ -241,7 +241,7 @@ describe("riga meta e accessibilità editoriale (§32, §85)", () => {
   });
 
   it("il segnalibro dice il suo stato a parole", () => {
-    expect(bookmarkAccessibilityLabel(false)).toBe("Salva");
+    expect(bookmarkAccessibilityLabel(false)).toBe("Salva contenuto");
     expect(bookmarkAccessibilityLabel(true)).toBe("Rimuovi dai salvati");
   });
 

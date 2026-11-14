@@ -1,49 +1,58 @@
 /**
- * Mi piace sui Post del Feed (HOM-02 §52–53, §83).
+ * Mi piace sui contenuti: Post, Articolo, video editoriale (HOM-02 §52–53, §83;
+ * HOM-03 §104; HOM-07 §10–§19, §135–§137, §170, §172, §189).
  *
- * Luigi (2026-11-11): il toggle scrive davvero già in HOM-02, sulle sorgenti
- * che hanno una tabella dei Mi piace (Società, media dei tifosi, post persona).
- * Dove la sorgente non lo supporta (`capabilities.canLike = false`) il tap
- * risponde con il messaggio "in arrivo", come gli altri controlli non ancora
- * attivi: nessun tap morto, nessuna scrittura.
+ * Dominio unico (HOM-07 §1): lo stesso motore serve Feed, dettaglio Post e
+ * dettaglio `/content/[type]/[id]`. Lo stato vive nello store normalizzato
+ * (`interactions/like-store.ts`): il toggle scrive UNA cella e rirenderizza solo
+ * l'action row interessata, non le pagine del Feed (§136, §256).
  *
- * HOM-03 §104 (Luigi 2026-11-12): anche Articoli e video editoriali
- * (`media_profile`) hanno il Like reale. Stessa entità ovunque: il toggle del
- * Feed e quello del dettaglio `/content/[type]/[id]` (use-content-interaction)
- * passano dalla stessa coda e dallo stesso tracker, e scrivono nelle stesse
- * cache — le due tab, il dettaglio post, lo stato interazioni del dettaglio.
+ * Il Like appartiene all'identità di interazione (§10–§11): derivata dal
+ * contesto già usato dall'app (ultima identità Dashboard, altrimenti la
+ * personale), mai scelta qui. «Messo» = quell'identità compare in `likedAs`.
  *
- * Tre regole, tutte per §83 (niente doppi eventi):
- *  • si invia lo stato desiderato (`liked`), mai "inverti": la RPC è idempotente;
+ * Quattro regole, tutte per §17–§19 (niente doppi eventi):
+ *  • si invia lo stato desiderato (`liked`), mai «inverti»: la RPC è idempotente;
  *  • le richieste sullo stesso contenuto sono serializzate, così l'ultima
  *    scelta dell'utente è anche l'ultima ad arrivare al server;
- *  • la patch ottimistica tocca solo quel contenuto; le risposte arrivano alla
- *    UI solo quando non ci sono altre richieste in volo (`createLikeTracker`).
+ *  • lo stato ottimistico tocca solo quella cella; le risposte arrivano alla UI
+ *    solo quando non ci sono altre richieste in volo (`createLikeTracker`);
+ *  • un errore ripristina stato e conteggio di prima del tap (§16) e dice
+ *    «Non è stato possibile completare l'operazione.»
  */
 
-import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { useToast } from "../../ui";
+import {
+  isLikedBy,
+  nextLikeSnapshot,
+  withLikeIdentity,
+} from "../interactions/interaction-identity";
+import { setContentLike } from "../interactions/interaction-service";
+import type { InteractionIdentity, LikeSnapshot } from "../interactions/interaction-types";
+import {
+  classifyLikeFailure,
+  trackLike,
+  type LikeFailureReason,
+} from "../interactions/like-analytics";
+import { likeItemKey, likeStore } from "../interactions/like-store";
+import {
+  interactionIdentityQuery,
+  useInteractionIdentity,
+} from "../interactions/use-interaction-identity";
 import { trackFeed } from "./feed-analytics";
-import { FEED_QK } from "./feed-keys";
 import { FEED_SOON_MESSAGES } from "./feed-labels";
-import { setPostLike, type ContentInteractionState } from "./feed-service";
 import {
   isContentItem,
   type FeedContentItem,
   type FeedContentType,
   type FeedItem,
-  type FeedPage,
-  type FeedPageParam,
-  type FeedPostItem,
-  type FeedScope,
 } from "./feed-types";
 
-type FeedData = InfiniteData<FeedPage, FeedPageParam>;
-
-export type LikeState = { likesCount: number; isLiked: boolean };
-
-const SCOPES: readonly FeedScope[] = ["per_te", "seguiti"];
+/** §16: il copy dell'errore, lo stesso per Like e Salvati in rimozione. */
+export const LIKE_ERROR_MESSAGE = "Non è stato possibile completare l'operazione.";
 
 /** Una coda per contenuto: la richiesta successiva parte quando la precedente è finita. */
 const queues = new Map<string, Promise<unknown>>();
@@ -52,27 +61,31 @@ function enqueue<T>(key: string, run: () => Promise<T>): Promise<T> {
   const previous = queues.get(key) ?? Promise.resolve();
   const next = previous.catch(() => undefined).then(run);
   queues.set(key, next);
-  void next.finally(() => {
-    if (queues.get(key) === next) {
-      queues.delete(key);
-    }
-  });
+  // L'errore lo gestisce chi attende `next`; la catena di pulizia non deve
+  // produrre un secondo rifiuto non gestito.
+  next
+    .finally(() => {
+      if (queues.get(key) === next) {
+        queues.delete(key);
+      }
+    })
+    .catch(() => undefined);
   return next;
 }
 
 /**
- * Richieste in volo per contenuto. Finché ce n’è più d’una, nessuna risposta
- * tocca la UI: resta lo stato ottimistico dell’ultimo tap. Quando l’ultima
- * si chiude si scrive l’ultimo stato CONFERMATO dal server — o, se nessuna
+ * Richieste in volo per contenuto. Finché ce n'è più d'una, nessuna risposta
+ * tocca la UI: resta lo stato ottimistico dell'ultimo tap. Quando l'ultima
+ * si chiude si scrive l'ultimo stato CONFERMATO dal server — o, se nessuna
  * è andata a buon fine, quello di prima del primo tap. Così un Mi piace
- * seguito subito da un "togli" non rimbalza su "piace", e due tap offline non
+ * seguito subito da un «togli» non rimbalza su «piace», e due tap offline non
  * lasciano un Mi piace che il server non ha mai registrato.
  */
-export function createLikeTracker() {
-  const entries = new Map<string, { pending: number; confirmed: LikeState }>();
+export function createLikeTracker<T>() {
+  const entries = new Map<string, { pending: number; confirmed: T }>();
 
   return {
-    begin(key: string, before: LikeState) {
+    begin(key: string, before: T) {
       const entry = entries.get(key);
       if (entry) {
         entry.pending += 1;
@@ -80,8 +93,12 @@ export function createLikeTracker() {
         entries.set(key, { confirmed: before, pending: 1 });
       }
     },
+    /** Logout o cambio utente: nessun conteggio di richieste dell'utente di prima. */
+    clear() {
+      entries.clear();
+    },
     /** Lo stato da scrivere, o `null` se altre richieste sono ancora in volo. */
-    settle(key: string, server: LikeState | null): LikeState | null {
+    settle(key: string, server: T | null): T | null {
       const entry = entries.get(key);
       if (!entry) {
         return server;
@@ -99,107 +116,171 @@ export function createLikeTracker() {
   };
 }
 
-const tracker = createLikeTracker();
+const tracker = createLikeTracker<LikeSnapshot>();
 
 /**
- * Scrive lo stato Like di UN contenuto (Post, Articolo o video editoriale) in
- * una pagina di Feed. Pura, testata.
+ * Logout o cambio account (chiamato da `resetUserInteractions`): coda e
+ * tracker sono stato di modulo dell'utente che esce. Le richieste già in volo
+ * finiscono, ma la loro risposta non tocca più lo store (vedi `epoch`).
  */
-export function patchPostLike(
-  data: FeedData | undefined,
-  itemId: string,
-  state: LikeState,
-): FeedData | undefined {
-  if (!data) {
-    return data;
-  }
-
-  return {
-    ...data,
-    pages: data.pages.map((page) => ({
-      ...page,
-      items: page.items.map((item): FeedItem =>
-        item.id === itemId && isContentItem(item)
-          ? ({ ...item, payload: { ...item.payload, ...state } } as FeedItem)
-          : item,
-      ),
-    })),
-  };
-}
-
-/** Lo stato ottimistico dopo un tap: il conteggio non scende mai sotto zero. */
-export function nextLikeState(current: LikeState): LikeState {
-  const isLiked = !current.isLiked;
-  return {
-    isLiked,
-    likesCount: Math.max(0, current.likesCount + (isLiked ? 1 : -1)),
-  };
+export function resetLikeEngine(): void {
+  tracker.clear();
+  queues.clear();
 }
 
 /**
  * Il contenuto da mettere (o togliere) Mi piace, indipendente dalla superficie.
- * `itemId` è la chiave globale `<content_type>:<post_id>` del Feed.
+ * `seed` è lo stato del payload che l'ha mostrato: serve solo se lo store non
+ * conosce ancora il contenuto.
  */
 export type LikeTarget = {
-  itemId: string;
   contentType: FeedContentType;
   postId: string;
-  current: LikeState;
+  seed: LikeSnapshot;
   canLike: boolean;
 };
 
-export function likeItemId(contentType: FeedContentType, postId: string): string {
-  return `${contentType}:${postId}`;
+/** Lo stato Mi piace di un payload: ciò che lo store riceve come seed (§135). */
+export function likeSnapshotOf(payload: {
+  likesCount: number;
+  likedAs: LikeSnapshot["likedAs"];
+}): LikeSnapshot {
+  return { likedAs: payload.likedAs, likesCount: payload.likesCount };
 }
 
 /**
- * Il motore condiviso da Feed e dettaglio: coda, tracker, patch ovunque.
- * Restituisce il toggle per un `LikeTarget`.
+ * Riempie lo store dai contenuti caricati (§135, §141): prevale solo un dato
+ * richiesto dopo ciò che lo store sa già (`fetchedAt` della pagina), quindi una
+ * pagina in cache non cancella ciò che l'utente ha fatto dopo.
+ */
+export function seedLikesFromItems(items: readonly FeedItem[]): void {
+  for (const item of items) {
+    if (isContentItem(item)) {
+      likeStore.seed(
+        likeItemKey(item.payload.contentType, item.payload.postId),
+        likeSnapshotOf(item.payload),
+        item.fetchedAt ?? 0,
+      );
+    }
+  }
+}
+
+type LikeVariables = {
+  target: LikeTarget;
+  identity: InteractionIdentity;
+  adding: boolean;
+  next: LikeSnapshot;
+  /** Generazione dello store al tap: se cambia (logout, altro utente) la risposta è scartata. */
+  epoch: number;
+};
+
+/**
+ * Il motore condiviso da Feed e dettagli: coda, tracker, store. Restituisce il
+ * toggle per un `LikeTarget`.
  */
 export function useContentLikeToggle({ profileId }: { profileId: string }) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  // Pubblica nello store identità e proprietario; qui serve solo a tenerli vivi.
+  useInteractionIdentity(profileId);
 
-  // HOM-02 §38, HOM-03 §104: Feed e dettaglio mostrano lo stesso stato, senza reload.
-  const writeEverywhere = (target: LikeTarget, state: LikeState) => {
-    for (const scope of SCOPES) {
-      queryClient.setQueryData<FeedData>(FEED_QK.feed(scope, profileId), (data) =>
-        patchPostLike(data, target.itemId, state),
-      );
-    }
-    queryClient.setQueryData<FeedPostItem | null>(
-      FEED_QK.postDetail(target.postId),
-      (detail) =>
-        detail && detail.id === target.itemId
-          ? { ...detail, payload: { ...detail.payload, ...state } }
-          : detail,
-    );
-    queryClient.setQueryData<ContentInteractionState | null>(
-      FEED_QK.interaction(target.contentType, target.postId),
-      (interaction) => (interaction ? { ...interaction, ...state } : interaction),
-    );
-  };
+  function fail(
+    target: LikeTarget,
+    identity: InteractionIdentity | null,
+    adding: boolean,
+    reason: LikeFailureReason,
+  ) {
+    trackLike({
+      action: adding ? "add" : "remove",
+      contentId: target.postId,
+      contentType: target.contentType,
+      identityType: identity?.type ?? null,
+      name: "like_failure",
+      reason,
+    });
+    showToast({ message: LIKE_ERROR_MESSAGE });
+  }
 
   const mutation = useMutation({
-    mutationFn: ({ target, next }: { target: LikeTarget; next: LikeState }) =>
-      enqueue(target.itemId, () => setPostLike(target.contentType, target.postId, next.isLiked)),
-    onMutate: ({ target, next }) => {
-      writeEverywhere(target, next);
-    },
-    onError: (_error, { target }) => {
-      const settled = tracker.settle(target.itemId, null);
-      if (settled) {
-        writeEverywhere(target, settled);
+    mutationFn: ({ target, identity, adding }: LikeVariables) =>
+      enqueue(likeItemKey(target.contentType, target.postId), () =>
+        setContentLike(target.contentType, target.postId, adding, identity),
+      ),
+    onError: (error, { target, identity, adding, epoch }) => {
+      if (likeStore.epoch() !== epoch) {
+        return;
       }
-      showToast({ message: "Non è stato possibile aggiornare il Mi piace." });
-    },
-    onSuccess: (server, { target }) => {
-      const settled = tracker.settle(target.itemId, server);
+      const key = likeItemKey(target.contentType, target.postId);
+      const settled = tracker.settle(key, null);
+      likeStore.release(key);
       if (settled) {
-        writeEverywhere(target, settled);
+        likeStore.write(key, settled);
       }
+      fail(target, identity, adding, classifyLikeFailure(error));
+    },
+    onSuccess: (server, { target, identity, adding, next, epoch }) => {
+      if (likeStore.epoch() !== epoch) {
+        return;
+      }
+      const key = likeItemKey(target.contentType, target.postId);
+      // Il server prevale (§19): conteggio suo; l'identità resta messa o tolta come ha risposto.
+      const settled = tracker.settle(key, {
+        likedAs: withLikeIdentity(next.likedAs, identity, server.isLiked),
+        likesCount: server.likesCount,
+      });
+      likeStore.release(key);
+      if (settled) {
+        // Dato server dell'istante della risposta (§19, §141): un fetch partito
+        // prima — anche mentre la richiesta era in volo — non lo sovrascrive.
+        likeStore.write(key, settled, Date.now());
+      }
+      trackLike({
+        contentId: target.postId,
+        contentType: target.contentType,
+        identityType: identity.type,
+        name: adding ? "like_add_success" : "like_remove_success",
+      });
     },
   });
+
+  // Identità non ancora in store (query in corso o fallita): si risolve qui e il
+  // tap prosegue; nessun Like inventato se il server non ne dà nessuna.
+  async function resolveIdentity(): Promise<InteractionIdentity | null> {
+    try {
+      return await queryClient.fetchQuery(interactionIdentityQuery(profileId));
+    } catch {
+      return null;
+    }
+  }
+
+  async function start(target: LikeTarget) {
+    const identity =
+      likeStore.getIdentity() ?? (profileId ? await resolveIdentity() : null);
+
+    if (!identity) {
+      fail(target, null, !isLikedBy(target.seed.likedAs, null), "no_identity");
+      return;
+    }
+
+    const key = likeItemKey(target.contentType, target.postId);
+    const before = likeStore.get(key) ?? target.seed;
+    const next = nextLikeSnapshot(before, identity);
+    const adding = isLikedBy(next.likedAs, identity);
+
+    trackFeed({ itemId: key, liked: adding, name: "feed_post_like_tap" });
+    trackLike({
+      contentId: target.postId,
+      contentType: target.contentType,
+      identityType: identity.type,
+      name: adding ? "like_add_attempt" : "like_remove_attempt",
+    });
+
+    tracker.begin(key, before);
+    // `before` crea la cella se la superficie mostrava ancora il fallback.
+    likeStore.hold(key, before);
+    likeStore.write(key, next);
+    mutation.mutate({ adding, epoch: likeStore.epoch(), identity, next, target });
+  }
 
   return (target: LikeTarget) => {
     if (!target.canLike) {
@@ -207,10 +288,7 @@ export function useContentLikeToggle({ profileId }: { profileId: string }) {
       return;
     }
 
-    const next = nextLikeState(target.current);
-    trackFeed({ itemId: target.itemId, liked: next.isLiked, name: "feed_post_like_tap" });
-    tracker.begin(target.itemId, target.current);
-    mutation.mutate({ next, target });
+    void start(target);
   };
 }
 
@@ -222,8 +300,14 @@ export function useToggleFeedPostLike({ profileId }: { profileId: string }) {
     toggle({
       canLike: item.payload.capabilities.canLike,
       contentType: item.payload.contentType,
-      current: { isLiked: item.payload.isLiked, likesCount: item.payload.likesCount },
-      itemId: item.id,
       postId: item.payload.postId,
+      seed: likeSnapshotOf(item.payload),
     });
+}
+
+/** Semina lo store dai contenuti del Feed a ogni cambio di `items` (§135). */
+export function useSeedLikes(items: readonly FeedItem[]) {
+  useEffect(() => {
+    seedLikesFromItems(items);
+  }, [items]);
 }

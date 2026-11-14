@@ -1,162 +1,107 @@
+/**
+ * Accesso dati dei Salvati (HOM-07 §83–§84, §160–§167).
+ *
+ *  • scrittura unica: `set_saved` con `target_type` + `target_id` espliciti
+ *    (§166–§167), per contenuti, profili, società, squadre e posizioni;
+ *  • lettura per categoria: `list_saved`, keyset su `saved_at desc` (§120–§121);
+ *  • stato di un contenuto aperto in dettaglio: `can_save` / `is_saved` di
+ *    `fetch_content_interaction_state`.
+ *
+ * Ogni lettura che semina lo store porta `fetchedAt`, l'istante (ms) in cui la
+ * richiesta è partita: lo store fa prevalere solo il dato server più recente
+ * (§19, §141).
+ *
+ * Restano i lettori batch dei flag di Cerca (profili, società, squadre) e lo
+ * stato iniziale del profilo pubblico: sono seed dello store, non stato
+ * indipendente.
+ */
+
 import { supabase } from "../../lib/supabase";
-import { contentDetailHref } from "../feed/content-routes";
-import { toggleSavedAd } from "../recruiting/recruiting-service";
-import { toggleSavedMediaTribuna } from "../profiles/media-tribuna-service";
-import { toggleSavedClubMedia } from "../clubs/club-media-service";
-import { toggleSavedFanMedia } from "../profiles/fan-media-service";
-import { toggleSavedFanTribuna } from "../profiles/fan-tribuna-service";
-import { toggleSavedMediaProfilePost } from "../profiles/media-profile-post-service";
+import type { FeedContentType } from "../feed/feed-types";
+import { parseSavedPage } from "./saved-presentation";
+import type {
+  SavedCategory,
+  SavedCursor,
+  SavedListRowWire,
+  SavedPage,
+  SavedTarget,
+} from "./saved-types";
 
-export type SavedKind = "profile" | "club" | "team" | "position" | "content";
-
-export type SavedSourceTable =
-  | "saved_profiles"
-  | "saved_clubs"
-  | "saved_teams"
-  | "saved_ads"
-  | "saved_media_tribuna"
-  | "saved_club_media"
-  | "saved_fan_tribuna"
-  | "saved_media_profile_posts"
-  | "saved_fan_media";
+export const SAVED_PAGE_SIZE = 20;
 
 /**
- * `content_type` copre tutte e cinque le superfici contenuto indicizzate da
- * Cerca > Media e contenuti: i bookmark fatti da lì confluiscono qui, senza
- * un secondo sistema di salvataggio (CER-05 §14).
+ * Salva o rimuove un target (§94–§100). Ritorna lo stato che il server ha
+ * registrato; senza riga ricade sul valore richiesto. L'errore risale: è chi
+ * ha aperto l'aggiornamento ottimistico a fare rollback.
  */
-export type SavedContentType =
-  | "media_tribuna"
-  | "club_media"
-  | "fan_tribuna"
-  | "media_profile"
-  | "fan_media";
-
-export type SavedItem = {
-  kind: SavedKind;
-  source_table: SavedSourceTable;
-  entity_id: string;
-  content_type: SavedContentType | null;
-  title: string;
-  subtitle: string | null;
-  thumbnail_url: string | null;
-  saved_at: string;
-};
-
-export type SavedFilter = "all" | "profile" | "club" | "position" | "content";
-
-export type SavedCounts = {
-  profiles_count: number;
-  clubs_count: number;
-  positions_count: number;
-  contents_count: number;
-};
-
-export async function fetchSavedItems(
-  filter: SavedFilter,
-  page: number,
-  pageSize = 20,
-): Promise<SavedItem[]> {
-  const offset = page * pageSize;
-  const { data, error } = await supabase.rpc("fetch_saved_items", {
-    p_filter: filter,
-    p_limit: pageSize,
-    p_offset: offset,
+export async function setSavedRemote(target: SavedTarget, saved: boolean): Promise<boolean> {
+  // Argomenti nominati: nella RPC `p_saved` precede `p_content_type`.
+  const { data, error } = await supabase.rpc("set_saved", {
+    p_content_type: target.type === "content" ? target.contentType : null,
+    p_saved: saved,
+    p_target_id: target.id,
+    p_target_type: target.type,
   });
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []) as SavedItem[];
+  const row = (Array.isArray(data) ? data[0] : data) as { is_saved?: boolean } | null | undefined;
+
+  return typeof row?.is_saved === "boolean" ? row.is_saved : saved;
 }
 
-export async function fetchSavedCounts(): Promise<SavedCounts> {
-  const { data, error } = await supabase.rpc("fetch_saved_counts");
+export type ContentSaveState = { canSave: boolean; isSaved: boolean; fetchedAt?: number };
+
+/**
+ * Stato Salvato di un contenuto per il suo dettaglio (§133). Null se il
+ * contenuto non è leggibile ora (nessuna riga): niente segnalibro da mostrare.
+ */
+export async function fetchContentSaveState(
+  contentType: FeedContentType,
+  postId: string,
+): Promise<ContentSaveState | null> {
+  const fetchedAt = Date.now();
+  const { data, error } = await supabase.rpc("fetch_content_interaction_state", {
+    p_content_type: contentType,
+    p_post_id: postId,
+  });
 
   if (error) {
     throw error;
   }
 
-  const row = Array.isArray(data) ? data[0] : data;
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { can_save?: boolean; is_saved?: boolean }
+    | null
+    | undefined;
 
-  return {
-    clubs_count: Number(row?.clubs_count ?? 0),
-    contents_count: Number(row?.contents_count ?? 0),
-    positions_count: Number(row?.positions_count ?? 0),
-    profiles_count: Number(row?.profiles_count ?? 0),
-  };
-}
-
-export async function saveProfile(
-  ownerId: string,
-  targetId: string,
-): Promise<void> {
-  if (ownerId === targetId) {
-    throw new Error("Non puoi salvare il tuo profilo.");
+  if (!row) {
+    return null;
   }
 
-  const { error } = await supabase.from("saved_profiles").upsert(
-    {
-      owner_profile_id: ownerId,
-      target_profile_id: targetId,
-    },
-    {
-      ignoreDuplicates: true,
-      onConflict: "owner_profile_id,target_profile_id",
-    },
-  );
+  return { canSave: row.can_save === true, fetchedAt, isSaved: row.is_saved === true };
+}
+
+/** Una pagina di una categoria del Saved Center (§105, §120–§121, §160–§161). */
+export async function fetchSavedPage(
+  category: SavedCategory,
+  cursor: SavedCursor | null,
+  limit = SAVED_PAGE_SIZE,
+): Promise<SavedPage> {
+  const fetchedAt = Date.now();
+  const { data, error } = await supabase.rpc("list_saved", {
+    p_category: category,
+    p_cursor: cursor,
+    p_limit: limit,
+  });
 
   if (error) {
     throw error;
   }
-}
 
-export async function unsaveProfile(
-  ownerId: string,
-  targetId: string,
-): Promise<void> {
-  const { error } = await supabase
-    .from("saved_profiles")
-    .delete()
-    .eq("owner_profile_id", ownerId)
-    .eq("target_profile_id", targetId);
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function saveClub(ownerId: string, clubId: string): Promise<void> {
-  const { error } = await supabase.from("saved_clubs").upsert(
-    {
-      club_id: clubId,
-      owner_profile_id: ownerId,
-    },
-    {
-      ignoreDuplicates: true,
-      onConflict: "owner_profile_id,club_id",
-    },
-  );
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function unsaveClub(
-  ownerId: string,
-  clubId: string,
-): Promise<void> {
-  const { error } = await supabase
-    .from("saved_clubs")
-    .delete()
-    .eq("owner_profile_id", ownerId)
-    .eq("club_id", clubId);
-
-  if (error) {
-    throw error;
-  }
+  return { ...parseSavedPage((data ?? []) as SavedListRowWire[]), fetchedAt };
 }
 
 export async function fetchProfileSaveState(
@@ -168,74 +113,6 @@ export async function fetchProfileSaveState(
     .select("owner_profile_id")
     .eq("owner_profile_id", ownerId)
     .eq("target_profile_id", targetId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return data !== null;
-}
-
-export async function fetchClubSaveState(
-  ownerId: string,
-  clubId: string,
-): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("saved_clubs")
-    .select("owner_profile_id")
-    .eq("owner_profile_id", ownerId)
-    .eq("club_id", clubId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return data !== null;
-}
-
-export async function saveTeam(ownerId: string, teamId: string): Promise<void> {
-  const { error } = await supabase.from("saved_teams").upsert(
-    {
-      owner_profile_id: ownerId,
-      team_id: teamId,
-    },
-    {
-      ignoreDuplicates: true,
-      onConflict: "owner_profile_id,team_id",
-    },
-  );
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function unsaveTeam(
-  ownerId: string,
-  teamId: string,
-): Promise<void> {
-  const { error } = await supabase
-    .from("saved_teams")
-    .delete()
-    .eq("owner_profile_id", ownerId)
-    .eq("team_id", teamId);
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function fetchTeamSaveState(
-  ownerId: string,
-  teamId: string,
-): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("saved_teams")
-    .select("owner_profile_id")
-    .eq("owner_profile_id", ownerId)
-    .eq("team_id", teamId)
     .maybeSingle();
 
   if (error) {
@@ -321,71 +198,3 @@ export async function fetchSavedTeamIds(
   return new Set((data ?? []).map((row) => row.team_id as string));
 }
 
-// Content route `/content/[type]/[id]` supports all five content surfaces
-// since CER-05 extended it. Saved positions (`saved_ads`) still have no per-ad
-// route and resolve to null, rendering as non-navigating rows.
-const ROUTABLE_CONTENT_TYPES = new Set<SavedContentType>([
-  "club_media",
-  "fan_media",
-  "fan_tribuna",
-  "media_profile",
-  "media_tribuna",
-]);
-
-export function resolveSavedItemHref(item: SavedItem): string | null {
-  switch (item.kind) {
-    case "profile":
-      return `/profile/${item.entity_id}`;
-    case "club":
-      return `/club/${item.entity_id}`;
-    case "team":
-      return `/club/team/${item.entity_id}`;
-    case "content":
-      return item.content_type && ROUTABLE_CONTENT_TYPES.has(item.content_type)
-        ? // HOM-05 D4: la provenienza Salvati, per la source degli eventi (→ OTHER).
-          contentDetailHref(item.content_type, item.entity_id, { origin: "SAVED" })
-        : null;
-    case "position":
-    default:
-      return null;
-  }
-}
-
-export async function removeSavedItem(
-  ownerId: string,
-  item: SavedItem,
-): Promise<void> {
-  switch (item.source_table) {
-    case "saved_profiles":
-      await unsaveProfile(ownerId, item.entity_id);
-      break;
-    case "saved_clubs":
-      await unsaveClub(ownerId, item.entity_id);
-      break;
-    case "saved_teams":
-      await unsaveTeam(ownerId, item.entity_id);
-      break;
-    case "saved_ads":
-      await toggleSavedAd(ownerId, item.entity_id, false);
-      break;
-    case "saved_media_tribuna":
-      await toggleSavedMediaTribuna(ownerId, item.entity_id, false);
-      break;
-    case "saved_club_media":
-      await toggleSavedClubMedia(ownerId, item.entity_id, false);
-      break;
-    case "saved_fan_tribuna":
-      await toggleSavedFanTribuna(ownerId, item.entity_id, false);
-      break;
-    case "saved_media_profile_posts":
-      await toggleSavedMediaProfilePost(ownerId, item.entity_id, false);
-      break;
-    case "saved_fan_media":
-      await toggleSavedFanMedia(ownerId, item.entity_id, false);
-      break;
-    default: {
-      const _exhaustive: never = item.source_table;
-      throw new Error(`Unknown source_table: ${String(_exhaustive)}`);
-    }
-  }
-}

@@ -12,6 +12,8 @@
  */
 
 import { supabase } from "../../lib/supabase";
+import { parseLikedAs } from "../interactions/interaction-identity";
+import type { LikeIdentityRef } from "../interactions/interaction-types";
 import { contentDetailHref, type ContentOrigin } from "./content-routes";
 import {
   asFeedContentType,
@@ -242,6 +244,7 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
         likesCount: readCount(row.data, "likes_count"),
         commentsCount: readCount(row.data, "comments_count"),
         isLiked: readBoolean(row.data, "is_liked"),
+        likedAs: parseLikedAs(row.data?.["liked_as"]),
         capabilities: readCapabilities(row.data, postType),
         version: readString(row.data, "version"),
       },
@@ -290,6 +293,7 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
       likesCount: readCount(row.data, "likes_count"),
       commentsCount: readCount(row.data, "comments_count"),
       isLiked: readBoolean(row.data, "is_liked"),
+      likedAs: parseLikedAs(row.data?.["liked_as"]),
       capabilities: readCapabilities(row.data, contentType),
       version: readString(row.data, "version"),
     },
@@ -324,6 +328,8 @@ export async function fetchHomeFeedPage({
   pageSize?: number;
 }): Promise<FeedPage> {
   const { cursor, pageIndex } = pageParam;
+  // HOM-07 §141: l'istante PRIMA della richiesta, per gli store Mi piace e Salvati.
+  const fetchedAt = Date.now();
 
   const { data, error } = await supabase.rpc("fetch_home_feed_page", {
     p_as_of: cursor?.asOf ?? null,
@@ -343,7 +349,10 @@ export async function fetchHomeFeedPage({
   const first = rows[0];
 
   return {
-    items: rows.map(mapFeedRow).filter((item): item is FeedItem => item !== null),
+    items: rows
+      .map(mapFeedRow)
+      .filter((item): item is FeedItem => item !== null)
+      .map((item) => ({ ...item, fetchedAt })),
     pageIndex,
     // Nessuna riga: la pagina è vuota e l'asOf della sessione resta quello che
     // il chiamante aveva già (o l'istante corrente per la pagina 0).
@@ -399,39 +408,10 @@ export function resolveFeedAuthorHref(item: FeedItem): string | null {
 }
 
 /**
- * HOM-02 §53, §83: Mi piace come STATO desiderato, non come toggle. Due tap
- * ravvicinati diventano "true" poi "false" e il risultato finale è quello
- * dell'ultimo, anche se una richiesta viene ripetuta. Il server restituisce il
- * conteggio reale, che sostituisce quello ottimistico.
+ * HOM-07 §165: il Mi piace come STATO desiderato (HOM-02 §53, §83) vive in
+ * `interactions/interaction-service.ts` (`setContentLike`), con l'identità di
+ * interazione; qui restano solo le letture del Feed.
  */
-export async function setPostLike(
-  contentType: FeedContentType,
-  postId: string,
-  liked: boolean,
-): Promise<{ likesCount: number; isLiked: boolean }> {
-  const { data, error } = await supabase.rpc("set_content_like", {
-    p_content_type: contentType,
-    p_liked: liked,
-    p_post_id: postId,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  const row = (Array.isArray(data) ? data[0] : data) as
-    | { likes_count?: unknown; is_liked?: unknown }
-    | null
-    | undefined;
-
-  // Una risposta senza conteggio non è uno stato: meglio l’errore (e il
-  // ritorno all’ultimo stato confermato) che un "0" inventato.
-  if (!row || typeof row.likes_count !== "number" || typeof row.is_liked !== "boolean") {
-    throw new Error("set_content_like: risposta senza stato");
-  }
-
-  return { likesCount: row.likes_count, isLiked: row.is_liked };
-}
 
 /** HOM-03 §66: tetto per chiamata, lo stesso che applica la RPC. */
 export const CONTENT_MEDIA_STATES_LIMIT = 20;
@@ -504,7 +484,11 @@ export type ContentInteractionState = {
   likesCount: number;
   commentsCount: number;
   isLiked: boolean;
+  /** HOM-07 §9: le sole identità del viewer che hanno messo Mi piace. */
+  likedAs: LikeIdentityRef[];
   canLike: boolean;
+  /** HOM-07 §141: istante (ms) in cui è partita la richiesta. */
+  fetchedAt?: number;
 };
 
 /**
@@ -516,6 +500,8 @@ export async function fetchContentInteractionState(
   contentType: FeedContentType,
   postId: string,
 ): Promise<ContentInteractionState | null> {
+  // HOM-07 §141: istante prima della richiesta, per lo store Mi piace.
+  const fetchedAt = Date.now();
   const { data, error } = await supabase.rpc("fetch_content_interaction_state", {
     p_content_type: contentType,
     p_post_id: postId,
@@ -534,7 +520,9 @@ export async function fetchContentInteractionState(
     likesCount: readCount(row, "likes_count"),
     commentsCount: readCount(row, "comments_count"),
     isLiked: row.is_liked === true,
+    likedAs: parseLikedAs(row.liked_as),
     canLike: row.can_like === true,
+    fetchedAt,
   };
 }
 
@@ -584,6 +572,8 @@ type ProfilePostDetailJson = {
  * `null` quando il post non è leggibile (RLS, nascosto, autore bloccato).
  */
 export async function fetchProfilePostDetail(postId: string): Promise<FeedPostItem | null> {
+  // HOM-07 §141: istante prima della richiesta, per gli store Mi piace e Salvati.
+  const fetchedAt = Date.now();
   const { data, error } = await supabase.rpc("fetch_profile_post_detail", {
     p_post_id: postId,
   });
@@ -592,7 +582,8 @@ export async function fetchProfilePostDetail(postId: string): Promise<FeedPostIt
     throw error;
   }
 
-  return mapProfilePostDetail(data as ProfilePostDetailJson | null);
+  const item = mapProfilePostDetail(data as ProfilePostDetailJson | null);
+  return item ? { ...item, fetchedAt } : null;
 }
 
 export function mapProfilePostDetail(json: ProfilePostDetailJson | null): FeedPostItem | null {

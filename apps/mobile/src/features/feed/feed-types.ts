@@ -20,6 +20,7 @@
  * affidarsi alla disciplina di chi scrive il componente.
  */
 
+import type { LikeIdentityRef } from "../interactions/interaction-types";
 import type { MediaContentType } from "../search/media/media-search-types";
 
 export type { MediaContentType };
@@ -348,6 +349,8 @@ export type FeedPostPayload = {
   likesCount: number;
   commentsCount: number;
   isLiked: boolean;
+  /** HOM-07 §9–§10: le sole identità del viewer che hanno messo Mi piace (`liked_as`). */
+  likedAs: LikeIdentityRef[];
   capabilities: FeedPostCapabilities;
   /** HOM-04 §73: `updated_at` del contenuto, passato alla modifica. Null se il server non lo manda. */
   version: string | null;
@@ -378,6 +381,8 @@ export type FeedEditorialPayload = {
   likesCount: number;
   commentsCount: number;
   isLiked: boolean;
+  /** HOM-07 §9–§10: vedi `FeedPostPayload.likedAs`. */
+  likedAs: LikeIdentityRef[];
   capabilities: FeedPostCapabilities;
   /** HOM-04 §73: vedi `FeedPostPayload.version`. */
   version: string | null;
@@ -434,6 +439,13 @@ type FeedEnvelope<TType extends FeedItemType, TPayload> = {
   isFollowingAuthor: boolean;
   nav: { kind: FeedNavKind; params: Record<string, string> } | null;
   payload: TPayload;
+  /**
+   * HOM-07 §141: istante (ms) in cui è partita la richiesta che ha portato
+   * l'elemento. Gli store Mi piace e Salvati lo usano per non farsi
+   * sovrascrivere da una pagina in cache più vecchia di un tap. Assente =
+   * sconosciuto (riempie solo una cella mancante).
+   */
+  fetchedAt?: number;
 };
 
 export type FeedPostItem = FeedEnvelope<"post", FeedPostPayload> & {

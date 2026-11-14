@@ -140,8 +140,15 @@ describe("menu ••• capability-driven", () => {
     expect(json).not.toContain("Non mi interessa");
   });
 
-  it("con azioni gestionali il foglio mostra solo quelle, anche se can_save è vero (§26–27, mockup 2)", () => {
+  it("con azioni gestionali e can_save vero, Salva compare per primo e le voci «per altri» no (HOM-07 §85–87)", () => {
     const { tree } = setup({ canDelete: true, canEdit: true, canSave: true });
+
+    expect(actionIds(tree)).toEqual(["save", "EDIT_CONTENT", "DELETE_CONTENT"]);
+    expect(textOf(tree)).not.toContain("Segnala");
+  });
+
+  it("senza can_save il foglio gestionale non mostra Salva", () => {
+    const { tree } = setup({ canDelete: true, canEdit: true, canSave: false });
 
     expect(actionIds(tree)).toEqual(["EDIT_CONTENT", "DELETE_CONTENT"]);
   });

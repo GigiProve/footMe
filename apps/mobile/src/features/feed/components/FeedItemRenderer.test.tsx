@@ -28,6 +28,7 @@ const handlers = {
   onOpenAuthor: vi.fn(),
   onOpenIdentity: vi.fn(),
   onOpenItem: vi.fn(),
+  onOpenLikes: vi.fn(),
   onOpenLink: vi.fn(),
   onOpenMedia: vi.fn(),
   onShare: vi.fn(),
@@ -99,6 +100,25 @@ describe("FeedItemRenderer", () => {
     expect(handlers.onShare).toHaveBeenCalledWith(item);
     expect(handlers.onToggleSaved).toHaveBeenCalledWith(item);
     expect(handlers.onOpenItem).toHaveBeenCalledWith(item);
+  });
+
+  it("HOM-07 §24: il numero Mi piace apre la lista con l'elemento, per Post, Articolo e Video", () => {
+    const items = [
+      makePostItem({}, { likesCount: 3 }),
+      makeArticleItem({}, { likesCount: 3 }),
+      makeVideoItem({}, { likesCount: 3 }),
+    ];
+
+    for (const item of items) {
+      handlers.onOpenLikes.mockClear();
+      const tree = renderWithToast(
+        <FeedItemRenderer handlers={handlers} item={item} modules={makeModules()} />,
+      );
+
+      pressTestId(tree, "feed-post-likes-count");
+
+      expect(handlers.onOpenLikes).toHaveBeenCalledWith(item);
+    }
   });
 
   it("il video editoriale apre il dettaglio dal titolo e passa Like e Salva con l'elemento", () => {

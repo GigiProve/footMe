@@ -1,14 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useToast } from "../../../ui";
-import { toggleSavedAd } from "../../recruiting/recruiting-service";
+import { setSavedTracked } from "../../saved/saved-commands";
+import { SAVED_COPY, SAVED_ERRORS } from "../../saved/saved-copy";
+import { SAVED_QK } from "../../saved/saved-keys";
 import { DASHBOARD_QK } from "../dashboard-keys";
 import type { PersonalSavedPositionsData } from "../adapters/personal-adapter";
 
 /**
  * Bookmark della preview "Posizioni salvate" (DAS-REV-03 §10, §18).
  *
- * Riusa `toggleSavedAd`, cioè il Saved globale del progetto: §10 chiede di
+ * Riusa il Saved globale del progetto (HOM-07: `setSavedTracked`): §10 chiede di
  * riutilizzare feedback, optimistic update e rollback già disponibili, non di
  * costruire un secondo sistema di salvataggio per la Dashboard.
  *
@@ -45,7 +47,8 @@ export function useToggleDashboardSavedAd(input: {
         throw new Error("Sessione non disponibile.");
       }
 
-      return toggleSavedAd(input.actorId, adId, !isSaved);
+      // HOM-07 §81, §130: la stessa mutation (`set_saved`) e lo stesso store di Cerca e Salvati.
+      return setSavedTracked({ id: adId, type: "position" }, !isSaved, "dashboard");
     },
 
     onMutate: async ({ adId }) => {
@@ -78,22 +81,16 @@ export function useToggleDashboardSavedAd(input: {
       return { previous };
     },
 
-    onError: (error, _variables, context) => {
+    onError: (_error, _variables, context) => {
       if (context?.previous) {
         queryClient.setQueryData(queryKey, context.previous);
       }
 
-      showToast({
-        message:
-          error instanceof Error
-            ? error.message
-            : "Impossibile aggiornare l'elemento salvato",
-        tone: "neutral",
-      });
+      showToast({ id: "saved-error", message: SAVED_ERRORS.remove, tone: "neutral" });
     },
 
     onSuccess: () => {
-      showToast({ message: "Rimosso dai Salvati", tone: "neutral" });
+      showToast({ message: SAVED_COPY.removed, tone: "neutral" });
     },
 
     onSettled: () => {
@@ -108,8 +105,8 @@ export function useToggleDashboardSavedAd(input: {
         ),
       });
       void queryClient.invalidateQueries({ queryKey });
-      void queryClient.invalidateQueries({ queryKey: ["saved-items"] });
-      void queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
+      void queryClient.invalidateQueries({ queryKey: SAVED_QK.lists });
+      void queryClient.invalidateQueries({ queryKey: SAVED_QK.counts });
     },
   });
 }

@@ -230,6 +230,8 @@ export function makePostItem(
       isLiked: false,
       isTruncated: false,
       kindLabel: "Highlights",
+      // HOM-07: `isLiked: true` in una fixture = una identità del viewer ha messo Mi piace.
+      likedAs: payloadOverrides.isLiked ? [{ id: "viewer-1", type: "person" }] : [],
       likesCount: 0,
       linkPreview: null,
       media: [],
@@ -274,6 +276,8 @@ function makeEditorialPayload(
     intro: null,
     isLiked: false,
     kindLabel: null,
+    // HOM-07: vedi `makePostItem`.
+    likedAs: overrides.isLiked ? [{ id: "viewer-1", type: "person" }] : [],
     likesCount: 0,
     media: [],
     postId: "a1",

@@ -4,10 +4,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { useSession } from "../../auth/use-session";
-import {
-  applyToRecruitingAd,
-  toggleSavedAd,
-} from "../../recruiting/recruiting-service";
+import { applyToRecruitingAd } from "../../recruiting/recruiting-service";
+import { POSITION_SAVED_INVALIDATIONS } from "../../saved/saved-position-invalidations";
+import { useIsSaved } from "../../saved/saved-store";
+import { useSetSaved } from "../../saved/use-set-saved";
 import { formatDeadlineDetailLabel } from "../../dashboard/personal/personal-presentation";
 import { fetchPositionDetail } from "../position-detail-service";
 import { formatCivilDateLabel } from "../../dashboard/positions/positions-presentation";
@@ -32,7 +32,12 @@ export function PositionDetailScreen() {
 
   const detailQuery = useQuery({
     queryKey: ["position-detail", id, profileId],
-    queryFn: () => fetchPositionDetail(profileId as string, id as string),
+    // HOM-07 §141: l'istante della richiesta accompagna il dato, per lo store Salvati.
+    queryFn: async () => {
+      const fetchedAt = Date.now();
+      const result = await fetchPositionDetail(profileId as string, id as string);
+      return result ? { ...result, fetchedAt } : result;
+    },
     enabled: !!profileId && !!id,
   });
 
@@ -155,20 +160,11 @@ export function PositionDetailScreen() {
         : null
       : null;
 
-  const toggleSavedMutation = useMutation({
-    mutationFn: () => {
-      if (!profileId || !detail) {
-        throw new Error("Sessione non valida.");
-      }
-      return toggleSavedAd(profileId, detail.ad_id, !detail.is_saved);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["position-detail", id] });
-      queryClient.invalidateQueries({ queryKey: ["search-positions"] });
-      queryClient.invalidateQueries({ queryKey: ["saved-items"] });
-      queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
-    },
-  });
+  // HOM-07 §81, §129–§130: lo stesso bookmark Posizioni di Cerca e Salvati,
+  // letto dallo store e scritto dalla mutation unica.
+  const savedTarget = detail ? ({ id: detail.ad_id, type: "position" } as const) : null;
+  const isSaved = useIsSaved(savedTarget, detail?.is_saved, detail?.fetchedAt ?? 0);
+  const setSaved = useSetSaved();
 
   return (
     <>
@@ -336,16 +332,22 @@ export function PositionDetailScreen() {
             ) : null}
 
             <Button
-              label={detail.is_saved ? "Salvata" : "Salva"}
+              label={isSaved ? "Salvata" : "Salva"}
               leftIcon={
                 <Ionicons
                   color={colors.accent}
-                  name={detail.is_saved ? "bookmark" : "bookmark-outline"}
+                  name={isSaved ? "bookmark" : "bookmark-outline"}
                   size={16}
                 />
               }
-              loading={toggleSavedMutation.isPending}
-              onPress={() => toggleSavedMutation.mutate()}
+              onPress={() =>
+                setSaved.mutate({
+                  invalidate: [["position-detail", id], ...POSITION_SAVED_INVALIDATIONS],
+                  saved: !isSaved,
+                  surface: "position",
+                  target: { id: detail.ad_id, type: "position" },
+                })
+              }
               variant="secondary"
             />
           </View>

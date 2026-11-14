@@ -48,6 +48,8 @@ type ArticleFeedPreviewProps = {
   onPressAuthor: () => void;
   onToggleSaved: () => void;
   onToggleLike: () => void;
+  /** HOM-07 §24: il numero della cella Mi piace apre la lista. */
+  onOpenLikes?: () => void;
   onComment: () => void;
   onShare: () => void;
   management?: ContentManagement;
@@ -60,6 +62,7 @@ export function ArticleFeedPreview({
   onPressAuthor,
   onToggleSaved,
   onToggleLike,
+  onOpenLikes,
   onComment,
   onShare,
 }: ArticleFeedPreviewProps) {
@@ -136,10 +139,14 @@ export function ArticleFeedPreview({
 
       <PostActionRow
         commentsCount={payload.commentsCount}
-        isLiked={payload.isLiked}
-        likesCount={payload.likesCount}
+        like={{
+          contentType: payload.contentType,
+          postId: payload.postId,
+          seed: { likedAs: payload.likedAs, likesCount: payload.likesCount },
+        }}
         onComment={onComment}
         onLike={onToggleLike}
+        onOpenLikes={onOpenLikes}
         onShare={onShare}
       />
     </FeedItemFrame>

@@ -11,7 +11,6 @@ import {
   getClubApplications,
   getClubAds,
   getPublishedAds,
-  toggleSavedAd,
   updateApplicationStatus,
   type ApplicationStatus,
   type ClubApplicationSummary,
@@ -19,6 +18,7 @@ import {
   type RecruitingAdSummary,
 } from "../../src/features/recruiting/recruiting-service";
 import { JobCard } from "../../src/features/recruiting/components/JobCard";
+import { setSavedTracked } from "../../src/features/saved/saved-commands";
 import {
   fetchClubTeams,
   type ClubTeam,
@@ -240,7 +240,8 @@ export default function AnnouncementsScreen() {
 
     try {
       setIsActionLoading(adId);
-      await toggleSavedAd(session.user.id, adId, shouldSave);
+      // HOM-07 §81, §130: stessa scrittura (`set_saved`) e stesso store di Cerca e Salvati.
+      await setSavedTracked({ id: adId, type: "position" }, shouldSave, "position");
       setPublicAds((current) =>
         current.map((ad) =>
           ad.id === adId ? { ...ad, is_saved: shouldSave } : ad,

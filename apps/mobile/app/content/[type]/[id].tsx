@@ -75,6 +75,8 @@ import {
 import { emitContentEvent } from "../../../src/features/content-insights/content-events-service";
 import { useContentDetailEvents } from "../../../src/features/content-insights/use-content-detail-events";
 import { colors, radius, spacing } from "../../../src/theme/tokens";
+import { SavedBookmarkButton } from "../../../src/features/saved/components/SavedBookmarkButton";
+import { useContentSaved } from "../../../src/features/saved/use-content-saved";
 import { AppText, Button } from "../../../src/ui";
 
 type TaggedEntry = ContentTaggedTarget;
@@ -445,6 +447,8 @@ function ContentDetailBody({
     Serve quindi il post, non solo la sua proiezione di lettura.
   */
   const [mediaPost, setMediaPost] = useState<MediaProfilePost | null>(null);
+  // HOM-07 §141: istante della richiesta di mediaPost / mediaTribunaPost, per lo store Salvati.
+  const [mediaLoadedAt, setMediaLoadedAt] = useState(0);
   const [mediaTribunaPost, setMediaTribunaPost] =
     useState<MediaTribunaPost | null>(null);
   const [isLoading, setLoading] = useState(true);
@@ -455,6 +459,18 @@ function ContentDetailBody({
   const contentType = type as ContentDetailType;
   const taggableType = asTaggedContentType(contentType);
 
+  // HOM-07 §91–§93, mockup 5: segnalibro nella barra del dettaglio, sullo store
+  // Salvati. Media/Creator (articoli e Tribuna) ha già il suo «Salva» in
+  // `MediaContentInteractions`, sullo stesso store: qui non si duplica.
+  const bookmark = useContentSaved(contentType as FeedContentType, id ?? "", {
+    enabled:
+      !!viewerId &&
+      !!id &&
+      SUPPORTED.includes(contentType) &&
+      contentType !== "media_profile" &&
+      contentType !== "media_tribuna",
+  });
+
   const load = useCallback(async () => {
     if (!id || !SUPPORTED.includes(contentType)) {
       setContent(null);
@@ -464,6 +480,7 @@ function ContentDetailBody({
 
     setLoading(true);
     setFailure(null);
+    const fetchedAt = Date.now();
     setMediaPost(null);
     setMediaTribunaPost(null);
 
@@ -479,6 +496,7 @@ function ContentDetailBody({
       } else if (contentType === "media_tribuna") {
         const post = await fetchMediaTribunaDetail(id, viewerId);
         setFanPost(null);
+        setMediaLoadedAt(fetchedAt);
         setMediaTribunaPost(post);
         const publisher = post ? await fetchContentPublisher(post.media_profile_id) : null;
         setContent(post && publisher ? mapMediaTribuna(post, publisher) : null);
@@ -490,6 +508,7 @@ function ContentDetailBody({
       } else {
         const post = await fetchMediaProfilePostDetail(id, viewerId);
         setFanPost(null);
+        setMediaLoadedAt(fetchedAt);
         setMediaPost(post);
         setContent(post ? mapMediaProfile(post, viewerId) : null);
       }
@@ -614,7 +633,11 @@ function ContentDetailBody({
         <AppText align="center" style={styles.topBarTitle} variant="bodySm">
           Contenuto
         </AppText>
-        <View style={styles.topBarButton} />
+        {content && bookmark.canSave ? (
+          <SavedBookmarkButton isSaved={bookmark.isSaved} onToggle={bookmark.toggle} />
+        ) : (
+          <View style={styles.topBarButton} />
+        )}
       </View>
 
       {isLoading ? (
@@ -762,6 +785,7 @@ function ContentDetailBody({
               contentType="media_profile"
               initialComments={mediaPost.comments}
               initialIsSaved={mediaPost.is_saved}
+              initialIsSavedAt={mediaLoadedAt}
               postId={mediaPost.id}
               viewerProfileId={viewerId}
             />
@@ -772,6 +796,7 @@ function ContentDetailBody({
               contentType="media_tribuna"
               initialComments={mediaTribunaPost.comments}
               initialIsSaved={mediaTribunaPost.is_saved}
+              initialIsSavedAt={mediaLoadedAt}
               postId={mediaTribunaPost.id}
               viewerProfileId={viewerId}
             />

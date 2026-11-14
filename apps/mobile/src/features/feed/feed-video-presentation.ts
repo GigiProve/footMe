@@ -259,7 +259,8 @@ export function buildEditorialAccessibilityLabel({
 
 /** Etichetta del bookmark: lo stato è nel nome, non solo nel colore (§85). */
 export function bookmarkAccessibilityLabel(isSaved: boolean): string {
-  return isSaved ? "Rimuovi dai salvati" : "Salva";
+  // HOM-07 §181: «Salva contenuto» / «Rimuovi dai salvati».
+  return isSaved ? "Rimuovi dai salvati" : "Salva contenuto";
 }
 
 /** §48: l'etichetta della preview è il titolo; l'azione è nel suggerimento. */

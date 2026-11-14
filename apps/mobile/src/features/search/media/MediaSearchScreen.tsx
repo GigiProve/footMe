@@ -18,6 +18,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { useSession } from "../../auth/use-session";
 import { useUnreadNotificationsCount } from "../../notifications/use-unread-notifications-count";
+import {
+  contentSavedTarget,
+  getSavedValue,
+  savedKey,
+  seedSaved,
+  useSavedStoreVersion,
+} from "../../saved/saved-store";
+import { useSetSaved } from "../../saved/use-set-saved";
 import { addRecentSearch } from "../recent-searches";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import {
@@ -57,7 +65,6 @@ import {
   searchMediaSourcesPage,
   searchMediaSuggestions,
   toggleFollowSource,
-  toggleSavedContent,
 } from "./media-search-service";
 import type {
   MediaContentRow,
@@ -103,6 +110,29 @@ type MediaListItem =
 
 function contentKey(row: { content_type: MediaContentType; post_id: string }): string {
   return `${row.content_type}:${row.post_id}`;
+}
+
+/**
+ * HOM-07 §133: il bookmark di una riga è quello dello store Salvati, seminato
+ * dal `is_saved` della riga; un salvataggio fatto altrove (Feed, dettaglio,
+ * Salvati) compare qui senza ricaricare i risultati.
+ */
+function resolveRowSaved(row: {
+  content_type: MediaContentType;
+  is_saved: boolean;
+  post_id: string;
+  fetchedAt?: number;
+}): boolean {
+  return getSavedValue(
+    contentSavedTarget(row.content_type, row.post_id),
+    row.is_saved,
+    row.fetchedAt ?? 0,
+  );
+}
+
+/** HOM-07 §141: ogni riga porta l'istante in cui la sua richiesta è partita. */
+function withFetchedAt<T>(rows: readonly T[], fetchedAt: number): (T & { fetchedAt: number })[] {
+  return rows.map((row) => ({ ...row, fetchedAt }));
 }
 
 function sourceKey(row: { entity_id: string; source_type: MediaSourceType }): string {
@@ -180,14 +210,14 @@ export function MediaSearchScreen() {
   const [sortSheetOpen, setSortSheetOpen] = useState(false);
 
   /**
-   * Override locali di bookmark e follow: il tap deve aggiornare l'icona
-   * immediatamente, senza modali e senza attendere un refetch (CER-05
-   * §14/§15). Le RPC restituiscono `is_saved` / `is_following` freschi al
-   * prossimo caricamento, quindi gli override valgono solo per le righe
-   * toccate in questa sessione di ricerca.
+   * Override locale del follow: il tap deve aggiornare l'icona immediatamente,
+   * senza modali e senza attendere un refetch (CER-05 §14/§15). Il bookmark
+   * invece non ha override qui: da HOM-07 §133 è nello store Salvati, condiviso
+   * con Feed, dettaglio e Salvati.
    */
-  const [savedOverrides, setSavedOverrides] = useState<Record<string, boolean>>({});
   const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
+  const setSaved = useSetSaved();
+  useSavedStoreVersion();
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -214,7 +244,10 @@ export function MediaSearchScreen() {
   // ── stato iniziale ────────────────────────────────────────────────
   const forYouQuery = useQuery({
     enabled: showHome && !!profileId,
-    queryFn: () => fetchMediaForYou(FOR_YOU_LIMIT),
+    queryFn: async () => {
+      const fetchedAt = Date.now();
+      return withFetchedAt(await fetchMediaForYou(FOR_YOU_LIMIT), fetchedAt);
+    },
     queryKey: ["media-for-you", profileId],
   });
 
@@ -237,13 +270,16 @@ export function MediaSearchScreen() {
   // `getNextPageParam` for TanStack to infer the page type.
   const contentsQuery = useInfiniteQuery({
     queryKey: ["search-media-content", submittedQuery, payload, sort],
-    queryFn: ({ pageParam }) =>
-      searchMediaContentPage({
+    queryFn: async ({ pageParam }) => {
+      const fetchedAt = Date.now();
+      const page = await searchMediaContentPage({
         filters: payload,
         page: pageParam,
         query: submittedQuery || null,
         sort,
-      }),
+      });
+      return { ...page, rows: withFetchedAt(page.rows, fetchedAt) };
+    },
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) =>
       lastPage.rows.length === MEDIA_PAGE_SIZE ? allPages.length : undefined,
@@ -266,9 +302,19 @@ export function MediaSearchScreen() {
     placeholderData: keepPreviousData,
   });
 
-  const contents = (contentsQuery.data?.pages.flatMap((page) => page.rows) ?? []).map(
-    (row) => ({ ...row, is_saved: savedOverrides[contentKey(row)] ?? row.is_saved }),
-  );
+  const rawContents = contentsQuery.data?.pages.flatMap((page) => page.rows) ?? [];
+  const contents = rawContents.map((row) => ({ ...row, is_saved: resolveRowSaved(row) }));
+
+  // Le RPC di Cerca sono un seme dello store Salvati (§134): nessuna copia a parte.
+  useEffect(() => {
+    for (const row of [...rawContents, ...(forYouQuery.data ?? [])]) {
+      seedSaved(
+        savedKey(contentSavedTarget(row.content_type, row.post_id)),
+        row.is_saved,
+        row.fetchedAt,
+      );
+    }
+  });
   const sources = (sourcesQuery.data?.pages.flatMap((page) => page.rows) ?? []).map(
     (row) => ({
       ...row,
@@ -351,29 +397,17 @@ export function MediaSearchScreen() {
     router.push(href as never);
   }
 
-  async function handleToggleSave(row: {
+  /** HOM-07 §94–§98, §133: ottimistico, con rollback e copy dalla mutation unica. */
+  function handleToggleSave(row: {
     content_type: MediaContentType;
     is_saved: boolean;
     post_id: string;
   }) {
-    if (!profileId) {
-      return;
-    }
-
-    const key = contentKey(row);
-    const current = savedOverrides[key] ?? row.is_saved;
-    const next = !current;
-
-    setSavedOverrides((prev) => ({ ...prev, [key]: next }));
-
-    try {
-      await toggleSavedContent(profileId, row.content_type, row.post_id, next);
-      queryClient.invalidateQueries({ queryKey: ["saved-items"] });
-      queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
-    } catch {
-      setSavedOverrides((prev) => ({ ...prev, [key]: current }));
-      Alert.alert("Errore", "Non siamo riusciti ad aggiornare i contenuti salvati.");
-    }
+    setSaved.mutate({
+      saved: !resolveRowSaved(row),
+      surface: "search",
+      target: contentSavedTarget(row.content_type, row.post_id),
+    });
   }
 
   async function handleToggleFollow(row: {
@@ -475,7 +509,7 @@ export function MediaSearchScreen() {
             }))}
             forYouRows={(forYouQuery.data ?? []).map((row) => ({
               ...row,
-              is_saved: savedOverrides[contentKey(row)] ?? row.is_saved,
+              is_saved: resolveRowSaved(row),
             }))}
             isLoading={forYouQuery.isLoading || discoverQuery.isLoading}
             onOpenContent={(row: MediaForYouRow) =>

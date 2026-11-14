@@ -4,8 +4,6 @@ import {
   addClubMediaComment,
   createClubMediaPost,
   fetchClubMediaFeed,
-  toggleClubMediaLike,
-  toggleSavedClubMedia,
 } from "./club-media-service";
 
 const mocks = vi.hoisted(() => {
@@ -107,6 +105,14 @@ vi.mock("../../lib/supabase", () => ({
     from: mocks.fromMock,
   },
 }));
+
+// HOM-07: i Mi piace passano da `set_content_like` per identità, non dalle tabelle.
+const interactionMocks = vi.hoisted(() => ({
+  loadInteractionIdentity: vi.fn(),
+  setContentLike: vi.fn(),
+}));
+
+vi.mock("../interactions/interaction-service", () => interactionMocks);
 
 const basePost = {
   attachment_label: null,
@@ -351,38 +357,6 @@ describe("club-media-service", () => {
         },
       ],
       table: "club_media_tagged_profiles",
-    });
-  });
-
-  it("toggles likes and saved posts with profile scoped writes", async () => {
-    mocks.queueResponses(
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-    );
-
-    await toggleClubMediaLike("viewer-1", "post-1", true);
-    await toggleClubMediaLike("viewer-1", "post-1", false);
-    await toggleSavedClubMedia("viewer-1", "post-1", true);
-    await toggleSavedClubMedia("viewer-1", "post-1", false);
-
-    expect(mocks.operations[0]).toMatchObject({
-      action: "upsert",
-      payload: { post_id: "post-1", profile_id: "viewer-1" },
-      table: "club_media_likes",
-    });
-    expect(mocks.operations[1]).toMatchObject({
-      action: "delete",
-      table: "club_media_likes",
-    });
-    expect(mocks.operations[2]).toMatchObject({
-      action: "upsert",
-      table: "saved_club_media",
-    });
-    expect(mocks.operations[3]).toMatchObject({
-      action: "delete",
-      table: "saved_club_media",
     });
   });
 

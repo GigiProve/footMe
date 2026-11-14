@@ -22,6 +22,12 @@ import {
   formatCompactRelativeTime,
   formatSpokenRelativeTime,
 } from "../../lib/relative-time";
+import {
+  LIKE_ACTION_ADD,
+  LIKE_ACTION_REMOVE,
+  LIKE_ACTION_VIEW_LIST,
+  LIKE_YOURS_LABEL,
+} from "../interactions/like-labels";
 import { getPlayerPositionLabel } from "../profiles/player-sports";
 import { formatRole } from "../profiles/profile-display-helpers";
 import { formatSourceKindLabel } from "../search/media/media-labels";
@@ -600,7 +606,19 @@ export function linkPreviewDomain(preview: Pick<FeedLinkPreview, "domain" | "url
 // ────────────────────────────────────────────────────────────────
 
 export type PostActionModel = {
-  like: { text: string; accessibilityLabel: string; selected: boolean };
+  like: {
+    /** «Mi piace» a zero, il numero formattato da uno in su (HOM-07 §6–§7). */
+    text: string;
+    /** Il numero, solo se c'è: è l'area che apre la lista (HOM-07 §24); `null` a zero (§26). */
+    countText: string | null;
+    /** «146 Mi piace» · «147 Mi piace. Hai messo Mi piace.» (HOM-07 §30–§31). */
+    accessibilityLabel: string;
+    selected: boolean;
+    /** «Metti Mi piace» / «Rimuovi Mi piace» (HOM-07 §30–§31). */
+    toggleActionLabel: string;
+    /** «Visualizza chi ha messo Mi piace», solo con Mi piace presenti (HOM-07 §26, §216). */
+    listActionLabel: string | null;
+  };
   comment: { text: string; accessibilityLabel: string };
   share: { text: string; accessibilityLabel: string };
 };
@@ -609,6 +627,10 @@ export type PostActionModel = {
  * Un solo controllo per ogni interazione: il conteggio fa parte del controllo
  * (§48, §57). Zero → solo la label, mai "0". Il numero parla allo screen reader
  * come "146 Mi piace" / "18 commenti" (§107). Condividi non ha mai un conteggio (§58).
+ *
+ * HOM-07: il Mi piace con numero ha due comportamenti (icona → toggle, numero →
+ * lista, §22–§24) ma resta UN controllo per lo screen reader, con l'azione
+ * «Visualizza chi ha messo Mi piace» (§30). A zero non esiste nessuna lista (§26).
  */
 export function buildPostActionModel(input: {
   likesCount: number;
@@ -617,6 +639,7 @@ export function buildPostActionModel(input: {
 }): PostActionModel {
   const likes = normalizeCount(input.likesCount);
   const comments = normalizeCount(input.commentsCount);
+  const spokenLike = likes > 0 ? `${formatCount(likes)} ${FEED_ACTION_LIKE}` : FEED_ACTION_LIKE;
 
   return {
     comment: {
@@ -627,9 +650,12 @@ export function buildPostActionModel(input: {
       text: comments > 0 ? formatCount(comments) : FEED_ACTION_COMMENT,
     },
     like: {
-      accessibilityLabel: likes > 0 ? `${formatCount(likes)} ${FEED_ACTION_LIKE}` : FEED_ACTION_LIKE,
+      accessibilityLabel: input.isLiked ? `${spokenLike}. ${LIKE_YOURS_LABEL}.` : spokenLike,
+      countText: likes > 0 ? formatCount(likes) : null,
+      listActionLabel: likes > 0 ? LIKE_ACTION_VIEW_LIST : null,
       selected: input.isLiked,
       text: likes > 0 ? formatCount(likes) : FEED_ACTION_LIKE,
+      toggleActionLabel: input.isLiked ? LIKE_ACTION_REMOVE : LIKE_ACTION_ADD,
     },
     share: { accessibilityLabel: FEED_ACTION_SHARE, text: FEED_ACTION_SHARE },
   };

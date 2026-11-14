@@ -65,8 +65,7 @@ vi.mock("./profile-social-service", () => ({
 
 vi.mock("../saved/saved-service", () => ({
   fetchProfileSaveState: vi.fn().mockResolvedValue(false),
-  saveProfile: vi.fn().mockResolvedValue(undefined),
-  unsaveProfile: vi.fn().mockResolvedValue(undefined),
+  setSavedRemote: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("../shortlist/use-shortlist-permissions", () => ({

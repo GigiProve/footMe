@@ -14,6 +14,7 @@ import {
   renderWithToast,
   textOf,
 } from "../feed-test-helpers";
+import { resetSavedStore } from "../../../saved/saved-store";
 import { ArticleFeedPreview } from "./ArticleFeedPreview";
 
 const dimensions = vi.hoisted(() => ({ fontScale: 1 }));
@@ -31,6 +32,8 @@ vi.mock("react-native", async (importOriginal) => ({
 const NOW = new Date("2026-07-31T12:00:00.000Z");
 
 beforeEach(() => {
+  // Lo store Salvati è di modulo: ogni test parte senza celle (HOM-07 §134).
+  resetSavedStore();
   dimensions.fontScale = 1;
   // Solo `Date`: la riga meta è relativa alle 10:00 della fixture.
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -265,7 +268,7 @@ describe("ArticleFeedPreview — segnalibro e riga azioni (§51–59)", () => {
     const json = textOf(tree);
 
     expect(countTestId(tree, "feed-bookmark")).toBe(1);
-    expect(findByLabel(tree, "Salva")).toHaveLength(1);
+    expect(findByLabel(tree, "Salva contenuto")).toHaveLength(1);
     // Ordine: header (con il segnalibro) → preview → riga azioni.
     expect(json.indexOf("feed-bookmark")).toBeGreaterThan(-1);
     expect(json.indexOf("feed-bookmark")).toBeLessThan(json.indexOf("feed-article-body"));
@@ -353,6 +356,6 @@ describe("ArticleFeedPreview — segnalibro e riga azioni (§51–59)", () => {
     const [like] = hostByTestId(tree, "feed-post-action-like");
 
     expect(like.props.accessibilityState).toEqual({ selected: true });
-    expect(like.props.accessibilityLabel).toBe("157 Mi piace");
+    expect(like.props.accessibilityLabel).toBe("157 Mi piace. Hai messo Mi piace.");
   });
 });

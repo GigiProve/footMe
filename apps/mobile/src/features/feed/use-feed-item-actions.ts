@@ -2,122 +2,77 @@
  * Azioni sulle card del Feed.
  *
  * Solo due azioni sono reali in questo blocco, ed è deliberato:
- *  • SALVA — `toggleSavedContent` esiste già e smista sulle 5 tabelle `saved_*`
- *    (§10 chiede di predisporre il bookmark, e qui funziona davvero);
+ *  • SALVA — HOM-07: passa dallo store normalizzato dei Salvati e dalla
+ *    mutation unica `set_saved` (§130–§137). Nessuna patch delle pagine del
+ *    Feed: il toggle aggiorna la sola cella del contenuto, quindi non
+ *    rirenderizza la lista né ricarica la Home (§137);
  *  • SEGUI — `toggleFollowSource` esiste già e conosce la differenza tra
  *    `profile_follows` e `club_follows`.
- * Mi piace, Commenta, Condividi, Non mi interessa, Nascondi, Non seguire e
- * Segnala sono esclusi dal §29: i loro punti d'accesso esistono e rispondono
- * con un messaggio, senza inventare comportamenti.
- *
- * La patch ottimistica riscrive le pagine della infinite query in cache, sul
- * modello di `use-saved-profile-flags.ts`, così il bookmark risponde al tocco
- * invece che al round-trip.
+ * Commenta, Condividi, Non mi interessa, Nascondi, Non seguire e Segnala
+ * rispondono con un messaggio, senza inventare comportamenti.
  */
 
-import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { useToast } from "../../ui";
-import {
-  toggleFollowSource,
-  toggleSavedContent,
-} from "../search/media/media-search-service";
+import { toggleFollowSource } from "../search/media/media-search-service";
+import { contentSavedTarget, getSavedValue, savedKey, seedSaved } from "../saved/saved-store";
+import { useSetSaved } from "../saved/use-set-saved";
 import { trackFeed } from "./feed-analytics";
 import { FEED_QK } from "./feed-keys";
-import type {
-  FeedItem,
-  FeedPage,
-  FeedPageParam,
-  FeedScope,
-  MediaContentType,
-} from "./feed-types";
+import { isContentItem, type FeedContentType, type FeedItem, type FeedScope } from "./feed-types";
 
-type SavedTarget = {
+/**
+ * HOM-07 §133, §141: i contenuti caricati seminano lo store Salvati con
+ * l'istante della loro pagina, così una pagina in cache più vecchia di un
+ * salvataggio fatto altrove non lo cancella, e un refetch più nuovo prevale.
+ */
+export function seedSavedFromItems(items: readonly FeedItem[]): void {
+  for (const item of items) {
+    if (isContentItem(item)) {
+      seedSaved(
+        savedKey(contentSavedTarget(item.payload.contentType, item.payload.postId)),
+        item.isSaved,
+        item.fetchedAt ?? 0,
+      );
+    }
+  }
+}
+
+export function useSeedSaved(items: readonly FeedItem[]) {
+  useEffect(() => {
+    seedSavedFromItems(items);
+  }, [items]);
+}
+
+type FeedSaveTap = {
   itemId: string;
-  contentType: MediaContentType;
+  contentType: FeedContentType;
   postId: string;
+  /** Il seme dal payload: lo store, se ne sa di più (altra superficie), vince. */
   isSaved: boolean;
 };
 
-const SCOPES: readonly FeedScope[] = ["per_te", "seguiti"];
-
-function patchSavedFlag(
-  data: InfiniteData<FeedPage, FeedPageParam> | undefined,
-  itemId: string,
-  isSaved: boolean,
-): InfiniteData<FeedPage, FeedPageParam> | undefined {
-  if (!data) {
-    return data;
-  }
+/**
+ * HOM-03 §37, §51, §95 + HOM-07: un solo Saved per tutta l'app. Lo stato
+ * mostrato è quello dello store, quindi Feed, dettaglio, Cerca e Salvati
+ * restano allineati (§133). La firma conserva `profileId` e `scope` per i
+ * chiamanti esistenti: la scrittura non dipende più da nessuno dei due.
+ */
+export function useToggleSavedFeedItem(_options?: { profileId: string; scope?: FeedScope }) {
+  const setSaved = useSetSaved();
 
   return {
-    ...data,
-    pages: data.pages.map((page) => ({
-      ...page,
-      items: page.items.map((item) =>
-        item.id === itemId ? ({ ...item, isSaved } as FeedItem) : item,
-      ),
-    })),
+    isPending: setSaved.isPending,
+    mutate: (tap: FeedSaveTap) => {
+      const target = contentSavedTarget(tap.contentType, tap.postId);
+      const next = !getSavedValue(target, tap.isSaved);
+
+      trackFeed({ itemId: tap.itemId, name: "feed_save_tap", saved: next });
+      setSaved.mutate({ saved: next, surface: "feed", target });
+    },
   };
-}
-
-/**
- * HOM-03 §37, §51, §95: un solo Saved per tutta l'app. Lo stesso contenuto può
- * stare in entrambe le tab, quindi la patch le tocca tutte e due; dopo la
- * scrittura si invalidano anche le liste e i contatori dei Salvati (come fa
- * Cerca → Media e contenuti), così "Salvato in Home" è salvato anche lì.
- *
- * `scope` resta nella firma per i chiamanti esistenti: la patch non dipende più
- * dalla tab da cui parte il tap.
- */
-export function useToggleSavedFeedItem({
-  profileId,
-}: {
-  profileId: string;
-  scope?: FeedScope;
-}) {
-  const queryClient = useQueryClient();
-  const { showToast } = useToast();
-
-  const writeSaved = (itemId: string, isSaved: boolean) => {
-    for (const scope of SCOPES) {
-      queryClient.setQueryData<InfiniteData<FeedPage, FeedPageParam>>(
-        FEED_QK.feed(scope, profileId),
-        (data) => patchSavedFlag(data, itemId, isSaved),
-      );
-    }
-  };
-
-  return useMutation({
-    mutationFn: (target: SavedTarget) =>
-      toggleSavedContent(profileId, target.contentType, target.postId, !target.isSaved),
-    onMutate: async (target) => {
-      await Promise.all(
-        SCOPES.map((scope) =>
-          queryClient.cancelQueries({ queryKey: FEED_QK.feed(scope, profileId) }),
-        ),
-      );
-      writeSaved(target.itemId, !target.isSaved);
-      trackFeed({ itemId: target.itemId, name: "feed_save_tap", saved: !target.isSaved });
-    },
-    onError: (_error, target) => {
-      // Si torna allo stato di prima del tap su quel solo elemento: ripristinare
-      // l'intera pagina cancellerebbe un Mi piace arrivato nel frattempo.
-      writeSaved(target.itemId, target.isSaved);
-      showToast({ message: "Non è stato possibile aggiornare i salvati." });
-    },
-    onSuccess: (_result, target) => {
-      showToast({
-        icon: target.isSaved ? "bookmark-outline" : "bookmark",
-        message: target.isSaved ? "Rimosso dai salvati." : "Salvato.",
-        tone: "success",
-      });
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ["saved-items"] });
-      void queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
-    },
-  });
 }
 
 type FollowTarget = {

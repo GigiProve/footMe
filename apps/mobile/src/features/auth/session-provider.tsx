@@ -10,6 +10,7 @@ import { Linking } from "react-native";
 import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { completeOAuthSessionFromUrl } from "./oauth";
 import { discardContentEvents } from "../content-insights/content-events-service";
+import { resetUserInteractions } from "../interactions/reset-user-interactions";
 import { supabase } from "../../lib/supabase";
 
 type AppProfile = {
@@ -107,6 +108,19 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let isMounted = true;
+    // HOM-07: utente della sessione corrente, per svuotare Mi piace e Salvati
+    // quando cambia (scadenza, altro account) anche senza passare da logout().
+    let currentUserId: string | null = null;
+
+    function trackUser(nextUserId: string | null) {
+      if (nextUserId === currentUserId) {
+        return;
+      }
+      if (currentUserId !== null) {
+        resetUserInteractions();
+      }
+      currentUserId = nextUserId;
+    }
 
     async function hydrateProfile(userId: string) {
       const nextProfile = await loadProfile(userId);
@@ -135,6 +149,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         return;
       }
 
+      trackUser(initialSession?.user?.id ?? null);
       setSession(initialSession);
 
       if (initialSession?.user) {
@@ -150,6 +165,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, nextSession: Session | null) => {
+        // Prima di setSession: nessun frame della nuova sessione con lo stato
+        // dell'utente di prima.
+        trackUser(nextSession?.user?.id ?? null);
         setSession(nextSession);
 
         if (!nextSession?.user) {

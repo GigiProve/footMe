@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyToRecruitingAd,
   getOwnedClub,
-  toggleSavedAd,
   updateApplicationStatus,
 } from "./recruiting-service";
 
@@ -168,28 +167,6 @@ describe("recruiting-service", () => {
     mocks.clubMaybeSingleMock.mockResolvedValueOnce({ data: club, error: null });
 
     await expect(getOwnedClub("profile-1")).resolves.toEqual(club);
-  });
-
-  it("saves an ad with the expected conflict target", async () => {
-    await toggleSavedAd("profile-2", "ad-4", true);
-
-    expect(mocks.savedAdsUpsertMock).toHaveBeenCalledWith(
-      {
-        ad_id: "ad-4",
-        profile_id: "profile-2",
-      },
-      { onConflict: "ad_id,profile_id" },
-    );
-  });
-
-  it("removes a saved ad by ad and profile id", async () => {
-    await toggleSavedAd("profile-3", "ad-7", false);
-
-    expect(mocks.deleteFirstEqMock).toHaveBeenCalledWith("ad_id", "ad-7");
-    expect(mocks.deleteFinalEqMock).toHaveBeenCalledWith(
-      "profile_id",
-      "profile-3",
-    );
   });
 
   /**

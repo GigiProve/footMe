@@ -67,6 +67,8 @@ export type FeedItemHandlers = {
   // HOM-02: i punti d’ingresso del Post. Navigazione, scrittura e analytics
   // stanno in FeedPane; il componente chiama e basta.
   onToggleLike: (item: FeedInteractiveItem) => void;
+  /** HOM-07 §24: il numero della cella Mi piace apre la lista di chi ha messo Mi piace. */
+  onOpenLikes: (item: FeedInteractiveItem) => void;
   /** §35: il media apre il dettaglio contenuto con l’indice selezionato. */
   onOpenMedia: (item: FeedPostItem, index: number) => void;
   /** §19, §22: mention e tag aprono l’identità per id, mai per nome. */
@@ -95,6 +97,7 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
           onPressAuthor={() => handlers.onOpenAuthor(item)}
           onToggleSaved={() => handlers.onToggleSaved(item)}
           onToggleLike={() => handlers.onToggleLike(item)}
+          onOpenLikes={() => handlers.onOpenLikes(item)}
           onOpenMedia={(index) => handlers.onOpenMedia(item, index)}
           onOpenIdentity={(target) => handlers.onOpenIdentity(item, target)}
           onOpenLink={() => handlers.onOpenLink(item)}
@@ -111,6 +114,7 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
           item={item}
           management={handlers.getManagement?.(item)}
           onComment={() => handlers.onComment(item)}
+          onOpenLikes={() => handlers.onOpenLikes(item)}
           onPress={() => handlers.onOpenItem(item)}
           onPressAuthor={() => handlers.onOpenAuthor(item)}
           onShare={() => handlers.onShare(item)}
@@ -125,6 +129,7 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
           item={item}
           management={handlers.getManagement?.(item)}
           onComment={() => handlers.onComment(item)}
+          onOpenLikes={() => handlers.onOpenLikes(item)}
           onPress={() => handlers.onOpenItem(item)}
           onPressAuthor={() => handlers.onOpenAuthor(item)}
           onShare={() => handlers.onShare(item)}

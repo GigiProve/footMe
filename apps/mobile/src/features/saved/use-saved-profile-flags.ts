@@ -1,13 +1,24 @@
-import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQueries } from "@tanstack/react-query";
 
 import { useSession } from "../auth/use-session";
-import { useToast } from "../../ui";
-import { fetchSavedProfileIds, saveProfile, unsaveProfile } from "./saved-service";
+import { SAVED_QK } from "./saved-keys";
+import { fetchSavedProfileIds } from "./saved-service";
+import {
+  getSavedEntry,
+  resolveSaved,
+  savedKey,
+  seedSaved,
+  useSavedStoreVersion,
+} from "./saved-store";
+import { useSetSaved } from "./use-set-saved";
 
 /**
- * Batch save-state lookup for the pages of profile ids loaded by an infinite
- * list (e.g. Cerca > Profili). One query per page so results merge
- * incrementally as pages load, without a giant re-fetch on every page.
+ * HOM-07 §130–§131, §134: i flag di Cerca > Profili sono il SEME dello store
+ * normalizzato, non uno stato a parte. Una query per pagina di id (i risultati
+ * si fondono man mano, senza un refetch gigante); lo stato mostrato è quello
+ * dello store, quindi un salvataggio fatto altrove — dal profilo, dal Saved
+ * Center — compare qui senza ricaricare la lista.
  */
 export function useSavedProfileFlags(pageIds: string[][]) {
   const { profile } = useSession();
@@ -16,15 +27,40 @@ export function useSavedProfileFlags(pageIds: string[][]) {
   const results = useQueries({
     queries: pageIds.map((ids) => ({
       enabled: !!ownerId && ids.length > 0,
-      queryFn: () => fetchSavedProfileIds(ownerId as string, ids),
-      queryKey: ["saved-profile-flags", ownerId, ids],
+      // HOM-07 §141: l'istante prima della richiesta accompagna i flag.
+      queryFn: async () => {
+        const fetchedAt = Date.now();
+        return { fetchedAt, ids: await fetchSavedProfileIds(ownerId as string, ids) };
+      },
+      queryKey: SAVED_QK.profileFlags(ownerId, ids),
     })),
   });
 
+  // Il contenuto dello store entra nel rendering: un toggle altrove ricalcola l'insieme.
+  useSavedStoreVersion();
+
+  const seeds = new Map<string, { value: boolean; at: number }>();
+  pageIds.forEach((ids, index) => {
+    const data = results[index]?.data;
+    if (data) {
+      for (const id of ids) {
+        seeds.set(id, { at: data.fetchedAt, value: data.ids.has(id) });
+      }
+    }
+  });
+
+  useEffect(() => {
+    for (const [id, seed] of seeds) {
+      seedSaved(savedKey({ id, type: "profile" }), seed.value, seed.at);
+    }
+  });
+
   const savedIds = new Set<string>();
-  for (const result of results) {
-    if (result.data) {
-      for (const id of result.data) {
+  for (const ids of pageIds) {
+    for (const id of ids) {
+      const entry = getSavedEntry(savedKey({ id, type: "profile" }));
+      const seed = seeds.get(id);
+      if (resolveSaved(entry, seed?.value, seed?.at ?? 0)) {
         savedIds.add(id);
       }
     }
@@ -35,76 +71,25 @@ export function useSavedProfileFlags(pageIds: string[][]) {
 
 type ToggleSavedProfileInput = {
   targetId: string;
+  /** Lo stato mostrato adesso: il tap lo inverte. */
   saved: boolean;
 };
 
 /**
- * Optimistically toggles the saved state of a profile, updating every cached
- * `["saved-profile-flags", ownerId, ...]` page in place. Never invalidates
- * `["search-profiles"]` — the search list itself is untouched by save state.
+ * Salva/rimuove un profilo dalle liste di Cerca. Passa dalla mutation unica
+ * `useSetSaved` (§133): ottimistica con rollback, nessuna invalidazione della
+ * lista di ricerca, che non dipende dallo stato salvato.
  */
 export function useToggleSavedProfile() {
-  const { profile } = useSession();
-  const ownerId = profile?.id ?? null;
-  const queryClient = useQueryClient();
-  const { showToast } = useToast();
+  const setSaved = useSetSaved();
 
-  return useMutation({
-    mutationFn: async ({ targetId, saved }: ToggleSavedProfileInput) => {
-      if (!ownerId) {
-        throw new Error("Sessione non disponibile.");
-      }
-      if (saved) {
-        await unsaveProfile(ownerId, targetId);
-      } else {
-        await saveProfile(ownerId, targetId);
-      }
-    },
-    onError: (error, _variables, context) => {
-      if (context?.previous) {
-        for (const [queryKey, data] of context.previous) {
-          queryClient.setQueryData(queryKey, data);
-        }
-      }
-      showToast({
-        message:
-          error instanceof Error
-            ? error.message
-            : "Impossibile aggiornare il profilo salvato",
-        tone: "neutral",
-      });
-    },
-    onMutate: async ({ targetId, saved }: ToggleSavedProfileInput) => {
-      await queryClient.cancelQueries({
-        queryKey: ["saved-profile-flags", ownerId],
-      });
-
-      const previous = queryClient.getQueriesData<Set<string>>({
-        queryKey: ["saved-profile-flags", ownerId],
-      });
-
-      for (const [queryKey, data] of previous) {
-        const nextSet = new Set(data ?? []);
-        if (saved) {
-          nextSet.delete(targetId);
-        } else {
-          nextSet.add(targetId);
-        }
-        queryClient.setQueryData(queryKey, nextSet);
-      }
-
-      return { previous };
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["saved-items"] });
-      queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
-    },
-    onSuccess: (_data, { saved }) => {
-      if (saved) {
-        showToast({ message: "Rimosso dai Salvati", tone: "neutral" });
-      } else {
-        showToast({ message: "Profilo salvato", tone: "success", icon: "bookmark" });
-      }
-    },
-  });
+  return {
+    isPending: setSaved.isPending,
+    mutate: ({ targetId, saved }: ToggleSavedProfileInput) =>
+      setSaved.mutate({
+        saved: !saved,
+        surface: "search",
+        target: { id: targetId, type: "profile" },
+      }),
+  };
 }

@@ -58,11 +58,13 @@ import { useFeedConnectivity } from "../use-feed-connectivity";
 import { useFeedFirstAccess } from "../use-feed-first-access";
 import {
   useToggleFollowSuggestion,
+  useSeedSaved,
   useToggleSavedFeedItem,
 } from "../use-feed-item-actions";
 import { originForScope } from "../content-routes";
 import { useContentManagement } from "../use-content-management";
-import { useToggleFeedPostLike } from "../use-feed-post-like";
+import { useOpenLikes } from "../../likes/use-open-likes";
+import { useSeedLikes, useToggleFeedPostLike } from "../use-feed-post-like";
 import { useFeedNewContent } from "../use-feed-new-content";
 import { useFeedScrollRestore } from "../use-feed-scroll-restore";
 import { useFeedSessionSeen } from "../use-feed-session-seen";
@@ -110,6 +112,12 @@ export function FeedPane({
   const toggleSaved = useToggleSavedFeedItem({ profileId, scope });
   const toggleFollow = useToggleFollowSuggestion({ profileId, scope });
   const toggleLike = useToggleFeedPostLike({ profileId });
+  const openLikes = useOpenLikes();
+  // HOM-07 §135: i contenuti caricati riempiono lo store dei Mi piace; dopo il
+  // toggle, che al cambio utente lo svuota.
+  useSeedLikes(feed.items);
+  // HOM-07 §133, §141: stesso principio per lo store Salvati.
+  useSeedSaved(feed.items);
   const manageContent = useContentManagement({ profileId });
   const videoController = useFeedVideoController();
   const mediaProcessing = useFeedMediaProcessing({ enabled: isActive, profileId });
@@ -215,21 +223,23 @@ export function FeedPane({
         return;
       }
 
-      // I post persona non hanno ancora un salvataggio (Centro Salvati, HOM-07):
-      // `capabilities.canSave` è false e il menu non mostra la voce.
-      const contentType = item.payload.contentType;
-      if (contentType === "profile_post") {
-        return;
-      }
-
+      // HOM-07 §78: anche il Post persona è salvabile; `capabilities.canSave`
+      // (server) decide se la voce compare.
       toggleSaved.mutate({
-        contentType,
+        contentType: item.payload.contentType,
         isSaved: item.isSaved,
         itemId: item.id,
         postId: item.payload.postId,
       });
     },
     onToggleLike: toggleLike,
+    // HOM-07 §24: il numero della cella Mi piace apre la lista.
+    onOpenLikes: (item: FeedInteractiveItem) =>
+      openLikes({
+        contentType: item.payload.contentType,
+        likesCount: item.payload.likesCount,
+        postId: item.payload.postId,
+      }),
     // HOM-04: le capability di gestione arrivano dal server, mai dal ruolo.
     getManagement: (item: FeedInteractiveItem) => manageContent(item, originForScope(scope)),
     onOpenMedia: (item: FeedPostItem, index: number) => {

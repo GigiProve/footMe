@@ -524,6 +524,40 @@ describe("buildPostActionModel", () => {
       buildPostActionModel({ commentsCount: 5, isLiked: false, likesCount: 5 }).share.text,
     ).toBe("Condividi");
   });
+
+  describe("Mi piace HOM-07", () => {
+    it("a zero: nessun numero e nessuna azione «lista» (§26, §216)", () => {
+      const { like } = buildPostActionModel({ commentsCount: 0, isLiked: false, likesCount: 0 });
+
+      expect(like.countText).toBeNull();
+      expect(like.listActionLabel).toBeNull();
+      expect(like.toggleActionLabel).toBe("Metti Mi piace");
+    });
+
+    it("con Mi piace presenti: il numero è l'area della lista, l'etichetta resta «146 Mi piace» (§24, §30)", () => {
+      const { like } = buildPostActionModel({ commentsCount: 0, isLiked: false, likesCount: 146 });
+
+      expect(like.countText).toBe("146");
+      expect(like.accessibilityLabel).toBe("146 Mi piace");
+      expect(like.toggleActionLabel).toBe("Metti Mi piace");
+      expect(like.listActionLabel).toBe("Visualizza chi ha messo Mi piace");
+    });
+
+    it("attivo: lo stato è detto a voce, non solo col colore (§31, §177)", () => {
+      const { like } = buildPostActionModel({ commentsCount: 0, isLiked: true, likesCount: 147 });
+
+      expect(like.accessibilityLabel).toBe("147 Mi piace. Hai messo Mi piace.");
+      expect(like.toggleActionLabel).toBe("Rimuovi Mi piace");
+      expect(like.listActionLabel).toBe("Visualizza chi ha messo Mi piace");
+    });
+
+    it("numeri in formato italiano nel controllo e nella voce parlata (§20–§21)", () => {
+      const { like } = buildPostActionModel({ commentsCount: 0, isLiked: false, likesCount: 12486 });
+
+      expect(like.countText).toBe("12.486");
+      expect(like.accessibilityLabel).toBe("12.486 Mi piace");
+    });
+  });
 });
 
 describe("linkPreviewDomain", () => {

@@ -652,9 +652,7 @@ export function MediaTabContent({
                         {item.description}
                       </AppText>
                     ) : null}
-                    <AppText color="inverse" style={styles.viewerStats} variant="caption">
-                      {`Piace a ${formatCount(item.likeCount)} persone • ${item.commentCount} commenti`}
-                    </AppText>
+                    {/* HOM-07 §4–§5: niente riga «Piace a N persone»; il conteggio sta nel controllo Mi piace. */}
 
                     {item.linkedTargets && item.linkedTargets.length > 0 ? (
                       <View style={styles.viewerLinkedList}>
@@ -1028,10 +1026,6 @@ const styles = StyleSheet.create({
   viewerRoot: {
     backgroundColor: colors.hero,
     flex: 1,
-  },
-  viewerStats: {
-    marginTop: spacing[8],
-    opacity: 0.9,
   },
   viewerTopBar: {
     alignItems: "center",

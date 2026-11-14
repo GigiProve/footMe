@@ -1,74 +1,87 @@
 import { createElement } from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FEED_QK } from "./feed-keys";
-import { makeEditorialItem, makeEditorialPayload, makePostPayload } from "./feed-post-fixtures";
-import type { FeedContentItem, FeedItem, FeedPage } from "./feed-types";
+import type { InteractionIdentity } from "../interactions/interaction-types";
+import { likeItemKey, likeStore } from "../interactions/like-store";
+import { makeEditorialItem, makeEditorialPayload, makePostItem } from "./feed-post-fixtures";
+import type { FeedContentItem, FeedEditorialPayload, FeedItem } from "./feed-types";
 import {
   createLikeTracker,
-  nextLikeState,
-  patchPostLike,
+  likeSnapshotOf,
+  resetLikeEngine,
+  seedLikesFromItems,
   useToggleFeedPostLike,
 } from "./use-feed-post-like";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const likeMocks = vi.hoisted(() => ({
-  setPostLike: vi.fn(),
+  loadInteractionIdentity: vi.fn(),
+  setContentLike: vi.fn(),
   showToast: vi.fn(),
 }));
 
 vi.mock("../../ui", () => ({ useToast: () => ({ showToast: likeMocks.showToast }) }));
-vi.mock("./feed-service", () => ({ setPostLike: likeMocks.setPostLike }));
+vi.mock("../interactions/interaction-service", () => ({
+  loadInteractionIdentity: likeMocks.loadInteractionIdentity,
+  setContentLike: likeMocks.setContentLike,
+}));
 
-function post(id: string, likesCount = 3): FeedItem {
-  return {
-    id,
-    type: "post",
-    rank: 1,
-    version: 1,
-    layoutHint: "standard",
-    publishedAt: null,
-    author: null,
-    reasonKey: null,
-    reasonLabel: null,
-    isSeen: false,
-    isSaved: false,
-    isFollowingAuthor: false,
-    nav: null,
-    title: null,
-    payload: makePostPayload({ likesCount, postId: id }),
-  };
+const PERSON: InteractionIdentity = {
+  avatarUrl: null,
+  id: "me",
+  isVerified: false,
+  name: "Io",
+  rank: 0,
+  type: "person",
+};
+
+const SOCIETY: InteractionIdentity = {
+  avatarUrl: null,
+  id: "club-1",
+  isVerified: true,
+  name: "Como 1907",
+  rank: 1,
+  type: "society",
+};
+
+const KEY = likeItemKey("media_profile", "v-1");
+
+function video(likesCount = 5, extra: Partial<FeedEditorialPayload> = {}): FeedContentItem {
+  return makeEditorialItem("media_profile:v-1", "video", {
+    likesCount,
+    postId: "v-1",
+    ...extra,
+  }) as FeedContentItem;
 }
 
-function data(items: FeedItem[]) {
-  const page: FeedPage = { asOf: "x", isLastPage: true, items, nextCursor: null, pageIndex: 0 };
-  return { pageParams: [{ cursor: null, pageIndex: 0 }], pages: [page] };
+function mount(client: QueryClient) {
+  let toggle: ((item: FeedContentItem) => void) | null = null;
+  function Probe() {
+    toggle = useToggleFeedPostLike({ profileId: "me" });
+    return null;
+  }
+  act(() => {
+    TestRenderer.create(createElement(QueryClientProvider, { client }, createElement(Probe)));
+  });
+  return (item: FeedContentItem) => toggle!(item);
 }
 
-describe("nextLikeState", () => {
-  it("aggiunge e toglie un Mi piace senza scendere sotto zero", () => {
-    expect(nextLikeState({ isLiked: false, likesCount: 146 })).toEqual({ isLiked: true, likesCount: 147 });
-    expect(nextLikeState({ isLiked: true, likesCount: 147 })).toEqual({ isLiked: false, likesCount: 146 });
-    expect(nextLikeState({ isLiked: true, likesCount: 0 })).toEqual({ isLiked: false, likesCount: 0 });
+function newClient() {
+  return new QueryClient({
+    defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   });
-});
+}
 
-describe("patchPostLike", () => {
-  it("modifica solo il Post indicato e lascia identici gli altri", () => {
-    const other = post("b");
-    const patched = patchPostLike(data([post("a"), other]), "a", { isLiked: true, likesCount: 4 });
-    const [first, second] = patched!.pages[0].items;
-
-    expect(first.type === "post" ? first.payload : null).toMatchObject({ isLiked: true, likesCount: 4 });
-    expect(second).toBe(other);
-  });
-
-  it("non tocca una cache vuota", () => {
-    expect(patchPostLike(undefined, "a", { isLiked: true, likesCount: 1 })).toBeUndefined();
-  });
+beforeEach(() => {
+  likeStore.clear();
+  resetLikeEngine();
+  likeMocks.loadInteractionIdentity.mockReset();
+  likeMocks.setContentLike.mockReset();
+  likeMocks.showToast.mockReset();
+  likeMocks.loadInteractionIdentity.mockResolvedValue(PERSON);
 });
 
 describe("createLikeTracker", () => {
@@ -76,14 +89,14 @@ describe("createLikeTracker", () => {
   const liked = { isLiked: true, likesCount: 147 };
 
   it("con una sola richiesta scrive la risposta del server", () => {
-    const tracker = createLikeTracker();
+    const tracker = createLikeTracker<typeof liked>();
     tracker.begin("a", unliked);
 
     expect(tracker.settle("a", liked)).toEqual(liked);
   });
 
   it("Mi piace e subito 'togli': la prima risposta non fa rimbalzare la UI", () => {
-    const tracker = createLikeTracker();
+    const tracker = createLikeTracker<typeof liked>();
     tracker.begin("a", unliked);
     tracker.begin("a", liked);
 
@@ -92,7 +105,7 @@ describe("createLikeTracker", () => {
   });
 
   it("due tap offline tornano allo stato di prima del primo tap", () => {
-    const tracker = createLikeTracker();
+    const tracker = createLikeTracker<typeof liked>();
     tracker.begin("a", unliked);
     tracker.begin("a", liked);
 
@@ -101,7 +114,7 @@ describe("createLikeTracker", () => {
   });
 
   it("se l'ultima fallisce resta l'ultimo stato confermato", () => {
-    const tracker = createLikeTracker();
+    const tracker = createLikeTracker<typeof liked>();
     tracker.begin("a", unliked);
     tracker.begin("a", liked);
 
@@ -110,7 +123,7 @@ describe("createLikeTracker", () => {
   });
 
   it("tiene separati Post diversi", () => {
-    const tracker = createLikeTracker();
+    const tracker = createLikeTracker<typeof liked>();
     tracker.begin("a", unliked);
     tracker.begin("b", unliked);
 
@@ -119,65 +132,211 @@ describe("createLikeTracker", () => {
   });
 });
 
-describe("patchPostLike — editoriali HOM-03", () => {
-  it("scrive lo stato Like anche su Articolo e video editoriale", () => {
-    const article = makeEditorialItem("media_profile:a-1", "article", { likesCount: 2 });
-    const video = makeEditorialItem("media_profile:v-1", "video", { likesCount: 5 });
+describe("seedLikesFromItems — HOM-07 §135", () => {
+  it("riempie la cella di ogni contenuto con conteggio e identità del viewer", () => {
+    const items: FeedItem[] = [
+      video(5, { isLiked: true }),
+      makePostItem("club_media:p-1", { likesCount: 2, postId: "p-1" }) as FeedItem,
+    ];
 
-    const patched = patchPostLike(data([article, video]), "media_profile:a-1", { isLiked: true, likesCount: 3 });
-    const [first, second] = patched!.pages[0].items;
+    seedLikesFromItems(items);
 
-    expect(first.type === "article" ? first.payload : null).toMatchObject({ isLiked: true, likesCount: 3 });
-    expect(second).toBe(video);
+    expect(likeStore.get(KEY)).toEqual({
+      likedAs: [{ id: "viewer-1", type: "person" }],
+      likesCount: 5,
+    });
+    expect(likeStore.get(likeItemKey("club_media", "p-1"))).toEqual({ likedAs: [], likesCount: 2 });
+  });
+
+  it("usa l'istante della pagina: una pagina più vecchia non sovrascrive una più nuova (§141)", () => {
+    seedLikesFromItems([{ ...video(7), fetchedAt: 300 } as FeedItem]);
+    seedLikesFromItems([{ ...video(5), fetchedAt: 100 } as FeedItem]);
+    expect(likeStore.get(KEY)?.likesCount).toBe(7);
+
+    seedLikesFromItems([{ ...video(9), fetchedAt: 400 } as FeedItem]);
+    expect(likeStore.get(KEY)?.likesCount).toBe(9);
+  });
+
+  it("likeSnapshotOf prende solo conteggio e identità", () => {
+    expect(
+      likeSnapshotOf({ ...makeEditorialPayload({ likesCount: 4 }), likedAs: [] }),
+    ).toEqual({ likedAs: [], likesCount: 4 });
   });
 });
 
-describe("useToggleFeedPostLike — HOM-03 §104", () => {
-  function mount(client: QueryClient) {
-    let toggle: ((item: FeedContentItem) => void) | null = null;
-    function Probe() {
-      toggle = useToggleFeedPostLike({ profileId: "me" });
-      return null;
-    }
-    act(() => {
-      TestRenderer.create(createElement(QueryClientProvider, { client }, createElement(Probe)));
-    });
-    return (item: FeedContentItem) => toggle!(item);
-  }
+describe("useToggleFeedPostLike — HOM-03 §104, HOM-07 §13–§19", () => {
+  it("Mi piace: UI subito aggiornata, poi il conteggio del server prevale", async () => {
+    let resolveServer: (value: { isLiked: boolean; likesCount: number }) => void = () => undefined;
+    likeMocks.setContentLike.mockReturnValue(
+      new Promise((resolve) => {
+        resolveServer = resolve;
+      }),
+    );
+    const item = video(5);
+    likeStore.seed(KEY, likeSnapshotOf(item.payload));
 
-  it("un video editoriale passa da set_content_like e aggiorna Feed e dettaglio", async () => {
-    likeMocks.setPostLike.mockResolvedValue({ isLiked: true, likesCount: 6 });
-    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
-    const video = makeEditorialItem("media_profile:v-1", "video", {
-      likesCount: 5,
-      postId: "v-1",
-    }) as FeedContentItem;
-    client.setQueryData(FEED_QK.feed("per_te", "me"), data([video]));
-    client.setQueryData(FEED_QK.interaction("media_profile", "v-1"), {
-      canLike: true,
-      commentsCount: 0,
-      isLiked: false,
-      likesCount: 5,
-    });
-
-    const toggle = mount(client);
+    const toggle = mount(newClient());
     await act(async () => {
-      toggle(video);
+      toggle(item);
     });
 
-    expect(likeMocks.setPostLike).toHaveBeenCalledWith("media_profile", "v-1", true);
-    const feed = client.getQueryData<ReturnType<typeof data>>(FEED_QK.feed("per_te", "me"));
-    const item = feed?.pages[0].items[0];
-    expect(item?.type === "video" ? item.payload : null).toMatchObject({ isLiked: true, likesCount: 6 });
-    expect(client.getQueryData(FEED_QK.interaction("media_profile", "v-1"))).toMatchObject({
-      isLiked: true,
-      likesCount: 6,
+    // Ottimistico: +1 e identità corrente fra quelle che hanno messo Mi piace.
+    await vi.waitFor(() =>
+      expect(likeStore.get(KEY)).toEqual({
+        likedAs: [{ id: "me", type: "person" }],
+        likesCount: 6,
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(likeMocks.setContentLike).toHaveBeenCalledWith("media_profile", "v-1", true, PERSON),
+    );
+
+    await act(async () => {
+      resolveServer({ isLiked: true, likesCount: 9 });
+    });
+
+    await vi.waitFor(() =>
+      expect(likeStore.get(KEY)).toEqual({
+        likedAs: [{ id: "me", type: "person" }],
+        likesCount: 9,
+      }),
+    );
+  });
+
+  it("una pagina partita mentre la richiesta era in volo non annulla il Mi piace confermato (§141)", async () => {
+    let resolveServer: (value: { isLiked: boolean; likesCount: number }) => void = () => undefined;
+    likeMocks.setContentLike.mockReturnValue(
+      new Promise((resolve) => {
+        resolveServer = resolve;
+      }),
+    );
+    const item = video(5);
+
+    const toggle = mount(newClient());
+    await act(async () => {
+      toggle(item);
+    });
+    await vi.waitFor(() => expect(likeMocks.setContentLike).toHaveBeenCalled());
+
+    // Refetch partito DOPO il tap ma prima che il server registrasse il Like.
+    likeStore.seed(KEY, { likedAs: [], likesCount: 5 }, Date.now());
+
+    await act(async () => {
+      resolveServer({ isLiked: true, likesCount: 6 });
+    });
+
+    await vi.waitFor(() =>
+      expect(likeStore.get(KEY)).toEqual({ likedAs: [{ id: "me", type: "person" }], likesCount: 6 }),
+    );
+  });
+
+  it("una risposta arrivata dopo il logout non scrive nello store del prossimo utente", async () => {
+    let resolveServer: (value: { isLiked: boolean; likesCount: number }) => void = () => undefined;
+    likeMocks.setContentLike.mockReturnValue(
+      new Promise((resolve) => {
+        resolveServer = resolve;
+      }),
+    );
+    const item = video(5);
+
+    const toggle = mount(newClient());
+    await act(async () => {
+      toggle(item);
+    });
+    await vi.waitFor(() => expect(likeMocks.setContentLike).toHaveBeenCalled());
+
+    // Il logout svuota store e motore (resetUserInteractions).
+    act(() => {
+      likeStore.clear();
+      resetLikeEngine();
+    });
+    await act(async () => {
+      resolveServer({ isLiked: true, likesCount: 6 });
+    });
+
+    expect(likeStore.get(KEY)).toBeUndefined();
+  });
+
+  it("errore: ripristina stato e conteggio di prima e avvisa (§16)", async () => {
+    likeMocks.setContentLike.mockRejectedValue(new Error("boom"));
+    const item = video(5);
+    likeStore.seed(KEY, likeSnapshotOf(item.payload));
+
+    const toggle = mount(newClient());
+    await act(async () => {
+      toggle(item);
+    });
+
+    await vi.waitFor(() => expect(likeMocks.showToast).toHaveBeenCalled());
+    expect(likeStore.get(KEY)).toEqual({ likedAs: [], likesCount: 5 });
+    expect(likeMocks.showToast).toHaveBeenCalledWith({
+      message: "Non è stato possibile completare l'operazione.",
     });
   });
 
+  it("doppio tap: due richieste in ordine, nessun conteggio +2 (§17)", async () => {
+    likeMocks.setContentLike.mockImplementation(
+      async (_type: string, _id: string, liked: boolean) => ({
+        isLiked: liked,
+        likesCount: liked ? 6 : 5,
+      }),
+    );
+    const item = video(5);
+    likeStore.seed(KEY, likeSnapshotOf(item.payload));
+
+    const toggle = mount(newClient());
+    await act(async () => {
+      toggle(item);
+      toggle(item);
+    });
+
+    await vi.waitFor(() => expect(likeMocks.setContentLike).toHaveBeenCalledTimes(2));
+    expect(likeMocks.setContentLike.mock.calls.map((call) => call[2])).toEqual([true, false]);
+    await vi.waitFor(() => expect(likeStore.get(KEY)).toEqual({ likedAs: [], likesCount: 5 }));
+  });
+
+  it("il Mi piace appartiene all'identità corrente: una Società può averlo già messo e la persona no", async () => {
+    likeMocks.loadInteractionIdentity.mockResolvedValue(PERSON);
+    likeMocks.setContentLike.mockResolvedValue({ isLiked: true, likesCount: 7 });
+    const item = video(6, {
+      likedAs: [{ id: SOCIETY.id, type: SOCIETY.type }],
+    });
+    likeStore.seed(KEY, likeSnapshotOf(item.payload));
+
+    const toggle = mount(newClient());
+    await act(async () => {
+      toggle(item);
+    });
+
+    // La persona NON aveva messo Mi piace: il tap lo aggiunge, non lo toglie.
+    await vi.waitFor(() =>
+      expect(likeMocks.setContentLike).toHaveBeenCalledWith("media_profile", "v-1", true, PERSON),
+    );
+    await vi.waitFor(() =>
+      expect(likeStore.get(KEY)?.likedAs).toEqual([
+        { id: SOCIETY.id, type: SOCIETY.type },
+        { id: PERSON.id, type: PERSON.type },
+      ]),
+    );
+  });
+
+  it("senza identità di interazione non parte nessun Mi piace", async () => {
+    likeMocks.loadInteractionIdentity.mockResolvedValue(null);
+    const item = video(5);
+    likeStore.seed(KEY, likeSnapshotOf(item.payload));
+
+    const toggle = mount(newClient());
+    await act(async () => {
+      toggle(item);
+    });
+
+    await vi.waitFor(() => expect(likeMocks.showToast).toHaveBeenCalled());
+    expect(likeMocks.setContentLike).not.toHaveBeenCalled();
+    expect(likeStore.get(KEY)).toEqual({ likedAs: [], likesCount: 5 });
+  });
+
   it("senza capability non scrive e mostra il messaggio", async () => {
-    likeMocks.setPostLike.mockClear();
-    const client = new QueryClient();
+    const client = newClient();
     const article = makeEditorialItem("media_tribuna:a-1", "article", {
       capabilities: { ...makeEditorialPayload().capabilities, canLike: false },
       contentType: "media_tribuna",
@@ -188,7 +347,7 @@ describe("useToggleFeedPostLike — HOM-03 §104", () => {
       toggle(article);
     });
 
-    expect(likeMocks.setPostLike).not.toHaveBeenCalled();
+    expect(likeMocks.setContentLike).not.toHaveBeenCalled();
     expect(likeMocks.showToast).toHaveBeenCalled();
   });
 });

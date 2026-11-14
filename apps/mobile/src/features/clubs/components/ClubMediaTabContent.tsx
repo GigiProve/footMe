@@ -37,8 +37,6 @@ import {
   createClubMediaPost,
   fetchClubMediaFeed,
   fetchClubMediaPostDetail,
-  toggleClubMediaLike,
-  toggleSavedClubMedia,
   type ClubMediaKind,
   type ClubMediaPost,
   type ClubMediaTaggedProfile,
@@ -48,6 +46,9 @@ import { useRouter } from "expo-router";
 
 import { articleNewHref } from "../../article-editor/article-routes";
 import { contentDetailHref } from "../../feed/content-routes";
+import { useContentInteraction } from "../../feed/use-content-interaction";
+import { useContentSaved } from "../../saved/use-content-saved";
+import { formatCount } from "../../../lib/format-count";
 import { TaggableTargetPicker } from "../../content/components/TaggableTargetPicker";
 import { TaggedContentGrid } from "../../content/components/TaggedContentGrid";
 import { TagManageSheet } from "../../content/components/TagManageSheet";
@@ -307,52 +308,6 @@ export function ClubMediaTabContent({
     );
   }
 
-  async function handleToggleLike(post: ClubMediaPost) {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per mettere Mi piace.");
-      return;
-    }
-
-    const nextLiked = !post.is_liked;
-    patchPost(post.id, {
-      is_liked: nextLiked,
-      like_count: Math.max(0, post.like_count + (nextLiked ? 1 : -1)),
-    });
-
-    try {
-      await toggleClubMediaLike(viewerProfileId, post.id, nextLiked);
-    } catch {
-      patchPost(post.id, {
-        is_liked: post.is_liked,
-        like_count: post.like_count,
-      });
-      Alert.alert("Errore", "Impossibile aggiornare il Mi piace.");
-    }
-  }
-
-  async function handleToggleSave(post: ClubMediaPost) {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per salvare il contenuto.");
-      return;
-    }
-
-    const nextSaved = !post.is_saved;
-    patchPost(post.id, {
-      is_saved: nextSaved,
-      saved_count: Math.max(0, post.saved_count + (nextSaved ? 1 : -1)),
-    });
-
-    try {
-      await toggleSavedClubMedia(viewerProfileId, post.id, nextSaved);
-    } catch {
-      patchPost(post.id, {
-        is_saved: post.is_saved,
-        saved_count: post.saved_count,
-      });
-      Alert.alert("Errore", "Impossibile aggiornare i salvati.");
-    }
-  }
-
   async function handleAddComment(body: string) {
     if (!selectedPost || !viewerProfileId) {
       Alert.alert("Accesso richiesto", "Accedi per commentare.");
@@ -515,12 +470,6 @@ export function ClubMediaTabContent({
         onShare={(post) => {
           void handleShare(post);
         }}
-        onToggleLike={(post) => {
-          void handleToggleLike(post);
-        }}
-        onToggleSave={(post) => {
-          void handleToggleSave(post);
-        }}
         onVideoClose={() => setIsVideoOpen(false)}
         post={selectedPost}
         viewerProfileId={viewerProfileId}
@@ -597,8 +546,6 @@ function ClubMediaDetailModal({
   onOpenVideo,
   onRefresh,
   onShare,
-  onToggleLike,
-  onToggleSave,
   onVideoClose,
   post,
   viewerProfileId,
@@ -611,13 +558,21 @@ function ClubMediaDetailModal({
   onOpenVideo: () => void;
   onRefresh: () => void;
   onShare: (post: ClubMediaPost) => void;
-  onToggleLike: (post: ClubMediaPost) => void;
-  onToggleSave: (post: ClubMediaPost) => void;
   onVideoClose: () => void;
   post: ClubMediaPost | null;
   viewerProfileId?: string | null;
 }) {
   const [commentBody, setCommentBody] = useState("");
+  // HOM-07 §133–§135: Mi piace e Salvati del dettaglio leggono e scrivono gli
+  // store condivisi, seminati dallo stato server del contenuto (stessa cella del
+  // Feed e del dettaglio canonico). Il conteggio include anche i Mi piace delle
+  // Società, che la vista legacy `club_media_likes` esclude.
+  const postId = post?.id ?? "";
+  const interaction = useContentInteraction("club_media", postId, {
+    enabled: !!post,
+    profileId: viewerProfileId ?? "",
+  });
+  const saved = useContentSaved("club_media", postId, { enabled: !!post && !!viewerProfileId });
 
   useEffect(() => {
     if (!post) {
@@ -777,10 +732,20 @@ function ClubMediaDetailModal({
             <View style={styles.actionsBar}>
               {post.kind !== "statement" ? (
                 <DetailAction
-                  active={post.is_liked}
-                  icon={post.is_liked ? "heart" : "heart-outline"}
-                  label={`Mi piace ${post.like_count > 0 ? post.like_count : ""}`.trim()}
-                  onPress={() => onToggleLike(post)}
+                  active={interaction.isLiked}
+                  icon={interaction.isLiked ? "heart" : "heart-outline"}
+                  label={
+                    interaction.likesCount > 0
+                      ? `Mi piace ${formatCount(interaction.likesCount)}`
+                      : "Mi piace"
+                  }
+                  onPress={() => {
+                    if (!viewerProfileId) {
+                      Alert.alert("Accesso richiesto", "Accedi per mettere Mi piace.");
+                      return;
+                    }
+                    interaction.toggleLike();
+                  }}
                 />
               ) : null}
               <DetailAction
@@ -788,12 +753,14 @@ function ClubMediaDetailModal({
                 label={`Commenta ${post.comment_count > 0 ? post.comment_count : ""}`.trim()}
                 onPress={() => {}}
               />
-              <DetailAction
-                active={post.is_saved}
-                icon={post.is_saved ? "bookmark" : "bookmark-outline"}
-                label="Salva"
-                onPress={() => onToggleSave(post)}
-              />
+              {saved.canSave ? (
+                <DetailAction
+                  active={saved.isSaved}
+                  icon={saved.isSaved ? "bookmark" : "bookmark-outline"}
+                  label={saved.isSaved ? "Rimuovi dai salvati" : "Salva"}
+                  onPress={saved.toggle}
+                />
+              ) : null}
               <DetailAction
                 icon="share-social-outline"
                 label="Condividi"

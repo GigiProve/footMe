@@ -174,38 +174,6 @@ export async function getPublishedAds(profileId: string) {
   })) as DiscoverableRecruitingAd[];
 }
 
-export async function toggleSavedAd(
-  profileId: string,
-  adId: string,
-  shouldSave: boolean,
-) {
-  if (shouldSave) {
-    const { error } = await supabase.from("saved_ads").upsert(
-      {
-        ad_id: adId,
-        profile_id: profileId,
-      },
-      { onConflict: "ad_id,profile_id" },
-    );
-
-    if (error) {
-      throw error;
-    }
-
-    return;
-  }
-
-  const { error } = await supabase
-    .from("saved_ads")
-    .delete()
-    .eq("ad_id", adId)
-    .eq("profile_id", profileId);
-
-  if (error) {
-    throw error;
-  }
-}
-
 /**
  * I motivi di dominio per cui una candidatura non viene accettata
  * (DAS-REV-18 §17, §38).

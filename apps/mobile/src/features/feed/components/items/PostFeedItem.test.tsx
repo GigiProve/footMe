@@ -48,6 +48,7 @@ function setup(payload: Partial<FeedPostPayload> = {}, overrides: Parameters<typ
   const props = {
     onComment: vi.fn(),
     onOpenIdentity: vi.fn(),
+    onOpenLikes: vi.fn(),
     onOpenLink: vi.fn(),
     onOpenMedia: vi.fn(),
     onPress: vi.fn(),
@@ -813,8 +814,9 @@ describe("PostFeedItem — riga azioni", () => {
     const json = textOf(tree);
 
     expect(like.props.accessibilityState).toEqual({ selected: true });
-    expect(like.props.accessibilityLabel).toBe("147 Mi piace");
-    expect(json).toContain('"name":"thumbs-up"');
+    // HOM-07 §31: lo stato attivo è detto a voce, non solo dal cuore pieno.
+    expect(like.props.accessibilityLabel).toBe("147 Mi piace. Hai messo Mi piace.");
+    expect(json).toContain('"name":"heart"');
     expect(json).toContain('"147"');
     expect(countTestId(tree, "feed-post-action-like")).toBe(1);
   });
@@ -824,7 +826,109 @@ describe("PostFeedItem — riga azioni", () => {
     const [like] = hostByTestId(tree, "feed-post-action-like");
 
     expect(like.props.accessibilityState).toEqual({ selected: false });
-    expect(textOf(tree)).toContain('"name":"thumbs-up-outline"');
+    expect(textOf(tree)).toContain('"name":"heart-outline"');
+  });
+
+  describe("Mi piace — icona e numero (HOM-07 §22–§31)", () => {
+    function pressCount(tree: TestRenderer.ReactTestRenderer) {
+      pressTestId(tree, "feed-post-likes-count");
+    }
+
+    it("tap sull'icona/cella mette Mi piace, tap sul numero apre la lista (§23–§24)", () => {
+      const { props, tree } = setup({ likesCount: 146 });
+
+      pressTestId(tree, "feed-post-action-like");
+      expect(props.onToggleLike).toHaveBeenCalledTimes(1);
+      expect(props.onOpenLikes).not.toHaveBeenCalled();
+
+      pressCount(tree);
+      expect(props.onOpenLikes).toHaveBeenCalledTimes(1);
+      expect(props.onToggleLike).toHaveBeenCalledTimes(1);
+    });
+
+    it("a zero non esiste nessuna lista: tutta la cella è il toggle (§26, §216)", () => {
+      const { props, tree } = setup({ likesCount: 0 });
+
+      expect(countTestId(tree, "feed-post-likes-count")).toBe(0);
+      pressTestId(tree, "feed-post-action-like");
+
+      expect(props.onToggleLike).toHaveBeenCalledTimes(1);
+      expect(props.onOpenLikes).not.toHaveBeenCalled();
+    });
+
+    it("il numero sta DENTRO la cella Mi piace: nessun secondo controllo (§5, §25)", () => {
+      const { tree } = setup({ likesCount: 146 });
+      const [like] = hostByTestId(tree, "feed-post-action-like");
+
+      expect(
+        like.findAll(
+          (node) => typeof node.type === "string" && node.props?.testID === "feed-post-likes-count",
+        ).length,
+      ).toBe(1);
+      expect(countTestIdPrefix(tree, "feed-post-action-")).toBe(3);
+      expect(findByLabel(tree, "146 Mi piace")).toHaveLength(1);
+    });
+
+    it("per lo screen reader resta UN elemento con le azioni del §30", () => {
+      const { tree } = setup({ likesCount: 146 });
+      const [like] = hostByTestId(tree, "feed-post-action-like");
+      const [count] = hostByTestId(tree, "feed-post-likes-count");
+
+      expect(like.props.accessibilityActions).toEqual([
+        { label: "Metti Mi piace", name: "toggleLike" },
+        { label: "Visualizza chi ha messo Mi piace", name: "openLikes" },
+      ]);
+      // Il numero non è un secondo elemento accessibile.
+      expect(count.props.accessible).toBe(false);
+      expect(count.props.importantForAccessibility).toBe("no-hide-descendants");
+    });
+
+    it("le azioni accessibili chiamano toggle e lista", () => {
+      const { props, tree } = setup({ isLiked: true, likesCount: 147 });
+      const [like] = hostByTestId(tree, "feed-post-action-like");
+
+      expect(like.props.accessibilityActions[0]).toEqual({
+        label: "Rimuovi Mi piace",
+        name: "toggleLike",
+      });
+
+      act(() => {
+        like.props.onAccessibilityAction({ nativeEvent: { actionName: "openLikes" } });
+        like.props.onAccessibilityAction({ nativeEvent: { actionName: "toggleLike" } });
+      });
+
+      expect(props.onOpenLikes).toHaveBeenCalledTimes(1);
+      expect(props.onToggleLike).toHaveBeenCalledTimes(1);
+    });
+
+    it("a zero l'unica azione accessibile è il toggle", () => {
+      const { tree } = setup({ likesCount: 0 });
+      const [like] = hostByTestId(tree, "feed-post-action-like");
+
+      expect(like.props.accessibilityActions).toEqual([
+        { label: "Metti Mi piace", name: "toggleLike" },
+      ]);
+    });
+
+    it("senza handler di lista il numero non è un'area a sé", () => {
+      const tree = renderWithToast(
+        <PostFeedItem
+          item={makePostItem({}, { likesCount: 5 })}
+          onComment={vi.fn()}
+          onOpenIdentity={vi.fn()}
+          onOpenLink={vi.fn()}
+          onOpenMedia={vi.fn()}
+          onPress={vi.fn()}
+          onPressAuthor={vi.fn()}
+          onShare={vi.fn()}
+          onToggleLike={vi.fn()}
+          onToggleSaved={vi.fn()}
+        />,
+      );
+
+      expect(countTestId(tree, "feed-post-likes-count")).toBe(0);
+      expect(textOf(tree)).toContain('"5"');
+    });
   });
 
   it("Condividi non mostra mai un conteggio", () => {

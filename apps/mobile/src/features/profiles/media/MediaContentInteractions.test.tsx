@@ -11,13 +11,13 @@ import { Alert } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetSavedStore } from "../../saved/saved-store";
 import { MediaContentInteractions } from "./MediaContentInteractions";
 
 const mocks = vi.hoisted(() => ({
   addMediaProfilePostComment: vi.fn(),
   addMediaTribunaComment: vi.fn(),
-  toggleSavedMediaProfilePost: vi.fn(),
-  toggleSavedMediaTribuna: vi.fn(),
+  setSavedRemote: vi.fn(),
 }));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
@@ -29,12 +29,15 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
 
 vi.mock("../media-profile-post-service", () => ({
   addMediaProfilePostComment: mocks.addMediaProfilePostComment,
-  toggleSavedMediaProfilePost: mocks.toggleSavedMediaProfilePost,
 }));
 
 vi.mock("../media-tribuna-service", () => ({
   addMediaTribunaComment: mocks.addMediaTribunaComment,
-  toggleSavedMediaTribuna: mocks.toggleSavedMediaTribuna,
+}));
+
+// HOM-07: il Salva passa dalla mutation unica `set_saved`, non più dai servizi per tabella.
+vi.mock("../../saved/saved-service", () => ({
+  setSavedRemote: mocks.setSavedRemote,
 }));
 
 function render(element: React.ReactElement) {
@@ -87,8 +90,8 @@ function hasText(root: TestRenderer.ReactTestInstance, value: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.toggleSavedMediaProfilePost.mockResolvedValue(undefined);
-  mocks.toggleSavedMediaTribuna.mockResolvedValue(undefined);
+  resetSavedStore();
+  mocks.setSavedRemote.mockResolvedValue(true);
   mocks.addMediaProfilePostComment.mockResolvedValue({
     author_avatar_url: null,
     author_name: "Luigi",
@@ -118,14 +121,13 @@ describe("MediaContentInteractions", () => {
       save.props.onPress();
     });
 
-    expect(mocks.toggleSavedMediaProfilePost).toHaveBeenCalledWith(
-      "viewer-1",
-      "article-1",
+    expect(mocks.setSavedRemote).toHaveBeenCalledWith(
+      { contentType: "media_profile", id: "article-1", type: "content" },
       true,
     );
   });
 
-  it("usa il servizio della Tribuna per un contenuto Tribuna", () => {
+  it("scrive il target della Tribuna per un contenuto Tribuna", () => {
     const tree = render(
       <MediaContentInteractions
         contentType="media_tribuna"
@@ -140,16 +142,15 @@ describe("MediaContentInteractions", () => {
       findByTestId(tree.root, "media-content-save").props.onPress();
     });
 
-    expect(mocks.toggleSavedMediaTribuna).toHaveBeenCalledWith(
-      "viewer-1",
-      "tribuna-1",
+    expect(mocks.setSavedRemote).toHaveBeenCalledWith(
+      { contentType: "media_tribuna", id: "tribuna-1", type: "content" },
       false,
     );
-    expect(mocks.toggleSavedMediaProfilePost).not.toHaveBeenCalled();
+    expect(mocks.setSavedRemote).toHaveBeenCalledTimes(1);
   });
 
   it("rimette lo stato precedente se il salvataggio non riesce", async () => {
-    mocks.toggleSavedMediaProfilePost.mockRejectedValue(new Error("rete"));
+    mocks.setSavedRemote.mockRejectedValue(new Error("rete"));
 
     const tree = render(
       <MediaContentInteractions
@@ -163,14 +164,18 @@ describe("MediaContentInteractions", () => {
 
     await act(async () => {
       findByTestId(tree.root, "media-content-save").props.onPress();
-      await Promise.resolve();
     });
+    await vi.waitFor(() => expect(Alert.alert).toHaveBeenCalled());
 
     expect(
       findByTestId(tree.root, "media-content-save").props.accessibilityState
         .selected,
     ).toBe(false);
-    expect(Alert.alert).toHaveBeenCalled();
+    // §97: il copy del salvataggio fallito.
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Errore",
+      "Non è stato possibile salvare il contenuto. Riprova.",
+    );
   });
 
   it("chiede di accedere invece di salvare a vuoto", () => {
@@ -188,7 +193,7 @@ describe("MediaContentInteractions", () => {
       findByTestId(tree.root, "media-content-save").props.onPress();
     });
 
-    expect(mocks.toggleSavedMediaProfilePost).not.toHaveBeenCalled();
+    expect(mocks.setSavedRemote).not.toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalledWith(
       "Accesso richiesto",
       "Accedi per salvare questo contenuto.",

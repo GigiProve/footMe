@@ -34,6 +34,7 @@ import {
 import type { ContentManagement } from "../../content-management-types";
 import { FEED_POST_OPEN_AUTHOR_HINT } from "../../feed-labels";
 import type { FeedPostItem } from "../../feed-types";
+import { contentSavedTarget } from "../../../saved/saved-store";
 import type { FeedIdentityTarget } from "../FeedItemRenderer";
 import { PostActionRow } from "../post/PostActionRow";
 import { PostBody } from "../post/PostBody";
@@ -50,6 +51,8 @@ type PostFeedItemProps = {
   onPressAuthor: () => void;
   onToggleSaved: () => void;
   onToggleLike: () => void;
+  /** HOM-07 §24: il numero della cella Mi piace apre la lista. Assente = nessuna lista. */
+  onOpenLikes?: () => void;
   /** §35: l'indice è quello della collezione nell'ordine del Post. */
   onOpenMedia: (index: number) => void;
   /** §19, §22: mention e tag aprono l'identità per id. */
@@ -72,6 +75,7 @@ export function PostFeedItem({
   onPressAuthor,
   onToggleSaved,
   onToggleLike,
+  onOpenLikes,
   onOpenMedia,
   onOpenIdentity,
   onOpenLink,
@@ -115,6 +119,7 @@ export function PostFeedItem({
             itemType={item.type}
             management={management}
             onToggleSaved={onToggleSaved}
+            savedTarget={contentSavedTarget(payload.contentType, payload.postId)}
           />
         }
       />
@@ -163,10 +168,14 @@ export function PostFeedItem({
 
       <PostActionRow
         commentsCount={payload.commentsCount}
-        isLiked={payload.isLiked}
-        likesCount={payload.likesCount}
+        like={{
+          contentType: payload.contentType,
+          postId: payload.postId,
+          seed: { likedAs: payload.likedAs, likesCount: payload.likesCount },
+        }}
         onComment={onComment}
         onLike={onToggleLike}
+        onOpenLikes={onOpenLikes}
         onShare={onShare}
       />
     </FeedItemFrame>

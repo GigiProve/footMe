@@ -1,15 +1,18 @@
-import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQueries } from "@tanstack/react-query";
 
 import { useSession } from "../auth/use-session";
-import { useToast } from "../../ui";
+import { SAVED_QK } from "./saved-keys";
+import { fetchSavedClubIds, fetchSavedTeamIds } from "./saved-service";
 import {
-  fetchSavedClubIds,
-  fetchSavedTeamIds,
-  saveClub,
-  saveTeam,
-  unsaveClub,
-  unsaveTeam,
-} from "./saved-service";
+  getSavedEntry,
+  resolveSaved,
+  savedKey,
+  seedSaved,
+  useSavedStoreVersion,
+} from "./saved-store";
+import type { SavedTarget } from "./saved-types";
+import { useSetSaved } from "./use-set-saved";
 
 export type SavedEntityKind = "club" | "team";
 
@@ -23,11 +26,16 @@ function fetchSavedIds(
     : fetchSavedTeamIds(ownerId, targetIds);
 }
 
+/** `club` della ricerca = target `society` del dominio Salvati (§80, §132). */
+function entityTarget(entity: SavedEntityKind, id: string): SavedTarget {
+  return entity === "club" ? { id, type: "society" } : { id, type: "team" };
+}
+
 /**
- * Batch save-state lookup for the pages of club/team ids loaded by an
- * infinite list (e.g. Cerca > Società). One query per page so results merge
- * incrementally as pages load, without a giant re-fetch on every page.
- * Mirrors `useSavedProfileFlags`.
+ * HOM-07 §132, §134: i flag di Cerca > Società seminano lo store normalizzato
+ * (una query per pagina di id, come `useSavedProfileFlags`); lo stato mostrato
+ * è quello dello store. Le squadre salvate vivono dentro Società (§82), ma
+ * restano un target proprio in scrittura.
  */
 export function useSavedEntityFlags(entity: SavedEntityKind, pageIds: string[][]) {
   const { profile } = useSession();
@@ -36,15 +44,39 @@ export function useSavedEntityFlags(entity: SavedEntityKind, pageIds: string[][]
   const results = useQueries({
     queries: pageIds.map((ids) => ({
       enabled: !!ownerId && ids.length > 0,
-      queryFn: () => fetchSavedIds(entity, ownerId as string, ids),
-      queryKey: ["saved-entity-flags", entity, ownerId, ids],
+      // HOM-07 §141: l'istante prima della richiesta accompagna i flag.
+      queryFn: async () => {
+        const fetchedAt = Date.now();
+        return { fetchedAt, ids: await fetchSavedIds(entity, ownerId as string, ids) };
+      },
+      queryKey: SAVED_QK.entityFlags(entity, ownerId, ids),
     })),
   });
 
+  useSavedStoreVersion();
+
+  const seeds = new Map<string, { value: boolean; at: number }>();
+  pageIds.forEach((ids, index) => {
+    const data = results[index]?.data;
+    if (data) {
+      for (const id of ids) {
+        seeds.set(id, { at: data.fetchedAt, value: data.ids.has(id) });
+      }
+    }
+  });
+
+  useEffect(() => {
+    for (const [id, seed] of seeds) {
+      seedSaved(savedKey(entityTarget(entity, id)), seed.value, seed.at);
+    }
+  });
+
   const savedIds = new Set<string>();
-  for (const result of results) {
-    if (result.data) {
-      for (const id of result.data) {
+  for (const ids of pageIds) {
+    for (const id of ids) {
+      const entry = getSavedEntry(savedKey(entityTarget(entity, id)));
+      const seed = seeds.get(id);
+      if (resolveSaved(entry, seed?.value, seed?.at ?? 0)) {
         savedIds.add(id);
       }
     }
@@ -55,95 +87,25 @@ export function useSavedEntityFlags(entity: SavedEntityKind, pageIds: string[][]
 
 type ToggleSavedEntityInput = {
   targetId: string;
+  /** Lo stato mostrato adesso: il tap lo inverte. */
   saved: boolean;
 };
 
-const SAVED_TOAST_MESSAGE: Record<SavedEntityKind, string> = {
-  club: "Società salvata",
-  team: "Squadra salvata",
-};
-
 /**
- * Optimistically toggles the saved state of a club/team, updating every
- * cached `["saved-entity-flags", entity, ownerId, ...]` page in place. Never
- * invalidates `["search-clubs"]` — the search list itself is untouched by
- * save state.
+ * Salva/rimuove una Società o una Squadra dalle liste di Cerca, dalla mutation
+ * unica `useSetSaved`. Non invalida `["search-clubs"]`: la lista di ricerca non
+ * dipende dallo stato salvato.
  */
 export function useToggleSavedEntity(entity: SavedEntityKind) {
-  const { profile } = useSession();
-  const ownerId = profile?.id ?? null;
-  const queryClient = useQueryClient();
-  const { showToast } = useToast();
+  const setSaved = useSetSaved();
 
-  return useMutation({
-    mutationFn: async ({ targetId, saved }: ToggleSavedEntityInput) => {
-      if (!ownerId) {
-        throw new Error("Sessione non disponibile.");
-      }
-
-      if (entity === "club") {
-        if (saved) {
-          await unsaveClub(ownerId, targetId);
-        } else {
-          await saveClub(ownerId, targetId);
-        }
-      } else {
-        if (saved) {
-          await unsaveTeam(ownerId, targetId);
-        } else {
-          await saveTeam(ownerId, targetId);
-        }
-      }
-    },
-    onError: (error, _variables, context) => {
-      if (context?.previous) {
-        for (const [queryKey, data] of context.previous) {
-          queryClient.setQueryData(queryKey, data);
-        }
-      }
-      showToast({
-        message:
-          error instanceof Error
-            ? error.message
-            : "Impossibile aggiornare l'elemento salvato",
-        tone: "neutral",
-      });
-    },
-    onMutate: async ({ targetId, saved }: ToggleSavedEntityInput) => {
-      await queryClient.cancelQueries({
-        queryKey: ["saved-entity-flags", entity, ownerId],
-      });
-
-      const previous = queryClient.getQueriesData<Set<string>>({
-        queryKey: ["saved-entity-flags", entity, ownerId],
-      });
-
-      for (const [queryKey, data] of previous) {
-        const nextSet = new Set(data ?? []);
-        if (saved) {
-          nextSet.delete(targetId);
-        } else {
-          nextSet.add(targetId);
-        }
-        queryClient.setQueryData(queryKey, nextSet);
-      }
-
-      return { previous };
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["saved-items"] });
-      queryClient.invalidateQueries({ queryKey: ["saved-counts"] });
-    },
-    onSuccess: (_data, { saved }) => {
-      if (saved) {
-        showToast({ message: "Rimosso dai Salvati", tone: "neutral" });
-      } else {
-        showToast({
-          message: SAVED_TOAST_MESSAGE[entity],
-          tone: "success",
-          icon: "bookmark",
-        });
-      }
-    },
-  });
+  return {
+    isPending: setSaved.isPending,
+    mutate: ({ targetId, saved }: ToggleSavedEntityInput) =>
+      setSaved.mutate({
+        saved: !saved,
+        surface: "search",
+        target: entityTarget(entity, targetId),
+      }),
+  };
 }

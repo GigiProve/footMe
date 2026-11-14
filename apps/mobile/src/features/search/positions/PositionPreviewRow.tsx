@@ -3,6 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing, typography } from "../../../theme/tokens";
 import { Avatar, AppText } from "../../../ui";
+import { useIsSaved } from "../../saved/saved-store";
 import type { PositionSearchRow } from "../search-types";
 import {
   distanceLabel,
@@ -25,6 +26,8 @@ export function PositionPreviewRow({
   const distance = distanceLabel(row.distance_km);
   const team = teamMetaLine(row);
   const location = locationMetaLine(row);
+  // HOM-07 §129: il bookmark è quello dello store Salvati, seminato dalla riga.
+  const isSaved = useIsSaved({ id: row.ad_id, type: "position" }, row.is_saved);
 
   return (
     <Pressable
@@ -57,14 +60,15 @@ export function PositionPreviewRow({
 
       <View style={styles.actions}>
         <Pressable
-          accessibilityLabel={row.is_saved ? "Rimuovi dai salvati" : "Salva posizione"}
+          accessibilityLabel={isSaved ? "Rimuovi dai salvati" : "Salva posizione"}
           accessibilityRole="button"
+          accessibilityState={{ selected: isSaved }}
           hitSlop={12}
           onPress={onToggleSaved}
         >
           <Ionicons
-            color={row.is_saved ? colors.accent : colors.textMuted}
-            name={row.is_saved ? "bookmark" : "bookmark-outline"}
+            color={isSaved ? colors.accent : colors.textMuted}
+            name={isSaved ? "bookmark" : "bookmark-outline"}
             size={20}
           />
         </Pressable>

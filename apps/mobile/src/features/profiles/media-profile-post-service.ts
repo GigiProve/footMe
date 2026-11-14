@@ -445,38 +445,6 @@ export async function addMediaProfilePostComment(input: {
   };
 }
 
-export async function toggleSavedMediaProfilePost(
-  profileId: string,
-  postId: string,
-  shouldSave: boolean,
-) {
-  if (shouldSave) {
-    const { error } = await supabase.from("saved_media_profile_posts").upsert(
-      {
-        post_id: postId,
-        profile_id: profileId,
-      },
-      { onConflict: "post_id,profile_id" },
-    );
-
-    if (error) {
-      throw error;
-    }
-
-    return;
-  }
-
-  const { error } = await supabase
-    .from("saved_media_profile_posts")
-    .delete()
-    .eq("post_id", postId)
-    .eq("profile_id", profileId);
-
-  if (error) {
-    throw error;
-  }
-}
-
 export async function searchMediaProfilePostTargets(
   query: string,
   limit = 8,

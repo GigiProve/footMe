@@ -17,6 +17,12 @@
  *
  * «Elimina» apre la conferma: il delete parte solo da lì (§39) e il dialogo
  * resta aperto finché il server non risponde (§45, §69).
+ *
+ * HOM-07 §85–§87: «Salva» / «Rimuovi dai salvati» è l'azione di questo modulo
+ * nel foglio unico, e vale per chiunque veda il contenuto — anche per chi lo
+ * gestisce: il Salvataggio è privato dell'utente, non della Società (§70–§72).
+ * Compare per prima, sopra le azioni di gestione; lo stato è quello dello store
+ * Salvati (§133).
  */
 
 import { useState } from "react";
@@ -37,6 +43,8 @@ import type { ContentManagement } from "../../content-management-types";
 import { trackFeed } from "../../feed-analytics";
 import { FEED_MENU_LABELS, FEED_SOON_MESSAGES } from "../../feed-labels";
 import type { FeedItemType } from "../../feed-types";
+import { useIsSaved } from "../../../saved/saved-store";
+import type { SavedTarget } from "../../../saved/saved-types";
 import { ContentActionSheet } from "../ContentActionSheet";
 import { ContentDeleteDialog } from "../ContentDeleteDialog";
 
@@ -49,7 +57,10 @@ export type FeedMenuEntryId =
 
 type FeedItemMenuProps = {
   itemType: FeedItemType;
+  /** Il seme dal payload; lo stato mostrato è quello dello store Salvati (HOM-07 §133). */
   isSaved: boolean;
+  /** Il target nello store Salvati: assente = si mostra `isSaved` così com'è. */
+  savedTarget?: SavedTarget | null;
   canSave: boolean;
   onToggleSaved: () => void;
   authorName?: string | null;
@@ -59,12 +70,14 @@ type FeedItemMenuProps = {
 
 export function FeedItemMenu({
   itemType,
-  isSaved,
+  isSaved: seedSaved,
+  savedTarget = null,
   canSave,
   onToggleSaved,
   authorName,
   management,
 }: FeedItemMenuProps) {
+  const isSaved = useIsSaved(savedTarget, seedSaved);
   const [isOpen, setOpen] = useState(false);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const [isDeleting, setDeleting] = useState(false);
@@ -128,9 +141,11 @@ export function FeedItemMenu({
   ];
 
   const otherActions = entries
-    // Con azioni gestionali il foglio mostra solo quelle (§26–27, mockup 1–2):
-    // Salva e le altre voci «per altri» appartengono a HOM-07/HOM-11 (§131).
-    .filter((entry) => !canManage && (entry.id === "save" ? canSave : true))
+    // HOM-07 §85–§87: Salva / Rimuovi dai salvati vale per chiunque veda il
+    // contenuto, anche per chi lo gestisce (il Salvataggio è dell'utente, non
+    // della Società). Le voci «per contenuti altrui» di HOM-11 restano assenti
+    // sul proprio contenuto (§131).
+    .filter((entry) => (entry.id === "save" ? canSave : !canManage))
     .map((entry) => entry.action);
 
   const managementActions: ActionSheetAction[] = management

@@ -6,8 +6,6 @@ import {
   fetchFanMediaFeed,
   fetchProfileFollowState,
   followProfile,
-  toggleFanMediaLike,
-  toggleSavedFanMedia,
   unfollowProfile,
 } from "./fan-media-service";
 
@@ -115,6 +113,14 @@ vi.mock("../../lib/supabase", () => ({
     from: mocks.fromMock,
   },
 }));
+
+// HOM-07: i Mi piace passano da `set_content_like` per identità, non dalle tabelle.
+const interactionMocks = vi.hoisted(() => ({
+  loadInteractionIdentity: vi.fn(),
+  setContentLike: vi.fn(),
+}));
+
+vi.mock("../interactions/interaction-service", () => interactionMocks);
 
 const basePost = {
   created_at: "2026-05-14T08:00:00Z",
@@ -282,38 +288,6 @@ describe("fan-media-service", () => {
         visual_url: "https://cdn.test/highlight.mp4",
       },
       table: "fan_media_posts",
-    });
-  });
-
-  it("toggles likes and saves with profile scoped writes", async () => {
-    mocks.queueResponses(
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-    );
-
-    await toggleFanMediaLike("viewer-1", "post-1", true);
-    await toggleFanMediaLike("viewer-1", "post-1", false);
-    await toggleSavedFanMedia("viewer-1", "post-1", true);
-    await toggleSavedFanMedia("viewer-1", "post-1", false);
-
-    expect(mocks.operations[0]).toMatchObject({
-      action: "upsert",
-      payload: { post_id: "post-1", profile_id: "viewer-1" },
-      table: "fan_media_likes",
-    });
-    expect(mocks.operations[1]).toMatchObject({
-      action: "delete",
-      table: "fan_media_likes",
-    });
-    expect(mocks.operations[2]).toMatchObject({
-      action: "upsert",
-      table: "saved_fan_media",
-    });
-    expect(mocks.operations[3]).toMatchObject({
-      action: "delete",
-      table: "saved_fan_media",
     });
   });
 

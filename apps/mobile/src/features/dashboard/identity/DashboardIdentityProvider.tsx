@@ -10,6 +10,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useSession } from "../../auth/use-session";
+import { INTERACTION_QK } from "../../interactions/interaction-keys";
 import { DASHBOARD_QK } from "../dashboard-keys";
 import type { DashboardIdentity } from "../dashboard-types";
 import { fetchDashboardIdentities } from "./identity-service";
@@ -157,13 +158,18 @@ function DashboardIdentityProviderInner({
     const identityId = current.id;
 
     writeLastIdentityId(actorId, identityId).then(() => {
+      // HOM-07 §11: l'identità con cui la Home mette Mi piace deriva da questa
+      // preferenza. Si rilegge subito, non allo scadere della cache.
+      void queryClient.invalidateQueries({
+        queryKey: INTERACTION_QK.identity(actorId),
+      });
       // Se nel frattempo il contesto è cambiato, la scrittura è andata a buon
       // fine ma non deve più guidare la risoluzione di questo render.
       if (currentIdRef.current === identityId) {
         setStoredId(identityId);
       }
     });
-  }, [actorId, current, storedId]);
+  }, [actorId, current, queryClient, storedId]);
 
   const selectIdentity = useCallback(
     (identityId: string) => {

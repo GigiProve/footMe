@@ -2,6 +2,7 @@ import { queryClient } from "../../lib/query-client";
 import { supabase } from "../../lib/supabase";
 import { drainContentEventsForSignOut } from "../content-insights/content-events-service";
 import { clearDashboardCache } from "../dashboard/cache/dashboard-cache";
+import { resetUserInteractions } from "../interactions/reset-user-interactions";
 import { saveLastAccountProfile } from "./last-account";
 
 type LogoutOptions = {
@@ -35,6 +36,10 @@ export async function logout(options?: LogoutOptions) {
 
   // HOM-05: gli eventi analytics in coda sono dell'utente che esce.
   await drainContentEventsForSignOut();
+
+  // HOM-07: Mi piace e Salvati stanno in store di modulo che `queryClient.clear()`
+  // non tocca. Prima del signOut, come la pulizia della Dashboard.
+  resetUserInteractions();
 
   const { error } = await supabase.auth.signOut();
 

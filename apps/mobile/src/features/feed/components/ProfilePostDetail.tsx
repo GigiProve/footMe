@@ -17,7 +17,7 @@
  * aggiorna anche le tab.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -40,6 +40,7 @@ import type { ContentOrigin } from "../content-routes";
 import { FEED_QK } from "../feed-keys";
 import { FEED_SOON_MESSAGES } from "../feed-labels";
 import { useBackToFeed } from "../use-back-to-feed";
+import { seedSavedFromItems, useToggleSavedFeedItem } from "../use-feed-item-actions";
 import { useContentManagement } from "../use-content-management";
 import {
   fetchProfilePostDetail,
@@ -47,7 +48,8 @@ import {
   resolveIdentityHref,
 } from "../feed-service";
 import { createFeedVideoController } from "../feed-video-controller";
-import { useToggleFeedPostLike } from "../use-feed-post-like";
+import { useOpenLikes } from "../../likes/use-open-likes";
+import { seedLikesFromItems, useToggleFeedPostLike } from "../use-feed-post-like";
 import { FeedVideoProvider } from "../use-feed-video";
 import { useFeedVideoLifecycle } from "../use-feed-video-lifecycle";
 import { ContentLoadErrorState, ContentUnavailableState } from "./ContentUnavailableState";
@@ -85,7 +87,10 @@ export function ProfilePostDetail({
   const { profile } = useSession();
   const { showToast } = useToast();
   const toggleLike = useToggleFeedPostLike({ profileId: profile?.id ?? "" });
+  const openLikes = useOpenLikes();
   const manageContent = useContentManagement({ profileId: profile?.id ?? "" });
+  // HOM-07 §133: il Salva del dettaglio è lo stesso del Feed (store Salvati).
+  const toggleSaved = useToggleSavedFeedItem();
   const [videoController] = useState(createFeedVideoController);
   useFeedVideoLifecycle(videoController);
   const scrollRef = useRef<ScrollView>(null);
@@ -97,6 +102,13 @@ export function ProfilePostDetail({
     queryKey: FEED_QK.postDetail(postId),
   });
   const item = query.data ?? null;
+  // HOM-07 §135: il dettaglio semina la stessa cella dei Mi piace del Feed.
+  useEffect(() => {
+    if (item) {
+      seedLikesFromItems([item]);
+      seedSavedFromItems([item]);
+    }
+  }, [item]);
   const availability = normalizeContentAvailability({
     data: query.data,
     error: query.error,
@@ -171,6 +183,13 @@ export function ProfilePostDetail({
                 });
                 router.push(resolveIdentityHref(target) as never);
               }}
+              onOpenLikes={() =>
+                openLikes({
+                  contentType: "profile_post",
+                  likesCount: item.payload.likesCount,
+                  postId: item.payload.postId,
+                })
+              }
               onOpenLink={() => {
                 const url = item.payload.linkPreview?.url;
                 if (url && /^https:\/\//i.test(url)) {
@@ -198,7 +217,14 @@ export function ProfilePostDetail({
               }}
               onShare={() => showToast({ message: FEED_SOON_MESSAGES.share })}
               onToggleLike={() => toggleLike(item)}
-              onToggleSaved={() => undefined}
+              onToggleSaved={() =>
+                toggleSaved.mutate({
+                  contentType: "profile_post",
+                  isSaved: item.isSaved,
+                  itemId: item.id,
+                  postId,
+                })
+              }
             />
           </ScrollView>
         )}

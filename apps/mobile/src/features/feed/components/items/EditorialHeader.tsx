@@ -19,6 +19,7 @@ import {
   buildEditorialMetaLine,
 } from "../../feed-video-presentation";
 import type { FeedEditorialItem } from "../../feed-types";
+import { contentSavedTarget, useIsSaved } from "../../../saved/saved-store";
 import { FeedBookmarkButton } from "./FeedBookmarkButton";
 import { FeedItemHeader } from "./FeedItemHeader";
 import { FeedItemMenu } from "./FeedItemMenu";
@@ -38,6 +39,9 @@ export function EditorialHeader({
   onToggleSaved,
 }: EditorialHeaderProps) {
   const line = { publishedAt: item.publishedAt, type: item.type };
+  // HOM-07 §92, §133: segnalibro e menu leggono lo stesso store Salvati.
+  const savedTarget = contentSavedTarget(item.payload.contentType, item.payload.postId);
+  const isSaved = useIsSaved(savedTarget, item.isSaved);
 
   return (
     <FeedItemHeader
@@ -57,12 +61,12 @@ export function EditorialHeader({
       right={
         <View style={styles.right}>
           {item.payload.capabilities.canSave ? (
-            <FeedBookmarkButton isSaved={item.isSaved} onToggle={onToggleSaved} />
+            <FeedBookmarkButton isSaved={isSaved} onToggle={onToggleSaved} />
           ) : null}
           <FeedItemMenu
             authorName={item.author?.name}
             canSave={false}
-            isSaved={item.isSaved}
+            isSaved={isSaved}
             itemType={item.type}
             management={management}
             onToggleSaved={onToggleSaved}

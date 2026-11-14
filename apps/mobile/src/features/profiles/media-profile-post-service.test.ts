@@ -4,7 +4,6 @@ import {
   addMediaProfilePostComment,
   createMediaProfilePost,
   fetchMediaProfilePostFeed,
-  toggleSavedMediaProfilePost,
 } from "./media-profile-post-service";
 
 const mocks = vi.hoisted(() => {
@@ -378,26 +377,6 @@ describe("media-profile-post-service", () => {
         { post_id: "post-1", target_id: "club-1", target_type: "club" },
       ],
       table: "media_profile_post_tagged_targets",
-    });
-  });
-
-  it("toggles saved media profile posts with profile scoped writes", async () => {
-    mocks.queueResponses(
-      { data: null, error: null },
-      { data: null, error: null },
-    );
-
-    await toggleSavedMediaProfilePost("viewer-1", "post-1", true);
-    await toggleSavedMediaProfilePost("viewer-1", "post-1", false);
-
-    expect(mocks.operations[0]).toMatchObject({
-      action: "upsert",
-      payload: { post_id: "post-1", profile_id: "viewer-1" },
-      table: "saved_media_profile_posts",
-    });
-    expect(mocks.operations[1]).toMatchObject({
-      action: "delete",
-      table: "saved_media_profile_posts",
     });
   });
 

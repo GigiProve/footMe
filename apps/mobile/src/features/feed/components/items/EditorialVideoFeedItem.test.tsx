@@ -14,6 +14,7 @@ import {
   renderWithToast,
   textOf,
 } from "../feed-test-helpers";
+import { resetSavedStore } from "../../../saved/saved-store";
 import { EditorialVideoFeedItem } from "./EditorialVideoFeedItem";
 
 vi.mock("expo-video", () => import("../../../../test/expo-video"));
@@ -22,6 +23,8 @@ vi.mock("expo-router", () => ({ useFocusEffect: () => undefined }));
 const NOW = new Date("2026-07-31T12:00:00.000Z");
 
 beforeEach(() => {
+  // Lo store Salvati è di modulo: ogni test parte senza celle (HOM-07 §134).
+  resetSavedStore();
   videoMock.reset();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -226,7 +229,7 @@ describe("EditorialVideoFeedItem — segnalibro e azioni (§37, §52–59)", () 
     expect(countTestId(tree, "feed-bookmark")).toBe(1);
     expect(json.indexOf("feed-bookmark")).toBeLessThan(json.indexOf("feed-editorial-video-title"));
 
-    press(tree, "Salva");
+    press(tree, "Salva contenuto");
 
     expect(props.onToggleSaved).toHaveBeenCalledTimes(1);
   });
