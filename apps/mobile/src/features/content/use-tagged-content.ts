@@ -71,8 +71,6 @@ export function mapTaggedItemToMediaItem(item: TaggedContentItem): MediaContentI
   const coverIcon = coverIconForItem(item);
 
   return {
-    commentCount: 0,
-    comments: [],
     coverIcon,
     description: item.title,
     id: `tag:${item.content_type}:${item.post_id}`,

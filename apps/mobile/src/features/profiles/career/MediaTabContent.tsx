@@ -118,15 +118,14 @@ export type MediaLinkedTarget = {
   target_type: "profile" | "club";
 };
 
-type MediaComment = {
-  author: string;
-  id: string;
-  text: string;
-};
-
+/**
+ * HOM-08 §1, §3, §18: nessun conteggio né anteprima di commenti. Un contenuto
+ * con commenti ha un dettaglio canonico (`taggedRef`), dove vive la sezione
+ * Commenti; il viewer locale serve ai media del profilo che non sono tra i sei
+ * tipi commentabili, quindi non finge un thread («Nessun commento per ora» né
+ * la lista finta) e non ha più l'Alert «Apri la lista completa».
+ */
 export type MediaContentItem = {
-  commentCount: number;
-  comments: MediaComment[];
   /** Icon shown on a generated cover when the item has no thumbnail image
    *  (e.g. a tagged poll/formation/opinion). */
   coverIcon?: ComponentProps<typeof Ionicons>["name"];
@@ -376,21 +375,6 @@ export function MediaTabContent({
     onEditContentPress?.(currentItem.id);
   }
 
-  function handleOpenComments() {
-    const currentItem = visibleItems[activeViewerIndex];
-
-    if (!currentItem) {
-      return;
-    }
-
-    Alert.alert(
-      "Commenti",
-      currentItem.commentCount > 0
-        ? `Apri la lista completa dei ${currentItem.commentCount} commenti.`
-        : "Non ci sono ancora commenti su questo contenuto.",
-    );
-  }
-
   function handleViewerScroll(offsetY: number) {
     if (viewportHeight <= 0) {
       return;
@@ -606,12 +590,6 @@ export function MediaTabContent({
                           onPress={() => handleToggleLike(item.id)}
                         />
                         <ViewerAction
-                          accessibilityLabel="Apri commenti contenuto"
-                          count={formatCount(item.commentCount)}
-                          icon="chatbubble-outline"
-                          onPress={handleOpenComments}
-                        />
-                        <ViewerAction
                           accessibilityLabel="Salva contenuto"
                           active={item.isSaved}
                           activeIcon="bookmark"
@@ -689,38 +667,6 @@ export function MediaTabContent({
                         ))}
                       </View>
                     ) : null}
-
-                    <View style={styles.commentsPreview}>
-                      {item.comments.length > 0 ? (
-                        item.comments.slice(0, 2).map((comment) => (
-                          <AppText key={comment.id} color="inverse" variant="bodySm">
-                            <AppText color="inverse" variant="metaStrong">
-                              {comment.author}
-                            </AppText>{" "}
-                            {comment.text}
-                          </AppText>
-                        ))
-                      ) : (
-                        <AppText color="inverse" style={styles.noCommentsText} variant="bodySm">
-                          Nessun commento per ora.
-                        </AppText>
-                      )}
-                    </View>
-
-                    <Pressable
-                      accessibilityLabel="Vedi tutti i commenti"
-                      onPress={handleOpenComments}
-                      style={({ pressed }) => [
-                        styles.viewAllButton,
-                        pressed ? styles.pressed : null,
-                      ]}
-                    >
-                      <AppText color="inverse" variant="bodySm">
-                        {item.commentCount > 0
-                          ? `Vedi tutti i ${item.commentCount} commenti`
-                          : "Apri commenti"}
-                      </AppText>
-                    </Pressable>
                   </View>
                 </View>
               ))}
@@ -783,10 +729,6 @@ function formatCount(value: number) {
 }
 
 const styles = StyleSheet.create({
-  commentsPreview: {
-    gap: spacing[6],
-    marginTop: spacing[8],
-  },
   emptyIconWrap: {
     alignItems: "center",
     backgroundColor: colors.surfaceMuted,
@@ -878,9 +820,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[16],
     paddingTop: spacing[16],
   },
-  noCommentsText: {
-    opacity: 0.82,
-  },
   pressed: {
     opacity: 0.82,
   },
@@ -935,10 +874,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: "42%",
     width: 70,
-  },
-  viewAllButton: {
-    marginTop: spacing[10],
-    paddingVertical: spacing[6],
   },
   viewerAction: {
     alignItems: "center",

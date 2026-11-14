@@ -2,6 +2,7 @@ import { notifyTaggedProfiles } from "../content/content-tag-service";
 import type { TaggableTarget } from "../content/tag-types";
 import { targetKey } from "../content/tag-types";
 import { supabase } from "../../lib/supabase";
+import { fetchCommentCounts } from "../feed/comment-counts-service";
 
 export const FAN_TRIBUNA_FORMATIONS = [
   "4-3-3",
@@ -21,15 +22,11 @@ export type FanTribunaMediaType = "image" | "video";
 
 export type FanTribunaFormation = (typeof FAN_TRIBUNA_FORMATIONS)[number];
 
-export type FanTribunaComment = {
-  author_avatar_url: string | null;
-  author_name: string;
-  body: string;
-  created_at: string;
-  id: string;
-  profile_id: string;
-};
-
+/*
+  HOM-08 §1, §3: nessun thread in questo servizio; `fan_tribuna_comments` è
+  assorbita da `content_comments` (RPC in `features/comments`). Resta il solo
+  conteggio, da `fetch_comment_counts` (una chiamata per lista).
+*/
 export type FanTribunaPollOption = {
   id: string;
   is_voted: boolean;
@@ -57,7 +54,6 @@ export type FanTribunaLineupPlayer = FanTribunaTaggedPlayer & {
 export type FanTribunaPost = {
   body: string | null;
   comment_count: number;
-  comments: FanTribunaComment[];
   created_at: string;
   formation: FanTribunaFormation | null;
   id: string;
@@ -605,44 +601,6 @@ export async function toggleSavedFanTribuna(
   }
 }
 
-export async function addFanTribunaComment(input: {
-  body: string;
-  postId: string;
-  profileId: string;
-}): Promise<FanTribunaComment> {
-  const body = requireText(input.body, "Scrivi un commento prima di pubblicare.");
-
-  const { data, error } = await supabase
-    .from("fan_tribuna_comments")
-    .insert({
-      body,
-      post_id: input.postId,
-      profile_id: input.profileId,
-    })
-    .select("id, post_id, profile_id, body, created_at")
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Commento non creato.");
-  }
-
-  const profiles = await loadProfilesById([input.profileId]);
-  const author = profiles.get(input.profileId);
-
-  return {
-    author_avatar_url: author?.avatar_url ?? null,
-    author_name: author?.full_name?.trim() || "Utente ProLink",
-    body: String((data as { body: string }).body),
-    created_at: String((data as { created_at: string }).created_at),
-    id: String((data as { id: string }).id),
-    profile_id: input.profileId,
-  };
-}
-
 // ─────────────────────────────────────────────────────────────
 // Internal helpers — post insert + enrichment
 // ─────────────────────────────────────────────────────────────
@@ -762,13 +720,12 @@ async function enrichFanTribunaPosts(
     savedIds,
     optionsByPost,
     pollVoteState,
-    commentsByPost,
     taggedTargetsByPost,
     lineupPlayersByPost,
   ] = await Promise.all([
     loadTribunaCountMap("fan_tribuna_support_votes", postIds),
     loadTribunaCountMap("saved_fan_tribuna", postIds),
-    loadTribunaCountMap("fan_tribuna_comments", postIds),
+    fetchCommentCounts("fan_tribuna", postIds),
     viewerProfileId
       ? loadViewerTribunaPostIds("fan_tribuna_support_votes", viewerProfileId, postIds)
       : Promise.resolve(new Set<string>()),
@@ -777,7 +734,6 @@ async function enrichFanTribunaPosts(
       : Promise.resolve(new Set<string>()),
     loadPollOptionsByPost(postIds),
     loadPollVoteState(postIds, viewerProfileId),
-    loadCommentsByPost(postIds),
     loadTaggedTargetsByPost(postIds),
     loadLineupPlayersByPost(postIds),
   ]);
@@ -813,7 +769,6 @@ async function enrichFanTribunaPosts(
     return {
       body: row.body ?? null,
       comment_count: commentCounts.get(row.id) ?? 0,
-      comments: commentsByPost.get(row.id) ?? [],
       created_at: row.created_at,
       formation: normalizeFormationOrNull(row.formation),
       id: row.id,
@@ -1115,50 +1070,6 @@ async function loadPollVoteState(
   }
 
   return { optionCounts, totalCounts, viewerOptionByPost };
-}
-
-async function loadCommentsByPost(postIds: string[]) {
-  const commentsByPost = new Map<string, FanTribunaComment[]>();
-
-  if (postIds.length === 0) {
-    return commentsByPost;
-  }
-
-  const { data, error } = await supabase
-    .from("fan_tribuna_comments")
-    .select("id, post_id, profile_id, body, created_at")
-    .in("post_id", postIds)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data ?? []) as {
-    body: string;
-    created_at: string;
-    id: string;
-    post_id: string;
-    profile_id: string;
-  }[];
-  const profiles = await loadProfilesById(rows.map((row) => row.profile_id));
-
-  for (const row of rows) {
-    const profile = profiles.get(row.profile_id);
-    const list = commentsByPost.get(row.post_id) ?? [];
-
-    list.push({
-      author_avatar_url: profile?.avatar_url ?? null,
-      author_name: profile?.full_name?.trim() || "Utente ProLink",
-      body: row.body,
-      created_at: row.created_at,
-      id: row.id,
-      profile_id: row.profile_id,
-    });
-    commentsByPost.set(row.post_id, list);
-  }
-
-  return commentsByPost;
 }
 
 /**

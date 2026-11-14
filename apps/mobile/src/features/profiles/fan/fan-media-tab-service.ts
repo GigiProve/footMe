@@ -139,8 +139,6 @@ function mapTribunaPhoto(post: FanTribunaPost): SortableMediaItem {
   const isVideo = post.media_type === "video";
 
   return {
-    commentCount: post.comment_count,
-    comments: [],
     description: post.body ?? post.title ?? "",
     id: post.id,
     isFeatured: false,
@@ -162,8 +160,6 @@ function mapLegacyPost(post: FanMediaPost): SortableMediaItem {
   const isVideo = post.visual_type === "video";
 
   return {
-    commentCount: post.comment_count,
-    comments: [],
     description: post.description,
     id: post.id,
     isFeatured: false,

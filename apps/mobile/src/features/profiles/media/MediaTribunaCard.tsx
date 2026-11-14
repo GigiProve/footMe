@@ -14,6 +14,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Avatar } from "../../../ui";
+import { useCommentsCount } from "../../comments/comment-count-store";
+import { likeItemKey } from "../../interactions/like-store";
 import type {
   MediaTribunaOption,
   MediaTribunaPost,
@@ -41,8 +43,13 @@ export function MediaTribunaCard({
   onVote,
   post,
 }: MediaTribunaCardProps) {
+  // HOM-08 §210–§214: la cella dello store, così carta e dettaglio non divergono.
+  const commentCount = useCommentsCount(
+    likeItemKey("media_tribuna", post.id),
+    post.comment_count,
+  );
   const typeLabel = formatMediaTribunaLabel(post.kind);
-  const counts = formatMediaTribunaCounts(post);
+  const counts = formatMediaTribunaCounts({ ...post, comment_count: commentCount });
   const isVotable = isMediaTribunaVotable(post.kind);
   const hasVoted = hasVotedMediaTribuna(post);
   /*
@@ -163,12 +170,10 @@ export function MediaTribunaCard({
               }`}
             />
           ) : null}
-          {post.comment_count > 0 ? (
+          {commentCount > 0 ? (
             <FooterCount
               icon="chatbubble-outline"
-              label={`${post.comment_count} ${
-                post.comment_count === 1 ? "commento" : "commenti"
-              }`}
+              label={`${commentCount} ${commentCount === 1 ? "commento" : "commenti"}`}
             />
           ) : null}
         </View>

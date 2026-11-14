@@ -15,7 +15,6 @@ function buildPost(overrides: Partial<MediaProfilePost> = {}): MediaProfilePost 
     body: "Il mercato entra nella fase decisiva.",
     category: "Mercato",
     comment_count: 12,
-    comments: [],
     cover_type: "image",
     cover_url: "https://example.com/cover.jpg",
     created_at: "2026-06-19T08:00:00Z",
@@ -83,6 +82,7 @@ describe("view model unificato", () => {
     expect(article.isExternal).toBe(false);
     expect(article.tagline).toBe("3 min");
     expect(article.category).toBe("Mercato");
+    expect(article.commentCount).toBe(12);
   });
 
   it("un link non viene attribuito a PROLINK come se l'avesse scritto", () => {

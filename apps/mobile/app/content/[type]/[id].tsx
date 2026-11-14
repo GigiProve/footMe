@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -7,11 +7,10 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 
-import { Screen } from "../../../src/components/ui/screen";
 import { trackArticle } from "../../../src/features/article-editor/article-analytics";
 import { articleKeys } from "../../../src/features/article-editor/article-keys";
 import { articleBodyKind } from "../../../src/features/article-editor/article-render";
@@ -38,15 +37,27 @@ import {
   fetchFanMediaPostDetail,
   type FanMediaPost,
 } from "../../../src/features/profiles/fan-media-service";
+import { CommentComposerBar } from "../../../src/features/comments/components/CommentComposerBar";
+import { CommentsOverlays } from "../../../src/features/comments/components/CommentsOverlays";
+import { CommentsSection } from "../../../src/features/comments/components/CommentsSection";
+import { useCommentsController } from "../../../src/features/comments/use-comments-controller";
+import { ContentActionRow } from "../../../src/features/feed/components/detail/ContentActionRow";
+import { ContentDetailFrame } from "../../../src/features/feed/components/detail/ContentDetailFrame";
 import { ContentDetailMedia } from "../../../src/features/feed/components/detail/ContentDetailMedia";
-import { ContentLikeControl } from "../../../src/features/feed/components/detail/ContentLikeControl";
 import {
   ContentLoadErrorState,
   ContentUnavailableState,
 } from "../../../src/features/feed/components/ContentUnavailableState";
+import { PostOrEditorialDetail } from "../../../src/features/feed/components/PostOrEditorialDetail";
 import { ProfilePostDetail } from "../../../src/features/feed/components/ProfilePostDetail";
 import { classifyContentError } from "../../../src/features/feed/content-availability-presentation";
-import { parseContentOrigin, type ContentOrigin } from "../../../src/features/feed/content-routes";
+import {
+  parseCommentFocus,
+  parseContentOrigin,
+  type CommentFocus,
+  type ContentOrigin,
+} from "../../../src/features/feed/content-routes";
+import { FEED_SOON_MESSAGES } from "../../../src/features/feed/feed-labels";
 import { useBackToFeed } from "../../../src/features/feed/use-back-to-feed";
 import { createFeedVideoController } from "../../../src/features/feed/feed-video-controller";
 import { legacyVideoMedia } from "../../../src/features/feed/feed-video-presentation";
@@ -77,7 +88,7 @@ import { useContentDetailEvents } from "../../../src/features/content-insights/u
 import { colors, radius, spacing } from "../../../src/theme/tokens";
 import { SavedBookmarkButton } from "../../../src/features/saved/components/SavedBookmarkButton";
 import { useContentSaved } from "../../../src/features/saved/use-content-saved";
-import { AppText, Button } from "../../../src/ui";
+import { AppText, Button, useToast } from "../../../src/ui";
 
 type TaggedEntry = ContentTaggedTarget;
 
@@ -374,45 +385,95 @@ function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentVi
 }
 
 /**
- * HOM-02: i post persona (`profile_post`) usano il Post component del Feed
- * (§109); le cinque sorgenti CER-05 restano sul dettaglio storico qui sotto.
+ * HOM-08 §8, §11, §13: due dettagli, nessun terzo renderer.
+ *  • Post (`profile_post`, e i Post di Società/Media dentro `club_media` /
+ *    `media_profile`) → «← Post», il Post component del Feed (HOM-02 §109);
+ *  • Articolo, video editoriale e le altre sorgenti CER-05 → dettaglio storico
+ *    qui sotto, con la stessa riga azioni ♡ | ◯ | ↗.
+ * Entrambi montano la sezione Commenti e il composer fisso. `?focus=` porta
+ * alla sezione o al composer (§5–§6).
  */
 export default function ContentDetailRoute() {
-  const { id, media, origin, type } = useLocalSearchParams<{
+  const { focus, id, media, origin, position, type } = useLocalSearchParams<{
+    focus?: string;
     id: string;
     media?: string;
     origin?: string;
+    position?: string;
     type: string;
   }>();
   // `Number("")` è 0: un `?media=` vuoto non è un tap su un media.
   const mediaIndex = media ? Number(media) : Number.NaN;
   // HOM-04 §122: la provenienza passata dal Feed; assente = ci si affida al Back.
   const contentOrigin = parseContentOrigin(origin);
+  const commentFocus = parseCommentFocus(focus);
+  const initialMediaIndex = Number.isInteger(mediaIndex) && mediaIndex >= 0 ? mediaIndex : null;
 
-  if (type === "profile_post" && id) {
+  // §35: `?media=N` dal Feed = tap già avvenuto sul video, parte una volta sola.
+  const editorial = () => (
+    <ContentDetailScreen
+      autoStartVideo={initialMediaIndex !== null}
+      focus={commentFocus}
+      origin={contentOrigin}
+    />
+  );
+
+  // HOM-08 §2: i commenti esistono solo per i sei tipi del contratto. Un tipo
+  // sconosciuto (o un id mancante) non monta il dettaglio né i commenti.
+  if (!id || (type !== "profile_post" && !SUPPORTED.includes(type as ContentDetailType))) {
+    return <UnavailableContentDetail origin={contentOrigin} />;
+  }
+
+  if (type === "profile_post") {
     return (
       <ProfilePostDetail
-        initialMediaIndex={Number.isInteger(mediaIndex) && mediaIndex >= 0 ? mediaIndex : null}
+        focus={commentFocus}
+        initialMediaIndex={initialMediaIndex}
         origin={contentOrigin}
         postId={id}
       />
     );
   }
 
-  // §35: `?media=N` dal Feed = tap già avvenuto sul video, parte una volta sola.
+  if (type === "club_media" || type === "media_profile") {
+    // Il Feed passa `position` solo per Articolo e video editoriale (resolveFeedItemHref):
+    // sono già noti come non-Post, quindi si salta la sonda e il suo round trip.
+    if (position !== undefined) {
+      return editorial();
+    }
+
+    return (
+      <PostOrEditorialDetail
+        contentType={type}
+        focus={commentFocus}
+        initialMediaIndex={initialMediaIndex}
+        origin={contentOrigin}
+        postId={id}
+        renderEditorial={editorial}
+      />
+    );
+  }
+
+  return editorial();
+}
+
+function UnavailableContentDetail({ origin }: { origin: ContentOrigin | null }) {
+  const backToFeed = useBackToFeed(origin);
+
   return (
-    <ContentDetailScreen
-      autoStartVideo={Number.isInteger(mediaIndex) && mediaIndex >= 0}
-      origin={contentOrigin}
-    />
+    <ContentDetailFrame title="Contenuto">
+      <ContentUnavailableState onBackToFeed={backToFeed} />
+    </ContentDetailFrame>
   );
 }
 
 function ContentDetailScreen({
   autoStartVideo,
+  focus,
   origin,
 }: {
   autoStartVideo: boolean;
+  focus: CommentFocus | null;
   origin: ContentOrigin | null;
 }) {
   // Controller locale al dettaglio: un solo video alla volta, pausa su
@@ -422,22 +483,33 @@ function ContentDetailScreen({
 
   return (
     <FeedVideoProvider controller={videoController}>
-      <ContentDetailBody autoStartVideo={autoStartVideo} origin={origin} />
+      <ContentDetailBody autoStartVideo={autoStartVideo} focus={focus} origin={origin} />
     </FeedVideoProvider>
   );
 }
 
 function ContentDetailBody({
   autoStartVideo,
+  focus,
   origin,
 }: {
   autoStartVideo: boolean;
+  focus: CommentFocus | null;
   origin: ContentOrigin | null;
 }) {
   const { id, type } = useLocalSearchParams<{ id: string; type: string }>();
   const { profile } = useSession();
   const router = useRouter();
+  const { showToast } = useToast();
   const viewerId = profile?.id ?? null;
+  const scrollRef = useRef<ScrollView>(null);
+  const comments = useCommentsController({
+    contentId: id ?? "",
+    contentType: type,
+    focus,
+    origin,
+    scrollRef,
+  });
 
   const [content, setContent] = useState<ContentView | null>(null);
   const [fanPost, setFanPost] = useState<FanTribunaPostDetail | null>(null);
@@ -619,27 +691,15 @@ function ContentDetailBody({
   }
 
   return (
-    <Screen>
-      <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityLabel="Torna indietro"
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          style={styles.topBarButton}
-        >
-          <Ionicons color={colors.textPrimary} name="arrow-back" size={24} />
-        </Pressable>
-        <AppText align="center" style={styles.topBarTitle} variant="bodySm">
-          Contenuto
-        </AppText>
-        {content && bookmark.canSave ? (
+    <ContentDetailFrame
+      footer={content ? <CommentComposerBar controller={comments} /> : null}
+      right={
+        content && bookmark.canSave ? (
           <SavedBookmarkButton isSaved={bookmark.isSaved} onToggle={bookmark.toggle} />
-        ) : (
-          <View style={styles.topBarButton} />
-        )}
-      </View>
-
+        ) : undefined
+      }
+      title="Contenuto"
+    >
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.accent} size="large" />
@@ -651,7 +711,12 @@ function ContentDetailBody({
           <ContentUnavailableState onBackToFeed={backToFeed} />
         )
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          ref={scrollRef}
+        >
           {content.video || detailCoverUrl ? (
             // HOM-03 §35, §50: video inline o cover ampia in testa; il titolo
             // segue come testata, senza la miniatura che la cover già mostra.
@@ -765,25 +830,31 @@ function ContentDetailBody({
             </>
           )}
 
-          {/* HOM-03 §104: il Mi piace è la stessa entity del Feed. */}
-          {viewerId && id && LIKEABLE.includes(contentType) ? (
-            <ContentLikeControl
+          {/*
+            HOM-08 §13: la riga azioni ♡ | ◯ | ↗ del Post anche qui (HOM-03 §104:
+            il Mi piace è la stessa entity del Feed). Condividi resta il toast
+            HOM-09; Commenta porta alla sezione sotto o al composer.
+          */}
+          {viewerId && id && SUPPORTED.includes(contentType) ? (
+            <ContentActionRow
               contentType={contentType as FeedContentType}
+              likeable={LIKEABLE.includes(contentType)}
+              onComment={comments.onActionRowComment}
+              onShare={() => showToast({ message: FEED_SOON_MESSAGES.share })}
               postId={id}
               profileId={viewerId}
             />
           ) : null}
 
           {/*
-            REV-PROF-21: Salva e commenti dei contenuti Media/Creator. Prima
-            stavano in una modale dentro il profilo — un secondo dettaglio —
-            e qui non esistevano: ora esiste un dettaglio solo, e non si è
-            perso niente.
+            REV-PROF-21: Salva dei contenuti Media/Creator. Prima stava in una
+            modale dentro il profilo — un secondo dettaglio — e qui non
+            esisteva: ora esiste un dettaglio solo. I commenti sono di HOM-08
+            (sezione sotto), non più di questo blocco.
           */}
           {mediaPost ? (
             <MediaContentInteractions
               contentType="media_profile"
-              initialComments={mediaPost.comments}
               initialIsSaved={mediaPost.is_saved}
               initialIsSavedAt={mediaLoadedAt}
               postId={mediaPost.id}
@@ -794,7 +865,6 @@ function ContentDetailBody({
           {mediaTribunaPost ? (
             <MediaContentInteractions
               contentType="media_tribuna"
-              initialComments={mediaTribunaPost.comments}
               initialIsSaved={mediaTribunaPost.is_saved}
               initialIsSavedAt={mediaLoadedAt}
               postId={mediaTribunaPost.id}
@@ -812,8 +882,14 @@ function ContentDetailBody({
               variant="secondary"
             />
           ) : null}
+
+          {/* HOM-08 §3, §184–§187: i commenti hanno i propri stati; il contenuto resta. */}
+          <View style={styles.divider} />
+          <CommentsSection controller={comments} />
         </ScrollView>
       )}
+
+      {content ? <CommentsOverlays controller={comments} /> : null}
 
       {isManageOpen && content && viewerId && taggableType ? (
         <TagManageSheet
@@ -831,7 +907,7 @@ function ContentDetailBody({
           visible
         />
       ) : null}
-    </Screen>
+    </ContentDetailFrame>
   );
 }
 
@@ -880,6 +956,10 @@ const styles = StyleSheet.create({
     gap: spacing[16],
     justifyContent: "center",
   },
+  divider: {
+    backgroundColor: colors.divider,
+    height: StyleSheet.hairlineWidth,
+  },
   headline: {
     gap: spacing[4],
   },
@@ -903,21 +983,5 @@ const styles = StyleSheet.create({
   sourceCardText: {
     flex: 1,
     gap: spacing[4],
-  },
-  topBar: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 44,
-  },
-  topBarButton: {
-    alignItems: "center",
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  topBarTitle: {
-    flex: 1,
-    fontWeight: "600",
   },
 });

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { CONTENT_DELETE_INVALIDATIONS } from "./content-lifecycle-cache";
-import { contentManageParams, editContentHref, viewInsightsHref } from "./content-routes";
+import {
+  commentFocusForCount,
+  commentsHref,
+  contentDetailHref,
+  contentManageParams,
+  editContentHref,
+  parseCommentFocus,
+  viewInsightsHref,
+} from "./content-routes";
 
 const target = {
   authorIdentityId: "author-1",
@@ -83,6 +91,30 @@ describe("viewInsightsHref (HOM-05 §3, §10)", () => {
     expect(editContentHref(contentManageParams({ ...target, contentType: "fan_tribuna" }))).toBeNull();
     expect(editContentHref(contentManageParams({ ...target, contentType: "media_tribuna" }))).toBeNull();
     expect(editContentHref(contentManageParams({ ...target, contentType: "fan_media" }))).toBeNull();
+  });
+});
+
+describe("focus dei commenti (HOM-08 §5–§6, §22)", () => {
+  it("con commenti il dettaglio apre sulla sezione, a zero sul composer", () => {
+    expect(commentFocusForCount(3)).toBe("comments");
+    expect(commentFocusForCount(0)).toBe("composer");
+    expect(commentsHref("profile_post", "p1", 2, { origin: "HOME_PER_TE" })).toBe(
+      "/content/profile_post/p1?focus=comments&origin=HOME_PER_TE",
+    );
+    expect(commentsHref("club_media", "p1", 0)).toBe("/content/club_media/p1?focus=composer");
+  });
+
+  it("il focus è additivo: senza, la href non cambia", () => {
+    expect(contentDetailHref("club_media", "p1", { media: 1, origin: "SEARCH" })).toBe(
+      "/content/club_media/p1?media=1&origin=SEARCH",
+    );
+  });
+
+  it("parseCommentFocus accetta solo i due valori noti", () => {
+    expect(parseCommentFocus("comments")).toBe("comments");
+    expect(parseCommentFocus(["composer", "x"])).toBe("composer");
+    expect(parseCommentFocus("altro")).toBeNull();
+    expect(parseCommentFocus(undefined)).toBeNull();
   });
 });
 

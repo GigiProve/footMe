@@ -62,8 +62,6 @@ function toMediaContentItem(post: MediaProfilePost): MediaContentItem {
   const isVideo = post.cover_type === "video";
 
   return {
-    commentCount: post.comment_count,
-    comments: [],
     // Nella griglia la caption non si vede: serve al viewer e al nome
     // accessibile della cella.
     description: post.excerpt ?? post.title,

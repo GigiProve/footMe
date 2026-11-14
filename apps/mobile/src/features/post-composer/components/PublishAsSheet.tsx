@@ -26,6 +26,10 @@ type PublishAsSheetProps = {
   selected: { type: ComposerIdentityType; id: string } | null;
   onSelect: (identity: ComposerIdentity) => void;
   onClose: () => void;
+  /** HOM-08 §32: «Commenta come» riusa lo stesso foglio. Default «Pubblica come». */
+  title?: string;
+  /** Prefisso dei testID delle righe: il composer commenti non collide con quello Post. */
+  testIDPrefix?: string;
 };
 
 function rowLabel(identity: ComposerIdentity, isSelected: boolean): string {
@@ -45,9 +49,11 @@ export function PublishAsSheet({
   selected,
   onSelect,
   onClose,
+  title = "Pubblica come",
+  testIDPrefix = "composer-publish-as",
 }: PublishAsSheetProps) {
   return (
-    <BottomSheet onClose={onClose} title="Pubblica come" visible={visible}>
+    <BottomSheet onClose={onClose} title={title} visible={visible}>
       <ScrollView bounces={false} style={styles.list}>
         {identities.map((identity, index) => {
           const isSelected = selected?.type === identity.type && selected.id === identity.id;
@@ -65,7 +71,7 @@ export function PublishAsSheet({
                 isLast ? null : styles.rowDivider,
                 pressed ? styles.pressed : null,
               ]}
-              testID={`composer-publish-as-${identity.type}-${identity.id}`}
+              testID={`${testIDPrefix}-${identity.type}-${identity.id}`}
             >
               <ComposerAvatar
                 name={identity.name}

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  addMediaTribunaComment,
   createMediaArticleDebate,
   createMediaCommunityQa,
   createMediaPlayerVote,
@@ -119,6 +118,13 @@ vi.mock("../../lib/supabase", () => ({
   },
 }));
 
+// HOM-08: il conteggio commenti arriva da `fetch_comment_counts`, non dalle tabelle.
+const countMocks = vi.hoisted(() => ({ fetchCommentCounts: vi.fn() }));
+
+vi.mock("../feed/comment-counts-service", () => ({
+  fetchCommentCounts: countMocks.fetchCommentCounts,
+}));
+
 const basePost = {
   body: null,
   created_at: "2026-05-19T08:00:00Z",
@@ -137,9 +143,12 @@ describe("media-tribuna-service", () => {
   beforeEach(() => {
     mocks.reset();
     mocks.fromMock.mockClear();
+    countMocks.fetchCommentCounts.mockReset();
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map());
   });
 
   it("loads editorial poll, article debate, player vote and Q&A with enrichment", async () => {
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map([["poll-1", 1]]));
     mocks.queueResponses(
       {
         data: [
@@ -168,7 +177,6 @@ describe("media-tribuna-service", () => {
         ],
         error: null,
       },
-      { data: [{ post_id: "poll-1" }, { post_id: "qa-1" }], error: null },
       { data: [{ post_id: "poll-1" }], error: null },
       {
         data: [
@@ -185,18 +193,6 @@ describe("media-tribuna-service", () => {
           { option_id: "option-attack", post_id: "poll-1", profile_id: "viewer-2" },
           { option_id: "option-defense", post_id: "poll-1", profile_id: "viewer-3" },
           { option_id: "option-player-1", post_id: "player-vote-1", profile_id: "viewer-1" },
-        ],
-        error: null,
-      },
-      {
-        data: [
-          {
-            body: "Serve una punta fisica.",
-            created_at: "2026-05-19T09:00:00Z",
-            id: "comment-1",
-            post_id: "poll-1",
-            profile_id: "viewer-1",
-          },
         ],
         error: null,
       },
@@ -234,10 +230,6 @@ describe("media-tribuna-service", () => {
         error: null,
       },
       {
-        data: [{ avatar_url: null, full_name: "Sara", id: "viewer-1", role: "player" }],
-        error: null,
-      },
-      {
         data: [{ avatar_url: null, full_name: "Anna", id: "viewer-2", role: "player" }],
         error: null,
       },
@@ -253,6 +245,13 @@ describe("media-tribuna-service", () => {
     const feed = await fetchMediaTribunaFeed("media-1", "viewer-1");
 
     expect(feed).toHaveLength(4);
+    expect(countMocks.fetchCommentCounts).toHaveBeenCalledWith("media_tribuna", [
+      "poll-1",
+      "debate-1",
+      "player-vote-1",
+      "qa-1",
+    ]);
+    expect(feed[1].comment_count).toBe(0);
     expect(feed[0]).toMatchObject({
       comment_count: 1,
       is_saved: true,
@@ -290,7 +289,6 @@ describe("media-tribuna-service", () => {
     mocks.queueResponses(
       { data: basePost, error: null },
       { data: null, error: null },
-      { data: [], error: null },
       { data: [], error: null },
       {
         data: [
@@ -347,8 +345,6 @@ describe("media-tribuna-service", () => {
       { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },
-      { data: [], error: null },
-      { data: [], error: null },
       {
         data: [
           {
@@ -392,7 +388,6 @@ describe("media-tribuna-service", () => {
         error: null,
       },
       { data: null, error: null },
-      { data: [], error: null },
       { data: [], error: null },
       {
         data: [
@@ -470,25 +465,11 @@ describe("media-tribuna-service", () => {
     });
   });
 
-  it("votes, saves, comments and handles Q&A votes with viewer-scoped writes", async () => {
+  it("votes, saves and handles Q&A votes with viewer-scoped writes", async () => {
     mocks.queueResponses(
       { data: null, error: null },
       { data: null, error: null },
       { data: null, error: null },
-      {
-        data: {
-          body: "Serve una punta fisica.",
-          created_at: "2026-05-19T10:00:00Z",
-          id: "comment-1",
-          post_id: "poll-1",
-          profile_id: "viewer-1",
-        },
-        error: null,
-      },
-      {
-        data: [{ avatar_url: null, full_name: "Luigi", id: "viewer-1", role: "player" }],
-        error: null,
-      },
       {
         data: {
           body: "Qual e' l'obiettivo stagionale?",
@@ -514,11 +495,6 @@ describe("media-tribuna-service", () => {
     });
     await toggleSavedMediaTribuna("viewer-1", "poll-1", true);
     await toggleSavedMediaTribuna("viewer-1", "poll-1", false);
-    const comment = await addMediaTribunaComment({
-      body: "  Serve una punta fisica. ",
-      postId: "poll-1",
-      profileId: "viewer-1",
-    });
     const question = await submitMediaTribunaQuestion({
       body: " Qual e' l'obiettivo stagionale? ",
       postId: "qa-1",
@@ -544,19 +520,19 @@ describe("media-tribuna-service", () => {
       action: "delete",
       table: "saved_media_tribuna",
     });
-    expect(comment).toMatchObject({
-      author_name: "Luigi",
-      body: "Serve una punta fisica.",
-    });
     expect(question).toMatchObject({
       author_name: "Luigi",
       body: "Qual e' l'obiettivo stagionale?",
     });
-    expect(mocks.operations[7]).toMatchObject({
+    // HOM-08: nessuna scrittura sulla tabella commenti legacy (dominio unico).
+    expect(mocks.operations.map((operation) => operation.table)).not.toContain(
+      "media_tribuna_comments",
+    );
+    expect(mocks.operations[5]).toMatchObject({
       action: "upsert",
       table: "media_tribuna_question_votes",
     });
-    expect(mocks.operations[8]).toMatchObject({
+    expect(mocks.operations[6]).toMatchObject({
       action: "delete",
       table: "media_tribuna_question_votes",
     });

@@ -553,7 +553,9 @@ export function resolvePostMediaHref(
   return contentDetailHref(item.payload.contentType, item.payload.postId, { media: index, origin });
 }
 
-type ProfilePostDetailJson = {
+type PostDetailJson = {
+  /** HOM-08 §8: `fetch_post_detail` dichiara il tipo di elemento; solo 'post' è un Post. */
+  item_type?: unknown;
   post_id?: unknown;
   published_at?: unknown;
   author?: {
@@ -567,14 +569,20 @@ type ProfilePostDetailJson = {
 };
 
 /**
- * HOM-02 §109: il dettaglio di un post persona usa lo stesso `data` del Feed e
- * passa dallo stesso `mapFeedRow`, così Feed e dettaglio non possono divergere.
- * `null` quando il post non è leggibile (RLS, nascosto, autore bloccato).
+ * HOM-02 §109, HOM-08 §8–§13: il dettaglio di un Post — persona, Società o
+ * Media — usa lo stesso `data` del Feed e passa dallo stesso `mapFeedRow`, così
+ * Feed e dettaglio non possono divergere. `null` quando il contenuto non è
+ * leggibile (RLS, nascosto, autore bloccato) OPPURE non è un Post (Articolo,
+ * video editoriale): il chiamante ripiega sul dettaglio editoriale.
  */
-export async function fetchProfilePostDetail(postId: string): Promise<FeedPostItem | null> {
+export async function fetchPostDetail(
+  contentType: FeedContentType,
+  postId: string,
+): Promise<FeedPostItem | null> {
   // HOM-07 §141: istante prima della richiesta, per gli store Mi piace e Salvati.
   const fetchedAt = Date.now();
-  const { data, error } = await supabase.rpc("fetch_profile_post_detail", {
+  const { data, error } = await supabase.rpc("fetch_post_detail", {
+    p_content_type: contentType,
     p_post_id: postId,
   });
 
@@ -582,19 +590,34 @@ export async function fetchProfilePostDetail(postId: string): Promise<FeedPostIt
     throw error;
   }
 
-  const item = mapProfilePostDetail(data as ProfilePostDetailJson | null);
+  const item = mapPostDetail(data as PostDetailJson | null, contentType);
   return item ? { ...item, fetchedAt } : null;
 }
 
-export function mapProfilePostDetail(json: ProfilePostDetailJson | null): FeedPostItem | null {
+/** Il Post persona: la forma storica di `fetch_profile_post_detail`. */
+export function mapProfilePostDetail(json: PostDetailJson | null): FeedPostItem | null {
+  return mapPostDetail(json, "profile_post");
+}
+
+export function mapPostDetail(
+  json: PostDetailJson | null,
+  contentType: FeedContentType,
+): FeedPostItem | null {
   if (!json || typeof json.post_id !== "string" || !json.author) {
+    return null;
+  }
+  // Un elemento dichiarato non-Post (Articolo, video) non si mostra come Post.
+  if (json.item_type !== undefined && json.item_type !== null && json.item_type !== "post") {
     return null;
   }
 
   const author = json.author;
   const postId = json.post_id;
+  // `fetch_post_detail(p_content_type, p_post_id)` risponde per il tipo chiesto:
+  // vale il parametro della route, la chiave della cache e dello store.
+  const resolvedType = contentType;
   const row: FeedItemRow = {
-    item_uid: `profile_post:${postId}`,
+    item_uid: `${resolvedType}:${postId}`,
     item_type: "post",
     rank_position: 0,
     rank_bucket: 0,
@@ -604,7 +627,8 @@ export function mapProfilePostDetail(json: ProfilePostDetailJson | null): FeedPo
     excerpt: null,
     thumbnail_url: null,
     published_at: typeof json.published_at === "string" ? json.published_at : null,
-    author_kind: "profile",
+    // `club_media` è la Società (l'autore è un club); gli altri tipi un profilo.
+    author_kind: resolvedType === "club_media" ? "club" : "profile",
     author_id: typeof author.id === "string" ? author.id : null,
     author_name: typeof author.name === "string" ? author.name : null,
     author_avatar_url: typeof author.avatar_url === "string" ? author.avatar_url : null,
@@ -616,8 +640,8 @@ export function mapProfilePostDetail(json: ProfilePostDetailJson | null): FeedPo
     suggestion_reason_key: null,
     suggestion_reason_label: null,
     nav_kind: "content",
-    nav_params: { content_type: "profile_post", post_id: postId },
-    data: { ...(json.data ?? {}), content_type: "profile_post", post_id: postId },
+    nav_params: { content_type: resolvedType, post_id: postId },
+    data: { ...(json.data ?? {}), content_type: resolvedType, post_id: postId },
     as_of: new Date(0).toISOString(),
     next_cursor_bucket: null,
     next_cursor_published_at: null,

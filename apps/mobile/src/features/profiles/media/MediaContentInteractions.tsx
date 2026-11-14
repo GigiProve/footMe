@@ -1,44 +1,31 @@
 /**
  * Interazioni del dettaglio contenuto Media/Creator (REV-PROF-21,
- * "Dettagli contenuto").
+ * "Dettagli contenuto"; HOM-08 §1, §3).
  *
  * Il Master Profile mostra anteprime; il dettaglio condiviso è responsabile
- * di Salva, commenti e reazioni. Prima della task quelle azioni vivevano in
- * una modale dentro il profilo — un secondo dettaglio, che la task vieta — e
- * il dettaglio canonico non le aveva. Sono state spostate qui, così esiste un
- * solo dettaglio e non si perde nulla: Salva resta disponibile, i commenti
- * restano dove si leggono i contenuti.
+ * di Salva. Prima di REV-PROF-21 quell'azione viveva in una modale dentro il
+ * profilo — un secondo dettaglio, che la task vieta. Sta qui, nel dettaglio,
+ * come REV-PROF-12 prescrive: nessuna icona Salvati nelle griglie.
  *
- * Funziona per entrambe le superfici Media — articoli e Tribuna — perché le
- * due hanno lo stesso contratto di interazione e lo stesso modello di
- * commento. Nessuna icona Salvati finisce nelle griglie: sta qui, nel
- * dettaglio, come REV-PROF-12 prescrive.
+ * HOM-08: i commenti NON vivono più qui. Un solo dominio (`content_comments`),
+ * una sola sezione (`features/comments`, montata dal dettaglio): la lista piatta
+ * e l'input «Invia» che questo componente portava sono stati tolti, non
+ * duplicati. Resta il Salva, per entrambe le superfici Media (articoli e
+ * Tribuna), che hanno lo stesso contratto di interazione.
  */
 import { useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, spacing } from "../../../theme/tokens";
-import { AppText, Avatar, Button, Input } from "../../../ui";
+import { AppText } from "../../../ui";
 import { setSavedTracked } from "../../saved/saved-commands";
 import { saveFailureMessage } from "../../saved/saved-copy";
 import { contentSavedTarget, useIsSaved } from "../../saved/saved-store";
-import { addMediaProfilePostComment } from "../media-profile-post-service";
-import { addMediaTribunaComment } from "../media-tribuna-service";
-
-export type MediaInteractionComment = {
-  author_avatar_url: string | null;
-  author_name: string;
-  body: string;
-  created_at: string;
-  id: string;
-  profile_id: string;
-};
 
 export type MediaContentInteractionsProps = {
-  /** Quale superficie: decide quale servizio esistente viene chiamato. */
+  /** Quale superficie: decide il target dello store Salvati. */
   contentType: "media_profile" | "media_tribuna";
-  initialComments: readonly MediaInteractionComment[];
   initialIsSaved: boolean;
   /** HOM-07 §141: istante (ms) della richiesta che ha prodotto `initialIsSaved`; 0 = ignoto. */
   initialIsSavedAt?: number;
@@ -48,22 +35,16 @@ export type MediaContentInteractionsProps = {
 
 export function MediaContentInteractions({
   contentType,
-  initialComments,
   initialIsSaved,
   initialIsSavedAt = 0,
   postId,
   viewerProfileId,
 }: MediaContentInteractionsProps) {
-  const [comments, setComments] = useState<MediaInteractionComment[]>([
-    ...initialComments,
-  ]);
   // HOM-07 §133: il Salva è nello store Salvati, seminato dal payload del
   // dettaglio; lo stesso contenuto salvato dal Feed o da Cerca compare qui.
   const savedTarget = contentSavedTarget(contentType, postId);
   const isSaved = useIsSaved(savedTarget, initialIsSaved, initialIsSavedAt);
   const [isSaving, setIsSaving] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [isPosting, setIsPosting] = useState(false);
 
   async function handleToggleSave() {
     if (!viewerProfileId) {
@@ -81,46 +62,6 @@ export function MediaContentInteractions({
       Alert.alert("Errore", saveFailureMessage("content", !isSaved));
     } finally {
       setIsSaving(false);
-    }
-  }
-
-  async function handleAddComment() {
-    if (!viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per commentare.");
-      return;
-    }
-
-    const body = draft.trim();
-
-    if (!body) {
-      return;
-    }
-
-    setIsPosting(true);
-
-    try {
-      const comment =
-        contentType === "media_profile"
-          ? await addMediaProfilePostComment({
-              body,
-              postId,
-              profileId: viewerProfileId,
-            })
-          : await addMediaTribunaComment({
-              body,
-              postId,
-              profileId: viewerProfileId,
-            });
-
-      setComments((current) => [...current, comment]);
-      setDraft("");
-    } catch (error) {
-      Alert.alert(
-        "Errore",
-        error instanceof Error ? error.message : "Commento non pubblicato.",
-      );
-    } finally {
-      setIsPosting(false);
     }
   }
 
@@ -151,84 +92,12 @@ export function MediaContentInteractions({
             {isSaved ? "Salvato" : "Salva"}
           </AppText>
         </Pressable>
-
-        <View accessible accessibilityLabel={`${comments.length} commenti`} style={styles.railCount}>
-          <Ionicons
-            color={colors.textMuted}
-            name="chatbubble-outline"
-            size={16}
-          />
-          <AppText color="secondary" variant="caption">
-            {comments.length}
-          </AppText>
-        </View>
-      </View>
-
-      {comments.length > 0 ? (
-        <View style={styles.comments}>
-          {comments.map((comment) => (
-            <View key={comment.id} style={styles.comment}>
-              <Avatar
-                name={comment.author_name}
-                size="sm"
-                uri={comment.author_avatar_url ?? undefined}
-              />
-              <View style={styles.commentText}>
-                <AppText numberOfLines={1} variant="titleSm">
-                  {comment.author_name}
-                </AppText>
-                <AppText color="secondary" variant="bodySm">
-                  {comment.body}
-                </AppText>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      <View style={styles.composer}>
-        <Input
-          onChangeText={setDraft}
-          placeholder="Scrivi un commento"
-          style={styles.composerInput}
-          value={draft}
-        />
-        <Button
-          disabled={draft.trim().length === 0 || isPosting}
-          label={isPosting ? "Invio…" : "Invia"}
-          onPress={() => {
-            void handleAddComment();
-          }}
-          size="sm"
-          testID="media-content-comment-submit"
-          variant="secondary"
-        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  comment: {
-    flexDirection: "row",
-    gap: spacing[10],
-  },
-  commentText: {
-    flexShrink: 1,
-    gap: spacing[4],
-    minWidth: 0,
-  },
-  comments: {
-    gap: spacing[12],
-  },
-  composer: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    gap: spacing[8],
-  },
-  composerInput: {
-    flex: 1,
-  },
   pressed: {
     opacity: 0.7,
   },
@@ -248,11 +117,6 @@ const styles = StyleSheet.create({
     gap: spacing[6],
     minHeight: 44,
     paddingRight: spacing[8],
-  },
-  railCount: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing[6],
   },
   root: {
     gap: spacing[16],

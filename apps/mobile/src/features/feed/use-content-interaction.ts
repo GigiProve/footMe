@@ -1,5 +1,7 @@
 /**
  * HOM-03 §104: Mi piace e commenti nel dettaglio `/content/[type]/[id]`.
+ * HOM-08: `commentsCount` (dominio unico dei commenti) semina anche
+ * `comment-count-store`, la cella che la `PostActionRow` mostra.
  *
  * Il dettaglio legacy non riceve il payload del Feed: legge lo stato da
  * `fetch_content_interaction_state` e lo semina nello store dei Mi piace
@@ -11,6 +13,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
+import { commentCountStore } from "../comments/comment-count-store";
 import type { LikeIdentityRef } from "../interactions/interaction-types";
 import { likeItemKey, likeStore, useLikeView } from "../interactions/like-store";
 import { FEED_QK } from "./feed-keys";
@@ -56,6 +59,8 @@ export function useContentInteraction(
         { likedAs: query.data.likedAs, likesCount: query.data.likesCount },
         query.data.fetchedAt ?? 0,
       );
+      // HOM-08 §210–§214: il conteggio commenti segue la stessa regola di freschezza.
+      commentCountStore.seed(key, query.data.commentsCount, query.data.fetchedAt ?? 0);
     }
   }, [key, query.data]);
 

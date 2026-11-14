@@ -200,7 +200,6 @@ function buildArticle(
     body: "Le trattative si infiammano.",
     category: "Mercato",
     comment_count: 4,
-    comments: [],
     cover_type: "image",
     cover_url: "https://cdn.test/articolo.jpg",
     created_at: "2026-06-19T08:00:00Z",
@@ -232,7 +231,6 @@ function buildTribunaPost(
   return {
     body: null,
     comment_count: 52,
-    comments: [],
     created_at: "2026-06-19T08:00:00Z",
     created_by_profile_id: "media-1",
     id: "tribuna-1",

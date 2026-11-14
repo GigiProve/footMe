@@ -11,6 +11,9 @@
  * (§122). Il Feed lo passa per ogni elemento; le altre superfici non lo
  * passano, e la sua assenza vuol dire «affidati al Back» (§127): non si
  * modificano le ~20 superfici che aprono `/content/...`.
+ *
+ * HOM-08 (§5–§6, §22): `focus` (`comments` | `composer`) è l'unico parametro
+ * nuovo; `commentsHref` lo sceglie dal numero di commenti.
  */
 
 import { articleEditHref, type ArticleOrigin } from "../article-editor/article-routes";
@@ -125,15 +128,61 @@ export function viewInsightsHref(params: ContentManageParams): string {
   return contentInsightsHref(params.content_type, params.content_id, params.origin);
 }
 
+/**
+ * HOM-08 §5–§6: dove atterra il dettaglio aperto dalla cella Commenta.
+ * `comments` = scroll alla sezione, tastiera chiusa; `composer` = composer
+ * attivo con focus. Parametro additivo: il dettaglio che non lo legge apre
+ * lo stesso contenuto.
+ */
+export const COMMENT_FOCUS_VALUES = ["comments", "composer"] as const;
+
+export type CommentFocus = (typeof COMMENT_FOCUS_VALUES)[number];
+
+/** Il valore della query string, o `null` se assente o sconosciuto. */
+export function parseCommentFocus(value: string | string[] | undefined): CommentFocus | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return COMMENT_FOCUS_VALUES.find((focus) => focus === raw) ?? null;
+}
+
+/** §5–§6: con commenti → sezione commenti; senza → composer a fuoco. */
+export function commentFocusForCount(commentsCount: number): CommentFocus {
+  return commentsCount > 0 ? "comments" : "composer";
+}
+
+/**
+ * La destinazione della cella Commenta (§5–§6, §22): il dettaglio canonico del
+ * contenuto con il `focus` deciso dal numero di commenti VISIBILE ORA (la cella
+ * dello store, non il payload congelato nella pagina).
+ */
+export function commentsHref(
+  contentType: FeedContentType,
+  postId: string,
+  commentsCount: number,
+  extra: { origin?: ContentOrigin | null } = {},
+): string {
+  return contentDetailHref(contentType, postId, {
+    focus: commentFocusForCount(commentsCount),
+    origin: extra.origin,
+  });
+}
+
 /** Il dettaglio contenuto con la provenienza (§122). */
 export function contentDetailHref(
   contentType: FeedContentType,
   postId: string,
-  extra: { origin?: ContentOrigin | null; media?: number; position?: number } = {},
+  extra: {
+    focus?: CommentFocus;
+    origin?: ContentOrigin | null;
+    media?: number;
+    position?: number;
+  } = {},
 ): string {
   const query: string[] = [];
   if (extra.media !== undefined) {
     query.push(`media=${extra.media}`);
+  }
+  if (extra.focus) {
+    query.push(`focus=${extra.focus}`);
   }
   if (extra.origin) {
     query.push(`origin=${extra.origin}`);

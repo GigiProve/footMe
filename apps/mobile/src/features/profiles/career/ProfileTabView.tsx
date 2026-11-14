@@ -161,8 +161,6 @@ function MediaTab({
         const tagMeta = getPlayerMediaTagMeta(item.tag);
 
         return {
-          commentCount: 0,
-          comments: [],
           description: item.description ?? "",
           id: item.id,
           isFeatured: item.is_featured,
@@ -191,8 +189,6 @@ function MediaTab({
     return highlightVideoUrl
       ? [
           {
-            commentCount: 0,
-            comments: [],
             description: "Video highlights del profilo.",
             id: "profile-highlight-video",
             isFeatured: false,

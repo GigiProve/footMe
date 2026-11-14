@@ -1,5 +1,7 @@
 /**
- * Mi piace sui contenuti: Post, Articolo, video editoriale (HOM-02 §52–53, §83;
+ * Mi piace sui contenuti: Post, Articolo, video editoriale e, da HOM-08 (§68–§76),
+ * i commenti (`contentType: "comment"`, stessa coda/store/RPC; un commento
+ * eliminato risponde `content_unavailable`, già classificato) (HOM-02 §52–53, §83;
  * HOM-03 §104; HOM-07 §10–§19, §135–§137, §170, §172, §189).
  *
  * Dominio unico (HOM-07 §1): lo stesso motore serve Feed, dettaglio Post e
@@ -25,6 +27,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { useToast } from "../../ui";
+import { commentCountStore } from "../comments/comment-count-store";
 import {
   isLikedBy,
   nextLikeSnapshot,
@@ -134,7 +137,8 @@ export function resetLikeEngine(): void {
  * conosce ancora il contenuto.
  */
 export type LikeTarget = {
-  contentType: FeedContentType;
+  /** HOM-08 §68, §221: anche `comment` (stessa entità `content_likes`). */
+  contentType: FeedContentType | "comment";
   postId: string;
   seed: LikeSnapshot;
   canLike: boolean;
@@ -156,11 +160,12 @@ export function likeSnapshotOf(payload: {
 export function seedLikesFromItems(items: readonly FeedItem[]): void {
   for (const item of items) {
     if (isContentItem(item)) {
-      likeStore.seed(
-        likeItemKey(item.payload.contentType, item.payload.postId),
-        likeSnapshotOf(item.payload),
-        item.fetchedAt ?? 0,
-      );
+      const key = likeItemKey(item.payload.contentType, item.payload.postId);
+      const fetchedAt = item.fetchedAt ?? 0;
+      likeStore.seed(key, likeSnapshotOf(item.payload), fetchedAt);
+      // HOM-08 §210–§214: stessa chiave e stesso `fetchedAt` anche per il
+      // conteggio dei commenti, così Feed e dettaglio non divergono.
+      commentCountStore.seed(key, item.payload.commentsCount, fetchedAt);
     }
   }
 }

@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  addMediaProfilePostComment,
-  createMediaProfilePost,
-  fetchMediaProfilePostFeed,
-} from "./media-profile-post-service";
+import { createMediaProfilePost, fetchMediaProfilePostFeed } from "./media-profile-post-service";
 
 const mocks = vi.hoisted(() => {
   type Filter = {
@@ -121,6 +117,13 @@ vi.mock("../../lib/supabase", () => ({
   },
 }));
 
+// HOM-08: il conteggio commenti arriva da `fetch_comment_counts`, non dalle tabelle.
+const countMocks = vi.hoisted(() => ({ fetchCommentCounts: vi.fn() }));
+
+vi.mock("../feed/comment-counts-service", () => ({
+  fetchCommentCounts: countMocks.fetchCommentCounts,
+}));
+
 const basePost = {
   author_id: "author-1",
   author_name: "Marco Bianchi",
@@ -145,9 +148,12 @@ describe("media-profile-post-service", () => {
   beforeEach(() => {
     mocks.reset();
     mocks.fromMock.mockClear();
+    countMocks.fetchCommentCounts.mockReset();
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map());
   });
 
-  it("fetches published feed items with comments, saved state and tagged targets", async () => {
+  it("fetches published feed items with comment count, saved state and tagged targets", async () => {
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map([["post-1", 2]]));
     mocks.queueResponses(
       {
         data: [
@@ -163,7 +169,6 @@ describe("media-profile-post-service", () => {
         ],
         error: null,
       },
-      { data: [{ post_id: "post-1" }, { post_id: "post-1" }], error: null },
       { data: [{ post_id: "post-1" }], error: null },
       {
         data: [
@@ -217,6 +222,11 @@ describe("media-profile-post-service", () => {
     const feed = await fetchMediaProfilePostFeed("media-1", "viewer-1");
 
     expect(feed.map((post) => post.id)).toEqual(["post-1", "post-2"]);
+    expect(countMocks.fetchCommentCounts).toHaveBeenCalledWith("media_profile", [
+      "post-1",
+      "post-2",
+    ]);
+    expect(feed[1].comment_count).toBe(0);
     expect(feed[0]).toMatchObject({
       comment_count: 2,
       display_mode: "full",
@@ -380,50 +390,15 @@ describe("media-profile-post-service", () => {
     });
   });
 
-  it("adds a comment for the current profile", async () => {
-    mocks.queueResponses(
-      {
-        data: {
-          body: "Bell'articolo!",
-          created_at: "2026-05-19T09:00:00Z",
-          id: "comment-1",
-          post_id: "post-1",
-          profile_id: "viewer-1",
-        },
-        error: null,
-      },
-      {
-        data: [
-          {
-            avatar_url: null,
-            full_name: "Luigi",
-            id: "viewer-1",
-            role: "fan",
-          },
-        ],
-        error: null,
-      },
+  it("non legge più la tabella commenti legacy (HOM-08: dominio unico) e un conteggio mancante vale 0", async () => {
+    mocks.queueResponses({ data: [{ ...basePost, id: "post-1" }], error: null });
+
+    const feed = await fetchMediaProfilePostFeed("media-1");
+
+    expect(feed[0]).not.toHaveProperty("comments");
+    expect(feed[0].comment_count).toBe(0);
+    expect(mocks.operations.map((operation) => operation.table)).not.toContain(
+      "media_profile_post_comments",
     );
-
-    const comment = await addMediaProfilePostComment({
-      body: "  Bell'articolo!  ",
-      postId: "post-1",
-      profileId: "viewer-1",
-    });
-
-    expect(comment).toMatchObject({
-      author_name: "Luigi",
-      body: "Bell'articolo!",
-      id: "comment-1",
-    });
-    expect(mocks.operations[0]).toMatchObject({
-      action: "select",
-      payload: {
-        body: "Bell'articolo!",
-        post_id: "post-1",
-        profile_id: "viewer-1",
-      },
-      table: "media_profile_post_comments",
-    });
   });
 });

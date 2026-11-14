@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { fetchCommentCounts } from "../feed/comment-counts-service";
 
 export type MediaTribunaKind =
   | "editorial_poll"
@@ -30,15 +31,12 @@ export type MediaTribunaOption = {
   vote_count: number;
 };
 
-export type MediaTribunaComment = {
-  author_avatar_url: string | null;
-  author_name: string;
-  body: string;
-  created_at: string;
-  id: string;
-  profile_id: string;
-};
-
+/*
+  HOM-08 §1, §3: nessun thread in questo servizio; `media_tribuna_comments`
+  è assorbita da `content_comments` (RPC in `features/comments`). Resta il solo
+  conteggio (`fetch_comment_counts`, una chiamata per lista). Domande e voti
+  della Tribuna editoriale restano qui: sono altro dai commenti.
+*/
 export type MediaTribunaQuestion = {
   author_avatar_url: string | null;
   author_name: string;
@@ -53,7 +51,6 @@ export type MediaTribunaQuestion = {
 export type MediaTribunaPost = {
   body: string | null;
   comment_count: number;
-  comments: MediaTribunaComment[];
   created_at: string;
   created_by_profile_id: string;
   id: string;
@@ -131,14 +128,6 @@ type MediaTribunaOptionRow = {
 };
 
 type MediaTribunaQuestionRow = {
-  body: string;
-  created_at: string;
-  id: string;
-  post_id: string;
-  profile_id: string;
-};
-
-type MediaTribunaCommentRow = {
   body: string;
   created_at: string;
   id: string;
@@ -382,34 +371,6 @@ export async function toggleSavedMediaTribuna(
   }
 }
 
-export async function addMediaTribunaComment(input: {
-  body: string;
-  postId: string;
-  profileId: string;
-}): Promise<MediaTribunaComment> {
-  const body = requireText(input.body, "Scrivi un commento prima di pubblicare.");
-
-  const { data, error } = await supabase
-    .from("media_tribuna_comments")
-    .insert({
-      body,
-      post_id: input.postId,
-      profile_id: input.profileId,
-    })
-    .select("id, post_id, profile_id, body, created_at")
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Commento non creato.");
-  }
-
-  return enrichComment(data as MediaTribunaCommentRow);
-}
-
 export async function submitMediaTribunaQuestion(input: {
   body: string;
   postId: string;
@@ -553,17 +514,15 @@ async function enrichMediaTribunaPosts(
     savedIds,
     optionsByPost,
     optionVoteState,
-    commentsByPost,
     questionsByPost,
     linkedArticles,
   ] = await Promise.all([
-    loadCountMap("media_tribuna_comments", "post_id", postIds),
+    fetchCommentCounts("media_tribuna", postIds),
     viewerProfileId
       ? loadViewerSavedPostIds(viewerProfileId, postIds)
       : Promise.resolve(new Set<string>()),
     loadOptionsByPost(postIds),
     loadOptionVoteState(postIds, viewerProfileId),
-    loadCommentsByPost(postIds),
     loadQuestionsByPost(postIds, viewerProfileId),
     loadLinkedArticles(linkedArticleIds),
   ]);
@@ -587,7 +546,6 @@ async function enrichMediaTribunaPosts(
     return {
       body: row.body ?? null,
       comment_count: commentCounts.get(row.id) ?? 0,
-      comments: commentsByPost.get(row.id) ?? [],
       created_at: row.created_at,
       created_by_profile_id: row.created_by_profile_id,
       id: row.id,
@@ -775,44 +733,6 @@ async function loadQuestionVoteState(
   return { questionCounts, viewerQuestionIds };
 }
 
-async function loadCommentsByPost(postIds: string[]) {
-  const commentsByPost = new Map<string, MediaTribunaComment[]>();
-
-  if (postIds.length === 0) {
-    return commentsByPost;
-  }
-
-  const { data, error } = await supabase
-    .from("media_tribuna_comments")
-    .select("id, post_id, profile_id, body, created_at")
-    .in("post_id", postIds)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data ?? []) as MediaTribunaCommentRow[];
-  const profiles = await loadProfilesById(rows.map((row) => row.profile_id));
-
-  for (const row of rows) {
-    const profile = profiles.get(row.profile_id);
-    const list = commentsByPost.get(row.post_id) ?? [];
-
-    list.push({
-      author_avatar_url: profile?.avatar_url ?? null,
-      author_name: profile?.full_name?.trim() || "Utente ProLink",
-      body: row.body,
-      created_at: row.created_at,
-      id: row.id,
-      profile_id: row.profile_id,
-    });
-    commentsByPost.set(row.post_id, list);
-  }
-
-  return commentsByPost;
-}
-
 async function loadLinkedArticles(articleIds: string[]) {
   const articles = new Map<string, LinkedMediaArticle>();
   const ids = uniqueIds(articleIds);
@@ -845,27 +765,6 @@ async function loadLinkedArticles(articleIds: string[]) {
   return articles;
 }
 
-async function loadCountMap(table: string, column: string, ids: string[]) {
-  const counts = new Map<string, number>();
-
-  if (ids.length === 0) {
-    return counts;
-  }
-
-  const { data, error } = await supabase.from(table).select(column).in(column, ids);
-
-  if (error) {
-    throw error;
-  }
-
-  for (const row of (data ?? []) as unknown as Record<string, string>[]) {
-    const id = row[column];
-    counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-
-  return counts;
-}
-
 async function loadViewerSavedPostIds(profileId: string, postIds: string[]) {
   const ids = new Set<string>();
 
@@ -888,20 +787,6 @@ async function loadViewerSavedPostIds(profileId: string, postIds: string[]) {
   }
 
   return ids;
-}
-
-async function enrichComment(row: MediaTribunaCommentRow) {
-  const profiles = await loadProfilesById([row.profile_id]);
-  const author = profiles.get(row.profile_id);
-
-  return {
-    author_avatar_url: author?.avatar_url ?? null,
-    author_name: author?.full_name?.trim() || "Utente ProLink",
-    body: row.body,
-    created_at: row.created_at,
-    id: row.id,
-    profile_id: row.profile_id,
-  };
 }
 
 async function loadProfilesById(profileIds: string[]) {

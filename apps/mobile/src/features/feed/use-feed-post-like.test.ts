@@ -3,6 +3,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { commentCountStore } from "../comments/comment-count-store";
 import type { InteractionIdentity } from "../interactions/interaction-types";
 import { likeItemKey, likeStore } from "../interactions/like-store";
 import { makeEditorialItem, makeEditorialPayload, makePostItem } from "./feed-post-fixtures";
@@ -155,6 +156,26 @@ describe("seedLikesFromItems — HOM-07 §135", () => {
 
     seedLikesFromItems([{ ...video(9), fetchedAt: 400 } as FeedItem]);
     expect(likeStore.get(KEY)?.likesCount).toBe(9);
+  });
+
+  it("semina anche il conteggio commenti, con lo stesso istante e la stessa chiave (HOM-08 §210)", () => {
+    commentCountStore.clear();
+
+    seedLikesFromItems([
+      { ...video(5, { commentsCount: 12 }), fetchedAt: 300 } as FeedItem,
+    ]);
+    expect(commentCountStore.get(KEY)).toBe(12);
+
+    // Una pagina più vecchia non cancella un conteggio più recente.
+    seedLikesFromItems([
+      { ...video(5, { commentsCount: 3 }), fetchedAt: 100 } as FeedItem,
+    ]);
+    expect(commentCountStore.get(KEY)).toBe(12);
+
+    seedLikesFromItems([
+      { ...video(5, { commentsCount: 15 }), fetchedAt: 400 } as FeedItem,
+    ]);
+    expect(commentCountStore.get(KEY)).toBe(15);
   });
 
   it("likeSnapshotOf prende solo conteggio e identità", () => {

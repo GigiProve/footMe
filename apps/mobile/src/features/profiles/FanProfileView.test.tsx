@@ -142,7 +142,6 @@ function tribunaPost(overrides: Partial<FanTribunaPost> = {}): FanTribunaPost {
   return {
     body: "Serve più spazio ai giovani.",
     comment_count: 18,
-    comments: [],
     created_at: "2026-05-15T08:00:00Z",
     formation: null,
     id: "opinion-1",

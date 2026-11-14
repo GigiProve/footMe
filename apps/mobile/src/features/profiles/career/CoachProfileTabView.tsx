@@ -177,8 +177,6 @@ function CoachMediaTab({
         const tagMeta = getCoachMediaTagMeta(item.tag);
 
         return {
-          commentCount: 0,
-          comments: [],
           description: item.description ?? "",
           id: item.id,
           isFeatured: item.is_featured,
@@ -205,8 +203,6 @@ function CoachMediaTab({
     return technicalVideoUrl
       ? [
           {
-            commentCount: 0,
-            comments: [],
             description: "Video tecnico del profilo.",
             id: "coach-technical-video",
             isFeatured: false,

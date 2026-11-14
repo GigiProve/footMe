@@ -37,7 +37,6 @@ function buildPost(overrides: Partial<MediaTribunaPost> = {}): MediaTribunaPost 
   return {
     body: null,
     comment_count: 0,
-    comments: [],
     created_at: "2026-06-19T08:00:00Z",
     created_by_profile_id: "media-1",
     id: "tribuna-1",

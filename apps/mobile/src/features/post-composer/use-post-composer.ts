@@ -107,6 +107,12 @@ import type {
   WireUpdatePostResult,
 } from "./composer-types";
 import { newComposerOperationKey } from "./operation-key";
+import {
+  MIN_SEARCH_LENGTH,
+  SEARCH_DEBOUNCE_MS,
+  useDebouncedValue,
+  useMentionAutocomplete,
+} from "./use-mention-autocomplete";
 
 export const COMPOSER_MEDIA_PERMISSION_COPY =
   "Consenti l'accesso a foto e video dalle impostazioni per aggiungerli al post.";
@@ -114,14 +120,11 @@ export const COMPOSER_VIDEO_TOO_LONG_COPY =
   "Alcuni video superano la durata massima consentita e non sono stati aggiunti.";
 export const COMPOSER_TAG_SEARCH_ERROR_COPY = "Ricerca non disponibile. Riprova.";
 
-/** Tempi in ms: la ricerca segue la digitazione, l'anteprima aspetta che si smetta di scrivere. */
+/** Tempi in ms: la ricerca segue la digitazione (`SEARCH_DEBOUNCE_MS`), l'anteprima aspetta che si smetta di scrivere. */
 export const LINK_DEBOUNCE_MS = 700;
-export const SEARCH_DEBOUNCE_MS = 300;
+export { SEARCH_DEBOUNCE_MS };
 export const RECOVERY_DEBOUNCE_MS = 800;
 export const REORDER_HINT_MS = 6000;
-
-/** Stessa soglia di `searchTagTargets` (§101): sotto i 2 caratteri non si cerca. */
-const MIN_SEARCH_LENGTH = 2;
 
 /* ------------------------------------------------------------------ */
 /* Apertura: contesto e Post da modificare                             */
@@ -256,17 +259,6 @@ export function usePostComposerSource(params: ComposerSourceParams): ComposerSou
 /* Composer                                                            */
 /* ------------------------------------------------------------------ */
 
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-
-  return debounced;
-}
-
 /** Solo la forma del Post, mai il suo contenuto (§201). */
 function publishProps(state: ComposerState): PublishProps {
   return {
@@ -356,7 +348,9 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
   }, [store]);
 
   const [notice, setNotice] = useState<string | null>(null);
-  const [selection, setSelection] = useState({ end: 0, start: 0 });
+  // HOM-08: stesso core per le mention dei commenti (`use-mention-autocomplete.ts`).
+  const mentionAutocomplete = useMentionAutocomplete({ body: state.body, mentions: state.mentions, userId });
+  const { selection, setSelection } = mentionAutocomplete;
   const [reorderHintDismissed, setReorderHintDismissed] = useState(false);
 
   // Tag: la selezione è una bozza locale finché non si preme «Fine» (§104–106).
@@ -533,22 +527,7 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
 
   /* ---------------- mention (§110–113) ---------------- */
 
-  const mentionQuery =
-    selection.start === selection.end ? mentionQueryAt(state.body, selection.end, state.mentions) : null;
-  const mentionText = useDebouncedValue(mentionQuery?.query ?? "", SEARCH_DEBOUNCE_MS);
-  const mentionEnabled = mentionQuery !== null && mentionText.trim().length >= MIN_SEARCH_LENGTH;
-
-  const mentionSearch = useQuery({
-    enabled: mentionEnabled,
-    queryFn: () => searchTagCandidates(mentionText),
-    queryKey: composerKeys.tagSearch(userId, mentionText),
-    staleTime: 60_000,
-  });
-
-  const mentionCandidates = mentionEnabled ? (mentionSearch.data ?? []) : [];
-  const mentionLoading = mentionQuery !== null && mentionQuery.query.trim().length >= MIN_SEARCH_LENGTH
-    ? mentionSearch.isFetching || mentionQuery.query !== mentionText
-    : false;
+  // Query, debounce e candidati: `useMentionAutocomplete`, chiamato sopra.
 
   /* ---------------- ricerca tag (§99–106) ---------------- */
 
@@ -1012,7 +991,7 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     }
   }
 
-  const mentionState = { candidates: mentionCandidates, loading: mentionLoading };
+  const mentionState = { candidates: mentionAutocomplete.candidates, loading: mentionAutocomplete.loading };
 
   return {
     actions: {

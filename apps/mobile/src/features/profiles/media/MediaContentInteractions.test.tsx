@@ -1,10 +1,11 @@
 /**
- * Interazioni del dettaglio contenuto Media/Creator (REV-PROF-21).
+ * Interazioni del dettaglio contenuto Media/Creator (REV-PROF-21; HOM-08).
  *
  * Il test fissa la riga della DoD che rischiava di regredire spostando le
- * azioni fuori dal profilo: Salva e commenti restano disponibili nel
- * dettaglio, per entrambe le superfici Media, e un salvataggio non riuscito
- * non resta a schermo come se fosse andato a buon fine.
+ * azioni fuori dal profilo: Salva resta disponibile nel dettaglio, per entrambe
+ * le superfici Media, e un salvataggio non riuscito non resta a schermo come se
+ * fosse andato a buon fine. HOM-08: i commenti non sono più qui (dominio unico
+ * in `features/comments`): nessun input e nessun invio.
  */
 import React from "react";
 import { Alert } from "react-native";
@@ -15,24 +16,14 @@ import { resetSavedStore } from "../../saved/saved-store";
 import { MediaContentInteractions } from "./MediaContentInteractions";
 
 const mocks = vi.hoisted(() => ({
-  addMediaProfilePostComment: vi.fn(),
-  addMediaTribunaComment: vi.fn(),
   setSavedRemote: vi.fn(),
 }));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: Object.assign(
     (props: Record<string, unknown>) => React.createElement("Ionicon", props),
-    { glyphMap: { bookmark: 1, "bookmark-outline": 1, "chatbubble-outline": 1 } },
+    { glyphMap: { bookmark: 1, "bookmark-outline": 1 } },
   ),
-}));
-
-vi.mock("../media-profile-post-service", () => ({
-  addMediaProfilePostComment: mocks.addMediaProfilePostComment,
-}));
-
-vi.mock("../media-tribuna-service", () => ({
-  addMediaTribunaComment: mocks.addMediaTribunaComment,
 }));
 
 // HOM-07: il Salva passa dalla mutation unica `set_saved`, non più dai servizi per tabella.
@@ -63,43 +54,10 @@ function findByTestId(root: TestRenderer.ReactTestInstance, testID: string) {
   return node;
 }
 
-function collectText(children: unknown): string {
-  if (typeof children === "string" || typeof children === "number") {
-    return String(children);
-  }
-
-  if (Array.isArray(children)) {
-    return children.map(collectText).join("");
-  }
-
-  if (children && typeof children === "object" && "props" in children) {
-    return collectText(
-      (children as { props?: { children?: unknown } }).props?.children,
-    );
-  }
-
-  return "";
-}
-
-function hasText(root: TestRenderer.ReactTestInstance, value: string) {
-  return (
-    root.findAll((node) => collectText(node.props.children).includes(value))
-      .length > 0
-  );
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   resetSavedStore();
   mocks.setSavedRemote.mockResolvedValue(true);
-  mocks.addMediaProfilePostComment.mockResolvedValue({
-    author_avatar_url: null,
-    author_name: "Luigi",
-    body: "Bell'articolo",
-    created_at: "2026-06-19T09:00:00Z",
-    id: "comment-new",
-    profile_id: "viewer-1",
-  });
   vi.spyOn(Alert, "alert").mockImplementation(() => undefined);
 });
 
@@ -108,7 +66,6 @@ describe("MediaContentInteractions", () => {
     const tree = render(
       <MediaContentInteractions
         contentType="media_profile"
-        initialComments={[]}
         initialIsSaved={false}
         postId="article-1"
         viewerProfileId="viewer-1"
@@ -131,7 +88,6 @@ describe("MediaContentInteractions", () => {
     const tree = render(
       <MediaContentInteractions
         contentType="media_tribuna"
-        initialComments={[]}
         initialIsSaved={true}
         postId="tribuna-1"
         viewerProfileId="viewer-1"
@@ -155,7 +111,6 @@ describe("MediaContentInteractions", () => {
     const tree = render(
       <MediaContentInteractions
         contentType="media_profile"
-        initialComments={[]}
         initialIsSaved={false}
         postId="article-1"
         viewerProfileId="viewer-1"
@@ -182,7 +137,6 @@ describe("MediaContentInteractions", () => {
     const tree = render(
       <MediaContentInteractions
         contentType="media_profile"
-        initialComments={[]}
         initialIsSaved={false}
         postId="article-1"
         viewerProfileId={null}
@@ -200,46 +154,18 @@ describe("MediaContentInteractions", () => {
     );
   });
 
-  it("mostra i commenti esistenti e pubblica il nuovo", async () => {
+  it("non ha più un input di commento (HOM-08: dominio unico)", () => {
     const tree = render(
       <MediaContentInteractions
         contentType="media_profile"
-        initialComments={[
-          {
-            author_avatar_url: null,
-            author_name: "Sara",
-            body: "Analisi interessante",
-            created_at: "2026-06-19T08:30:00Z",
-            id: "comment-1",
-            profile_id: "profile-2",
-          },
-        ]}
         initialIsSaved={false}
         postId="article-1"
         viewerProfileId="viewer-1"
       />,
     );
 
-    expect(hasText(tree.root, "Analisi interessante")).toBe(true);
-
-    const input = tree.root.findAll(
-      (node) => typeof node.props.onChangeText === "function",
-    )[0];
-
-    act(() => {
-      input?.props.onChangeText("Bell'articolo");
-    });
-
-    await act(async () => {
-      findByTestId(tree.root, "media-content-comment-submit").props.onPress();
-      await Promise.resolve();
-    });
-
-    expect(mocks.addMediaProfilePostComment).toHaveBeenCalledWith({
-      body: "Bell'articolo",
-      postId: "article-1",
-      profileId: "viewer-1",
-    });
-    expect(hasText(tree.root, "Bell'articolo")).toBe(true);
+    expect(
+      tree.root.findAll((node) => typeof node.props.onChangeText === "function"),
+    ).toHaveLength(0);
   });
 });

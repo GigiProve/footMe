@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { fetchCommentCounts } from "../feed/comment-counts-service";
 
 export const FAN_MEDIA_TAG_OPTIONS = [
   { label: "Partita", value: "Partita" },
@@ -15,18 +16,14 @@ export const FAN_MEDIA_TAG_OPTIONS = [
 export type FanMediaTag = (typeof FAN_MEDIA_TAG_OPTIONS)[number]["value"];
 export type FanMediaVisualType = "image" | "video";
 
-export type FanMediaComment = {
-  author_avatar_url: string | null;
-  author_name: string;
-  body: string;
-  created_at: string;
-  id: string;
-  profile_id: string;
-};
-
+/*
+  HOM-08 §1, §3: nessun thread in questo servizio; `fan_media_comments` è
+  assorbita da `content_comments` (RPC in `features/comments`). Resta il solo
+  conteggio (`fetch_comment_counts`, una chiamata per lista), che semina anche
+  `comment-count-store`.
+*/
 export type FanMediaPost = {
   comment_count: number;
-  comments: FanMediaComment[];
   created_at: string;
   description: string;
   id: string;
@@ -67,12 +64,6 @@ type FanMediaPostRow = {
   visual_url: string;
 };
 
-type ProfileRow = {
-  avatar_url: string | null;
-  full_name: string | null;
-  id: string;
-};
-
 const POST_SELECT =
   "id, profile_id, description, tag, visual_url, visual_type, thumbnail_url, status, published_at, created_at, updated_at";
 
@@ -106,7 +97,7 @@ export async function fetchFanMediaFeed(
     throw error;
   }
 
-  return enrichFanMediaPosts((data ?? []) as FanMediaPostRow[], viewerProfileId, true);
+  return enrichFanMediaPosts((data ?? []) as FanMediaPostRow[], viewerProfileId);
 }
 
 export async function fetchFanMediaPostDetail(
@@ -128,11 +119,7 @@ export async function fetchFanMediaPostDetail(
     return null;
   }
 
-  const [post] = await enrichFanMediaPosts(
-    [data as FanMediaPostRow],
-    viewerProfileId,
-    true,
-  );
+  const [post] = await enrichFanMediaPosts([data as FanMediaPostRow], viewerProfileId);
 
   return post ?? null;
 }
@@ -155,59 +142,13 @@ export async function createFanMediaPost(
     throw new Error("Contenuto non creato.");
   }
 
-  const [post] = await enrichFanMediaPosts(
-    [data as FanMediaPostRow],
-    input.profileId,
-    true,
-  );
+  const [post] = await enrichFanMediaPosts([data as FanMediaPostRow], input.profileId);
 
   if (!post) {
     throw new Error("Contenuto non creato.");
   }
 
   return post;
-}
-
-export async function addFanMediaComment(input: {
-  body: string;
-  postId: string;
-  profileId: string;
-}): Promise<FanMediaComment> {
-  const trimmedBody = input.body.trim();
-
-  if (!trimmedBody) {
-    throw new Error("Scrivi un commento prima di pubblicare.");
-  }
-
-  const { data, error } = await supabase
-    .from("fan_media_comments")
-    .insert({
-      body: trimmedBody,
-      post_id: input.postId,
-      profile_id: input.profileId,
-    })
-    .select("id, post_id, profile_id, body, created_at")
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Commento non creato.");
-  }
-
-  const profiles = await loadProfilesById([input.profileId]);
-  const author = profiles.get(input.profileId);
-
-  return {
-    author_avatar_url: author?.avatar_url ?? null,
-    author_name: author?.full_name?.trim() || "Utente ProLink",
-    body: String((data as { body: string }).body),
-    created_at: String((data as { created_at: string }).created_at),
-    id: String((data as { id: string }).id),
-    profile_id: input.profileId,
-  };
 }
 
 export async function deleteFanMediaPost(postId: string) {
@@ -302,23 +243,15 @@ function buildCreatePayload(input: CreateFanMediaPostInput) {
 async function enrichFanMediaPosts(
   rows: FanMediaPostRow[],
   viewerProfileId?: string | null,
-  includeComments = false,
 ): Promise<FanMediaPost[]> {
   if (rows.length === 0) {
     return [];
   }
 
   const postIds = rows.map((row) => row.id);
-  const [
-    likeCounts,
-    commentCounts,
-    savedCounts,
-    likedIds,
-    savedIds,
-    commentsByPost,
-  ] = await Promise.all([
+  const [likeCounts, commentCounts, savedCounts, likedIds, savedIds] = await Promise.all([
     loadPostCountMap("fan_media_likes", postIds),
-    loadPostCountMap("fan_media_comments", postIds),
+    fetchCommentCounts("fan_media", postIds),
     loadPostCountMap("saved_fan_media", postIds),
     viewerProfileId
       ? loadViewerPostIds("fan_media_likes", viewerProfileId, postIds)
@@ -326,14 +259,10 @@ async function enrichFanMediaPosts(
     viewerProfileId
       ? loadViewerPostIds("saved_fan_media", viewerProfileId, postIds)
       : Promise.resolve(new Set<string>()),
-    includeComments
-      ? loadCommentsByPost(postIds)
-      : Promise.resolve(new Map<string, FanMediaComment[]>()),
   ]);
 
   return rows.map((row) => ({
     comment_count: commentCounts.get(row.id) ?? 0,
-    comments: commentsByPost.get(row.id) ?? [],
     created_at: row.created_at,
     description: row.description,
     id: row.id,
@@ -403,74 +332,6 @@ async function loadViewerPostIds(
   return ids;
 }
 
-async function loadCommentsByPost(postIds: string[]) {
-  const commentsByPost = new Map<string, FanMediaComment[]>();
-
-  if (postIds.length === 0) {
-    return commentsByPost;
-  }
-
-  const { data, error } = await supabase
-    .from("fan_media_comments")
-    .select("id, post_id, profile_id, body, created_at")
-    .in("post_id", postIds)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data ?? []) as {
-    body: string;
-    created_at: string;
-    id: string;
-    post_id: string;
-    profile_id: string;
-  }[];
-  const profiles = await loadProfilesById(rows.map((row) => row.profile_id));
-
-  for (const row of rows) {
-    const profile = profiles.get(row.profile_id);
-    const list = commentsByPost.get(row.post_id) ?? [];
-
-    list.push({
-      author_avatar_url: profile?.avatar_url ?? null,
-      author_name: profile?.full_name?.trim() || "Utente ProLink",
-      body: row.body,
-      created_at: row.created_at,
-      id: row.id,
-      profile_id: row.profile_id,
-    });
-    commentsByPost.set(row.post_id, list);
-  }
-
-  return commentsByPost;
-}
-
-async function loadProfilesById(profileIds: string[]) {
-  const profiles = new Map<string, ProfileRow>();
-  const ids = uniqueIds(profileIds);
-
-  if (ids.length === 0) {
-    return profiles;
-  }
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, avatar_url")
-    .in("id", ids);
-
-  if (error) {
-    throw error;
-  }
-
-  for (const profile of (data ?? []) as ProfileRow[]) {
-    profiles.set(profile.id, profile);
-  }
-
-  return profiles;
-}
-
 function normalizeDescription(value: string) {
   const trimmed = value.trim();
 
@@ -504,13 +365,3 @@ function normalizeText(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function uniqueIds(ids: string[]) {
-  return Array.from(
-    new Set(
-      ids
-        .filter((id): id is string => typeof id === "string")
-        .map((id) => id.trim())
-        .filter(Boolean),
-    ),
-  );
-}

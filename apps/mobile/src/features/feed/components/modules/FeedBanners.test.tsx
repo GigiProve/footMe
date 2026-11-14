@@ -106,6 +106,18 @@ describe("NewContentPill (HOM-01.1 §40–§41)", () => {
 
     expect(onPress).toHaveBeenCalledTimes(1);
   });
+
+  it("con `label` è la stessa pill per «Nuovi commenti» (HOM-08 §141)", () => {
+    const onPress = vi.fn();
+    const tree = render(<NewContentPill label="Nuovi commenti" onPress={onPress} />);
+
+    expect(textOf(tree)).toContain("Nuovi commenti");
+    expect(textOf(tree)).not.toContain(FEED_NEW_CONTENT);
+
+    press(tree, "Nuovi commenti");
+
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("fine Feed e componenti rimossi", () => {

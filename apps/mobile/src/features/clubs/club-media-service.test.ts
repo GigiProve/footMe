@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  addClubMediaComment,
-  createClubMediaPost,
-  fetchClubMediaFeed,
-} from "./club-media-service";
+import { createClubMediaPost, fetchClubMediaFeed } from "./club-media-service";
 
 const mocks = vi.hoisted(() => {
   type Filter = {
@@ -114,6 +110,13 @@ const interactionMocks = vi.hoisted(() => ({
 
 vi.mock("../interactions/interaction-service", () => interactionMocks);
 
+// HOM-08: il conteggio commenti arriva da `fetch_comment_counts`, non dalle tabelle.
+const countMocks = vi.hoisted(() => ({ fetchCommentCounts: vi.fn() }));
+
+vi.mock("../feed/comment-counts-service", () => ({
+  fetchCommentCounts: countMocks.fetchCommentCounts,
+}));
+
 const basePost = {
   attachment_label: null,
   body: "Corpo contenuto",
@@ -141,9 +144,12 @@ describe("club-media-service", () => {
   beforeEach(() => {
     mocks.reset();
     mocks.fromMock.mockClear();
+    countMocks.fetchCommentCounts.mockReset();
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map());
   });
 
   it("fetches feed items with social state, counts and tagged profiles", async () => {
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map([["post-new", 1]]));
     mocks.queueResponses(
       // posts
       {
@@ -170,8 +176,6 @@ describe("club-media-service", () => {
       },
       // like counts
       { data: [{ post_id: "post-new" }, { post_id: "post-new" }], error: null },
-      // comment counts
-      { data: [{ post_id: "post-new" }], error: null },
       // liked by viewer
       { data: [{ post_id: "post-new" }], error: null },
       // saved by viewer
@@ -210,6 +214,11 @@ describe("club-media-service", () => {
     const feed = await fetchClubMediaFeed("club-1", "viewer-1");
 
     expect(feed.map((post) => post.id)).toEqual(["post-new", "post-old"]);
+    expect(countMocks.fetchCommentCounts).toHaveBeenCalledWith("club_media", [
+      "post-new",
+      "post-old",
+    ]);
+    expect(feed[1].comment_count).toBe(0);
     expect(feed[0]).toMatchObject({
       comment_count: 1,
       is_liked: true,
@@ -277,8 +286,6 @@ describe("club-media-service", () => {
       // notifyTaggedProfiles → notifications insert
       { data: null, error: null },
       // enrichClubMediaPosts: like counts
-      { data: [], error: null },
-      // comment counts
       { data: [], error: null },
       // liked by viewer (no viewer)
       // saved by viewer (no viewer)
@@ -360,50 +367,15 @@ describe("club-media-service", () => {
     });
   });
 
-  it("adds a comment for the current profile", async () => {
+  it("non legge né scrive più la tabella commenti legacy (HOM-08: dominio unico)", async () => {
     mocks.queueResponses(
-      {
-        data: {
-          body: "Forza Como!",
-          created_at: "2026-05-14T09:00:00Z",
-          id: "comment-1",
-          post_id: "post-1",
-          profile_id: "viewer-1",
-        },
-        error: null,
-      },
-      {
-        data: [
-          {
-            avatar_url: null,
-            full_name: "Luigi",
-            id: "viewer-1",
-            role: "fan",
-          },
-        ],
-        error: null,
-      },
+      { data: [{ ...basePost, id: "post-1", kind: "market", title: "Nuovo acquisto" }], error: null },
     );
 
-    const comment = await addClubMediaComment({
-      body: "  Forza Como!  ",
-      postId: "post-1",
-      profileId: "viewer-1",
-    });
+    const feed = await fetchClubMediaFeed("club-1");
 
-    expect(comment).toMatchObject({
-      author_name: "Luigi",
-      body: "Forza Como!",
-      id: "comment-1",
-    });
-    expect(mocks.operations[0]).toMatchObject({
-      action: "select",
-      payload: {
-        body: "Forza Como!",
-        post_id: "post-1",
-        profile_id: "viewer-1",
-      },
-      table: "club_media_comments",
-    });
+    expect(feed[0]).not.toHaveProperty("comments");
+    expect(feed[0].comment_count).toBe(0);
+    expect(mocks.operations.map((operation) => operation.table)).not.toContain("club_media_comments");
   });
 });

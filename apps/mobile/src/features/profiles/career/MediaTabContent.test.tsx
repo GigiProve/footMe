@@ -55,8 +55,6 @@ describe("MediaTabContent", () => {
         authorName="Alessandro Bianchi"
         initialItems={[
           {
-            commentCount: 12,
-            comments: [],
             description: "Video highlights del profilo.",
             id: "profile-highlight-video",
             isFeatured: false,
@@ -87,8 +85,6 @@ describe("MediaTabContent", () => {
         authorName="Alessandro Bianchi"
         initialItems={[
           {
-            commentCount: 0,
-            comments: [],
             description: "",
             id: "normal-item",
             isFeatured: false,
@@ -100,8 +96,6 @@ describe("MediaTabContent", () => {
             type: "image",
           },
           {
-            commentCount: 0,
-            comments: [],
             description: "",
             id: "featured-item",
             isFeatured: true,
@@ -136,8 +130,6 @@ describe("MediaTabContent", () => {
   */
   const REV_PROF_12_ITEMS: MediaContentItem[] = [
     {
-      commentCount: 3,
-      comments: [],
       description: "Assist di tacco.",
       durationSeconds: 24,
       id: "clip",
@@ -150,8 +142,6 @@ describe("MediaTabContent", () => {
       videoUrl: "https://example.com/clip.mp4",
     },
     {
-      commentCount: 0,
-      comments: [],
       description: "",
       id: "shot",
       isFeatured: false,
@@ -233,5 +223,22 @@ describe("MediaTabContent", () => {
     });
 
     expect(findSaveAction().props.active).toBe(false);
+  });
+
+  it("non mostra più commenti finti né l'Alert «Apri la lista» nel viewer (HOM-08)", () => {
+    const tree = renderMediaTabContent(
+      <MediaTabContent
+        authorName="Alessandro Bianchi"
+        initialItems={[...REV_PROF_12_ITEMS]}
+        mode="visitor"
+      />,
+    );
+
+    act(() => {
+      tree.root.findByProps({ testID: "media-grid-item-clip" }).props.onPress();
+    });
+
+    expect(tree.root.findAllByProps({ accessibilityLabel: "Apri commenti contenuto" })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: "Vedi tutti i commenti" })).toHaveLength(0);
   });
 });

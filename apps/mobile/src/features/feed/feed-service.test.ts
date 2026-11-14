@@ -6,6 +6,7 @@ import {
   fetchContentMediaStates,
   fetchHomeFeedPage,
   mapFeedRow,
+  mapPostDetail,
   mapProfilePostDetail,
   resolveIdentityHref,
   resolvePostMediaHref,
@@ -587,6 +588,40 @@ describe("mapFeedRow — Post HOM-02", () => {
     expect(item?.author?.name).toBe("Matteo Rossi");
     expect(mapProfilePostDetail(null)).toBeNull();
     expect(mapProfilePostDetail({ post_id: "pp-1" })).toBeNull();
+  });
+
+  it("il dettaglio canonico serve anche i Post di Società e Media (HOM-08 §8, §11)", () => {
+    const club = mapPostDetail(
+      {
+        author: { id: "c-1", is_verified: true, name: "AC Como" },
+        data: { ...hom02Data, content_type: "club_media", author_identity_type: "society" },
+        item_type: "post",
+        post_id: "cm-1",
+        published_at: "2026-11-11T08:00:00.000Z",
+      },
+      "club_media",
+    );
+
+    expect(club?.id).toBe("club_media:cm-1");
+    expect(club?.payload.contentType).toBe("club_media");
+    expect(club?.author?.kind).toBe("club");
+    expect(club?.payload.authorIdentityType).toBe("society");
+
+    const media = mapPostDetail(
+      { author: { id: "m-1", name: "Redazione" }, data: hom02Data, post_id: "mp-1" },
+      "media_profile",
+    );
+    expect(media?.id).toBe("media_profile:mp-1");
+    expect(media?.author?.kind).toBe("profile");
+  });
+
+  it("un elemento dichiarato non-Post non si mostra come Post (ripiego sul dettaglio editoriale)", () => {
+    expect(
+      mapPostDetail(
+        { author: { id: "c-1", name: "AC Como" }, data: hom02Data, item_type: "article", post_id: "cm-2" },
+        "club_media",
+      ),
+    ).toBeNull();
   });
 });
 

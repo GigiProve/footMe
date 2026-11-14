@@ -39,16 +39,27 @@ import {
  * sola volta, con `announceForAccessibility` e senza live region, che su
  * Android la farebbe leggere due volte. Chi la usa la monta solo nella tab
  * attiva, così non si annuncia una tab che l'utente non sta guardando.
+ *
+ * HOM-08 §141: la stessa pill, con `label`, serve «Nuovi commenti» nel dettaglio
+ * (un solo componente, nessun restyle). Senza `label` resta «Nuovi contenuti».
  */
-export function NewContentPill({ onPress }: { onPress: () => void }) {
+export function NewContentPill({
+  accessibilityHint = "Torna all'inizio del Feed e mostra i nuovi contenuti",
+  label = FEED_NEW_CONTENT,
+  onPress,
+}: {
+  accessibilityHint?: string;
+  label?: string;
+  onPress: () => void;
+}) {
   useEffect(() => {
-    AccessibilityInfo.announceForAccessibility?.(`${FEED_NEW_CONTENT} disponibili`);
-  }, []);
+    AccessibilityInfo.announceForAccessibility?.(`${label} disponibili`);
+  }, [label]);
 
   return (
     <Pressable
-      accessibilityHint="Torna all'inizio del Feed e mostra i nuovi contenuti"
-      accessibilityLabel={FEED_NEW_CONTENT}
+      accessibilityHint={accessibilityHint}
+      accessibilityLabel={label}
       accessibilityRole="button"
       hitSlop={8}
       onPress={onPress}
@@ -57,7 +68,7 @@ export function NewContentPill({ onPress }: { onPress: () => void }) {
     >
       <Ionicons color={colors.accent} name="arrow-up" size={15} />
       <AppText color="accent" style={styles.pillLabel} variant="feedMeta">
-        {FEED_NEW_CONTENT}
+        {label}
       </AppText>
     </Pressable>
   );

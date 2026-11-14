@@ -32,7 +32,6 @@ beforeEach(() => {
 function tribunaPhoto(overrides: Record<string, unknown> = {}) {
   return {
     body: "Derby",
-    comment_count: 4,
     created_at: "2026-02-01T10:00:00Z",
     id: "tribuna-photo-1",
     is_saved: false,
@@ -50,7 +49,6 @@ function tribunaPhoto(overrides: Record<string, unknown> = {}) {
 
 function legacyPost(overrides: Record<string, unknown> = {}) {
   return {
-    comment_count: 1,
     created_at: "2026-01-01T10:00:00Z",
     description: "Curva",
     id: "legacy-1",

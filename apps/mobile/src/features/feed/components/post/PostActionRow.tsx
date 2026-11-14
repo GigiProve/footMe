@@ -28,6 +28,13 @@
  * l'accent (§8, §177). Lo stato arriva dallo store (`useLikeView`): un toggle
  * rirenderizza questa cella e non il Feed (§136).
  * Commenta: l'intera cella è un solo entry point (§33–§36).
+ *
+ * HOM-08 §210–§214: il conteggio dei commenti viene dallo store dedicato
+ * (`comment-count-store`, stessa chiave dei Mi piace), con il payload come
+ * fallback prima del seed: pubblicare o eliminare un commento nel dettaglio
+ * aggiorna questa cella senza toccare le pagine del Feed. `LikeAction` ha la
+ * variante `compact` (larghezza naturale, identica logica) per la riga del
+ * commento (§68–§73), che non ha tre aree uguali.
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
@@ -35,6 +42,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, sizes, spacing } from "../../../../theme/tokens";
 import { AppText } from "../../../../ui";
+import { useCommentsCount } from "../../../comments/comment-count-store";
 import type { LikeSnapshot } from "../../../interactions/interaction-types";
 import { likeItemKey, useLikeView } from "../../../interactions/like-store";
 import { buildPostActionModel } from "../../feed-post-presentation";
@@ -105,17 +113,27 @@ export function PostActionButton({
 // cella ha spazio libero, a sinistra il cuore resta suo.
 const COUNT_HIT_SLOP = { bottom: 0, left: spacing[6], right: spacing[24], top: 0 };
 
+/**
+ * HOM-08 §236: nella variante `compact` il cuore ha il suo spazio (12 + 20 + 12
+ * = 44pt di larghezza, vedi `actionCompact`), quindi il numero non si allarga
+ * verso sinistra: le due aree non si sovrappongono. A destra il tocco arriva a
+ * ~44pt con lo slop, senza uscire dalla riga del commento.
+ */
+const COMPACT_COUNT_HIT_SLOP = { bottom: 0, left: 0, right: spacing[28], top: 0 };
+
 type LikeActionProps = PostLikeSource & {
   onToggle: () => void;
   onOpenLikes?: () => void;
   testID: string;
   /** Fuori dal prefisso `feed-post-action-`, che nei test conta le tre azioni. */
   countTestID?: string;
+  /** HOM-08 §68–§73: larghezza naturale (riga commento), invece di `flex: 1`. */
+  compact?: boolean;
 };
 
 /**
- * La cella Mi piace, collegata allo store. Esportata anche per il dettaglio
- * storico (`ContentLikeControl`), che mostra il solo Mi piace.
+ * La cella Mi piace, collegata allo store. Esportata anche per la riga azioni
+ * dei commenti (HOM-08 §74, variante `compact`).
  */
 export function LikeAction({
   contentType,
@@ -125,6 +143,7 @@ export function LikeAction({
   onOpenLikes,
   testID,
   countTestID = "feed-post-likes-count",
+  compact = false,
 }: LikeActionProps) {
   const view = useLikeView(likeItemKey(contentType, postId), seed);
   const { like } = buildPostActionModel({
@@ -154,7 +173,11 @@ export function LikeAction({
         }
       }}
       onPress={onToggle}
-      style={({ pressed }) => [styles.action, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.action,
+        compact ? styles.actionCompact : null,
+        pressed ? styles.pressed : null,
+      ]}
       testID={testID}
     >
       <Ionicons
@@ -167,7 +190,7 @@ export function LikeAction({
         // bottone. Fuori dall'albero accessibile: la cella parla per intero.
         <Pressable
           accessible={false}
-          hitSlop={COUNT_HIT_SLOP}
+          hitSlop={compact ? COMPACT_COUNT_HIT_SLOP : COUNT_HIT_SLOP}
           importantForAccessibility="no-hide-descendants"
           onPress={listAction}
           style={styles.count}
@@ -194,7 +217,15 @@ export function PostActionRow({
   onComment,
   onShare,
 }: PostActionRowProps) {
-  const model = buildPostActionModel({ commentsCount, isLiked: false, likesCount: 0 });
+  const liveCommentsCount = useCommentsCount(
+    likeItemKey(like.contentType, like.postId),
+    commentsCount,
+  );
+  const model = buildPostActionModel({
+    commentsCount: liveCommentsCount,
+    isLiked: false,
+    likesCount: 0,
+  });
 
   return (
     <View style={styles.row}>
@@ -230,6 +261,17 @@ const styles = StyleSheet.create({
     gap: spacing[6],
     justifyContent: "center",
     minHeight: sizes.touchTarget,
+  },
+  // §236: area del cuore ≥ 44×44 (paddingLeft 12 + icona 20 + gap 12 = 44).
+  actionCompact: {
+    flex: 0,
+    gap: spacing[12],
+    justifyContent: "flex-start",
+    // Il margine negativo riporta il cuore sul filo del testo del commento
+    // (mockup 1) senza rinunciare ai 44pt di tocco a sinistra.
+    marginLeft: -spacing[12],
+    minWidth: sizes.touchTarget,
+    paddingLeft: spacing[12],
   },
   // Il numero: alto quanto la cella; la larghezza di tocco la dà `hitSlop`, così
   // il layout resta quello di HOM-02 (§28) e il numero resta vicino al cuore.

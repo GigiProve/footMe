@@ -354,8 +354,6 @@ export function AgentMediaTab({
       const tagMeta = getAgentMediaTagMeta(item.tag);
 
       return {
-        commentCount: 0,
-        comments: [],
         description: item.description ?? "",
         id: item.id,
         /* I contenuti del Procuratore non hanno ancora un'evidenza persistita. */

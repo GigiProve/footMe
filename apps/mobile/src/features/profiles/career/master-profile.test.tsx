@@ -196,8 +196,6 @@ describe("Master Profile Calciatore — Carriera", () => {
 describe("Master Profile Calciatore — Media", () => {
   const items = [
     {
-      commentCount: 0,
-      comments: [],
       description: "",
       id: "photo-1",
       isFeatured: false,
@@ -208,8 +206,6 @@ describe("Master Profile Calciatore — Media", () => {
       type: "image" as const,
     },
     {
-      commentCount: 0,
-      comments: [],
       description: "",
       durationSeconds: 24,
       id: "video-1",

@@ -103,9 +103,10 @@ export const FEED_ACTION_SHARE = "Condividi";
  * condivisione. I controlli restano visibili e leggibili come chiede il §10, e
  * il tap risponde con un messaggio esplicito: nessun comportamento inventato,
  * nessun tap morto. Il segnalibro nella stessa riga funziona davvero.
+ * HOM-08: i commenti sono reali (la cella Commenta apre il dettaglio), quindi
+ * qui non c'è più il messaggio «I commenti arriveranno presto».
  */
 export const FEED_SOON_MESSAGES = {
-  comment: "I commenti arriveranno presto.",
   hide: "Questa azione arriverà presto.",
   like: "Il Mi piace su questo contenuto arriverà presto.",
   notInterested: "Questa azione arriverà presto.",

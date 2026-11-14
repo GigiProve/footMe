@@ -126,7 +126,10 @@ export function hasVotedMediaTribuna(post: MediaTribunaPost): boolean {
   return post.options.some((option) => option.is_voted);
 }
 
-/** "368 voti · 52 commenti", senza le voci che valgono zero. */
+/**
+ * "368 voti · 52 commenti", senza le voci che valgono zero. HOM-08: il numero
+ * dei commenti è il conteggio server (`fetch_comment_counts`, dominio unico).
+ */
 export function formatMediaTribunaCounts(post: MediaTribunaPost): string[] {
   const parts: string[] = [];
 

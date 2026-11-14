@@ -5,6 +5,8 @@
  * l'anteprima specifica del formato e i due conteggi. Il testo integrale, i
  * commenti, le reazioni, il salvataggio e le azioni owner vivono nel dettaglio
  * condiviso — qui non c'è nessun campo "Scrivi un commento" e nessun thread.
+ * HOM-08: il conteggio commenti viene da `fetch_comment_counts` (dominio unico
+ * `content_comments`), letto dal servizio una volta per lista.
  */
 import { memo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -12,6 +14,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, spacing, typography } from "../../../theme/tokens";
 import { AppText } from "../../../ui";
+import { useCommentsCount } from "../../comments/comment-count-store";
+import { likeItemKey } from "../../interactions/like-store";
 import type { FanTribunaPost } from "../fan-tribuna-service";
 import { FootballPitchPreview } from "./FootballPitchPreview";
 import {
@@ -30,13 +34,18 @@ type FanTribunaCardProps = {
 };
 
 function FanTribunaCardComponent({ onOpen, post }: FanTribunaCardProps) {
+  // HOM-08 §210–§214: la cella dello store, così carta e dettaglio non divergono.
+  const commentCount = useCommentsCount(
+    likeItemKey("fan_tribuna", post.id),
+    post.comment_count,
+  );
   const typeLabel = getFanContentLabel(post.kind);
   const relativeDate = formatFanRelativeDate(post.published_at ?? post.created_at);
 
   return (
     <Pressable
       accessibilityHint="Apre il contenuto"
-      accessibilityLabel={buildCardAccessibilityLabel(post, typeLabel)}
+      accessibilityLabel={buildCardAccessibilityLabel(post, typeLabel, commentCount)}
       accessibilityRole="button"
       onPress={onOpen}
       style={({ pressed }) => [styles.card, pressed ? styles.cardPressed : null]}
@@ -98,7 +107,7 @@ function FanTribunaCardComponent({ onOpen, post }: FanTribunaCardProps) {
             size={15}
           />
           <AppText color="secondary" variant="numeric">
-            {formatFanCount(post.comment_count)}
+            {formatFanCount(commentCount)}
           </AppText>
         </View>
         <View style={styles.footerSpacer} />
@@ -200,12 +209,13 @@ function FormationPreview({ post }: { post: FanTribunaPost }) {
 function buildCardAccessibilityLabel(
   post: FanTribunaPost,
   typeLabel: string,
+  commentCount: number,
 ): string {
   return [
     typeLabel,
     post.title,
     `${formatFanCount(post.support_count)} reazioni`,
-    `${formatFanCount(post.comment_count)} commenti`,
+    `${formatFanCount(commentCount)} commenti`,
   ]
     .filter(Boolean)
     .join(", ");

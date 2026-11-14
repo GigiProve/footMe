@@ -33,7 +33,6 @@ import {
 } from "../../profiles/media-upload-service";
 import type { PublicClubProfile } from "../club-service";
 import {
-  addClubMediaComment,
   createClubMediaPost,
   fetchClubMediaFeed,
   fetchClubMediaPostDetail,
@@ -45,8 +44,10 @@ import {
 import { useRouter } from "expo-router";
 
 import { articleNewHref } from "../../article-editor/article-routes";
-import { contentDetailHref } from "../../feed/content-routes";
+import { useCommentsCount } from "../../comments/comment-count-store";
+import { commentsHref, contentDetailHref } from "../../feed/content-routes";
 import { useContentInteraction } from "../../feed/use-content-interaction";
+import { likeItemKey } from "../../interactions/like-store";
 import { useContentSaved } from "../../saved/use-content-saved";
 import { formatCount } from "../../../lib/format-count";
 import { TaggableTargetPicker } from "../../content/components/TaggableTargetPicker";
@@ -299,37 +300,16 @@ export function ClubMediaTabContent({
     setIsVideoOpen(false);
   }
 
-  function patchPost(postId: string, patch: Partial<ClubMediaPost>) {
-    setPosts((current) =>
-      current.map((post) => (post.id === postId ? { ...post, ...patch } : post)),
+  /*
+    HOM-08 §1, §3, §5–§6: i commenti vivono solo nel dettaglio canonico. Si
+    chiude la modale e si apre quel dettaglio — sulla sezione commenti se ce
+    ne sono, sul composer se non ce ne sono.
+  */
+  function handleOpenComments(post: ClubMediaPost, commentsCount: number) {
+    handleClosePost();
+    router.push(
+      commentsHref("club_media", post.id, commentsCount, { origin: "PROFILE" }) as never,
     );
-    setSelectedPost((current) =>
-      current?.id === postId ? { ...current, ...patch } : current,
-    );
-  }
-
-  async function handleAddComment(body: string) {
-    if (!selectedPost || !viewerProfileId) {
-      Alert.alert("Accesso richiesto", "Accedi per commentare.");
-      return;
-    }
-
-    try {
-      const comment = await addClubMediaComment({
-        body,
-        postId: selectedPost.id,
-        profileId: viewerProfileId,
-      });
-      const nextComments = [...selectedPost.comments, comment];
-      patchPost(selectedPost.id, {
-        comment_count: selectedPost.comment_count + 1,
-        comments: nextComments,
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Impossibile pubblicare il commento.";
-      Alert.alert("Errore", message);
-    }
   }
 
   async function handleShare(post: ClubMediaPost) {
@@ -460,10 +440,8 @@ export function ClubMediaTabContent({
       <ClubMediaDetailModal
         isLoading={isDetailLoading}
         isVideoOpen={isVideoOpen}
-        onAddComment={(body) => {
-          void handleAddComment(body);
-        }}
         onClose={handleClosePost}
+        onOpenComments={handleOpenComments}
         onOpenProfile={onOpenProfile}
         onOpenVideo={() => setIsVideoOpen(true)}
         onRefresh={() => { void loadPosts(); }}
@@ -540,8 +518,8 @@ function MediaFeedRow({
 function ClubMediaDetailModal({
   isLoading,
   isVideoOpen,
-  onAddComment,
   onClose,
+  onOpenComments,
   onOpenProfile,
   onOpenVideo,
   onRefresh,
@@ -552,8 +530,9 @@ function ClubMediaDetailModal({
 }: {
   isLoading: boolean;
   isVideoOpen: boolean;
-  onAddComment: (body: string) => void;
   onClose: () => void;
+  /** HOM-08: chiude la modale e apre il dettaglio canonico sui commenti. */
+  onOpenComments: (post: ClubMediaPost, commentsCount: number) => void;
   onOpenProfile: (profileId: string) => void;
   onOpenVideo: () => void;
   onRefresh: () => void;
@@ -562,23 +541,23 @@ function ClubMediaDetailModal({
   post: ClubMediaPost | null;
   viewerProfileId?: string | null;
 }) {
-  const [commentBody, setCommentBody] = useState("");
   // HOM-07 §133–§135: Mi piace e Salvati del dettaglio leggono e scrivono gli
   // store condivisi, seminati dallo stato server del contenuto (stessa cella del
   // Feed e del dettaglio canonico). Il conteggio include anche i Mi piace delle
   // Società, che la vista legacy `club_media_likes` esclude.
+  // HOM-08 §1, §3, §22: nessun thread in questa modale — un dettaglio solo. Il
+  // conteggio commenti è la cella dello store (seminata dallo stato server) e
+  // «Commenta» apre il dettaglio canonico sulla sezione commenti o sul composer.
   const postId = post?.id ?? "";
   const interaction = useContentInteraction("club_media", postId, {
     enabled: !!post,
     profileId: viewerProfileId ?? "",
   });
+  const commentsCount = useCommentsCount(
+    likeItemKey("club_media", postId),
+    interaction.commentsCount,
+  );
   const saved = useContentSaved("club_media", postId, { enabled: !!post && !!viewerProfileId });
-
-  useEffect(() => {
-    if (!post) {
-      setCommentBody("");
-    }
-  }, [post]);
 
   if (!post) {
     return null;
@@ -587,15 +566,6 @@ function ClubMediaDetailModal({
   const meta = KIND_META[post.kind];
   const heroUrl = post.thumbnail_url ?? (post.visual_type === "image" ? post.visual_url : null);
   const isStatement = post.kind === "statement";
-
-  function handleSubmitComment() {
-    const trimmed = commentBody.trim();
-    if (!trimmed) {
-      return;
-    }
-    onAddComment(trimmed);
-    setCommentBody("");
-  }
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} visible={post !== null}>
@@ -750,8 +720,8 @@ function ClubMediaDetailModal({
               ) : null}
               <DetailAction
                 icon="chatbubble-outline"
-                label={`Commenta ${post.comment_count > 0 ? post.comment_count : ""}`.trim()}
-                onPress={() => {}}
+                label={commentsCount > 0 ? `Commenta ${formatCount(commentsCount)}` : "Commenta"}
+                onPress={() => onOpenComments(post, commentsCount)}
               />
               {saved.canSave ? (
                 <DetailAction
@@ -766,54 +736,6 @@ function ClubMediaDetailModal({
                 label="Condividi"
                 onPress={() => onShare(post)}
               />
-            </View>
-
-            <View style={styles.commentsSection}>
-              <AppText style={styles.commentsTitle} variant="titleSm">
-                Commenti
-              </AppText>
-              {post.comments.length > 0 ? (
-                <View style={styles.commentsList}>
-                  {post.comments.map((comment) => (
-                    <View key={comment.id} style={styles.commentRow}>
-                      <Avatar
-                        name={comment.author_name}
-                        size="sm"
-                        uri={comment.author_avatar_url}
-                      />
-                      <View style={styles.commentText}>
-                        <AppText style={styles.commentAuthor} variant="bodySm">
-                          {comment.author_name}
-                        </AppText>
-                        <AppText color="secondary" variant="bodySm">
-                          {comment.body}
-                        </AppText>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <AppText color="secondary" variant="bodySm">
-                  Nessun commento per ora.
-                </AppText>
-              )}
-
-              <View style={styles.commentComposer}>
-                <View style={styles.commentInputWrap}>
-                  <Input
-                    label="Aggiungi commento"
-                    onChangeText={setCommentBody}
-                    placeholder="Scrivi un commento"
-                    value={commentBody}
-                  />
-                </View>
-                <Button
-                  disabled={!commentBody.trim()}
-                  label="Invia"
-                  onPress={handleSubmitComment}
-                  size="sm"
-                />
-              </View>
             </View>
           </View>
         </ScrollView>
@@ -1529,34 +1451,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing[12],
     position: "absolute",
     right: 0,
-  },
-  commentAuthor: {
-    fontWeight: typography.fontWeight.bold,
-  },
-  commentComposer: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    gap: spacing[10],
-  },
-  commentInputWrap: {
-    flex: 1,
-  },
-  commentRow: {
-    flexDirection: "row",
-    gap: spacing[10],
-  },
-  commentText: {
-    flex: 1,
-    gap: spacing[4],
-  },
-  commentsList: {
-    gap: spacing[14],
-  },
-  commentsSection: {
-    gap: spacing[14],
-  },
-  commentsTitle: {
-    fontWeight: typography.fontWeight.bold,
   },
   createIcon: {
     alignItems: "center",

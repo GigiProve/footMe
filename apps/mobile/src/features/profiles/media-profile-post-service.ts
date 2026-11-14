@@ -1,5 +1,6 @@
 import { notifyTaggedProfiles, searchTagTargets } from "../content/content-tag-service";
 import { supabase } from "../../lib/supabase";
+import { fetchCommentCounts } from "../feed/comment-counts-service";
 
 /**
  * Notify everyone following a media profile that it published new content.
@@ -66,22 +67,17 @@ export type MediaProfilePostTaggedTarget = {
   target_type: MediaProfilePostTargetType;
 };
 
-export type MediaProfilePostComment = {
-  author_avatar_url: string | null;
-  author_name: string;
-  body: string;
-  created_at: string;
-  id: string;
-  profile_id: string;
-};
-
+/*
+  HOM-08 §1, §3: nessun thread in questo servizio; `media_profile_post_comments`
+  è assorbita da `content_comments` (RPC in `features/comments`). Resta il solo
+  conteggio (`fetch_comment_counts`, una chiamata per lista).
+*/
 export type MediaProfilePost = {
   author_id: string | null;
   author_name: string;
   body: string | null;
   category: string;
   comment_count: number;
-  comments: MediaProfilePostComment[];
   cover_type: MediaProfilePostCoverType | null;
   cover_url: string | null;
   created_at: string;
@@ -305,11 +301,7 @@ export async function fetchMediaProfilePostDetail(
     return null;
   }
 
-  const [post] = await enrichMediaProfilePosts(
-    [data as MediaProfilePostRow],
-    viewerProfileId,
-    true,
-  );
+  const [post] = await enrichMediaProfilePosts([data as MediaProfilePostRow], viewerProfileId);
 
   return post ?? null;
 }
@@ -397,52 +389,9 @@ export async function createMediaProfilePost(
   const [post] = await enrichMediaProfilePosts(
     [data as MediaProfilePostRow],
     input.createdByProfileId,
-    true,
   );
 
   return post;
-}
-
-export async function addMediaProfilePostComment(input: {
-  body: string;
-  postId: string;
-  profileId: string;
-}): Promise<MediaProfilePostComment> {
-  const trimmedBody = input.body.trim();
-
-  if (!trimmedBody) {
-    throw new Error("Scrivi un commento prima di pubblicare.");
-  }
-
-  const { data, error } = await supabase
-    .from("media_profile_post_comments")
-    .insert({
-      body: trimmedBody,
-      post_id: input.postId,
-      profile_id: input.profileId,
-    })
-    .select("id, post_id, profile_id, body, created_at")
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    throw new Error("Commento non creato.");
-  }
-
-  const profiles = await loadProfilesById([input.profileId]);
-  const author = profiles.get(input.profileId);
-
-  return {
-    author_avatar_url: author?.avatar_url ?? null,
-    author_name: author?.full_name?.trim() || "Utente ProLink",
-    body: String((data as { body: string }).body),
-    created_at: String((data as { created_at: string }).created_at),
-    id: String((data as { id: string }).id),
-    profile_id: input.profileId,
-  };
 }
 
 export async function searchMediaProfilePostTargets(
@@ -464,25 +413,20 @@ export async function searchMediaProfilePostTargets(
 async function enrichMediaProfilePosts(
   rows: MediaProfilePostRow[],
   viewerProfileId?: string | null,
-  includeComments = false,
 ): Promise<MediaProfilePost[]> {
   if (rows.length === 0) {
     return [];
   }
 
   const postIds = rows.map((row) => row.id);
-  const [commentCounts, savedIds, taggedTargets, commentsByPost, publisherNames] =
-    await Promise.all([
-      loadPostCountMap("media_profile_post_comments", postIds),
-      viewerProfileId
-        ? loadViewerSavedPostIds(viewerProfileId, postIds)
-        : Promise.resolve(new Set<string>()),
-      loadTaggedTargets(postIds),
-      includeComments
-        ? loadCommentsByPost(postIds)
-        : Promise.resolve(new Map<string, MediaProfilePostComment[]>()),
-      loadPublisherNames(rows.map((row) => row.media_profile_id)),
-    ]);
+  const [commentCounts, savedIds, taggedTargets, publisherNames] = await Promise.all([
+    fetchCommentCounts("media_profile", postIds),
+    viewerProfileId
+      ? loadViewerSavedPostIds(viewerProfileId, postIds)
+      : Promise.resolve(new Set<string>()),
+    loadTaggedTargets(postIds),
+    loadPublisherNames(rows.map((row) => row.media_profile_id)),
+  ]);
 
   return rows.map((row) => {
     const body = row.body ?? null;
@@ -493,7 +437,6 @@ async function enrichMediaProfilePosts(
       body,
       category: row.category,
       comment_count: commentCounts.get(row.id) ?? 0,
-      comments: commentsByPost.get(row.id) ?? [],
       cover_type: normalizeCoverType(row.cover_type),
       cover_url: row.cover_url ?? null,
       created_at: row.created_at,
@@ -518,29 +461,6 @@ async function enrichMediaProfilePosts(
       updated_at: row.updated_at,
     };
   });
-}
-
-async function loadPostCountMap(table: string, postIds: string[]) {
-  const counts = new Map<string, number>();
-
-  if (postIds.length === 0) {
-    return counts;
-  }
-
-  const { data, error } = await supabase
-    .from(table)
-    .select("post_id")
-    .in("post_id", postIds);
-
-  if (error) {
-    throw error;
-  }
-
-  for (const row of (data ?? []) as { post_id: string }[]) {
-    counts.set(row.post_id, (counts.get(row.post_id) ?? 0) + 1);
-  }
-
-  return counts;
 }
 
 async function loadViewerSavedPostIds(profileId: string, postIds: string[]) {
@@ -651,50 +571,6 @@ async function loadTaggedTargets(postIds: string[]) {
   }
 
   return targetsByPost;
-}
-
-async function loadCommentsByPost(postIds: string[]) {
-  const commentsByPost = new Map<string, MediaProfilePostComment[]>();
-
-  if (postIds.length === 0) {
-    return commentsByPost;
-  }
-
-  const { data, error } = await supabase
-    .from("media_profile_post_comments")
-    .select("id, post_id, profile_id, body, created_at")
-    .in("post_id", postIds)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data ?? []) as {
-    body: string;
-    created_at: string;
-    id: string;
-    post_id: string;
-    profile_id: string;
-  }[];
-  const profiles = await loadProfilesById(rows.map((row) => row.profile_id));
-
-  for (const row of rows) {
-    const profile = profiles.get(row.profile_id);
-    const list = commentsByPost.get(row.post_id) ?? [];
-
-    list.push({
-      author_avatar_url: profile?.avatar_url ?? null,
-      author_name: profile?.full_name?.trim() || "Utente ProLink",
-      body: row.body,
-      created_at: row.created_at,
-      id: row.id,
-      profile_id: row.profile_id,
-    });
-    commentsByPost.set(row.post_id, list);
-  }
-
-  return commentsByPost;
 }
 
 async function loadPublisherNames(mediaProfileIds: string[]) {

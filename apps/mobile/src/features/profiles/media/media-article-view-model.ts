@@ -27,6 +27,7 @@ export type MediaArticleOrigin = "NATIVE" | "EXTERNAL_LINK" | "IMPORTED_TEXT";
 export type MediaArticleViewModel = {
   /** "Mercato", "Interviste": la categoria canonica dell'articolo. */
   category: string;
+  /** HOM-08: conteggio server (`fetch_comment_counts`), 0 se non disponibile. */
   commentCount: number;
   coverUrl: string | null;
   /** "19 giu", localizzata. Assente se la data non è utilizzabile. */

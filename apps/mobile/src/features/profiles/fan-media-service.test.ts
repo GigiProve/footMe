@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  addFanMediaComment,
   createFanMediaPost,
   fetchFanMediaFeed,
   fetchProfileFollowState,
@@ -122,6 +121,13 @@ const interactionMocks = vi.hoisted(() => ({
 
 vi.mock("../interactions/interaction-service", () => interactionMocks);
 
+// HOM-08: il conteggio commenti arriva da `fetch_comment_counts`, non dalle tabelle.
+const countMocks = vi.hoisted(() => ({ fetchCommentCounts: vi.fn() }));
+
+vi.mock("../feed/comment-counts-service", () => ({
+  fetchCommentCounts: countMocks.fetchCommentCounts,
+}));
+
 const basePost = {
   created_at: "2026-05-14T08:00:00Z",
   description: "Una domenica piena di calcio.",
@@ -140,9 +146,12 @@ describe("fan-media-service", () => {
   beforeEach(() => {
     mocks.reset();
     mocks.fromMock.mockClear();
+    countMocks.fetchCommentCounts.mockReset();
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map());
   });
 
-  it("loads a fan feed with social counts, viewer state and comments", async () => {
+  it("loads a fan feed with social counts and viewer state", async () => {
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map([["post-1", 1]]));
     mocks.queueResponses(
       {
         data: [
@@ -158,46 +167,23 @@ describe("fan-media-service", () => {
         error: null,
       },
       { data: [{ post_id: "post-1" }, { post_id: "post-1" }], error: null },
-      { data: [{ post_id: "post-1" }], error: null },
       { data: [{ post_id: "post-2" }], error: null },
       { data: [{ post_id: "post-1" }], error: null },
       { data: [{ post_id: "post-2" }], error: null },
-      {
-        data: [
-          {
-            body: "Che atmosfera.",
-            created_at: "2026-05-14T09:00:00Z",
-            id: "comment-1",
-            post_id: "post-1",
-            profile_id: "viewer-1",
-          },
-        ],
-        error: null,
-      },
-      {
-        data: [
-          {
-            avatar_url: "https://cdn.test/viewer.jpg",
-            full_name: "Luigi",
-            id: "viewer-1",
-          },
-        ],
-        error: null,
-      },
     );
 
     const feed = await fetchFanMediaFeed("fan-1", "viewer-1");
 
     expect(feed.map((post) => post.id)).toEqual(["post-1", "post-2"]);
+    // HOM-08: nessun commento letto da questo servizio (dominio unico).
+    expect(feed[0]).not.toHaveProperty("comments");
+    expect(mocks.operations.map((operation) => operation.table)).not.toContain(
+      "fan_media_comments",
+    );
+    expect(countMocks.fetchCommentCounts).toHaveBeenCalledWith("fan_media", ["post-1", "post-2"]);
+    expect(feed[1].comment_count).toBe(0);
     expect(feed[0]).toMatchObject({
       comment_count: 1,
-      comments: [
-        {
-          author_avatar_url: "https://cdn.test/viewer.jpg",
-          author_name: "Luigi",
-          body: "Che atmosfera.",
-        },
-      ],
       is_liked: true,
       is_saved: false,
       like_count: 2,
@@ -288,52 +274,6 @@ describe("fan-media-service", () => {
         visual_url: "https://cdn.test/highlight.mp4",
       },
       table: "fan_media_posts",
-    });
-  });
-
-  it("adds comments and resolves author metadata", async () => {
-    mocks.queueResponses(
-      {
-        data: {
-          body: "Forza Como!",
-          created_at: "2026-05-14T09:00:00Z",
-          id: "comment-1",
-          post_id: "post-1",
-          profile_id: "viewer-1",
-        },
-        error: null,
-      },
-      {
-        data: [
-          {
-            avatar_url: null,
-            full_name: "Luigi",
-            id: "viewer-1",
-          },
-        ],
-        error: null,
-      },
-    );
-
-    const comment = await addFanMediaComment({
-      body: "  Forza Como!  ",
-      postId: "post-1",
-      profileId: "viewer-1",
-    });
-
-    expect(comment).toMatchObject({
-      author_name: "Luigi",
-      body: "Forza Como!",
-      id: "comment-1",
-    });
-    expect(mocks.operations[0]).toMatchObject({
-      action: "select",
-      payload: {
-        body: "Forza Como!",
-        post_id: "post-1",
-        profile_id: "viewer-1",
-      },
-      table: "fan_media_comments",
     });
   });
 

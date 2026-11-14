@@ -223,8 +223,6 @@ function StaffMediaTab({
       const tagMeta = getStaffMediaTagMeta(item.tag);
 
       return {
-        commentCount: 0,
-        comments: [],
         description: item.description ?? "",
         id: item.id,
         isFeatured: item.is_featured,

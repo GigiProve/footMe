@@ -31,7 +31,6 @@ function buildMediaPost(
     body: null,
     category: "Media",
     comment_count: 4,
-    comments: [],
     cover_type: "image",
     cover_url: "https://cdn.test/foto.jpg",
     created_at: "2026-06-19T08:00:00Z",

@@ -61,7 +61,9 @@ import {
   useSeedSaved,
   useToggleSavedFeedItem,
 } from "../use-feed-item-actions";
-import { originForScope } from "../content-routes";
+import { commentsHref, originForScope } from "../content-routes";
+import { commentCountStore } from "../../comments/comment-count-store";
+import { likeItemKey } from "../../interactions/like-store";
 import { useContentManagement } from "../use-content-management";
 import { useOpenLikes } from "../../likes/use-open-likes";
 import { useSeedLikes, useToggleFeedPostLike } from "../use-feed-post-like";
@@ -287,9 +289,19 @@ export function FeedPane({
       });
       void Linking.openURL(preview.url).catch(() => undefined);
     },
+    // HOM-08 §4–§6, §22: la cella Commenta apre il dettaglio canonico; con
+    // commenti sulla sezione, a zero sul composer. Il numero è quello della cella
+    // dello store (aggiornata dal dettaglio), non il payload congelato nella pagina.
     onComment: (item: FeedInteractiveItem) => {
       trackFeed({ itemId: item.id, name: "feed_post_comment_tap" });
-      showToast({ message: FEED_SOON_MESSAGES.comment });
+      const count =
+        commentCountStore.get(likeItemKey(item.payload.contentType, item.payload.postId)) ??
+        item.payload.commentsCount;
+      openHref(
+        commentsHref(item.payload.contentType, item.payload.postId, count, {
+          origin: originForScope(scope),
+        }),
+      );
     },
     onShare: (item: FeedInteractiveItem) => {
       trackFeed({ itemId: item.id, name: "feed_post_share_tap" });

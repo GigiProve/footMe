@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  addFanTribunaComment,
   createFanTribunaFormation,
   createFanTribunaPoll,
   createFanTribunaProposal,
@@ -116,6 +115,13 @@ vi.mock("../../lib/supabase", () => ({
   },
 }));
 
+// HOM-08: il conteggio commenti arriva da `fetch_comment_counts`, non dalle tabelle.
+const countMocks = vi.hoisted(() => ({ fetchCommentCounts: vi.fn() }));
+
+vi.mock("../feed/comment-counts-service", () => ({
+  fetchCommentCounts: countMocks.fetchCommentCounts,
+}));
+
 // notifyTaggedProfiles is a best-effort side effect tested elsewhere; stub it so
 // it does not consume queued supabase responses and shift operation alignment.
 vi.mock("../content/content-tag-service", () => ({
@@ -142,9 +148,12 @@ describe("fan-tribuna-service", () => {
   beforeEach(() => {
     mocks.reset();
     mocks.fromMock.mockClear();
+    countMocks.fetchCommentCounts.mockReset();
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map());
   });
 
   it("loads poll, proposal and formation cards with viewer state and enrichment", async () => {
+    countMocks.fetchCommentCounts.mockResolvedValue(new Map([["proposal-1", 1]]));
     mocks.queueResponses(
       {
         data: [
@@ -172,7 +181,6 @@ describe("fan-tribuna-service", () => {
       },
       { data: [{ post_id: "proposal-1" }, { post_id: "formation-1" }], error: null },
       { data: [{ post_id: "proposal-1" }], error: null },
-      { data: [{ post_id: "poll-1" }, { post_id: "proposal-1" }], error: null },
       { data: [{ post_id: "proposal-1" }], error: null },
       { data: [{ post_id: "proposal-1" }], error: null },
       {
@@ -187,18 +195,6 @@ describe("fan-tribuna-service", () => {
           { option_id: "option-yes", post_id: "poll-1", profile_id: "viewer-1" },
           { option_id: "option-yes", post_id: "poll-1", profile_id: "viewer-2" },
           { option_id: "option-no", post_id: "poll-1", profile_id: "viewer-3" },
-        ],
-        error: null,
-      },
-      {
-        data: [
-          {
-            body: "Bella idea.",
-            created_at: "2026-05-15T09:00:00Z",
-            id: "comment-1",
-            post_id: "proposal-1",
-            profile_id: "viewer-1",
-          },
         ],
         error: null,
       },
@@ -232,16 +228,6 @@ describe("fan-tribuna-service", () => {
         ],
         error: null,
       },
-      {
-        data: [
-          {
-            avatar_url: "https://cdn.test/viewer.jpg",
-            full_name: "Sara",
-            id: "viewer-1",
-          },
-        ],
-        error: null,
-      },
     );
 
     const feed = await fetchFanTribunaFeed("fan-1", "viewer-1");
@@ -257,6 +243,12 @@ describe("fan-tribuna-service", () => {
       { id: "option-no", is_voted: false, percentage: 33, vote_count: 1 },
     ]);
     expect(feed[0].total_vote_count).toBe(3);
+    expect(countMocks.fetchCommentCounts).toHaveBeenCalledWith("fan_tribuna", [
+      "poll-1",
+      "proposal-1",
+      "formation-1",
+    ]);
+    expect(feed[0].comment_count).toBe(0);
     expect(feed[1]).toMatchObject({
       comment_count: 1,
       is_saved: true,
@@ -269,10 +261,11 @@ describe("fan-tribuna-service", () => {
         },
       ],
     });
-    expect(feed[1].comments[0]).toMatchObject({
-      author_name: "Sara",
-      body: "Bella idea.",
-    });
+    // HOM-08: nessun thread letto da questo servizio (dominio unico), solo il conteggio.
+    expect(feed[1]).not.toHaveProperty("comments");
+    expect(mocks.operations.map((operation) => operation.table)).not.toContain(
+      "fan_tribuna_comments",
+    );
     expect(feed[2]).toMatchObject({
       formation: "4-3-3",
       lineup_players: [
@@ -296,7 +289,6 @@ describe("fan-tribuna-service", () => {
     mocks.queueResponses(
       { data: basePost, error: null },
       { data: null, error: null },
-      { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },
@@ -358,8 +350,6 @@ describe("fan-tribuna-service", () => {
         error: null,
       },
       { data: null, error: null },
-      { data: [], error: null },
-      { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },
@@ -429,8 +419,6 @@ describe("fan-tribuna-service", () => {
       { data: [], error: null },
       { data: [], error: null },
       { data: [], error: null },
-      { data: [], error: null },
-      { data: [], error: null },
       {
         data: [
           {
@@ -474,32 +462,12 @@ describe("fan-tribuna-service", () => {
     });
   });
 
-  it("votes, saves, supports and comments with viewer-scoped writes", async () => {
+  it("votes, saves and supports with viewer-scoped writes", async () => {
     mocks.queueResponses(
       { data: null, error: null },
       { data: null, error: null },
       { data: null, error: null },
       { data: null, error: null },
-      {
-        data: {
-          body: "Sono d'accordo.",
-          created_at: "2026-05-15T10:00:00Z",
-          id: "comment-1",
-          post_id: "proposal-1",
-          profile_id: "viewer-1",
-        },
-        error: null,
-      },
-      {
-        data: [
-          {
-            avatar_url: null,
-            full_name: "Luigi",
-            id: "viewer-1",
-          },
-        ],
-        error: null,
-      },
     );
 
     await voteFanTribunaPoll({
@@ -510,11 +478,6 @@ describe("fan-tribuna-service", () => {
     await toggleFanTribunaSupport("viewer-1", "proposal-1", true);
     await toggleSavedFanTribuna("viewer-1", "proposal-1", true);
     await toggleSavedFanTribuna("viewer-1", "proposal-1", false);
-    const comment = await addFanTribunaComment({
-      body: "  Sono d'accordo. ",
-      postId: "proposal-1",
-      profileId: "viewer-1",
-    });
 
     expect(mocks.operations[0]).toMatchObject({
       action: "upsert",
@@ -536,10 +499,6 @@ describe("fan-tribuna-service", () => {
     expect(mocks.operations[3]).toMatchObject({
       action: "delete",
       table: "saved_fan_tribuna",
-    });
-    expect(comment).toMatchObject({
-      author_name: "Luigi",
-      body: "Sono d'accordo.",
     });
   });
 });
