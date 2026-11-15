@@ -638,11 +638,42 @@ describe("mapFeedRow — Post HOM-02", () => {
       canDelete: true,
       canEdit: true,
       canLike: true,
+      canMarkNotInterested: false,
       canReport: false,
       canSave: false,
       canShare: true,
       canViewInsights: false,
     });
+  });
+
+  // HOM-11 §20, §126, §54: i campi nuovi si leggono con default sicuri (assenti → falso).
+  it("legge can_mark_not_interested, viewer_has_reported e viewer_follows_author dal data", () => {
+    const item = mapFeedRow(
+      makeRow({
+        data: {
+          ...hom02Data,
+          capabilities: { ...hom02Data.capabilities, can_mark_not_interested: true, can_report: true },
+          viewer_follows_author: true,
+          viewer_has_reported: true,
+        },
+      }),
+    );
+    if (item?.type !== "post") throw new Error("atteso un post");
+
+    expect(item.payload.capabilities).toMatchObject({ canMarkNotInterested: true, canReport: true });
+    expect(item.isFollowingAuthor).toBe(true);
+    expect(item.viewerHasReported).toBe(true);
+  });
+
+  it("un server pre-HOM-11 non rompe nulla: nessuna capability HOM-11, non seguito, non segnalato", () => {
+    const item = mapFeedRow(
+      makeRow({ data: { content_type: "club_media", post_id: "post-1" }, is_following_author: false }),
+    );
+    if (item?.type !== "post") throw new Error("atteso un post");
+
+    expect(item.payload.capabilities).toMatchObject({ canMarkNotInterested: false, canReport: false });
+    expect(item.isFollowingAuthor).toBe(false);
+    expect(item.viewerHasReported).toBeUndefined();
   });
 
   it("scarta una link preview non https", () => {

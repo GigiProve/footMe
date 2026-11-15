@@ -17,6 +17,9 @@
  *    resta con «Invio non riuscito · Riprova» (§98) e toccare il testo lo riapre nel
  *    composer per correggerlo (§101). Senza capability non ci sono Mi piace né Rispondi.
  *  • Avatar a 32pt anche nelle risposte: il design system non ha una taglia da 24.
+ *  • HOM-11 §134–§140: un commento segnalato dal viewer si ripiega in «Commento segnalato»
+ *    (`CommentReportedRow`), senza azioni; le risposte restano. Il ••• compare anche sul
+ *    commento altrui quando c'è almeno un'azione (Non seguire, Segnala; §69–§72).
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
@@ -25,6 +28,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors, sizes, spacing } from "../../../theme/tokens";
 import { AppText, VerifiedCheck } from "../../../ui";
 import { LikeAction } from "../../feed/components/post/PostActionRow";
+import { followSourceKey, followSourceOfIdentity } from "../../following/follow-source";
+import { useIsSourceUnfollowed } from "../../following/unfollowed-sources-store";
+import { useIsReported } from "../../moderation/reported-store";
 import { ComposerAvatar } from "../../post-composer/components/ComposerAvatar";
 import {
   COMMENT_ACTIONS_LABEL,
@@ -37,11 +43,14 @@ import {
   buildCommentActions,
   commentAuthorAccessibilityLabel,
   commentMetaLine,
+  commentReportKey,
+  isCommentCollapsed,
   replyAccessibilityLabel,
 } from "../comment-presentation";
 import type { CommentEntity } from "../comment-types";
 import type { CommentsController } from "../use-comments-controller";
 import { CommentBody } from "./CommentBody";
+import { CommentReportedRow } from "./CommentReportedRow";
 
 const AVATAR_HIT_SLOP = { bottom: spacing[6], left: spacing[6], right: spacing[6], top: spacing[6] };
 
@@ -55,9 +64,23 @@ export function CommentRow({ comment, isReply, controller }: CommentRowProps) {
   const { actions } = controller;
   const author = comment.author;
   const send = comment.send;
-  const menu = buildCommentActions(comment, { isSending: send !== null });
+  // HOM-11 §62, §126: gli insiemi di sessione valgono prima del refetch. Store di modulo,
+  // abbonati per cella: segnalare o lasciare un autore non rirenderizza il thread.
+  const authorSource = author ? followSourceOfIdentity(author) : null;
+  const unfollowedInSession = useIsSourceUnfollowed(authorSource ? followSourceKey(authorSource) : null);
+  const reportedInSession = useIsReported(commentReportKey(comment.id));
+  const menu = buildCommentActions(comment, {
+    isSending: send !== null,
+    reportedInSession,
+    unfollowedInSession,
+  });
   const canOpenAuthor = comment.capabilities.canOpenAuthor && author !== null && send === null;
   const headerLabel = commentAuthorAccessibilityLabel(comment);
+
+  // HOM-11 §134–§140: il commento segnalato dal viewer si ripiega, senza azioni; le risposte restano.
+  if (isCommentCollapsed(comment, reportedInSession)) {
+    return <CommentReportedRow commentId={comment.id} isReply={isReply} />;
+  }
 
   const identity = (
     <View style={styles.identity}>

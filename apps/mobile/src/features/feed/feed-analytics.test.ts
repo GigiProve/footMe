@@ -121,6 +121,8 @@ describe("trackFeed", () => {
     { itemId: "a:1", name: "feed_article_open", origin: "feed", position: 4 },
     // HOM-04 §134–135: solo id, tipo, identità autrice e origine
     { ...CONTENT_PROPS, name: "content_menu_open" },
+    // HOM-11 §185
+    { ...CONTENT_PROPS, name: "content_actions_open" },
     { ...CONTENT_PROPS, name: "edit_selected" },
     { ...CONTENT_PROPS, name: "insights_selected" },
     { ...CONTENT_PROPS, name: "delete_selected" },

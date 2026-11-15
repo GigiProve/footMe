@@ -71,6 +71,9 @@ function fingerprint(comment: Comment): string {
     comment.author?.isVerified,
     JSON.stringify(comment.capabilities),
     comment.isContentAuthor,
+    // HOM-11: un refetch che cambia Follow o «segnalato» (altro device, §295) aggiorna la riga.
+    comment.viewerFollowsAuthor,
+    comment.viewerHasReported,
   ].join("|");
 }
 

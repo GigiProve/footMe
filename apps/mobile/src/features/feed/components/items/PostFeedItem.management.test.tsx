@@ -9,9 +9,13 @@ import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setAnalyticsSink, type AnalyticsEvent } from "../../../../lib/analytics";
+import { resetReportedStore, reportedStore } from "../../../moderation/reported-store";
+import { resetUnfollowedSourcesStore } from "../../../following/unfollowed-sources-store";
 import { buildManageTarget } from "../../content-actions-presentation";
+import type { FeedbackSurface } from "../../content-feedback-actions";
 import type { ContentManagement } from "../../content-management-types";
-import type { FeedContentItem, FeedPostCapabilities } from "../../feed-types";
+import type { ContentOrigin } from "../../content-routes";
+import type { FeedContentItem, FeedPostCapabilities, FeedPostItem } from "../../feed-types";
 import type { DeleteContentOutcome } from "../../use-delete-content";
 import {
   countTestId,
@@ -29,6 +33,9 @@ vi.mock("expo-router", () => ({ useFocusEffect: () => undefined }));
 
 afterEach(() => {
   setAnalyticsSink(null);
+  // HOM-11: gli insiemi di sessione sono di modulo, ogni test parte da zero.
+  resetReportedStore();
+  resetUnfollowedSourcesStore();
 });
 
 const BASE: FeedPostCapabilities = {
@@ -45,19 +52,32 @@ const BASE: FeedPostCapabilities = {
 function setup(
   caps: Partial<FeedPostCapabilities>,
   onDelete: () => Promise<DeleteContentOutcome | null> = async () => "removed",
+  extra: {
+    item?: Partial<FeedPostItem>;
+    origin?: ContentOrigin;
+    surface?: FeedbackSurface;
+  } = {},
 ) {
   const capabilities = { ...BASE, ...caps };
-  const item = makePostItem({}, { capabilities });
+  const item = makePostItem(extra.item ?? {}, { capabilities });
+  const feedback = {
+    item: item as FeedContentItem,
+    onNotInterested: vi.fn(),
+    onReport: vi.fn(),
+    onUnfollow: vi.fn(),
+    surface: extra.surface ?? ("feed" as const),
+  };
   const management: ContentManagement = {
     capabilities: {
       canDelete: capabilities.canDelete,
       canEdit: capabilities.canEdit,
       canViewInsights: capabilities.canViewInsights,
     },
+    feedback,
     onDelete: vi.fn(onDelete),
     onEdit: vi.fn(),
     onInsights: vi.fn(),
-    target: buildManageTarget(item as FeedContentItem, "HOME_PER_TE"),
+    target: buildManageTarget(item as FeedContentItem, extra.origin ?? "HOME_PER_TE"),
   };
   const props = {
     onComment: vi.fn(),
@@ -72,7 +92,7 @@ function setup(
   };
   const tree = renderWithToast(<PostFeedItem item={item} management={management} {...props} />);
 
-  return { management, tree };
+  return { feedback, management, tree };
 }
 
 /** Gli id delle righe del foglio azioni, nell'ordine in cui sono disegnate. */
@@ -156,7 +176,10 @@ describe("menu ••• capability-driven", () => {
   it("senza capability di gestione il menu resta quello degli altri contenuti (§130)", () => {
     const { tree } = setup({});
 
-    expect(actionIds(tree).filter((id) => id.endsWith("_CONTENT") || id === "VIEW_INSIGHTS")).toEqual([]);
+    // Solo le azioni di gestione HOM-04: REPORT_CONTENT (HOM-11) è attesa qui.
+    expect(
+      actionIds(tree).filter((id) => ["EDIT_CONTENT", "DELETE_CONTENT", "VIEW_INSIGHTS"].includes(id)),
+    ).toEqual([]);
     expect(textOf(tree)).toContain("Segnala");
     expect(() => press(tree, "Altre azioni")).not.toThrow();
   });
@@ -199,6 +222,138 @@ describe("menu ••• capability-driven", () => {
     press(tree, "Altre azioni");
 
     expect(events.some((event) => event.name === "content_menu_open")).toBe(true);
+    // HOM-11 §185: anche `content_actions_open`, con l'origin del menu.
+    const opened = events.find((event) => event.name === "content_actions_open");
+    expect(opened?.props).toMatchObject({ contentId: "p1", origin: "HOME_PER_TE" });
+  });
+});
+
+/**
+ * HOM-11 §1–§13, §19–§27, §54–§56, §126–§131, §229–§236, §246–§247: lo STESSO foglio HOM-04,
+ * esteso con Non mi interessa, Non seguire e Segnala; ogni voce dipende da capability, origin
+ * e stato Follow, e il contenuto gestito non ne ha nessuna.
+ */
+describe("menu ••• HOM-11 — contenuti altrui", () => {
+  const FOLLOWED = { isFollowingAuthor: true };
+
+  it("Per te, autore seguito: Salva, Non mi interessa, Non seguire <nome>, divisore, Segnala (§11)", () => {
+    const { tree } = setup({ canMarkNotInterested: true, canSave: true }, undefined, { item: FOLLOWED });
+
+    expect(actionIds(tree)).toEqual(["save", "NOT_INTERESTED", "UNFOLLOW_SOURCE", "REPORT_CONTENT"]);
+    expect(countTestId(tree, "action-sheet-divider")).toBe(1);
+    expect(textOf(tree)).toContain('"Non seguire Como 1907"');
+    // Un solo foglio, quello HOM-04 «Azioni contenuto» (§1, §229): nessun secondo menu.
+    expect(
+      tree.root.findAll(
+        (node) => typeof node.type === "string" && node.props?.accessibilityLabel === "Azioni contenuto",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("senza can_mark_not_interested (Seguiti, Profilo, Salvati, Cerca) la voce non c'è (§19, §23–§26, §234–§235)", () => {
+    const { tree } = setup({ canMarkNotInterested: false }, undefined, { origin: "HOME_SEGUITI" });
+
+    expect(actionIds(tree)).not.toContain("NOT_INTERESTED");
+    expect(textOf(tree)).not.toContain("Non mi interessa");
+  });
+
+  it("Non seguire solo se il viewer segue davvero, e mai «Segui» al suo posto (§54–§56, §246–§247)", () => {
+    const { tree } = setup({ canMarkNotInterested: true });
+
+    expect(actionIds(tree)).not.toContain("UNFOLLOW_SOURCE");
+    expect(textOf(tree)).not.toContain("Non seguire");
+    expect(textOf(tree)).not.toContain('"Segui');
+  });
+
+  it("nel dettaglio «Non mi interessa» dipende dall'origin Per te, non dalla lista (§27)", () => {
+    const fromPerTe = setup({}, undefined, { origin: "HOME_PER_TE", surface: "detail" });
+    expect(actionIds(fromPerTe.tree)).toContain("NOT_INTERESTED");
+
+    const fromProfile = setup({}, undefined, { origin: "PROFILE", surface: "detail" });
+    expect(actionIds(fromProfile.tree)).not.toContain("NOT_INTERESTED");
+  });
+
+  it("sul contenuto gestito NON compare nessuna delle tre voci (D5, §4–§7, §230–§231)", () => {
+    const { tree } = setup({ canEdit: true, canMarkNotInterested: true }, undefined, { item: FOLLOWED });
+
+    expect(actionIds(tree)).toEqual(["EDIT_CONTENT"]);
+  });
+
+  it("Non mi interessa, Non seguire e Segnala chiamano ciascuno il proprio handler (§166)", () => {
+    const { feedback, tree } = setup({ canMarkNotInterested: true }, undefined, { item: FOLLOWED });
+
+    pressTestId(tree, "action-sheet-NOT_INTERESTED");
+    expect(feedback.onNotInterested).toHaveBeenCalledWith({
+      contentId: "p1",
+      contentType: "club_media",
+      origin: "HOME_PER_TE",
+      reposter: null,
+    });
+
+    pressTestId(tree, "action-sheet-UNFOLLOW_SOURCE");
+    expect(feedback.onUnfollow).toHaveBeenCalledWith({
+      origin: "HOME_PER_TE",
+      source: { id: "club-1", kind: "club", name: "Como 1907" },
+      surface: "content",
+    });
+
+    pressTestId(tree, "action-sheet-REPORT_CONTENT");
+    expect(feedback.onReport).toHaveBeenCalledWith({
+      contentType: "club_media",
+      origin: "HOME_PER_TE",
+      parentContentId: null,
+      targetId: "p1",
+      targetType: "CONTENT",
+    });
+    // Nessuna cascata: ogni tap ha chiamato SOLO il suo handler (§167).
+    expect(feedback.onNotInterested).toHaveBeenCalledTimes(1);
+    expect(feedback.onUnfollow).toHaveBeenCalledTimes(1);
+    expect(feedback.onReport).toHaveBeenCalledTimes(1);
+  });
+
+  it("Segnala è rosso con la bandierina e non dipende dal solo colore (§201, §214)", () => {
+    const { tree } = setup({});
+    const [report] = hostByTestId(tree, "action-sheet-REPORT_CONTENT");
+
+    expect(report.props.accessibilityLabel).toBe("Segnala");
+    expect(report.props.accessibilityHint).toBe("Apre la segnalazione");
+  });
+
+  it("già segnalato (payload): «Segnalazione inviata ✓» non azionabile al posto di Segnala (§126–§131, D6)", () => {
+    const { feedback, tree } = setup({}, undefined, { item: { viewerHasReported: true } });
+    // Sia il Pressable (che riceve `disabled`) sia il suo nodo host portano il testID.
+    const sent = tree.root.findAll((node) => node.props?.testID === "action-sheet-REPORT_SENT");
+
+    expect(actionIds(tree)).not.toContain("REPORT_CONTENT");
+    expect(textOf(tree)).toContain("Segnalazione inviata ✓");
+    expect(sent.some((node) => node.props.disabled === true)).toBe(true);
+    expect(sent.every((node) => node.props.accessibilityLabel === "Segnalazione inviata")).toBe(true);
+    // Un tap non apre di nuovo il flow (§131).
+    expect(feedback.onReport).not.toHaveBeenCalled();
+  });
+
+  it("già segnalato (sessione): vale prima che il refetch porti il dato del server (§126)", () => {
+    reportedStore.add("CONTENT:club_media:p1");
+    const { tree } = setup({});
+
+    expect(actionIds(tree)).toContain("REPORT_SENT");
+    expect(actionIds(tree)).not.toContain("REPORT_CONTENT");
+  });
+
+  it("senza can_report il server nega Segnala (proprio, gestito, non segnalabile)", () => {
+    const { tree } = setup({ canReport: false });
+
+    expect(actionIds(tree)).not.toContain("REPORT_CONTENT");
+    expect(actionIds(tree)).not.toContain("REPORT_SENT");
+  });
+
+  it("delegato Società (D5): nessuna capability HOM-04 ma can_report falso → nemmeno «Non seguire <Società>»", () => {
+    const { tree } = setup({ canMarkNotInterested: false, canReport: false }, undefined, {
+      item: { isFollowingAuthor: true },
+    });
+
+    expect(actionIds(tree)).toEqual([]);
+    expect(textOf(tree)).not.toContain("Non seguire");
   });
 });
 

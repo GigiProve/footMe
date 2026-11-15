@@ -358,10 +358,13 @@ export function readCapabilities(
     canComment: flag("can_comment", legacy),
     canShare: flag("can_share", true),
     canSave: flag("can_save", legacy),
-    canReport: flag("can_report", true),
+    // HOM-11: Segnala ha ora un dominio vero dietro (Trust & Safety): senza il dato del
+    // server — che lo nega sul contenuto proprio o gestito (D5) — la voce non compare.
+    canReport: flag("can_report", false),
     canEdit: flag("can_edit", false),
     canDelete: flag("can_delete", false),
     canViewInsights: flag("can_view_insights", false),
+    canMarkNotInterested: flag("can_mark_not_interested", false),
   };
 }
 

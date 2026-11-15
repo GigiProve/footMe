@@ -21,12 +21,14 @@ import {
   commentIdentityContextLabel,
   commentMetaLine,
   commentMentionsForSubmit,
+  commentReportKey,
   commentableIdentities,
   defaultCommentIdentity,
   editErrorCopy,
   extractCommentLinks,
   hasCommentIdentityChoice,
   identityFromAuthor,
+  isCommentCollapsed,
   isCommentMeaningful,
   mergeReplyRefs,
   mergeRootRefs,
@@ -561,6 +563,121 @@ describe("menu ••• — §146–§147, §171–§174", () => {
       targetType: "COMMENT",
       viewerId: "viewer-1",
     });
+  });
+});
+
+/**
+ * HOM-11 §69–§73, §126–§140, §254, §278–§280: il menu del commento altrui (Non seguire,
+ * Segnala), mai Non mi interessa né Salva, il proprio commento invariato, il commento
+ * segnalato ripiegato.
+ */
+describe("menu ••• HOM-11 — commenti altrui", () => {
+  const other = {
+    author: author({ name: "Luca Verdi" }),
+    capabilities: {
+      canDelete: false,
+      canEdit: false,
+      canLike: true,
+      canOpenAuthor: true,
+      canReply: true,
+      canReport: true,
+    },
+    status: "active" as const,
+  };
+  const own = {
+    ...other,
+    capabilities: { ...other.capabilities, canDelete: true, canEdit: true, canReport: false },
+  };
+
+  it("commento altrui, autore seguito: Non seguire <autore>, divisore, Segnala (§70)", () => {
+    const actions = buildCommentActions({ ...other, viewerFollowsAuthor: true });
+
+    expect(actions.map((action) => action.id)).toEqual(["unfollow", "report"]);
+    expect(actions[0].label).toBe("Non seguire Luca Verdi");
+    expect(actions[1]).toMatchObject({ destructive: true, dividerBefore: true, icon: "flag-outline", label: "Segnala" });
+  });
+
+  it("autore non seguito: solo Segnala, mai «Segui» (§54–§56)", () => {
+    const actions = buildCommentActions(other);
+
+    expect(actions.map((action) => action.id)).toEqual(["report"]);
+    expect(actions[0].dividerBefore).toBe(false);
+    expect(actions.some((action) => /^segui/i.test(action.label))).toBe(false);
+  });
+
+  it("mai «Non mi interessa» (§71) né Salva (§72), con qualunque combinazione", () => {
+    const every = buildCommentActions({ ...other, viewerFollowsAuthor: true });
+    const labels = every.map((action) => action.label.toLowerCase());
+
+    expect(labels.some((label) => label.includes("non mi interessa"))).toBe(false);
+    expect(labels.some((label) => label.includes("salva"))).toBe(false);
+  });
+
+  it("già segnalato: «Segnalazione inviata ✓» non azionabile al posto di Segnala (§130, D6)", () => {
+    const actions = buildCommentActions({ ...other, viewerHasReported: true });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatchObject({
+      accessibilityLabel: "Segnalazione inviata",
+      disabled: true,
+      id: "reported",
+      label: "Segnalazione inviata ✓",
+    });
+  });
+
+  it("già segnalato in sessione (prima del refetch): lo stesso", () => {
+    expect(buildCommentActions(other, { reportedInSession: true }).map((action) => action.id)).toEqual(["reported"]);
+  });
+
+  it("fonte appena lasciata in sessione: Non seguire non si offre di nuovo (§62)", () => {
+    const actions = buildCommentActions(
+      { ...other, viewerFollowsAuthor: true },
+      { unfollowedInSession: true },
+    );
+
+    expect(actions.map((action) => action.id)).toEqual(["report"]);
+  });
+
+  it("senza can_report (server vecchio, commento proprio o gestito) niente Segnala", () => {
+    const denied = { ...other, capabilities: { ...other.capabilities, canReport: false } };
+
+    expect(buildCommentActions(denied)).toEqual([]);
+    expect(buildCommentActions({ ...denied, capabilities: { ...denied.capabilities, canReport: undefined } })).toEqual([]);
+  });
+
+  it("il proprio commento resta quello di HOM-08: Modifica ed Elimina, nessuna voce HOM-11 (§73)", () => {
+    const actions = buildCommentActions({ ...own, viewerFollowsAuthor: true, viewerHasReported: true });
+
+    expect(actions.map((action) => action.id)).toEqual(["edit", "delete"]);
+  });
+
+  it("un segnaposto o l'invio in corso non hanno menu", () => {
+    expect(buildCommentActions({ ...other, status: "deleted", viewerFollowsAuthor: true })).toEqual([]);
+    expect(buildCommentActions({ ...other, viewerFollowsAuthor: true }, { isSending: true })).toEqual([]);
+  });
+
+  it("senza autore (non disponibile) non c'è un nome da dire: niente Non seguire", () => {
+    const actions = buildCommentActions({ ...other, author: null, viewerFollowsAuthor: true });
+
+    expect(actions.map((action) => action.id)).toEqual(["report"]);
+  });
+});
+
+describe("commento segnalato — §134–§140, §278–§280", () => {
+  it("si ripiega se il payload dice «segnalato» o se la sessione lo ha appena segnalato", () => {
+    expect(isCommentCollapsed({ status: "active", viewerHasReported: true }, false)).toBe(true);
+    expect(isCommentCollapsed({ status: "active", viewerHasReported: false }, true)).toBe(true);
+    expect(isCommentCollapsed({ status: "active", viewerHasReported: false }, false)).toBe(false);
+    expect(isCommentCollapsed({ status: "active" }, false)).toBe(false);
+  });
+
+  it("un segnaposto è già ripiegato: non si ripiega due volte", () => {
+    expect(isCommentCollapsed({ status: "deleted", viewerHasReported: true }, true)).toBe(false);
+  });
+
+  it("la chiave è dell'id del commento: una Risposta segnalata non ripiega le altre (§138–§139)", () => {
+    expect(commentReportKey("c-1")).toBe("COMMENT:c-1");
+    expect(commentReportKey("c-1")).not.toBe(commentReportKey("c-2"));
   });
 });
 

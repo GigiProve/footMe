@@ -56,6 +56,8 @@ const DISMISS_DURATION = 2500;
 /** Con un'azione da leggere e toccare, 2,5 s non bastano. */
 const DISMISS_DURATION_WITH_ACTION = 6000;
 const ANIMATION_DURATION = 200;
+/** Etichetta ~18pt + 13 sopra e sotto = 44pt di area di tocco (HOM-11 §206). */
+const ACTION_HIT_SLOP = { bottom: 13, left: 8, right: 8, top: 13 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
@@ -179,7 +181,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <Pressable
                 accessibilityLabel={toast.action.label}
                 accessibilityRole="button"
-                hitSlop={8}
+                // HOM-11 §206: l'etichetta è alta ~18pt; l'area di tocco arriva a 44pt
+                // senza cambiare l'aspetto della snackbar.
+                hitSlop={ACTION_HIT_SLOP}
                 onPress={() => {
                   const action = toast.action;
                   hide();

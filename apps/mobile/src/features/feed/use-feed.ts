@@ -28,8 +28,11 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 
+import { hiddenTargetKey } from "../feed-feedback/feed-feedback-presentation";
+import { hiddenContentStore } from "../feed-feedback/hidden-content-store";
 import { trackFeed } from "./feed-analytics";
 import { arrangeFeedItems, mergeFeedPages } from "./feed-arrange";
+import { canonicalTargetOf } from "./feed-signal-cache";
 import {
   loadFeedCache,
   saveFeedCacheScope,
@@ -53,6 +56,12 @@ export function useFeedCache(profileId: string) {
 }
 
 const FIRST_PAGE_PARAM: FeedPageParam = { cursor: null, pageIndex: 0 };
+
+/** Il contenuto di questo elemento è nascosto con «Non mi interessa» in questa sessione? */
+function isHiddenInSession(item: FeedItem): boolean {
+  const target = canonicalTargetOf(item);
+  return target !== null && hiddenContentStore.has(hiddenTargetKey(target.contentType, target.contentId));
+}
 
 export type UseFeedResult = {
   items: FeedItem[];
@@ -153,8 +162,13 @@ export function useFeed({
     }
     lastPersistedRef.current = stamp;
 
+    // HOM-11 §169–§170: i contenuti nascosti con «Non mi interessa» in questa sessione non si
+    // riscrivono su disco (la lista visibile li tiene per il placeholder, §29–§36).
+    const persistable =
+      scope === "per_te" ? items.filter((item) => !isHiddenInSession(item)) : items;
+
     void saveFeedCacheScope(profileId, scope, {
-      items,
+      items: persistable,
       pageCount: pages.length,
       updatedAt: new Date().toISOString(),
     });

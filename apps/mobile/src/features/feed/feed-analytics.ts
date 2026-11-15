@@ -92,6 +92,9 @@ export type FeedAnalyticsEvent =
   // HOM-04 §134–135: gestione del contenuto. Solo id, tipo, tipo identità
   // autrice e provenienza: mai il testo del Post.
   | ({ name: "content_menu_open" } & ContentAnalyticsProps)
+  // HOM-11 §185: il nome che la spec dà all'apertura del menu, con l'origin. Affianca
+  // `content_menu_open` (stesse proprietà): nessun altro evento HOM-04 è duplicato.
+  | ({ name: "content_actions_open" } & ContentAnalyticsProps)
   | ({ name: "edit_selected" } & ContentAnalyticsProps)
   | ({ name: "insights_selected" } & ContentAnalyticsProps)
   | ({ name: "delete_selected" } & ContentAnalyticsProps)

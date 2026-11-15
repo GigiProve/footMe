@@ -5,6 +5,7 @@ import {
   clearFeedCache,
   FEED_CACHE_ITEM_CAP,
   loadFeedCache,
+  removeContentFromCachedScope,
   saveFeedCacheMeta,
   saveFeedCacheScope,
 } from "./feed-cache";
@@ -205,6 +206,66 @@ describe("clearFeedCache", () => {
     await clearFeedCache(PROFILE);
 
     expect(await loadFeedCache(PROFILE)).toBeNull();
+  });
+});
+
+describe("removeContentFromCachedScope — HOM-11 §169–§170, §292", () => {
+  it("toglie il contenuto dalla copia su disco della tab, lasciando intatti gli altri e l'altra tab", async () => {
+    await saveFeedCacheScope(PROFILE, "per_te", { items: [makePost("a"), makePost("b"), makePost("c")] });
+    await saveFeedCacheScope(PROFILE, "seguiti", { items: [makePost("b")] });
+
+    await removeContentFromCachedScope(PROFILE, "per_te", "club_media", "b");
+
+    const cache = await loadFeedCache(PROFILE);
+    expect(cache?.scopes.per_te.items.map((item) => item.id)).toEqual(["a", "c"]);
+    // Non mi interessa non vale per Seguiti (§26).
+    expect(cache?.scopes.seguiti.items.map((item) => item.id)).toEqual(["b"]);
+  });
+
+  it("toglie anche un Simple Repost dell'originale (il target è il contenuto canonico)", async () => {
+    const wrapper = { ...makePost("b"), id: "repost:club_media:b" };
+    await saveFeedCacheScope(PROFILE, "per_te", { items: [makePost("a"), wrapper] });
+
+    await removeContentFromCachedScope(PROFILE, "per_te", "club_media", "b");
+
+    expect((await loadFeedCache(PROFILE))?.scopes.per_te.items.map((item) => item.id)).toEqual(["a"]);
+  });
+
+  it("il tipo conta: lo stesso id con un altro tipo non si tocca", async () => {
+    await saveFeedCacheScope(PROFILE, "per_te", { items: [makePost("a")] });
+
+    await removeContentFromCachedScope(PROFILE, "per_te", "media_profile", "a");
+
+    expect((await loadFeedCache(PROFILE))?.scopes.per_te.items.map((item) => item.id)).toEqual(["a"]);
+  });
+
+  it("mantiene scroll, id visti e le altre chiavi del record", async () => {
+    const scroll = { itemCount: 3, offset: 120, savedAt: new Date().toISOString() };
+    await saveFeedCacheScope(PROFILE, "per_te", {
+      items: [makePost("a"), makePost("b")],
+      scroll,
+      seenIds: ["a"],
+      updatedAt: new Date().toISOString(),
+    });
+    await saveFeedCacheMeta(PROFILE, { activeScope: "seguiti" });
+
+    await removeContentFromCachedScope(PROFILE, "per_te", "club_media", "b");
+
+    const cache = await loadFeedCache(PROFILE);
+    expect(cache?.scopes.per_te.scroll).toEqual(scroll);
+    expect(cache?.scopes.per_te.seenIds).toEqual(["a"]);
+    expect(cache?.activeScope).toBe("seguiti");
+  });
+
+  it("senza cache o senza il contenuto non scrive nulla e non solleva", async () => {
+    await expect(removeContentFromCachedScope(PROFILE, "per_te", "club_media", "x")).resolves.toBeUndefined();
+    expect(await AsyncStorage.getItem(KEY)).toBeNull();
+
+    await saveFeedCacheScope(PROFILE, "per_te", { items: [makePost("a")] });
+    const before = await AsyncStorage.getItem(KEY);
+    await removeContentFromCachedScope(PROFILE, "per_te", "club_media", "zzz");
+
+    expect(await AsyncStorage.getItem(KEY)).toBe(before);
   });
 });
 

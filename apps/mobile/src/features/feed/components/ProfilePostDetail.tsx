@@ -34,6 +34,7 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { useSession } from "../../auth/use-session";
+import { reconcileFollowFromItems } from "../../following/reconcile-follow";
 import { colors, spacing } from "../../../theme/tokens";
 import { useOpenReference } from "../../repost/use-open-reference";
 import { buildShareTarget } from "../../share/share-presentation";
@@ -72,8 +73,22 @@ import { PostFeedItem } from "./items/PostFeedItem";
  * corrente — si esce dalla schermata invece di lasciare uno stato vuoto.
  */
 function detailManagement(management: ContentManagement, leave: () => void): ContentManagement {
+  const { feedback } = management;
+
   return {
     ...management,
+    // HOM-11 §27, §29: «Non mi interessa» nel dettaglio aperto da Per te nasconde il contenuto e
+    // lascia la schermata: si torna a Per te, dove il segnaposto «Contenuto nascosto · Annulla»
+    // sta già nella posizione del Post. Le altre due azioni restano nel dettaglio.
+    feedback: feedback
+      ? {
+          ...feedback,
+          onNotInterested: (target) => {
+            feedback.onNotInterested(target);
+            leave();
+          },
+        }
+      : undefined,
     onDelete: async () => {
       const outcome = await management.onDelete();
       if (outcome === "removed") {
@@ -109,7 +124,8 @@ export function ProfilePostDetail({
   const openReference = useOpenReference("detail", origin);
   const toggleLike = useToggleFeedPostLike({ profileId: profile?.id ?? "" });
   const openLikes = useOpenLikes();
-  const manageContent = useContentManagement({ profileId: profile?.id ?? "" });
+  // HOM-11 §27: nel dettaglio «Non mi interessa» dipende dall'origin (Per te), non dalla lista.
+  const manageContent = useContentManagement({ profileId: profile?.id ?? "", surface: "detail" });
   // HOM-07 §133: il Salva del dettaglio è lo stesso del Feed (store Salvati).
   const toggleSaved = useToggleSavedFeedItem();
   const [videoController] = useState(createFeedVideoController);
@@ -136,6 +152,8 @@ export function ProfilePostDetail({
     if (item) {
       seedLikesFromItems([item]);
       seedSavedFromItems([item]);
+      // HOM-11 §173: il Follow del payload più nuovo smentisce un «Non seguire» di sessione.
+      reconcileFollowFromItems([item]);
     }
   }, [item]);
   const availability = normalizeContentAvailability({

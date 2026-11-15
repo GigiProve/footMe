@@ -108,13 +108,13 @@ export const FEED_ACTION_SHARE_A11Y = "Condividi contenuto";
  * HOM-08: i commenti sono reali (la cella Commenta apre il dettaglio), quindi
  * qui non c'è più il messaggio «I commenti arriveranno presto».
  * HOM-09: lo stesso vale per Condividi, che apre il pannello (`features/share`).
+ * HOM-11: Non mi interessa, Non seguire e Segnala sono reali (`feed-feedback`,
+ * `following`, `moderation`) e «Nascondi» non esiste più (non era nella spec, che
+ * distingue solo Non mi interessa / Non seguire / Segnala): qui non restano messaggi
+ * «arriverà presto» per il menu.
  */
 export const FEED_SOON_MESSAGES = {
-  hide: "Questa azione arriverà presto.",
   like: "Il Mi piace su questo contenuto arriverà presto.",
-  notInterested: "Questa azione arriverà presto.",
-  report: "Le segnalazioni arriveranno presto.",
-  unfollow: "Questa azione arriverà presto.",
 } as const;
 
 // ── Post (HOM-02) ───────────────────────────────────────────────
@@ -143,13 +143,12 @@ export const FEED_MEDIA_STATE_LABELS = {
 } as const;
 
 // ── Menu contestuale (§20) ──────────────────────────────────────
+// Solo Salva / Rimuovi dai salvati (HOM-07). Il copy di Non mi interessa, Non seguire
+// e Segnala sta nei loro moduli (`feed-feedback-presentation`, `content-feedback-actions`,
+// `moderation-presentation`): un copy, un posto (HOM-11 §49).
 export const FEED_MENU_LABELS = {
-  hide: "Nascondi",
-  notInterested: "Non mi interessa",
-  report: "Segnala",
   save: "Salva",
   unsave: "Rimuovi dai salvati",
-  unfollow: "Non seguire",
 } as const;
 
 // ── Helper di etichetta ─────────────────────────────────────────

@@ -39,6 +39,11 @@ export default function RootLayout() {
             <Stack.Screen name="drafts" options={{ gestureEnabled: true }} />
             {/* HOM-07 §45–§46, §54: la lista Mi piace è una pagina detail fuori dalle tab; il Back (anche a gesto) torna alla stessa lista e allo stesso scroll. */}
             <Stack.Screen name="likes/[type]/[id]" options={{ gestureEnabled: true }} />
+            {/* HOM-11 §79, D7: Segnala è un flow a schermo intero, senza bottom navigation né chrome Home; «Fine» torna all'origine nello stack. */}
+            <Stack.Screen
+              name="report/[targetType]/[id]"
+              options={{ animation: "slide_from_bottom", presentation: "fullScreenModal" }}
+            />
           </Stack>
         </ToastProvider>
       </SessionProvider>

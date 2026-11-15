@@ -18,7 +18,14 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { FEED_ITEM_TYPES, type FeedItem, type FeedItemType, type FeedScope } from "./feed-types";
+import { isCanonicalTarget } from "./feed-signal-cache";
+import {
+  FEED_ITEM_TYPES,
+  type FeedContentType,
+  type FeedItem,
+  type FeedItemType,
+  type FeedScope,
+} from "./feed-types";
 
 const PREFIX = "@footme/feed/v1/";
 
@@ -250,6 +257,36 @@ export async function saveFeedCacheScope(
   await writeCache(profileId, {
     ...cache,
     scopes: { ...cache.scopes, [scope]: merged },
+  });
+}
+
+/**
+ * HOM-11 §169–§170, §292: toglie un contenuto (e i suoi Simple Repost) dalla copia su DISCO di
+ * una tab. Serve a «Non mi interessa»: la query in memoria NON si tocca — il placeholder
+ * «Contenuto nascosto · Annulla» sta nella lista visibile e rimuovere l'elemento dai dati
+ * sposterebbe lo scroll —, ma al prossimo avvio il Post non deve riapparire dalla cache prima
+ * del refetch. Best-effort come ogni scrittura di questa cache.
+ */
+export async function removeContentFromCachedScope(
+  profileId: string,
+  scope: FeedScope,
+  contentType: FeedContentType,
+  contentId: string,
+): Promise<void> {
+  const cache = await loadFeedCache(profileId);
+  if (!cache) {
+    return;
+  }
+
+  const previous = cache.scopes[scope];
+  const items = previous.items.filter((item) => !isCanonicalTarget(item, contentType, contentId));
+  if (items.length === previous.items.length) {
+    return;
+  }
+
+  await writeCache(profileId, {
+    ...cache,
+    scopes: { ...cache.scopes, [scope]: { ...previous, items } },
   });
 }
 

@@ -57,6 +57,12 @@ export type CommentCapabilities = {
   canReply: boolean;
   canLike: boolean;
   canOpenAuthor: boolean;
+  /**
+   * HOM-11 §70, §132: Segnala sul commento altrui. Il server la nega sul commento della
+   * propria identità o gestito e sui non attivi. Assente = falso: un server pre-HOM-11 non
+   * la manda e la voce non compare.
+   */
+  canReport?: boolean;
 };
 
 export type Comment = {
@@ -88,6 +94,17 @@ export type Comment = {
   capabilities: CommentCapabilities;
   /** Solo sui commenti dell'utente: riconciliazione dell'inserimento ottimistico (§94, §223). */
   operationKey: string | null;
+  /**
+   * HOM-11 §70, §54: il viewer segue l'identità autrice (Follow globale, `viewer_follows_author`).
+   * Decide se il menu offre «Non seguire <autore>»; mai «Segui» (§56). Assente = falso.
+   */
+  viewerFollowsAuthor?: boolean;
+  /**
+   * HOM-11 §126–§140: il viewer ha già segnalato questo commento (`viewer_has_reported`). La
+   * riga si ripiega in «Commento segnalato» senza azioni (§134–§140); le risposte restano
+   * (§136–§139). Assente = falso.
+   */
+  viewerHasReported?: boolean;
 };
 
 export type CommentCursor = Record<string, unknown>;

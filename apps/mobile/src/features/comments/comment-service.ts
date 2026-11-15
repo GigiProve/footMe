@@ -164,6 +164,8 @@ function mapCapabilities(value: unknown): CommentCapabilities {
     canEdit: raw.can_edit === true,
     canLike: raw.can_like === true,
     canOpenAuthor: raw.can_open_author === true,
+    // HOM-11 §70: assente (server pre-HOM-11) = nessuna voce Segnala.
+    canReport: raw.can_report === true,
     canReply: raw.can_reply === true,
   };
 }
@@ -217,6 +219,9 @@ export function mapComment(value: unknown): Comment | null {
     rootCommentId: rootId,
     status,
     updatedAt: typeof value.updated_at === "string" ? value.updated_at : created_at,
+    // HOM-11 §54, §126, §134: assenti (server pre-HOM-11) = non seguito, non segnalato.
+    viewerFollowsAuthor: isActive && value.viewer_follows_author === true,
+    viewerHasReported: isActive && value.viewer_has_reported === true,
     version: count(value.version, 1),
   };
 }

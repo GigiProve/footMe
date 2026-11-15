@@ -43,6 +43,17 @@ export type ActionSheetAction = {
   /** Filetto sopra l'azione, solo se non è la prima della lista. */
   dividerBefore?: boolean;
   accessibilityHint?: string;
+  /**
+   * Etichetta parlata, se diversa dal testo a vista (HOM-11 §201: «Segnalazione inviata ✓»
+   * si legge «Segnalazione inviata»). Assente = `label`.
+   */
+  accessibilityLabel?: string;
+  /**
+   * Riga non azionabile (HOM-11 D6, §130: «Segnalazione inviata ✓»): resta visibile,
+   * attenuata e dichiarata disabilitata ai lettori di schermo; un tap non fa nulla e non
+   * chiude il foglio.
+   */
+  disabled?: boolean;
   onPress: () => void;
 };
 
@@ -141,8 +152,10 @@ export function ActionSheet({
                   action.accessibilityHint ??
                   (action.destructive ? DESTRUCTIVE_ACTION_HINT : undefined)
                 }
-                accessibilityLabel={action.label}
+                accessibilityLabel={action.accessibilityLabel ?? action.label}
                 accessibilityRole="button"
+                accessibilityState={action.disabled ? { disabled: true } : undefined}
+                disabled={action.disabled}
                 onPress={() => {
                   onClose();
                   action.onPress();
@@ -150,19 +163,26 @@ export function ActionSheet({
                 style={({ pressed }) => [
                   styles.row,
                   pressed ? styles.pressed : null,
+                  action.disabled ? styles.disabledRow : null,
                 ]}
                 testID={action.id ? `action-sheet-${action.id}` : undefined}
               >
                 {action.icon ? (
                   <Ionicons
-                    color={action.destructive ? colors.danger : colors.textPrimary}
+                    color={
+                      action.disabled
+                        ? colors.textMuted
+                        : action.destructive
+                          ? colors.danger
+                          : colors.textPrimary
+                    }
                     name={action.icon}
                     size={20}
                   />
                 ) : null}
                 <View style={styles.rowText}>
                   <AppText
-                    color={action.destructive ? "danger" : "primary"}
+                    color={action.disabled ? "muted" : action.destructive ? "danger" : "primary"}
                     variant="bodyLg"
                   >
                     {action.label}
@@ -247,6 +267,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.6,
+  },
+  disabledRow: {
+    opacity: 0.75,
   },
   cancel: {
     alignItems: "center",

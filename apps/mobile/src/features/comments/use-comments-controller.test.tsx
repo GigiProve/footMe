@@ -12,10 +12,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setAnalyticsSink, type AnalyticsEvent } from "../../lib/analytics";
+import { resetUnfollowedSourcesStore, unfollowedSourcesStore } from "../following/unfollowed-sources-store";
 import { likeItemKey } from "../interactions/like-store";
 import { commentCountStore } from "./comment-count-store";
 import { commentStore } from "./comment-store";
-import type { CommentContext, CommentIdentity } from "./comment-types";
+import type { CommentContext, CommentEntity, CommentIdentity } from "./comment-types";
 import { useCommentsController, type CommentsController, type CommentsFocus } from "./use-comments-controller";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -24,10 +25,15 @@ const mocks = vi.hoisted(() => ({
   context: { current: null as unknown },
   push: vi.fn(),
   rootsAsOf: { current: null as string | null },
+  toggleFollowSource: vi.fn(),
   updatesArgs: vi.fn(),
 }));
 
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
+// HOM-11: il Follow globale (Non seguire dal menu di un commento) non va in rete.
+vi.mock("../search/media/media-search-service", () => ({
+  toggleFollowSource: mocks.toggleFollowSource,
+}));
 vi.mock("../../lib/supabase", () => ({ supabase: { rpc: vi.fn() } }));
 vi.mock("../../ui", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 vi.mock("../auth/use-session", () => ({ useSession: () => ({ profile: { id: "viewer-1" } }) }));
@@ -292,5 +298,98 @@ describe("stato di disponibilità — §177–§190", () => {
     expect(controller.sort).toBe("recent");
     expect(commentStore.getSort(KEY)).toBe("recent");
     expect(names()).toContain("comments_sort_changed");
+  });
+});
+
+/**
+ * HOM-11 §70, §132–§133, §145: dal menu di un commento altrui partono Non seguire (Follow
+ * globale, snackbar) e Segnala (lo stesso flow dei contenuti, target COMMENT).
+ */
+describe("menu del commento — HOM-11", () => {
+  const OTHER: CommentEntity = {
+    author: {
+      avatarUrl: null,
+      clubCategory: null,
+      clubName: null,
+      identityId: "c-77",
+      identityType: "society",
+      isVerified: false,
+      mediaKind: null,
+      name: "AC Como",
+      primaryPosition: null,
+      role: null,
+      teamLabel: null,
+    },
+    body: "Bravi ragazzi.",
+    capabilities: { canDelete: false, canEdit: false, canLike: true, canOpenAuthor: true, canReply: true, canReport: true },
+    contentId: "post-1",
+    contentType: "profile_post",
+    createdAt: "2026-11-14T09:00:00.000Z",
+    editedAt: null,
+    id: "c-1",
+    isContentAuthor: false,
+    likedAs: [],
+    likesCount: 0,
+    links: [],
+    mentions: [],
+    operationKey: null,
+    repliesCount: 0,
+    replyTo: null,
+    replyToCommentId: null,
+    rootCommentId: "c-1",
+    send: null,
+    status: "active",
+    updatedAt: "2026-11-14T09:00:00.000Z",
+    version: 1,
+    viewerFollowsAuthor: true,
+  };
+
+  beforeEach(() => {
+    mocks.push.mockReset();
+    mocks.toggleFollowSource.mockReset();
+    mocks.toggleFollowSource.mockResolvedValue(undefined);
+    resetUnfollowedSourcesStore();
+  });
+
+  it("Segnala: apre la route del flow con target COMMENT, tipo e id del contenuto padre e origin", () => {
+    mount(null);
+    act(() => controller.actions.openMenu(OTHER));
+
+    act(() => controller.overlays.runMenuAction("report"));
+
+    expect(mocks.push).toHaveBeenCalledWith(
+      "/report/comment/c-1?contentType=profile_post&contentId=post-1&origin=HOME_PER_TE",
+    );
+    expect(controller.overlays.menuTarget).toBeNull();
+  });
+
+  it("Segnala su una Risposta: lo stesso target COMMENT con il proprio id (§104, §265)", () => {
+    mount(null);
+    const reply = { ...OTHER, id: "c-2", replyToCommentId: "c-1", rootCommentId: "c-1" };
+    act(() => controller.actions.openMenu(reply));
+
+    act(() => controller.overlays.runMenuAction("report"));
+
+    expect(mocks.push).toHaveBeenCalledWith(expect.stringContaining("/report/comment/c-2?"));
+  });
+
+  it("Non seguire: Follow globale sulla fonte giusta (Società → club) e nessun flow di segnalazione", async () => {
+    mount(null);
+    act(() => controller.actions.openMenu(OTHER));
+
+    await act(async () => controller.overlays.runMenuAction("unfollow"));
+
+    expect(mocks.toggleFollowSource).toHaveBeenCalledWith("viewer-1", "club", "c-77", false);
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(unfollowedSourcesStore.has("club:c-77")).toBe(true);
+  });
+
+  it("Segnala non lascia l'autore: nessuna cascata sul Follow (§150, §286)", () => {
+    mount(null);
+    act(() => controller.actions.openMenu(OTHER));
+    act(() => controller.overlays.runMenuAction("report"));
+
+    expect(mocks.toggleFollowSource).not.toHaveBeenCalled();
+    expect(unfollowedSourcesStore.has("club:c-77")).toBe(false);
   });
 });

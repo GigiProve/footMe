@@ -7,7 +7,9 @@ import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { countTestId, hostByTestId, press, pressTestId, render } from "../../feed/components/feed-test-helpers";
+import { resetUnfollowedSourcesStore, unfollowedSourcesStore } from "../../following/unfollowed-sources-store";
 import { likeStore } from "../../interactions/like-store";
+import { reportedStore, resetReportedStore } from "../../moderation/reported-store";
 import type { CommentEntity } from "../comment-types";
 import type { CommentsController } from "../use-comments-controller";
 import { CommentPlaceholderRow } from "./CommentPlaceholderRow";
@@ -74,6 +76,9 @@ function comment(overrides: Partial<CommentEntity> = {}): CommentEntity {
 beforeEach(() => {
   Object.values(actions).forEach((mock) => mock.mockReset());
   likeStore.clear();
+  // HOM-11: gli insiemi di sessione sono di modulo, ogni test parte da zero.
+  resetReportedStore();
+  resetUnfollowedSourcesStore();
 });
 
 describe("CommentRow", () => {
@@ -210,6 +215,81 @@ describe("CommentRow", () => {
 
     expect(style).toContain("paddingLeft");
     expect(style).not.toContain("marginLeft");
+  });
+});
+
+/**
+ * HOM-11 §69–§72, §134–§140, §278–§280: il ••• sul commento altrui quando c'è almeno
+ * un'azione, e il commento segnalato ripiegato senza azioni.
+ */
+describe("CommentRow — HOM-11", () => {
+  it("commento altrui con can_report: compare il ••• (Segnala, §70, §132)", () => {
+    const reportable = comment({
+      capabilities: { canDelete: false, canEdit: false, canLike: true, canOpenAuthor: true, canReply: true, canReport: true },
+    });
+    const tree = render(<CommentRow comment={reportable} controller={controller} isReply={false} />);
+
+    expect(countTestId(tree, "comment-menu-c-1")).toBe(1);
+    press(tree, "Azioni commento");
+    expect(actions.openMenu).toHaveBeenCalledWith(reportable);
+  });
+
+  it("commento altrui con autore seguito: compare il ••• anche senza can_report (Non seguire, §70)", () => {
+    const followed = comment({ viewerFollowsAuthor: true });
+    const tree = render(<CommentRow comment={followed} controller={controller} isReply={false} />);
+
+    expect(countTestId(tree, "comment-menu-c-1")).toBe(1);
+  });
+
+  it("l'unica azione era Non seguire e la fonte è appena stata lasciata: nessun ••• vuoto (§62)", () => {
+    unfollowedSourcesStore.add("profile:p-2");
+    const followed = comment({ viewerFollowsAuthor: true });
+    const tree = render(<CommentRow comment={followed} controller={controller} isReply={false} />);
+
+    expect(countTestId(tree, "comment-menu-c-1")).toBe(0);
+  });
+
+  it("segnalato (payload): riga «Commento segnalato» senza Mi piace, Rispondi né menu (§134–§135, §140)", () => {
+    const reported = comment({ viewerHasReported: true });
+    const tree = render(<CommentRow comment={reported} controller={controller} isReply={false} />);
+
+    expect(countTestId(tree, "comment-reported-c-1")).toBe(1);
+    expect(JSON.stringify(tree.toJSON())).toContain("Commento segnalato");
+    expect(countTestId(tree, "comment-like-c-1")).toBe(0);
+    expect(countTestId(tree, "comment-reply-c-1")).toBe(0);
+    expect(countTestId(tree, "comment-menu-c-1")).toBe(0);
+    expect(countTestId(tree, "comment-author-c-1")).toBe(0);
+    // Il testo del commento segnalato non si mostra più al reporter.
+    expect(JSON.stringify(tree.toJSON())).not.toContain("Ottimo progetto.");
+  });
+
+  it("segnalato in sessione (prima del refetch): si ripiega subito", () => {
+    reportedStore.add("COMMENT:c-1");
+    const tree = render(<CommentRow comment={comment()} controller={controller} isReply={false} />);
+
+    expect(countTestId(tree, "comment-reported-c-1")).toBe(1);
+  });
+
+  it("una risposta segnalata si ripiega da sola: le altre restano (§138–§139)", () => {
+    reportedStore.add("COMMENT:c-2");
+    const reported = render(
+      <CommentRow comment={comment({ id: "c-2", replyToCommentId: "c-1" })} controller={controller} isReply />,
+    );
+    const sibling = render(
+      <CommentRow comment={comment({ id: "c-3", replyToCommentId: "c-1" })} controller={controller} isReply />,
+    );
+
+    expect(countTestId(reported, "comment-reported-c-2")).toBe(1);
+    expect(countTestId(sibling, "comment-reported-c-3")).toBe(0);
+    expect(countTestId(sibling, "comment-like-c-3")).toBe(1);
+  });
+
+  it("il commento ripiegato è un solo elemento leggibile: la bandierina non è l'unico segnale (§201)", () => {
+    const tree = render(<CommentRow comment={comment({ viewerHasReported: true })} controller={controller} isReply={false} />);
+    const bar = hostByTestId(tree, "comment-reported-c-1")[0];
+
+    expect(bar.props.accessible).toBe(true);
+    expect(bar.props.accessibilityLabel).toBe("Commento segnalato");
   });
 });
 

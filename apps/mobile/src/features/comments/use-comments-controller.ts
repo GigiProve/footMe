@@ -35,11 +35,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../ui";
 import { openExternalUrl } from "../article-editor/article-links";
 import { useSession } from "../auth/use-session";
+import { parseContentOrigin } from "../feed/content-routes";
 import { resolveIdentityHref } from "../feed/feed-service";
 import { useContentLikeToggle } from "../feed/use-feed-post-like";
+import { followSourceOfIdentity } from "../following/follow-source";
+import { useUnfollowFromContent } from "../following/use-unfollow-from-content";
 import { isLikedForDisplay } from "../interactions/interaction-identity";
 import { likeItemKey, likeStore } from "../interactions/like-store";
 import { useOpenLikes } from "../likes/use-open-likes";
+import { reportHref } from "../moderation/moderation-routes";
 import { trackComment } from "./comment-analytics";
 import { commentCountStore } from "./comment-count-store";
 import {
@@ -50,6 +54,7 @@ import {
 import { COMMENTS_QK } from "./comment-keys";
 import {
   authorHref,
+  commentActionContext,
   commentableIdentities,
   extractCommentLinks,
   mergeRootRefs,
@@ -67,6 +72,7 @@ import type {
   CommentRef,
   CommentSort,
 } from "./comment-types";
+import type { CommentMenuSelection } from "./components/CommentActionSheet";
 import { useCommentContext, type CommentContextState } from "./use-comment-context";
 import { useCommentUpdates } from "./use-comment-updates";
 import { useDeleteComment } from "./use-delete-comment";
@@ -177,7 +183,8 @@ export type CommentsController = {
     setAsOpen: (open: boolean) => void;
     menuTarget: CommentEntity | null;
     closeMenu: () => void;
-    runMenuAction: (action: "edit" | "delete") => void;
+    /** Modifica / Elimina (HOM-08), Non seguire / Segnala (HOM-11 §70). */
+    runMenuAction: (action: CommentMenuSelection) => void;
   };
 
   /** Da attaccare all'`onLayout` della sezione, per lo scroll di apertura (§5–§6). */
@@ -316,6 +323,11 @@ export function useCommentsController({
 
   const toggleLikeEngine = useContentLikeToggle({ profileId: viewerId });
   const openLikesList = useOpenLikes();
+
+  /* ---------------- Non seguire dal menu del commento (HOM-11 §70) ---------------- */
+
+  // Il Follow globale, non un sistema dei commenti: stessa mutation, stessa snackbar dei contenuti.
+  const unfollowActions = useUnfollowFromContent();
 
   /* ---------------- fogli ---------------- */
 
@@ -568,7 +580,7 @@ export function useCommentsController({
     trackComment({ commentId: rootId, contentId, contentType, loaded, name: "more_replies_loaded" });
   }
 
-  function runMenuAction(action: "edit" | "delete") {
+  function runMenuAction(action: CommentMenuSelection) {
     // L'entità di ADESSO, non lo snapshot di quando il menu si è aperto: un seed arrivato
     // nel frattempo cambia versione e testo, e una modifica con la versione vecchia
     // sarebbe un conflitto spurio.
@@ -580,8 +592,27 @@ export function useCommentsController({
     }
     if (action === "edit") {
       editor.start(target);
-    } else {
+    } else if (action === "delete") {
       deletion.request(target);
+    } else if (action === "unfollow") {
+      // §70, §145: la fonte è l'identità che ha scritto il commento (Società → `club_follows`).
+      const source = target.author ? followSourceOfIdentity(target.author) : null;
+      if (source) {
+        void unfollowActions.unfollow({ origin: parseContentOrigin(origin ?? undefined), source, surface: "comment" });
+      }
+    } else {
+      // §132–§133: lo stesso flow dei contenuti, con `target_type = COMMENT`. Il contesto per
+      // le azioni contestuali è quello di HOM-08 §174; «Fine» torna a questo thread (§116–§119).
+      const context = commentActionContext(target, viewerId);
+      router.push(
+        reportHref({
+          contentType: context.contentType,
+          origin: parseContentOrigin(origin ?? undefined),
+          parentContentId: context.contentId,
+          targetId: context.commentId,
+          targetType: "COMMENT",
+        }) as never,
+      );
     }
   }
 

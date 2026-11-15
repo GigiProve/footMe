@@ -90,7 +90,32 @@ describe("mapComment — forma unica del contratto A5", () => {
       canLike: true,
       canOpenAuthor: true,
       canReply: true,
+      // HOM-11: assente nel payload = falso.
+      canReport: false,
     });
+  });
+
+  it("HOM-11 §54, §70, §126: legge can_report, viewer_follows_author e viewer_has_reported; assenti = falso", () => {
+    const flagged = mapComment(
+      raw({
+        capabilities: { can_like: true, can_report: true },
+        viewer_follows_author: true,
+        viewer_has_reported: true,
+      }),
+    );
+    expect(flagged?.capabilities.canReport).toBe(true);
+    expect(flagged).toMatchObject({ viewerFollowsAuthor: true, viewerHasReported: true });
+
+    // Un server pre-HOM-11 non manda nulla: nessuna voce nuova, nessun commento ripiegato.
+    expect(mapComment(raw())).toMatchObject({ viewerFollowsAuthor: false, viewerHasReported: false });
+  });
+
+  it("HOM-11: un segnaposto non porta Segui, Segnala né «segnalato»", () => {
+    const placeholder = mapComment(
+      raw({ status: "deleted", viewer_follows_author: true, viewer_has_reported: true }),
+    );
+
+    expect(placeholder).toMatchObject({ viewerFollowsAuthor: false, viewerHasReported: false });
   });
 
   it("§48: senza root_comment_id un commento è il proprio root", () => {

@@ -63,6 +63,12 @@ import {
   useToggleSavedFeedItem,
 } from "../use-feed-item-actions";
 import { commentsHref, originForScope } from "../content-routes";
+import { filterViewerSignals } from "../feed-signal-cache";
+import { followSourceKey } from "../../following/follow-source";
+import { reconcileFollowFromItems } from "../../following/reconcile-follow";
+import { unfollowedSourcesStore, useUnfollowedVersion } from "../../following/unfollowed-sources-store";
+import { reportTargetKey } from "../../moderation/moderation-presentation";
+import { reportedStore, useReportedVersion } from "../../moderation/reported-store";
 import { commentCountStore } from "../../comments/comment-count-store";
 import { likeItemKey } from "../../interactions/like-store";
 import { useContentManagement } from "../use-content-management";
@@ -110,6 +116,19 @@ export function FeedPane({
   const [pendingFollowId, setPendingFollowId] = useState<string | null>(null);
 
   const feed = useFeed({ cache, isCacheReady, profileId, scope });
+  // HOM-11 §65, §125, §169, §171: ciò che il viewer ha segnalato — e, in Seguiti, le fonti
+  // che ha lasciato — non rientra dalle pagine successive né dalla cache non ancora
+  // ripulita. Le due versioni fanno rileggere la lista quando un insieme di sessione cambia.
+  useReportedVersion();
+  useUnfollowedVersion();
+  const items = filterViewerSignals(feed.items, {
+    isReported: (contentType, contentId) =>
+      reportedStore.has(reportTargetKey({ contentType, targetId: contentId, targetType: "CONTENT" })),
+    isUnfollowed:
+      scope === "seguiti"
+        ? (source) => unfollowedSourcesStore.has(followSourceKey(source))
+        : undefined,
+  });
   const profilesQuery = useSuggestedProfiles(profileId);
   const clubsQuery = useSuggestedClubs(profileId);
   const toggleSaved = useToggleSavedFeedItem({ profileId, scope });
@@ -121,6 +140,11 @@ export function FeedPane({
   useSeedLikes(feed.items);
   // HOM-07 §133, §141: stesso principio per lo store Salvati.
   useSeedSaved(feed.items);
+  // HOM-11 §173: una pagina server più nuova che dice «seguito» smentisce un «Non seguire» di
+  // sessione (ri-seguito da profilo, Cerca o lista Mi piace). Lo stato finale è del server.
+  useEffect(() => {
+    reconcileFollowFromItems(feed.items);
+  }, [feed.items]);
   const manageContent = useContentManagement({ profileId });
   const videoController = useFeedVideoController();
   const mediaProcessing = useFeedMediaProcessing({ enabled: isActive, profileId });
@@ -248,6 +272,8 @@ export function FeedPane({
       }),
     // HOM-04: le capability di gestione arrivano dal server, mai dal ruolo.
     getManagement: (item: FeedInteractiveItem) => manageContent(item, originForScope(scope)),
+    // HOM-11 §21, §26, D2: il segnaposto «Contenuto nascosto · Annulla» esiste solo in Per te.
+    hideOrigin: scope === "per_te" ? originForScope(scope) : null,
     onOpenMedia: (item: FeedPostItem, index: number) => {
       const media = item.payload.media[index];
       if (!media) {
@@ -366,7 +392,7 @@ export function FeedPane({
       emptyTrackedRef.current ||
       feed.isInitialLoading ||
       feed.isError ||
-      feed.items.length > 0
+      items.length > 0
     ) {
       return;
     }
@@ -383,7 +409,7 @@ export function FeedPane({
   }, [
     feed.isError,
     feed.isInitialLoading,
-    feed.items.length,
+    items.length,
     followingState.data?.followsNobody,
     scope,
   ]);
@@ -473,7 +499,7 @@ export function FeedPane({
         hasNextPage={feed.hasNextPage}
         isFetchingNextPage={feed.isFetchingNextPage}
         isRefreshing={feed.isRefreshing}
-        items={feed.items}
+        items={items}
         listRef={listRef}
         ListEmptyComponent={emptyComponent}
         ListHeaderComponent={header}

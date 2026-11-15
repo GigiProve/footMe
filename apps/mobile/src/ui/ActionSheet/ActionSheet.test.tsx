@@ -56,6 +56,34 @@ describe("ActionSheet — estensioni HOM-04", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  // HOM-11 D6, §130, §201: «Segnalazione inviata ✓» è una riga non azionabile.
+  it("una riga disabilitata resta visibile, è dichiarata disabilitata e ha l'etichetta parlata propria", () => {
+    const onPress = vi.fn();
+    const { tree } = render([
+      {
+        accessibilityLabel: "Segnalazione inviata",
+        disabled: true,
+        id: "SENT",
+        label: "Segnalazione inviata ✓",
+        onPress,
+      },
+    ]);
+    const [row] = byTestId(tree, "action-sheet-SENT");
+
+    expect(row.props.disabled).toBe(true);
+    expect(row.props.accessibilityState).toEqual({ disabled: true });
+    expect(row.props.accessibilityLabel).toBe("Segnalazione inviata");
+    expect(JSON.stringify(tree.toJSON())).toContain("Segnalazione inviata ✓");
+  });
+
+  it("una riga normale non dichiara nessuno stato disabilitato", () => {
+    const { tree } = render([{ id: "A", label: "A", onPress: vi.fn() }]);
+    const [row] = byTestId(tree, "action-sheet-A");
+
+    expect(row.props.accessibilityState).toBeUndefined();
+    expect(row.props.accessibilityLabel).toBe("A");
+  });
+
   it("la maniglia chiude con un gesto verso il basso, non con uno corto (§109)", () => {
     const { onClose, tree } = render([{ id: "A", label: "A", onPress: vi.fn() }], { showGrabber: true });
     const [grabber] = byTestId(tree, "action-sheet-grabber");

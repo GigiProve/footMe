@@ -15,6 +15,13 @@
 import { formatCompactRelativeTime, formatSpokenRelativeTime } from "../../lib/relative-time";
 import { authorMetaParts, segmentBody } from "../feed/feed-post-presentation";
 import type { FeedAuthorMeta } from "../feed/feed-types";
+import { unfollowLabel } from "../following/follow-source";
+import {
+  REPORTED_ACTION_A11Y_LABEL,
+  REPORTED_ACTION_LABEL,
+  REPORT_ACTION_LABEL,
+  reportTargetKey,
+} from "../moderation/moderation-presentation";
 import {
   defaultIdentity,
   extractUrls,
@@ -701,26 +708,47 @@ function mergeRefs(
 /* Menu ••• (§146–§147, §171–§174)                                      */
 /* ------------------------------------------------------------------ */
 
-export type CommentActionId = "edit" | "delete";
+export type CommentActionId = "edit" | "delete" | "unfollow" | "report" | "reported";
 
 export type CommentActionItem = {
   id: CommentActionId;
   label: string;
-  icon: "create-outline" | "trash-outline";
+  icon:
+    | "create-outline"
+    | "trash-outline"
+    | "person-remove-outline"
+    | "flag-outline"
+    | "checkmark-circle-outline";
   destructive: boolean;
   dividerBefore: boolean;
+  /** HOM-11 D6, §130: «Segnalazione inviata ✓» non è azionabile. */
+  disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 };
 
 /**
  * Le azioni del menu di UN commento dalle capability del server (§197–§198).
- * Solo Modifica / Elimina (§146); mai Segnala, Salva, Copia link, Fissa (§147). Per
- * i commenti altrui `[]` → nessun •••. È il punto d'estensione di HOM-11 (§171–§173):
- * le azioni future per `target_type = COMMENT` si aggiungono qui, con il contesto di
- * `commentActionContext`.
+ *
+ * Il proprio commento (o gestito): Modifica / Elimina, invariato (HOM-08 §146, HOM-11 §73) —
+ * mai Segnala né Non seguire sul proprio. Il commento altrui (HOM-11 §69–§72, §132):
+ *  • «Non seguire <autore>» solo se il viewer segue davvero l'identità autrice (§54),
+ *    mai «Segui» al suo posto (§56);
+ *  • «Segnala» — o «Segnalazione inviata ✓» non azionabile se già segnalato (§130) —
+ *    se `canReport`, dopo un divisore, in rosso con la bandierina (§201);
+ *  • mai «Non mi interessa» (§71), mai Salva (§72), né Copia link o Fissa (HOM-08 §147).
+ * Senza azioni `[]` → nessun •••. `commentActionContext` porta il contesto al flow.
  */
 export function buildCommentActions(
-  comment: Pick<Comment, "status" | "capabilities">,
-  options: { isSending?: boolean } = {},
+  comment: Pick<Comment, "status" | "capabilities"> &
+    Partial<Pick<Comment, "author" | "viewerFollowsAuthor" | "viewerHasReported">>,
+  options: {
+    isSending?: boolean;
+    /** «Non seguire» appena fatto: vale prima che il refetch porti il dato del server (§62). */
+    unfollowedInSession?: boolean;
+    /** «Segnala» appena inviato (§126): vale prima del refetch. */
+    reportedInSession?: boolean;
+  } = {},
 ): CommentActionItem[] {
   if (comment.status !== "active" || options.isSending) {
     return [];
@@ -746,7 +774,60 @@ export function buildCommentActions(
     });
   }
 
+  // §73: il proprio commento resta quello di HOM-08, senza voci HOM-11.
+  if (comment.capabilities.canEdit || comment.capabilities.canDelete) {
+    return actions;
+  }
+
+  if (comment.viewerFollowsAuthor === true && !options.unfollowedInSession && comment.author) {
+    actions.push({
+      destructive: false,
+      dividerBefore: false,
+      icon: "person-remove-outline",
+      id: "unfollow",
+      label: unfollowLabel(comment.author.name),
+    });
+  }
+
+  if (comment.viewerHasReported === true || options.reportedInSession) {
+    actions.push({
+      accessibilityLabel: REPORTED_ACTION_A11Y_LABEL,
+      destructive: false,
+      disabled: true,
+      dividerBefore: actions.length > 0,
+      icon: "checkmark-circle-outline",
+      id: "reported",
+      label: REPORTED_ACTION_LABEL,
+    });
+  } else if (comment.capabilities.canReport === true) {
+    actions.push({
+      accessibilityHint: "Apre la segnalazione",
+      destructive: true,
+      dividerBefore: actions.length > 0,
+      icon: "flag-outline",
+      id: "report",
+      label: REPORT_ACTION_LABEL,
+    });
+  }
+
   return actions;
+}
+
+/**
+ * HOM-11 §134–§140: il commento va ripiegato in «Commento segnalato» se il viewer lo ha
+ * segnalato (payload o sessione). Solo i commenti attivi: un segnaposto è già ripiegato.
+ * Le risposte non seguono il padre (§136–§139): ognuna decide per sé.
+ */
+export function isCommentCollapsed(
+  comment: Pick<Comment, "status" | "viewerHasReported">,
+  reportedInSession: boolean,
+): boolean {
+  return comment.status === "active" && (comment.viewerHasReported === true || reportedInSession);
+}
+
+/** La chiave del commento nello store dei segnalati: un commento si identifica per id (§104). */
+export function commentReportKey(commentId: string): string {
+  return reportTargetKey({ contentType: "comment", targetId: commentId, targetType: "COMMENT" });
 }
 
 /** §174: ciò che il sistema di azioni contestuali (HOM-11) riceve per un commento. */

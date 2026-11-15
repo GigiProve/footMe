@@ -12,7 +12,9 @@
  * nulla invece di far crashare la Home su un client vecchio.
  */
 
+import { HideableContent } from "../../feed-feedback/components/HideableContent";
 import type { ContentManagement } from "../content-management-types";
+import type { ContentOrigin } from "../content-routes";
 import type {
   FeedContentType,
   FeedEditorialItem,
@@ -81,6 +83,12 @@ export type FeedItemHandlers = {
   getManagement?: (item: FeedInteractiveItem) => ContentManagement | undefined;
   /** HOM-10 §111: il tap sulla card dell'originale incorporato in un Post lo apre. */
   onOpenReference?: (reference: { contentType: FeedContentType; contentId: string }) => void;
+  /**
+   * HOM-11 §29–§36: l'origin delle liste in cui «Non mi interessa» esiste (Per te, D2).
+   * Dove è presente, un contenuto nascosto lascia il posto al segnaposto compatto, nella
+   * stessa posizione. Assente (Seguiti) = i contenuti non si sostituiscono mai (§26).
+   */
+  hideOrigin?: ContentOrigin | null;
 };
 
 type FeedItemRendererProps = {
@@ -93,53 +101,59 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
   switch (item.type) {
     case "post":
       return (
-        <PostFeedItem
-          item={item}
-          management={handlers.getManagement?.(item)}
-          onPress={() => handlers.onOpenItem(item)}
-          onPressAuthor={() => handlers.onOpenAuthor(item)}
-          onToggleSaved={() => handlers.onToggleSaved(item)}
-          onToggleLike={() => handlers.onToggleLike(item)}
-          onOpenLikes={() => handlers.onOpenLikes(item)}
-          onOpenMedia={(index) => handlers.onOpenMedia(item, index)}
-          onOpenIdentity={(target) => handlers.onOpenIdentity(item, target)}
-          onOpenLink={() => handlers.onOpenLink(item)}
-          onOpenReference={handlers.onOpenReference}
-          onComment={() => handlers.onComment(item)}
-          onShare={() => handlers.onShare(item)}
-        />
+        <HideableContent item={item} origin={handlers.hideOrigin ?? null}>
+          <PostFeedItem
+            item={item}
+            management={handlers.getManagement?.(item)}
+            onPress={() => handlers.onOpenItem(item)}
+            onPressAuthor={() => handlers.onOpenAuthor(item)}
+            onToggleSaved={() => handlers.onToggleSaved(item)}
+            onToggleLike={() => handlers.onToggleLike(item)}
+            onOpenLikes={() => handlers.onOpenLikes(item)}
+            onOpenMedia={(index) => handlers.onOpenMedia(item, index)}
+            onOpenIdentity={(target) => handlers.onOpenIdentity(item, target)}
+            onOpenLink={() => handlers.onOpenLink(item)}
+            onOpenReference={handlers.onOpenReference}
+            onComment={() => handlers.onComment(item)}
+            onShare={() => handlers.onShare(item)}
+          />
+        </HideableContent>
       );
 
     // HOM-03 §39, §96: un solo Articolo nel Feed, e il video editoriale come
     // Post con una gerarchia in più. Nessun componente per variante.
     case "article":
       return (
-        <ArticleFeedPreview
-          item={item}
-          management={handlers.getManagement?.(item)}
-          onComment={() => handlers.onComment(item)}
-          onOpenLikes={() => handlers.onOpenLikes(item)}
-          onPress={() => handlers.onOpenItem(item)}
-          onPressAuthor={() => handlers.onOpenAuthor(item)}
-          onShare={() => handlers.onShare(item)}
-          onToggleLike={() => handlers.onToggleLike(item)}
-          onToggleSaved={() => handlers.onToggleSaved(item)}
-        />
+        <HideableContent item={item} origin={handlers.hideOrigin ?? null}>
+          <ArticleFeedPreview
+            item={item}
+            management={handlers.getManagement?.(item)}
+            onComment={() => handlers.onComment(item)}
+            onOpenLikes={() => handlers.onOpenLikes(item)}
+            onPress={() => handlers.onOpenItem(item)}
+            onPressAuthor={() => handlers.onOpenAuthor(item)}
+            onShare={() => handlers.onShare(item)}
+            onToggleLike={() => handlers.onToggleLike(item)}
+            onToggleSaved={() => handlers.onToggleSaved(item)}
+          />
+        </HideableContent>
       );
 
     case "video":
       return (
-        <EditorialVideoFeedItem
-          item={item}
-          management={handlers.getManagement?.(item)}
-          onComment={() => handlers.onComment(item)}
-          onOpenLikes={() => handlers.onOpenLikes(item)}
-          onPress={() => handlers.onOpenItem(item)}
-          onPressAuthor={() => handlers.onOpenAuthor(item)}
-          onShare={() => handlers.onShare(item)}
-          onToggleLike={() => handlers.onToggleLike(item)}
-          onToggleSaved={() => handlers.onToggleSaved(item)}
-        />
+        <HideableContent item={item} origin={handlers.hideOrigin ?? null}>
+          <EditorialVideoFeedItem
+            item={item}
+            management={handlers.getManagement?.(item)}
+            onComment={() => handlers.onComment(item)}
+            onOpenLikes={() => handlers.onOpenLikes(item)}
+            onPress={() => handlers.onOpenItem(item)}
+            onPressAuthor={() => handlers.onOpenAuthor(item)}
+            onShare={() => handlers.onShare(item)}
+            onToggleLike={() => handlers.onToggleLike(item)}
+            onToggleSaved={() => handlers.onToggleSaved(item)}
+          />
+        </HideableContent>
       );
 
     case "suggested_position":

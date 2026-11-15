@@ -145,6 +145,10 @@ Il messaggio di commit usa il codice task: `DAS-REV-25 - Shortlist Position: agg
   (HOM-06.1 scriverà su quelle tabelle), salvataggi dei post persona,
   commenti, condivisione, repost, segnalazioni, blocco profilo, ranking e
   discovery, notifiche social.
+  Aggiornamento 2026-11-15: HOM-06.1..HOM-10 committati; HOM-11 (Segnalazioni e
+  Feedback) in codice, non committato, migrazione `20261126090000` non applicata
+  al remoto (vedi `feature-map.md`). Restano: blocco profilo (HOM-12), ranking e
+  discovery, notifiche social.
 - **Messaggi** — MES-03.1 (consolidamento Centro Notifiche, allineato a
   HOM-14), MES-04 (consolidamento messaggistica + identità Società),
   MES-05 (condivisione contatti).

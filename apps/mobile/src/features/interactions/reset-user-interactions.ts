@@ -19,7 +19,12 @@ import { commentCountStore } from "../comments/comment-count-store";
 import { resetCommentDrafts } from "../comments/comment-draft-store";
 import { COMMENTS_QK } from "../comments/comment-keys";
 import { commentStore } from "../comments/comment-store";
+import { resetHiddenContentStore } from "../feed-feedback/hidden-content-store";
 import { resetLikeEngine } from "../feed/use-feed-post-like";
+import { resetUnfollowedSourcesStore } from "../following/unfollowed-sources-store";
+import { MODERATION_QK } from "../moderation/moderation-keys";
+import { resetReportDraftStore } from "../moderation/report-draft-store";
+import { resetReportedStore } from "../moderation/reported-store";
 import { resetSavedCommands } from "../saved/saved-commands";
 import { resetSavedStore } from "../saved/saved-store";
 import { likeStore } from "./like-store";
@@ -32,6 +37,15 @@ export function resetUserInteractions(): void {
   commentStore.clear();
   commentCountStore.clear();
   resetCommentDrafts();
+  // HOM-11: gli insiemi di sessione di «Non mi interessa», Non seguire e Segnala sono per
+  // utente (§176): un account nuovo non eredita contenuti nascosti, fonti lasciate, target
+  // segnalati — né il testo di una segnalazione in corso (§184, input privato di moderazione).
+  resetHiddenContentStore();
+  resetUnfollowedSourcesStore();
+  resetReportedStore();
+  resetReportDraftStore();
+  // Lo stato «già segnalato» in cache è per viewer (§295): non si lascia leggere al prossimo.
+  queryClient.removeQueries({ queryKey: MODERATION_QK.all });
   // Le liste in cache portano solo gli id: contro lo store appena svuotato darebbero un
   // thread bianco (A → B → A entro lo staleTime). Si buttano insieme agli store.
   queryClient.removeQueries({ queryKey: COMMENTS_QK.all });

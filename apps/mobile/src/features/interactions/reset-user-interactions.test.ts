@@ -4,6 +4,11 @@ import { commentCountStore } from "../comments/comment-count-store";
 import { createCommentDraftStore, registerCommentDraft } from "../comments/comment-draft-store";
 import { COMMENTS_QK } from "../comments/comment-keys";
 import { commentStore } from "../comments/comment-store";
+import { hiddenContentStore } from "../feed-feedback/hidden-content-store";
+import { unfollowedSourcesStore } from "../following/unfollowed-sources-store";
+import { MODERATION_QK } from "../moderation/moderation-keys";
+import { reportDraftStore } from "../moderation/report-draft-store";
+import { reportedStore } from "../moderation/reported-store";
 import { queryClient } from "../../lib/query-client";
 import { beginSavedMutation, getSavedEntry, getSavedEpoch, seedSaved } from "../saved/saved-store";
 import { likeStore } from "./like-store";
@@ -58,5 +63,30 @@ describe("resetUserInteractions — logout e cambio account (HOM-07 §70, §103)
     expect(draft.getState()).toMatchObject({ active: false, body: "" });
     expect(commentCountStore.epoch()).toBe(countEpoch + 1);
     expect(commentStore.epoch()).toBe(commentEpoch + 1);
+  });
+
+  it("HOM-11: svuota contenuti nascosti, fonti lasciate, segnalati e bozze di segnalazione (§176, §184)", () => {
+    hiddenContentStore.begin("club_media:p1");
+    unfollowedSourcesStore.add("club:c-1");
+    reportedStore.add("COMMENT:c-1");
+    reportDraftStore.update("COMMENT:c-1", (draft) => ({ ...draft, details: "testo privato" }));
+    queryClient.setQueryData(
+      MODERATION_QK.state("user-a", { contentType: "profile_post", targetId: "p1", targetType: "CONTENT" }),
+      { alreadyReported: true, available: true, reportable: true },
+    );
+    const hiddenEpoch = hiddenContentStore.epoch();
+
+    resetUserInteractions();
+
+    expect(hiddenContentStore.get("club_media:p1")).toBeUndefined();
+    expect(hiddenContentStore.epoch()).toBe(hiddenEpoch + 1);
+    expect(unfollowedSourcesStore.has("club:c-1")).toBe(false);
+    expect(reportedStore.has("COMMENT:c-1")).toBe(false);
+    expect(reportDraftStore.has("COMMENT:c-1")).toBe(false);
+    expect(
+      queryClient.getQueryData(
+        MODERATION_QK.state("user-a", { contentType: "profile_post", targetId: "p1", targetType: "CONTENT" }),
+      ),
+    ).toBeUndefined();
   });
 });

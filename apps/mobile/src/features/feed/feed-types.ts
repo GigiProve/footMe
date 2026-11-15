@@ -329,6 +329,12 @@ export type FeedPostCapabilities = {
   canEdit: boolean;
   canDelete: boolean;
   canViewInsights: boolean;
+  /**
+   * HOM-11 §20–§21: «Non mi interessa» solo dove c'è una logica di recommendation
+   * (Per te) e non sul contenuto gestito. Assente o `false` = la voce non compare.
+   * Opzionale nel tipo: un server pre-HOM-11 non lo manda e il mapper lo porta a `false`.
+   */
+  canMarkNotInterested?: boolean;
 };
 
 /**
@@ -479,6 +485,12 @@ type FeedEnvelope<TType extends FeedItemType, TPayload> = {
    * `payload.postId` + `contentType` non deve usare `id`.
    */
   repost?: FeedRepostContext | null;
+  /**
+   * HOM-11 §126–§131: il viewer ha già segnalato questo contenuto (`data.viewer_has_reported`,
+   * server). Presente solo quando vero; assente = no. Il menu mostra «Segnalazione inviata ✓»
+   * al posto di «Segnala».
+   */
+  viewerHasReported?: boolean;
   payload: TPayload;
   /**
    * HOM-07 §141: istante (ms) in cui è partita la richiesta che ha portato

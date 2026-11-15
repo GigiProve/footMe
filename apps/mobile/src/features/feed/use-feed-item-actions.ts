@@ -8,8 +8,8 @@
  *    rirenderizza la lista né ricarica la Home (§137);
  *  • SEGUI — `toggleFollowSource` esiste già e conosce la differenza tra
  *    `profile_follows` e `club_follows`.
- * Commenta, Condividi, Non mi interessa, Nascondi, Non seguire e Segnala
- * rispondono con un messaggio, senza inventare comportamenti.
+ * HOM-11: Non mi interessa, Non seguire e Segnala non stanno qui — hanno i propri
+ * moduli (`feed-feedback`, `following`, `moderation`) e il menu li compone.
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";

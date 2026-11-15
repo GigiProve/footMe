@@ -6,7 +6,13 @@
  * `is_following` e `is_self` sono relativi a lui.
  */
 
+/**
+ * Radice di ogni lista Mi piace: HOM-11 §62 la invalida per prefisso dopo «Non seguire», perché
+ * ogni attore porta lo stato Follow (`is_following`).
+ */
+export const LIKES_ROOT_KEY = "content-likers";
+
 export const LIKES_QK = {
   list: (contentType: string, postId: string, viewerId: string) =>
-    ["content-likers", contentType, postId, viewerId] as const,
+    [LIKES_ROOT_KEY, contentType, postId, viewerId] as const,
 };

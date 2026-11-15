@@ -15,6 +15,8 @@ import {
   textOf,
 } from "../feed-test-helpers";
 import { resetSavedStore } from "../../../saved/saved-store";
+import { buildManageTarget } from "../../content-actions-presentation";
+import type { ContentManagement } from "../../content-management-types";
 import { ArticleFeedPreview } from "./ArticleFeedPreview";
 
 const dimensions = vi.hoisted(() => ({ fontScale: 1 }));
@@ -313,15 +315,49 @@ describe("ArticleFeedPreview — segnalibro e riga azioni (§51–59)", () => {
     ).toHaveLength(3);
   });
 
-  it("il menu ••• degli editoriali non ripete «Salva»", () => {
+  it("il menu ••• degli editoriali non ripete «Salva» e non ha più «Nascondi» (HOM-11)", () => {
     const { tree } = setup();
 
     press(tree, "Altre azioni");
 
-    // Il menu è aperto (le altre voci ci sono) ma Salva no: lo fa il segnalibro.
-    expect(textNodes(tree, "Nascondi").length).toBeGreaterThan(0);
+    // Salva lo fa il segnalibro. «Nascondi» non esiste più: la spec distingue solo Non mi
+    // interessa / Non seguire / Segnala, che arrivano dal `management` (vedi sotto).
     expect(textNodes(tree, "Salva")).toHaveLength(0);
     expect(textNodes(tree, "Rimuovi dai salvati")).toHaveLength(0);
+    expect(textNodes(tree, "Nascondi")).toHaveLength(0);
+  });
+
+  it("HOM-11 §8, §141: con il feedback del server il menu dell'Articolo offre Segnala, senza Salva", () => {
+    const item = makeArticleItem({}, { media: [makeMediaItem(0)] });
+    const management: ContentManagement = {
+      capabilities: { canDelete: false, canEdit: false, canViewInsights: false },
+      feedback: {
+        item,
+        onNotInterested: vi.fn(),
+        onReport: vi.fn(),
+        onUnfollow: vi.fn(),
+        surface: "feed",
+      },
+      onDelete: vi.fn(async () => "removed" as const),
+      onEdit: vi.fn(),
+      onInsights: vi.fn(),
+      target: buildManageTarget(item, "HOME_PER_TE"),
+    };
+    const tree = renderWithToast(
+      <ArticleFeedPreview
+        item={item}
+        management={management}
+        onComment={vi.fn()}
+        onPress={vi.fn()}
+        onPressAuthor={vi.fn()}
+        onShare={vi.fn()}
+        onToggleLike={vi.fn()}
+        onToggleSaved={vi.fn()}
+      />,
+    );
+
+    expect(textNodes(tree, "Segnala").length).toBeGreaterThan(0);
+    expect(textNodes(tree, "Salva")).toHaveLength(0);
   });
 
   it("Mi piace · Commenta · Condividi: zero → label, mai «0»; con conteggi il solo numero", () => {

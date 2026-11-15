@@ -169,7 +169,10 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
     reasonLabel: row.suggestion_reason_label,
     isSeen: row.is_seen === true,
     isSaved: row.is_saved === true,
-    isFollowingAuthor: row.is_following_author === true,
+    // HOM-11 §54–§55: la colonna della spina o, per i dettagli (che non hanno la colonna),
+    // `data.viewer_follows_author`: è sempre il Follow GLOBALE del viewer verso l'autore.
+    isFollowingAuthor:
+      row.is_following_author === true || readBoolean(row.data, "viewer_follows_author"),
     nav: buildNav(row),
   };
 
@@ -217,6 +220,10 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
   // chi ha ripostato; l'elemento non è un'altra riga (nessun engagement wrapper §81).
   const repost = readRepost(row.data);
   const repostContext = repost ? { repost } : {};
+  // HOM-11 §126–§131: solo quando vero, così un server pre-HOM-11 non cambia la forma.
+  const reportedContext = readBoolean(row.data, "viewer_has_reported")
+    ? { viewerHasReported: true }
+    : {};
 
   if (type === "post") {
     const postType = asFeedContentType(row.data?.["content_type"]);
@@ -231,6 +238,7 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
     return {
       ...envelope,
       ...repostContext,
+      ...reportedContext,
       type,
       title: row.title,
       payload: {
@@ -286,6 +294,7 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
   return {
     ...envelope,
     ...repostContext,
+    ...reportedContext,
     type,
     title: row.title,
     payload: {

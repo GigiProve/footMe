@@ -35,6 +35,8 @@ export function ContentActionSheet({
   useEffect(() => {
     if (visible) {
       trackFeed({ authorIdentityType, contentId, contentType, name: "content_menu_open", origin });
+      // HOM-11 §185: `content_actions_open` con l'origin, accanto a quello HOM-04.
+      trackFeed({ authorIdentityType, contentId, contentType, name: "content_actions_open", origin });
     }
   }, [authorIdentityType, contentId, contentType, origin, visible]);
 
