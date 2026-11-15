@@ -3,6 +3,7 @@ import type {
   CommunicationSummary,
 } from "./communications-service";
 import { formatSystemEvent, GROUP_CHAT_COPY } from "./group-chat-presentation";
+import { sharedMessagePreview } from "../share/share-presentation";
 import type { InboxConversation } from "./messaging-service";
 
 export type ChatFilter = "all" | "direct" | "group" | "unread";
@@ -65,7 +66,12 @@ export function buildConversationPreview(
     return buildSystemEventPreview(conversation);
   }
 
-  const body = conversation.last_message_body;
+  // HOM-09 §288: una condivisione senza testo ha body vuoto; l'anteprima dice
+  // «Contenuto condiviso», mai l'URL né un id. Con testo vale il testo.
+  const body =
+    conversation.last_message_kind === "content_reference"
+      ? sharedMessagePreview(conversation.last_message_body)
+      : conversation.last_message_body;
 
   if (!body) {
     return EMPTY_PREVIEW;

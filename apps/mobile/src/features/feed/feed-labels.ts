@@ -97,6 +97,8 @@ export const FEED_OFFLINE =
 export const FEED_ACTION_LIKE = "Mi piace";
 export const FEED_ACTION_COMMENT = "Commenta";
 export const FEED_ACTION_SHARE = "Condividi";
+/** HOM-09 §227: il controllo è annunciato «Condividi contenuto»; il testo a vista resta «Condividi». */
+export const FEED_ACTION_SHARE_A11Y = "Condividi contenuto";
 
 /**
  * Il §29 esclude da questo blocco il sistema Mi piace, i commenti e la
@@ -105,13 +107,13 @@ export const FEED_ACTION_SHARE = "Condividi";
  * nessun tap morto. Il segnalibro nella stessa riga funziona davvero.
  * HOM-08: i commenti sono reali (la cella Commenta apre il dettaglio), quindi
  * qui non c'è più il messaggio «I commenti arriveranno presto».
+ * HOM-09: lo stesso vale per Condividi, che apre il pannello (`features/share`).
  */
 export const FEED_SOON_MESSAGES = {
   hide: "Questa azione arriverà presto.",
   like: "Il Mi piace su questo contenuto arriverà presto.",
   notInterested: "Questa azione arriverà presto.",
   report: "Le segnalazioni arriveranno presto.",
-  share: "La condivisione arriverà presto.",
   unfollow: "Questa azione arriverà presto.",
 } as const;
 

@@ -328,7 +328,7 @@ describe("ArticleFeedPreview — segnalibro e riga azioni (§51–59)", () => {
     const zero = setup();
     expect(findByLabel(zero.tree, "Mi piace")).toHaveLength(1);
     expect(findByLabel(zero.tree, "Commenta")).toHaveLength(1);
-    expect(findByLabel(zero.tree, "Condividi")).toHaveLength(1);
+    expect(findByLabel(zero.tree, "Condividi contenuto")).toHaveLength(1);
     expect(textOf(zero.tree)).not.toContain('"0"');
 
     const counted = setup({}, { commentsCount: 23, likesCount: 156 });

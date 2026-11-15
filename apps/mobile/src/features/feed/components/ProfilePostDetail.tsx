@@ -15,8 +15,9 @@
  * INLINE con lo stesso `VideoMedia` del Feed — niente più player modale — e
  * quello toccato nel Feed parte una volta sola (il tap è già avvenuto). Il
  * controller è locale al dettaglio: un solo video alla volta anche qui (§29), e
- * pausa su background e uscita dalla schermata. La condivisione risponde «in
- * arrivo» (HOM-09); il Mi piace è quello reale del Feed e aggiorna anche le tab.
+ * pausa su background e uscita dalla schermata. Condividi apre il pannello
+ * HOM-09 sopra questo dettaglio (`useContentShare`); il Mi piace è quello reale
+ * del Feed e aggiorna anche le tab.
  *
  * HOM-08 §3–§7, §184–§191: sotto la riga azioni e un filo divisore c'è la
  * sezione Commenti, nello stesso scroll; il composer è fisso in basso, fuori
@@ -34,7 +35,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useSession } from "../../auth/use-session";
 import { colors, spacing } from "../../../theme/tokens";
-import { useToast } from "../../../ui";
+import { buildShareTarget } from "../../share/share-presentation";
+import { useContentShare } from "../../share/use-content-share";
 import { CommentComposerBar } from "../../comments/components/CommentComposerBar";
 import { CommentsOverlays } from "../../comments/components/CommentsOverlays";
 import { CommentsSection } from "../../comments/components/CommentsSection";
@@ -50,7 +52,6 @@ import { normalizeContentAvailability } from "../content-availability-presentati
 import type { ContentManagement } from "../content-management-types";
 import type { CommentFocus, ContentOrigin } from "../content-routes";
 import { FEED_QK } from "../feed-keys";
-import { FEED_SOON_MESSAGES } from "../feed-labels";
 import { useBackToFeed } from "../use-back-to-feed";
 import { seedSavedFromItems, useToggleSavedFeedItem } from "../use-feed-item-actions";
 import { useContentManagement } from "../use-content-management";
@@ -101,7 +102,8 @@ export function ProfilePostDetail({
 }) {
   const router = useRouter();
   const { profile } = useSession();
-  const { showToast } = useToast();
+  // HOM-09 §4, §9, §175: «Condividi» apre il pannello sopra questo dettaglio.
+  const share = useContentShare(origin);
   const toggleLike = useToggleFeedPostLike({ profileId: profile?.id ?? "" });
   const openLikes = useOpenLikes();
   const manageContent = useContentManagement({ profileId: profile?.id ?? "" });
@@ -236,7 +238,7 @@ export function ProfilePostDetail({
                     router.push(href as never);
                   }
                 }}
-                onShare={() => showToast({ message: FEED_SOON_MESSAGES.share })}
+                onShare={() => share.open(buildShareTarget(item))}
                 onToggleLike={() => toggleLike(item)}
                 onToggleSaved={() =>
                   toggleSaved.mutate({
@@ -251,6 +253,7 @@ export function ProfilePostDetail({
               <CommentsSection controller={comments} />
             </ScrollView>
             <CommentsOverlays controller={comments} />
+            {share.element}
           </>
         )}
       </ContentDetailFrame>

@@ -780,7 +780,7 @@ describe("PostFeedItem — riga azioni", () => {
 
     expect(findByLabel(tree, "Mi piace")).toHaveLength(1);
     expect(findByLabel(tree, "Commenta")).toHaveLength(1);
-    expect(findByLabel(tree, "Condividi")).toHaveLength(1);
+    expect(findByLabel(tree, "Condividi contenuto")).toHaveLength(1);
     expect(json).not.toContain('"0"');
     expect(json).not.toMatch(/0 (Mi piace|commenti)/);
   });
@@ -939,7 +939,7 @@ describe("PostFeedItem — riga azioni", () => {
       .findAll((node) => String(node.type) === "Text")
       .map((node) => node.props.children);
 
-    expect(share.props.accessibilityLabel).toBe("Condividi");
+    expect(share.props.accessibilityLabel).toBe("Condividi contenuto");
     expect(texts).toEqual(["Condividi"]);
   });
 
@@ -949,6 +949,14 @@ describe("PostFeedItem — riga azioni", () => {
     expect(countTestIdPrefix(tree, "feed-post-action-")).toBe(3);
     expect(findByLabel(tree, "Salva contenuto")).toHaveLength(0);
     expect(findByLabel(tree, "Rimuovi dai salvati")).toHaveLength(0);
+  });
+
+  it("per un tipo che il server non condivide (fan_tribuna) la cella Condividi non c'è (HOM-09)", () => {
+    const { tree } = setup({ contentType: "fan_tribuna" });
+
+    expect(countTestId(tree, "feed-post-action-share")).toBe(0);
+    expect(countTestId(tree, "feed-post-action-like")).toBe(1);
+    expect(countTestId(tree, "feed-post-action-comment")).toBe(1);
   });
 
   it("le tre azioni hanno la stessa larghezza flessibile (§59–60)", () => {

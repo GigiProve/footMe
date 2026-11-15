@@ -7,6 +7,7 @@ import { formatMessageTime } from "../chat-helpers";
 import { ContactCardMessage } from "../contact-card-message";
 import type { ConversationMessage } from "../messaging-service";
 import { useChatMediaUrl } from "../use-chat-media-url";
+import { ContentReferenceCard } from "./ContentReferenceCard";
 
 type MessageBubbleProps = {
   isOwnMessage: boolean;
@@ -37,6 +38,24 @@ export function MessageBubble({
           onLongPress={() => onCopyContactPhone(message.shared_contact_phone ?? "")}
           onPress={() => void Linking.openURL(`tel:${message.shared_contact_phone}`)}
           phone={message.shared_contact_phone}
+          timestamp={formatMessageTime(message.sent_at)}
+        />
+      </View>
+    );
+  }
+
+  // HOM-09 §95–§97: testo opzionale + card nella stessa unità, non una bolla di testo.
+  if (message.message_kind === "content_reference") {
+    return (
+      <View style={[styles.wrapper, isOwnMessage ? styles.alignEnd : styles.alignStart]}>
+        {visibleSenderName ? (
+          <AppText color="muted" numberOfLines={1} style={styles.senderName} variant="caption">
+            {visibleSenderName}
+          </AppText>
+        ) : null}
+        <ContentReferenceCard
+          isOwnMessage={isOwnMessage}
+          message={message}
           timestamp={formatMessageTime(message.sent_at)}
         />
       </View>

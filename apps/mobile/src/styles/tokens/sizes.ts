@@ -19,4 +19,9 @@ export const sizes = {
   chatHeaderHeight: 56,
   chatComposerButton: 36,
   chatAvatar: 36,
+  /** Maniglia in cima a un bottom sheet (HOM-09 §12). */
+  sheetHandleWidth: 36,
+  sheetHandleHeight: 4,
+  /** Altezza massima di un bottom sheet scorrevole, in percentuale dello schermo. */
+  sheetMaxHeight: "90%",
 } as const;

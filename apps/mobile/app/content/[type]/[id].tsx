@@ -57,7 +57,6 @@ import {
   type CommentFocus,
   type ContentOrigin,
 } from "../../../src/features/feed/content-routes";
-import { FEED_SOON_MESSAGES } from "../../../src/features/feed/feed-labels";
 import { useBackToFeed } from "../../../src/features/feed/use-back-to-feed";
 import { createFeedVideoController } from "../../../src/features/feed/feed-video-controller";
 import { legacyVideoMedia } from "../../../src/features/feed/feed-video-presentation";
@@ -88,7 +87,9 @@ import { useContentDetailEvents } from "../../../src/features/content-insights/u
 import { colors, radius, spacing } from "../../../src/theme/tokens";
 import { SavedBookmarkButton } from "../../../src/features/saved/components/SavedBookmarkButton";
 import { useContentSaved } from "../../../src/features/saved/use-content-saved";
-import { AppText, Button, useToast } from "../../../src/ui";
+import { buildSharePreviewFromDetail } from "../../../src/features/share/share-presentation";
+import { useContentShare } from "../../../src/features/share/use-content-share";
+import { AppText, Button } from "../../../src/ui";
 
 type TaggedEntry = ContentTaggedTarget;
 
@@ -500,7 +501,8 @@ function ContentDetailBody({
   const { id, type } = useLocalSearchParams<{ id: string; type: string }>();
   const { profile } = useSession();
   const router = useRouter();
-  const { showToast } = useToast();
+  // HOM-09 §4, §9, §175: Condividi apre il pannello sopra questo dettaglio.
+  const share = useContentShare(origin);
   const viewerId = profile?.id ?? null;
   const scrollRef = useRef<ScrollView>(null);
   const comments = useCommentsController({
@@ -832,15 +834,30 @@ function ContentDetailBody({
 
           {/*
             HOM-08 §13: la riga azioni ♡ | ◯ | ↗ del Post anche qui (HOM-03 §104:
-            il Mi piace è la stessa entity del Feed). Condividi resta il toast
-            HOM-09; Commenta porta alla sezione sotto o al composer.
+            il Mi piace è la stessa entity del Feed). Condividi apre il pannello
+            HOM-09 (la preview viene da ciò che questa vista già conosce, senza un
+            secondo fetch); Commenta porta alla sezione sotto o al composer.
           */}
           {viewerId && id && SUPPORTED.includes(contentType) ? (
             <ContentActionRow
               contentType={contentType as FeedContentType}
               likeable={LIKEABLE.includes(contentType)}
               onComment={comments.onActionRowComment}
-              onShare={() => showToast({ message: FEED_SOON_MESSAGES.share })}
+              onShare={() =>
+                share.open({
+                  contentId: id,
+                  contentType: contentType as FeedContentType,
+                  preview: buildSharePreviewFromDetail({
+                    authorName: publisherName || null,
+                    durationSeconds: content.video?.durationSeconds ?? null,
+                    excerpt: content.excerpt ?? content.body,
+                    hasVideo: content.video !== null,
+                    isArticle: content.isArticle,
+                    thumbnailUrl: detailCoverUrl ?? content.thumbnailUrl,
+                    title: content.title,
+                  }),
+                })
+              }
               postId={id}
               profileId={viewerId}
             />
@@ -890,6 +907,7 @@ function ContentDetailBody({
       )}
 
       {content ? <CommentsOverlays controller={comments} /> : null}
+      {share.element}
 
       {isManageOpen && content && viewerId && taggableType ? (
         <TagManageSheet

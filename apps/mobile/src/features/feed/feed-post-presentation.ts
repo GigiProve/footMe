@@ -36,8 +36,10 @@ import {
   FEED_ACTION_COMMENT,
   FEED_ACTION_LIKE,
   FEED_ACTION_SHARE,
+  FEED_ACTION_SHARE_A11Y,
   FEED_MEDIA_STATE_LABELS,
 } from "./feed-labels";
+import { isShareContentType } from "../share/share-types";
 import type {
   FeedAuthorMeta,
   FeedIdentityType,
@@ -621,6 +623,12 @@ export type PostActionModel = {
   };
   comment: { text: string; accessibilityLabel: string };
   share: { text: string; accessibilityLabel: string };
+  /**
+   * HOM-09: false per i tipi che il server non condivide (`fan_tribuna`,
+   * `media_tribuna`): la cella Condividi non compare invece di aprire un
+   * pannello che finirebbe in errore. Senza `contentType` la cella c'è.
+   */
+  showShare: boolean;
 };
 
 /**
@@ -636,6 +644,7 @@ export function buildPostActionModel(input: {
   likesCount: number;
   commentsCount: number;
   isLiked: boolean;
+  contentType?: string;
 }): PostActionModel {
   const likes = normalizeCount(input.likesCount);
   const comments = normalizeCount(input.commentsCount);
@@ -657,6 +666,7 @@ export function buildPostActionModel(input: {
       text: likes > 0 ? formatCount(likes) : FEED_ACTION_LIKE,
       toggleActionLabel: input.isLiked ? LIKE_ACTION_REMOVE : LIKE_ACTION_ADD,
     },
-    share: { accessibilityLabel: FEED_ACTION_SHARE, text: FEED_ACTION_SHARE },
+    share: { accessibilityLabel: FEED_ACTION_SHARE_A11Y, text: FEED_ACTION_SHARE },
+    showShare: input.contentType === undefined || isShareContentType(input.contentType),
   };
 }

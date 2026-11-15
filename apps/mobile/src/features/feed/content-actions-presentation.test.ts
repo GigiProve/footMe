@@ -59,6 +59,13 @@ describe("buildContentActions — matrice delle capability (§136–138)", () =>
     expect(ids(actions)).toEqual(["VIEW_INSIGHTS"]);
   });
 
+  it("Copia link non è nel menu •••: vive solo in Condividi → Copia link (HOM-09 §145–§146)", () => {
+    const actions = buildContentActions("post", ALL);
+
+    expect(Object.values(CONTENT_ACTION_IDS).some((id) => /link|share/i.test(id))).toBe(false);
+    expect(actions.some((action) => /link/i.test(action.label))).toBe(false);
+  });
+
   it("nessuna capability: nessuna azione", () => {
     const none = { canDelete: false, canEdit: false, canViewInsights: false };
 

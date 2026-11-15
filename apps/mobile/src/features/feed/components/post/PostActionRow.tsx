@@ -225,6 +225,7 @@ export function PostActionRow({
     commentsCount: liveCommentsCount,
     isLiked: false,
     likesCount: 0,
+    contentType: like.contentType,
   });
 
   return (
@@ -242,13 +243,15 @@ export function PostActionRow({
         testID="feed-post-action-comment"
         text={model.comment.text}
       />
-      <PostActionButton
-        accessibilityLabel={model.share.accessibilityLabel}
-        icon="arrow-redo-outline"
-        onPress={onShare}
-        testID="feed-post-action-share"
-        text={model.share.text}
-      />
+      {model.showShare ? (
+        <PostActionButton
+          accessibilityLabel={model.share.accessibilityLabel}
+          icon="arrow-redo-outline"
+          onPress={onShare}
+          testID="feed-post-action-share"
+          text={model.share.text}
+        />
+      ) : null}
     </View>
   );
 }

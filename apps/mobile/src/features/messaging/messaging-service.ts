@@ -23,7 +23,9 @@ export type MessageKind =
   | "image"
   | "video"
   | "document"
-  | "system_event";
+  | "system_event"
+  /** HOM-09 §95: testo opzionale + reference a un contenuto, un solo messaggio. */
+  | "content_reference";
 
 export type ConversationMessage = {
   message_id: string;
@@ -41,6 +43,16 @@ export type ConversationMessage = {
   system_payload?: Record<string, unknown> | null;
   /** Ordine server della timeline (§17); assente sui payload precedenti a DAS-REV-33. */
   seq?: number;
+  /**
+   * HOM-09 §98–§102: solo per i `content_reference`. La reference punta al
+   * contenuto canonico (§99); lo snapshot è il primo rendering e non fa fede
+   * (§101). `content_available` è rivalidato dal server per il viewer (§122) e
+   * lo snapshot arriva `null` se non è leggibile (§114–§118).
+   */
+  content_ref_type?: string | null;
+  content_ref_id?: string | null;
+  content_snapshot?: Record<string, unknown> | null;
+  content_available?: boolean | null;
 };
 
 export async function getConversationSummaries() {

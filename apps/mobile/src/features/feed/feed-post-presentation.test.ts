@@ -525,6 +525,25 @@ describe("buildPostActionModel", () => {
     ).toBe("Condividi");
   });
 
+  it("Condividi compare solo per i quattro tipi che il server condivide (HOM-09)", () => {
+    const base = { commentsCount: 0, isLiked: false, likesCount: 0 };
+
+    for (const contentType of ["profile_post", "club_media", "media_profile", "fan_media"] as const) {
+      expect(buildPostActionModel({ ...base, contentType }).showShare).toBe(true);
+    }
+    for (const contentType of ["fan_tribuna", "media_tribuna"] as const) {
+      expect(buildPostActionModel({ ...base, contentType }).showShare).toBe(false);
+    }
+    expect(buildPostActionModel(base).showShare).toBe(true);
+  });
+
+  it("Condividi è annunciato «Condividi contenuto» (HOM-09 §227)", () => {
+    expect(
+      buildPostActionModel({ commentsCount: 0, isLiked: false, likesCount: 0 }).share
+        .accessibilityLabel,
+    ).toBe("Condividi contenuto");
+  });
+
   describe("Mi piace HOM-07", () => {
     it("a zero: nessun numero e nessuna azione «lista» (§26, §216)", () => {
       const { like } = buildPostActionModel({ commentsCount: 0, isLiked: false, likesCount: 0 });

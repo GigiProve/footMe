@@ -5,8 +5,8 @@
  * §13: anche qui le tre celle ♡ | ◯ | ↗ del Post, la stessa `PostActionRow`
  * del Feed — nessun secondo componente. Lo stato Mi piace è la stessa cella
  * dello store (`useContentInteraction` legge `fetch_content_interaction_state`
- * e la semina, insieme al conteggio commenti); Condividi resta il messaggio
- * «in arrivo» di HOM-09; Commenta porta alla sezione commenti o al composer
+ * e la semina, insieme al conteggio commenti); Condividi apre il pannello
+ * HOM-09 (`onShare` lo decide la superficie); Commenta porta alla sezione commenti o al composer
  * (decide il controller dei commenti dal numero corrente).
  *
  * Durante il caricamento riserva lo spazio: niente salto di layout. Senza

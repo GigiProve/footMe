@@ -1,14 +1,21 @@
 import { ReactNode } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, spacing } from "../../theme/tokens";
+import { colors, radius, sizes, spacing } from "../../theme/tokens";
 import { AppText } from "../AppText/AppText";
 
 export type BottomSheetProps = {
   children: ReactNode;
   onClose: () => void;
   onDismiss?: () => void;
+  /**
+   * Il contenuto scorre se supera il 90% dello schermo (font grandi su schermi
+   * piccoli, HOM-09 §235, §335). Assente = foglio ad altezza del contenuto, come prima.
+   */
+  scrollable?: boolean;
+  /** Maniglia in cima al foglio (HOM-09 §12). Assente = foglio senza maniglia, come prima. */
+  showHandle?: boolean;
   title?: string;
   visible: boolean;
 };
@@ -17,6 +24,8 @@ export function BottomSheet({
   children,
   onClose,
   onDismiss,
+  scrollable = false,
+  showHandle = false,
   title,
   visible,
 }: BottomSheetProps) {
@@ -36,7 +45,8 @@ export function BottomSheet({
         onPress={onClose}
         style={styles.overlay}
       >
-        <Pressable style={styles.sheet}>
+        <Pressable style={[styles.sheet, scrollable ? styles.sheetScrollable : null]}>
+          {showHandle ? <View style={styles.handle} testID="bottom-sheet-handle" /> : null}
           {title ? (
             <View style={styles.header}>
               <AppText
@@ -60,7 +70,19 @@ export function BottomSheet({
               </Pressable>
             </View>
           ) : null}
-          <View style={styles.body}>{children}</View>
+          {scrollable ? (
+            <ScrollView
+              bounces={false}
+              contentContainerStyle={styles.body}
+              showsVerticalScrollIndicator={false}
+              style={styles.scroll}
+              testID="bottom-sheet-scroll"
+            >
+              {children}
+            </ScrollView>
+          ) : (
+            <View style={styles.body}>{children}</View>
+          )}
         </Pressable>
       </Pressable>
     </Modal>
@@ -80,6 +102,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[20],
     paddingTop: spacing[20],
     paddingBottom: spacing[32],
+  },
+  handle: {
+    alignSelf: "center",
+    backgroundColor: colors.borderStrong,
+    borderRadius: radius.full,
+    height: sizes.sheetHandleHeight,
+    marginBottom: spacing[16],
+    marginTop: -spacing[8],
+    width: sizes.sheetHandleWidth,
   },
   header: {
     alignItems: "center",
@@ -101,5 +132,14 @@ const styles = StyleSheet.create({
   },
   body: {
     gap: spacing[4],
+  },
+  // Il percentuale si risolve sull'overlay (altezza piena): oltre il tetto il
+  // contenuto scorre invece di uscire dallo schermo.
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  sheetScrollable: {
+    maxHeight: sizes.sheetMaxHeight,
   },
 });

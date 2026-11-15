@@ -133,6 +133,33 @@ describe("buildConversationPreview", () => {
     ).toBe("Apri la chat per iniziare.");
   });
 
+  describe("content shares (HOM-09 §288)", () => {
+    const sharedRow: InboxConversation = {
+      ...directConversation,
+      last_message_body: "",
+      last_message_kind: "content_reference",
+    };
+
+    it("says «Contenuto condiviso» when the share has no text", () => {
+      expect(buildConversationPreview(sharedRow, "me")).toBe("Contenuto condiviso");
+      expect(buildConversationPreview({ ...sharedRow, last_message_body: null }, "me")).toBe(
+        "Contenuto condiviso",
+      );
+    });
+
+    it("shows the optional text when there is one", () => {
+      expect(
+        buildConversationPreview({ ...sharedRow, last_message_body: "  Guarda questo  " }, "me"),
+      ).toBe("Guarda questo");
+    });
+
+    it("keeps the group sender prefix", () => {
+      expect(
+        buildConversationPreview({ ...groupConversation, last_message_kind: "content_reference", last_message_body: "" }, "me"),
+      ).toBe("Coach Bianchi: Contenuto condiviso");
+    });
+  });
+
   describe("system events (DAS-REV-33 §24)", () => {
     const eventRow: InboxConversation = {
       ...groupConversation,

@@ -39,6 +39,11 @@ export type ToastOptions = {
   message: string;
   tone?: ToastTone;
   icon?: IoniconsName;
+  /**
+   * Colora solo l'icona di verde, lasciando il toast neutro (HOM-09 §246: un
+   * normale success icon, non un fondo verde). Con `tone: "success"` non serve.
+   */
+  iconTone?: "success";
 };
 
 type ToastContextValue = {
@@ -154,7 +159,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   name={toast.icon}
                   size={16}
                   color={
-                    toast.tone === "success"
+                    toast.tone === "success" || toast.iconTone === "success"
                       ? colors.success
                       : colors.textSecondary
                   }

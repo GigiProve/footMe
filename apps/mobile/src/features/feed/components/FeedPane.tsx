@@ -22,7 +22,6 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { spacing } from "../../../theme/tokens";
-import { useToast } from "../../../ui";
 import {
   authorOpenEventType,
   identityOpenEvent,
@@ -36,7 +35,8 @@ import { trackFeed } from "../feed-analytics";
 import type { CachedFeed } from "../feed-cache";
 import { FEED_QK } from "../feed-keys";
 import { fetchHomeFollowingState } from "../feed-meta-service";
-import { FEED_SOON_MESSAGES } from "../feed-labels";
+import { buildShareTarget } from "../../share/share-presentation";
+import { useContentShare } from "../../share/use-content-share";
 import {
   resolveFeedAuthorHref,
   resolveFeedItemHref,
@@ -123,7 +123,7 @@ export function FeedPane({
   const manageContent = useContentManagement({ profileId });
   const videoController = useFeedVideoController();
   const mediaProcessing = useFeedMediaProcessing({ enabled: isActive, profileId });
-  const { showToast } = useToast();
+  const share = useContentShare(originForScope(scope));
 
   const cachedScope = cache?.scopes[scope];
   const seen = useFeedSessionSeen({
@@ -303,9 +303,11 @@ export function FeedPane({
         }),
       );
     },
+    // HOM-09 §4, §9: il tap apre solo il pannello Condividi sopra questa tab.
+    // Non naviga, non invia, non conta come condivisione; l'origine resta montata.
     onShare: (item: FeedInteractiveItem) => {
       trackFeed({ itemId: item.id, name: "feed_post_share_tap" });
-      showToast({ message: FEED_SOON_MESSAGES.share });
+      share.open(buildShareTarget(item));
     },
   };
 
@@ -527,6 +529,8 @@ export function FeedPane({
         onScroll={scroll.onScroll}
         showInlineRetry={feed.isError && feed.items.length > 0}
       />
+
+      {share.element}
 
       {/* HOM-01.1 §43–47: nessuna pill di refresh e nessun banner di
           ripristino. L'unico elemento sovrapposto è "Nuovi contenuti". */}
