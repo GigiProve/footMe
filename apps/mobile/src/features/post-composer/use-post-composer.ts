@@ -32,6 +32,20 @@
  *    esplicite §93 e la regola media+link §95); qui solo il debounce e la chiamata.
  *  • Analytics (§200–201): solo conteggi, tipi, esiti e dominio.
  *
+ * HOM-10 (Repost, §14–§41, §61–§72, §120–§133, §137–§148, §225–§233) nello STESSO
+ * hook, senza un editor nuovo (§16): una reference sul composer lo porta in
+ * modalità Repost.
+ *  • apertura: oltre al contesto si legge `fetch_repost_state` (identità con
+ *    `can_repost`, originale e snapshot per la card); la lista di «Reposta come» è
+ *    la sua, non quella di `fetch_post_composer_context` (§30);
+ *  • body non significativo (§62) → Simple Repost: `repost_content`, OTTIMISTICO
+ *    (§70) — il composer si chiude al tap e l'esito arriva dopo; un errore fa
+ *    rollback e mostra la frase dell'errore (§72). Nessuna bozza (§137);
+ *  • body significativo → `submit_content` con `reference` nel payload, stessa
+ *    idempotenza, bozze e programmazione di HOM-06.2 (§86, §235, §151);
+ *  • niente recovery locale (la bozza server la sostituisce, e quella locale del
+ *    Post normale non si tocca) né anteprima link (§97).
+ *
  * HOM-06.2 (bozze e programmazione, §81–§136, §147, §163–§167, §203–§211) nello
  * stesso hook, senza un secondo composer (§83):
  *  • autosave su `save_content_draft` (`useAutosave`) dal primo contenuto
@@ -63,6 +77,25 @@ import {
 } from "../publishing/publishing-service";
 import type { ContentRef, Publication } from "../publishing/publishing-types";
 import { useAutosave } from "../publishing/use-autosave";
+import { trackRepost } from "../repost/repost-analytics";
+import { performRemoveRepost, performSimpleRepost } from "../repost/repost-actions";
+import { invalidateAfterRepostChange } from "../repost/repost-cache";
+import {
+  hintFirstIdentity,
+  insertTokenAtSelection,
+  isReferenceUnavailableCode,
+  isRepostComposer,
+  isSignificantRepostBody,
+  repostIntent,
+  REPOST_COMPOSER_COPY,
+} from "../repost/repost-composer-presentation";
+import { REPOST_QK } from "../repost/repost-keys";
+import {
+  composerIdentitiesFromState,
+  composerReferenceFromState,
+} from "../repost/repost-presentation";
+import { fetchRepostState } from "../repost/repost-service";
+import type { RepostContentRef, SimpleRepostFailure } from "../repost/repost-types";
 import { domainOf, trackComposer, type PublishProps } from "./composer-analytics";
 import { applyEditToCaches, applyPublishToCaches, editPatchFromState } from "./composer-cache";
 import { composerKeys } from "./composer-keys";
@@ -139,6 +172,8 @@ export type ComposerSourceParams = {
   edit: { contentType: FeedContentType; contentId: string; origin: string | null } | null;
   /** HOM-06.2 §147: la bozza / il programmato / il fallito da riaprire (`draft_type` + `draft_id`). */
   draftRef?: ContentRef | null;
+  /** HOM-10 §14, §16: l'originale da ripostare (`mode=repost`). Assente = composer Post normale. */
+  reference?: RepostContentRef | null;
 };
 
 export type ComposerSource =
@@ -191,7 +226,27 @@ export function usePostComposerSource(params: ComposerSourceParams): ComposerSou
     staleTime: 0,
   });
 
-  const failure = (edit ? editQuery.error : null) ?? (draftRef ? draftQuery.error : null) ?? context.error;
+  // HOM-10 §14, §139–§141: l'originale viene dal link d'ingresso o dalla bozza riaperta.
+  const draftReference = draftRef ? (draftQuery.data?.reference ?? null) : null;
+  const repostRef: RepostContentRef | null = edit
+    ? null
+    : (params.reference ??
+      (draftReference ? { contentId: draftReference.contentId, contentType: draftReference.contentType } : null));
+
+  // Lo stato Repost si rilegge a ogni apertura (§35): le capability e `has_simple_repost` non vengono dalla cache.
+  const repostQuery = useQuery({
+    enabled: userId.length > 0 && repostRef !== null,
+    queryFn: () => fetchRepostState(repostRef as RepostContentRef),
+    queryKey: repostRef
+      ? REPOST_QK.state(userId, repostRef.contentType, repostRef.contentId)
+      : [...REPOST_QK.root, "none"],
+    refetchOnMount: "always",
+    retry: 1,
+    staleTime: 0,
+  });
+
+  const failure =
+    (edit ? editQuery.error : null) ?? (draftRef ? draftQuery.error : null) ?? context.error ?? repostQuery.error;
 
   if (failure) {
     return {
@@ -205,13 +260,58 @@ export function usePostComposerSource(params: ComposerSourceParams): ComposerSou
         if (draftRef) {
           void draftQuery.refetch();
         }
+        if (repostRef) {
+          void repostQuery.refetch();
+        }
       },
       status: "error",
     };
   }
 
-  if (!context.data || (edit && !editQuery.data) || (draftRef && !draftQuery.data)) {
+  if (
+    !context.data ||
+    (edit && !editQuery.data) ||
+    (draftRef && !draftQuery.data) ||
+    (repostRef && !repostQuery.data)
+  ) {
     return { status: "loading" };
+  }
+
+  // HOM-10 §16: stesso editor, aperto sull'originale. La lista di «Reposta come» è quella del server
+  // per il Repost (`can_repost`, §30), non quella del Post normale.
+  if (repostRef && repostQuery.data) {
+    const reference = composerReferenceFromState(repostRef, repostQuery.data);
+    const identities = composerIdentitiesFromState(repostQuery.data);
+
+    if (draftRef && draftQuery.data) {
+      return {
+        initialState: createDraftState({
+          draft: { ...draftQuery.data, reference },
+          draftOperationKey,
+          identities,
+          limits: context.data.limits,
+          operationKey,
+          origin,
+          schedule: context.data.schedule,
+        }),
+        status: "ready",
+      };
+    }
+
+    return {
+      initialState: createComposerState({
+        draftOperationKey,
+        identities,
+        // §28: l'identità della riga Condividi vince su quella di default dell'origin (profilo → persona).
+        identity: hintFirstIdentity(identities, identityHint) ?? defaultIdentity(origin, identities, identityHint),
+        limits: context.data.limits,
+        operationKey,
+        origin,
+        reference,
+        schedule: context.data.schedule,
+      }),
+      status: "ready",
+    };
   }
 
   if (edit && editQuery.data) {
@@ -307,12 +407,39 @@ export type UsePostComposerOptions = {
   profileId: string;
   onPublished: (result: ComposerPublishedResult, state: ComposerState) => void;
   onUpdated: (result: WireUpdatePostResult, state: ComposerState) => void;
+  /**
+   * HOM-10 §70–§71, §245: il Simple Repost è partito (ottimistico). Lo schermo chiude e torna
+   * all'origine con il toast «Repost effettuato»; l'esito vero arriva dopo.
+   */
+  onSimpleReposted?: () => void;
+  /** HOM-10 §72, §229: la chiamata è fallita (o l'originale è sparito); lo stato locale è già tornato indietro. */
+  onSimpleRepostFailed?: (failure: SimpleRepostFailure) => void;
+  /** HOM-10 §130: «Rimuovi repost» riuscito → toast «Repost rimosso». */
+  onRepostRemoved?: () => void;
 };
 
-export function usePostComposer({ initialState, userId, profileId, onPublished, onUpdated }: UsePostComposerOptions) {
+export function usePostComposer({
+  initialState,
+  userId,
+  profileId,
+  onPublished,
+  onUpdated,
+  onSimpleReposted,
+  onSimpleRepostFailed,
+  onRepostRemoved,
+}: UsePostComposerOptions) {
   const queryClient = useQueryClient();
   const [store] = useState(() => createComposerStore(initialState));
   const state = useSyncExternalStore(store.subscribe, store.getState);
+  // HOM-10 §16: stessa sessione, stessa modalità. La reference non cambia mai (§47), quindi vale per tutta la vita dell'hook.
+  const isRepost = isRepostComposer(initialState);
+  // §234: la chiave del Simple Repost è dell'azione, non di `operationKey` (che è del `submit_content`):
+  // doppio tap e retry la riusano, e un invio con testo successivo non la sovrascrive.
+  const [simpleRepostKey] = useState(newComposerOperationKey);
+  const removingRef = useRef(false);
+  const orphanDeletedRef = useRef(false);
+  // §128–§131: finché «Rimuovi repost» è in volo «Reposta» non parte (due richieste senza ordine).
+  const [removingRepost, setRemovingRepost] = useState(false);
 
   /* ---------------- bozza server e autosave (HOM-06.2 §116–§132) ---------------- */
 
@@ -330,7 +457,10 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     paused: state.publish.status === "publishing",
     payload: toDraftPayload(state),
     persistLocal: false,
-    significant: autosaveEnabled && hasSavableContent(state),
+    // HOM-10 §137, §338: nel Repost «significativo» è la regola del §62 (invisibili e token `@`/`https://` soli
+    // inclusi), la stessa che decide Simple Repost vs Post: un body che la UI tratta da vuoto non crea bozze.
+    significant:
+      autosaveEnabled && (isRepost ? isSignificantRepostBody(state.body, state.mentions) : hasSavableContent(state)),
     snapshot: null,
     userId,
   });
@@ -404,11 +534,25 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
       return;
     }
 
+    // HOM-10 §269: il Repost ha il suo evento di apertura; non è anche un «composer_open» di Post.
+    if (opened.reference) {
+      trackRepost({
+        contentId: opened.reference.contentId,
+        contentType: opened.reference.contentType,
+        identityType: opened.identity?.type ?? null,
+        name: "repost_composer_open",
+        origin: opened.origin,
+        source: opened.draft.ref ? "draft" : "entry",
+      });
+      return;
+    }
+
     trackComposer({ identityType: opened.identity?.type ?? null, name: "composer_open", origin: opened.origin });
   }, [store]);
 
   useEffect(() => {
-    if (store.getState().mode.kind !== "create") {
+    // HOM-10: il composer Repost non ripristina la copia locale (è del Post normale) e non la scrive.
+    if (store.getState().mode.kind !== "create" || isRepost) {
       return;
     }
 
@@ -435,7 +579,7 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     return () => {
       cancelled = true;
     };
-  }, [store, userId]);
+  }, [isRepost, store, userId]);
 
   // La bozza server (ref + versione) viaggia nello snapshot: è l'unica copia locale (§125). Un programmato non ne ha (§167).
   const savedRef = autosave.ref;
@@ -481,7 +625,8 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
 
   /* ---------------- anteprima link (§73–98) ---------------- */
 
-  const linkTarget = linkFetchTarget(state);
+  // HOM-10 §97: nel Repost un URL resta testo cliccabile, senza una seconda rich card accanto all'originale.
+  const linkTarget = isRepost ? null : linkFetchTarget(state);
 
   useEffect(() => {
     if (!linkTarget) {
@@ -495,6 +640,39 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
 
     return () => clearTimeout(timer);
   }, [linkTarget, store]);
+
+  /* ---------------- analytics del Repost (§269–§271) ---------------- */
+
+  const refType = state.reference?.contentType ?? null;
+  const refId = state.reference?.contentId ?? null;
+  const identityType = state.identity?.type ?? null;
+  // §138: «testo iniziato» = il body è diventato significativo; mai il testo.
+  const textStarted = isRepost && isSignificantRepostBody(state.body, state.mentions);
+  const textTrackedRef = useRef(false);
+  const linkDomain = isRepost ? domainOf(firstEligibleUrl(state.body)?.normalized ?? "") : null;
+  const draftTrackedRef = useRef(initialState.draft.ref !== null);
+  const hasDraftRef = autosave.ref !== null;
+
+  useEffect(() => {
+    if (textStarted && refType && refId && !textTrackedRef.current) {
+      textTrackedRef.current = true;
+      trackRepost({ contentId: refId, contentType: refType, identityType, name: "repost_text_started" });
+    }
+  }, [textStarted, refType, refId, identityType]);
+
+  useEffect(() => {
+    if (linkDomain) {
+      trackRepost({ domain: linkDomain, name: "repost_link_added" });
+    }
+  }, [linkDomain]);
+
+  // §137–§138: la bozza nasce al primo contenuto significativo, mai da un Simple Repost vuoto.
+  useEffect(() => {
+    if (isRepost && hasDraftRef && refType && refId && !draftTrackedRef.current) {
+      draftTrackedRef.current = true;
+      trackRepost({ contentId: refId, contentType: refType, identityType, name: "repost_draft_created" });
+    }
+  }, [hasDraftRef, identityType, isRepost, refId, refType]);
 
   const loadingUrl = state.link.status === "loading" ? state.link.url : null;
 
@@ -565,6 +743,28 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
         staleTime: 0,
       });
 
+      const current = store.getState();
+
+      // HOM-10 §37, §155: nel Repost la lista e le capability sono quelle di `fetch_repost_state`
+      // (can_repost, can_publish_post, has_simple_repost), e l'originale si rivalida.
+      if (isRepostComposer(current) && current.reference) {
+        const ref: RepostContentRef = { contentId: current.reference.contentId, contentType: current.reference.contentType };
+        const repostState = await queryClient.fetchQuery({
+          queryFn: () => fetchRepostState(ref),
+          queryKey: REPOST_QK.state(userId, ref.contentType, ref.contentId),
+          staleTime: 0,
+        });
+
+        store.dispatch({
+          identities: composerIdentitiesFromState(repostState),
+          limits: context.limits,
+          schedule: context.schedule,
+          type: "contextRefreshed",
+        });
+        store.dispatch({ reference: composerReferenceFromState(ref, repostState), type: "referenceRefreshed" });
+        return;
+      }
+
       store.dispatch({
         identities: context.identities,
         limits: context.limits,
@@ -580,6 +780,19 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     store.dispatch({ body, type: "bodyChanged" });
   }
 
+  /**
+   * HOM-10 §17–§18, §94, §96: la toolbar del Repost inserisce `@` o `https://` alla selezione.
+   * `@` apre l'autocomplete esistente (`mentionQueryAt`); non esiste un secondo selettore.
+   * Il cursore va dopo il token, così digitare continua la mention o l'URL.
+   */
+  function insertToken(token: string) {
+    const current = store.getState();
+    const inserted = insertTokenAtSelection(current.body, selection, token);
+
+    store.dispatch({ body: inserted.body, type: "bodyChanged" });
+    setSelection({ end: inserted.cursor, start: inserted.cursor });
+  }
+
   /** §26–29: cambia solo l'autore, poi si rivalidano le capability dalla lista del server. */
   function changeIdentity(identity: ComposerIdentity) {
     const previous = store.getState().identity;
@@ -589,7 +802,11 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     const next = store.getState().identity;
 
     if (previous && next && (previous.id !== next.id || previous.type !== next.type)) {
-      trackComposer({ from: previous.type, name: "identity_changed", to: next.type });
+      if (isRepost) {
+        trackRepost({ from: previous.type, name: "repost_identity_changed", to: next.type });
+      } else {
+        trackComposer({ from: previous.type, name: "identity_changed", to: next.type });
+      }
     }
 
     void refreshContext();
@@ -713,7 +930,11 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     });
 
     if (store.getState().mentions.length > before) {
-      trackComposer({ name: "mention_added", targetType: candidate.identityType });
+      if (isRepost) {
+        trackRepost({ name: "repost_mention_added", targetType: candidate.identityType });
+      } else {
+        trackComposer({ name: "mention_added", targetType: candidate.identityType });
+      }
     }
   }
 
@@ -774,9 +995,50 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
       uploaderRef.current?.cancel(item.localId);
     }
 
-    if (!isEditingScheduled(store.getState())) {
+    // HOM-10: il composer Repost non ha una copia locale; quella che c'è è del Post normale e non si tocca.
+    if (!isEditingScheduled(store.getState()) && !isRepost) {
       void clearRecovery(userId);
     }
+
+    discardEmptiedRepostDraft();
+  }
+
+  /**
+   * HOM-10 §137, §142, §338: il testo di un Repost è stato tolto dopo che l'autosave aveva già creato la bozza
+   * (o la bozza riaperta è stata svuotata). Uscendo senza testo non resta nessuna bozza col vecchio testo:
+   * si elimina secondo la policy HOM-06.2. Con del testo vale l'uscita a tre azioni, non questo ramo.
+   * Fire-and-forget: un fallimento lascia la bozza in Bozze, eliminabile da lì.
+   */
+  function discardEmptiedRepostDraft() {
+    const current = store.getState();
+    const handle = autosaveRef.current;
+
+    if (
+      !isRepost ||
+      isSignificantRepostBody(current.body, current.mentions) ||
+      isEditingScheduled(current) ||
+      orphanDeletedRef.current ||
+      !handle.ref ||
+      handle.version === null
+    ) {
+      return;
+    }
+
+    orphanDeletedRef.current = true;
+    const target = { ref: handle.ref, version: handle.version };
+
+    void (async () => {
+      try {
+        // Un body non significativo non salva (flush ritorna la versione nota): nessun salvataggio nuovo.
+        const latest = (await handle.flush()) ?? target;
+        await deleteContentDraft(latest.ref, latest.version);
+      } catch {
+        // La bozza resta in Bozze.
+      }
+
+      await handle.stop();
+      invalidatePublishing();
+    })();
   }
 
   /* ---------------- bozza: scelta di pubblicazione, uscita (§81–§102, §133–§136) ---------------- */
@@ -816,7 +1078,9 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
 
     if (saved && !hasUploadsInFlight(media) && !hasFailedMedia(media)) {
       recoveryRef.current.off = true;
-      await clearRecovery(userId);
+      if (!isRepost) {
+        await clearRecovery(userId);
+      }
     }
 
     invalidatePublishing();
@@ -856,8 +1120,29 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
 
   /* ---------------- pubblicazione e salvataggio ---------------- */
 
+  /** HOM-10 §269, §271: gli eventi del Post con testo, distinti da quelli del Simple Repost. */
+  function referencedProps(snapshot: ComposerState) {
+    return {
+      contentId: snapshot.reference?.contentId ?? "",
+      contentType: snapshot.reference?.contentType ?? ("profile_post" as FeedContentType),
+      identityType: snapshot.identity?.type ?? null,
+    };
+  }
+
   async function submitCreate(started: ComposerState) {
-    trackComposer({ name: "publish_attempt", ...publishProps(started) });
+    if (isRepost) {
+      const intended = submitPublication(started);
+
+      trackRepost({
+        hasLink: firstEligibleUrl(started.body) !== null,
+        mentionCount: started.mentions.length,
+        name: "referenced_post_publish_attempt",
+        scheduled: intended !== "keep" && intended.mode === "scheduled",
+        ...referencedProps(started),
+      });
+    } else {
+      trackComposer({ name: "publish_attempt", ...publishProps(started) });
+    }
 
     // §68: i media ancora in coda partono; si attende la fine di quelli in volo.
     for (const item of started.media) {
@@ -894,16 +1179,34 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
       });
 
       recoveryRef.current.off = true;
-      void clearRecovery(userId);
+      if (!isRepost) {
+        void clearRecovery(userId);
+      }
       await autosaveRef.current.stop();
       applyPublishToCaches(queryClient, { profileId });
       invalidatePublishing();
-      trackComposer({
-        ...publishProps(latest),
-        contentType: result.ref.contentType,
-        name: "publish_success",
-        replayed: result.replayed,
-      });
+      if (isRepost) {
+        // §271: l'esito tecnico «Post con reference» ha i suoi eventi; l'insight dell'originale si rilegge (§239).
+        trackRepost({
+          name: "referenced_post_publish_success",
+          postContentType: result.ref.contentType,
+          replayed: result.replayed,
+          ...referencedProps(latest),
+        });
+        if (result.status === "scheduled") {
+          trackRepost({ name: "referenced_post_scheduled", ...referencedProps(latest) });
+        }
+        if (latest.reference) {
+          invalidateAfterRepostChange(queryClient, profileId, latest.reference);
+        }
+      } else {
+        trackComposer({
+          ...publishProps(latest),
+          contentType: result.ref.contentType,
+          name: "publish_success",
+          replayed: result.replayed,
+        });
+      }
       if (result.status === "scheduled") {
         trackPublishing({ format: "post", identityType: identity.type, name: "schedule_confirmed" });
       }
@@ -924,17 +1227,112 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
       const code: ComposerSubmitErrorKind = kind === "content_permission_denied" ? "post_permission_denied" : kind;
 
       store.dispatch({ code, type: "publishFailed" });
-      trackComposer({ ...publishProps(latest), code, name: "publish_failure" });
+      if (isRepost) {
+        trackRepost({ code, name: "referenced_post_publish_failure", ...referencedProps(latest) });
+      } else {
+        trackComposer({ ...publishProps(latest), code, name: "publish_failure" });
+      }
 
       // La chiave non è più riusabile: nuova chiave, contenuto intatto, l'utente riprova (§118).
       if (code === "post_operation_conflict" || code === "content_operation_conflict") {
         store.dispatch({ operationKey: newComposerOperationKey(), type: "operationKeyRotated" });
       }
 
-      if (code === "post_permission_denied") {
-        await refreshContext(); // §169–172
+      // §169–172, §37, §231: il permesso o l'originale sono cambiati → si rilegge, il testo resta (§230).
+      if (code === "post_permission_denied" || isReferenceUnavailableCode(code)) {
+        await refreshContext();
       }
     }
+  }
+
+  /**
+   * HOM-10 §63, §70–§72, §126, §137: Simple Repost. Ottimistico: lo stato diventa «ripostato»
+   * e lo schermo si chiude PRIMA della risposta (`onSimpleReposted`); l'esito arriva dopo e,
+   * se negativo, `performSimpleRepost` ha già fatto il rollback e qui si dice perché (§72).
+   * Nessuna bozza e nessun recovery: il body è vuoto (§137).
+   */
+  async function submitSimpleRepost(started: ComposerState) {
+    const { identity, reference } = started;
+
+    if (!identity || !reference) {
+      store.dispatch({ type: "publishReset" });
+      return;
+    }
+
+    // §137, §338: una bozza server nata da del testo poi cancellato (o riaperta da Bozze) non deve restare
+    // dopo il Repost. Si attende l'eventuale salvataggio in volo PRIMA di chiudere, così la versione da
+    // eliminare è quella giusta (senza, il CAS fallirebbe); senza bozza questo passo non costa nulla.
+    const handle = autosaveRef.current;
+    let draftTarget: { ref: ContentRef; version: number } | null = null;
+
+    if (handle.ref && handle.version !== null) {
+      draftTarget = (await handle.flush()) ?? { ref: handle.ref, version: handle.version };
+    }
+
+    recoveryRef.current.off = true;
+    onSimpleReposted?.();
+
+    const result = await performSimpleRepost({
+      actor: { id: identity.id, type: identity.type },
+      operationKey: simpleRepostKey,
+      profileId,
+      queryClient,
+      ref: { contentId: reference.contentId, contentType: reference.contentType },
+    });
+
+    if (result.ok) {
+      if (draftTarget) {
+        try {
+          await deleteContentDraft(draftTarget.ref, draftTarget.version);
+        } catch {
+          // Il Repost è fatto: una bozza che non si riesce a togliere resta in Bozze, eliminabile da lì.
+        }
+        invalidatePublishing();
+      }
+      return;
+    }
+
+    // Lo schermo può essere già chiuso: lo store è esterno, il reset è innocuo.
+    store.dispatch({ type: "publishReset" });
+    onSimpleRepostFailed?.(result.failure);
+  }
+
+  /**
+   * HOM-10 §128–§131, §238: «Rimuovi repost», immediato e senza conferma. Il composer resta
+   * aperto (il testo è ancora utilizzabile §125) e il flag torna a «non ripostato»; su errore
+   * rollback e una riga di stato.
+   */
+  async function removeSimpleRepost() {
+    const { identity, reference } = store.getState();
+
+    if (!identity || !reference || removingRef.current) {
+      return;
+    }
+
+    removingRef.current = true;
+    setRemovingRepost(true);
+    const actor = { id: identity.id, type: identity.type };
+
+    store.dispatch({ identityId: actor.id, identityType: actor.type, type: "simpleRepostChanged", value: false });
+
+    const result = await performRemoveRepost({
+      actor,
+      profileId,
+      queryClient,
+      ref: { contentId: reference.contentId, contentType: reference.contentType },
+    });
+
+    removingRef.current = false;
+    setRemovingRepost(false);
+
+    if (result.ok) {
+      setNotice(null);
+      onRepostRemoved?.();
+      return;
+    }
+
+    store.dispatch({ identityId: actor.id, identityType: actor.type, type: "simpleRepostChanged", value: true });
+    setNotice(REPOST_COMPOSER_COPY.removeFailed);
   }
 
   async function submitEdit(started: ComposerState) {
@@ -972,7 +1370,8 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
    * in modo sincrono: il secondo non passa (§119, §239).
    */
   async function submit() {
-    if (store.getState().publish.status === "publishing") {
+    // `removingRef` e non lo stato: il tap può arrivare prima del re-render.
+    if (store.getState().publish.status === "publishing" || removingRef.current) {
       return;
     }
 
@@ -986,6 +1385,9 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
 
     if (started.mode.kind === "edit") {
       await submitEdit(started);
+    } else if (isRepost && repostIntent(started) === "simple") {
+      // §61–§64: lo decide il body normalizzato; l'utente non vede la distinzione (§65).
+      await submitSimpleRepost(started);
     } else {
       await submitCreate(started);
     }
@@ -1002,10 +1404,12 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
       deleteDraft,
       discard,
       dismissLink,
+      insertToken,
       keepDraft,
       moveMedia,
       openTagSheet,
       removeMedia,
+      removeSimpleRepost,
       retryLink,
       retryMedia,
       selectMention,
@@ -1024,6 +1428,8 @@ export function usePostComposer({ initialState, userId, profileId, onPublished, 
     isDirty: isDirty(state),
     mention: mentionState,
     notice,
+    /** HOM-10: «Rimuovi repost» in corso → CTA chiusa e nessun invio. */
+    removingRepost,
     showReorderHint: hintArmed,
     state,
     tag: {

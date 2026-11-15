@@ -24,6 +24,8 @@ import {
   readLinkPreview,
   readMedia,
   readMentions,
+  readReference,
+  readRepost,
   readTagged,
 } from "./feed-post-mapper";
 import {
@@ -211,6 +213,10 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
   }
 
   const postId = readString(row.data, "post_id");
+  // HOM-10 §73, §186: un Simple Repost aggregato è l'originale più il contesto di
+  // chi ha ripostato; l'elemento non è un'altra riga (nessun engagement wrapper §81).
+  const repost = readRepost(row.data);
+  const repostContext = repost ? { repost } : {};
 
   if (type === "post") {
     const postType = asFeedContentType(row.data?.["content_type"]);
@@ -221,8 +227,10 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
     // §14: il testo completo arriva in `data.body`; `excerpt` (280) resta per
     // i server pre-HOM-02.
     const body = readString(row.data, "body");
+    const reference = readReference(row.data);
     return {
       ...envelope,
+      ...repostContext,
       type,
       title: row.title,
       payload: {
@@ -247,6 +255,8 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
         likedAs: parseLikedAs(row.data?.["liked_as"]),
         capabilities: readCapabilities(row.data, postType),
         version: readString(row.data, "version"),
+        // HOM-10 §86–§88: l'embedded dell'originale, solo per un Post con testo.
+        ...(reference ? { reference } : {}),
       },
     };
   }
@@ -275,6 +285,7 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
 
   return {
     ...envelope,
+    ...repostContext,
     type,
     title: row.title,
     payload: {

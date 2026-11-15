@@ -28,6 +28,8 @@ import type {
   FeedMediaVariant,
   FeedMention,
   FeedPostCapabilities,
+  FeedReference,
+  FeedRepostContext,
   FeedTaggedIdentity,
 } from "./feed-types";
 
@@ -360,6 +362,60 @@ export function readCapabilities(
     canEdit: flag("can_edit", false),
     canDelete: flag("can_delete", false),
     canViewInsights: flag("can_view_insights", false),
+  };
+}
+
+/**
+ * HOM-10 §88, §100, §173–§175: `data.reference` di un Post con testo. Il tipo e
+ * l'id sono obbligatori (senza, nessuna card: non si indovina l'originale). Una
+ * reference con `available: true` ma senza snapshot vale «non disponibile»: la
+ * card non ha nulla da mostrare e non apre una route che potrebbe non esistere.
+ * `null` = nessuna reference (Post normale, server pre-HOM-10).
+ */
+export function readReference(data: Data): FeedReference | null {
+  const raw = isRecord(data?.["reference"]) ? (data["reference"] as Data) : null;
+  const contentType = asFeedContentType(raw?.["content_type"]);
+  const contentId = str(raw, "content_id");
+
+  if (!contentType || !contentId) {
+    return null;
+  }
+
+  const snapshot = isRecord(raw?.["snapshot"]) ? (raw["snapshot"] as Record<string, unknown>) : null;
+
+  return {
+    available: raw?.["available"] === true && snapshot !== null,
+    contentId,
+    contentType,
+    snapshot,
+  };
+}
+
+/**
+ * HOM-10 §73, §186–§187: `data.repost` di un Simple Repost aggregato. Senza il
+ * reposter con id e nome la riga non ha un «X ha ripostato» da dire (§292): il
+ * contesto si scarta e l'elemento resta l'originale puro.
+ */
+export function readRepost(data: Data): FeedRepostContext | null {
+  const raw = isRecord(data?.["repost"]) ? (data["repost"] as Data) : null;
+  const reposter = isRecord(raw?.["reposter"]) ? (raw["reposter"] as Data) : null;
+  const identityId = str(reposter, "identity_id");
+  const name = str(reposter, "display_name");
+
+  if (!identityId || !name) {
+    return null;
+  }
+
+  return {
+    additionalCount: readCount(raw, "additional_count"),
+    reposter: {
+      avatarUrl: str(reposter, "avatar_url"),
+      identityId,
+      // Valori del sistema: person | society | media (mai «profile», che non esiste per le identità).
+      identityType: str(reposter, "identity_type") ?? "person",
+      isVerified: reposter?.["is_verified"] === true,
+      name,
+    },
   };
 }
 

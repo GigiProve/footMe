@@ -21,6 +21,7 @@
 
 import type { ContentManageParams, ContentOrigin } from "../feed/content-routes";
 import type { FeedContentType } from "../feed/feed-types";
+import { isShareContentType } from "../share/share-types";
 import { COMPOSER_ORIGINS, type ComposerOrigin } from "./composer-types";
 
 export const COMPOSER_PATH = "/post-compose";
@@ -52,6 +53,46 @@ export function composerHref({
     query.push(`identity=${encodeURIComponent(identityId)}`);
   }
   return `${COMPOSER_PATH}?${query.join("&")}`;
+}
+
+/**
+ * HOM-10 §14, §16, §243: «Repost» apre lo STESSO composer (`/post-compose`) con una
+ * reference. Nessuna route nuova: stessa schermata full-screen, stesso ritorno con
+ * `router.back()` (§245, §247). `identity` è l'identità Home, solo un suggerimento
+ * (§21 di HOM-06.1): la lista del server resta l'autorità.
+ */
+export function repostComposerHref({
+  origin,
+  ref,
+  identityId,
+}: {
+  origin: ComposerOrigin;
+  ref: { contentType: FeedContentType; contentId: string };
+  identityId?: string | null;
+}): string {
+  const query = [
+    "mode=repost",
+    `refType=${ref.contentType}`,
+    `refId=${encodeURIComponent(ref.contentId)}`,
+    `origin=${origin}`,
+  ];
+  if (identityId) {
+    query.push(`identity=${encodeURIComponent(identityId)}`);
+  }
+  return `${COMPOSER_PATH}?${query.join("&")}`;
+}
+
+/** §243–§244: l'origine della superficie da cui si è aperto il Condividi → quella del composer. */
+export function composerOriginForContent(origin: ContentOrigin | null): ComposerOrigin {
+  switch (origin) {
+    case "HOME_PER_TE":
+    case "HOME_SEGUITI":
+      return origin;
+    case "PROFILE":
+      return "PERSONAL_PROFILE";
+    default:
+      return "CONTENT_DETAIL";
+  }
 }
 
 /** §143, §164: la modifica porta con sé la versione letta all'apertura del menu (§160). */
@@ -99,6 +140,24 @@ export function parseComposerCreateParams(params: SearchParams): ComposerCreateP
     identityId: first(params.identity),
     origin: parseComposerOrigin(params.origin) ?? "HOME_PER_TE",
   };
+}
+
+/**
+ * HOM-10 §14, §16: la reference con cui si apre il composer Repost, o `null`. Solo i
+ * quattro tipi ripostabili (§42; gli stessi di HOM-09): un tipo ignoto non apre un
+ * composer che non potrebbe pubblicare nulla, e il composer normale resta intatto.
+ */
+export function parseComposerReference(
+  params: SearchParams,
+): { contentType: FeedContentType; contentId: string } | null {
+  const type = first(params.refType);
+  const id = first(params.refId);
+
+  if (first(params.mode) !== "repost" || !id || !isShareContentType(type)) {
+    return null;
+  }
+
+  return { contentId: id, contentType: type };
 }
 
 /** `null` se tipo o id mancano o il tipo non è un Post modificabile: lo schermo mostra «non disponibile». */

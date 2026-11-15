@@ -19,7 +19,9 @@ import {
   publicationRowLabel,
   resolveLauncherMode,
   scheduledMenuActions,
+  scheduledStatusLabel,
   submitSuccessCopy,
+  unschedulableCopy,
   validateScheduleChoice,
 } from "./publishing-presentation";
 import type { ContentLauncherState, Publication } from "./publishing-types";
@@ -228,6 +230,24 @@ describe("launcher (§4–§10)", () => {
   it("«Posizione aperta» resta sotto il divisore per chi ha quell'azione", () => {
     expect(launcherRows(base, ["open_position"]).secondary).toEqual(["drafts", "open_position"]);
     expect(launcherRows(null, ["open_position"])).toEqual({ primary: ["post"], secondary: ["open_position"] });
+  });
+});
+
+describe("Repost nella lista Programmati (HOM-10 §155, §345)", () => {
+  it("un job fallito per originale sparito lo dice, senza motivi tecnici", () => {
+    expect(scheduledStatusLabel({ failureCode: "reference_unavailable", status: "failed" })).toBe(
+      "Il contenuto originale non è più disponibile.",
+    );
+  });
+
+  it("gli altri fallimenti e gli altri stati restano come prima", () => {
+    expect(scheduledStatusLabel({ failureCode: "boh", status: "failed" })).toBe("Pubblicazione non riuscita");
+    expect(scheduledStatusLabel({ status: "failed" })).toBe("Pubblicazione non riuscita");
+    expect(scheduledStatusLabel({ failureCode: "reference_unavailable", status: "scheduled" })).toBe("Programmato");
+  });
+
+  it("unschedulable_reason «reference» ha la sua frase", () => {
+    expect(unschedulableCopy("reference")).toBe("Il contenuto originale non è più disponibile.");
   });
 });
 

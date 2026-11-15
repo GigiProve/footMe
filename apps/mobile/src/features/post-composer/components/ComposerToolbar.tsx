@@ -28,6 +28,16 @@ type ComposerToolbarProps = {
   tagDisabled?: boolean;
   onPressMedia: () => void;
   onPressTag: () => void;
+  /**
+   * HOM-10 §17–§18, §92–§96, §308–§309: nel composer Repost la toolbar è ristretta a «@»
+   * e «link» — niente Foto/video, niente Tagga. Con questa prop le due azioni normali
+   * non esistono, non sono solo disabilitate.
+   */
+  repost?: {
+    disabled?: boolean;
+    onPressLink: () => void;
+    onPressMention: () => void;
+  };
 };
 
 type ToolbarActionProps = {
@@ -73,7 +83,39 @@ export function ComposerToolbar({
   tagDisabled = false,
   onPressMedia,
   onPressTag,
+  repost,
 }: ComposerToolbarProps) {
+  if (repost) {
+    const disabled = repost.disabled ?? false;
+
+    return (
+      <View style={[styles.container, styles.repostContainer]}>
+        <Pressable
+          accessibilityLabel="Menziona una persona o una società"
+          accessibilityRole="button"
+          accessibilityState={{ disabled }}
+          disabled={disabled}
+          onPress={repost.onPressMention}
+          style={({ pressed }) => [styles.iconAction, disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
+          testID="composer-toolbar-mention"
+        >
+          <Ionicons color={colors.textPrimary} name="at-outline" size={22} />
+        </Pressable>
+        <Pressable
+          accessibilityLabel="Inserisci un link"
+          accessibilityRole="button"
+          accessibilityState={{ disabled }}
+          disabled={disabled}
+          onPress={repost.onPressLink}
+          style={({ pressed }) => [styles.iconAction, disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
+          testID="composer-toolbar-link"
+        >
+          <Ionicons color={colors.textPrimary} name="link-outline" size={22} />
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {showMedia ? (
@@ -117,7 +159,16 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.4,
   },
+  iconAction: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+    minWidth: 44,
+  },
   pressed: {
     opacity: 0.6,
+  },
+  repostContainer: {
+    gap: spacing[8],
   },
 });

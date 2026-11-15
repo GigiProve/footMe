@@ -35,6 +35,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useSession } from "../../auth/use-session";
 import { colors, spacing } from "../../../theme/tokens";
+import { useOpenReference } from "../../repost/use-open-reference";
 import { buildShareTarget } from "../../share/share-presentation";
 import { useContentShare } from "../../share/use-content-share";
 import { CommentComposerBar } from "../../comments/components/CommentComposerBar";
@@ -104,6 +105,8 @@ export function ProfilePostDetail({
   const { profile } = useSession();
   // HOM-09 §4, §9, §175: «Condividi» apre il pannello sopra questo dettaglio.
   const share = useContentShare(origin);
+  // HOM-10 §60, §111: nel dettaglio la card dell'originale apre l'originale intero (un livello solo, §57).
+  const openReference = useOpenReference("detail", origin);
   const toggleLike = useToggleFeedPostLike({ profileId: profile?.id ?? "" });
   const openLikes = useOpenLikes();
   const manageContent = useContentManagement({ profileId: profile?.id ?? "" });
@@ -222,6 +225,7 @@ export function ProfilePostDetail({
                 // Nel dettaglio le immagini sono già intere e i video si riproducono
                 // da sé (`VideoMedia`): il tap su un media non apre altro.
                 onOpenMedia={() => undefined}
+                onOpenReference={openReference}
                 onPress={() => undefined}
                 onPressAuthor={() => {
                   if (item.author) {

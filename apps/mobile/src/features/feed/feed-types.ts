@@ -331,6 +331,35 @@ export type FeedPostCapabilities = {
   canViewInsights: boolean;
 };
 
+/**
+ * HOM-10 §88, §100: la reference strutturata di un Post con testo all'originale.
+ * `snapshot` è lo snapshot HOM-09 dell'originale (corrente, §168); `null` quando
+ * non è disponibile o non leggibile dal viewer (§173–§175). Un solo livello (§57):
+ * lo snapshot non porta mai la reference annidata. Resta grezzo qui: lo legge
+ * `features/repost` (`snapshotToPreview`), il Feed non ne conosce la forma.
+ */
+export type FeedReference = {
+  contentType: FeedContentType;
+  contentId: string;
+  available: boolean;
+  snapshot: Record<string, unknown> | null;
+};
+
+/** HOM-10 §73, §186–§189: chi ha ripostato, già scelto dal server (rappresentante + conteggio). */
+export type FeedReposter = {
+  identityType: string;
+  identityId: string;
+  name: string;
+  avatarUrl: string | null;
+  isVerified: boolean;
+};
+
+export type FeedRepostContext = {
+  reposter: FeedReposter;
+  /** §187, §290–§291: gli altri reposter; 0 = «X ha ripostato». */
+  additionalCount: number;
+};
+
 export type FeedPostPayload = {
   contentType: FeedContentType;
   postId: string;
@@ -354,6 +383,11 @@ export type FeedPostPayload = {
   capabilities: FeedPostCapabilities;
   /** HOM-04 §73: `updated_at` del contenuto, passato alla modifica. Null se il server non lo manda. */
   version: string | null;
+  /**
+   * HOM-10 §86–§88: il Post con testo che incorpora un altro contenuto. Assente o
+   * `null` per un Post normale e per un server pre-HOM-10.
+   */
+  reference?: FeedReference | null;
 };
 
 /**
@@ -438,6 +472,13 @@ type FeedEnvelope<TType extends FeedItemType, TPayload> = {
   isSaved: boolean;
   isFollowingAuthor: boolean;
   nav: { kind: FeedNavKind; params: Record<string, string> } | null;
+  /**
+   * HOM-10 §73–§76, §185–§187: presente solo quando l'elemento è un Simple Repost
+   * aggregato. L'elemento resta l'originale (autore, azioni, id canonico nel
+   * payload); `id` invece è `repost:<tipo>:<id>`, quindi chi cerca un elemento per
+   * `payload.postId` + `contentType` non deve usare `id`.
+   */
+  repost?: FeedRepostContext | null;
   payload: TPayload;
   /**
    * HOM-07 §141: istante (ms) in cui è partita la richiesta che ha portato

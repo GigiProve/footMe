@@ -13,7 +13,7 @@ import {
   resolveFeedAuthorHref,
   resolveFeedItemHref,
 } from "./feed-service";
-import type { FeedContentItem, FeedItemRow } from "./feed-types";
+import type { FeedContentItem, FeedItemRow, FeedPostItem } from "./feed-types";
 
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
@@ -253,6 +253,140 @@ describe("resolveFeedItemHref", () => {
     );
 
     expect(resolveFeedItemHref(item!)).toBeNull();
+  });
+});
+
+describe("mapFeedRow — Repost (HOM-10)", () => {
+  const SNAPSHOT = {
+    author_is_verified: true,
+    author_name: "Matteo Rossi",
+    excerpt: "Grande vittoria oggi!",
+    item_kind: "post",
+  };
+
+  const REPOST = {
+    additional_count: 3,
+    reposter: {
+      avatar_url: "https://example.test/m.jpg",
+      display_name: "Marco Bianchi",
+      identity_id: "p-1",
+      identity_type: "profile",
+      is_verified: true,
+    },
+  };
+
+  it("un Post normale non porta né `repost` né `reference` (nessuna chiave in più)", () => {
+    const item = mapFeedRow(makeRow()) as FeedContentItem;
+
+    expect("repost" in item).toBe(false);
+    expect("reference" in item.payload).toBe(false);
+  });
+
+  it("Simple Repost aggregato: l'elemento resta l'originale, con il contesto del reposter (§73, §186–§187)", () => {
+    const item = mapFeedRow(
+      makeRow({ data: { ...makeRow().data, repost: REPOST }, item_uid: "repost:club_media:post-1" }),
+    ) as FeedContentItem;
+
+    expect(item.id).toBe("repost:club_media:post-1");
+    // L'identità canonica resta nel payload: Like, Commenti, Salva e Condividi sono dell'originale (§76–§81).
+    expect(item.payload.postId).toBe("post-1");
+    expect(item.payload.contentType).toBe("club_media");
+    expect(item.author?.name).toBe("Como 1907");
+    expect(item.repost).toEqual({
+      additionalCount: 3,
+      reposter: {
+        avatarUrl: "https://example.test/m.jpg",
+        identityId: "p-1",
+        identityType: "profile",
+        isVerified: true,
+        name: "Marco Bianchi",
+      },
+    });
+  });
+
+  it("vale per Articolo e Video come per il Post (§42, §118–§119)", () => {
+    const video = mapFeedRow(
+      makeRow({
+        data: { content_type: "media_profile", post_id: "v-1", repost: REPOST },
+        item_type: "video",
+      }),
+    ) as FeedContentItem;
+    const article = mapFeedRow(
+      makeRow({
+        data: { content_type: "club_media", post_id: "a-1", repost: { ...REPOST, additional_count: 0 } },
+        item_type: "article",
+      }),
+    ) as FeedContentItem;
+
+    expect(video.repost?.additionalCount).toBe(3);
+    expect(article.repost?.additionalCount).toBe(0);
+  });
+
+  it("senza reposter con id e nome il contesto si scarta: nessun wrapper vuoto (§170, §292)", () => {
+    const noName = mapFeedRow(
+      makeRow({ data: { ...makeRow().data, repost: { additional_count: 2, reposter: { identity_id: "p-1" } } } }),
+    ) as FeedContentItem;
+    const noReposter = mapFeedRow(makeRow({ data: { ...makeRow().data, repost: { additional_count: 2 } } })) as FeedContentItem;
+
+    expect("repost" in noName).toBe(false);
+    expect("repost" in noReposter).toBe(false);
+  });
+
+  it("un conteggio malformato vale zero («X ha ripostato», §291)", () => {
+    const item = mapFeedRow(
+      makeRow({ data: { ...makeRow().data, repost: { ...REPOST, additional_count: "tanti" } } }),
+    ) as FeedContentItem;
+
+    expect(item.repost?.additionalCount).toBe(0);
+  });
+
+  it("Post con reference disponibile: tipo, id, disponibilità e snapshot grezzo (§88, §100)", () => {
+    const item = mapFeedRow(
+      makeRow({
+        data: {
+          ...makeRow().data,
+          reference: { available: true, content_id: "orig-1", content_type: "profile_post", snapshot: SNAPSHOT },
+        },
+      }),
+    ) as FeedPostItem;
+
+    expect(item.payload.reference).toEqual({
+      available: true,
+      contentId: "orig-1",
+      contentType: "profile_post",
+      snapshot: SNAPSHOT,
+    });
+  });
+
+  it("reference non disponibile o senza snapshot: «non disponibile», il Post resta (§172–§173)", () => {
+    const gone = mapFeedRow(
+      makeRow({
+        data: {
+          ...makeRow().data,
+          reference: { available: false, content_id: "orig-1", content_type: "profile_post", snapshot: null },
+        },
+      }),
+    ) as FeedPostItem;
+    const noSnapshot = mapFeedRow(
+      makeRow({
+        data: {
+          ...makeRow().data,
+          reference: { available: true, content_id: "orig-1", content_type: "profile_post" },
+        },
+      }),
+    ) as FeedPostItem;
+
+    expect(gone).not.toBeNull();
+    expect(gone.payload.reference?.available).toBe(false);
+    expect(noSnapshot.payload.reference?.available).toBe(false);
+  });
+
+  it("reference senza tipo o id valido: nessuna card (non si indovina l'originale)", () => {
+    const item = mapFeedRow(
+      makeRow({ data: { ...makeRow().data, reference: { available: true, content_id: "orig-1", content_type: "boh" } } }),
+    ) as FeedPostItem;
+
+    expect("reference" in item.payload).toBe(false);
   });
 });
 

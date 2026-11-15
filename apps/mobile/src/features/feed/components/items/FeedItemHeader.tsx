@@ -15,7 +15,8 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { formatRelativeTime } from "../../../../lib/relative-time";
 import { spacing } from "../../../../theme/tokens";
 import { AppText, Avatar, VerifiedCheck } from "../../../../ui";
-import type { FeedItem } from "../../feed-types";
+import { ReposterRow } from "../../../repost/components/ReposterRow";
+import { isContentItem, type FeedItem } from "../../feed-types";
 
 type FeedItemHeaderProps = {
   item: FeedItem;
@@ -56,7 +57,7 @@ export function FeedItemHeader({
           .filter(Boolean)
           .join(" · ");
 
-  return (
+  const row = (
     <View style={styles.row}>
       <Pressable
         accessibilityHint={accessibilityHint}
@@ -90,6 +91,22 @@ export function FeedItemHeader({
       {right}
     </View>
   );
+
+  // HOM-10 §73–§76: un Simple Repost è l'originale con una riga discreta sopra. L'header resta
+  // dell'autore dell'originale (§75); Post, Articolo e Video passano tutti da qui.
+  if (isContentItem(item) && item.repost) {
+    return (
+      <View>
+        <ReposterRow
+          repost={item.repost}
+          target={{ contentId: item.payload.postId, contentType: item.payload.contentType }}
+        />
+        {row}
+      </View>
+    );
+  }
+
+  return row;
 }
 
 const styles = StyleSheet.create({

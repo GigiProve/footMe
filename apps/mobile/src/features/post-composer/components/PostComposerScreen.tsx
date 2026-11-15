@@ -26,6 +26,20 @@
  * aggiornato»): nessuna schermata di successo (§130). Il `ToastProvider` sta nel
  * layout radice, sopra lo Stack: il toast sopravvive alla chiusura del composer.
  *
+ * HOM-10 (Repost, §14–§41, §45–§49, §120–§133, §144–§148, §158–§162, §283) nello
+ * STESSO composer, senza un editor nuovo (§16). Con una reference (`?mode=repost`, o
+ * una bozza che ne porta una) la schermata cambia così:
+ *  • header «Annulla | Repost | Reposta/Programma/Già ripostato», tastiera CHIUSA
+ *    all'apertura (§20), placeholder unico (§23) e microcopy (§24) mentre il body è
+ *    vuoto, senza «Facoltativo» (§25);
+ *  • sotto il testo l'originale come card in sola lettura (§45–§48) e, con un Simple
+ *    Repost già attivo, «Hai già ripostato…» + «Rimuovi repost» (§125–§130);
+ *  • toolbar ristretta a «@» e link (§17–§18); niente Foto/video, Tagga, anteprima
+ *    link (§97); «Pubblicazione» solo con testo e `can_schedule_content` (§144–§145);
+ *  • «Reposta come» solo con più di una identità con `can_repost` (§28–§29).
+ * In Modifica di un Post con reference la stessa card compare in sola lettura, senza
+ * X né sostituzione (§160–§162).
+ *
  * HOM-06.2 (bozze e programmazione) nello STESSO composer, senza un secondo (§83):
  *  • «Pubblicazione · Ora ›» sopra la toolbar, solo se l'identity ha
  *    `can_schedule_content` (§84–§85); la CTA segue la scelta: Pubblica / Programma
@@ -46,6 +60,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  type TextInput,
 } from "react-native";
 import { useNavigation, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -61,6 +76,20 @@ import { PublicationSheet } from "../../publishing/components/PublicationSheet";
 import { trackPublishing } from "../../publishing/publishing-analytics";
 import { submitSuccessCopy } from "../../publishing/publishing-presentation";
 import { parseDraftRef } from "../../publishing/publishing-routes";
+import { RepostAlreadyNotice } from "../../repost/components/RepostAlreadyNotice";
+import { RepostEmbeddedCard } from "../../repost/components/RepostEmbeddedCard";
+import {
+  isRepostComposer,
+  REPOST_COMPOSER_COPY,
+  sameRepostIdentity,
+  shouldShowAlreadyReposted,
+  shouldShowRepostPublication,
+  isSignificantRepostBody,
+  repostIdentityAccessibilityLabel,
+} from "../../repost/repost-composer-presentation";
+import { embeddedReferenceModel, simpleRepostFailureCopy } from "../../repost/repost-presentation";
+import type { SimpleRepostFailure } from "../../repost/repost-types";
+import { useOpenReference } from "../../repost/use-open-reference";
 import {
   canPublish,
   composerCtaLabel,
@@ -82,6 +111,7 @@ import {
   contentOriginForComposer,
   parseComposerCreateParams,
   parseComposerEditParams,
+  parseComposerReference,
 } from "../composer-routes";
 import { composerStatus, exitDecision, type ExitDecision } from "../composer-status";
 import { usePostComposer, usePostComposerSource, type ComposerPublishedResult } from "../use-post-composer";
@@ -170,6 +200,8 @@ export function PostComposerScreen({ kind, search }: PostComposerScreenProps) {
       : null,
     identityHint: createParams.identityId,
     origin: createParams.origin,
+    // HOM-10 §14: «Condividi → Repost» apre questo stesso composer sull'originale.
+    reference: kind === "create" ? parseComposerReference(search) : null,
     userId: isBrokenEdit ? "" : userId,
   });
 
@@ -345,9 +377,30 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
     showToast({ message: COMPOSER_UPDATED_TOAST, tone: "success" });
   }
 
+  /** HOM-10 §70–§71, §245, §249: chiude e torna all'origine subito; un toast leggero, nessuna schermata di successo. */
+  function handleSimpleReposted() {
+    if (mountedRef.current) {
+      leave();
+    }
+    showToast({ icon: "checkmark-circle", iconTone: "success", message: REPOST_COMPOSER_COPY.simpleSuccess });
+  }
+
+  /** HOM-10 §72, §229: lo stato è già tornato indietro; l'utente sa perché. */
+  function handleSimpleRepostFailed(failure: SimpleRepostFailure) {
+    showToast({ message: simpleRepostFailureCopy(failure) });
+  }
+
+  /** HOM-10 §130. */
+  function handleRepostRemoved() {
+    showToast({ icon: "checkmark-circle", iconTone: "success", message: REPOST_COMPOSER_COPY.removed });
+  }
+
   const composer = usePostComposer({
     initialState,
     onPublished: handlePublished,
+    onRepostRemoved: handleRepostRemoved,
+    onSimpleReposted: handleSimpleReposted,
+    onSimpleRepostFailed: handleSimpleRepostFailed,
     onUpdated: handleUpdated,
     profileId,
     userId,
@@ -357,12 +410,25 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
   const isEdit = state.mode.kind === "edit";
   const isScheduledEdit = isEditingScheduled(state);
   const isPublishing = state.publish.status === "publishing";
-  const ctaState: ComposerHeaderCtaState = isPublishing ? "loading" : canPublish(state) ? "enabled" : "disabled";
+  const isRepost = isRepostComposer(state);
+  // HOM-10: con «Rimuovi repost» in volo «Reposta» è chiuso (due richieste senza ordine, §128–§131).
+  const ctaState: ComposerHeaderCtaState = isPublishing
+    ? "loading"
+    : canPublish(state) && !composer.removingRepost
+      ? "enabled"
+      : "disabled";
   const status = composerStatus(state, composer.notice);
   const summary = tagSummary(state.tagged);
-  const showPreview = shouldShowRichPreview(state);
+  // §97: nel Repost un URL resta testo, senza una seconda card accanto all'originale.
+  const showPreview = !isRepost && shouldShowRichPreview(state);
   // §84–§85: la riga Pubblicazione esiste solo con `can_schedule_content`; mai nella Modifica di un pubblicato (§83).
-  const showPublication = !isEdit && state.identity?.canSchedule === true;
+  // HOM-10 §144–§145, §341–§342: nel Repost solo con del testo, mai per un Simple Repost vuoto.
+  const showPublication = isRepost
+    ? shouldShowRepostPublication(state)
+    : !isEdit && state.identity?.canSchedule === true;
+  const reference = state.reference ? embeddedReferenceModel(state.reference) : null;
+  const openReference = useOpenReference("composer", contentOriginForComposer(state.origin));
+  const bodyInputRef = useRef<TextInput>(null);
   // Una bozza (nuova, riaperta o fallita) ha l'uscita a tre azioni (§133–§136); un programmato e un Post pubblicato no.
   const usesDraftExit = !isEdit && !isScheduledEdit;
   const publicationNote =
@@ -464,16 +530,23 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
         onSubmit={() => {
           void actions.submit();
         }}
-        title={isEdit || isScheduledEdit ? "Modifica post" : "Nuovo post"}
+        title={isRepost ? REPOST_COMPOSER_COPY.title : isEdit || isScheduledEdit ? "Modifica post" : "Nuovo post"}
       />
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         {state.identity ? (
           <ComposerIdentityRow
-            accessibilityLabel={identityAccessibilityLabel(state.identity)}
+            accessibilityLabel={
+              isRepost ? repostIdentityAccessibilityLabel(state.identity) : identityAccessibilityLabel(state.identity)
+            }
             identity={state.identity}
             onPress={() => setPublishAsOpen(true)}
             selectable={hasIdentityChoice(state) && !isPublishing}
+            showContext={isRepost}
+            // §38–§39: l'identità che ha perso il permesso resta (il testo non si tocca) ma non finge di essere valida.
+            unauthorized={
+              isRepost && !state.identities.some((candidate) => sameRepostIdentity(candidate, state.identity))
+            }
           />
         ) : null}
 
@@ -485,26 +558,38 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
           style={styles.flex}
         >
           <ComposerBodyInput
-            autoFocus={!isEdit}
+            // §20, §298: il Repost si apre a tastiera chiusa, così «Reposta» è a un tap (fast path §21).
+            autoFocus={!isEdit && !isRepost}
             editable={!isPublishing && state.canEdit}
+            inputRef={bodyInputRef}
             maxLength={state.limits.maxBodyLength}
             onChangeText={actions.setBody}
             onSelectionChange={actions.setSelection}
+            placeholder={isRepost ? REPOST_COMPOSER_COPY.placeholder : undefined}
             value={state.body}
           />
 
-          <ComposerMediaGrid
-            getAccessibilityLabel={mediaAccessibilityLabel}
-            items={state.media}
-            onDragActiveChange={handleDragActiveChange}
-            onMove={handleMove}
-            onOpen={setPreviewId}
-            onRemove={actions.removeMedia}
-            onRetry={actions.retryMedia}
-            readOnly={isEdit || isPublishing}
-            showReadOnlyNote={isEdit}
-            showReorderHint={composer.showReorderHint}
-          />
+          {isRepost && !isSignificantRepostBody(state.body, state.mentions) && !shouldShowAlreadyReposted(state) ? (
+            // §24–§25: una sola riga discreta; «Facoltativo» e spiegazioni doppie non esistono.
+            <AppText color="muted" style={styles.microcopy} variant="feedMeta">
+              {REPOST_COMPOSER_COPY.microcopy}
+            </AppText>
+          ) : null}
+
+          {isRepost ? null : (
+            <ComposerMediaGrid
+              getAccessibilityLabel={mediaAccessibilityLabel}
+              items={state.media}
+              onDragActiveChange={handleDragActiveChange}
+              onMove={handleMove}
+              onOpen={setPreviewId}
+              onRemove={actions.removeMedia}
+              onRetry={actions.retryMedia}
+              readOnly={isEdit || isPublishing}
+              showReadOnlyNote={isEdit}
+              showReorderHint={composer.showReorderHint}
+            />
+          )}
 
           {showPreview ? (
             <ComposerLinkPreviewCard
@@ -520,6 +605,30 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
               highlightedNames={state.tagged.slice(0, 2).map((identity) => identity.displayName)}
               onPress={actions.openTagSheet}
               text={summary}
+            />
+          ) : null}
+
+          {reference && state.reference ? (
+            // §45–§48, §160–§162: l'originale, in sola lettura — né X né sostituzione né azioni. Il tap lo apre
+            // sopra il composer, che resta com'è (§49); l'originale sparito non è tappabile (§177).
+            <View style={styles.reference}>
+              <RepostEmbeddedCard
+                model={reference}
+                onPress={
+                  reference.kind === "available"
+                    ? () => openReference({ contentId: reference.contentId, contentType: reference.contentType })
+                    : undefined
+                }
+              />
+            </View>
+          ) : null}
+
+          {shouldShowAlreadyReposted(state) ? (
+            <RepostAlreadyNotice
+              busy={composer.removingRepost || isPublishing}
+              onRemove={() => {
+                void actions.removeSimpleRepost();
+              }}
             />
           ) : null}
         </ScrollView>
@@ -544,7 +653,7 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
           />
         ) : null}
 
-        {usesDraftExit && composer.autosave.status !== "idle" ? (
+        {usesDraftExit && composer.autosave.status !== "idle" && !(isRepost && !isSignificantRepostBody(state.body, state.mentions)) ? (
           <View style={styles.autosaveRow}>
             <AutosaveStatus status={composer.autosave} />
           </View>
@@ -556,12 +665,28 @@ function PostComposerForm({ initialState, userId, profileId, onClose }: PostComp
             void actions.addMedia();
           }}
           onPressTag={actions.openTagSheet}
+          repost={
+            isRepost
+              ? {
+                  disabled: isPublishing,
+                  onPressLink: () => {
+                    actions.insertToken("https://");
+                    bodyInputRef.current?.focus();
+                  },
+                  onPressMention: () => {
+                    actions.insertToken("@");
+                    bodyInputRef.current?.focus();
+                  },
+                }
+              : undefined
+          }
           showMedia={!isEdit}
           tagDisabled={isPublishing}
         />
       </KeyboardAvoidingView>
 
       <PublishAsSheet
+        title={isRepost ? REPOST_COMPOSER_COPY.identitySheetTitle : undefined}
         identities={state.identities}
         onClose={() => setPublishAsOpen(false)}
         onSelect={(identity) => {
@@ -659,6 +784,14 @@ const styles = StyleSheet.create({
   messageActions: {
     alignSelf: "stretch",
     gap: spacing[12],
+  },
+  microcopy: {
+    paddingHorizontal: spacing[16],
+    paddingBottom: spacing[8],
+  },
+  reference: {
+    paddingHorizontal: spacing[16],
+    paddingTop: spacing[8],
   },
   root: {
     backgroundColor: colors.surface,

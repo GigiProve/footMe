@@ -108,7 +108,9 @@ export type UnschedulableReason =
   | "media_not_ready"
   | "rights"
   | "source"
-  | "capability";
+  | "capability"
+  // HOM-10 §153–§155: l'originale incorporato non è più disponibile o ripostabile.
+  | "reference";
 
 export type WireDraftListItem = {
   content_type: FeedContentType;
@@ -231,6 +233,10 @@ export const PUBLISHING_ERROR_CODES = [
   "post_invalid_mention",
   "post_invalid_tag",
   "post_invalid_link",
+  // HOM-10 §153–§155, §231: l'originale incorporato non esiste più, non è leggibile o non è ripostabile.
+  "repost_reference_unavailable",
+  // HOM-10 §47, §160: tentativo di cambiare la reference dopo il primo salvataggio (il client non lo offre mai).
+  "repost_reference_immutable",
 ] as const;
 
 export type PublishingErrorCode = (typeof PUBLISHING_ERROR_CODES)[number];

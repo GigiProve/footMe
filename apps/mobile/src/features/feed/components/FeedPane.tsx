@@ -35,6 +35,7 @@ import { trackFeed } from "../feed-analytics";
 import type { CachedFeed } from "../feed-cache";
 import { FEED_QK } from "../feed-keys";
 import { fetchHomeFollowingState } from "../feed-meta-service";
+import { useOpenReference } from "../../repost/use-open-reference";
 import { buildShareTarget } from "../../share/share-presentation";
 import { useContentShare } from "../../share/use-content-share";
 import {
@@ -124,6 +125,8 @@ export function FeedPane({
   const videoController = useFeedVideoController();
   const mediaProcessing = useFeedMediaProcessing({ enabled: isActive, profileId });
   const share = useContentShare(originForScope(scope));
+  // HOM-10 §111, §248: la card dell'originale incorporato apre l'originale con la provenienza della tab.
+  const openReference = useOpenReference("feed", originForScope(scope));
 
   const cachedScope = cache?.scopes[scope];
   const seen = useFeedSessionSeen({
@@ -235,6 +238,7 @@ export function FeedPane({
       });
     },
     onToggleLike: toggleLike,
+    onOpenReference: openReference,
     // HOM-07 §24: il numero della cella Mi piace apre la lista.
     onOpenLikes: (item: FeedInteractiveItem) =>
       openLikes({

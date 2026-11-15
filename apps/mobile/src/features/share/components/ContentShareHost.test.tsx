@@ -19,7 +19,9 @@ import { ContentShareHost } from "./ContentShareHost";
 
 const mocks = vi.hoisted(() => ({
   fetchInboxConversations: vi.fn(),
+  fetchRepostState: vi.fn(),
   fetchShareRecipients: vi.fn(),
+  push: vi.fn(),
   recordContentShareEvent: vi.fn(),
   sendContentShare: vi.fn(),
   setStringAsync: vi.fn(),
@@ -27,8 +29,19 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("expo-clipboard", () => ({ setStringAsync: mocks.setStringAsync }));
 
+vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
+
 vi.mock("../../auth/use-session", () => ({
   useSession: () => ({ profile: { id: "me" } }),
+}));
+
+// HOM-10: il pannello legge lo stato Repost e l'identità Home; i moduli reali importano il client Supabase.
+vi.mock("../../repost/repost-service", () => ({
+  fetchRepostState: mocks.fetchRepostState,
+}));
+
+vi.mock("../../interactions/use-interaction-identity", () => ({
+  useInteractionIdentity: () => ({ identity: { id: "me", type: "person" }, isLoading: false }),
 }));
 
 // Il modulo reale importa il client Supabase, che non si carica nell'ambiente di test.
@@ -194,8 +207,32 @@ async function press(tree: TestRenderer.ReactTestRenderer, testID: string) {
   });
 }
 
+/** Lo stato di `fetch_repost_state` già mappato: ripostabile, con l'identità Home che può farlo. */
+function repostState(overrides: { repostable?: boolean; hasSimpleRepost?: boolean; canRepost?: boolean } = {}) {
+  return {
+    identities: [
+      {
+        avatarUrl: null,
+        canPublishPost: true,
+        canRepost: overrides.canRepost ?? true,
+        canSchedule: true,
+        contextLabel: "Profilo personale",
+        hasSimpleRepost: overrides.hasSimpleRepost ?? false,
+        id: "me",
+        isVerified: false,
+        name: "Marco Bianchi",
+        type: "person",
+      },
+    ],
+    preview: null,
+    repostable: overrides.repostable ?? true,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // Di default il contenuto non è ripostabile: il pannello è quello di HOM-09.
+  mocks.fetchRepostState.mockResolvedValue({ identities: [], preview: null, repostable: false });
   mocks.fetchInboxConversations.mockResolvedValue([conversation()]);
   mocks.fetchShareRecipients.mockResolvedValue({ items: [], nextCursor: null });
   mocks.recordContentShareEvent.mockResolvedValue(undefined);
@@ -289,6 +326,88 @@ describe("ContentShareHost — pannello (§10–§12, §22, §34)", () => {
     expect(countTestId(tree, "share-recent-conv:c1")).toBe(1);
     expect(countTestId(tree, "share-recent-conv:g9")).toBe(0);
     expect(countTestId(tree, "share-recent-conv:b9")).toBe(0);
+  });
+});
+
+describe("ContentShareHost — Repost (HOM-10 §2–§5, §120–§123, §273–§274)", () => {
+  it("contenuto non ripostabile: nessuna riga Repost, il pannello è quello di HOM-09 (§296)", async () => {
+    const { tree } = await mount();
+
+    expect(countTestId(tree, "share-repost")).toBe(0);
+    expect(textOf(tree)).toContain("Invia su PROLINK");
+  });
+
+  it("nessuna identità con can_repost: nessuna riga (un tap non porterebbe a nulla)", async () => {
+    mocks.fetchRepostState.mockResolvedValue(repostState({ canRepost: false }));
+    const { tree } = await mount();
+
+    expect(countTestId(tree, "share-repost")).toBe(0);
+  });
+
+  it("«Repost» è la prima azione, sopra «Invia su PROLINK», con il sottotitolo del §2", async () => {
+    mocks.fetchRepostState.mockResolvedValue(repostState());
+    const { tree } = await mount();
+    const json = textOf(tree);
+
+    expect(countTestId(tree, "share-repost")).toBe(1);
+    expect(json).toContain("Condividi questo contenuto con la tua rete");
+    expect(json.indexOf("Repost")).toBeGreaterThan(-1);
+    expect(json.indexOf("Repost")).toBeLessThan(json.indexOf("Invia su PROLINK"));
+    expect(hostByTestId(tree, "share-repost")[0].props.accessibilityLabel).toBe(
+      "Repost, condividi pubblicamente questo contenuto con la tua rete",
+    );
+    expect(countTestId(tree, "share-repost-active")).toBe(0);
+    // §4: nessuna seconda funzione Repost.
+    expect(json).not.toContain("con un pensiero");
+    expect(json).not.toContain("Condividi nel Feed");
+  });
+
+  it("già ripostato dall'identità Home: «Repost ✓» + «Hai già ripostato questo contenuto», ancora premibile (§122–§123)", async () => {
+    mocks.fetchRepostState.mockResolvedValue(repostState({ hasSimpleRepost: true }));
+    const { tree } = await mount();
+
+    expect(textOf(tree)).toContain("Hai già ripostato questo contenuto");
+    expect(countTestId(tree, "share-repost-active")).toBe(1);
+    expect(hostByTestId(tree, "share-repost")[0].props.accessibilityLabel).toBe(
+      "Repost. Hai già ripostato questo contenuto",
+    );
+    expect(hostByTestId(tree, "share-repost")[0].props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  it("il tap chiude il pannello e, a pannello chiuso, apre il composer Repost con reference e origin (§14, §243)", async () => {
+    mocks.fetchRepostState.mockResolvedValue(repostState());
+    const { onClosed, tree } = await mount();
+
+    await press(tree, "share-repost");
+
+    // Nessuna navigazione finché il Modal non si è chiuso.
+    expect(sheetVisible(tree)).toBe(false);
+    expect(mocks.push).not.toHaveBeenCalled();
+
+    dismiss(tree, 0);
+
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    const href = mocks.push.mock.calls[0][0] as string;
+    expect(href).toContain("/post-compose?");
+    expect(href).toContain("mode=repost");
+    expect(href).toContain("refType=club_media");
+    expect(href).toContain(`refId=${CONTENT_ID}`);
+    expect(href).toContain("origin=HOME_PER_TE");
+    expect(href).toContain("identity=me");
+    expect(onClosed).toHaveBeenCalled();
+    // Il Repost non invia, non copia, non conta come condivisione.
+    expect(mocks.sendContentShare).not.toHaveBeenCalled();
+    expect(mocks.recordContentShareEvent).not.toHaveBeenCalled();
+  });
+
+  it("con il Repost già attivo il tap apre comunque il composer (§123)", async () => {
+    mocks.fetchRepostState.mockResolvedValue(repostState({ hasSimpleRepost: true }));
+    const { tree } = await mount();
+
+    await press(tree, "share-repost");
+    dismiss(tree, 0);
+
+    expect(mocks.push).toHaveBeenCalledTimes(1);
   });
 });
 

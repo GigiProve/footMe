@@ -12,8 +12,16 @@
  * lì SOLO il tipo `ComposerState`.
  */
 
+import type { FeedContentType } from "../feed/feed-types";
 import { primaryCtaLabel, publishingErrorCopy, toWirePublication } from "../publishing/publishing-presentation";
 import type { Publication } from "../publishing/publishing-types";
+import {
+  canSubmitRepost,
+  isRepostComposer,
+  isSignificantRepostBody,
+  referencePayload,
+  repostCtaLabel,
+} from "../repost/repost-composer-presentation";
 import type {
   ComposerIdentity,
   ComposerLimits,
@@ -381,6 +389,12 @@ export function canPublish(state: ComposerState): boolean {
     return false;
   }
 
+  // HOM-10 §61–§64, §126–§127: nel composer Repost il body vuoto è un Simple Repost, non un Post vuoto.
+  if (isRepostComposer(state)) {
+    // Un programmato riaperto si salva solo se è cambiato qualcosa (§167), come per il Post normale.
+    return canSubmitRepost(state) && (!isEditingScheduled(state) || isDirty(state));
+  }
+
   if (publishBlockReason(state, state.limits) !== null) {
     return false;
   }
@@ -530,6 +544,12 @@ export function isDirty(state: ComposerState): boolean {
   // HOM-06.2 §167: un programmato è «modificato» se contenuto o data differiscono da quando l'hai aperto.
   if (isEditingScheduled(state)) {
     return state.draft.baselineKey !== contentKey(state);
+  }
+
+  // HOM-10 §137, §142: nel Repost «c'è lavoro da non perdere» solo con testo significativo (§62, token soli esclusi):
+  // un body che la UI tratta da vuoto chiude senza dialog, e la bozza eventuale la toglie `discard`.
+  if (isRepostComposer(state)) {
+    return isSignificantRepostBody(state.body, state.mentions);
   }
 
   if (state.mode.kind === "create" || !state.baseline) {
@@ -937,6 +957,8 @@ export function toDraftContent(state: ComposerState): {
   tagged: WireTaggedIdentity[];
   media: WirePublishMedia[];
   link: WirePublishLink | null;
+  /** HOM-10 §88, §139: solo nel composer Repost; assente per un Post normale (nessuna chiave in più). */
+  reference?: { content_type: FeedContentType; content_id: string };
 } {
   // Solo la coda: togliere spazi iniziali sposterebbe gli offset delle mention.
   const body = state.body.trimEnd();
@@ -946,6 +968,7 @@ export function toDraftContent(state: ComposerState): {
     link: toWireLink({ ...state, body }),
     media: toWireMedia(state.media),
     mentions: toWireMentions(state.mentions, body.length),
+    ...(isRepostComposer(state) && state.reference ? { reference: referencePayload(state.reference) } : {}),
     tagged: toWireTagged(state.tagged),
   };
 }
@@ -977,6 +1000,11 @@ export function submitPublication(state: ComposerState): Publication | "keep" {
 export function composerCtaLabel(state: ComposerState): string {
   if (state.mode.kind === "edit") {
     return "Salva";
+  }
+
+  // HOM-10 §15, §127, §146–§148: Reposta · Programma · Già ripostato.
+  if (isRepostComposer(state)) {
+    return repostCtaLabel(state);
   }
 
   return primaryCtaLabel(state.identity?.canSchedule ? state.publication : { mode: "now" }, {

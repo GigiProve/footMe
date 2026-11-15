@@ -34,6 +34,7 @@ import { useToast } from "../../ui";
 import { useSession } from "../auth/use-session";
 import { MESSAGING_QK } from "../messaging/messaging-keys";
 import { fetchInboxConversations } from "../messaging/messaging-service";
+import { trackRepost } from "../repost/repost-analytics";
 import { trackShare } from "./share-analytics";
 import {
   composeStatusOf,
@@ -171,6 +172,20 @@ export function useShareFlow(input: {
   const openMore = () => {
     trackShare({ name: "share_more_open" });
     afterModalClosed(() => showFull("pick"));
+  };
+
+  /**
+   * HOM-10 §14, §123, §243: «Repost» chiude il pannello e passa il controllo al composer, che è una
+   * route a schermo intero sopra l'origine (stesso handoff sheet → modale delle altre azioni: si
+   * naviga a pannello chiuso). Il flusso si chiude: al ritorno l'origine è com'era (§248) e il
+   * pannello si può riaprire, con `Repost ✓` già aggiornato dalla cache.
+   */
+  const openRepost = (alreadyReposted: boolean, navigate: () => void) => {
+    trackRepost({ alreadyReposted, name: "repost_entry_selected", ...surface });
+    afterModalClosed(() => {
+      navigate();
+      closeAll();
+    });
   };
 
   const copyLink = async () => {
@@ -442,6 +457,7 @@ export function useShareFlow(input: {
     fullScreen,
     goToCompose,
     openMore,
+    openRepost,
     profileId,
     recents,
     recentsLoading: inbox.isLoading,

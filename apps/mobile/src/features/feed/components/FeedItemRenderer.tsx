@@ -14,6 +14,7 @@
 
 import type { ContentManagement } from "../content-management-types";
 import type {
+  FeedContentType,
   FeedEditorialItem,
   FeedItem,
   FeedPostItem,
@@ -78,6 +79,8 @@ export type FeedItemHandlers = {
   onShare: (item: FeedInteractiveItem) => void;
   /** HOM-04: azioni di gestione per il menu •••, dalle capability dell'elemento. */
   getManagement?: (item: FeedInteractiveItem) => ContentManagement | undefined;
+  /** HOM-10 §111: il tap sulla card dell'originale incorporato in un Post lo apre. */
+  onOpenReference?: (reference: { contentType: FeedContentType; contentId: string }) => void;
 };
 
 type FeedItemRendererProps = {
@@ -101,6 +104,7 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
           onOpenMedia={(index) => handlers.onOpenMedia(item, index)}
           onOpenIdentity={(target) => handlers.onOpenIdentity(item, target)}
           onOpenLink={() => handlers.onOpenLink(item)}
+          onOpenReference={handlers.onOpenReference}
           onComment={() => handlers.onComment(item)}
           onShare={() => handlers.onShare(item)}
         />

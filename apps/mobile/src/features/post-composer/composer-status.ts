@@ -11,6 +11,11 @@
  * Niente di tutto ciò cancella contenuto (§170).
  */
 
+import {
+  isRepostComposer,
+  referencedPostErrorCopy,
+  repostBlockReason,
+} from "../repost/repost-composer-presentation";
 import { errorCopy, publishBlockReason } from "./composer-presentation";
 import type { ComposerState } from "./composer-reducer";
 
@@ -43,14 +48,19 @@ export function composerStatus(state: ComposerState, notice: string | null): Com
     return { message: mode === "edit" ? COMPOSER_SAVING_COPY : COMPOSER_PUBLISHING_COPY, tone: "progress" };
   }
 
-  const blocked = publishBlockReason(state, state.limits);
+  // HOM-10 §38–§39, §229–§232, §288: il composer Repost ha le sue frasi; il testo resta sempre intatto.
+  const repost = isRepostComposer(state);
+  const blocked = repost ? repostBlockReason(state) : publishBlockReason(state, state.limits);
 
   if (blocked) {
     return { message: blocked, tone: "error" };
   }
 
   if (state.publish.status === "failed") {
-    return { message: errorCopy(state.publish.code, mode), tone: "error" };
+    return {
+      message: repost ? referencedPostErrorCopy(state.publish.code) : errorCopy(state.publish.code, mode),
+      tone: "error",
+    };
   }
 
   return notice ? { message: notice, tone: "notice" } : null;

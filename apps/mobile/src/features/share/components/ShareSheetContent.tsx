@@ -9,6 +9,9 @@
  *
  * Copia link e share esterno non dipendono dai Recenti (§81): sono sempre
  * attivi, anche mentre i Recenti caricano o sono vuoti (§79).
+ *
+ * HOM-10 §2–§5: sopra «Invia su PROLINK», se il contenuto è ripostabile, la riga
+ * «Repost» (distribuzione pubblica) — stesso pannello, nessun secondo share sheet.
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
@@ -16,6 +19,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, sizes, spacing } from "../../../theme/tokens";
 import { AppText, Divider } from "../../../ui";
+import { RepostShareRow } from "../../repost/components/RepostShareRow";
+import type { ShareRepostRow } from "../../repost/repost-presentation";
 import { SHARE_COPY } from "../share-presentation";
 import type { SharePreview, ShareRecipient } from "../share-types";
 import { SharePreviewCard } from "./SharePreviewCard";
@@ -29,6 +34,12 @@ type ShareSheetContentProps = {
   onExternalShare: () => void;
   onMore: () => void;
   onSelectRecent: (recipient: ShareRecipient, position: number) => void;
+  /**
+   * HOM-10 §2–§5: «Repost» è la prima azione, quella pubblica, sopra «Invia su
+   * PROLINK». Assente = il contenuto non è ripostabile da questo viewer (§296): il
+   * pannello è quello di HOM-09 identico.
+   */
+  repost?: { row: ShareRepostRow; onPress: () => void };
 };
 
 function ActionRow({
@@ -64,11 +75,19 @@ export function ShareSheetContent({
   onExternalShare,
   onMore,
   onSelectRecent,
+  repost,
 }: ShareSheetContentProps) {
   return (
     <View style={styles.container} testID="share-sheet">
       <SharePreviewCard maxLines={1} preview={preview} />
       <Divider />
+
+      {repost ? (
+        <>
+          <RepostShareRow onPress={repost.onPress} row={repost.row} />
+          <Divider />
+        </>
+      ) : null}
 
       <View style={styles.section}>
         <AppText accessibilityRole="header" variant="titleSm">

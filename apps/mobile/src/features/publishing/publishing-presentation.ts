@@ -357,7 +357,13 @@ export function editedAgoLabel(iso: string, now: Date = new Date()): string {
 }
 
 /** §191, §194: stato di un elemento della tab Programmati. */
-export function scheduledStatusLabel(item: Pick<DraftListItem, "status">): string {
+export function scheduledStatusLabel(
+  item: Pick<DraftListItem, "status"> & Partial<Pick<DraftListItem, "failureCode">>,
+): string {
+  // HOM-10 §155, §345: il job non ha pubblicato perché l'originale incorporato non c'è più.
+  if (item.status === "failed" && item.failureCode === "reference_unavailable") {
+    return "Il contenuto originale non è più disponibile.";
+  }
   if (item.status === "failed") return "Pubblicazione non riuscita";
   if (item.status === "publishing") return "Pubblicazione in corso";
   return "Programmato";
@@ -377,6 +383,8 @@ export function unschedulableCopy(reason: UnschedulableReason | null): string {
       return "Completa la fonte originale per programmarlo.";
     case "capability":
       return "Non è stato possibile programmare questo contenuto con l'identità selezionata.";
+    case "reference":
+      return "Il contenuto originale non è più disponibile."; // HOM-10 §155
     default:
       return "Questo contenuto non può ancora essere programmato.";
   }
@@ -633,6 +641,10 @@ export function publishingErrorCopy(kind: PublishingErrorKind, format: ContentFo
       return "Uno dei tag non è più valido. Controlla e riprova.";
     case "post_invalid_link":
       return "Il link non è valido.";
+    case "repost_reference_unavailable":
+      return "Il contenuto originale non è più disponibile."; // HOM-10 §229
+    case "repost_reference_immutable":
+      return "Non è stato possibile completare l'operazione. Riprova.";
     case "network":
       return "Connessione assente. Riprova quando sei online.";
     default:

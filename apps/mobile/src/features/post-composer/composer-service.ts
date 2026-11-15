@@ -20,6 +20,7 @@ import { supabase } from "../../lib/supabase";
 import { formatTargetRoleLabel, searchTagTargets, type TagSearchResult } from "../content/content-tag-service";
 import { fromWirePublication, fetchContentForEditor, mapSchedulePolicy, PublishingRequestError } from "../publishing/publishing-service";
 import type { ContentRef, SchedulePolicy } from "../publishing/publishing-types";
+import { composerReferenceFromWire } from "../repost/repost-presentation";
 import { normalizeUrl } from "./composer-presentation";
 import {
   COMPOSER_ERROR_CODES,
@@ -143,6 +144,9 @@ export function mapDraftForEditor(wire: WireDraftPostEditor, now: Date = new Dat
   const publication =
     saved.mode === "scheduled" && new Date(saved.scheduledAt).getTime() <= now.getTime() ? ({ mode: "now" } as const) : saved;
 
+  // HOM-10 §139–§141: la bozza porta la reference; assente = Post normale (nessuna chiave in più).
+  const reference = composerReferenceFromWire(post.reference);
+
   return {
     body: post.body,
     canEdit: wire.capabilities.can_edit,
@@ -151,6 +155,7 @@ export function mapDraftForEditor(wire: WireDraftPostEditor, now: Date = new Dat
     identity: { ...mapComposerIdentity(wire.identity), canSchedule: wire.capabilities.can_schedule },
     link,
     media,
+    ...(reference ? { reference } : {}),
     mentions: post.mentions.map((mention) => ({
       displayName: mention.display_name,
       end: mention.end,
@@ -212,6 +217,9 @@ export function mapPostForEdit(wire: WirePostForEdit): ComposerPostForEdit {
       width: item.width,
     }));
 
+  // HOM-10 §161–§162: l'originale incorporato si mostra in sola lettura; assente = nessuna chiave.
+  const reference = composerReferenceFromWire(wire.reference);
+
   return {
     author: mapComposerIdentity(wire.author),
     body: wire.body,
@@ -220,6 +228,7 @@ export function mapPostForEdit(wire: WirePostForEdit): ComposerPostForEdit {
     contentType: wire.content_type,
     link,
     media,
+    ...(reference ? { reference } : {}),
     mentions: wire.mentions.map((mention) => ({
       displayName: mention.display_name,
       end: mention.end,

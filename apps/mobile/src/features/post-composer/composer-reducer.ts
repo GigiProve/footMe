@@ -36,6 +36,7 @@ import type {
   ComposerDraftForEditor,
   ComposerDraftInfo,
   ComposerIdentity,
+  ComposerIdentityType,
   ComposerLimits,
   ComposerLinkPreviewState,
   ComposerMediaItem,
@@ -45,6 +46,7 @@ import type {
   ComposerOrigin,
   ComposerPostForEdit,
   ComposerPublishStatus,
+  ComposerReference,
   ComposerRecoverySnapshot,
   ComposerSubmitErrorKind,
   ComposerTaggedIdentity,
@@ -83,6 +85,13 @@ export type ComposerState = {
   publish: ComposerPublishStatus;
   /** Solo Modifica: cosa c'era all'apertura, per Salva (§158) e Annulla (§138). */
   baseline: ComposerBaseline | null;
+  /**
+   * HOM-10 §16, §45–§47: l'originale incorporato. In creazione/bozza il composer è in
+   * modalità Repost (stesso editor, §16) e la reference è immutabile per tutta la
+   * sessione; in Modifica è la reference del Post, in sola lettura (§160–§162). Non
+   * conta come contenuto: da sola non rende `isEmpty` falso né pubblicabile un Post.
+   */
+  reference: ComposerReference | null;
 };
 
 /** I campi che l'upload può aggiornare su un item. */
@@ -101,6 +110,16 @@ export type ComposerAction =
    * (HOM-06.2: `canSchedule`).
    */
   | { type: "contextRefreshed"; identities: ComposerIdentity[]; limits: ComposerLimits; schedule?: SchedulePolicy }
+  /**
+   * HOM-10 §37, §155, §231: rivalidazione dell'originale (disponibilità e card). Mai
+   * un'altra reference: quella della sessione non si sostituisce (§47, §160).
+   */
+  | { type: "referenceRefreshed"; reference: ComposerReference }
+  /**
+   * HOM-10 §120, §128–§130, §237: l'identità ha (o non ha più) un Simple Repost
+   * attivo. Cambia solo il flag: testo, mention e identità selezionata restano.
+   */
+  | { type: "simpleRepostChanged"; identityType: ComposerIdentityType; identityId: string; value: boolean }
   /** HOM-06.2 §86–§91: la scelta del foglio «Quando vuoi pubblicare?». */
   | { type: "publicationChanged"; publication: Publication }
   | { type: "bodyChanged"; body: string }
@@ -157,6 +176,8 @@ export function createComposerState(input: {
   /** HOM-06.2: assenti nei chiamanti di HOM-06.1 → default prudenti. */
   schedule?: SchedulePolicy;
   draftOperationKey?: string;
+  /** HOM-10 §16: apre il composer in modalità Repost sull'originale indicato. */
+  reference?: ComposerReference | null;
 }): ComposerState {
   return {
     baseline: null,
@@ -175,6 +196,7 @@ export function createComposerState(input: {
     origin: input.origin,
     publication: { mode: "now" },
     publish: { status: "idle" },
+    reference: input.reference ?? null,
     schedule: input.schedule ?? DEFAULT_SCHEDULE_POLICY,
     tagged: [],
   };
@@ -232,6 +254,8 @@ export function createDraftState(input: {
     // Un programmato conserva la propria data anche se l'identity ha perso la capability (§190): non si riscrive da sola.
     publication: scheduled || identity.canSchedule ? draft.publication : { mode: "now" },
     publish: { status: "idle" },
+    // HOM-10 §139–§141: la bozza porta la reference; riaprirla è di nuovo un Repost.
+    reference: draft.reference ?? null,
     schedule: input.schedule,
     tagged: draft.tagged,
   };
@@ -285,6 +309,8 @@ export function createEditState(input: {
     origin: input.origin ?? "CONTENT_DETAIL",
     publication: { mode: "now" },
     publish: { status: "idle" },
+    // HOM-10 §161–§162: la reference si mostra, non si tocca (e non parte in `update_post`).
+    reference: edit.reference ?? null,
     schedule: DEFAULT_SCHEDULE_POLICY,
     tagged: edit.tagged,
   };
@@ -407,6 +433,34 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
         limits: action.limits,
         publication: keepsPublication ? state.publication : { mode: "now" },
         schedule,
+      };
+    }
+
+    case "referenceRefreshed": {
+      const { reference } = state;
+
+      // §47, §160: solo la STESSA reference si aggiorna (disponibilità, card).
+      if (
+        !reference ||
+        reference.contentType !== action.reference.contentType ||
+        reference.contentId !== action.reference.contentId
+      ) {
+        return state;
+      }
+
+      return { ...state, reference: action.reference };
+    }
+
+    case "simpleRepostChanged": {
+      const apply = (identity: ComposerIdentity): ComposerIdentity =>
+        identity.type === action.identityType && identity.id === action.identityId
+          ? { ...identity, hasSimpleRepost: action.value }
+          : identity;
+
+      return {
+        ...state,
+        identities: state.identities.map(apply),
+        identity: state.identity ? apply(state.identity) : state.identity,
       };
     }
 

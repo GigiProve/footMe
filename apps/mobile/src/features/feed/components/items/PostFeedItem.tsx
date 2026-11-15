@@ -14,6 +14,11 @@
  * HOM-03: il Video social è questo stesso componente (§2–3). Un Post con un solo
  * video lo riproduce inline nella media collection; nessun `VideoPost`.
  *
+ * HOM-10 §86–§88, §100–§114: un Post con testo può incorporare un altro contenuto.
+ * L'originale è una card compatta sotto il testo e il link (`RepostEmbeddedCard`),
+ * senza azioni proprie: la action row è di questo Post (§101, §110). Un Simple
+ * Repost non è un Post: la sua riga sta in `FeedItemHeader`.
+ *
  * Il tap su avatar e nome apre l'autore e basta (§7): il corpo apre il
  * contenuto, le mention aprono la loro identità senza risalire al corpo. Tutti
  * gli effetti — Like, apertura media/identità/link, commenti, condivisione —
@@ -21,10 +26,12 @@
  * (HOM-07/08/09). Il componente traccia solo ciò che nasce al suo interno.
  */
 
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { spacing } from "../../../../theme/tokens";
 import { AppText } from "../../../../ui";
+import { RepostEmbeddedCard } from "../../../repost/components/RepostEmbeddedCard";
+import { embeddedModelFromFeed } from "../../../repost/repost-presentation";
 import {
   buildAuthorAccessibilityLabel,
   buildAuthorMetaLine,
@@ -33,7 +40,7 @@ import {
 } from "../../feed-post-presentation";
 import type { ContentManagement } from "../../content-management-types";
 import { FEED_POST_OPEN_AUTHOR_HINT } from "../../feed-labels";
-import type { FeedPostItem } from "../../feed-types";
+import type { FeedContentType, FeedPostItem } from "../../feed-types";
 import { contentSavedTarget } from "../../../saved/saved-store";
 import type { FeedIdentityTarget } from "../FeedItemRenderer";
 import { PostActionRow } from "../post/PostActionRow";
@@ -67,6 +74,8 @@ type PostFeedItemProps = {
   autoStartMediaIndex?: number | null;
   /** HOM-04: azioni di gestione dal server, per il menu •••. Assente = nessuna. */
   management?: ContentManagement;
+  /** HOM-10 §111: il tap sulla card dell'originale incorporato lo apre. Assente = card non tappabile. */
+  onOpenReference?: (reference: { contentType: FeedContentType; contentId: string }) => void;
 };
 
 export function PostFeedItem({
@@ -85,8 +94,10 @@ export function PostFeedItem({
   onMediaLayout,
   autoStartMediaIndex = null,
   management,
+  onOpenReference,
 }: PostFeedItemProps) {
   const { payload } = item;
+  const referenceModel = payload.reference ? embeddedModelFromFeed(payload.reference) : null;
   const body = postBodyText(payload);
   const taggedSummary = summarizeTagged(payload.tagged, payload.mentions);
   const authorLine = {
@@ -157,6 +168,25 @@ export function PostFeedItem({
         <PostLinkPreview onPress={onOpenLink} preview={payload.linkPreview} />
       ) : null}
 
+      {referenceModel ? (
+        // HOM-10 §100, §110–§114: l'originale come card compatta SOTTO il testo, senza barra di
+        // interazione (la action row sotto è di questo Post, §101); un solo livello (§57).
+        <View style={styles.reference}>
+          <RepostEmbeddedCard
+            model={referenceModel}
+            onPress={
+              onOpenReference && referenceModel.kind === "available"
+                ? () =>
+                    onOpenReference({
+                      contentId: referenceModel.contentId,
+                      contentType: referenceModel.contentType,
+                    })
+                : undefined
+            }
+          />
+        </View>
+      ) : null}
+
       <PostMediaCollection
         autoStartIndex={autoStartMediaIndex}
         itemId={item.id}
@@ -183,6 +213,9 @@ export function PostFeedItem({
 }
 
 const styles = StyleSheet.create({
+  reference: {
+    marginTop: spacing[12],
+  },
   title: {
     marginTop: spacing[12],
   },

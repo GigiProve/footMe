@@ -21,6 +21,7 @@ import type {
   PublishingErrorKind,
   WireSchedulePolicy,
 } from "../publishing/publishing-types";
+import type { SharePreview } from "../share/share-types";
 
 /* ------------------------------------------------------------------ */
 /* Identità e politiche                                                */
@@ -68,6 +69,28 @@ export type ComposerIdentity = {
   contextLabel: string;
   /** HOM-06.2 §84–§85: con false niente riga Pubblicazione e CTA «Pubblica» standard. */
   canSchedule: boolean;
+  /**
+   * HOM-10 §33: con testo serve `can_publish_post` oltre a `can_repost`. Solo le
+   * identità lette da `fetch_repost_state` lo portano; assente = non si sa, e non
+   * blocca (il server rivalida §35).
+   */
+  canPublishPost?: boolean;
+  /** HOM-10 §120, §122, §125: l'identità ha già un Simple Repost attivo dell'originale. */
+  hasSimpleRepost?: boolean;
+};
+
+/**
+ * HOM-10 §45–§47, §160–§162: l'originale incorporato in un Post. Nel composer è una
+ * card in SOLA LETTURA: non si rimuove, non si sostituisce, non si riordina.
+ * `available: false` = l'originale non è più leggibile o ripostabile (§155, §231):
+ * la pubblicazione referenziata resta chiusa, il testo no (§230). `preview` è lo
+ * snapshot corrente dell'originale (§168), `null` quando non c'è nulla da mostrare.
+ */
+export type ComposerReference = {
+  contentType: FeedContentType;
+  contentId: string;
+  available: boolean;
+  preview: SharePreview | null;
 };
 
 export type ComposerLimits = {
@@ -312,6 +335,12 @@ export type WirePostForEdit = {
     duration_seconds: number | null;
   }[];
   can_edit: boolean;
+  /**
+   * HOM-10 §160–§162: la reference del Post, in sola lettura. Stessa forma di
+   * `data.reference` del Feed (`{content_type, content_id, available, snapshot}`);
+   * assente o `null` per un Post senza reference e per un server pre-HOM-10.
+   */
+  reference?: unknown;
 };
 
 /** Argomenti di `update_post` (§155–161): media e autore non cambiano. */
@@ -425,6 +454,8 @@ export type ComposerPostForEdit = {
   /** Media pubblicati, già `uploadStatus: "uploaded"` e solo lettura (§151). */
   media: ComposerMediaItem[];
   canEdit: boolean;
+  /** HOM-10 §161–§162: l'originale incorporato, mai rimovibile né sostituibile. Assente = Post senza reference. */
+  reference?: ComposerReference | null;
 };
 
 /**
@@ -503,6 +534,8 @@ export type WireDraftPostEditor = {
         domain?: string | null;
       } | null;
     } | null;
+    /** HOM-10 §139: la reference persistita nella bozza (`{content_type, content_id, available, snapshot}`). */
+    reference?: unknown;
   } | null;
 };
 
@@ -524,4 +557,6 @@ export type ComposerDraftForEditor = {
   link: Extract<ComposerLinkPreviewState, { status: "ready" }> | null;
   /** Il Post aveva un URL ma nessuna anteprima salvata: non si rigenera da sola (§93). */
   hadLinkWithoutPreview: boolean;
+  /** HOM-10 §139–§141: la reference salvata con la bozza; riaprirla è di nuovo un Repost. Assente = nessuna. */
+  reference?: ComposerReference | null;
 };
