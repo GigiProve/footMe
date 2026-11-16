@@ -30,6 +30,22 @@ import { fetchSocietyMasterProfile } from "../../src/features/clubs/society/soci
 import { buildClubShareMessage } from "../../src/features/clubs/society/society-profile-model";
 import type { PositionFilter } from "../../src/features/clubs/society/society-profile-model";
 import type { SocietyMasterProfile } from "../../src/features/clubs/society/society-profile-types";
+import { blockedIdentityStore, useBlockEntry } from "../../src/features/blocking/blocked-identity-store";
+import { trackBlocking } from "../../src/features/blocking/blocking-analytics";
+import {
+  SHEET_HANDOFF_MS,
+  blockMenuLabel,
+  blockTargetKey,
+  canBlockAs,
+  isBlockedPhase,
+} from "../../src/features/blocking/blocking-presentation";
+import { fetchProfileAvailability } from "../../src/features/blocking/blocking-service";
+import type { BlockIdentityRef } from "../../src/features/blocking/blocking-types";
+import { BlockConfirmSheet } from "../../src/features/blocking/components/BlockConfirmSheet";
+import { BlockedByMeState } from "../../src/features/blocking/components/BlockedByMeState";
+import { ProfileUnavailableState } from "../../src/features/blocking/components/ProfileUnavailableState";
+import { useBlockActions } from "../../src/features/blocking/use-block-actions";
+import { useBlockerIdentity } from "../../src/features/blocking/use-blocker-identity";
 import { openDirectConversation } from "../../src/features/messaging/messaging-service";
 import { trackProfileEvent } from "../../src/features/profiles/profile-analytics";
 import { colors, spacing } from "../../src/theme/tokens";
@@ -56,6 +72,20 @@ export default function ClubProfileScreen() {
   const [isOpeningChat, setOpeningChat] = useState(false);
   const [isMenuVisible, setMenuVisible] = useState(false);
 
+  /*
+    HOM-12: la Società è un'identità a sé (§4, §129): bloccarla non tocca le persone
+    collegate. Il cancello server precede il caricamento (§173–§175); lo store di
+    sessione è la verità del Block (§193).
+  */
+  const blockActions = useBlockActions();
+  const { blocker, societyCapable } = useBlockerIdentity(profile ?? null);
+  const [isUnavailable, setIsUnavailable] = useState(false);
+  const [gateBlocker, setGateBlocker] = useState<BlockIdentityRef | null>(null);
+  const [gateName, setGateName] = useState<string | null>(null);
+  const [isBlockConfirmVisible, setBlockConfirmVisible] = useState(false);
+  const blockEntry = useBlockEntry(id ? blockTargetKey({ id, type: "society" }) : null);
+  const isBlockedByMe = isBlockedPhase(blockEntry);
+
   const loadProfile = useCallback(async () => {
     if (!id) {
       setIsLoading(false);
@@ -66,6 +96,28 @@ export default function ClubProfileScreen() {
     setHasError(false);
 
     try {
+      const gateAt = Date.now();
+      const availability = await fetchProfileAvailability({ id, type: "society" });
+      const gateKey = blockTargetKey({ id, type: "society" });
+
+      if (availability.state === "unavailable") {
+        setIsUnavailable(true);
+        setData(null);
+        trackBlocking({ identityType: "society", name: "profile_unavailable_state_viewed" });
+        return;
+      }
+      setIsUnavailable(false);
+
+      if (availability.state === "blocked_by_me") {
+        blockedIdentityStore.seed(gateKey, true, availability.blockId, gateAt);
+        setGateBlocker(availability.blocker);
+        setGateName(availability.name);
+        setData(null);
+        trackBlocking({ identityType: "society", name: "blocked_profile_state_viewed_by_blocker" });
+        return;
+      }
+      blockedIdentityStore.seed(gateKey, false, null, gateAt);
+
       /*
         Il club per il modulo Media condiviso arriva dalla lettura già
         esistente: REV-PROF-17 non riscrive quel dominio, gli passa la stessa
@@ -222,12 +274,79 @@ export default function ClubProfileScreen() {
     }
   }
 
+  const clubName = data?.club.name ?? null;
+
+  /** §22–§23: la conferma si apre dal menu, dopo che il menu si è chiuso. */
+  function handleBlockSelected() {
+    trackBlocking({ identityType: "society", name: "block_selected", surface: "profile" });
+    setMenuVisible(false);
+    setTimeout(() => setBlockConfirmVisible(true), SHEET_HANDOFF_MS);
+  }
+
+  function handleBlockCancelled() {
+    setBlockConfirmVisible(false);
+    trackBlocking({ identityType: "society", name: "block_confirmation_cancelled", surface: "profile" });
+  }
+
+  async function handleBlockConfirmed() {
+    setBlockConfirmVisible(false);
+    if (!blocker || !id) return;
+
+    await blockActions.block({
+      blocker,
+      surface: "profile",
+      target: { id, name: clubName, type: "society" },
+    });
+  }
+
+  /** §156–§158: Sblocca senza conferma, poi si ricarica il profilo (Follow reale dal server). */
+  async function handleUnblockFromGate() {
+    const effectiveBlocker = gateBlocker ?? blocker;
+    if (!id || !effectiveBlocker) return;
+
+    trackBlocking({ identityType: "society", name: "unblock_from_profile" });
+    const ok = await blockActions.unblock({
+      blockId: blockEntry?.blockId,
+      blocker: effectiveBlocker,
+      surface: "profile",
+      target: { id, name: clubName ?? gateName, type: "society" },
+    });
+
+    if (ok) {
+      setGateBlocker(null);
+      await loadProfile();
+    }
+  }
+
   if (isLoading) {
     return (
       <Screen>
         <Stack.Screen options={{ headerShown: false }} />
         <TopBar onBack={() => router.back()} />
         <SocietyProfileSkeleton />
+      </Screen>
+    );
+  }
+
+  if (isUnavailable) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <TopBar onBack={() => router.back()} />
+        <ProfileUnavailableState />
+      </Screen>
+    );
+  }
+
+  if (isBlockedByMe) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ headerShown: false }} />
+        <TopBar onBack={() => router.back()} />
+        <BlockedByMeState
+          isBusy={blockEntry?.phase === "pending_unblock"}
+          onUnblock={() => void handleUnblockFromGate()}
+        />
       </Screen>
     );
   }
@@ -353,11 +472,33 @@ export default function ClubProfileScreen() {
                   label: "Segnala società",
                   onPress: () => void handleReport(),
                 },
+                /* HOM-12 §14–§15: «Blocca {nome}», solo per chi può bloccare come questa identità. */
+                ...(canBlockAs({
+                  blocker,
+                  societyCapable,
+                  target: { id: data.club.id, type: "society" },
+                })
+                  ? [
+                      {
+                        destructive: true,
+                        icon: "ban-outline" as const,
+                        id: "block-profile",
+                        label: blockMenuLabel(data.club.name),
+                        onPress: handleBlockSelected,
+                      },
+                    ]
+                  : []),
               ]
         }
         onClose={() => setMenuVisible(false)}
         title="Azioni società"
         visible={isMenuVisible}
+      />
+      <BlockConfirmSheet
+        name={data.club.name}
+        onCancel={handleBlockCancelled}
+        onConfirm={() => void handleBlockConfirmed()}
+        visible={isBlockConfirmVisible}
       />
     </Screen>
   );

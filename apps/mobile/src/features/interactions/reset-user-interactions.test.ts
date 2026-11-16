@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { blockedIdentityStore } from "../blocking/blocked-identity-store";
+import { BLOCK_QK } from "../blocking/blocking-keys";
 import { commentCountStore } from "../comments/comment-count-store";
 import { createCommentDraftStore, registerCommentDraft } from "../comments/comment-draft-store";
 import { COMMENTS_QK } from "../comments/comment-keys";
@@ -15,6 +17,22 @@ import { likeStore } from "./like-store";
 import { resetUserInteractions } from "./reset-user-interactions";
 
 vi.mock("../../ui", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+
+describe("resetUserInteractions — Block di sessione (HOM-12 §193–§194)", () => {
+  it("svuota lo store dei Block e l'availability in cache", () => {
+    blockedIdentityStore.seed("profile:u1", true, "b1", 1);
+    queryClient.setQueryData(BLOCK_QK.availability("user-a", { id: "u1", type: "person" }), { state: "blocked_by_me" });
+    const epoch = blockedIdentityStore.epoch();
+
+    resetUserInteractions();
+
+    expect(blockedIdentityStore.get("profile:u1")).toBeUndefined();
+    expect(blockedIdentityStore.epoch()).toBe(epoch + 1);
+    expect(
+      queryClient.getQueryData(BLOCK_QK.availability("user-a", { id: "u1", type: "person" })),
+    ).toBeUndefined();
+  });
+});
 
 describe("resetUserInteractions — logout e cambio account (HOM-07 §70, §103)", () => {
   it("svuota Mi piace, identità e Salvati e cambia generazione a entrambi gli store", () => {

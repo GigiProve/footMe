@@ -89,6 +89,24 @@ import { SHORTLIST_QK } from "../dashboard/shortlist/shortlist-keys";
 import { SELECTION_EVENTS_QK } from "../dashboard/events/events-keys";
 import { SELECTION_EVENTS_HREFS } from "../dashboard/events/events-routes";
 import { fetchProfileEventInviteState } from "../dashboard/events/invite/invite-service";
+import { blockedIdentityStore, useBlockEntry } from "../blocking/blocked-identity-store";
+import { trackBlocking } from "../blocking/blocking-analytics";
+import {
+  SHEET_HANDOFF_MS,
+  blockMenuLabel,
+  blockTargetKey,
+  canBlockAs,
+  isBlockedPhase,
+  targetTypeForRole,
+} from "../blocking/blocking-presentation";
+import { fetchProfileAvailability } from "../blocking/blocking-service";
+import type { BlockIdentityRef } from "../blocking/blocking-types";
+import { BlockConfirmSheet } from "../blocking/components/BlockConfirmSheet";
+import { BlockedByMeState } from "../blocking/components/BlockedByMeState";
+import { ProfileUnavailableState } from "../blocking/components/ProfileUnavailableState";
+import { useBlockActions } from "../blocking/use-block-actions";
+import { useBlockerIdentity } from "../blocking/use-blocker-identity";
+import { useRefetchOnActive } from "../blocking/use-refetch-on-active";
 import { colors, spacing } from "../../theme/tokens";
 import { ActionSheet, AppText, Button, useToast } from "../../ui";
 
@@ -145,6 +163,21 @@ export function PublicProfileScreen() {
   }>({ initialStep: "selector", open: false });
 
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
+
+  /*
+    HOM-12: Blocca / Sblocca. Il cancello (`fetch_profile_availability`) precede il
+    caricamento del profilo (§173–§175); la cella dello store è la verità di sessione
+    (§193): ottimismo del Blocca, convergenza con il server, ritorno dopo lo Sblocca.
+  */
+  const blockActions = useBlockActions();
+  const { blocker, societyCapable } = useBlockerIdentity(viewerProfile ?? null);
+  const [isUnavailable, setIsUnavailable] = useState(false);
+  const [gateBlocker, setGateBlocker] = useState<BlockIdentityRef | null>(null);
+  const [gateName, setGateName] = useState<string | null>(null);
+  const [blockConfirmVisible, setBlockConfirmVisible] = useState(false);
+  const blockKey = profileId ? blockTargetKey({ id: profileId, type: "person" }) : null;
+  const blockEntry = useBlockEntry(blockKey);
+  const isBlockedByMe = isBlockedPhase(blockEntry);
   const requestedTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const fanInitialTab = parseFanProfileTab(requestedTab);
   /** REV-PROF-21: deep link a una tab del Master Profile Media/Creator. */
@@ -156,6 +189,14 @@ export function PublicProfileScreen() {
   const viewedProfileId = completeProfile?.profile.id ?? null;
   const canFollowOrSave =
     !!currentUserId && !!viewedProfileId && currentUserId !== viewedProfileId;
+  const blockTargetType = targetTypeForRole(completeProfile?.profile.role);
+  const canBlockTarget =
+    canFollowOrSave &&
+    canBlockAs({
+      blocker,
+      societyCapable,
+      target: viewedProfileId ? { id: viewedProfileId, type: blockTargetType } : null,
+    });
   const isProfileSaved = useIsSaved(
     canFollowOrSave && viewedProfileId ? { id: viewedProfileId, type: "profile" } : null,
     profileSavedSeed?.value,
@@ -328,6 +369,36 @@ export function PublicProfileScreen() {
     try {
       setIsLoading(true);
       setErrorMessage(null);
+
+      /*
+        HOM-12 §173–§175, §81: il cancello server PRIMA del caricamento. Bloccato da me →
+        stato dedicato senza il profilo sotto; non disponibile (bloccato, sospeso o
+        inesistente, indistinguibili: §82–§84) → stato neutro. Un errore del cancello è un
+        errore di caricamento: mai un profilo mostrato per default. Person e media
+        condividono `profiles.id`: il tipo non è noto finché il profilo non è caricato.
+      */
+      const gateAt = Date.now();
+      const availability = await fetchProfileAvailability({ id: profileId, type: "person" });
+      const gateKey = blockTargetKey({ id: profileId, type: "person" });
+
+      if (availability.state === "unavailable") {
+        setIsUnavailable(true);
+        setCompleteProfile(null);
+        trackBlocking({ identityType: "person", name: "profile_unavailable_state_viewed" });
+        return;
+      }
+      setIsUnavailable(false);
+
+      if (availability.state === "blocked_by_me") {
+        blockedIdentityStore.seed(gateKey, true, availability.blockId, gateAt);
+        setGateBlocker(availability.blocker);
+        setGateName(availability.name);
+        setCompleteProfile(null);
+        trackBlocking({ identityType: "person", name: "blocked_profile_state_viewed_by_blocker" });
+        return;
+      }
+      blockedIdentityStore.seed(gateKey, false, null, gateAt);
+
       const data = await getCompleteProfessionalProfile(profileId);
       setCompleteProfile(data);
     } catch {
@@ -470,6 +541,87 @@ export function PublicProfileScreen() {
       setIsFollowPending(false);
     }
   }
+
+  /** §22–§23: «Blocca {nome}» apre la conferma; niente parte finché non si conferma. */
+  function handleBlockSelected() {
+    trackBlocking({ identityType: blockTargetType, name: "block_selected", surface: "profile" });
+    setProfileActionsVisible(false);
+    // Un Modal alla volta su iOS: il menu si chiude prima che la conferma si apra.
+    setTimeout(() => setBlockConfirmVisible(true), SHEET_HANDOFF_MS);
+  }
+
+  function handleBlockCancelled() {
+    setBlockConfirmVisible(false);
+    trackBlocking({
+      identityType: blockTargetType,
+      name: "block_confirmation_cancelled",
+      surface: "profile",
+    });
+  }
+
+  async function handleBlockConfirmed() {
+    setBlockConfirmVisible(false);
+    if (!blocker || !viewedProfileId) {
+      return;
+    }
+    const ok = await blockActions.block({
+      blocker,
+      surface: "profile",
+      target: {
+        id: viewedProfileId,
+        name: completeProfile?.profile.full_name ?? null,
+        type: blockTargetType,
+      },
+    });
+    if (ok) {
+      // §41, §159: nessun «Segui già» da stato vecchio dopo il Block.
+      setIsFollowed(false);
+    }
+  }
+
+  /** §156–§158: Sblocca senza conferma, poi si ricarica il profilo e lo stato Follow reale. */
+  async function handleUnblockFromGate() {
+    const effectiveBlocker = gateBlocker ?? blocker;
+    if (!profileId || !effectiveBlocker) {
+      return;
+    }
+    trackBlocking({ identityType: blockTargetType, name: "unblock_from_profile" });
+    const ok = await blockActions.unblock({
+      blockId: blockEntry?.blockId,
+      blocker: effectiveBlocker,
+      surface: "profile",
+      target: {
+        id: profileId,
+        name: completeProfile?.profile.full_name ?? gateName,
+        type: blockTargetType,
+      },
+    });
+    if (!ok) {
+      return;
+    }
+    setGateBlocker(null);
+    setIsFollowed(false);
+    await loadProfile();
+    // §41, §159: il Follow non si ripristina; il CTA riflette lo stato reale (default «Segui»).
+    if (currentUserId) {
+      void fetchProfileFollowState(currentUserId, profileId)
+        .then(setIsFollowed)
+        .catch(() => setIsFollowed(false));
+    }
+  }
+
+  // §208–§210: un Block fatto altrove converge appena l'app torna attiva.
+  useRefetchOnActive(() => {
+    if (profileId && session?.user) {
+      void loadProfile();
+    }
+  });
+
+  useEffect(() => {
+    if (profileActionsVisible && viewedProfileId) {
+      trackBlocking({ identityType: blockTargetType, name: "profile_actions_open" });
+    }
+  }, [blockTargetType, profileActionsVisible, viewedProfileId]);
 
   async function handleToggleSaveProfile() {
     if (!currentUserId || !viewedProfileId || isSavePending) {
@@ -629,7 +781,7 @@ export function PublicProfileScreen() {
             ? getProfileViewerTitle(completeProfile.profile.role as AppRole)
             : "Profilo"}
         </AppText>
-        {canFollowOrSave ? (
+        {canFollowOrSave && !isBlockedByMe ? (
           <View style={styles.topBarActions}>
             <Pressable
               accessibilityLabel={
@@ -679,6 +831,13 @@ export function PublicProfileScreen() {
             saltare il layout.
           */
           <ProfileSkeleton testID="profile-loading-skeleton" />
+        ) : isUnavailable ? (
+          <ProfileUnavailableState />
+        ) : isBlockedByMe ? (
+          <BlockedByMeState
+            isBusy={blockEntry?.phase === "pending_unblock"}
+            onUnblock={() => void handleUnblockFromGate()}
+          />
         ) : errorMessage ? (
           <View style={styles.stateBlock}>
             <AppText variant="titleSm">Profilo non disponibile</AppText>
@@ -844,10 +1003,28 @@ export function PublicProfileScreen() {
             label: "Segnala profilo",
             onPress: handleReportProfile,
           },
+          /* HOM-12 §14–§19, §241: «Blocca {nome}», solo qui — mai nel menu dei contenuti. */
+          ...(canBlockTarget
+            ? [
+                {
+                  destructive: true,
+                  icon: "ban-outline" as const,
+                  id: "block-profile",
+                  label: blockMenuLabel(completeProfile?.profile.full_name),
+                  onPress: handleBlockSelected,
+                },
+              ]
+            : []),
         ]}
         onClose={() => setProfileActionsVisible(false)}
         title="Azioni profilo"
         visible={profileActionsVisible}
+      />
+      <BlockConfirmSheet
+        name={completeProfile?.profile.full_name ?? null}
+        onCancel={handleBlockCancelled}
+        onConfirm={() => void handleBlockConfirmed()}
+        visible={blockConfirmVisible}
       />
       {operatingSociety && viewedProfileId && actorId ? (
         <ProfileShortlistFlow

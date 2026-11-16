@@ -239,6 +239,8 @@ export type InboxConversation = {
   unread_count: number;
   archived: boolean;
   blocked_by_me: boolean;
+  /** HOM-12 §116: una DIRECT bloccata non è una destinazione di condivisione valida. */
+  can_send?: boolean;
   /** DAS-REV-32 §5: path privato dell'immagine dei gruppi organizzativi, altrimenti null. */
   group_avatar_path: string | null;
   /** DAS-REV-33 §21: null per le non-gruppo e i gruppi legacy. */
@@ -286,6 +288,12 @@ export type DirectConversationMeta = {
   i_have_sent: boolean;
   other_has_sent: boolean;
   blocked_by_me: boolean;
+  /**
+   * HOM-12 §107, §110: `false` se c'è un Block in QUALUNQUE direzione, senza dire chi ha
+   * bloccato. Assente su un server precedente: vale «si può scrivere» (il server rifiuta
+   * comunque l'invio, §110).
+   */
+  can_send?: boolean;
   archived: boolean;
   application_id: string | null;
   application_status: string | null;
@@ -397,25 +405,11 @@ export async function fetchGroupConversationMeta(
   };
 }
 
-export async function blockUser(targetProfileId: string) {
-  const { error } = await supabase.rpc("block_user", {
-    target_profile_id: targetProfileId,
-  });
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function unblockUser(targetProfileId: string) {
-  const { error } = await supabase.rpc("unblock_user", {
-    target_profile_id: targetProfileId,
-  });
-
-  if (error) {
-    throw error;
-  }
-}
+/*
+  HOM-12 §166: `blockUser`/`unblockUser` (MES-02, blocco a livello account) sono sostituiti
+  dal dominio Block identity-to-identity in `features/blocking` (`block_identity`,
+  `unblock_identity`). Le vecchie RPC restano sul server come wrapper deprecati (D5).
+*/
 
 export type ConversationReportReason =
   | "spam"

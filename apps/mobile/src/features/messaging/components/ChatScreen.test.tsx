@@ -57,8 +57,18 @@ vi.mock("../../dashboard/groups/groups-service", () => ({
   fetchGroupAvatarUrl: vi.fn().mockResolvedValue(null),
 }));
 
+// HOM-12: Blocca/Sblocca passano da features/blocking (il vecchio blockUser MES-02 non esiste più).
+const blockingMocks = vi.hoisted(() => ({
+  blockIdentity: vi.fn(),
+  unblockIdentity: vi.fn(),
+}));
+
+vi.mock("../../blocking/blocking-service", () => ({
+  blockIdentity: blockingMocks.blockIdentity,
+  unblockIdentity: blockingMocks.unblockIdentity,
+}));
+
 const serviceMocks = vi.hoisted(() => ({
-  blockUser: vi.fn(),
   fetchConversationType: vi.fn(),
   fetchDirectConversationMeta: vi.fn(),
   fetchGroupConversationMeta: vi.fn(),
@@ -71,7 +81,6 @@ const serviceMocks = vi.hoisted(() => ({
   setConversationArchived: vi.fn(),
   subscribeToConversation: vi.fn(),
   subscribeToMyGroupPeriods: vi.fn(),
-  unblockUser: vi.fn(),
   unsubscribeFromConversation: vi.fn(),
 }));
 
@@ -80,7 +89,6 @@ const serviceMocks = vi.hoisted(() => ({
 vi.mock("../messaging-service", () => {
   return {
     getChatMediaSignedUrl: vi.fn(),
-    blockUser: serviceMocks.blockUser,
     fetchConversationType: serviceMocks.fetchConversationType,
     fetchDirectConversationMeta: serviceMocks.fetchDirectConversationMeta,
     fetchGroupConversationMeta: serviceMocks.fetchGroupConversationMeta,
@@ -93,7 +101,6 @@ vi.mock("../messaging-service", () => {
     setConversationArchived: serviceMocks.setConversationArchived,
     subscribeToConversation: serviceMocks.subscribeToConversation,
     subscribeToMyGroupPeriods: serviceMocks.subscribeToMyGroupPeriods,
-    unblockUser: serviceMocks.unblockUser,
     unsubscribeFromConversation: serviceMocks.unsubscribeFromConversation,
   };
 });
@@ -343,6 +350,104 @@ describe("ChatScreen", () => {
       body: "Ciao a te",
       conversationId: "conv-1",
       senderProfileId: "me-1",
+    });
+  });
+
+  describe("HOM-12 block states", () => {
+    function textsOf(tree: TestRenderer.ReactTestRenderer) {
+      return tree.root
+        .findAllByType(AppText)
+        .map((node) => node.props.children)
+        .flat();
+    }
+
+    beforeEach(async () => {
+      const store = await import("../../blocking/blocked-identity-store");
+      store.resetBlockedIdentityStore();
+    });
+
+    it("blocker: one compact row above a disabled composer, draft untouched, no navigation", async () => {
+      const meta = buildMeta({ blocked_by_me: true, can_send: false });
+      serviceMocks.fetchDirectConversationMeta.mockResolvedValue(meta);
+
+      const tree = await renderScreen({ messages: [buildMessage()], meta });
+
+      expect(textsOf(tree)).toContain("Hai bloccato Luca Bianchi");
+      expect(tree.root.findAllByProps({ testID: "chat-blocker-row" }).length).toBeGreaterThan(0);
+      expect(tree.root.findAllByProps({ testID: "chat-composer-disabled" }).length).toBeGreaterThan(0);
+      expect(tree.root.findByProps({ placeholder: "Scrivi un messaggio..." }).props.editable).toBe(false);
+      expect(textsOf(tree)).not.toContain("Non puoi inviare messaggi a questo profilo.");
+      expect(backMock).not.toHaveBeenCalled();
+    });
+
+    it("blocked: neutral notice, composer disabled, no Sblocca and no red row", async () => {
+      const meta = buildMeta({ blocked_by_me: false, can_send: false });
+      serviceMocks.fetchDirectConversationMeta.mockResolvedValue(meta);
+
+      const tree = await renderScreen({ messages: [buildMessage()], meta });
+
+      expect(textsOf(tree)).toContain("Non puoi inviare messaggi a questo profilo.");
+      expect(textsOf(tree)).not.toContain("Sblocca");
+      expect(tree.root.findAllByProps({ testID: "chat-blocker-row" })).toHaveLength(0);
+      expect(tree.root.findByProps({ placeholder: "Scrivi un messaggio..." }).props.editable).toBe(false);
+    });
+
+    it("a normal chat keeps the composer enabled and shows neither state", async () => {
+      const meta = buildMeta({ can_send: true });
+      serviceMocks.fetchDirectConversationMeta.mockResolvedValue(meta);
+
+      const tree = await renderScreen({ messages: [buildMessage()], meta });
+
+      expect(tree.root.findByProps({ placeholder: "Scrivi un messaggio..." }).props.editable).toBe(true);
+      expect(tree.root.findAllByProps({ testID: "chat-blocker-row" })).toHaveLength(0);
+      expect(tree.root.findAllByProps({ testID: "chat-blocked-notice" })).toHaveLength(0);
+    });
+
+    it("a send rejected by a Block restores the draft and shows the neutral copy", async () => {
+      const meta = buildMeta({ can_send: true });
+      serviceMocks.fetchDirectConversationMeta.mockResolvedValue(meta);
+      serviceMocks.sendMessage.mockRejectedValue({
+        code: "42501",
+        message: "new row violates row-level security policy",
+      });
+
+      const tree = await renderScreen({ messages: [buildMessage()], meta });
+
+      await act(async () => {
+        tree.root.findByProps({ placeholder: "Scrivi un messaggio..." }).props.onChangeText("Ciao");
+        await Promise.resolve();
+      });
+      await act(async () => {
+        tree.root.findByProps({ accessibilityLabel: "Invia messaggio" }).props.onPress();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+
+      expect(tree.root.findByProps({ placeholder: "Scrivi un messaggio..." }).props.value).toBe("Ciao");
+      expect(textsOf(tree)).toContain("Non puoi inviare messaggi a questo profilo.");
+    });
+
+    it("Sblocca from the chat row calls unblock_identity and keeps the chat open", async () => {
+      const meta = buildMeta({ blocked_by_me: true, can_send: false });
+      serviceMocks.fetchDirectConversationMeta.mockResolvedValue(meta);
+      blockingMocks.unblockIdentity.mockResolvedValue("unblocked");
+
+      const tree = await renderScreen({ messages: [buildMessage()], meta });
+
+      await act(async () => {
+        tree.root.findByProps({ testID: "chat-blocker-unblock" }).props.onPress();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(blockingMocks.unblockIdentity).toHaveBeenCalledWith({
+        blocker: { id: "me-1", type: "person" },
+        target: { id: "other-1", type: "person" },
+      });
+      expect(backMock).not.toHaveBeenCalled();
     });
   });
 

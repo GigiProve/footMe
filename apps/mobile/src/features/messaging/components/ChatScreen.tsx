@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +9,25 @@ import * as ImagePicker from "expo-image-picker";
 
 import { useSession } from "../../auth/use-session";
 import { colors } from "../../../theme/tokens";
-import { ConfirmModal, useToast } from "../../../ui";
+import { useToast } from "../../../ui";
+import { blockedIdentityStore, useBlockEntry } from "../../blocking/blocked-identity-store";
+import { trackBlocking } from "../../blocking/blocking-analytics";
+import {
+  BLOCK_COPY,
+  SHEET_HANDOFF_MS,
+  blockMenuLabel,
+  blockTargetKey,
+  chatBlockState,
+  isBlockedPhase,
+  isBlockedSendError,
+  personalIdentityRef,
+  targetTypeForRole,
+} from "../../blocking/blocking-presentation";
+import { BlockConfirmSheet } from "../../blocking/components/BlockConfirmSheet";
+import { ChatBlockedNotice } from "../../blocking/components/ChatBlockedNotice";
+import { ChatBlockerRow } from "../../blocking/components/ChatBlockerRow";
+import { useBlockActions } from "../../blocking/use-block-actions";
+import { useRefetchOnActive } from "../../blocking/use-refetch-on-active";
 import { sendMediaMessage, uploadChatMedia } from "../chat-media-service";
 import {
   buildChatListItems,
@@ -28,7 +46,6 @@ import { MESSAGING_QK } from "../messaging-keys";
 import { GROUP_INFO_AVAILABLE, groupInfoRoute } from "../messaging-routes";
 import { useGroupAccessSignals, useGroupChatAccess } from "../use-group-chat-access";
 import {
-  blockUser,
   fetchConversationType,
   fetchDirectConversationMeta,
   fetchGroupConversationMeta,
@@ -40,7 +57,6 @@ import {
   sendMessage,
   setConversationArchived,
   subscribeToConversation,
-  unblockUser,
   unsubscribeFromConversation,
   type ConversationReportReason,
 } from "../messaging-service";
@@ -176,7 +192,17 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
         return;
       }
 
+      // La bozza non si perde mai (HOM-12 §113).
       setDraft(body);
+
+      // HOM-12 §110–§112: un invio rifiutato per Block (anche partito prima che la chat lo
+      // sapesse, §111) mostra il copy neutro e riallinea lo stato della chat (§210).
+      if (!isGroup && isBlockedSendError(error)) {
+        showToast({ id: "chat-blocked-send", message: BLOCK_COPY.blockedChatNotice, tone: "neutral" });
+        queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
+        return;
+      }
+
       showToast({
         message:
           error instanceof Error ? error.message : "Errore durante l'invio del messaggio.",
@@ -189,35 +215,12 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     },
   });
 
-  const blockMutation = useMutation({
-    mutationFn: () => blockUser(metaQuery.data?.other_profile_id ?? ""),
-    onError: (error: unknown) => {
-      showToast({
-        message: error instanceof Error ? error.message : "Impossibile bloccare l'utente.",
-        tone: "neutral",
-      });
-    },
-    onSuccess: () => {
-      setIsBlockConfirmVisible(false);
-      showToast({ message: "Utente bloccato.", tone: "success" });
-      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
-      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(myProfileId) });
-      router.back();
-    },
-  });
-
-  const unblockMutation = useMutation({
-    mutationFn: () => unblockUser(metaQuery.data?.other_profile_id ?? ""),
-    onError: (error: unknown) => {
-      showToast({
-        message: error instanceof Error ? error.message : "Impossibile sbloccare l'utente.",
-        tone: "neutral",
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
-    },
-  });
+  /*
+    HOM-12 §90–§109, §160–§161: Blocca/Sblocca dalla chat. Sostituisce il flusso MES-02:
+    la chat RESTA aperta dopo il Block (niente `router.back()`, §100–§101), la stessa DIRECT
+    si riattiva allo Sblocca (§161), il composer si disabilita senza toccare la bozza (§113).
+  */
+  const blockActions = useBlockActions();
 
   const archiveMutation = useMutation({
     mutationFn: (archived: boolean) => setConversationArchived(conversationId, archived),
@@ -273,6 +276,91 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
   const displayedMessages = isSearching ? filterMessagesForSearch(messages, searchQuery) : messages;
   const items = useMemo(() => buildChatListItems(displayedMessages), [displayedMessages]);
   const resultsCount = isSearchMode ? (isSearching ? displayedMessages.length : null) : null;
+
+  const otherTargetType = targetTypeForRole(meta?.other_role);
+  const blockKey = meta ? blockTargetKey({ id: meta.other_profile_id, type: otherTargetType }) : null;
+  const blockEntry = useBlockEntry(blockKey);
+  const myIdentity = personalIdentityRef(myProfileId ? { id: myProfileId, role: profile?.role } : null);
+  const chatState = chatBlockState({
+    blockedByMe: meta?.blocked_by_me ?? false,
+    canSend: meta?.can_send,
+    override: blockEntry ? isBlockedPhase(blockEntry) : null,
+  });
+  const isUnblocking = blockEntry?.phase === "pending_unblock";
+
+  // §194, §209: il meta letto dal server riallinea la cella (convergenza cross-device).
+  const metaUpdatedAt = metaQuery.dataUpdatedAt;
+  const metaBlockedByMe = meta?.blocked_by_me;
+  useEffect(() => {
+    if (blockKey && metaUpdatedAt && metaBlockedByMe !== undefined) {
+      blockedIdentityStore.seed(blockKey, metaBlockedByMe, null, metaUpdatedAt);
+    }
+  }, [blockKey, metaBlockedByMe, metaUpdatedAt]);
+
+  // §250: una sola volta per chat, appena il meta dice com'è lo stato.
+  const trackedOpenRef = useRef(false);
+  useEffect(() => {
+    if (!meta || trackedOpenRef.current) {
+      return;
+    }
+    trackedOpenRef.current = true;
+    if (chatState === "blocker") {
+      trackBlocking({ name: "blocked_direct_opened_by_blocker" });
+    } else if (chatState === "blocked") {
+      trackBlocking({ name: "blocked_direct_opened_by_blocked" });
+    }
+  }, [chatState, meta]);
+
+  // §208–§210: una DIRECT aperta altrove converge appena l'app torna attiva.
+  useRefetchOnActive(() => {
+    if (conversationId && !isGroup) {
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
+    }
+  });
+
+  function handleBlockToggle() {
+    if (!meta) {
+      return;
+    }
+    if (chatState === "blocker") {
+      handleUnblock();
+      return;
+    }
+    trackBlocking({ identityType: otherTargetType, name: "block_selected", surface: "chat" });
+    // Un Modal alla volta su iOS: il menu si chiude prima che la conferma si apra.
+    setTimeout(() => setIsBlockConfirmVisible(true), SHEET_HANDOFF_MS);
+  }
+
+  function handleBlockCancelled() {
+    setIsBlockConfirmVisible(false);
+    trackBlocking({ identityType: otherTargetType, name: "block_confirmation_cancelled", surface: "chat" });
+  }
+
+  function handleBlockConfirmed() {
+    setIsBlockConfirmVisible(false);
+    if (!meta || !myIdentity) {
+      return;
+    }
+    void blockActions.block({
+      blocker: myIdentity,
+      surface: "chat",
+      target: { id: meta.other_profile_id, name: meta.other_full_name, type: otherTargetType },
+    });
+  }
+
+  /** §99–§101, §205: stessa mutation, la chat resta aperta; se fallisce il Block e il composer restano. */
+  function handleUnblock() {
+    if (!meta || !myIdentity) {
+      return;
+    }
+    trackBlocking({ name: "unblock_from_chat" });
+    void blockActions.unblock({
+      blockId: blockEntry?.blockId,
+      blocker: myIdentity,
+      surface: "chat",
+      target: { id: meta.other_profile_id, name: meta.other_full_name, type: otherTargetType },
+    });
+  }
 
   function handleSend() {
     const body = draft.trim();
@@ -526,18 +614,34 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
           showSenderNames={isGroup}
         />
 
-        {banners?.showInlineSafetyRow ? (
+        {banners?.showInlineSafetyRow && chatState === "none" ? (
           <InlineSafetyRow
             onArchive={() => archiveMutation.mutate(!(meta?.archived ?? false))}
-            onBlock={() => setIsBlockConfirmVisible(true)}
+            blockLabel={blockMenuLabel(displayName)}
+            onBlock={() => {
+              // HOM-12 §250: stessa telemetria della voce di menu; nessun Modal da chiudere prima.
+              trackBlocking({ identityType: otherTargetType, name: "block_selected", surface: "chat" });
+              setIsBlockConfirmVisible(true);
+            }}
             onReport={() => setIsReportModalVisible(true)}
           />
         ) : null}
 
+        {/* HOM-12 §93–§95: una sola riga compatta sopra il composer, non una card. */}
+        {!isGroup && chatState === "blocker" ? (
+          <ChatBlockerRow
+            isBusy={isUnblocking}
+            name={meta?.other_full_name ?? null}
+            onUnblock={handleUnblock}
+          />
+        ) : null}
+        {/* §106–§109: lato bloccato, avviso neutro e nessun Sblocca. */}
+        {!isGroup && chatState === "blocked" ? <ChatBlockedNotice /> : null}
+
         {showComposer ? (
           <ChatComposer
             allowContactShare={!isGroup}
-            blocked={meta?.blocked_by_me ?? false}
+            blocked={!isGroup && chatState !== "none"}
             draft={draft}
             isSending={sendMutation.isPending}
             isUploading={isUploadingMedia}
@@ -554,22 +658,12 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
 
       <ChatActionsSheet
         isArchived={meta?.archived ?? false}
-        isBlocked={meta?.blocked_by_me ?? false}
+        isBlocked={chatState === "blocker"}
         isGroup={isGroup}
         onArchiveToggle={() => archiveMutation.mutate(!(meta?.archived ?? false))}
-        onBlockToggle={() => {
-          // Without meta (e.g. a group conversation) there is no one to block.
-          if (!meta) {
-            return;
-          }
-
-          if (meta.blocked_by_me) {
-            unblockMutation.mutate();
-            return;
-          }
-
-          setIsBlockConfirmVisible(true);
-        }}
+        // Without meta (e.g. a group conversation) there is no one to block.
+        onBlockToggle={handleBlockToggle}
+        otherName={meta?.other_full_name ?? null}
         onClose={() => setIsActionsSheetVisible(false)}
         onOpenProfile={handleOpenProfile}
         onReport={() => setIsReportModalVisible(true)}
@@ -577,18 +671,10 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
         visible={isActionsSheetVisible}
       />
 
-      <ConfirmModal
-        cancelLabel="Annulla"
-        confirmLabel="Blocca"
-        isBusy={blockMutation.isPending}
-        message="Non riceverai più messaggi da questo profilo."
-        onCancel={() => setIsBlockConfirmVisible(false)}
-        onConfirm={() => {
-          if (meta) {
-            blockMutation.mutate();
-          }
-        }}
-        title="Bloccare utente?"
+      <BlockConfirmSheet
+        name={meta?.other_full_name ?? null}
+        onCancel={handleBlockCancelled}
+        onConfirm={handleBlockConfirmed}
         visible={isBlockConfirmVisible}
       />
 

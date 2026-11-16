@@ -50,7 +50,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.queues.clear();
   mocks.calls.length = 0;
-  mocks.rpc.mockResolvedValue({ data: null, error: null });
+  // HOM-12: il cancello Società risponde «available» salvo i test che lo cambiano.
+  mocks.rpc.mockImplementation((name?: unknown) =>
+    Promise.resolve(
+      name === "fetch_profile_availability"
+        ? { data: { state: "available" }, error: null }
+        : { data: null, error: null },
+    ),
+  );
 });
 
 describe("fetchPositionDetail", () => {
@@ -131,6 +138,27 @@ describe("fetchPositionDetail", () => {
     enqueue("saved_ads", { data: null, error: null });
 
     await expect(fetchPositionDetail("u1", "missing")).resolves.toBeNull();
+  });
+
+  it("HOM-12 §134: la posizione di una Società bloccata risponde come non disponibile", async () => {
+    enqueue("recruiting_ads", {
+      data: { club_id: "c1", clubs: { id: "c1", logo_url: null, name: "AC Como" }, id: "ad1" },
+      error: null,
+    });
+    enqueue("saved_ads", { data: null, error: null });
+    mocks.rpc.mockImplementation((name?: unknown) =>
+      Promise.resolve(
+        name === "fetch_profile_availability"
+          ? { data: { state: "unavailable" }, error: null }
+          : { data: null, error: null },
+      ),
+    );
+
+    await expect(fetchPositionDetail("u1", "ad1")).resolves.toBeNull();
+    expect(mocks.rpc).toHaveBeenCalledWith("fetch_profile_availability", {
+      p_target_id: "c1",
+      p_target_type: "society",
+    });
   });
 
   it("propagates query errors", async () => {

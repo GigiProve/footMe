@@ -15,6 +15,8 @@
  */
 
 import { queryClient } from "../../lib/query-client";
+import { BLOCK_QK } from "../blocking/blocking-keys";
+import { resetBlockedIdentityStore } from "../blocking/blocked-identity-store";
 import { commentCountStore } from "../comments/comment-count-store";
 import { resetCommentDrafts } from "../comments/comment-draft-store";
 import { COMMENTS_QK } from "../comments/comment-keys";
@@ -44,6 +46,10 @@ export function resetUserInteractions(): void {
   resetUnfollowedSourcesStore();
   resetReportedStore();
   resetReportDraftStore();
+  // HOM-12 §193–§194: i Block di sessione sono per utente; un account nuovo non eredita
+  // celle «bloccato» né availability in cache del precedente.
+  resetBlockedIdentityStore();
+  queryClient.removeQueries({ queryKey: BLOCK_QK.all });
   // Lo stato «già segnalato» in cache è per viewer (§295): non si lascia leggere al prossimo.
   queryClient.removeQueries({ queryKey: MODERATION_QK.all });
   // Le liste in cache portano solo gli id: contro lo store appena svuotato darebbero un

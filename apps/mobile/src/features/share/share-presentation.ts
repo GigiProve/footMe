@@ -387,6 +387,9 @@ export function selectRecentRecipients(
       (!isGroup && conversation.conversation_type !== "direct") ||
       conversation.archived ||
       conversation.blocked_by_me ||
+      // HOM-12 §114–§116: una DIRECT bloccata in QUALUNQUE direzione non è una destinazione
+      // (il server ora la omette; qui si copre anche una cache vecchia). Mai per i GROUP (§119).
+      (!isGroup && conversation.can_send === false) ||
       (isGroup && conversation.group_status != null && conversation.group_status !== "active")
     ) {
       continue;

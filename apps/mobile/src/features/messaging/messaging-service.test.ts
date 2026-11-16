@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  blockUser,
   fetchConversationType,
   fetchDirectConversationMeta,
   fetchGroupConversationMeta,
@@ -13,7 +12,6 @@ import {
   sendContactCardMessage,
   sendMessage,
   setConversationArchived,
-  unblockUser,
 } from "./messaging-service";
 
 const { createSignedUrlMock, fromMock, insertMock, rpcMock, storageFromMock } = vi.hoisted(() => {
@@ -338,44 +336,6 @@ describe("fetchDirectConversationMeta", () => {
     await expect(fetchDirectConversationMeta("conversation-1")).rejects.toThrow(
       "Conversazione non trovata",
     );
-  });
-});
-
-describe("blockUser / unblockUser", () => {
-  beforeEach(() => {
-    rpcMock.mockReset();
-  });
-
-  it("calls block_user with the target profile id", async () => {
-    rpcMock.mockResolvedValue({ data: null, error: null });
-
-    await blockUser("profile-2");
-
-    expect(rpcMock).toHaveBeenCalledWith("block_user", {
-      target_profile_id: "profile-2",
-    });
-  });
-
-  it("throws when block_user errors", async () => {
-    rpcMock.mockResolvedValue({ data: null, error: new Error("Non puoi bloccare te stesso") });
-
-    await expect(blockUser("profile-1")).rejects.toThrow("Non puoi bloccare te stesso");
-  });
-
-  it("calls unblock_user with the target profile id", async () => {
-    rpcMock.mockResolvedValue({ data: null, error: null });
-
-    await unblockUser("profile-2");
-
-    expect(rpcMock).toHaveBeenCalledWith("unblock_user", {
-      target_profile_id: "profile-2",
-    });
-  });
-
-  it("throws when unblock_user errors", async () => {
-    rpcMock.mockResolvedValue({ data: null, error: new Error("boom") });
-
-    await expect(unblockUser("profile-2")).rejects.toThrow("boom");
   });
 });
 

@@ -126,6 +126,11 @@ export const DASHBOARD_CAPABILITIES = [
   // delle due dà accesso alle conversazioni, che dipende dalla membership.
   "groups_view",
   "groups_create",
+  // HOM-12 §11–§12: bloccare un profilo COME la Società è un potere esplicito, mai
+  // implicito nell'essere amministratore. Il titolare lo ha di suo (D3); il controllo
+  // «Bloccare profili» del catalogo DAS-REV-14 lo concede ad altri (il client invia
+  // sempre control id, mai chiavi). Va tenuto allineato al CHECK SQL.
+  "can_block_identity",
 ] as const;
 
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];

@@ -36,6 +36,23 @@ vi.mock("./profile-service", () => ({
   getCompleteProfessionalProfile: vi.fn(),
 }));
 
+// HOM-12: il cancello server precede il caricamento del profilo.
+const blockingMocks = vi.hoisted(() => ({
+  blockIdentity: vi.fn(),
+  fetchProfileAvailability: vi.fn(),
+  unblockIdentity: vi.fn(),
+}));
+
+vi.mock("../blocking/blocking-service", () => ({
+  blockIdentity: blockingMocks.blockIdentity,
+  fetchProfileAvailability: blockingMocks.fetchProfileAvailability,
+  unblockIdentity: blockingMocks.unblockIdentity,
+}));
+
+vi.mock("../interactions/interaction-service", () => ({
+  loadInteractionIdentity: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("../networking/networking-service", () => ({
   requestConnection: vi.fn(),
 }));
@@ -402,12 +419,114 @@ function buildDirectorProfile(): CompleteProfessionalProfile {
   };
 }
 
+async function flush() {
+  for (let turn = 0; turn < 8; turn += 1) {
+    await Promise.resolve();
+  }
+}
+
+function mockVisitorSession() {
+  vi.mocked(useSession).mockReturnValue({
+    isLoading: false,
+    needsOnboarding: false,
+    profile: {
+      avatar_url: null,
+      city: "Milano",
+      club_id: null,
+      club_name: null,
+      full_name: "Mario Rossi",
+      id: "user-1",
+      is_admin: false,
+      region: "Lombardia",
+      role: "player",
+    },
+    refreshProfile: vi.fn(),
+    session: { user: { id: "user-1" } } as never,
+  });
+}
+
+function textsOf(tree: TestRenderer.ReactTestRenderer): unknown[] {
+  return JSON.stringify(tree.toJSON()).match(/"([^"]+)"/g) ?? [];
+}
+
 describe("PublicProfileScreen", () => {
   beforeEach(() => {
     backMock.mockReset();
     localSearchParamsMock.mockReset();
     vi.mocked(useSession).mockReset();
     vi.mocked(getCompleteProfessionalProfile).mockReset();
+    blockingMocks.fetchProfileAvailability.mockReset();
+    blockingMocks.fetchProfileAvailability.mockResolvedValue({
+      blockId: null,
+      blocker: null,
+      name: null,
+      state: "available",
+    });
+  });
+
+  describe("HOM-12 availability gate", () => {
+    it("blocked by me: dedicated state with Sblocca, the profile is never loaded or rendered", async () => {
+      localSearchParamsMock.mockReturnValue({ id: "agent-2" });
+      mockVisitorSession();
+      blockingMocks.fetchProfileAvailability.mockResolvedValue({
+        blockId: "block-1",
+        blocker: { id: "user-1", type: "person" },
+        name: null,
+        state: "blocked_by_me",
+      });
+
+      let tree!: TestRenderer.ReactTestRenderer;
+      await act(async () => {
+        tree = TestRenderer.create(<PublicProfileScreen />);
+        await flush();
+      });
+
+      const text = textsOf(tree).join(" ");
+      expect(text).toContain("Hai bloccato questo profilo");
+      expect(text).toContain("Sblocca");
+      expect(getCompleteProfessionalProfile).not.toHaveBeenCalled();
+      expect(tree.root.findAllByProps({ testID: "blocked-by-me-state" }).length).toBeGreaterThan(0);
+    });
+
+    it("unavailable: neutral copy, no reason, no profile call", async () => {
+      localSearchParamsMock.mockReturnValue({ id: "agent-2" });
+      mockVisitorSession();
+      blockingMocks.fetchProfileAvailability.mockResolvedValue({
+        blockId: null,
+        blocker: null,
+        name: null,
+        state: "unavailable",
+      });
+
+      let tree!: TestRenderer.ReactTestRenderer;
+      await act(async () => {
+        tree = TestRenderer.create(<PublicProfileScreen />);
+        await flush();
+      });
+
+      const text = textsOf(tree).join(" ");
+      expect(text).toContain("Profilo non disponibile");
+      expect(text).toContain("Questo profilo non è disponibile.");
+      expect(text).not.toMatch(/bloccat/i);
+      expect(getCompleteProfessionalProfile).not.toHaveBeenCalled();
+    });
+
+    it("asks the gate before loading the profile", async () => {
+      localSearchParamsMock.mockReturnValue({ id: "agent-2" });
+      mockVisitorSession();
+      vi.mocked(getCompleteProfessionalProfile).mockResolvedValue(buildAgentProfile());
+
+      await act(async () => {
+        TestRenderer.create(<PublicProfileScreen />);
+        await flush();
+      });
+
+      expect(blockingMocks.fetchProfileAvailability).toHaveBeenCalledWith({
+        id: "agent-2",
+        type: "person",
+      });
+      expect(getCompleteProfessionalProfile).toHaveBeenCalledWith("agent-2");
+    });
   });
 
   it("redirects to the owner profile when the requested id matches the session user", () => {
@@ -464,8 +583,7 @@ describe("PublicProfileScreen", () => {
 
     await act(async () => {
       tree = TestRenderer.create(<PublicProfileScreen />);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
     });
 
     expect(tree.root.findByProps({ mode: "visitor" })).toBeTruthy();
@@ -503,8 +621,7 @@ describe("PublicProfileScreen", () => {
 
     await act(async () => {
       tree = TestRenderer.create(<PublicProfileScreen />);
-      await Promise.resolve();
-      await Promise.resolve();
+      await flush();
     });
 
     expect(tree.root.findByProps({ mode: "director" })).toBeTruthy();

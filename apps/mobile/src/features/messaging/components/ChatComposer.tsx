@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, sizes, spacing } from "../../../theme/tokens";
-import { ActionSheet, AppText } from "../../../ui";
+import { ActionSheet } from "../../../ui";
 
 type ChatComposerProps = {
   /** DAS-REV-32 §25: nei GROUP la condivisione contatto non esiste (il server la rifiuta). */
@@ -33,27 +33,25 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const [isAttachSheetVisible, setIsAttachSheetVisible] = useState(false);
 
-  if (blocked) {
-    return (
-      <View style={styles.blockedBar}>
-        <Ionicons color={colors.textMuted} name="ban-outline" size={16} />
-        <View style={styles.blockedTextWrap}>
-          <AppText color="muted" variant="bodySm">
-            Hai bloccato questo utente
-          </AppText>
-        </View>
-      </View>
-    );
-  }
-
-  const canSend = draft.trim().length > 0 && !isSending;
+  /*
+    HOM-12 §90, §98, §113, §246: con un Block attivo il composer resta al suo posto ma
+    disabilitato (in sola lettura, semanticamente esplicito). Il testo già digitato NON
+    si cancella: la bozza vive nella schermata e qui si mostra com'è. Lo stato del Block
+    lo racconta la riga sopra il composer (blocker) o l'avviso neutro (bloccato).
+  */
+  const canSend = !blocked && draft.trim().length > 0 && !isSending;
 
   return (
-    <View style={styles.bar}>
+    <View
+      accessibilityState={{ disabled: blocked }}
+      style={[styles.bar, blocked ? styles.barDisabled : null]}
+      testID={blocked ? "chat-composer-disabled" : undefined}
+    >
       <Pressable
         accessibilityLabel="Allega file"
         accessibilityRole="button"
-        disabled={isUploading}
+        accessibilityState={{ disabled: blocked || isUploading }}
+        disabled={blocked || isUploading}
         onPress={() => setIsAttachSheetVisible(true)}
         style={styles.attachButton}
       >
@@ -66,6 +64,9 @@ export function ChatComposer({
 
       <View style={styles.inputWrap}>
         <TextInput
+          accessibilityHint={blocked ? "Non puoi scrivere in questa conversazione." : undefined}
+          accessibilityState={{ disabled: blocked }}
+          editable={!blocked}
           multiline
           onChangeText={onChangeDraft}
           placeholder="Scrivi un messaggio..."
@@ -78,6 +79,7 @@ export function ChatComposer({
       <Pressable
         accessibilityLabel="Invia messaggio"
         accessibilityRole="button"
+        accessibilityState={{ disabled: !canSend }}
         disabled={!canSend}
         onPress={onSend}
         style={[styles.sendButton, !canSend ? styles.sendButtonDisabled : null]}
@@ -138,18 +140,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[10],
   },
-  blockedBar: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    flexDirection: "row",
-    gap: spacing[8],
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[10],
-  },
-  blockedTextWrap: {
-    flex: 1,
+  barDisabled: {
+    opacity: 0.5,
   },
   input: {
     color: colors.textPrimary,

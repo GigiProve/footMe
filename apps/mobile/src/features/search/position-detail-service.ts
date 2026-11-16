@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { fetchProfileAvailability } from "../blocking/blocking-service";
 
 /**
  * Stato dell'azione per l'utente corrente (DAS-REV-03 §15, §17).
@@ -122,6 +123,19 @@ export async function fetchPositionDetail(
   }
 
   const ad = adData as unknown as AdDetailRow;
+
+  // HOM-12 §129, §134, §173–§175: la posizione di una Società bloccata (in uno dei due
+  // versi) non è raggiungibile nemmeno da deep link, Salvati o vecchie notifiche. Si
+  // risponde come per una posizione non più pubblicata: stesso stato neutro, nessun
+  // motivo (§84). Il blocco del solo titolare PERSON non conta (§127, D2): il cancello
+  // guarda l'identità Società.
+  const clubId = ad.clubs?.id ?? ad.club_id;
+  if (clubId) {
+    const availability = await fetchProfileAvailability({ id: clubId, type: "society" });
+    if (availability.state !== "available") {
+      return null;
+    }
+  }
 
   return {
     action: (actionData as PositionActionState | null) ?? {

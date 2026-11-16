@@ -1,10 +1,18 @@
 import { ActionSheet, type ActionSheetAction } from "../../../ui";
+import { blockMenuLabel, unblockA11yLabel } from "../../blocking/blocking-presentation";
+
+/** «Sblocca {nome}» come voce di menu (stessa forma dell'etichetta accessibile del pulsante). */
+function unblockActionLabel(name: string | null | undefined): string {
+  return unblockA11yLabel(name);
+}
 
 type ChatActionsSheetProps = {
   isArchived: boolean;
   /** DAS-REV-32 §25: nei GROUP non c'è un profilo da aprire né un utente da bloccare/segnalare. */
   isGroup?: boolean;
   isBlocked: boolean;
+  /** HOM-12 §15: «Blocca {nome}» / «Sblocca {nome}»; assente = ripiego generico. */
+  otherName?: string | null;
   onArchiveToggle: () => void;
   onBlockToggle: () => void;
   onClose: () => void;
@@ -24,6 +32,7 @@ export function ChatActionsSheet({
   onOpenProfile,
   onReport,
   onSearch,
+  otherName,
   visible,
 }: ChatActionsSheetProps) {
   const searchAction: ActionSheetAction = {
@@ -49,7 +58,7 @@ export function ChatActionsSheet({
         {
           destructive: true,
           icon: "ban-outline",
-          label: isBlocked ? "Sblocca utente" : "Blocca utente",
+          label: isBlocked ? unblockActionLabel(otherName) : blockMenuLabel(otherName),
           onPress: onBlockToggle,
         },
         {

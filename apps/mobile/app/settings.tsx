@@ -7,6 +7,7 @@ import { Redirect, useRouter } from "expo-router";
 import { Screen } from "../src/components/ui/screen";
 import { KeyboardAwareForm } from "../src/components/ui/keyboard-aware-form";
 import { useSession } from "../src/features/auth/use-session";
+import { BLOCK_COPY } from "../src/features/blocking/blocking-presentation";
 import { supabase } from "../src/lib/supabase";
 import { colors, spacing } from "../src/theme/tokens";
 import { AppText, Badge, Button, Card, ListItem, SectionCard } from "../src/ui";
@@ -123,6 +124,25 @@ export default function SettingsScreen() {
             showDivider={false}
             subtitle="Richieste, candidature, attività, Store e altro"
             title="Preferenze notifiche"
+          />
+        </SectionCard>
+
+        {/* HOM-12 §141–§142: il luogo stabile dove gestire i profili bloccati. */}
+        <SectionCard
+          description={BLOCK_COPY.privacySectionDescription}
+          title={BLOCK_COPY.privacySection}
+        >
+          <ListItem
+            onPress={() => router.push("/blocked-profiles" as never)}
+            right={
+              <Ionicons
+                color={colors.textMuted}
+                name="chevron-forward"
+                size={20}
+              />
+            }
+            showDivider={false}
+            title={BLOCK_COPY.listTitle}
           />
         </SectionCard>
 
