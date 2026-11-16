@@ -1,44 +1,34 @@
 import React from "react";
-import { act } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setAnalyticsSink } from "../../../../lib/analytics";
 import {
+  FEED_INTRO_AREAS_TITLE,
   FEED_INTRO_BODY,
+  FEED_INTRO_CLOSE,
+  FEED_INTRO_EDIT_AREAS_A11Y,
+  FEED_INTRO_NOTE,
   FEED_INTRO_PRIMARY_CTA,
-  FEED_INTRO_SECONDARY_CTA,
-  FEED_INTRO_SHEET_SAVE,
   FEED_INTRO_TITLE,
 } from "../../feed-labels";
-import type { FeedIntroOption } from "../../feed-types";
-import { press, render, textOf } from "../feed-test-helpers";
-import { FeedPersonalizeModule, resetPromptImpressionForTests } from "./FeedPersonalizeModule";
+import type { FeedIntroArea } from "../../feed-types";
+import { countTestId, press, render, textOf } from "../feed-test-helpers";
+import { FeedPersonalizeModule, resetIntroImpressionForTests } from "./FeedPersonalizeModule";
 
-const OPTIONS: FeedIntroOption[] = [
-  { key: "wants_players", label: "Calciatori", prefill: false, isDerivable: false },
-  { key: "wants_clubs", label: "Società", prefill: true, isDerivable: true },
-  { key: "wants_positions", label: "Posizioni aperte", prefill: false, isDerivable: true },
-  { key: "wants_local_media", label: "Media locali", prefill: false, isDerivable: false },
+const AREAS: FeedIntroArea[] = [
+  { kind: "region", label: "Lombardia" },
+  { kind: "province", label: "Monza e Brianza" },
 ];
 
-function setup(options = OPTIONS) {
-  const props = { isSaving: false, onDismiss: vi.fn(), onSave: vi.fn(), options };
+function setup(areas: FeedIntroArea[] = AREAS, withEdit = true) {
+  const props = {
+    areas,
+    onClose: vi.fn(),
+    onEditAreas: withEdit ? vi.fn() : undefined,
+    onStart: vi.fn(),
+  };
 
   return { props, tree: render(<FeedPersonalizeModule {...props} />) };
-}
-
-function checkboxes(tree: ReturnType<typeof render>) {
-  return tree.root.findAll(
-    (node) =>
-      typeof node.type === "string" && node.props?.accessibilityRole === "checkbox",
-  );
-}
-
-function sheetVisible(tree: ReturnType<typeof render>): boolean {
-  const modal = tree.root.find(
-    (node) => typeof node.type === "string" && String(node.type) === "Modal",
-  );
-  return modal.props.visible === true;
 }
 
 function captureEvents() {
@@ -49,83 +39,75 @@ function captureEvents() {
 
 afterEach(() => {
   setAnalyticsSink(null);
-  resetPromptImpressionForTests();
+  resetIntroImpressionForTests();
 });
 
-describe("FeedPersonalizeModule", () => {
-  it("mostra il copy del §28 e le due azioni", () => {
+describe("FeedPersonalizeModule (HOM-13 D1)", () => {
+  it("mostra il copy dei §136–§139 e la CTA principale «Inizia»", () => {
     const json = textOf(setup().tree);
 
     expect(json).toContain(FEED_INTRO_TITLE);
     expect(json).toContain(FEED_INTRO_BODY);
+    expect(json).toContain(FEED_INTRO_NOTE);
     expect(json).toContain(FEED_INTRO_PRIMARY_CTA);
-    expect(json).toContain(FEED_INTRO_SECONDARY_CTA);
   });
 
-  /** §27: i quattro selettori non stanno più nella Home. */
-  it("non mostra le opzioni finché non si tocca Personalizza", () => {
+  it("non ha checkbox né il vecchio «Non ora» (§240, §146)", () => {
     const { tree } = setup();
 
-    expect(sheetVisible(tree)).toBe(false);
-
-    press(tree, FEED_INTRO_PRIMARY_CTA);
-
-    expect(sheetVisible(tree)).toBe(true);
+    const checkboxes = tree.root.findAll(
+      (node) => typeof node.type === "string" && node.props?.accessibilityRole === "checkbox",
+    );
+    expect(checkboxes).toHaveLength(0);
+    expect(textOf(tree)).not.toContain("Non ora");
+    expect(textOf(tree)).not.toContain("Personalizza");
   });
 
-  it("preseleziona nel foglio le opzioni deducibili dal profilo", () => {
-    const boxes = checkboxes(setup().tree);
+  it("mostra «Le tue aree» con i valori del profilo (§140–§141)", () => {
+    const json = textOf(setup().tree);
 
-    expect(boxes).toHaveLength(4);
-    expect(boxes[0].props.accessibilityState).toEqual({ checked: false });
-    expect(boxes[1].props.accessibilityState).toEqual({ checked: true });
+    expect(json).toContain(FEED_INTRO_AREAS_TITLE);
+    expect(json).toContain("Lombardia");
+    expect(json).toContain("Monza e Brianza");
   });
 
-  it("salva le sole opzioni selezionate", () => {
+  it("senza aree non mostra la sezione", () => {
+    const { tree } = setup([]);
+
+    expect(countTestId(tree, "feed-personalize-areas")).toBe(0);
+    expect(textOf(tree)).not.toContain(FEED_INTRO_AREAS_TITLE);
+  });
+
+  it("«Inizia» riconosce lo stato", () => {
     const { props, tree } = setup();
 
     press(tree, FEED_INTRO_PRIMARY_CTA);
-    act(() => {
-      checkboxes(tree)[0].props.onPress();
-    });
-    press(tree, FEED_INTRO_SHEET_SAVE);
 
-    expect(props.onSave).toHaveBeenCalledTimes(1);
-    const selected = props.onSave.mock.calls[0][0] as string[];
-    expect([...selected].sort()).toEqual(["wants_clubs", "wants_players"]);
+    expect(props.onStart).toHaveBeenCalledTimes(1);
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 
-  it("Non ora chiude senza salvare (§31)", () => {
+  it("l'accesso rapido chiude (§144)", () => {
     const { props, tree } = setup();
 
-    // La × fa la stessa cosa ma ha un'etichetta propria: lo screen reader non
-    // deve trovare due controlli "Non ora" identici.
-    press(tree, FEED_INTRO_SECONDARY_CTA);
-    press(tree, "Chiudi");
+    press(tree, FEED_INTRO_CLOSE);
 
-    expect(props.onDismiss).toHaveBeenCalledTimes(2);
-    expect(props.onSave).not.toHaveBeenCalled();
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(props.onStart).not.toHaveBeenCalled();
   });
 
-  it("traccia impression, apertura e rinvio del §69", () => {
-    const names = captureEvents();
-    const { tree } = setup();
+  it("«Modifica» porta all'editor del profilo (§142)", () => {
+    const { props, tree } = setup();
 
-    press(tree, FEED_INTRO_PRIMARY_CTA);
-    press(tree, FEED_INTRO_SECONDARY_CTA);
+    press(tree, FEED_INTRO_EDIT_AREAS_A11Y);
 
-    expect(names).toEqual([
-      "home_personalization_prompt_impression",
-      "home_personalization_opened",
-      "home_personalization_skipped",
-    ]);
+    expect(props.onEditAreas).toHaveBeenCalledTimes(1);
   });
-});
 
-describe("FeedPersonalizeModule — impression", () => {
-  afterEach(() => {
-    setAnalyticsSink(null);
-    resetPromptImpressionForTests();
+  it("senza route di editor «Modifica» non compare", () => {
+    const { tree } = setup(AREAS, false);
+
+    expect(() => press(tree, FEED_INTRO_EDIT_AREAS_A11Y)).toThrow();
   });
 
   it("conta l'impression una volta per sessione, non a ogni rimontaggio", () => {
@@ -134,6 +116,6 @@ describe("FeedPersonalizeModule — impression", () => {
     setup().tree.unmount();
     setup();
 
-    expect(names.filter((name) => name === "home_personalization_prompt_impression")).toHaveLength(1);
+    expect(names.filter((name) => name === "home_intro_impression")).toHaveLength(1);
   });
 });

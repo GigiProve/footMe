@@ -42,19 +42,19 @@ export type FeedAnalyticsEvent =
       targetType: "profile" | "club";
       targetId: string;
     }
-  | { name: "feed_personalize_tap"; options: string }
-  | { name: "feed_personalize_dismiss"; reason: "later" | "completed" }
   | { name: "feed_refresh"; scope: FeedScope; trigger: "pull" | "new_content_banner" }
   | { name: "feed_page_load"; scope: FeedScope; page: number }
   | { name: "feed_empty_state_shown"; scope: FeedScope; reason: "no_follows" | "no_content" }
   | { name: "feed_discover_profiles_tap"; scope: FeedScope }
   | { name: "feed_save_tap"; itemId: string; saved: boolean }
   | { name: "feed_item_menu_open"; itemType: FeedItemType }
-  // HOM-01.1 §69: il prompt di primo accesso. Nessuna proprietà: non serve
-  // altro per contare impression, aperture e rinvii.
-  | { name: "home_personalization_prompt_impression" }
-  | { name: "home_personalization_opened" }
-  | { name: "home_personalization_skipped" }
+  // HOM-13 D1 §135–§144: lo stato di primo accesso. Nessuna proprietà: serve a contare
+  // comparsa, «Inizia», accesso rapido e apertura dell'editor delle aree. Sostituisce gli
+  // eventi del prompt HOM-01.1 (`home_personalization_*`, `feed_personalize_*`).
+  | { name: "home_intro_impression" }
+  | { name: "home_intro_start" }
+  | { name: "home_intro_close" }
+  | { name: "home_intro_edit_areas" }
   // HOM-01.1 §70: la pill "Nuovi contenuti". La disponibilità NON è
   // un'impression degli elementi: quelle restano `feed_item_impression`,
   // registrate solo quando gli elementi sono davvero a schermo.

@@ -149,6 +149,13 @@ Il messaggio di commit usa il codice task: `DAS-REV-25 - Shortlist Position: agg
   Sblocca Profilo) in codice, non committato, migrazione `20261127090000` non
   applicata al remoto (vedi `feature-map.md`). Restano: ranking e discovery,
   notifiche social.
+  Aggiornamento 2026-11-16 (sera): HOM-12 committato; HOM-13 (Ranking,
+  personalizzazione e Discovery Feed) in codice, non committato. Per te è una
+  sessione con snapshot (`fetch_home_for_you_page`, `feed_sessions`), ranking
+  e config `feed_ranking.*` lato server, Seguiti invariato e cronologico;
+  primo accesso senza checkbox (`feed_preferences` non entra più nel ranking).
+  Migrazione `20261128090000` non applicata al remoto; test PGlite solo nello
+  scratchpad di sessione.
 - **Messaggi** — MES-03.1 (consolidamento Centro Notifiche, allineato a
   HOM-14), MES-04 (consolidamento messaggistica + identità Società),
   MES-05 (condivisione contatti).

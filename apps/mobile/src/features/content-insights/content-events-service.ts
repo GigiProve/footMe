@@ -141,7 +141,7 @@ export function emitContentEvent(input: ContentEventInput): void {
     const event = buildContentEvent(input, {
       eventId: newContentEventId(),
       occurredAt: new Date().toISOString(),
-      sessionId: getContentEventsSessionId(),
+      sessionId: input.sessionId || getContentEventsSessionId(),
     });
     if (!event) {
       return;

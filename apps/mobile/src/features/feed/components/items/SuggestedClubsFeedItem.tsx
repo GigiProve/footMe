@@ -13,7 +13,6 @@ import {
 } from "../../feed-labels";
 import { FEED_SUGGESTION_ROWS } from "../../feed-suggestions-service";
 import type { FeedSuggestedClubRow } from "../../feed-types";
-import { FeedModuleError } from "../modules/FeedModuleError";
 import { SuggestedProfilesSkeleton } from "../skeletons/FeedSkeleton";
 import { FeedItemFrame } from "./FeedItemFrame";
 import { FeedSectionHeader } from "./FeedSectionHeader";
@@ -24,7 +23,6 @@ type SuggestedClubsFeedItemProps = {
   isLoading: boolean;
   isError: boolean;
   pendingId: string | null;
-  onRetry: () => void;
   onSeeAll: () => void;
   onPressClub: (row: FeedSuggestedClubRow) => void;
   onToggleFollow: (row: FeedSuggestedClubRow) => void;
@@ -35,7 +33,6 @@ export function SuggestedClubsFeedItem({
   isLoading,
   isError,
   pendingId,
-  onRetry,
   onSeeAll,
   onPressClub,
   onToggleFollow,
@@ -44,12 +41,9 @@ export function SuggestedClubsFeedItem({
     return <SuggestedProfilesSkeleton />;
   }
 
+  // HOM-13 §269–§271: un errore del modulo lo nasconde, il Feed continua.
   if (isError) {
-    return (
-      <FeedItemFrame>
-        <FeedModuleError onRetry={onRetry} title={FEED_SUGGESTED_CLUBS_TITLE} />
-      </FeedItemFrame>
-    );
+    return null;
   }
 
   const visible = (rows ?? []).slice(0, FEED_SUGGESTION_ROWS);

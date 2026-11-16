@@ -10,6 +10,7 @@ import { Linking } from "react-native";
 import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { completeOAuthSessionFromUrl } from "./oauth";
 import { discardContentEvents } from "../content-insights/content-events-service";
+import { discardFeedEvents } from "../feed/feed-events-service";
 import { resetUserInteractions } from "../interactions/reset-user-interactions";
 import { supabase } from "../../lib/supabase";
 
@@ -174,6 +175,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           // HOM-05 §149: eventi analytics di una sessione chiusa non devono
           // partire a nome del prossimo account.
           discardContentEvents();
+          discardFeedEvents();
           setProfile(null);
           setIsLoading(false);
           return;

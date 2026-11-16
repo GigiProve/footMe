@@ -53,7 +53,9 @@ export function FeedItemHeader({
   const meta =
     metaLine !== undefined
       ? (metaLine ?? "")
-      : [item.publishedAt ? formatRelativeTime(item.publishedAt) : null, kindLabel, item.reasonLabel]
+      : // HOM-13 §214–§216, §280–§282: nessuna reason sulle card dei contenuti («Dalla tua
+        // zona», «Consigliato»…). Solo tempo e tipologia.
+        [item.publishedAt ? formatRelativeTime(item.publishedAt) : null, kindLabel]
           .filter(Boolean)
           .join(" · ");
 

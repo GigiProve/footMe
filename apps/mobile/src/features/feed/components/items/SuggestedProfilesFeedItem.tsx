@@ -14,7 +14,6 @@ import {
 } from "../../feed-labels";
 import { FEED_SUGGESTION_ROWS } from "../../feed-suggestions-service";
 import type { FeedSuggestedProfileRow } from "../../feed-types";
-import { FeedModuleError } from "../modules/FeedModuleError";
 import { SuggestedProfilesSkeleton } from "../skeletons/FeedSkeleton";
 import { FeedItemFrame } from "./FeedItemFrame";
 import { FeedSectionHeader } from "./FeedSectionHeader";
@@ -25,7 +24,6 @@ type SuggestedProfilesFeedItemProps = {
   isLoading: boolean;
   isError: boolean;
   pendingId: string | null;
-  onRetry: () => void;
   onSeeAll: () => void;
   onPressProfile: (row: FeedSuggestedProfileRow) => void;
   onToggleFollow: (row: FeedSuggestedProfileRow) => void;
@@ -36,7 +34,6 @@ export function SuggestedProfilesFeedItem({
   isLoading,
   isError,
   pendingId,
-  onRetry,
   onSeeAll,
   onPressProfile,
   onToggleFollow,
@@ -45,17 +42,14 @@ export function SuggestedProfilesFeedItem({
     return <SuggestedProfilesSkeleton />;
   }
 
+  // HOM-13 §269–§271: un errore del modulo lo NASCONDE, il Feed continua.
   if (isError) {
-    return (
-      <FeedItemFrame>
-        <FeedModuleError onRetry={onRetry} title={FEED_SUGGESTED_PROFILES_TITLE} />
-      </FeedItemFrame>
-    );
+    return null;
   }
 
   const visible = (rows ?? []).slice(0, FEED_SUGGESTION_ROWS);
 
-  // Nessuna riga: lo slot sparisce del tutto, cornice compresa (§57).
+  // HOM-13 §4, §191: zero righe = modulo omesso, cornice compresa (§57). Mai riempire.
   if (visible.length === 0) {
     return null;
   }

@@ -1,16 +1,15 @@
 /**
- * Modulo di primo accesso "Personalizza il tuo Feed" (§6).
+ * Stato di primo accesso del Feed (HOM-13 D1, §135–§146; evoluzione di HOM-01.1 §27–§31).
  *
- * Il §6 è categorico su due punti e questo hook li rispetta entrambi:
- *  • non è una pagina esterna né un onboarding separato: è un modulo temporaneo
- *    dentro la Home, reso nel `ListHeaderComponent` della tab Per te;
- *  • dopo il completamento o la chiusura non deve occupare permanentemente il
- *    Feed. Lo stato autorevole è server-side (`feed_preferences.intro_state`),
- *    così sopravvive alla reinstallazione; una copia locale evita che il modulo
- *    lampeggi durante il primo caricamento.
+ * Due punti del brief restano e questo hook li rispetta:
+ *  • non è una pagina esterna né un onboarding: è un modulo dentro la Home, reso nel
+ *    `ListHeaderComponent` della tab Per te (§135, §237);
+ *  • compare UNA volta sola. Lo stato autorevole è server-side (`should_show`, vero solo
+ *    con `intro_state = 'pending'`), quindi sopravvive alla reinstallazione; una copia
+ *    locale evita che il modulo lampeggi tra il tap e il refetch.
  *
- * La personalizzazione non è obbligatoria: "Lo farò più tardi" chiude il modulo
- * e la Home resta pienamente usabile con i dati già presenti nel profilo.
+ * «Inizia» e l'accesso rapido chiamano la stessa RPC `acknowledge_feed_intro` (§143–§144):
+ * nessuna selezione obbligatoria (§145), nessuna riproposta (§146, §148).
  */
 
 import { useCallback, useState } from "react";
@@ -18,13 +17,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { trackFeed } from "./feed-analytics";
 import { saveFeedCacheMeta, type CachedFeedFirstAccess } from "./feed-cache";
+import { shouldShowIntro } from "./feed-intro-presentation";
+import { acknowledgeFeedIntro, fetchMyFeedIntro } from "./feed-intro-service";
 import { FEED_QK } from "./feed-keys";
-import {
-  dismissFeedIntro,
-  fetchMyFeedIntro,
-  setFeedPreferences,
-} from "./feed-preferences-service";
-import type { FeedPreferenceKey } from "./feed-types";
+
+export type FeedIntroDismissReason = "start" | "close";
 
 export function useFeedFirstAccess({
   profileId,
@@ -43,55 +40,36 @@ export function useFeedFirstAccess({
     queryKey: FEED_QK.intro(profileId),
   });
 
-  const resolve = useCallback(
-    (patch: Partial<CachedFeedFirstAccess>) => {
+  const acknowledge = useMutation({
+    mutationFn: acknowledgeFeedIntro,
+    onMutate: () => {
       setResolvedLocally(true);
       if (profileId) {
-        void saveFeedCacheMeta(profileId, { firstAccess: patch });
+        void saveFeedCacheMeta(profileId, {
+          firstAccess: { personalizeCompletedAt: new Date().toISOString() },
+        });
       }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: FEED_QK.intro(profileId) });
     },
-    [profileId, queryClient],
+  });
+
+  const resolve = useCallback(
+    (reason: FeedIntroDismissReason) => {
+      trackFeed({ name: reason === "start" ? "home_intro_start" : "home_intro_close" });
+      acknowledge.mutate();
+    },
+    [acknowledge],
   );
 
-  const save = useMutation({
-    mutationFn: (selected: readonly FeedPreferenceKey[]) => setFeedPreferences(selected),
-    onMutate: (selected) => {
-      trackFeed({ name: "feed_personalize_tap", options: selected.join(",") });
-      trackFeed({ name: "feed_personalize_dismiss", reason: "completed" });
-      resolve({ personalizeCompletedAt: new Date().toISOString() });
-    },
-    onSuccess: () => {
-      // Le preferenze cambiano i suggerimenti: vanno ricaricati.
-      void queryClient.invalidateQueries({
-        queryKey: FEED_QK.suggestedProfiles(profileId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: FEED_QK.suggestedClubs(profileId),
-      });
-    },
-  });
-
-  const dismiss = useMutation({
-    mutationFn: dismissFeedIntro,
-    onMutate: () => {
-      trackFeed({ name: "feed_personalize_dismiss", reason: "later" });
-      resolve({ personalizeDismissedAt: new Date().toISOString() });
-    },
-  });
-
-  const locallyResolved =
-    isResolvedLocally ||
-    !!cachedFirstAccess?.personalizeCompletedAt ||
-    !!cachedFirstAccess?.personalizeDismissedAt;
+  const locallyResolved = isResolvedLocally || !!cachedFirstAccess?.personalizeCompletedAt;
 
   return {
-    // Un errore sull'intro non deve MAI bloccare il Feed: il modulo si nasconde
-    // e basta (§23).
-    isVisible: introQuery.data?.shouldShow === true && !locallyResolved,
-    options: introQuery.data?.options ?? [],
-    dismiss: () => dismiss.mutate(),
-    save: (selected: readonly FeedPreferenceKey[]) => save.mutate(selected),
-    isSaving: save.isPending,
+    areas: introQuery.data?.areas ?? [],
+    // Un errore sull'intro non deve MAI bloccare il Feed: il modulo si nasconde e basta (§23).
+    isVisible: shouldShowIntro(introQuery.data, locallyResolved),
+    start: () => resolve("start"),
+    close: () => resolve("close"),
   };
 }

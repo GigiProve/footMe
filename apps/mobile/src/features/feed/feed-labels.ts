@@ -27,19 +27,27 @@ export const FEED_TAB_LABELS: Record<FeedScope, string> = {
   seguiti: "Seguiti",
 };
 
-// ── Modulo di primo accesso (HOM-01.1 §28) ──────────────────────
-export const FEED_INTRO_TITLE = "Personalizza ciò che vuoi vedere";
+// ── Stato di primo accesso (HOM-13 §135–§144, D1) ───────────────
+// Sostituisce il prompt «Personalizza ciò che vuoi vedere» di HOM-01.1: niente
+// checkbox, niente «Non ora» con riproposta. Una sola volta.
+export const FEED_INTRO_EYEBROW = "Il tuo Feed";
+/** §136. */
+export const FEED_INTRO_TITLE = "Rendiamo il tuo Feed più utile fin da subito";
+/** §138. */
 export const FEED_INTRO_BODY =
-  "Dicci cosa ti interessa per rendere il Feed ancora più rilevante.";
-export const FEED_INTRO_PRIMARY_CTA = "Personalizza";
-export const FEED_INTRO_SECONDARY_CTA = "Non ora";
-/**
- * Il foglio che «Personalizza» apre (§30): riusa le quattro opzioni e il
- * salvataggio di HOM-01, cambia solo il punto d'accesso.
- */
-export const FEED_INTRO_SHEET_BODY =
-  "PROLINK utilizzerà il tuo ruolo, le aree di interesse e i profili che segui per mostrarti contenuti più rilevanti.";
-export const FEED_INTRO_SHEET_SAVE = "Salva preferenze";
+  "Partiamo dalle aree che ti interessano. Per il resto, PROLINK imparerà progressivamente da ciò che guardi e dalle persone con cui interagisci.";
+/** §139. */
+export const FEED_INTRO_NOTE =
+  "Queste preferenze servono a dare priorità ai contenuti, non a escludere persone o categorie dal Feed.";
+/** §141. */
+export const FEED_INTRO_AREAS_TITLE = "Le tue aree";
+/** §142: porta al normale editor del profilo. */
+export const FEED_INTRO_EDIT_AREAS = "Modifica";
+export const FEED_INTRO_EDIT_AREAS_A11Y = "Modifica le tue aree nel profilo";
+/** §143. */
+export const FEED_INTRO_PRIMARY_CTA = "Inizia";
+/** §144: accesso rapido, la stessa azione di «Inizia». */
+export const FEED_INTRO_CLOSE = "Chiudi";
 
 // ── Posizione suggerita (§9) ────────────────────────────────────
 export const FEED_POSITION_OVERLINE = "Per te";

@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "../../lib/supabase";
+import { isFeedSessionExpired } from "./feed-session-presentation";
 import type {
   FeedFollowingStateRow,
   FeedScope,
@@ -32,6 +33,33 @@ export async function fetchHomeFeedUpdates(
   });
 
   if (error) {
+    throw error;
+  }
+
+  const row = ((data ?? []) as FeedUpdatesRow[])[0];
+
+  return {
+    newItemsCount: Number(row?.new_items_count ?? 0),
+    newestPublishedAt: row?.newest_published_at ?? null,
+    previewAvatarUrls: row?.preview_avatar_urls ?? [],
+  };
+}
+
+/**
+ * HOM-13 §2, §232: i nuovi contenuti di Per te rispetto a UNA sessione (pubblicati dopo
+ * il suo `as_of` e non già emessi). Il tap sulla pill crea una sessione nuova; qui si
+ * conta soltanto. Una sessione scaduta (`feed_session_expired`) non è un errore da
+ * mostrare: nessuna pill, e la prossima sessione la sostituisce.
+ */
+export async function fetchHomeForYouUpdates(sessionId: string): Promise<FeedUpdates> {
+  const { data, error } = await supabase.rpc("fetch_home_for_you_updates", {
+    p_session_id: sessionId,
+  });
+
+  if (error) {
+    if (isFeedSessionExpired(error)) {
+      return { newItemsCount: 0, newestPublishedAt: null, previewAvatarUrls: [] };
+    }
     throw error;
   }
 

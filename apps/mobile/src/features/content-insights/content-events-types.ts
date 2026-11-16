@@ -87,6 +87,11 @@ export type ContentEventInput = {
   postId: string;
   source: ContentEventSource;
   props?: ContentEventProps;
+  /**
+   * HOM-13 §252–§256: l'attribuzione al Feed. Per un'impression della Home è il
+   * `feed_session_id` (Per te) o l'id locale di Seguiti; assente = la sessione dell'app.
+   */
+  sessionId?: string | null;
 };
 
 /** Il JSON esatto di un elemento di `p_events` (snake_case, come il contratto). */

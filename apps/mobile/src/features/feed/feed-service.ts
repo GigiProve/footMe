@@ -9,6 +9,9 @@
  * HOM-03: Articolo e video editoriale passano dagli stessi lettori del Post
  * (§38, §104), più due letture leggere: lo stato dei media in elaborazione
  * (§65–66) e lo stato Mi piace del dettaglio legacy (§104).
+ *
+ * HOM-13: Per te passa da `fetchHomeForYouPage` (sessione + cursore di posizione,
+ * §81–§97, §221–§224); Seguiti resta su `fetchHomeFeedPage`, invariata (§267).
  */
 
 import { supabase } from "../../lib/supabase";
@@ -33,6 +36,7 @@ import {
   type FeedContentItem,
   type FeedContentType,
   type FeedCursor,
+  type FeedForYouRow,
   type FeedItem,
   type FeedItemRow,
   type FeedItemType,
@@ -43,9 +47,15 @@ import {
   type FeedPageParam,
   type FeedPostItem,
   type FeedReasonKey,
+  type FeedRowCore,
   type FeedScope,
   type MediaContentType,
 } from "./feed-types";
+import {
+  dedupeByUnitId,
+  isFeedSessionExpired,
+  newSessionParam,
+} from "./feed-session-presentation";
 
 /** 10 e non 20: ogni riga porta un payload jsonb (vedi header dell'RPC). */
 export const FEED_PAGE_SIZE = 10;
@@ -116,7 +126,7 @@ function readBoolean(data: Record<string, unknown> | null, key: string): boolean
 }
 
 function buildNav(
-  row: FeedItemRow,
+  row: FeedRowCore,
 ): { kind: FeedNavKind; params: Record<string, string> } | null {
   if (row.nav_kind !== "content" && row.nav_kind !== "position") {
     return null;
@@ -132,7 +142,7 @@ function buildNav(
   return { kind: row.nav_kind, params };
 }
 
-function buildAuthor(row: FeedItemRow) {
+function buildAuthor(row: FeedRowCore) {
   if (!row.author_id || !row.author_kind || !row.author_name) {
     return null;
   }
@@ -152,14 +162,23 @@ function buildAuthor(row: FeedItemRow) {
  * tipo sconosciuto, oppure payload incompleto per quel tipo (un post senza
  * post_id non è apribile e non deve occupare uno slot).
  */
-export function mapFeedRow(row: FeedItemRow): FeedItem | null {
+export function mapFeedRow(
+  row: FeedRowCore,
+  options?: {
+    /** HOM-13 §224: `feed_unit_id`, la chiave stabile della unit (default `item_uid`). */
+    unitId?: string | null;
+    /** HOM-13 §227: la sessione Per te che ha emesso la riga. */
+    sessionId?: string | null;
+  },
+): FeedItem | null {
   const type = asItemType(row.item_type);
   if (!type) {
     return null;
   }
 
   const envelope = {
-    id: row.item_uid,
+    id: options?.unitId || row.item_uid,
+    ...(options?.sessionId ? { feedSessionId: options.sessionId } : {}),
     rank: row.rank_position,
     version: row.component_version,
     layoutHint: asLayoutHint(row.layout_hint),
@@ -182,7 +201,11 @@ export function mapFeedRow(row: FeedItemRow): FeedItem | null {
       type,
       payload: {
         moduleKey: type,
-        moduleLimit: readNumber(row.data, "module_limit") ?? 6,
+        // HOM-13 §4: massimo 3 righe per modulo; `module_index` sceglie la fetta.
+        moduleIndex: readNumber(row.data, "module_index") ?? 0,
+        identityType: readString(row.data, "identity_type"),
+        identityId: readString(row.data, "identity_id"),
+        moduleLimit: readNumber(row.data, "module_limit") ?? 3,
       },
     };
   }
@@ -370,7 +393,7 @@ export async function fetchHomeFeedPage({
 
   return {
     items: rows
-      .map(mapFeedRow)
+      .map((row) => mapFeedRow(row))
       .filter((item): item is FeedItem => item !== null)
       .map((item) => ({ ...item, fetchedAt })),
     pageIndex,
@@ -379,6 +402,100 @@ export async function fetchHomeFeedPage({
     asOf: first?.as_of ?? cursor?.asOf ?? new Date().toISOString(),
     nextCursor: first ? readCursor(first) : null,
     isLastPage: first ? first.is_last_page === true : true,
+  };
+}
+
+/**
+ * HOM-13 §1–§3: Per te come sessione. `session.sessionId` null crea lo snapshot (con
+ * l'identità attiva, SOLO in creazione: nelle pagine successive è fissata nella
+ * sessione); valorizzato legge la pagina con `position > afterPosition`.
+ *
+ * `P0002` / `feed_session_expired` (sessione altrui, inesistente o scaduta) ripartono
+ * qui con una sessione nuova, in modo trasparente (§228): il chiamante riceve una pagina
+ * normale con `session.isNew = true`. Qualunque altro errore si propaga.
+ */
+export async function fetchHomeForYouPage({
+  pageParam,
+  pageSize = FEED_PAGE_SIZE,
+}: {
+  pageParam: FeedPageParam;
+  pageSize?: number;
+}): Promise<FeedPage> {
+  const fetchedAt = Date.now();
+  const requested = pageParam.session ?? newSessionParam(null);
+  const limit = requested.limit ?? pageSize;
+
+  const call = (param: typeof requested) =>
+    supabase.rpc("fetch_home_for_you_page", {
+      p_after_position: param.sessionId ? param.afterPosition : null,
+      p_identity_id: param.sessionId ? null : (param.identity?.id ?? null),
+      p_identity_type: param.sessionId ? null : (param.identity?.type ?? null),
+      p_limit: limit,
+      p_session_id: param.sessionId,
+    });
+
+  let response = await call(requested);
+  let startedNew = requested.sessionId === null;
+
+  if (response.error && requested.sessionId && isFeedSessionExpired(response.error)) {
+    response = await call(newSessionParam(requested.identity ?? null));
+    startedNew = true;
+  }
+
+  if (response.error) {
+    throw response.error;
+  }
+
+  return mapForYouPage((response.data ?? []) as FeedForYouRow[], {
+    fetchedAt,
+    limit,
+    pageIndex: pageParam.pageIndex,
+    requestedSessionId: startedNew ? null : requested.sessionId,
+    startedNew,
+  });
+}
+
+/**
+ * Righe di Per te -> pagina. Pura (testabile): i valori scalari di sessione sono uguali
+ * su tutte le righe, si leggono dalla prima. Zero righe = pagina vuota e ultima; il
+ * Feed «davvero vuoto» è una sessione nuova senza righe.
+ */
+export function mapForYouPage(
+  rows: readonly FeedForYouRow[],
+  context: {
+    fetchedAt: number;
+    limit: number;
+    pageIndex: number;
+    requestedSessionId: string | null;
+    startedNew: boolean;
+  },
+): FeedPage {
+  const first = rows[0];
+  const sessionId = first?.feed_session_id ?? context.requestedSessionId;
+  const isLastPage = first ? first.is_last_page === true : true;
+
+  const items = dedupeByUnitId(
+    rows
+      .map((row) => mapFeedRow(row, { sessionId: row.feed_session_id, unitId: row.feed_unit_id }))
+      .filter((item): item is FeedItem => item !== null)
+      .map((item) => ({ ...item, fetchedAt: context.fetchedAt })),
+  );
+
+  return {
+    asOf: new Date(context.fetchedAt).toISOString(),
+    isLastPage,
+    items,
+    nextCursor: null,
+    pageIndex: context.pageIndex,
+    session: sessionId
+      ? {
+          feedSessionId: sessionId,
+          isNew: context.startedNew,
+          limit: context.limit,
+          nextPosition: isLastPage ? null : (first?.next_position ?? null),
+          rankingVersion: first?.ranking_version ?? null,
+        }
+      : null,
   };
 }
 

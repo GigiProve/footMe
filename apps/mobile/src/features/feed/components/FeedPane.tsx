@@ -77,7 +77,15 @@ import { useSeedLikes, useToggleFeedPostLike } from "../use-feed-post-like";
 import { useFeedNewContent } from "../use-feed-new-content";
 import { useFeedScrollRestore } from "../use-feed-scroll-restore";
 import { useFeedSessionSeen } from "../use-feed-session-seen";
-import { useSuggestedClubs, useSuggestedProfiles } from "../use-feed-suggestions";
+import {
+  useFeedModuleRows,
+  useSuggestedClubs,
+  useSuggestedProfiles,
+} from "../use-feed-suggestions";
+import { useSession } from "../../auth/use-session";
+import { emitFeedEvent, getSeguitiLocalSessionId } from "../feed-events-service";
+import { unitEventInput } from "../feed-events-presentation";
+import { introEditHref } from "../feed-intro-presentation";
 import { FeedList } from "./FeedList";
 import type {
   FeedIdentityTarget,
@@ -129,8 +137,12 @@ export function FeedPane({
         ? (source) => unfollowedSourcesStore.has(followSourceKey(source))
         : undefined,
   });
-  const profilesQuery = useSuggestedProfiles(profileId);
-  const clubsQuery = useSuggestedClubs(profileId);
+  // HOM-13 §4, §269–§271: i moduli di Per te sono query indipendenti, una per unit.
+  const moduleRows = useFeedModuleRows(profileId, scope === "per_te" ? items : []);
+  // «Scopri chi seguire» (§236): solo lo stato vuoto di Seguiti usa l'elenco piatto.
+  const profilesQuery = useSuggestedProfiles(profileId, scope === "seguiti");
+  const clubsQuery = useSuggestedClubs(profileId, scope === "seguiti");
+  const { profile } = useSession();
   const toggleSaved = useToggleSavedFeedItem({ profileId, scope });
   const toggleFollow = useToggleFollowSuggestion({ profileId, scope });
   const toggleLike = useToggleFeedPostLike({ profileId });
@@ -159,6 +171,42 @@ export function FeedPane({
     scope,
   });
 
+  // §254–§255: stato delle righe di un modulo suggeriti; "n/a" per le altre unit.
+  const rowsOfModule = (item: FeedItem): "n/a" | "loading" | "empty" | "rows" => {
+    const state =
+      item.type === "suggested_profiles"
+        ? moduleRows.profiles(item)
+        : item.type === "suggested_clubs"
+          ? moduleRows.clubs(item)
+          : null;
+    if (!state) {
+      return "n/a";
+    }
+    if (state.isError) {
+      return "empty";
+    }
+    if (state.rows === undefined) {
+      return "loading";
+    }
+    return state.rows.length > 0 ? "rows" : "empty";
+  };
+
+  // Un modulo visto mentre le righe erano in caricamento è già marcato «visto»: la sua
+  // impression parte qui, appena le righe arrivano (mai se il modulo resta vuoto o fallisce).
+  const pendingModuleImpressions = useRef(new Map<string, FeedItem>());
+  useEffect(() => {
+    for (const [key, item] of pendingModuleImpressions.current) {
+      const state = rowsOfModule(item);
+      if (state === "loading") {
+        continue;
+      }
+      pendingModuleImpressions.current.delete(key);
+      if (state === "rows") {
+        emitFeedEvent(unitEventInput(item, scope, "impression"));
+      }
+    }
+  });
+
   const scroll = useFeedScrollRestore({
     hydratedFromCache: feed.hydratedFromCache,
     itemCount: feed.items.length,
@@ -168,7 +216,12 @@ export function FeedPane({
     scope,
   });
 
-  const newContent = useFeedNewContent({ profileId, scope, since: feed.asOf });
+  const newContent = useFeedNewContent({
+    profileId,
+    scope,
+    sessionId: feed.sessionId,
+    since: feed.asOf,
+  });
   const connectivity = useFeedConnectivity({
     error: feed.error,
     hasCachedItems: feed.items.length > 0,
@@ -198,6 +251,8 @@ export function FeedPane({
 
   const handlers = {
     onOpenItem: (item: FeedItem) => {
+      // HOM-13 §256, §259: apertura di contenuto o Posizione, con tab e sessione.
+      emitFeedEvent(unitEventInput(item, scope, "open"));
       if (item.type === "suggested_position") {
         trackFeed({
           name: "feed_position_open",
@@ -342,7 +397,22 @@ export function FeedPane({
   };
 
 
+  /** HOM-13 §256, §259: il follow nato dal Feed, con la sessione che l'ha esposto. */
+  const trackFollowFromFeed = (row: { entity_id: string; is_following: boolean }, type: "profile" | "club") => {
+    // Solo il «Segui»: smettere di seguire non è un risultato professionale del Feed.
+    if (!row.is_following) {
+      emitFeedEvent({
+        eventType: "follow_from_feed",
+        feedSessionId: feed.sessionId,
+        tab: scope,
+        targetId: row.entity_id,
+        targetType: type,
+      });
+    }
+  };
+
   const followProfileRow = (row: FeedSuggestedProfileRow) => {
+    trackFollowFromFeed(row, "profile");
     setPendingFollowId(row.entity_id);
     toggleFollow.mutate(
       { isFollowing: row.is_following, targetId: row.entity_id, targetType: "profile" },
@@ -351,6 +421,7 @@ export function FeedPane({
   };
 
   const followClubRow = (row: FeedSuggestedClubRow) => {
+    trackFollowFromFeed(row, "club");
     setPendingFollowId(row.entity_id);
     toggleFollow.mutate(
       { isFollowing: row.is_following, targetId: row.entity_id, targetType: "club" },
@@ -359,15 +430,26 @@ export function FeedPane({
   };
 
   const modules: FeedModulesState = {
-    clubs: {
-      isError: clubsQuery.isError,
-      isLoading: clubsQuery.isLoading,
-      retry: () => void clubsQuery.refetch(),
-      rows: clubsQuery.data,
+    clubs: moduleRows.clubs,
+    onPressSuggestedClub: (row) => {
+      emitFeedEvent({
+        eventType: "suggested_profile_open",
+        feedSessionId: feed.sessionId,
+        tab: scope,
+        targetId: row.entity_id,
+        targetType: "club",
+      });
+      openHref(`/club/${row.entity_id}`);
     },
-    onPressSuggestedClub: (row) => openHref(`/club/${row.entity_id}`),
     onPressSuggestedProfile: (row) => {
       trackFeed({ name: "feed_suggested_profile_open", profileId: row.entity_id, scope });
+      emitFeedEvent({
+        eventType: "suggested_profile_open",
+        feedSessionId: feed.sessionId,
+        tab: scope,
+        targetId: row.entity_id,
+        targetType: "profile",
+      });
       openHref(`/profile/${row.entity_id}`);
     },
     onSeeAllClubs: () => openHref("/search/clubs"),
@@ -375,12 +457,7 @@ export function FeedPane({
     onToggleFollowClub: followClubRow,
     onToggleFollowProfile: followProfileRow,
     pendingFollowId,
-    profiles: {
-      isError: profilesQuery.isError,
-      isLoading: profilesQuery.isLoading,
-      retry: () => void profilesQuery.refetch(),
-      rows: profilesQuery.data,
-    },
+    profiles: moduleRows.profiles,
   };
 
   // §25: "stato vuoto visualizzato". Una volta sola per montaggio, e solo
@@ -430,7 +507,9 @@ export function FeedPane({
 
     newContentTrackedRef.current = true;
     trackFeed({ count: newContent.count, name: "feed_new_content_available", scope });
-  }, [newContent.count, scope, showNewContent]);
+    // HOM-13 §259: la comparsa della pill, una per comparsa e solo nella tab visibile.
+    emitFeedEvent({ eventType: "new_content_pill_shown", feedSessionId: feed.sessionId, tab: scope });
+  }, [feed.sessionId, newContent.count, scope, showNewContent]);
 
   // §16: skeleton solo quando non c'è davvero nulla. Con contenuti in cache la
   // schermata non viene mai sostituita da un loader.
@@ -449,6 +528,9 @@ export function FeedPane({
     return <FeedErrorState detail={feed.error?.message ?? null} onRetry={feed.retry} />;
   }
 
+  // HOM-13 §142: «Modifica» apre l'editor del profilo esistente per il ruolo dell'utente.
+  const introEditRoute = introEditHref(profile?.role);
+
   // HOM-01.1 §24: Seguiti non ha più un helper sotto le tab.
   const header = (
     <View>
@@ -456,10 +538,10 @@ export function FeedPane({
       {scope === "per_te" && intro.isVisible ? (
         <View style={styles.introSpacing}>
           <FeedPersonalizeModule
-            isSaving={intro.isSaving}
-            onDismiss={intro.dismiss}
-            onSave={intro.save}
-            options={intro.options}
+            areas={intro.areas}
+            onClose={intro.close}
+            onEditAreas={introEditRoute ? () => openHref(introEditRoute) : undefined}
+            onStart={intro.start}
           />
         </View>
       ) : null}
@@ -518,16 +600,32 @@ export function FeedPane({
               );
             }
 
-            if (seen.markSeen(item.id)) {
-              // HOM-05 §32–33: la stessa impression (≥50%, ≥350ms) va al server;
-              // il server deduplica per finestra, il registro di sessione resta.
+            // HOM-13: la chiave di «già visto» include la sessione Per te, perché gli id dei
+            // moduli (`module:suggested_profiles:<n>`) ripartono da 0 a ogni sessione.
+            const seenKey = item.feedSessionId ? `${item.feedSessionId}:${item.id}` : item.id;
+            if (seen.markSeen(seenKey)) {
+              // HOM-05 §32–33, HOM-13 §252–§256: la stessa impression (≥50%, ≥350ms) va al
+              // server con l'attribuzione al Feed: `session_id` = `feed_session_id` in Per te,
+              // l'id locale in Seguiti. Il server deduplica per finestra.
               if (isContentItem(item)) {
                 emitContentEvent({
                   contentType: item.payload.contentType,
                   eventType: "impression",
                   postId: item.payload.postId,
+                  sessionId:
+                    scope === "per_te" ? item.feedSessionId : getSeguitiLocalSessionId(),
                   source: sourceForScope(scope),
                 });
+              }
+
+              // §254–§255: Opportunity e suggeriti si registrano a parte. Un modulo con le
+              // righe ancora in caricamento resta in attesa (l'effetto sopra lo emette quando
+              // arrivano); un modulo senza righe non è a schermo, quindi non è un'impression.
+              const moduleRowsState = rowsOfModule(item);
+              if (moduleRowsState === "loading") {
+                pendingModuleImpressions.current.set(seenKey, item);
+              } else if (moduleRowsState !== "empty") {
+                emitFeedEvent(unitEventInput(item, scope, "impression"));
               }
 
               trackFeed({
@@ -572,6 +670,12 @@ export function FeedPane({
               // Mai il contrario, altrimenti la lista salta sotto il dito. La
               // dedup per id di `mergeFeedPages` evita i duplicati.
               trackFeed({ name: "feed_new_content_tap", scope });
+              // HOM-13 §92, §259: il tap crea una sessione Feed nuova (`feed.refresh`).
+              emitFeedEvent({
+                eventType: "new_content_pill_tap",
+                feedSessionId: feed.sessionId,
+                tab: scope,
+              });
               scroll.scrollToTop(true);
               newContent.dismiss();
               feed.refresh("new_content_banner");

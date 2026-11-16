@@ -70,7 +70,11 @@ export type FeedNavKind = "content" | "position";
 // Righe grezze delle RPC
 // ────────────────────────────────────────────────────────────────
 
-export type FeedItemRow = {
+/**
+ * Colonne comuni a Seguiti e Per te (HOM-13 contratto §1): la presentazione di
+ * un'unit. `mapFeedRow` lavora su questa forma.
+ */
+export type FeedRowCore = {
   item_uid: string;
   item_type: string;
   rank_position: number;
@@ -95,10 +99,32 @@ export type FeedItemRow = {
   nav_kind: string | null;
   nav_params: Record<string, string | null> | null;
   data: Record<string, unknown> | null;
+};
+
+/** `fetch_home_feed_page` (Seguiti): cursore keyset con `as_of` congelato. */
+export type FeedItemRow = FeedRowCore & {
   as_of: string;
   next_cursor_bucket: number | null;
   next_cursor_published_at: string | null;
   next_cursor_uid: string | null;
+  is_last_page: boolean;
+};
+
+/** HOM-13 §222: i tipi di unit del Feed Per te. */
+export type FeedUnitType = "CONTENT" | "SIMPLE_REPOST" | "OPPORTUNITY" | "SUGGESTED_PROFILES";
+
+/**
+ * `fetch_home_for_you_page` (HOM-13 §1): nessun `as_of` né cursore keyset; la
+ * pagina successiva si chiede con `feed_session_id` + `next_position`. I valori
+ * scalari sono uguali su tutte le righe della pagina. Nessuno score né reason
+ * verso il client (§214–§216): `rank_bucket` è opaco e si ignora.
+ */
+export type FeedForYouRow = FeedRowCore & {
+  feed_session_id: string;
+  feed_unit_id: string;
+  unit_type: string;
+  ranking_version: string | null;
+  next_position: number | null;
   is_last_page: boolean;
 };
 
@@ -149,33 +175,27 @@ export type FeedSuggestedClubRow = {
   component_version: number;
 };
 
-/** Chiavi delle 4 opzioni del modulo di primo accesso (§6). */
-export type FeedPreferenceKey =
-  | "wants_players"
-  | "wants_clubs"
-  | "wants_positions"
-  | "wants_local_media";
-
+/**
+ * HOM-13 D1 §136–§144: `fetch_my_feed_intro()` restituisce UNA riga con le aree già
+ * presenti nel profilo (nessuna nuova tassonomia, §142). Le colonne
+ * `pref_key/label/prefill/is_derivable` non esistono più.
+ */
 export type FeedIntroRow = {
-  pref_key: string;
-  label: string;
-  prefill: boolean;
-  is_derivable: boolean;
-  intro_state: string;
   should_show: boolean;
+  intro_state: string | null;
+  areas: unknown;
 };
 
-export type FeedIntroOption = {
-  key: FeedPreferenceKey;
+export type FeedIntroAreaKind = "region" | "province" | "city";
+
+export type FeedIntroArea = {
+  kind: FeedIntroAreaKind;
   label: string;
-  prefill: boolean;
-  isDerivable: boolean;
 };
 
 export type FeedIntro = {
   shouldShow: boolean;
-  state: "pending" | "completed" | "skipped";
-  options: FeedIntroOption[];
+  areas: FeedIntroArea[];
 };
 
 // ────────────────────────────────────────────────────────────────
@@ -194,10 +214,37 @@ export type FeedCursor = {
   uid: string;
 };
 
+/**
+ * HOM-13 §95–§97, §227: il cursore di Per te è una posizione dentro lo snapshot di
+ * una sessione, mai un numero di pagina. `sessionId` null = nuova sessione
+ * (primo avvio, pull-to-refresh, tap sulla pill, sessione scaduta).
+ */
+export type FeedSessionParam = {
+  sessionId: string | null;
+  afterPosition: number | null;
+  /** Ampiezza della pagina chiesta (default: `FEED_PAGE_SIZE`). Il revalidate dalla cache chiede quanto già mostrato. */
+  limit?: number;
+  /** Solo a sessione nuova: l'identità attiva Home (HOM-07). Il server la fissa nella sessione. */
+  identity?: { type: "person" | "media" | "society"; id: string } | null;
+};
+
+/** Stato di sessione che una pagina porta con sé (§227: sessione + cursore nella cache). */
+export type FeedSessionState = {
+  feedSessionId: string;
+  nextPosition: number | null;
+  rankingVersion: string | null;
+  /** Ampiezza con cui è stata chiesta la pagina. */
+  limit: number;
+  /** true = la sessione è stata (ri)creata da questa richiesta. */
+  isNew: boolean;
+};
+
 /** `pageParam` di useInfiniteQuery: la pagina 0 non ha cursore ma può avere un asOf. */
 export type FeedPageParam = {
   cursor: FeedCursor | null;
   pageIndex: number;
+  /** HOM-13: solo Per te. Assente in Seguiti. */
+  session?: FeedSessionParam;
 };
 
 export type FeedPage = {
@@ -206,6 +253,8 @@ export type FeedPage = {
   asOf: string;
   nextCursor: FeedCursor | null;
   isLastPage: boolean;
+  /** HOM-13: solo Per te. */
+  session?: FeedSessionState | null;
 };
 
 // ────────────────────────────────────────────────────────────────
@@ -447,6 +496,14 @@ export type FeedPositionPayload = {
 export type FeedDiscoveryPayload = {
   moduleKey: "suggested_profiles" | "suggested_clubs";
   moduleLimit: number;
+  /** HOM-13 §4: quale fetta di suggerimenti riempie questo modulo (0 = le prime 3). */
+  moduleIndex: number;
+  /**
+   * HOM-13 D3: identità della sessione che ha giustificato il modulo. Il riempimento usa la
+   * stessa, non quella corrente; null = il server ricade sulla personale.
+   */
+  identityType: string | null;
+  identityId: string | null;
 };
 
 // ────────────────────────────────────────────────────────────────
@@ -485,6 +542,12 @@ type FeedEnvelope<TType extends FeedItemType, TPayload> = {
    * `payload.postId` + `contentType` non deve usare `id`.
    */
   repost?: FeedRepostContext | null;
+  /**
+   * HOM-13 §227: la sessione Per te che ha emesso l'elemento. Insieme a `rank`
+   * (posizione nello snapshot) permette di riprendere il cursore dalla cache.
+   * Assente in Seguiti e nelle cache pre-HOM-13.
+   */
+  feedSessionId?: string;
   /**
    * HOM-11 §126–§131: il viewer ha già segnalato questo contenuto (`data.viewer_has_reported`,
    * server). Presente solo quando vero; assente = no. Il menu mostra «Segnalazione inviata ✓»

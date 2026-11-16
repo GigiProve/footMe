@@ -355,7 +355,13 @@ export function makeSuggestedProfilesItem(): FeedItem {
     ...envelope("module:suggested_profiles:0"),
     type: "suggested_profiles",
     author: null,
-    payload: { moduleKey: "suggested_profiles", moduleLimit: 6 },
+    payload: {
+      identityId: null,
+      identityType: null,
+      moduleIndex: 0,
+      moduleKey: "suggested_profiles",
+      moduleLimit: 3,
+    },
   };
 }
 
@@ -364,7 +370,13 @@ export function makeSuggestedClubsItem(): FeedItem {
     ...envelope("module:suggested_clubs:0"),
     type: "suggested_clubs",
     author: null,
-    payload: { moduleKey: "suggested_clubs", moduleLimit: 6 },
+    payload: {
+      identityId: null,
+      identityType: null,
+      moduleIndex: 0,
+      moduleKey: "suggested_clubs",
+      moduleLimit: 3,
+    },
   };
 }
 
@@ -416,7 +428,7 @@ export function makeModules(
   overrides: Partial<FeedModulesState> = {},
 ): FeedModulesState {
   return {
-    clubs: { isError: false, isLoading: false, retry: () => {}, rows: [makeClubRow()] },
+    clubs: () => ({ isError: false, isLoading: false, retry: () => {}, rows: [makeClubRow()] }),
     onPressSuggestedClub: () => {},
     onPressSuggestedProfile: () => {},
     onSeeAllClubs: () => {},
@@ -424,12 +436,12 @@ export function makeModules(
     onToggleFollowClub: () => {},
     onToggleFollowProfile: () => {},
     pendingFollowId: null,
-    profiles: {
+    profiles: () => ({
       isError: false,
       isLoading: false,
       retry: () => {},
       rows: [makeProfileRow()],
-    },
+    }),
     ...overrides,
   };
 }

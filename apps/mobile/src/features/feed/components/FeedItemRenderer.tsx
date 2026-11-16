@@ -3,8 +3,13 @@
  * componente corretto in base al tipo ricevuto").
  *
  * Qui NON esiste alcuna sequenza: nessun indice, nessuna posizione, nessuna
- * regola di alternanza. L'ordine arriva dalla spina e viene rifinito da
- * `arrangeFeedItems`; questo file sa solo disegnare un elemento alla volta.
+ * regola di alternanza. L'ordine arriva dal server (HOM-13 §220) e il client non lo
+ * rifinisce; questo file sa solo disegnare un elemento alla volta.
+ *
+ * HOM-13 §225–§226: il renderer segue il tipo della unit con i componenti ESISTENTI —
+ * CONTENT → Post/Articolo/Video (HOM-02/03), SIMPLE_REPOST → lo stesso componente
+ * dell'originale con la riga del reposter (HOM-10), OPPORTUNITY → la card Posizione
+ * (HOM-01.1), SUGGESTED_PROFILES → i moduli suggeriti. Nessun renderer nuovo.
  *
  * Si usa uno `switch` esaustivo e non una mappa a oggetti: la mappa perderebbe
  * il narrowing del payload e ogni componente riceverebbe una union. Il `default`
@@ -21,8 +26,11 @@ import type {
   FeedItem,
   FeedPostItem,
   FeedSuggestedClubRow,
+  FeedSuggestedClubsItem,
   FeedSuggestedProfileRow,
+  FeedSuggestedProfilesItem,
 } from "../feed-types";
+import type { FeedModuleRows } from "../use-feed-suggestions";
 import { ArticleFeedPreview } from "./items/ArticleFeedPreview";
 import { EditorialVideoFeedItem } from "./items/EditorialVideoFeedItem";
 import { PostFeedItem } from "./items/PostFeedItem";
@@ -31,18 +39,12 @@ import { SuggestedPositionFeedItem } from "./items/SuggestedPositionFeedItem";
 import { SuggestedProfilesFeedItem } from "./items/SuggestedProfilesFeedItem";
 
 export type FeedModulesState = {
-  profiles: {
-    rows: FeedSuggestedProfileRow[] | undefined;
-    isLoading: boolean;
-    isError: boolean;
-    retry: () => void;
-  };
-  clubs: {
-    rows: FeedSuggestedClubRow[] | undefined;
-    isLoading: boolean;
-    isError: boolean;
-    retry: () => void;
-  };
+  /**
+   * HOM-13 §4: le righe di OGNI modulo suggerito, per unit (un `module_index` ciascuno).
+   * Funzioni di sola lettura: le query stanno in `useFeedModuleRows`, il renderer non fa fetch.
+   */
+  profiles: (item: FeedSuggestedProfilesItem) => FeedModuleRows<FeedSuggestedProfileRow>;
+  clubs: (item: FeedSuggestedClubsItem) => FeedModuleRows<FeedSuggestedClubRow>;
   pendingFollowId: string | null;
   onSeeAllProfiles: () => void;
   onSeeAllClubs: () => void;
@@ -161,33 +163,37 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
         <SuggestedPositionFeedItem item={item} onPress={() => handlers.onOpenItem(item)} />
       );
 
-    case "suggested_profiles":
+    case "suggested_profiles": {
+      const state = modules.profiles(item);
       return (
         <SuggestedProfilesFeedItem
-          isError={modules.profiles.isError}
-          isLoading={modules.profiles.isLoading}
+          isError={state.isError}
+          isLoading={state.isLoading}
           onPressProfile={modules.onPressSuggestedProfile}
-          onRetry={modules.profiles.retry}
           onSeeAll={modules.onSeeAllProfiles}
           onToggleFollow={modules.onToggleFollowProfile}
           pendingId={modules.pendingFollowId}
-          rows={modules.profiles.rows}
+          rows={state.rows}
         />
       );
+    }
 
-    case "suggested_clubs":
+    // HOM-13: il carosello Società è un'unit SUGGESTED_PROFILES con `item_type`
+    // `suggested_clubs` (§222): stesso componente di sempre, riempito dalla stessa RPC.
+    case "suggested_clubs": {
+      const state = modules.clubs(item);
       return (
         <SuggestedClubsFeedItem
-          isError={modules.clubs.isError}
-          isLoading={modules.clubs.isLoading}
+          isError={state.isError}
+          isLoading={state.isLoading}
           onPressClub={modules.onPressSuggestedClub}
-          onRetry={modules.clubs.retry}
           onSeeAll={modules.onSeeAllClubs}
           onToggleFollow={modules.onToggleFollowClub}
           pendingId={modules.pendingFollowId}
-          rows={modules.clubs.rows}
+          rows={state.rows}
         />
       );
+    }
 
     default: {
       // Tipo non riconosciuto: si degrada in silenzio invece di crashare.

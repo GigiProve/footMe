@@ -1,159 +1,183 @@
 /**
- * Prompt di primo accesso "Personalizza ciò che vuoi vedere" (HOM-01.1
- * §27–§31).
+ * Stato di primo accesso «Rendiamo il tuo Feed più utile fin da subito» (HOM-13 D1,
+ * §135–§146, §274, §285). Stessa architettura di HOM-01.1 §27–§31: un modulo dentro la
+ * Home, nel `ListHeaderComponent` della tab Per te, che scorre via insieme al Feed e non è
+ * un secondo onboarding.
  *
- * Semplificato rispetto a HOM-01: niente più quattro selettori dentro la Home,
- * solo titolo, una riga di testo, "Personalizza" e "Non ora". Vive nel
- * `ListHeaderComponent` della tab Per te, quindi il Feed comincia subito sotto
- * e scorre via insieme al prompt: non è un secondo onboarding (§29).
+ * Contenuto (§136–§144):
+ *  • titolo e due testi (§138 + §139): si parte dalle aree, il resto lo impara PROLINK, le
+ *    preferenze danno priorità e non escludono nulla;
+ *  • «Le tue aree» con i valori già presenti nel profilo (§140–§141) e «Modifica» verso
+ *    l'editor del profilo esistente (§142). Senza aree la sezione non compare;
+ *  • CTA principale «Inizia» (§143); accesso rapido «Chiudi» nel rail (§144): stessa azione.
  *
- * "Personalizza" apre il foglio con le stesse quattro opzioni e lo stesso
- * salvataggio di HOM-01 (§30: si aggiorna solo il punto d'accesso, il ranking
- * non cambia). "Non ora" e la × chiudono il prompt; la chiusura è persistita
- * da `useFeedFirstAccess`, lato server e in cache locale (§31).
- *
- * Gli eventi del §69 vivono qui perché descrivono il prompt, non il
- * salvataggio: gli eventi HOM-01 (`feed_personalize_*`) restano nell'hook.
+ * Niente checkbox né foglio di preferenze (§240), niente «Non ora» con riproposta (§146).
+ * Dynamic Type (§274): solo `AppText` e `minHeight`, nessuna altezza fissa sul testo; le aree
+ * vanno a capo (`flexWrap`).
  */
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, radius, sizes, spacing } from "../../../../theme/tokens";
-import { AppText, Button } from "../../../../ui";
+import { AppText, Button, ContentModule } from "../../../../ui";
 import { trackFeed } from "../../feed-analytics";
 import {
+  FEED_INTRO_AREAS_TITLE,
   FEED_INTRO_BODY,
+  FEED_INTRO_CLOSE,
+  FEED_INTRO_EDIT_AREAS,
+  FEED_INTRO_EDIT_AREAS_A11Y,
+  FEED_INTRO_EYEBROW,
+  FEED_INTRO_NOTE,
   FEED_INTRO_PRIMARY_CTA,
-  FEED_INTRO_SECONDARY_CTA,
   FEED_INTRO_TITLE,
 } from "../../feed-labels";
-import type { FeedIntroOption, FeedPreferenceKey } from "../../feed-types";
-import { FeedPreferencesSheet } from "./FeedPreferencesSheet";
+import type { FeedIntroArea } from "../../feed-types";
 
-/** Vive a livello di modulo per sopravvivere ai rimontaggi del prompt. */
-let promptImpressionTracked = false;
+/** Vive a livello di modulo per sopravvivere ai rimontaggi dello stato. */
+let introImpressionTracked = false;
 
 /** Solo per i test: azzera il registro dell'impression. */
-export function resetPromptImpressionForTests(): void {
-  promptImpressionTracked = false;
+export function resetIntroImpressionForTests(): void {
+  introImpressionTracked = false;
 }
 
 type FeedPersonalizeModuleProps = {
-  options: FeedIntroOption[];
-  isSaving: boolean;
-  onSave: (selected: FeedPreferenceKey[]) => void;
-  onDismiss: () => void;
+  areas: readonly FeedIntroArea[];
+  /** «Inizia»: riconosce lo stato (`acknowledge_feed_intro`). */
+  onStart: () => void;
+  /** Accesso rapido (§144): la stessa azione di «Inizia». */
+  onClose: () => void;
+  /** «Modifica» (§142). Assente = nessuna route di editor per questo ruolo. */
+  onEditAreas?: () => void;
 };
 
 export function FeedPersonalizeModule({
-  options,
-  isSaving,
-  onSave,
-  onDismiss,
+  areas,
+  onStart,
+  onClose,
+  onEditAreas,
 }: FeedPersonalizeModuleProps) {
-  const [isSheetOpen, setSheetOpen] = useState(false);
-
-  // Una impression per sessione JS: il prompt si rimonta quando la lista passa
-  // per skeleton o errore, e ogni rimontaggio non è una nuova comparsa.
+  // Una impression per sessione JS: lo stato si rimonta quando la lista passa per
+  // skeleton o errore, e ogni rimontaggio non è una nuova comparsa.
   useEffect(() => {
-    if (promptImpressionTracked) {
+    if (introImpressionTracked) {
       return;
     }
-    promptImpressionTracked = true;
-    trackFeed({ name: "home_personalization_prompt_impression" });
+    introImpressionTracked = true;
+    trackFeed({ name: "home_intro_impression" });
   }, []);
 
-  function open() {
-    trackFeed({ name: "home_personalization_opened" });
-    setSheetOpen(true);
-  }
-
-  function skip() {
-    trackFeed({ name: "home_personalization_skipped" });
-    onDismiss();
+  function editAreas() {
+    trackFeed({ name: "home_intro_edit_areas" });
+    onEditAreas?.();
   }
 
   return (
-    <View style={styles.card} testID="feed-personalize">
-      <View style={styles.topRow}>
-        <Ionicons color={colors.accent} name="sparkles-outline" size={20} />
-        <Pressable
-          accessibilityHint={FEED_INTRO_SECONDARY_CTA}
-          accessibilityLabel="Chiudi"
-          accessibilityRole="button"
-          onPress={skip}
-          style={styles.close}
-        >
-          <Ionicons color={colors.textMuted} name="close" size={20} />
-        </Pressable>
-      </View>
-
-      <AppText accessibilityRole="header" align="center" variant="titleMd">
+    <ContentModule
+      actions={[
+        {
+          accessibilityLabel: FEED_INTRO_CLOSE,
+          icon: "close",
+          label: FEED_INTRO_CLOSE,
+          onPress: onClose,
+          tone: "muted",
+        },
+      ]}
+      eyebrow={FEED_INTRO_EYEBROW}
+      testID="feed-personalize"
+    >
+      <AppText accessibilityRole="header" variant="titleMd">
         {FEED_INTRO_TITLE}
       </AppText>
-      <AppText align="center" color="secondary" style={styles.body} variant="feedMeta">
+      <AppText color="secondary" style={styles.paragraph} variant="feedMeta">
         {FEED_INTRO_BODY}
       </AppText>
+      <AppText color="secondary" style={styles.paragraph} variant="feedMeta">
+        {FEED_INTRO_NOTE}
+      </AppText>
 
-      <View style={styles.actions}>
-        <Button
-          label={FEED_INTRO_PRIMARY_CTA}
-          onPress={open}
-          style={styles.action}
-        />
-        <Button
-          label={FEED_INTRO_SECONDARY_CTA}
-          onPress={skip}
-          style={styles.action}
-          variant="link"
-        />
-      </View>
+      {areas.length > 0 ? (
+        <View style={styles.areas} testID="feed-personalize-areas">
+          <View style={styles.areasHeader}>
+            <AppText color="muted" style={styles.areasTitle} variant="eyebrow">
+              {FEED_INTRO_AREAS_TITLE}
+            </AppText>
+            {onEditAreas ? (
+              <Pressable
+                accessibilityHint={FEED_INTRO_EDIT_AREAS_A11Y}
+                accessibilityLabel={FEED_INTRO_EDIT_AREAS_A11Y}
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={editAreas}
+                style={styles.edit}
+              >
+                <AppText color="accent" variant="actionLabel">
+                  {FEED_INTRO_EDIT_AREAS}
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={styles.chips}>
+            {areas.map((area) => (
+              <View key={`${area.kind}:${area.label}`} style={styles.chip}>
+                <AppText variant="feedMeta">{area.label}</AppText>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
-      <FeedPreferencesSheet
-        isSaving={isSaving}
-        onClose={() => setSheetOpen(false)}
-        onSave={onSave}
-        options={options}
-        visible={isSheetOpen}
+      <Button
+        fullWidth
+        label={FEED_INTRO_PRIMARY_CTA}
+        onPress={onStart}
+        style={styles.cta}
       />
-    </View>
+    </ContentModule>
   );
 }
 
 const styles = StyleSheet.create({
-  action: {
-    flex: 1,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: spacing[12],
+  areas: {
     marginTop: spacing[14],
   },
-  body: {
-    marginTop: spacing[6],
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius[16],
-    borderWidth: 1,
-    paddingBottom: spacing[16],
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[4],
-  },
-  // L'area di tocco della × sporge oltre il padding per restare a 44pt.
-  close: {
-    alignItems: "center",
-    height: sizes.touchTarget,
-    justifyContent: "center",
-    marginRight: -spacing[12],
-    width: sizes.touchTarget,
-  },
-  topRow: {
+  areasHeader: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+    marginBottom: spacing[8],
+  },
+  areasTitle: {
+    flexShrink: 1,
+  },
+  chip: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: spacing[32],
+    paddingHorizontal: spacing[12],
+    paddingVertical: spacing[4],
+  },
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[8],
+  },
+  cta: {
+    marginTop: spacing[16],
+  },
+  // L'area di tocco di «Modifica» arriva a 44pt senza fissare l'altezza del testo.
+  edit: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: sizes.touchTarget,
+    paddingHorizontal: spacing[4],
+  },
+  paragraph: {
+    marginTop: spacing[6],
   },
 });
