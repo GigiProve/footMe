@@ -7,7 +7,7 @@ import { FeedHeader } from "./FeedHeader";
 
 function setup(overrides: Partial<React.ComponentProps<typeof FeedHeader>> = {}) {
   const props = {
-    hasUnreadNotifications: false,
+    notificationCount: 0,
     onOpenComposer: vi.fn(),
     onOpenNotifications: vi.fn(),
     ...overrides,
@@ -34,30 +34,29 @@ describe("FeedHeader", () => {
     expect(json).not.toContain("logo");
   });
 
-  it("non mostra l'indicatore quando non ci sono notifiche non lette", () => {
-    const { tree } = setup({ hasUnreadNotifications: false });
+  it("non mostra il badge quando non ci sono notifiche nuove", () => {
+    const { tree } = setup({ notificationCount: 0 });
 
-    expect(countTestId(tree, "feed-header-unread-dot")).toBe(0);
+    expect(countTestId(tree, "feed-header-badge")).toBe(0);
   });
 
-  it("mostra un indicatore discreto, non un contatore, quando ci sono non lette", () => {
-    const { tree } = setup({ hasUnreadNotifications: true });
+  // HOM-14 §5: il numero sulla campanella conta le notifiche nuove dall'ultima
+  // apertura del Centro (sostituisce il punto di HOM-01.1 §5).
+  it("mostra il numero delle notifiche nuove sulla campanella", () => {
+    const { tree } = setup({ notificationCount: 5 });
 
-    const dot = tree.root.find(
-      (node) =>
-        typeof node.type === "string" &&
-        node.props?.testID === "feed-header-unread-dot",
-    );
+    expect(countTestId(tree, "feed-header-badge")).toBe(1);
+    expect(textOf(tree)).toContain("5");
+  });
 
-    expect(countTestId(tree, "feed-header-unread-dot")).toBe(1);
-    // §2 vieta numeri grandi e badge invasivi: l'indicatore è un punto e non
-    // contiene alcun testo.
-    expect(dot.props.children ?? null).toBeNull();
-    expect(
-      tree.root.findAll(
-        (node) => typeof node.type === "string" && String(node.type) === "Text",
-      ).length,
-    ).toBe(1); // solo "PROLINK"
+  it("la campanella dichiara a parole quante notifiche sono nuove", () => {
+    const { tree } = setup({ notificationCount: 1 });
+
+    const labels = tree.root
+      .findAll((node) => typeof node.type === "string" && typeof node.props?.accessibilityLabel === "string")
+      .map((node) => node.props.accessibilityLabel);
+
+    expect(labels).toContain("Notifiche, 1 nuova");
   });
 
   it("collega campanella e + ai rispettivi handler", () => {

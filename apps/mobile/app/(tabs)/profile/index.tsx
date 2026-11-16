@@ -17,7 +17,7 @@ import { articleNewHref } from "../../../src/features/article-editor/article-rou
 import { contentDetailHref } from "../../../src/features/feed/content-routes";
 import type { FeedContentType } from "../../../src/features/feed/feed-types";
 import { type PublicClubProfile } from "../../../src/features/clubs/club-service";
-import { getUnreadCount } from "../../../src/features/clubs/notification-service";
+import { useUnreadNotificationsCount } from "../../../src/features/notifications/use-unread-notifications-count";
 import {
   SocietyMasterProfileView,
   SocietyProfileSkeleton,
@@ -154,11 +154,8 @@ export default function ProfileScreen() {
   const [agentMediaEditingItemId, setAgentMediaEditingItemId] = useState<string | null>(null);
   const [directorMediaEditingItemId, setDirectorMediaEditingItemId] = useState<string | null>(null);
   const profileId = profile?.id ?? "";
-  const { data: unreadCount = 0 } = useQuery({
-    enabled: !!profileId,
-    queryFn: () => getUnreadCount(profileId),
-    queryKey: ["notifications-unread", profileId],
-  });
+  // HOM-14 §5: un solo hook per il badge della campanella.
+  const unreadCount = useUnreadNotificationsCount();
   const loadPendingMemberships = useCallback(async () => {
     if (!userId) {
       setPendingMemberships([]);

@@ -1,34 +1,28 @@
+/**
+ * HOM-14 §196 — accesso dati alle Preferenze notifiche. Persistenza lato server,
+ * quindi sincronizzata tra device. Il mapping del jsonb sta in
+ * `notification-preferences-presentation.ts`.
+ */
 import { supabase } from "../../lib/supabase";
+import { parseNotificationPreferences } from "./notification-preferences-presentation";
+import type {
+  NotificationPreferenceKey,
+  NotificationPreferences,
+} from "./notification-preferences-types";
 
-export type NotificationPreferenceKey =
-  | "requests"
-  | "applications"
-  | "content_tags"
-  | "new_followers"
-  | "store"
-  | "promotions";
-
-export type NotificationPreferences = {
-  profile_id: string;
-  requests: boolean;
-  applications: boolean;
-  content_tags: boolean;
-  new_followers: boolean;
-  store: boolean;
-  promotions: boolean;
-};
+export type {
+  NotificationPreferenceKey,
+  NotificationPreferences,
+} from "./notification-preferences-types";
 
 export async function fetchMyNotificationPreferences(): Promise<NotificationPreferences> {
-  const { data, error } = await supabase.rpc(
-    "fetch_my_notification_preferences",
-  );
+  const { data, error } = await supabase.rpc("fetch_my_notification_preferences");
 
   if (error) {
     throw error;
   }
 
-  const row = Array.isArray(data) ? data[0] : data;
-  return row as NotificationPreferences;
+  return parseNotificationPreferences(data);
 }
 
 export async function setNotificationPreference(

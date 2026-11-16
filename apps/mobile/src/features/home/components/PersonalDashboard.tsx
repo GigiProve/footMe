@@ -5,10 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { KeyboardAwareForm } from "../../../components/ui/keyboard-aware-form";
 import { Screen } from "../../../components/ui/screen";
 import { useSession } from "../../auth/use-session";
-import {
-  fetchNotifications,
-  getUnreadCount,
-} from "../../clubs/notification-service";
+import { fetchNotifications } from "../../clubs/notification-service";
+import { useUnreadNotificationsCount } from "../../notifications/use-unread-notifications-count";
 import { formatRelativeTime } from "../../../lib/relative-time";
 import { getHomeDashboard } from "../home-dashboard-service";
 import { spacing } from "../../../theme/tokens";
@@ -35,11 +33,8 @@ export function PersonalDashboard() {
   const profileId = profile?.id ?? "";
   const userEmail = session?.user?.email ?? null;
 
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["notifications-unread", profileId],
-    queryFn: () => getUnreadCount(profileId),
-    enabled: !!profileId,
-  });
+  // HOM-14 §5: lo stesso badge di ogni superficie (nuove dall'ultima apertura del Centro).
+  const unreadCount = useUnreadNotificationsCount();
 
   const { data: dashboard } = useQuery({
     queryKey: ["home-dashboard", userId, userEmail],

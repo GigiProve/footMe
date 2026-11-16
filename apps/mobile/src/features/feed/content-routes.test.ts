@@ -8,6 +8,7 @@ import {
   contentManageParams,
   editContentHref,
   parseCommentFocus,
+  parseCommentTarget,
   viewInsightsHref,
 } from "./content-routes";
 
@@ -115,6 +116,24 @@ describe("focus dei commenti (HOM-08 §5–§6, §22)", () => {
     expect(parseCommentFocus(["composer", "x"])).toBe("composer");
     expect(parseCommentFocus("altro")).toBeNull();
     expect(parseCommentFocus(undefined)).toBeNull();
+  });
+});
+
+describe("commento di una notifica (HOM-14 §47, §51)", () => {
+  it("porta commento e thread, additivi dopo il focus", () => {
+    expect(
+      contentDetailHref("profile_post", "p1", { comment: "r1", focus: "comments", root: "c1" }),
+    ).toBe("/content/profile_post/p1?focus=comments&comment=r1&root=c1");
+  });
+
+  it("senza commento il thread non viaggia da solo", () => {
+    expect(contentDetailHref("profile_post", "p1", { root: "c1" })).toBe("/content/profile_post/p1");
+  });
+
+  it("parseCommentTarget legge i due parametri e richiede il commento", () => {
+    expect(parseCommentTarget("r1", "c1")).toEqual({ commentId: "r1", rootCommentId: "c1" });
+    expect(parseCommentTarget(["r1", "x"], undefined)).toEqual({ commentId: "r1", rootCommentId: null });
+    expect(parseCommentTarget(undefined, "c1")).toBeNull();
   });
 });
 

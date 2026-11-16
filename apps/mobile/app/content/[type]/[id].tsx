@@ -53,8 +53,10 @@ import { ProfilePostDetail } from "../../../src/features/feed/components/Profile
 import { classifyContentError } from "../../../src/features/feed/content-availability-presentation";
 import {
   parseCommentFocus,
+  parseCommentTarget,
   parseContentOrigin,
   type CommentFocus,
+  type CommentTarget,
   type ContentOrigin,
 } from "../../../src/features/feed/content-routes";
 import { useBackToFeed } from "../../../src/features/feed/use-back-to-feed";
@@ -395,14 +397,18 @@ function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentVi
  * alla sezione o al composer (§5–§6).
  */
 export default function ContentDetailRoute() {
-  const { focus, id, media, origin, position, type } = useLocalSearchParams<{
+  const { comment, focus, id, media, origin, position, root, type } = useLocalSearchParams<{
+    comment?: string;
     focus?: string;
     id: string;
     media?: string;
     origin?: string;
     position?: string;
+    root?: string;
     type: string;
   }>();
+  // HOM-14 §47, §51: la notifica di Commento/Risposta porta commento e thread.
+  const commentTarget = parseCommentTarget(comment, root);
   // `Number("")` è 0: un `?media=` vuoto non è un tap su un media.
   const mediaIndex = media ? Number(media) : Number.NaN;
   // HOM-04 §122: la provenienza passata dal Feed; assente = ci si affida al Back.
@@ -414,6 +420,7 @@ export default function ContentDetailRoute() {
   const editorial = () => (
     <ContentDetailScreen
       autoStartVideo={initialMediaIndex !== null}
+      commentTarget={commentTarget}
       focus={commentFocus}
       origin={contentOrigin}
     />
@@ -428,6 +435,7 @@ export default function ContentDetailRoute() {
   if (type === "profile_post") {
     return (
       <ProfilePostDetail
+        commentTarget={commentTarget}
         focus={commentFocus}
         initialMediaIndex={initialMediaIndex}
         origin={contentOrigin}
@@ -445,6 +453,7 @@ export default function ContentDetailRoute() {
 
     return (
       <PostOrEditorialDetail
+        commentTarget={commentTarget}
         contentType={type}
         focus={commentFocus}
         initialMediaIndex={initialMediaIndex}
@@ -470,10 +479,12 @@ function UnavailableContentDetail({ origin }: { origin: ContentOrigin | null }) 
 
 function ContentDetailScreen({
   autoStartVideo,
+  commentTarget,
   focus,
   origin,
 }: {
   autoStartVideo: boolean;
+  commentTarget: CommentTarget | null;
   focus: CommentFocus | null;
   origin: ContentOrigin | null;
 }) {
@@ -484,17 +495,24 @@ function ContentDetailScreen({
 
   return (
     <FeedVideoProvider controller={videoController}>
-      <ContentDetailBody autoStartVideo={autoStartVideo} focus={focus} origin={origin} />
+      <ContentDetailBody
+        autoStartVideo={autoStartVideo}
+        commentTarget={commentTarget}
+        focus={focus}
+        origin={origin}
+      />
     </FeedVideoProvider>
   );
 }
 
 function ContentDetailBody({
   autoStartVideo,
+  commentTarget,
   focus,
   origin,
 }: {
   autoStartVideo: boolean;
+  commentTarget: CommentTarget | null;
   focus: CommentFocus | null;
   origin: ContentOrigin | null;
 }) {
@@ -511,6 +529,7 @@ function ContentDetailBody({
     focus,
     origin,
     scrollRef,
+    target: commentTarget,
   });
 
   const [content, setContent] = useState<ContentView | null>(null);

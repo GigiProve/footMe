@@ -10,24 +10,27 @@
  * tab, che sulla Home non compare perché coprirebbe il wordmark (decisione
  * confermata da Luigi il 2026-11-11).
  *
- * Le notifiche non lette sono un punto piccolo, mai un numero (§5).
+ * HOM-14 §5 sostituisce il punto di HOM-01.1 §5: la campanella mostra un badge
+ * numerico con le notifiche NUOVE dall'ultima apertura del Centro (non quelle
+ * mai aperte), lo stesso `NotificationBadge` delle altre superfici.
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, sizes, spacing } from "../../../theme/tokens";
-import { AppText } from "../../../ui";
+import { AppText, NotificationBadge } from "../../../ui";
 import { FEED_BRAND } from "../feed-labels";
 
 type FeedHeaderProps = {
-  hasUnreadNotifications: boolean;
+  /** Notifiche nuove dall'ultima apertura del Centro (HOM-14 §5–§7). */
+  notificationCount: number;
   onOpenNotifications: () => void;
   onOpenComposer: () => void;
 };
 
 export function FeedHeader({
-  hasUnreadNotifications,
+  notificationCount,
   onOpenNotifications,
   onOpenComposer,
 }: FeedHeaderProps) {
@@ -44,15 +47,19 @@ export function FeedHeader({
 
       <Pressable
         accessibilityLabel={
-          hasUnreadNotifications ? "Notifiche, ci sono notifiche non lette" : "Notifiche"
+          notificationCount > 0
+            ? `Notifiche, ${notificationCount} ${notificationCount === 1 ? "nuova" : "nuove"}`
+            : "Notifiche"
         }
         accessibilityRole="button"
         onPress={onOpenNotifications}
         style={styles.iconButton}
       >
         <Ionicons color={colors.textPrimary} name="notifications-outline" size={23} />
-        {hasUnreadNotifications ? (
-          <View style={styles.dot} testID="feed-header-unread-dot" />
+        {notificationCount > 0 ? (
+          <View style={styles.badge} testID="feed-header-badge">
+            <NotificationBadge count={notificationCount} tone="accent" />
+          </View>
         ) : null}
       </Pressable>
 
@@ -81,16 +88,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 19,
   },
-  dot: {
-    backgroundColor: colors.accent,
-    borderColor: colors.surface,
-    borderRadius: 4.5,
-    borderWidth: 1.5,
-    height: 9,
+  badge: {
     position: "absolute",
-    right: 11,
-    top: 10,
-    width: 9,
+    right: 4,
+    top: 5,
   },
   iconButton: {
     alignItems: "center",

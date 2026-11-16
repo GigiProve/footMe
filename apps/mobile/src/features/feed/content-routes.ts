@@ -166,15 +166,36 @@ export function commentsHref(
   });
 }
 
+/**
+ * HOM-14 §47, §51, §57: la notifica di Commento, Risposta o Menzione apre il
+ * dettaglio sulla sezione Commenti con il commento (`comment`) e il suo thread
+ * (`root`, il commento principale) raggiungibili. Parametri additivi: un
+ * dettaglio che non li legge apre comunque i Commenti (`focus=comments`).
+ */
+export type CommentTarget = { commentId: string; rootCommentId: string | null };
+
+/** I due valori della query string, o `null` se manca il commento. */
+export function parseCommentTarget(
+  comment: string | string[] | undefined,
+  root: string | string[] | undefined,
+): CommentTarget | null {
+  const commentId = Array.isArray(comment) ? comment[0] : comment;
+  const rootId = Array.isArray(root) ? root[0] : root;
+
+  return commentId ? { commentId, rootCommentId: rootId || null } : null;
+}
+
 /** Il dettaglio contenuto con la provenienza (§122). */
 export function contentDetailHref(
   contentType: FeedContentType,
   postId: string,
   extra: {
+    comment?: string | null;
     focus?: CommentFocus;
     origin?: ContentOrigin | null;
     media?: number;
     position?: number;
+    root?: string | null;
   } = {},
 ): string {
   const query: string[] = [];
@@ -183,6 +204,12 @@ export function contentDetailHref(
   }
   if (extra.focus) {
     query.push(`focus=${extra.focus}`);
+  }
+  if (extra.comment) {
+    query.push(`comment=${extra.comment}`);
+    if (extra.root) {
+      query.push(`root=${extra.root}`);
+    }
   }
   if (extra.origin) {
     query.push(`origin=${extra.origin}`);

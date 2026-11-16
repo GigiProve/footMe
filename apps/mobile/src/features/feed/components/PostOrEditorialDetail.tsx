@@ -22,7 +22,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 
 import { colors, spacing } from "../../../theme/tokens";
-import type { CommentFocus, ContentOrigin } from "../content-routes";
+import type { CommentFocus, CommentTarget, ContentOrigin } from "../content-routes";
 import { FEED_QK } from "../feed-keys";
 import { fetchPostDetail } from "../feed-service";
 import { ContentLoadErrorState } from "./ContentUnavailableState";
@@ -30,6 +30,8 @@ import { ContentDetailFrame } from "./detail/ContentDetailFrame";
 import { ProfilePostDetail } from "./ProfilePostDetail";
 
 type PostOrEditorialDetailProps = {
+  /** HOM-14 §47, §51: commento e thread a cui porta una notifica. */
+  commentTarget?: CommentTarget | null;
   contentType: "club_media" | "media_profile";
   focus: CommentFocus | null;
   initialMediaIndex: number | null;
@@ -40,6 +42,7 @@ type PostOrEditorialDetailProps = {
 };
 
 export function PostOrEditorialDetail({
+  commentTarget = null,
   contentType,
   focus,
   initialMediaIndex,
@@ -60,6 +63,7 @@ export function PostOrEditorialDetail({
   if (wasPost || probe.data) {
     return (
       <ProfilePostDetail
+        commentTarget={commentTarget}
         contentType={contentType}
         focus={focus}
         initialMediaIndex={initialMediaIndex}

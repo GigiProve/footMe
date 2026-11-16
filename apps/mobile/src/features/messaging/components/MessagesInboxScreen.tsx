@@ -13,7 +13,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { Screen } from "../../../components/ui/screen";
 import { useSession } from "../../auth/use-session";
-import { getUnreadCount } from "../../clubs/notification-service";
+import { useUnreadNotificationsCount } from "../../notifications/use-unread-notifications-count";
 import { formatRelativeTime } from "../../../lib/relative-time";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button, EmptyState, HeaderBell, ScreenHeader } from "../../../ui";
@@ -91,11 +91,8 @@ export function MessagesInboxScreen() {
     queryKey: ["communications", profileId],
   });
 
-  const { data: unreadCount = 0 } = useQuery({
-    enabled: !!profileId,
-    queryFn: () => getUnreadCount(profileId),
-    queryKey: ["notifications-unread", profileId],
-  });
+  // HOM-14 §5: il badge della campanella, non i Messaggi (§1: domini separati).
+  const unreadCount = useUnreadNotificationsCount();
 
   useFocusEffect(
     useCallback(() => {

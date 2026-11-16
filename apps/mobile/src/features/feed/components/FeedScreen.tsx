@@ -187,7 +187,7 @@ export function FeedScreen() {
     <FeedVideoProvider controller={videoController}>
       <SafeAreaView style={styles.root}>
         <FeedHeader
-          hasUnreadNotifications={unreadCount > 0}
+          notificationCount={unreadCount}
           onOpenComposer={handleOpenComposer}
           onOpenNotifications={() => router.push("/notifications")}
         />

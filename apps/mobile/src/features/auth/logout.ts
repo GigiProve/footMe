@@ -4,6 +4,7 @@ import { drainContentEventsForSignOut } from "../content-insights/content-events
 import { clearDashboardCache } from "../dashboard/cache/dashboard-cache";
 import { discardFeedEvents, flushFeedEvents } from "../feed/feed-events-service";
 import { resetUserInteractions } from "../interactions/reset-user-interactions";
+import { clearPushStateForLogout } from "../notifications/push/push-service";
 import { saveLastAccountProfile } from "./last-account";
 
 type LogoutOptions = {
@@ -45,6 +46,10 @@ export async function logout(options?: LogoutOptions) {
   // HOM-07: Mi piace e Salvati stanno in store di modulo che `queryClient.clear()`
   // non tocca. Prima del signOut, come la pulizia della Dashboard.
   resetUserInteractions();
+
+  // HOM-14 §274: il device smette di ricevere le push dell'account che esce. Prima
+  // del signOut (la RPC vuole la sessione); non lancia e ha un tetto di tempo.
+  await clearPushStateForLogout();
 
   const { error } = await supabase.auth.signOut();
 

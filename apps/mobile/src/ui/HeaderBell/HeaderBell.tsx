@@ -12,7 +12,9 @@ type HeaderBellProps = {
 export function HeaderBell({ count, onPress }: HeaderBellProps) {
   return (
     <Pressable
-      accessibilityLabel="Notifiche"
+      accessibilityLabel={
+        count > 0 ? `Notifiche, ${count} ${count === 1 ? "nuova" : "nuove"}` : "Notifiche"
+      }
       accessibilityRole="button"
       onPress={onPress}
       style={styles.bellWrapper}

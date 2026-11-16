@@ -1,143 +1,164 @@
+/**
+ * Riga del Centro Notifiche (HOM-14 §24–§29, §238–§254).
+ *
+ * Lista aperta, non una card (§25): padding 20, separatore `colors.divider` in
+ * fondo, nessun bordo. Non aperta = fondo azzurrino leggero `heroSoft` (§26) più
+ * un piccolo dot; aperta = fondo bianco (§27). Il fondo non è l'unico segnale:
+ * l'etichetta di accessibilità dice «Non aperta» (§249).
+ *
+ * Attore (avatar/logo, nome, check standard) e copy sociale arrivano da
+ * `notification-presentation`; le righe operative senza attore mostrano l'icona
+ * della categoria. Nessun troncamento del testo essenziale (§250): il nome può
+ * andare a capo, la preview è limitata a due righe (§251).
+ */
+
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
+import { formatCompactRelativeTime } from "../../lib/relative-time";
 import { colors, radius, spacing } from "../../styles";
-import { AppText } from "../../ui";
-import { formatRelativeTime } from "../../lib/relative-time";
-import type { AppNotification } from "../clubs/membership-types";
+import { AppText, Avatar, VerifiedCheck } from "../../ui";
 import {
-  ctaLabelFor,
-  iconNameForCategory,
-  notificationTimestamp,
-  resolveNotificationCategory,
-  selectionEventResponseLines,
-} from "./notifications-helpers";
+  isSocialNotification,
+  notificationAccessibilityLabel,
+  notificationActorName,
+  notificationPreview,
+  notificationPrimaryText,
+  notificationSecondaryText,
+} from "./notification-presentation";
+import type { InboxNotification } from "./notification-types";
+import { iconNameForNotificationType, resolveNotificationCategory } from "./notifications-helpers";
 
 type NotificationRowProps = {
-  notification: AppNotification;
-  onPress: (notification: AppNotification) => void;
+  notification: InboxNotification;
+  onPress: (notification: InboxNotification) => void;
 };
 
 export function NotificationRow({ notification, onPress }: NotificationRowProps) {
-  const category = resolveNotificationCategory(notification);
-  const iconName = iconNameForCategory(
-    category,
+  const isUnopened = !notification.isOpened;
+  const social = isSocialNotification(notification);
+  const actor = notification.actor;
+  const secondary = notificationSecondaryText(notification);
+  const preview = notificationPreview(notification);
+  const iconName = iconNameForNotificationType(
+    notification.type,
+    resolveNotificationCategory(notification),
   ) as keyof typeof Ionicons.glyphMap;
-  const isUnread = !notification.is_read;
-  /* DAS-REV-31 screen 16: una riga aggregata è una sola unità di non letto;
-     titolo in grassetto per intero, evento e nomi come metadati. */
-  const response = selectionEventResponseLines(notification);
-  const time = formatRelativeTime(notificationTimestamp(notification));
 
   return (
     <Pressable
-      accessibilityLabel={
-        response
-          ? [notification.title, response.names, time].filter(Boolean).join(", ")
-          : undefined
-      }
+      accessibilityLabel={notificationAccessibilityLabel(notification)}
       accessibilityRole="button"
       onPress={() => onPress(notification)}
       style={({ pressed }) => [
         styles.container,
-        isUnread ? styles.unread : null,
+        isUnopened ? styles.unopened : null,
         pressed ? styles.pressed : null,
       ]}
     >
-      <View style={styles.iconCircle}>
-        <Ionicons color={colors.accent} name={iconName} size={20} />
-      </View>
-      <View style={styles.body}>
-        <View style={styles.titleRow}>
-          <AppText
-            numberOfLines={response ? 3 : 1}
-            style={styles.title}
-            variant={isUnread || response ? "titleSm" : "bodyLg"}
-          >
-            {notification.title}
-          </AppText>
-          {isUnread ? <View style={styles.dot} /> : null}
+      {social && actor ? (
+        /* Le iniziali su `accentSoft` sparirebbero sulla riga azzurrina (`heroSoft`): l'hairline tiene il cerchio. */
+        <View style={[styles.avatarRing, actor.type === "society" ? styles.avatarRingSquare : null]}>
+          <Avatar
+            name={notificationActorName(notification)}
+            size="md"
+            square={actor.type === "society"}
+            tone={actor.type === "society" ? "ink" : "accent"}
+            uri={actor.available ? actor.avatarUrl : null}
+          />
         </View>
-        {response ? (
-          <>
-            {/* Il titolo del server nomina già l'evento («… a Open day
-                Primavera.», §23): una seconda riga lo ripeterebbe. */}
-            {response.names ? (
-              <AppText color="muted" numberOfLines={2} variant="bodySm">
-                {response.names}
-              </AppText>
-            ) : null}
-          </>
-        ) : notification.body ? (
-          <AppText color="secondary" numberOfLines={2} variant="bodySm">
-            {notification.body}
+      ) : (
+        <View style={styles.iconCircle}>
+          <Ionicons color={colors.accent} name={iconName} size={22} />
+        </View>
+      )}
+
+      <View style={styles.body}>
+        <View style={styles.nameRow}>
+          <AppText style={styles.name} variant="titleMd">
+            {notificationPrimaryText(notification)}
+          </AppText>
+          {social && actor?.available && actor.verified ? <VerifiedCheck size={15} /> : null}
+        </View>
+        {secondary ? (
+          <AppText color="secondary" variant="feedBody">
+            {secondary}
           </AppText>
         ) : null}
-        <View style={styles.metaRow}>
-          <AppText color="muted" variant="caption">
-            {time}
+        {preview ? (
+          <AppText color="muted" numberOfLines={2} variant="feedBody">
+            {`“${preview}”`}
           </AppText>
-          {response ? (
-            <Ionicons color={colors.textMuted} name="chevron-forward" size={18} />
-          ) : (
-            <AppText color="accent" variant="caption" style={styles.cta}>
-              {ctaLabelFor(notification)}
-            </AppText>
-          )}
-        </View>
+        ) : null}
+      </View>
+
+      <View style={styles.meta}>
+        <AppText color="muted" variant="feedMeta">
+          {formatCompactRelativeTime(notification.displayAt)}
+        </AppText>
+        {isUnopened ? <View style={styles.dot} /> : null}
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    gap: spacing[12],
-    paddingHorizontal: spacing[16],
-    paddingVertical: spacing[14],
-    borderRadius: radius[12],
-  },
-  unread: {
-    backgroundColor: colors.heroSoft,
-  },
-  pressed: {
-    opacity: 0.82,
-  },
-  iconCircle: {
-    width: 40,
-    height: 40,
+  avatarRing: {
+    borderColor: colors.border,
     borderRadius: radius.full,
-    backgroundColor: colors.accentSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  avatarRingSquare: {
+    borderRadius: radius[11],
   },
   body: {
     flex: 1,
     gap: spacing[4],
   },
-  titleRow: {
+  container: {
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.divider,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
-    alignItems: "center",
-    gap: spacing[8],
-  },
-  title: {
-    flexShrink: 1,
+    gap: spacing[12],
+    paddingHorizontal: spacing[20],
+    paddingVertical: spacing[14],
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: radius.full,
     backgroundColor: colors.accent,
+    borderRadius: radius.full,
+    height: 8,
+    width: 8,
   },
-  metaRow: {
-    flexDirection: "row",
+  iconCircle: {
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: spacing[4],
+    // Sulla riga azzurrina `accentSoft` sparirebbe (stesso valore di `heroSoft`): hairline e fondo bianco.
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexShrink: 0,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
   },
-  cta: {
-    fontWeight: "600",
+  meta: {
+    alignItems: "flex-end",
+    gap: spacing[8],
+  },
+  name: {
+    flexShrink: 1,
+  },
+  nameRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[4],
+  },
+  pressed: {
+    opacity: 0.82,
+  },
+  unopened: {
+    backgroundColor: colors.heroSoft,
   },
 });

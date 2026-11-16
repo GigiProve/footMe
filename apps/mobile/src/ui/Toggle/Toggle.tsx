@@ -9,6 +9,11 @@ type ToggleProps = {
   onValueChange: (value: boolean) => void;
   subtitle?: string;
   value: boolean;
+  /**
+   * `row`: riga di lista dentro un `ContentModule` (bordo e radius 16 li porta il modulo,
+   * fra le righe c'è `colors.divider`). `boxed` (default) è il campo autonomo dei form.
+   */
+  variant?: "boxed" | "row";
 };
 
 export function Toggle({
@@ -17,6 +22,7 @@ export function Toggle({
   onValueChange,
   subtitle,
   value,
+  variant = "boxed",
 }: ToggleProps) {
   return (
     <Pressable
@@ -24,7 +30,10 @@ export function Toggle({
       accessibilityState={{ checked: value, disabled }}
       disabled={disabled}
       onPress={() => onValueChange(!value)}
-      style={[styles.container, disabled ? styles.disabled : null]}
+      style={[
+        variant === "row" ? styles.row : styles.container,
+        disabled ? styles.disabled : null,
+      ]}
     >
       <View style={styles.labelGroup}>
         <AppText
@@ -40,7 +49,9 @@ export function Toggle({
           </AppText>
         ) : null}
       </View>
-      <View style={[styles.track, value ? styles.trackOn : null]}>
+      <View
+        style={[styles.track, variant === "row" ? styles.trackRow : null, value ? styles.trackOn : null]}
+      >
         <View style={[styles.knob, value ? styles.knobOn : null]} />
       </View>
     </Pressable>
@@ -56,6 +67,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBackground,
     paddingLeft: spacing[16],
     paddingRight: spacing[12],
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing[12],
+  },
+  row: {
+    minHeight: 56,
+    borderBottomColor: colors.divider,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: spacing[8],
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -79,6 +100,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
     justifyContent: "center",
     paddingHorizontal: 3,
+  },
+  // Sul fondo bianco del modulo `surfaceMuted` è quasi invisibile: la traccia OFF usa il bordo.
+  trackRow: {
+    backgroundColor: colors.border,
   },
   trackOn: {
     backgroundColor: colors.accent,

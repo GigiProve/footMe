@@ -1,490 +1,436 @@
-import { useMemo, useState } from "react";
-import { Alert, ScrollView, SectionList, StyleSheet, View } from "react-native";
+/**
+ * Centro Notifiche (HOM-14 §20–§32, §216–§230).
+ *
+ * Una sola timeline per tutti i tipi (§21), a sezioni Oggi / Questa settimana /
+ * Precedenti (§23). Niente tab, filtri, «solo non lette» né «Segna tutte come
+ * lette» (§18, §237). Header: titolo e icona sliders verso le Preferenze (§30–
+ * §32); un solo menu minimo per «Elimina notifiche aperte» (decisione Luigi).
+ *
+ * Stati (§10–§13): aprire il Centro marca VISTE le notifiche fino all'ora del
+ * server della prima pagina (il badge si azzera, l'azzurrino resta, §216–§217);
+ * toccare una riga la marca APERTA (diventa bianca, §9) e apre il target dal
+ * Target Resolver. Il client non crea mai notifiche (§171).
+ */
+
+import { useEffect, useRef, useState } from "react";
+import { Alert, Pressable, SafeAreaView, SectionList, StyleSheet, View, type ViewToken } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 
-import { Screen } from "../../components/ui/screen";
 import { useSession } from "../auth/use-session";
-import { ROLE_LINK_HREFS } from "../role-link/role-link-routes";
 import { colors, spacing } from "../../styles";
 import {
   ActionSheet,
   AppText,
   Button,
-  EmptyState,
   ScreenHeader,
+  Skeleton,
   useToast,
   type ActionSheetAction,
 } from "../../ui";
+import { trackNotification } from "./notification-analytics";
+import { notificationKeys } from "./notification-keys";
 import {
-  deleteReadNotifications,
-  fetchNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-} from "../clubs/notification-service";
-import type { AppNotification } from "../clubs/membership-types";
-import { NotificationRow } from "./NotificationRow";
-import {
-  filterNotificationsByCategory,
-  filterUnread,
-  groupNotifications,
+  flattenNotificationPages,
   groupNotificationsByTime,
-  isScheduledContentNotification,
-  isSelectionEventNotification,
-  latestUpdatedAt,
-  NOTIFICATION_FILTERS,
-  scheduledContentNotificationHref,
-  selectionEventNotificationHref,
-  type NotificationCategoryFilter,
-} from "./notifications-helpers";
+} from "./notification-presentation";
+import {
+  deleteOpenedNotifications,
+  fetchNotificationPage,
+  markNotificationCenterSeen,
+  markNotificationOpened,
+} from "./notification-service";
+import type { InboxNotification, NotificationCursor, NotificationPage } from "./notification-types";
+import { openNotificationTarget, useOpenNotificationFromPush } from "./use-notification-navigation";
+import { NotificationRow } from "./NotificationRow";
 
-export function NotificationCenterScreen() {
+type TimelineData = InfiniteData<NotificationPage, NotificationCursor | null>;
+
+/** §229: la lista si legge già a metà riga; l'impression conta solo ciò che resta visibile. */
+const VIEWABILITY = { itemVisiblePercentThreshold: 60, minimumViewTime: 600 };
+
+const SKELETON_ROWS = [0, 1, 2, 3, 4];
+
+function cursorAfter(page: NotificationPage): NotificationCursor | undefined {
+  const last = page.items[page.items.length - 1];
+
+  return page.hasMore && last ? { beforeAt: last.displayAt, beforeId: last.id } : undefined;
+}
+
+/** §229: skeleton leggeri, con la stessa geometria della riga. */
+function NotificationSkeleton() {
+  return (
+    <View accessibilityLabel="Caricamento notifiche" style={styles.skeleton}>
+      {SKELETON_ROWS.map((row) => (
+        <View key={row} style={styles.skeletonRow}>
+          <Skeleton.Circle />
+          <View style={styles.skeletonText}>
+            <Skeleton.Row style={styles.skeletonShort} />
+            <Skeleton.Row />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function NotificationCenterScreen({
+  openNotificationId = null,
+}: {
+  /** `/notifications?open=<id>`: il tap su un push (§177). */
+  openNotificationId?: string | null;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { profile } = useSession();
   const profileId = profile?.id ?? "";
+  const timelineKey = notificationKeys.timeline(profileId);
 
-  const [categoryFilter, setCategoryFilter] =
-    useState<NotificationCategoryFilter>("tutte");
-  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
-  const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { data: notifications = [], isLoading, isError } = useQuery({
-    queryKey: ["notifications", profileId],
-    queryFn: () => fetchNotifications(profileId),
+  useOpenNotificationFromPush(openNotificationId);
+
+  const query = useInfiniteQuery({
     enabled: !!profileId,
+    getNextPageParam: cursorAfter,
+    initialPageParam: null as NotificationCursor | null,
+    queryFn: ({ pageParam }) => fetchNotificationPage(pageParam),
+    queryKey: timelineKey,
   });
 
-  /* DAS-REV-31 §24: si marca letta la revisione vista. Se il server
-     risponde false è arrivata una nuova risposta nel gruppo: si rilegge il
-     Centro, così la riga torna non letta con il conteggio aggiornato. */
-  const markReadMutation = useMutation({
-    mutationFn: (item: Pick<AppNotification, "id" | "revision">) =>
-      markNotificationRead(item.id, item.revision ?? null),
+  const pages = query.data?.pages ?? [];
+  const items = flattenNotificationPages(pages);
+  const sections = groupNotificationsByTime(items);
+
+  /* §14–§16, §216–§217: aprire il Centro vede tutto fino all'ora del SERVER della prima
+     pagina (mai l'orologio del device): una riga arrivata dopo resta NEW. Al refresh la
+     stessa regola vede ciò che il Centro mostra davvero (§17). */
+  const asOf = pages[0]?.asOf ?? null;
+  const seenAsOf = useRef<string | null>(null);
+  const openTracked = useRef(false);
+  const { mutate: markSeen } = useMutation({
+    mutationFn: markNotificationCenterSeen,
+    onSuccess: (seenCount) => {
+      trackNotification({ name: "notification_center_seen_batch", seenCount });
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.badge(profileId) });
+    },
+  });
+
+  useEffect(() => {
+    if (!asOf || seenAsOf.current === asOf) {
+      return;
+    }
+    seenAsOf.current = asOf;
+
+    if (!openTracked.current) {
+      openTracked.current = true;
+      const badgeCount = queryClient.getQueryData<number>(notificationKeys.badge(profileId)) ?? 0;
+
+      trackNotification({ badgeCount, name: "notification_center_open" });
+      if (badgeCount > 0) {
+        trackNotification({ clearedCount: badgeCount, name: "notification_badge_cleared_on_center_open" });
+      }
+    }
+    markSeen(asOf);
+  }, [asOf, markSeen, profileId, queryClient]);
+
+  /* §9, §121: aperta = bianca subito (ottimistico). Se il server rifiuta perché l'aggregato
+     ha avuto nuova attività, la riga si rilegge e torna azzurrina (§122). */
+  const openMutation = useMutation({
+    mutationFn: (item: InboxNotification) => markNotificationOpened(item.id, item.revision),
+    onError: (_error: Error, _item: InboxNotification, context: { previous?: TimelineData } | undefined) => {
+      if (context?.previous) {
+        queryClient.setQueryData(timelineKey, context.previous);
+      }
+    },
     onMutate: async (item) => {
-      await queryClient.cancelQueries({ queryKey: ["notifications", profileId] });
-      const previous = queryClient.getQueryData<AppNotification[]>([
-        "notifications",
-        profileId,
-      ]);
-      queryClient.setQueryData<AppNotification[]>(
-        ["notifications", profileId],
-        (old) =>
-          (old ?? []).map((n) =>
-            n.id === item.id ? { ...n, is_read: true } : n,
-          ),
+      await queryClient.cancelQueries({ queryKey: timelineKey });
+      const previous = queryClient.getQueryData<TimelineData>(timelineKey);
+
+      queryClient.setQueryData<TimelineData>(timelineKey, (old) =>
+        old
+          ? {
+              ...old,
+              pages: old.pages.map((page) => ({
+                ...page,
+                items: page.items.map((row) => (row.id === item.id ? { ...row, isOpened: true } : row)),
+              })),
+            }
+          : old,
       );
+
       return { previous };
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.badge(profileId) });
     },
     onSuccess: (marked) => {
       if (!marked) {
-        queryClient.invalidateQueries({ queryKey: ["notifications", profileId] });
+        void queryClient.invalidateQueries({ queryKey: timelineKey });
       }
     },
-    onError: (_err, _item, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(["notifications", profileId], context.previous);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["notifications-unread", profileId],
-      });
-    },
   });
 
-  const markAllReadMutation = useMutation({
-    mutationFn: (asOf: string | null) => markAllNotificationsRead(asOf),
+  const deleteMutation = useMutation({
+    mutationFn: deleteOpenedNotifications,
+    onError: () => showToast({ message: "Impossibile eliminare le notifiche" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", profileId] });
-      queryClient.invalidateQueries({
-        queryKey: ["notifications-unread", profileId],
-      });
-      showToast({
-        message: "Tutte le notifiche sono state segnate come lette",
-        tone: "success",
-      });
-    },
-    onError: () => {
-      showToast({ message: "Impossibile aggiornare le notifiche" });
+      void queryClient.invalidateQueries({ queryKey: timelineKey });
+      showToast({ message: "Notifiche aperte eliminate", tone: "success" });
     },
   });
 
-  const deleteReadMutation = useMutation({
-    mutationFn: deleteReadNotifications,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", profileId] });
-      showToast({ message: "Notifiche lette eliminate", tone: "success" });
-    },
-    onError: () => {
-      showToast({ message: "Impossibile eliminare le notifiche" });
-    },
-  });
+  /* §256: impression di una notifica visibile, una volta per versione. */
+  const impressions = useRef(new Set<string>());
+  const [handleViewable] = useState(() => ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    for (const token of viewableItems) {
+      const item = token.item as InboxNotification | undefined;
 
-  function handlePress(item: AppNotification) {
-    if (!item.is_read) {
-      markReadMutation.mutate(item);
-    }
-
-    if (item.type === "content_tag") {
-      const contentType = item.data?.content_type;
-      const postId = item.data?.post_id;
-      if (contentType && postId) {
-        router.push({
-          pathname: "/content/[type]/[id]",
-          params: { type: contentType, id: postId },
+      // Gli header di sezione arrivano come token senza `id`: non sono notifiche.
+      if (item?.id && !impressions.current.has(`${item.id}:${item.revision}`)) {
+        impressions.current.add(`${item.id}:${item.revision}`);
+        trackNotification({
+          eventCount: item.eventCount,
+          isOpened: item.isOpened,
+          name: "notification_impression",
+          notificationType: item.type,
         });
       }
-    } else if (isScheduledContentNotification(item)) {
-      /* HOM-06.2 §200–§201: «Tap notifica failure: apre l'elemento fallito» (la
-         lista Programmati, dove ha le sue azioni); il successo apre il contenuto
-         pubblicato. La destinazione rilegge accesso e stato dal server. */
-      const href = scheduledContentNotificationHref(item);
-      if (href) {
-        router.push(href as never);
-      }
-    } else if (item.type === "agent_representation_request") {
-      const representationId = item.data?.representation_id;
-      if (representationId) {
-        router.push(`/representation/${representationId}` as never);
-      }
-    } else if (item.type === "agent_representation_responded") {
-      const representationId = item.data?.representation_id;
-      if (representationId) {
-        router.push(`/representation/assistito/${representationId}` as never);
-      }
-    } else if (item.type === "agent_invite_reconciled") {
-      // REV-PROF-14: l'assistito invitato si e' collegato. Il procuratore
-      // arriva sulla gestione del rapporto appena nato, non su un invito che
-      // ormai non esiste piu'.
-      const representationId = item.data?.representation_id;
-      if (representationId) {
-        router.push(`/representation/assistito/${representationId}` as never);
-      }
-    } else if (item.type === "agent_representation_visibility_proposed") {
-      const representationId = item.data?.representation_id;
-      if (representationId) {
-        router.push(`/representation/manage/${representationId}` as never);
-      }
-    } else if (
-      item.type === "application_received" ||
-      item.type === "application_status"
-    ) {
-      router.push("/(tabs)/announcements" as never);
-    } else if (isSelectionEventNotification(item)) {
-      /* DAS-REV-29 §22: «Tap apre lo stesso evento con stato personale
-         corrente; non una chat.» DAS-REV-30 §20: mai un'azione automatica
-         dalla notifica. DAS-REV-31 §25: le risposte aggregate aprono i
-         Partecipanti sul filtro del tipo, l'aggiornamento apre il dettaglio
-         con il banner. La destinazione rilegge stato e accesso dal server. */
-      const href = selectionEventNotificationHref(item);
-      if (href) {
-        router.push(href as never);
-      }
-    } else if (item.type === "society_invitation_created") {
-      /* DAS-REV-19 §27: «La notifica apre lo stesso invitation_id. Il
-         backend valida l'accesso del destinatario anche quando il link
-         proviene da una notifica legittima.» La riga porta l'ID, non la
-         proposta: il contenuto viene riletto dalla destinazione. */
-      const inviteId = item.data?.invite_id;
-      if (inviteId) {
-        router.push(`/invitation/${inviteId}` as never);
-      }
-    } else if (item.type === "role_request_created") {
-      /* DAS-REV-21 §41: la notifica apre lo stesso request_id. Il backend
-         rivalida l'accesso anche quando il link viene da una notifica
-         legittima. */
-      const requestId = item.data?.request_id;
-      if (requestId) {
-        router.push(ROLE_LINK_HREFS.societyRequest(requestId) as never);
-      }
-    } else if (
-      item.type === "role_request_approved" ||
-      item.type === "role_request_declined"
-    ) {
-      /* L'esito della propria richiesta: il record personale, non il Centro
-         della Società, a cui la persona non ha accesso (§41). */
-      const requestId = item.data?.request_id;
-      if (requestId) {
-        router.push(
-          ROLE_LINK_HREFS.myRequest(requestId, { from: "notification" }) as never,
-        );
-      }
-    } else if (item.type.startsWith("role_assignment_")) {
-      /* §41: «Le modifiche già attive aprono il rapporto/incarico
-         gestionale, senza Approva/Rifiuta e senza spostare l'utente nel
-         Centro Inviti.» Il destinatario decide quale lato: la persona apre
-         il proprio incarico, la Società quello della persona. */
-      const isSociety = item.type.endsWith("_by_person");
-      const assignmentId = item.data?.assignment_id;
-      const clubId = item.data?.club_id;
-      const personId = item.data?.profile_id;
-
-      if (isSociety && clubId && personId) {
-        router.push(
-          ROLE_LINK_HREFS.societyPerson(clubId, personId, {
-            from: "notification",
-          }) as never,
-        );
-      } else if (assignmentId) {
-        router.push(ROLE_LINK_HREFS.assignment(assignmentId) as never);
-      }
-    } else if (item.type.startsWith("role_link_")) {
-      /* §38: «Le terminazioni aprono un esito/storico autorizzato, non un
-         detail con comandi ormai invalidi.» */
-      const clubId = item.data?.club_id;
-      const personId = item.data?.profile_id;
-
-      if (item.type === "role_link_left" && clubId && personId) {
-        router.push(
-          ROLE_LINK_HREFS.societyPerson(clubId, personId, {
-            from: "notification",
-          }) as never,
-        );
-      } else {
-        router.push(ROLE_LINK_HREFS.societies as never);
-      }
-    } else if (item.type === "new_follower") {
-      const followerProfileId = item.data?.follower_profile_id;
-      if (followerProfileId) {
-        router.push(`/profile/${followerProfileId}` as never);
-      }
     }
-    // agent_representation_removed: mark read only, no navigation
+  });
+
+  function handlePress(item: InboxNotification) {
+    trackNotification({
+      name: "notification_open",
+      notificationType: item.type,
+      origin: "center",
+      wasOpened: item.isOpened,
+    });
+
+    if (!item.isOpened) {
+      openMutation.mutate(item);
+    }
+
+    // §161: anche con target non disponibile la notifica risulta aperta; la
+    // destinazione mostra lo stato neutro (§157–§159).
+    openNotificationTarget(router, item, "center");
   }
 
-  function handleMarkAllRead() {
-    markAllReadMutation.mutate(latestUpdatedAt(notifications));
+  async function handleRefresh() {
+    setIsRefreshing(true);
+    trackNotification({ name: "notification_refresh" });
+    try {
+      await query.refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
   }
 
-  function handleToggleUnreadOnly() {
-    setShowUnreadOnly((prev) => !prev);
+  function handleEndReached() {
+    if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) {
+      trackNotification({ loadedCount: items.length, name: "notification_load_more" });
+      void query.fetchNextPage();
+    }
   }
 
-  function handleOpenPreferences() {
-    router.push("/notification-preferences" as never);
-  }
-
-  function handleDeleteRead() {
+  function handleDeleteOpened() {
     Alert.alert(
-      "Elimina notifiche lette",
-      "Sei sicuro di voler eliminare tutte le notifiche già lette? L'operazione non è reversibile.",
+      "Elimina notifiche aperte",
+      "Eliminare tutte le notifiche già aperte? L'operazione non è reversibile.",
       [
         { style: "cancel", text: "Annulla" },
-        {
-          onPress: () => deleteReadMutation.mutate(),
-          style: "destructive",
-          text: "Elimina",
-        },
+        { onPress: () => deleteMutation.mutate(), style: "destructive", text: "Elimina" },
       ],
     );
   }
 
-  const actionSheetActions: ActionSheetAction[] = [
-    {
-      icon: "checkmark-done-outline",
-      label: "Segna tutte come lette",
-      onPress: handleMarkAllRead,
-    },
-    {
-      icon: "filter-outline",
-      label: showUnreadOnly ? "Mostra tutte" : "Mostra solo non lette",
-      onPress: handleToggleUnreadOnly,
-    },
-    {
-      icon: "settings-outline",
-      label: "Preferenze notifiche",
-      onPress: handleOpenPreferences,
-    },
+  const menuActions: ActionSheetAction[] = [
     {
       destructive: true,
       icon: "trash-outline",
-      label: "Elimina notifiche lette",
-      onPress: handleDeleteRead,
+      id: "delete-opened",
+      label: "Elimina notifiche aperte",
+      onPress: handleDeleteOpened,
     },
   ];
 
-  const sections = useMemo(() => {
-    const byCategory = filterNotificationsByCategory(
-      notifications,
-      categoryFilter,
-    );
-    const byReadState = showUnreadOnly ? filterUnread(byCategory) : byCategory;
-    const grouped = groupNotifications(byReadState);
-    return groupNotificationsByTime(grouped);
-  }, [notifications, categoryFilter, showUnreadOnly]);
-
   const header = (
-    <View style={styles.headerWrapper}>
+    <View style={styles.header}>
       <View style={styles.topRow}>
-        <Button
-          label="Indietro"
-          onPress={() => router.back()}
-          size="sm"
-          variant="link"
-        />
+        <Button label="Indietro" onPress={() => router.back()} size="sm" variant="link" />
       </View>
       <ScreenHeader
         action={
-          <Button
-            accessibilityLabel="Gestisci notifiche"
-            label=""
-            leftIcon={
-              <Ionicons
-                color={colors.textPrimary}
-                name="options-outline"
-                size={20}
-              />
-            }
-            onPress={() => setIsActionSheetVisible(true)}
-            size="sm"
-            variant="icon"
-          />
+          <View style={styles.actions}>
+            <Button
+              accessibilityLabel="Preferenze notifiche"
+              label=""
+              leftIcon={<Ionicons color={colors.textPrimary} name="options-outline" size={22} />}
+              onPress={() => router.push("/notification-preferences" as never)}
+              size="sm"
+              variant="icon"
+            />
+            <Button
+              accessibilityLabel="Altre azioni"
+              label=""
+              leftIcon={<Ionicons color={colors.textPrimary} name="ellipsis-horizontal" size={22} />}
+              onPress={() => setIsMenuVisible(true)}
+              size="sm"
+              variant="icon"
+            />
+          </View>
         }
         title="Notifiche"
       />
-      <ScrollView
-        contentContainerStyle={styles.chipsRow}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipsScroll}
-      >
-        {NOTIFICATION_FILTERS.map((filter) => (
-          <Button
-            key={filter.value}
-            label={filter.label}
-            onPress={() => setCategoryFilter(filter.value)}
-            selected={categoryFilter === filter.value}
-            size="sm"
-            style={styles.chip}
-            variant="chipAction"
-          />
-        ))}
-      </ScrollView>
     </View>
   );
 
-  if (isLoading) {
-    return (
-      <Screen>
-        <View style={styles.container}>
-          {header}
-          <View style={styles.center}>
-            <AppText variant="bodySm" color="muted">
-              Caricamento...
-            </AppText>
-          </View>
-        </View>
-      </Screen>
-    );
-  }
-
-  if (isError) {
-    return (
-      <Screen>
-        <View style={styles.container}>
-          {header}
-          <View style={styles.center}>
-            <EmptyState
-              icon="alert-circle-outline"
-              title="Errore"
-              description="Impossibile caricare le notifiche. Riprova."
-              variant="error"
-            />
-          </View>
-        </View>
-      </Screen>
-    );
-  }
+  const showSkeleton = query.isPending;
+  const showError = query.isError && items.length === 0;
 
   return (
-    <Screen>
+    /* §25: lista aperta a tutta larghezza su fondo chiaro: lo `Screen` condiviso aggiunge 20px di
+       margine che, sommati al padding della riga, staccavano l'azzurrino dai bordi. */
+    <SafeAreaView style={styles.root}>
       <View style={styles.container}>
         {header}
 
-        <SectionList
-          contentContainerStyle={
-            sections.length === 0 ? styles.emptyContainer : styles.listContent
-          }
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={
-            <EmptyState
-              icon="notifications-outline"
-              title="Nessuna notifica"
-              description={
-                showUnreadOnly
-                  ? "Non hai notifiche non lette in questa categoria."
-                  : "Qui troverai gli aggiornamenti, ad esempio quando vieni taggato in un contenuto."
-              }
-            />
-          }
-          renderItem={({ item }) => (
-            <NotificationRow notification={item} onPress={handlePress} />
-          )}
-          renderSectionHeader={({ section: { title } }) => (
-            <AppText color="muted" style={styles.sectionTitle} variant="titleSm">
-              {title}
+        {showSkeleton ? (
+          <NotificationSkeleton />
+        ) : showError ? (
+          // §230: stato compatto; tutto il blocco riprova.
+          <Pressable
+            accessibilityHint="Tocca per riprovare"
+            accessibilityRole="button"
+            onPress={() => void query.refetch()}
+            style={styles.centered}
+          >
+            <AppText align="center" color="muted" variant="bodyLg">
+              Non è stato possibile caricare le notifiche. Riprova.
             </AppText>
-          )}
-          sections={sections}
-          stickySectionHeadersEnabled={false}
-        />
+          </Pressable>
+        ) : (
+          <SectionList
+            ListEmptyComponent={
+              // §227–§228: nessuna illustrazione.
+              <View style={styles.centered}>
+                <AppText align="center" variant="headingSm">
+                  Ancora nessuna notifica
+                </AppText>
+                <AppText align="center" color="muted" variant="bodyLg">
+                  Qui troverai gli aggiornamenti sulle attività che ti riguardano.
+                </AppText>
+              </View>
+            }
+            ListFooterComponent={
+              query.isFetchNextPageError ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void query.fetchNextPage()}
+                  style={styles.footer}
+                >
+                  <AppText align="center" color="accent" variant="bodyLg">
+                    Non è stato possibile caricare altre notifiche. Riprova.
+                  </AppText>
+                </Pressable>
+              ) : null
+            }
+            contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.listContent}
+            keyExtractor={(item) => item.id}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.6}
+            onRefresh={() => void handleRefresh()}
+            onViewableItemsChanged={handleViewable}
+            refreshing={isRefreshing}
+            renderItem={({ item }) => <NotificationRow notification={item} onPress={handlePress} />}
+            renderSectionHeader={({ section }) => (
+              <AppText accessibilityRole="header" color="muted" style={styles.sectionTitle} variant="titleSm">
+                {section.title}
+              </AppText>
+            )}
+            sections={sections}
+            stickySectionHeadersEnabled={false}
+            viewabilityConfig={VIEWABILITY}
+          />
+        )}
       </View>
 
       <ActionSheet
-        actions={actionSheetActions}
-        onClose={() => setIsActionSheetVisible(false)}
-        title="Gestisci notifiche"
-        visible={isActionSheetVisible}
+        actions={menuActions}
+        onClose={() => setIsMenuVisible(false)}
+        title="Notifiche"
+        visible={isMenuVisible}
       />
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    backgroundColor: colors.surface,
+    flex: 1,
+  },
+  actions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[4],
+  },
+  centered: {
+    alignItems: "center",
+    flex: 1,
+    gap: spacing[8],
+    justifyContent: "center",
+    padding: spacing[24],
+  },
   container: {
     flex: 1,
   },
-  headerWrapper: {
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[12],
+  emptyContainer: {
+    flexGrow: 1,
+  },
+  footer: {
+    padding: spacing[20],
+  },
+  header: {
+    gap: spacing[8],
     paddingBottom: spacing[8],
-    gap: spacing[12],
-  },
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  chipsScroll: {
-    flexGrow: 0,
-  },
-  chipsRow: {
-    alignItems: "center",
-    paddingVertical: spacing[4],
-  },
-  chip: {
-    marginRight: spacing[8],
+    paddingHorizontal: spacing[20],
+    paddingTop: spacing[12],
   },
   listContent: {
-    paddingHorizontal: spacing[12],
     paddingBottom: spacing[24],
   },
-  emptyContainer: {
-    flex: 1,
-    padding: spacing[20],
-    justifyContent: "center",
-  },
   sectionTitle: {
-    paddingHorizontal: spacing[16],
-    paddingTop: spacing[16],
     paddingBottom: spacing[8],
+    paddingHorizontal: spacing[20],
+    paddingTop: spacing[20],
   },
-  center: {
-    flex: 1,
+  skeleton: {
+    paddingHorizontal: spacing[20],
+    paddingTop: spacing[8],
+  },
+  skeletonRow: {
     alignItems: "center",
-    justifyContent: "center",
-    padding: spacing[20],
+    flexDirection: "row",
+    gap: spacing[12],
+    paddingVertical: spacing[14],
+  },
+  skeletonShort: {
+    width: "55%",
+  },
+  skeletonText: {
+    flex: 1,
+  },
+  topRow: {
+    alignItems: "center",
+    flexDirection: "row",
   },
 });

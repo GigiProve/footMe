@@ -52,7 +52,7 @@ import { emitContentEvent } from "../../content-insights/content-events-service"
 import { useContentDetailEvents } from "../../content-insights/use-content-detail-events";
 import { normalizeContentAvailability } from "../content-availability-presentation";
 import type { ContentManagement } from "../content-management-types";
-import type { CommentFocus, ContentOrigin } from "../content-routes";
+import type { CommentFocus, CommentTarget, ContentOrigin } from "../content-routes";
 import { FEED_QK } from "../feed-keys";
 import { useBackToFeed } from "../use-back-to-feed";
 import { seedSavedFromItems, useToggleSavedFeedItem } from "../use-feed-item-actions";
@@ -105,10 +105,13 @@ export function ProfilePostDetail({
   focus = null,
   initialMediaIndex = null,
   origin = null,
+  commentTarget = null,
 }: {
   postId: string;
   /** HOM-08 §8: `profile_post`, `club_media` o `media_profile` (Post di Società/Media). */
   contentType?: FeedContentType;
+  /** HOM-14 §47, §51: commento e thread a cui porta una notifica. */
+  commentTarget?: CommentTarget | null;
   /** HOM-08 §5–§6: dove atterrare (sezione commenti o composer a fuoco). */
   focus?: CommentFocus | null;
   /** §35: il media toccato nel Feed, portato in vista una sola volta. */
@@ -138,6 +141,7 @@ export function ProfilePostDetail({
     focus,
     origin,
     scrollRef,
+    target: commentTarget,
   });
 
   const query = useQuery({

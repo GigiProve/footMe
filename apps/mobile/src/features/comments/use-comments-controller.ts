@@ -35,7 +35,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../ui";
 import { openExternalUrl } from "../article-editor/article-links";
 import { useSession } from "../auth/use-session";
-import { parseContentOrigin } from "../feed/content-routes";
+import { parseContentOrigin, type CommentTarget } from "../feed/content-routes";
 import { resolveIdentityHref } from "../feed/feed-service";
 import { useContentLikeToggle } from "../feed/use-feed-post-like";
 import { followSourceOfIdentity } from "../following/follow-source";
@@ -203,12 +203,18 @@ export function useCommentsController({
   focus,
   origin = null,
   scrollRef,
+  target = null,
 }: {
   contentType: string;
   contentId: string;
   focus: CommentsFocus;
   origin?: string | null;
   scrollRef: RefObject<ScrollView | null>;
+  /**
+   * HOM-14 §47, §51: il commento (e il thread) a cui porta la notifica. Apre il
+   * thread del commento principale; senza di esso la sezione si apre come sempre.
+   */
+  target?: CommentTarget | null;
 }): CommentsController {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -334,6 +340,17 @@ export function useCommentsController({
   const [sortOpen, setSortOpen] = useState(false);
   const [asOpen, setAsOpen] = useState(false);
   const [menuTarget, setMenuTarget] = useState<CommentEntity | null>(null);
+
+  /* ---------------- thread di una notifica (HOM-14 §51) ---------------- */
+
+  // Una risposta apre il thread del suo commento principale; una volta sola per commento.
+  const targetRootId = target?.rootCommentId ?? null;
+  const targetCommentId = target?.commentId ?? null;
+  useEffect(() => {
+    if (targetRootId && targetCommentId && targetRootId !== targetCommentId) {
+      commentStore.setExpanded(targetRootId, true);
+    }
+  }, [targetCommentId, targetRootId]);
 
   /* ---------------- scroll di apertura (§5–§6) ---------------- */
 

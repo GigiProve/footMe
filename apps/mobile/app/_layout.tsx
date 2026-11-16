@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
 import { SessionProvider } from "../src/features/auth/session-provider";
+import { PushNotificationsHost } from "../src/features/notifications/push/PushNotificationsHost";
 import { queryClient } from "../src/lib/query-client";
 import { useAppFonts } from "../src/styles/fonts";
 import { ToastProvider } from "../src/ui";
@@ -24,6 +25,8 @@ export default function RootLayout() {
       <SessionProvider>
         <ToastProvider>
           <StatusBar style="dark" />
+          {/* HOM-14 §176-§179: registrazione Push, tap su notifica e pulizia al cambio account; non renderizza nulla. */}
+          <PushNotificationsHost />
           <Stack screenOptions={{ headerShown: false, gestureEnabled: false }}>
             {/* HOM-06.1 §6: il composer Post è a schermo intero, senza bottom navigation. */}
             <Stack.Screen
