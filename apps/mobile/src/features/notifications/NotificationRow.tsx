@@ -10,15 +10,23 @@
  * `notification-presentation`; le righe operative senza attore mostrano l'icona
  * della categoria. Nessun troncamento del testo essenziale (§250): il nome può
  * andare a capo, la preview è limitata a due righe (§251).
+ *
+ * DAS-REV-34 §15–§17, screen 07/08: le notifiche strutturali dei gruppi (target
+ * `conversation`) mostrano l'avatar del gruppo (`GroupAvatar`, iniziali senza
+ * immagine), il titolo del server e una riga di contesto «AC Como · Ora»: il tempo
+ * passa lì, non nella colonna a destra. Nessuna categoria né filtro nuovi.
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { formatCompactRelativeTime } from "../../lib/relative-time";
+import { formatCompactRelativeTime, formatRelativeTime } from "../../lib/relative-time";
 import { colors, radius, spacing } from "../../styles";
 import { AppText, Avatar, VerifiedCheck } from "../../ui";
+import { GroupAvatar } from "../dashboard/groups/components/GroupAvatar";
 import {
+  conversationContextLine,
+  conversationNotificationDisplay,
   isSocialNotification,
   notificationAccessibilityLabel,
   notificationActorName,
@@ -37,6 +45,7 @@ type NotificationRowProps = {
 export function NotificationRow({ notification, onPress }: NotificationRowProps) {
   const isUnopened = !notification.isOpened;
   const social = isSocialNotification(notification);
+  const conversation = conversationNotificationDisplay(notification);
   const actor = notification.actor;
   const secondary = notificationSecondaryText(notification);
   const preview = notificationPreview(notification);
@@ -56,7 +65,12 @@ export function NotificationRow({ notification, onPress }: NotificationRowProps)
         pressed ? styles.pressed : null,
       ]}
     >
-      {social && actor ? (
+      {conversation ? (
+        /* Stessa resa dei gruppi in Inbox e Centro (`GroupAvatar`); l'hairline tiene il cerchio sull'azzurrino. */
+        <View style={styles.avatarRing}>
+          <GroupAvatar name={conversation.groupName} path={conversation.avatarPath} size="md" />
+        </View>
+      ) : social && actor ? (
         /* Le iniziali su `accentSoft` sparirebbero sulla riga azzurrina (`heroSoft`): l'hairline tiene il cerchio. */
         <View style={[styles.avatarRing, actor.type === "society" ? styles.avatarRingSquare : null]}>
           <Avatar
@@ -90,12 +104,20 @@ export function NotificationRow({ notification, onPress }: NotificationRowProps)
             {`“${preview}”`}
           </AppText>
         ) : null}
+        {conversation ? (
+          /* Screen 07/08: «AC Como · Ora». Il tempo sta qui, non nella colonna a destra. */
+          <AppText color="muted" variant="feedMeta">
+            {conversationContextLine(notification, formatRelativeTime(notification.displayAt))}
+          </AppText>
+        ) : null}
       </View>
 
       <View style={styles.meta}>
-        <AppText color="muted" variant="feedMeta">
-          {formatCompactRelativeTime(notification.displayAt)}
-        </AppText>
+        {conversation ? null : (
+          <AppText color="muted" variant="feedMeta">
+            {formatCompactRelativeTime(notification.displayAt)}
+          </AppText>
+        )}
         {isUnopened ? <View style={styles.dot} /> : null}
       </View>
     </Pressable>
@@ -104,6 +126,8 @@ export function NotificationRow({ notification, onPress }: NotificationRowProps)
 
 const styles = StyleSheet.create({
   avatarRing: {
+    // In riga con un titolo su due righe l'anello si stirava in verticale (capsula).
+    alignSelf: "flex-start",
     borderColor: colors.border,
     borderRadius: radius.full,
     borderWidth: StyleSheet.hairlineWidth,

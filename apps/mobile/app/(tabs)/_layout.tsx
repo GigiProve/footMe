@@ -7,8 +7,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { usePendingAuthTarget } from "../../src/features/auth/use-pending-auth-target";
 import { useSession } from "../../src/features/auth/use-session";
-import { fetchCommunications } from "../../src/features/messaging/communications-service";
-import { fetchInboxConversations } from "../../src/features/messaging/messaging-service";
+import { messagesTabA11yLabel } from "../../src/features/messaging/inbox-helpers";
+import { MESSAGING_QK } from "../../src/features/messaging/messaging-keys";
+import { fetchMessagesBadgeCount } from "../../src/features/messaging/messaging-service";
+import { useMessagingReconciliation } from "../../src/features/messaging/use-messaging-reconciliation";
 import { usePendingSocietyInvite } from "../../src/features/network/use-pending-society-invite";
 import { usePendingAdminInvite } from "../../src/features/dashboard/admins/use-pending-admin-invite";
 import { usePendingAssistitoInvite } from "../../src/features/relationships/assistiti/use-pending-assistito-invite";
@@ -46,17 +48,20 @@ export default function TabsLayout() {
   const isFocused = useIsFocused();
   useToastBottomInset(isFocused ? sizes.tabBarHeight : 0);
 
-  const conversationsQuery = useQuery({
+  /*
+    DAS-REV-34 §10, §29: il badge Messaggi è un aggregato del server (conversazioni
+    con almeno un non letto + comunicazioni non lette), non la somma delle righe
+    caricate dalla pagina o dalle tab aperte. Si rilegge a focus dell'Inbox, a
+    ritorno in foreground, a lettura di una chat e a ogni cambio di mute.
+  */
+  const badgeQuery = useQuery({
     enabled: !!profileId,
-    queryFn: () => fetchInboxConversations(),
-    queryKey: ["inbox-conversations", profileId],
+    queryFn: fetchMessagesBadgeCount,
+    queryKey: MESSAGING_QK.badge(profileId),
   });
 
-  const communicationsQuery = useQuery({
-    enabled: !!profileId,
-    queryFn: () => fetchCommunications(),
-    queryKey: ["communications", profileId],
-  });
+  // Realtime dello stato personale (mute da un altro dispositivo) e riconciliazione a foreground.
+  useMessagingReconciliation(profileId);
 
   // Un invito aperto prima del login riparte da qui: le tab sono il punto in
   // cui confluiscono sia chi accede sia chi finisce l'onboarding.
@@ -85,10 +90,7 @@ export default function TabsLayout() {
   // ricordato prima di rimandare al login (o all'onboarding).
   usePendingAuthTarget(isReadyForInvites);
 
-  const unreadThreadsCount = profileId
-    ? (conversationsQuery.data ?? []).filter((item) => item.unread_count > 0).length +
-      (communicationsQuery.data ?? []).filter((item) => !item.is_read).length
-    : 0;
+  const unreadThreadsCount = profileId ? (badgeQuery.data ?? 0) : 0;
 
   // HOM-15 §293: login e onboarding li impone la guardia comune del layout
   // radice (`SessionGuard`), che ricorda anche il target (§297). Qui solo
@@ -129,6 +131,8 @@ export default function TabsLayout() {
           name="messages"
           options={{
             ...buildTabOptions("Messaggi", "messages"),
+            // §29: il badge annuncia conversazioni da leggere, non messaggi.
+            tabBarAccessibilityLabel: messagesTabA11yLabel(unreadThreadsCount),
             tabBarBadge: unreadThreadsCount > 0 ? unreadThreadsCount : undefined,
             tabBarBadgeStyle: styles.messagesBadge,
           }}

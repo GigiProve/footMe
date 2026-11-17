@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  acknowledgeConversationRead,
   fetchConversationType,
   fetchDirectConversationMeta,
   fetchGroupConversationMeta,
   fetchInboxConversations,
+  fetchMessagesBadgeCount,
   getChatMediaSignedUrl,
   markInboxAllRead,
   openDirectConversation,
@@ -484,5 +486,75 @@ describe("markInboxAllRead", () => {
     rpcMock.mockResolvedValue({ data: null, error: new Error("boom") });
 
     await expect(markInboxAllRead()).rejects.toThrow("boom");
+  });
+});
+
+describe("acknowledgeConversationRead (DAS-REV-34 §11)", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+  });
+
+  it("calls the rpc with the boundary and the observed period, and reads the projection back", async () => {
+    rpcMock.mockResolvedValue({ data: { last_read_seq: 9, unread_count: 2 }, error: null });
+
+    const result = await acknowledgeConversationRead({ conversationId: "c1", periodId: "p1", upToSeq: 9 });
+
+    expect(rpcMock).toHaveBeenCalledWith("acknowledge_conversation_read", {
+      p_conversation_id: "c1",
+      p_period_id: "p1",
+      p_up_to_seq: 9,
+    });
+    expect(result).toEqual({ lastReadSeq: 9, unreadCount: 2 });
+  });
+
+  it("sends a null period for DIRECT and tolerates an empty payload", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null });
+
+    const result = await acknowledgeConversationRead({ conversationId: "c1", periodId: null, upToSeq: 3 });
+
+    expect(rpcMock).toHaveBeenCalledWith("acknowledge_conversation_read", {
+      p_conversation_id: "c1",
+      p_period_id: null,
+      p_up_to_seq: 3,
+    });
+    expect(result).toEqual({ lastReadSeq: null, unreadCount: null });
+  });
+
+  it("rethrows the server error so the chat can read PERIOD_ENDED", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { message: "PERIOD_ENDED" } });
+
+    await expect(
+      acknowledgeConversationRead({ conversationId: "c1", periodId: "p0", upToSeq: 3 }),
+    ).rejects.toMatchObject({ message: "PERIOD_ENDED" });
+  });
+});
+
+describe("fetchMessagesBadgeCount (DAS-REV-34 §10)", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+  });
+
+  it("returns the server total, not a client-side sum", async () => {
+    rpcMock.mockResolvedValue({
+      data: { communication_units: 0, conversation_units: 3, total: 3 },
+      error: null,
+    });
+
+    await expect(fetchMessagesBadgeCount()).resolves.toBe(3);
+    expect(rpcMock).toHaveBeenCalledWith("fetch_messages_badge_count");
+  });
+
+  it("is zero for an empty or malformed payload, never negative", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null });
+    await expect(fetchMessagesBadgeCount()).resolves.toBe(0);
+
+    rpcMock.mockResolvedValue({ data: { total: -2 }, error: null });
+    await expect(fetchMessagesBadgeCount()).resolves.toBe(0);
+  });
+
+  it("throws on error instead of reporting zero unread", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: new Error("boom") });
+
+    await expect(fetchMessagesBadgeCount()).rejects.toThrow("boom");
   });
 });

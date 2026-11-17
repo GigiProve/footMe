@@ -54,6 +54,28 @@ vi.mock("../../messaging/messaging-service", () => ({
 }));
 vi.mock("../../messaging/use-group-chat-access", () => ({ purgeConversationCache: async () => {} }));
 
+/* DAS-REV-34 §8: lo stato Notifiche arriva dal server; mai il client supabase reale. */
+const muteMocks = vi.hoisted(() => ({
+  fetchConversationNotificationState: vi.fn(),
+  setConversationMute: vi.fn(),
+}));
+vi.mock("../../messaging/mute/mute-service", () => ({
+  fetchConversationNotificationState: muteMocks.fetchConversationNotificationState,
+  setConversationMute: muteMocks.setConversationMute,
+}));
+
+const notificationState = (patch: Record<string, unknown> = {}) => ({
+  canChange: true,
+  conversationId: "g1",
+  conversationType: "group" as const,
+  isMuted: false,
+  muteOption: null,
+  mutedUntil: null,
+  periodId: "period-1",
+  stateVersion: 0,
+  ...patch,
+});
+
 const serviceMocks = vi.hoisted(() => ({
   fetchGroupAvatarUrl: vi.fn(),
   fetchGroupManagement: vi.fn(),
@@ -154,6 +176,7 @@ beforeEach(() => {
   routerMocks.params = { conversationId: "g1" };
   serviceMocks.fetchGroupAvatarUrl.mockResolvedValue(null);
   serviceMocks.fetchGroupManagement.mockResolvedValue(management());
+  muteMocks.fetchConversationNotificationState.mockResolvedValue(notificationState());
 });
 
 afterEach(() => {
@@ -257,6 +280,66 @@ describe("Info gruppo: stessa struttura, azioni per capability (§5, §9)", () =
 
     expect(texts(tree)).toContain("Non è stato possibile caricare il gruppo. Riprova.");
     expect(texts(tree)).toContain("Riprova");
+  });
+});
+
+describe("Info gruppo: riga personale Notifiche (DAS-REV-34 §5, §8; screen 01)", () => {
+  it("da Messaggi, con un periodo attivo: «Notifiche · Attive» con chevron e label con lo stato", async () => {
+    const tree = await render(<GroupInfoScreen origin="messages" />);
+
+    expect(texts(tree)).toEqual(expect.arrayContaining(["Notifiche", "Attive"]));
+    expect(pressable(tree, "group-info-notifications")).toBeDefined();
+    expect(
+      tree.root.findAll((node) => node.props?.accessibilityLabel === "Notifiche, Attive").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("un mute attivo dice «Silenziose» e lo annuncia", async () => {
+    muteMocks.fetchConversationNotificationState.mockResolvedValue(
+      notificationState({ isMuted: true, muteOption: "8h", mutedUntil: "2026-11-17T20:00:00Z", stateVersion: 3 }),
+    );
+    const tree = await render(<GroupInfoScreen origin="messages" />);
+
+    expect(texts(tree)).toContain("Silenziose");
+    expect(
+      tree.root.findAll((node) => node.props?.accessibilityLabel === "Notifiche, Silenziose").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("dalla Dashboard la riga non c'è e lo stato personale non viene nemmeno chiesto", async () => {
+    serviceMocks.fetchGroupManagement.mockResolvedValue(management({ capabilities: ADMIN, myRole: "admin" }));
+    const tree = await render(<GroupInfoScreen origin="dashboard" />);
+
+    expect(hasTestID(tree, "group-info-notifications")).toBe(false);
+    expect(muteMocks.fetchConversationNotificationState).not.toHaveBeenCalled();
+  });
+
+  it("manager non membro da Messaggi: il server dice NOT_MEMBER e la riga non compare", async () => {
+    muteMocks.fetchConversationNotificationState.mockRejectedValue({ message: "NOT_MEMBER" });
+    serviceMocks.fetchGroupManagement.mockResolvedValue(
+      management({ capabilities: MANAGER, leavePath: null, myPeriodId: null, myPeriodVersion: null, myRole: null }),
+    );
+    const tree = await render(<GroupInfoScreen origin="messages" />);
+
+    expect(hasTestID(tree, "group-info-notifications")).toBe(false);
+    expect(texts(tree)).not.toContain("Notifiche");
+  });
+
+  it("in ARCHIVED la preferenza personale resta modificabile senza riabilitare altre modifiche", async () => {
+    serviceMocks.fetchGroupManagement.mockResolvedValue(management({ status: "archived" }));
+    const tree = await render(<GroupInfoScreen origin="messages" />);
+
+    expect(pressable(tree, "group-info-notifications")).toBeDefined();
+    expect(hasTestID(tree, "group-name-edit")).toBe(false);
+    expect(pressable(tree, "group-info-team")).toBeUndefined();
+  });
+
+  it("se il server non consente la modifica la riga resta leggibile ma senza tap", async () => {
+    muteMocks.fetchConversationNotificationState.mockResolvedValue(notificationState({ canChange: false }));
+    const tree = await render(<GroupInfoScreen origin="messages" />);
+
+    expect(texts(tree)).toContain("Notifiche");
+    expect(pressable(tree, "group-info-notifications")).toBeUndefined();
   });
 });
 

@@ -44,14 +44,17 @@ import {
 } from "../group-chat-presentation";
 import { MESSAGING_QK } from "../messaging-keys";
 import { GROUP_INFO_AVAILABLE, groupInfoRoute } from "../messaging-routes";
+import { ConversationNotificationsSheet } from "../mute/ConversationNotificationsSheet";
+import { decideReadAck } from "../read-state-presentation";
 import { useGroupAccessSignals, useGroupChatAccess } from "../use-group-chat-access";
+import { useVisibleConversation } from "../use-visible-conversation";
 import {
+  acknowledgeConversationRead,
   fetchConversationType,
   fetchDirectConversationMeta,
   fetchGroupConversationMeta,
   getConversationMessages,
   getShareablePhoneContact,
-  markConversationRead,
   reportConversation,
   sendContactCardMessage,
   sendMessage,
@@ -88,6 +91,7 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
   const [draft, setDraft] = useState("");
   const [isActionsSheetVisible, setIsActionsSheetVisible] = useState(false);
   const [isBlockConfirmVisible, setIsBlockConfirmVisible] = useState(false);
+  const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -169,18 +173,78 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
     };
   }, [conversationId, isRevoked, queryClient]);
 
+  /*
+    DAS-REV-34 §11, §16: la lettura si conferma solo con la chat davvero a
+    schermo (in primo piano, app attiva), fino alla sequence più alta caricata:
+    i messaggi arrivati nel frattempo restano non letti. Per i GROUP l'ack porta
+    il periodo osservato; un `PERIOD_ENDED` è una revoca. Ack ripetuti non
+    partono: si rinnova solo se la sequence avanza.
+  */
+  const isVisible = useVisibleConversation(conversationId, !isRevoked);
+  const groupPeriodId = groupMetaQuery.data?.periodId ?? null;
+  const ackedRef = useRef<{ key: string; seq: number } | null>(null);
+  const handleAccessErrorRef = useRef(access.handleAccessError);
+
   useEffect(() => {
-    if (!conversationId || isRevoked || !messagesQuery.dataUpdatedAt) {
+    handleAccessErrorRef.current = access.handleAccessError;
+  });
+
+  const messagesData = messagesQuery.data;
+  const isMessagesReady = messagesQuery.isSuccess && !typeQuery.isPending;
+
+  useEffect(() => {
+    const key = `${conversationId}:${groupPeriodId ?? ""}`;
+    const decision = decideReadAck({
+      isGroup,
+      isReady: isMessagesReady,
+      isRevoked,
+      isVisible,
+      lastAckedSeq: ackedRef.current?.key === key ? ackedRef.current.seq : null,
+      messages: messagesData ?? [],
+      periodId: groupPeriodId,
+    });
+
+    if (decision.action === "none") {
       return;
     }
 
-    markConversationRead(conversationId)
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(myProfileId) });
-      })
-      .catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, isRevoked, messagesQuery.dataUpdatedAt]);
+    const refreshReadProjections = () => {
+      void queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(myProfileId) });
+      void queryClient.invalidateQueries({ queryKey: MESSAGING_QK.badge(myProfileId) });
+    };
+
+    const previous = ackedRef.current;
+    const sent = { key, seq: decision.upToSeq };
+
+    ackedRef.current = sent;
+
+    acknowledgeConversationRead({
+      conversationId,
+      periodId: decision.periodId,
+      upToSeq: decision.upToSeq,
+    })
+      .then(refreshReadProjections)
+      .catch((error: unknown) => {
+        // Il tentativo fallito non conta come confermato: il prossimo aggiornamento riprova.
+        if (ackedRef.current === sent) {
+          ackedRef.current = previous;
+        }
+
+        if (isGroup) {
+          handleAccessErrorRef.current(error);
+        }
+      });
+  }, [
+    conversationId,
+    groupPeriodId,
+    isGroup,
+    isMessagesReady,
+    isRevoked,
+    isVisible,
+    messagesData,
+    myProfileId,
+    queryClient,
+  ]);
 
   const sendMutation = useMutation({
     mutationFn: (body: string) =>
@@ -312,8 +376,18 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
   }, [chatState, meta]);
 
   // §208–§210: una DIRECT aperta altrove converge appena l'app torna attiva.
+  // DAS-REV-34 §22, §25: al ritorno in foreground la chat rivalida timeline e accesso
+  // (la lettura riparte dai dati nuovi, e una revoca avvenuta altrove emerge dal meta).
   useRefetchOnActive(() => {
-    if (conversationId && !isGroup) {
+    if (!conversationId || isRevoked) {
+      return;
+    }
+
+    queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMessages(conversationId) });
+
+    if (isGroup) {
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.groupMeta(conversationId) });
+    } else {
       queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMeta(conversationId) });
     }
   });
@@ -665,11 +739,31 @@ export function ChatScreen({ conversationId, initialName }: ChatScreenProps) {
         onBlockToggle={handleBlockToggle}
         otherName={meta?.other_full_name ?? null}
         onClose={() => setIsActionsSheetVisible(false)}
+        // DAS-REV-34 §9: nelle DIRECT le Notifiche si aprono dal menu; i GROUP le hanno in Info.
+        onOpenNotifications={
+          isGroup
+            ? undefined
+            : () => {
+                // Un Modal alla volta su iOS: il menu si chiude prima che lo sheet si apra.
+                setTimeout(() => setIsNotificationsVisible(true), SHEET_HANDOFF_MS);
+              }
+        }
         onOpenProfile={handleOpenProfile}
         onReport={() => setIsReportModalVisible(true)}
         onSearch={() => setIsSearchMode(true)}
         visible={isActionsSheetVisible}
       />
+
+      {isGroup ? null : (
+        <ConversationNotificationsSheet
+          conversationId={conversationId}
+          conversationType="direct"
+          onClose={() => setIsNotificationsVisible(false)}
+          periodId={null}
+          profileId={myProfileId}
+          visible={isNotificationsVisible}
+        />
+      )}
 
       <BlockConfirmSheet
         name={meta?.other_full_name ?? null}

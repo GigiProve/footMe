@@ -14,6 +14,8 @@
  * Centro, ora qui.
  *
  *   • «route»       → navigare a `href`.
+ *   • «conversation»→ DAS-REV-34 §25: il server decide chat / Info gruppo / fallback
+ *                     (`resolve_conversation_target`); mai una route dal client.
  *   • «none»        → nessuna navigazione per scelta (es. rappresentanza rimossa).
  *   • «unavailable» → mancano gli identificativi: il tap apre comunque la
  *                     notifica, senza errore né pagina bianca (§157, §161), e
@@ -30,6 +32,11 @@ import { contentDetailHref, type ContentOrigin } from "../feed/content-routes";
 import type { FeedContentType } from "../feed/feed-types";
 import { draftsHref } from "../publishing/publishing-routes";
 import {
+  CONVERSATION_UNAVAILABLE_MESSAGE,
+  conversationLinkFromTarget,
+  type ConversationLink,
+} from "./conversation-target-presentation";
+import {
   isScheduledContentNotification,
   isSelectionEventNotification,
   scheduledContentNotificationHref,
@@ -39,6 +46,8 @@ import type { NotificationTargetSource } from "./notification-types";
 
 export type NotificationDestination =
   | { kind: "route"; href: string }
+  /** DAS-REV-34 §25: la destinazione la decide il server (`resolve_conversation_target`), non il client. */
+  | { kind: "conversation"; link: ConversationLink }
   | { kind: "none" }
   | { kind: "unavailable" };
 
@@ -110,6 +119,14 @@ function resolveStructuredTarget(source: NotificationTargetSource): Notification
     case "scheduled_content":
       // §89, §156: l'elemento fallito si gestisce dove ha Riprova · Modifica · Sposta (HOM-06.2 §195).
       return ROUTE(draftsHref("scheduled"));
+
+    case "conversation": {
+      // DAS-REV-34 §25: aggiunta, rimozione, ruolo, eliminazione di un gruppo. Mai una route
+      // diretta: un id non è una capability, e la chat non si apre prima della risposta server.
+      const link = conversationLinkFromTarget(target);
+
+      return link ? { kind: "conversation", link } : UNAVAILABLE;
+    }
 
     default:
       return null;
@@ -239,6 +256,10 @@ function resolveOperational(source: NotificationTargetSource): NotificationDesti
  * ogni altro target senza identificativi è un contenuto non più raggiungibile.
  */
 export function notificationUnavailableMessage(source: NotificationTargetSource): string {
+  if (source.target?.type === "conversation") {
+    return CONVERSATION_UNAVAILABLE_MESSAGE;
+  }
+
   return source.target?.type === "profile" || source.type === "new_follower"
     ? BLOCK_COPY.unavailableTitle
     : CONTENT_UNAVAILABLE_TITLE;

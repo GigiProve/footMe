@@ -247,4 +247,53 @@ describe("copy del target non disponibile (HOM-15 §149–§150, §295)", () => 
       ),
     ).toBe("Contenuto non disponibile");
   });
+
+  it("una conversazione non raggiungibile dice «Questa conversazione non è più disponibile.»", () => {
+    expect(
+      notificationUnavailableMessage(
+        source({
+          actor: null,
+          target: { id: "x", params: {}, type: "conversation" },
+          type: "group_deleted",
+        }),
+      ),
+    ).toBe("Questa conversazione non è più disponibile.");
+  });
+});
+
+describe("target conversation (DAS-REV-34 §25)", () => {
+  const GROUP = "3f8c1b5e-1d2a-4c3b-9a7e-0123456789ab";
+  const PERIOD = "9f8c1b5e-1d2a-4c3b-9a7e-0123456789ab";
+  const group = (params: Record<string, unknown>, id = GROUP) =>
+    source({ actor: null, target: { id, params, type: "conversation" }, type: "group_admin_promoted" });
+
+  it("non è mai una route diretta: il server decide chat, Info o fallback", () => {
+    expect(resolveNotificationTarget(group({ intent: "role", period_id: PERIOD }))).toEqual({
+      kind: "conversation",
+      link: { conversationId: GROUP, intent: "role", periodId: PERIOD },
+    });
+  });
+
+  it("porta l'intento di ognuna delle cinque notifiche strutturali", () => {
+    for (const intent of ["added", "removed", "role", "deleted"] as const) {
+      expect(resolveNotificationTarget(group({ intent, period_id: PERIOD }))).toMatchObject({
+        kind: "conversation",
+        link: { intent },
+      });
+    }
+  });
+
+  it("identificativi non validi → non disponibile, senza interrogare il server", () => {
+    expect(resolveNotificationTarget(group({ intent: "added" }, "non-un-uuid"))).toEqual({ kind: "unavailable" });
+    expect(resolveNotificationTarget(group({ period_id: "../x" }))).toEqual({ kind: "unavailable" });
+  });
+
+  it("nome del gruppo e Società dello snapshot non entrano nella destinazione", () => {
+    const destination = resolveNotificationTarget(
+      group({ group_name: "Staff Primavera", intent: "added", period_id: PERIOD, society_name: "AC Como" }),
+    );
+
+    expect(JSON.stringify(destination)).not.toContain("Staff Primavera");
+    expect(JSON.stringify(destination)).not.toContain("AC Como");
+  });
 });

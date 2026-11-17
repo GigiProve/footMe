@@ -12,8 +12,11 @@ import type {
 const backMock = vi.fn();
 const pushMock = vi.fn();
 const replaceMock = vi.fn();
+// DAS-REV-34 §16: la chat conferma la lettura solo se la schermata è in primo piano.
+const focusState = vi.hoisted(() => ({ focused: true }));
 
 vi.mock("expo-router", () => ({
+  useIsFocused: () => focusState.focused,
   /*
     Il guard delle modifiche non salvate si aggancia a "beforeRemove" del
     navigatore: senza questo stub le schermate di modifica non montano.
@@ -68,7 +71,15 @@ vi.mock("../../blocking/blocking-service", () => ({
   unblockIdentity: blockingMocks.unblockIdentity,
 }));
 
+// Il selector Notifiche della DIRECT legge lo stato dal server: mai il client supabase reale.
+vi.mock("../mute/mute-service", () => ({
+  fetchConversationNotificationState: vi.fn(),
+  setConversationMute: vi.fn(),
+  subscribeToMyActorStates: vi.fn(() => ({})),
+}));
+
 const serviceMocks = vi.hoisted(() => ({
+  acknowledgeConversationRead: vi.fn(),
   fetchConversationType: vi.fn(),
   fetchDirectConversationMeta: vi.fn(),
   fetchGroupConversationMeta: vi.fn(),
@@ -88,6 +99,7 @@ const serviceMocks = vi.hoisted(() => ({
 // crashes in the vitest environment (react-native-url-polyfill BlobModule).
 vi.mock("../messaging-service", () => {
   return {
+    acknowledgeConversationRead: serviceMocks.acknowledgeConversationRead,
     getChatMediaSignedUrl: vi.fn(),
     fetchConversationType: serviceMocks.fetchConversationType,
     fetchDirectConversationMeta: serviceMocks.fetchDirectConversationMeta,
@@ -129,6 +141,8 @@ afterEach(() => {
 beforeEach(async () => {
   vi.clearAllMocks();
 
+  focusState.focused = true;
+  serviceMocks.acknowledgeConversationRead.mockResolvedValue({ lastReadSeq: 0, unreadCount: 0 });
   serviceMocks.subscribeToConversation.mockReturnValue({});
   serviceMocks.subscribeToMyGroupPeriods.mockReturnValue({});
   serviceMocks.unsubscribeFromConversation.mockResolvedValue(undefined);
@@ -577,7 +591,7 @@ describe("ChatScreen", () => {
       expect(serviceMocks.fetchGroupConversationMeta.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
-    it("clears the cache, goes back and warns when my active period ends", async () => {
+    it("clears the cache and replaces the open chat with the focused fallback when my active period ends", async () => {
       serviceMocks.fetchGroupConversationMeta.mockResolvedValue(groupMeta);
 
       const tree = await renderScreen({ groupMeta, messages: [buildMessage()] });
@@ -595,12 +609,15 @@ describe("ChatScreen", () => {
         });
       });
 
+      // DAS-REV-34 §22: fallback 11 al posto di toast + back, nessun nome sotto.
       await waitUntil(() => {
-        expect(backMock).toHaveBeenCalledTimes(1);
-        expect(textsOf(tree)).toContain("Non fai più parte di questo gruppo.");
+        expect(replaceMock).toHaveBeenCalledTimes(1);
       });
       await settle();
-      expect(backMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledWith("/messages/unavailable?reason=revoked");
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      expect(backMock).not.toHaveBeenCalled();
+      expect(textsOf(tree)).not.toContain("Non fai più parte di questo gruppo.");
       expect(lastQueryClient?.getQueryData(["conversation-messages", "conv-1"])).toBeUndefined();
       expect(lastQueryClient?.getQueryData(["group-conversation-meta", "conv-1"])).toBeUndefined();
     });
@@ -626,19 +643,20 @@ describe("ChatScreen", () => {
       });
       await settle();
 
-      expect(backMock).not.toHaveBeenCalled();
+      expect(replaceMock).not.toHaveBeenCalled();
 
       await act(async () => {
         onPeriodChange(periodRow({ id: "period-1", revoked_kind: "deleted" }));
       });
 
-      // The deleted copy proves the first (older) period did not already revoke:
+      // The deleted reason proves the first (older) period did not already revoke:
       // a second revoke is a no-op, so an earlier "ended" revoke would win.
       await waitUntil(() => {
-        expect(backMock).toHaveBeenCalledTimes(1);
-        expect(textsOf(tree)).toContain("Il gruppo è stato eliminato.");
+        expect(replaceMock).toHaveBeenCalledTimes(1);
       });
-      expect(textsOf(tree)).not.toContain("Non fai più parte di questo gruppo.");
+      expect(replaceMock).toHaveBeenCalledWith("/messages/unavailable?reason=deleted");
+      expect(backMock).not.toHaveBeenCalled();
+      expect(textsOf(tree)).not.toContain("Il gruppo è stato eliminato.");
     });
 
     it("revokes when the meta fetch says the membership is gone", async () => {
@@ -649,12 +667,76 @@ describe("ChatScreen", () => {
       await renderScreen({ messages: [] });
 
       await waitUntil(() => {
-        expect(backMock).toHaveBeenCalledTimes(1);
+        expect(replaceMock).toHaveBeenCalledWith("/messages/unavailable?reason=revoked");
       });
       // Access lost is final: the meta must not be retried or refetched into a loop.
       await settle();
-      expect(backMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      expect(backMock).not.toHaveBeenCalled();
       expect(serviceMocks.fetchGroupConversationMeta).toHaveBeenCalledTimes(1);
+    });
+
+    describe("DAS-REV-34 read acknowledgment", () => {
+      const seqMessages = [
+        buildMessage({ message_id: "m-1", seq: 4 }),
+        buildMessage({ message_id: "m-2", seq: 9 }),
+        buildMessage({ message_id: "m-3", seq: 7 }),
+      ];
+
+      it("a visible GROUP chat acknowledges up to the highest loaded seq with the observed period", async () => {
+        serviceMocks.fetchGroupConversationMeta.mockResolvedValue(groupMeta);
+
+        await renderScreen({ groupMeta, messages: seqMessages });
+
+        await waitUntil(() => {
+          expect(serviceMocks.acknowledgeConversationRead).toHaveBeenCalledWith({
+            conversationId: "conv-1",
+            periodId: "period-1",
+            upToSeq: 9,
+          });
+        });
+        // Same data again: the boundary only moves forward, no repeated ack.
+        await settle();
+        expect(serviceMocks.acknowledgeConversationRead).toHaveBeenCalledTimes(1);
+        expect(serviceMocks.markConversationRead).not.toHaveBeenCalled();
+      });
+
+      it("a DIRECT chat acknowledges without a period", async () => {
+        serviceMocks.fetchConversationType.mockResolvedValue("direct");
+        serviceMocks.fetchDirectConversationMeta.mockResolvedValue(buildMeta());
+
+        await renderScreen({ messages: seqMessages, meta: buildMeta() });
+
+        await waitUntil(() => {
+          expect(serviceMocks.acknowledgeConversationRead).toHaveBeenCalledWith({
+            conversationId: "conv-1",
+            periodId: null,
+            upToSeq: 9,
+          });
+        });
+      });
+
+      it("never acknowledges while the chat is not in the foreground", async () => {
+        focusState.focused = false;
+        serviceMocks.fetchGroupConversationMeta.mockResolvedValue(groupMeta);
+
+        await renderScreen({ groupMeta, messages: seqMessages });
+        await settle();
+
+        expect(serviceMocks.acknowledgeConversationRead).not.toHaveBeenCalled();
+        expect(serviceMocks.markConversationRead).not.toHaveBeenCalled();
+      });
+
+      it("treats PERIOD_ENDED from the acknowledgment as a revocation", async () => {
+        serviceMocks.fetchGroupConversationMeta.mockResolvedValue(groupMeta);
+        serviceMocks.acknowledgeConversationRead.mockRejectedValue({ message: "PERIOD_ENDED" });
+
+        await renderScreen({ groupMeta, messages: seqMessages });
+
+        await waitUntil(() => {
+          expect(replaceMock).toHaveBeenCalledWith("/messages/unavailable?reason=revoked");
+        });
+      });
     });
   });
 });

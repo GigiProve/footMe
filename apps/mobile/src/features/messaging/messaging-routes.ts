@@ -21,3 +21,12 @@ export function groupInfoRoute(conversationId: string, origin?: "dashboard"): st
 
 /** Inbox Messaggi: destinazione dopo la revoca dell'accesso (§26). */
 export const MESSAGES_INBOX_ROUTE = "/(tabs)/messages";
+
+/**
+ * DAS-REV-34 §22: fallback focalizzato (PNG 11, 12) senza bottom navigation.
+ * Una sola definizione: lo usano la chat aperta alla revoca/eliminazione e il
+ * resolver dei link storici e delle Push (filone notifiche).
+ */
+export function conversationUnavailableRoute(reason: "deleted" | "revoked" | "unavailable"): string {
+  return `/messages/unavailable?reason=${reason}`;
+}

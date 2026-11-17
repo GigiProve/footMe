@@ -4,6 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors, spacing, typography } from "../../../theme/tokens";
 import { AppText, Avatar } from "../../../ui";
 import { GroupAvatar } from "../../dashboard/groups/components/GroupAvatar";
+import { conversationRowA11yLabel } from "../inbox-helpers";
 
 /*
   DAS-REV-32 §12: nessuna label tecnica «Diretta»/«Gruppo» sulla riga; il tipo
@@ -14,6 +15,11 @@ type ConversationRowProps = {
   avatarUrl?: string | null;
   groupAvatarPath?: string | null;
   isGroup?: boolean;
+  /**
+   * DAS-REV-34 §10: conversazione silenziata. Una piccola icona accanto al
+   * timestamp, compresente col badge dei non letti (mai al posto suo, QA-026).
+   */
+  isMuted?: boolean;
   lastMessage: string;
   name: string;
   onPress: () => void;
@@ -27,6 +33,7 @@ export function ConversationRow({
   avatarUrl,
   groupAvatarPath = null,
   isGroup = false,
+  isMuted = false,
   lastMessage,
   name,
   onPress,
@@ -38,7 +45,7 @@ export function ConversationRow({
 
   return (
     <Pressable
-      accessibilityLabel={`Conversazione con ${name}`}
+      accessibilityLabel={conversationRowA11yLabel({ isMuted, name, statusLabel, unreadCount })}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
@@ -64,9 +71,19 @@ export function ConversationRow({
           <AppText numberOfLines={1} style={styles.nameText} variant="titleSm">
             {name}
           </AppText>
-          <AppText variant="caption" color="muted" style={styles.timestamp}>
-            {statusLabel ? `${statusLabel} · ${timestamp}` : timestamp}
-          </AppText>
+          <View style={styles.meta}>
+            {isMuted ? (
+              <Ionicons
+                color={colors.textMuted}
+                name="notifications-off-outline"
+                size={13}
+                testID="conversation-row-muted"
+              />
+            ) : null}
+            <AppText variant="caption" color="muted" style={styles.timestamp}>
+              {statusLabel ? `${statusLabel} · ${timestamp}` : timestamp}
+            </AppText>
+          </View>
         </View>
         <View style={styles.bottomLine}>
           <AppText
@@ -134,9 +151,14 @@ const styles = StyleSheet.create({
   nameText: {
     flex: 1,
   },
+  meta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[4],
+    marginLeft: spacing[8],
+  },
   timestamp: {
     fontSize: typography.fontSize[11],
-    marginLeft: spacing[8],
   },
   bottomLine: {
     flexDirection: "row",
@@ -154,7 +176,8 @@ const styles = StyleSheet.create({
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: colors.danger,
+    // DAS-REV-34 §6: i badge usano l'accent standard (PNG 03/04), non il rosso.
+    backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing[6],

@@ -1,5 +1,6 @@
 import { ActionSheet, type ActionSheetAction } from "../../../ui";
 import { blockMenuLabel, unblockA11yLabel } from "../../blocking/blocking-presentation";
+import { NOTIFICATIONS_COPY } from "../mute/mute-presentation";
 
 /** «Sblocca {nome}» come voce di menu (stessa forma dell'etichetta accessibile del pulsante). */
 function unblockActionLabel(name: string | null | undefined): string {
@@ -16,6 +17,11 @@ type ChatActionsSheetProps = {
   onArchiveToggle: () => void;
   onBlockToggle: () => void;
   onClose: () => void;
+  /**
+   * DAS-REV-34 §9: voce «Notifiche» della DIRECT, che apre lo stesso sheet
+   * delle GROUP (nei GROUP il punto d'ingresso è la riga di Info gruppo).
+   */
+  onOpenNotifications?: () => void;
   onOpenProfile: () => void;
   onReport: () => void;
   onSearch: () => void;
@@ -29,6 +35,7 @@ export function ChatActionsSheet({
   onArchiveToggle,
   onBlockToggle,
   onClose,
+  onOpenNotifications,
   onOpenProfile,
   onReport,
   onSearch,
@@ -54,6 +61,15 @@ export function ChatActionsSheet({
           onPress: onOpenProfile,
         },
         searchAction,
+        ...(onOpenNotifications
+          ? [
+              {
+                icon: "notifications-outline" as const,
+                label: NOTIFICATIONS_COPY.rowLabel,
+                onPress: onOpenNotifications,
+              },
+            ]
+          : []),
         archiveAction,
         {
           destructive: true,

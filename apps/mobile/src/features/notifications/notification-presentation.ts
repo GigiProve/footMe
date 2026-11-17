@@ -261,6 +261,55 @@ export function notificationPreview(item: Pick<InboxNotification, "preview">): s
   return preview ? preview : null;
 }
 
+/* ------------------- notifiche strutturali dei gruppi (DAS-REV-34 §15–§17) ------------------- */
+
+function paramText(params: Record<string, unknown> | undefined, key: string): string | null {
+  const value = params?.[key];
+
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/** Target `conversation`: aggiunta, rimozione, ruolo, eliminazione di un gruppo. Nessuna categoria nuova. */
+export function isConversationNotification(item: Pick<InboxNotification, "target">): boolean {
+  return item.target?.type === "conversation";
+}
+
+export type ConversationNotificationDisplay = {
+  /** Path dell'avatar del gruppo nello snapshot dell'evento; null = iniziali. */
+  avatarPath: string | null;
+  groupName: string;
+  societyName: string | null;
+};
+
+/**
+ * Quel che la riga mostra del gruppo, dallo snapshot minimo dell'evento in
+ * `target_params` (§17): il nome come era al momento, mai riletto dal gruppo, che
+ * per chi è stato rimosso o per un gruppo eliminato non è più leggibile.
+ */
+export function conversationNotificationDisplay(
+  item: Pick<InboxNotification, "target">,
+): ConversationNotificationDisplay | null {
+  if (!isConversationNotification(item)) return null;
+
+  const params = item.target?.params;
+
+  return {
+    avatarPath: paramText(params, "group_avatar_path"),
+    groupName: paramText(params, "group_name") ?? "Gruppo",
+    societyName: paramText(params, "society_name"),
+  };
+}
+
+/** «AC Como · Ora» (screen 07/08): la Società del gruppo e il tempo, nella stessa riga di contesto. */
+export function conversationContextLine(
+  item: Pick<InboxNotification, "target">,
+  timeLabel: string,
+): string {
+  const societyName = conversationNotificationDisplay(item)?.societyName;
+
+  return [societyName, timeLabel].filter(Boolean).join(" · ");
+}
+
 /* --------------------------- accessibilità (§248–§249) --------------------------- */
 
 export const NOTIFICATION_UNOPENED_LABEL = "Non aperta";
@@ -277,6 +326,7 @@ export function notificationAccessibilityLabel(item: InboxNotification, now: Dat
   const parts = [
     [notificationPrimaryText(item), notificationSecondaryText(item)].filter(Boolean).join(lineSeparator),
     preview ? `Anteprima: ${preview}` : null,
+    conversationNotificationDisplay(item)?.societyName ?? null,
     formatSpokenRelativeTime(item.displayAt, now) || null,
     item.isOpened ? null : NOTIFICATION_UNOPENED_LABEL,
   ];

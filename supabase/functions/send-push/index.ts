@@ -7,6 +7,12 @@
  * dell'invio e restituisce solo quelle ancora legittime, già con titolo e corpo
  * brevi (§211). Qui c'è solo il trasporto.
  *
+ * DAS-REV-34: la stessa coda porta push di conversazione (messaggi DIRECT e
+ * GROUP, archiviazione/riattivazione dei gruppi). `claim_push_deliveries` le
+ * restituisce con `d_kind`, `d_thread_id` e `d_ttl_seconds`; `buildMessages`
+ * ne ricava `threadId`, `ttl` e il payload `data` (vedi expo-push.ts). Ordine di
+ * rilascio: PRIMA questa funzione, poi la migrazione 20261202100000.
+ *
  * Il service role vive SOLO qui, mai nel client mobile.
  *
  * Trigger: `footme_push_wake()` (pg_cron + pg_net, migrazione

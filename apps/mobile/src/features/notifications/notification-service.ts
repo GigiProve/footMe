@@ -56,7 +56,7 @@ type TimelineRow = {
 };
 
 const IDENTITY_TYPES: readonly string[] = ["person", "media", "society"];
-const TARGET_TYPES: readonly string[] = ["profile", "content", "comment", "scheduled_content"];
+const TARGET_TYPES: readonly string[] = ["profile", "content", "comment", "scheduled_content", "conversation"];
 
 function identityType(value: string | null): NotificationIdentityType | null {
   return value && IDENTITY_TYPES.includes(value) ? (value as NotificationIdentityType) : null;

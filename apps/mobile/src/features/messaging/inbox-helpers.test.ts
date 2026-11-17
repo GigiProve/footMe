@@ -7,11 +7,16 @@ import {
   categoryLabel,
   CHAT_FILTERS,
   COMMUNICATION_FILTERS,
+  conversationRowA11yLabel,
   conversationStatusLabel,
+  emptyConversationsLabel,
   filterCommunications,
   filterConversations,
+  inboxUnreadCount,
+  isArchivedGroup,
   matchesCommunicationQuery,
   matchesConversationQuery,
+  messagesTabA11yLabel,
 } from "./inbox-helpers";
 import type { InboxConversation } from "./messaging-service";
 
@@ -220,10 +225,11 @@ describe("conversationStatusLabel (DAS-REV-33 §21)", () => {
     ).toBeNull();
   });
 
-  it("does not alter the unread logic", () => {
+  it("excludes an archived group from Non letti (DAS-REV-34 §13)", () => {
     const archived = { ...groupConversation, group_status: "archived" as const };
 
-    expect(filterConversations([archived], "unread")).toEqual([archived]);
+    expect(filterConversations([archived], "unread")).toEqual([]);
+    expect(filterConversations([archived], "all")).toEqual([archived]);
   });
 });
 
@@ -343,5 +349,81 @@ describe("filter chip definitions", () => {
       { label: "Eventi", value: "eventi" },
       { label: "Non lette", value: "unread" },
     ]);
+  });
+});
+
+describe("DAS-REV-34 Inbox: mute, archiviati e Non letti", () => {
+  /** Scenario del PNG 03: Staff Primavera 17 (silenziato), Luca Verdi 2, Prima squadra 4. */
+  const staff: InboxConversation = {
+    ...groupConversation,
+    conversation_id: "g-staff",
+    display_title: "Staff Primavera",
+    is_muted: true,
+    unread_count: 17,
+  };
+  const luca: InboxConversation = { ...directConversation, conversation_id: "d-luca", unread_count: 2 };
+  const prima: InboxConversation = { ...groupConversation, conversation_id: "g-prima", unread_count: 4 };
+  const archived: InboxConversation = {
+    ...groupConversation,
+    conversation_id: "g-archived",
+    group_status: "archived",
+    unread_count: 6,
+  };
+
+  it("il mute non nasconde il numero reale dei non letti né sposta la riga (QA-025, QA-026)", () => {
+    expect(inboxUnreadCount(staff)).toBe(17);
+    expect(filterConversations([staff, luca, prima], "unread").map((item) => item.conversation_id)).toEqual([
+      "g-staff",
+      "d-luca",
+      "g-prima",
+    ]);
+  });
+
+  it("Non letti esclude i GROUP archiviati; Tutti e Gruppi li mantengono (§13)", () => {
+    const list = [staff, luca, archived];
+
+    expect(filterConversations(list, "unread").map((item) => item.conversation_id)).toEqual(["g-staff", "d-luca"]);
+    expect(filterConversations(list, "all")).toHaveLength(3);
+    expect(filterConversations(list, "group").map((item) => item.conversation_id)).toContain("g-archived");
+  });
+
+  it("un GROUP archiviato non porta un counter anche se il payload lo manda", () => {
+    expect(isArchivedGroup(archived)).toBe(true);
+    expect(inboxUnreadCount(archived)).toBe(0);
+    expect(inboxUnreadCount({ ...archived, unread_count: 0 })).toBe(0);
+  });
+
+  it("dopo la lettura di Staff Primavera restano solo Luca 2 e Prima squadra 4", () => {
+    const read = { ...staff, unread_count: 0 };
+
+    expect(filterConversations([read, luca, prima], "unread").map((item) => item.conversation_id)).toEqual([
+      "d-luca",
+      "g-prima",
+    ]);
+  });
+
+  it("l'empty del filtro Non letti dice «Nessun messaggio da leggere» (§25)", () => {
+    expect(emptyConversationsLabel("unread")).toBe("Nessun messaggio da leggere");
+    expect(emptyConversationsLabel("all")).toBe("Nessuna conversazione trovata");
+    expect(emptyConversationsLabel("group")).toBe("Nessuna conversazione trovata");
+  });
+
+  it("la label della riga annuncia mute e non letti (§29)", () => {
+    expect(conversationRowA11yLabel({ isMuted: true, name: "Staff Primavera", unreadCount: 17 })).toBe(
+      "Staff Primavera, notifiche silenziose, 17 messaggi non letti",
+    );
+    expect(conversationRowA11yLabel({ isMuted: false, name: "Luca Verdi", unreadCount: 1 })).toBe(
+      "Luca Verdi, 1 messaggio non letto",
+    );
+    expect(conversationRowA11yLabel({ isMuted: false, name: "Luca Verdi", unreadCount: 0 })).toBe("Luca Verdi");
+    expect(
+      conversationRowA11yLabel({ isMuted: false, name: "Staff Primavera", statusLabel: "Archiviato", unreadCount: 0 }),
+    ).toBe("Staff Primavera, archiviato");
+  });
+
+  it("la label della tab Messaggi conta conversazioni, non messaggi (§10, §29)", () => {
+    expect(messagesTabA11yLabel(0)).toBe("Messaggi");
+    expect(messagesTabA11yLabel(1)).toBe("Messaggi, 1 conversazione da leggere");
+    expect(messagesTabA11yLabel(3)).toBe("Messaggi, 3 conversazioni da leggere");
   });
 });

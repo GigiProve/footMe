@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  conversationContextLine,
+  conversationNotificationDisplay,
   flattenNotificationPages,
   groupNotificationsByTime,
+  isConversationNotification,
   notificationAccessibilityLabel,
   notificationActorName,
   notificationActorSuffix,
@@ -222,6 +225,72 @@ describe("tipi senza attore", () => {
     const legacy = make({ actor: null, target: null, title: "Mario Rossi", type: "new_follower" });
 
     expect(notificationPrimaryText(legacy)).toBe("Mario Rossi");
+  });
+});
+
+describe("notifiche strutturali dei gruppi (DAS-REV-34 §15–§17)", () => {
+  const GROUP_ID = "3f8c1b5e-1d2a-4c3b-9a7e-0123456789ab";
+  const group = make({
+    actor: null,
+    category: "attivita",
+    target: {
+      id: GROUP_ID,
+      params: {
+        group_avatar_path: "groups/staff.jpg",
+        group_name: "Staff Primavera",
+        intent: "added",
+        period_id: "9f8c1b5e-1d2a-4c3b-9a7e-0123456789ab",
+        society_name: "AC Como",
+      },
+      type: "conversation",
+    },
+    title: "Sei stato aggiunto al gruppo Staff Primavera",
+    type: "group_member_added",
+  });
+
+  it("riconosce il target conversation e legge lo snapshot dell'evento", () => {
+    expect(isConversationNotification(group)).toBe(true);
+    expect(isConversationNotification(make())).toBe(false);
+    expect(conversationNotificationDisplay(group)).toEqual({
+      avatarPath: "groups/staff.jpg",
+      groupName: "Staff Primavera",
+      societyName: "AC Como",
+    });
+    expect(conversationNotificationDisplay(make())).toBeNull();
+  });
+
+  it("senza snapshot: nome neutro, iniziali al posto dell'avatar, nessuna Società", () => {
+    const bare = make({ actor: null, target: { id: GROUP_ID, params: {}, type: "conversation" } });
+
+    expect(conversationNotificationDisplay(bare)).toEqual({
+      avatarPath: null,
+      groupName: "Gruppo",
+      societyName: null,
+    });
+  });
+
+  it("il titolo è quello della notifica e la riga di contesto è «Società · tempo» (screen 07/08)", () => {
+    expect(notificationPrimaryText(group)).toBe("Sei stato aggiunto al gruppo Staff Primavera");
+    expect(notificationSecondaryText(group)).toBeNull();
+    expect(conversationContextLine(group, "Ora")).toBe("AC Como · Ora");
+    expect(conversationContextLine(group, "10 min fa")).toBe("AC Como · 10 min fa");
+  });
+
+  it("senza Società la riga di contesto è solo il tempo", () => {
+    const bare = make({ actor: null, target: { id: GROUP_ID, params: {}, type: "conversation" } });
+
+    expect(conversationContextLine(bare, "Ieri")).toBe("Ieri");
+  });
+
+  it("l'etichetta di accessibilità include titolo, Società, tempo e «Non aperta»", () => {
+    const label = notificationAccessibilityLabel(
+      { ...group, displayAt: new Date(2026, 10, 16, 10, 0, 0).toISOString() },
+      NOW,
+    );
+
+    expect(label).toBe(
+      "Sei stato aggiunto al gruppo Staff Primavera. AC Como. 2 ore fa. Non aperta",
+    );
   });
 });
 

@@ -6,6 +6,10 @@
  * prodotto). Lo stato Push viene dal permesso reale del sistema operativo (§184-§186):
  * se è negato gli switch mostrano la scelta salvata ma la pagina dichiara che non
  * arriveranno push. Il prompt OS parte solo dal gesto esplicito sul rail del modulo.
+ *
+ * DAS-REV-34 §15–§17: sezione «Messaggi» con due interruttori globali dell'account,
+ * «Messaggi» (push_messages) e «Mostra anteprima» (message_preview). Stesso pattern
+ * dei toggle esistenti: aggiornamento ottimistico, rollback e toast in caso di errore.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -33,6 +37,7 @@ import {
   OTHER_SECTION_MICROCOPY,
   PUSH_BLOCKED_NOTICE,
   PUSH_INTERACTION_SECTION,
+  PUSH_MESSAGES_SECTION,
   PUSH_PUBLISHING_SECTION,
   PUSH_SECTION_MICROCOPY,
   SYSTEM_ROW_LABEL,
@@ -182,6 +187,7 @@ export function NotificationPreferencesScreen() {
         label={row.label}
         disabled={blocked && isPushPreferenceKey(row.key)}
         onValueChange={(value) => updateMutation.mutate({ key: row.key, value })}
+        subtitle={row.subtitle}
         value={readPreference(current, row.key)}
         variant="row"
       />
@@ -242,6 +248,10 @@ export function NotificationPreferencesScreen() {
 
             <ContentModule eyebrow={PUSH_PUBLISHING_SECTION.eyebrow}>
               <View style={styles.list}>{renderToggles(PUSH_PUBLISHING_SECTION, preferences)}</View>
+            </ContentModule>
+
+            <ContentModule eyebrow={PUSH_MESSAGES_SECTION.eyebrow}>
+              <View style={styles.list}>{renderToggles(PUSH_MESSAGES_SECTION, preferences)}</View>
             </ContentModule>
 
             <AppText color="secondary" variant="bodySm">

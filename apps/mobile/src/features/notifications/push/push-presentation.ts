@@ -7,6 +7,8 @@
  * le Push che iOS/Android hanno negato.
  */
 
+import { isUuid, type ConversationLink } from "../conversation-target-presentation";
+
 export type PushPermissionState = "granted" | "denied" | "undetermined" | "unsupported";
 
 export type PushPermissionInfo = {
@@ -109,6 +111,99 @@ export function extractNotificationId(data: unknown): string | null {
   const value = (data as Record<string, unknown>).notification_id;
 
   return typeof value === "string" && NOTIFICATION_ID_PATTERN.test(value) ? value : null;
+}
+
+export type ConversationPushKind = "message" | "lifecycle";
+
+/** Il payload data di una push chat o lifecycle (DAS-REV-34 §20): solo identificativi. */
+export type ConversationPushPayload = {
+  conversationId: string;
+  kind: ConversationPushKind;
+  periodId: string | null;
+};
+
+function conversationPushRecord(data: unknown): Record<string, unknown> | null {
+  return typeof data === "object" && data !== null ? (data as Record<string, unknown>) : null;
+}
+
+/**
+ * DAS-REV-34 §20, §25: le push di chat portano `{conversation_id, period_id, kind}` e
+ * nessun testo. Si accettano solo uuid e i due `kind` noti: i valori finiscono in una
+ * RPC e in un path, e un id non è comunque una capability (lo decide il server).
+ * `period_id` assente o null = DIRECT; presente ma non uuid = payload scartato.
+ */
+export function extractConversationPush(data: unknown): ConversationPushPayload | null {
+  const record = conversationPushRecord(data);
+  const conversationId = record?.conversation_id;
+
+  if (!record || !isUuid(conversationId)) {
+    return null;
+  }
+
+  const { kind, period_id: period } = record;
+
+  if (kind !== "message" && kind !== "lifecycle") {
+    return null;
+  }
+
+  if (period !== undefined && period !== null && !isUuid(period)) {
+    return null;
+  }
+
+  return { conversationId, kind, periodId: typeof period === "string" ? period : null };
+}
+
+/** L'intento da passare al resolver: la push ordinaria è `message`, Archive/Reactivate `lifecycle`. */
+export function conversationPushLink(payload: ConversationPushPayload): ConversationLink {
+  return { conversationId: payload.conversationId, intent: payload.kind, periodId: payload.periodId };
+}
+
+/**
+ * DAS-REV-34 §20: in foreground, la push di una conversazione già aperta e visibile
+ * non deve produrre banner né voce in lista. Solo per la stessa conversazione: ogni
+ * altra push, anche di chat, si presenta normalmente.
+ */
+export function shouldSuppressForegroundPush(data: unknown, visibleConversationId: string | null): boolean {
+  if (!visibleConversationId) {
+    return false;
+  }
+
+  const record = conversationPushRecord(data);
+
+  return record !== null && record.conversation_id === visibleConversationId;
+}
+
+export type ForegroundPresentation = {
+  shouldPlaySound: boolean;
+  shouldSetBadge: boolean;
+  shouldShowBanner: boolean;
+  shouldShowList: boolean;
+};
+
+/**
+ * Come si presenta una push mentre l'app è in primo piano. Su iOS niente suono
+ * forzato; su Android `shouldPlaySound: false` sopprime anche il banner (doc
+ * expo-notifications), quindi lì resta true: il volume lo governa il sistema.
+ * La push della conversazione visibile non mostra nulla, nemmeno il suono.
+ */
+export function foregroundPresentation(
+  data: unknown,
+  visibleConversationId: string | null,
+  isAndroid: boolean,
+): ForegroundPresentation {
+  const suppressed = shouldSuppressForegroundPush(data, visibleConversationId);
+
+  return {
+    shouldPlaySound: !suppressed && isAndroid,
+    shouldSetBadge: false,
+    shouldShowBanner: !suppressed,
+    shouldShowList: !suppressed,
+  };
+}
+
+/** Vero per una push di conversazione (chat o lifecycle): alla ricezione si ricaricano Inbox e badge Messaggi. */
+export function isConversationPush(data: unknown): boolean {
+  return extractConversationPush(data) !== null;
 }
 
 /** §177: il tap apre il Centro; l'handler `open` decide opened + Target Resolver (§167). */

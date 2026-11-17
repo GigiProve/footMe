@@ -229,12 +229,14 @@ export function classifyGroupAccessError(error: unknown): GroupAccessError | nul
     return "archived";
   }
 
-  if (text.includes("SOCIETY_GROUP_DELETED")) {
+  if (text.includes("SOCIETY_GROUP_DELETED") || text.includes("GROUP_DELETED")) {
     return "deleted";
   }
 
+  // DAS-REV-34 §11: l'ack di lettura di un periodo non più corrente dice `PERIOD_ENDED`.
   if (
     text.includes("SOCIETY_GROUP_NOT_MEMBER") ||
+    text.includes("PERIOD_ENDED") ||
     text.toLowerCase().includes("conversazione non trovata")
   ) {
     return "ended";

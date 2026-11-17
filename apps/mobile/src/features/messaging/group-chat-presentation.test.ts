@@ -208,6 +208,12 @@ describe("classifyGroupAccessError", () => {
     expect(classifyGroupAccessError({ message: "Conversazione non trovata" })).toBe("ended");
   });
 
+  it("DAS-REV-34 §11: PERIOD_ENDED from the read acknowledgment is a revocation, GROUP_DELETED a deletion", () => {
+    expect(classifyGroupAccessError({ message: "PERIOD_ENDED" })).toBe("ended");
+    expect(classifyGroupAccessError({ message: "GROUP_DELETED" })).toBe("deleted");
+    expect(isAccessLostError({ message: "PERIOD_ENDED" })).toBe(true);
+  });
+
   it("returns null for unrelated errors", () => {
     expect(classifyGroupAccessError({ message: "network" })).toBeNull();
     expect(classifyGroupAccessError(null)).toBeNull();

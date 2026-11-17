@@ -38,6 +38,8 @@ export async function invalidateGroupQueries(
     ...GROUPS_QK_LIST_PREFIXES.map((prefix) => queryClient.invalidateQueries({ queryKey: [prefix, actorId] })),
     // Inbox, header chat e messaggi (evento di sistema) leggono la stessa Conversation.
     queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(actorId) }),
+    // DAS-REV-34 §13: archivia/riattiva cambiano chi contribuisce al badge Messaggi.
+    queryClient.invalidateQueries({ queryKey: MESSAGING_QK.badge(actorId) }),
     queryClient.invalidateQueries({ queryKey: MESSAGING_QK.groupMeta(conversationId) }),
     queryClient.invalidateQueries({ queryKey: MESSAGING_QK.conversationMessages(conversationId) }),
   ]);
@@ -66,4 +68,5 @@ export async function purgeGroupQueries(queryClient: QueryClient, actorId: strin
     void queryClient.invalidateQueries({ queryKey: [prefix, actorId] });
   });
   void queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(actorId) });
+  void queryClient.invalidateQueries({ queryKey: MESSAGING_QK.badge(actorId) });
 }

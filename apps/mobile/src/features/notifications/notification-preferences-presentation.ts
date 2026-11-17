@@ -21,7 +21,9 @@ export const DEFAULT_PUSH_PREFERENCES: Record<PushPreferenceKey, boolean> = {
   comments_replies: true,
   likes: false,
   mentions: true,
+  message_preview: true,
   new_followers: true,
+  push_messages: true,
   reposts: true,
   scheduled_content: true,
 };
@@ -37,6 +39,8 @@ export const DEFAULT_OTHER_PREFERENCES: Record<OtherPreferenceKey, boolean> = {
 export type PreferenceRowConfig<K extends NotificationPreferenceKey> = {
   key: K;
   label: string;
+  /** Riga di aiuto sotto l'etichetta, quando la sola etichetta non dice cosa controlla. */
+  subtitle?: string;
 };
 
 export type PreferenceSectionConfig<K extends NotificationPreferenceKey> = {
@@ -44,7 +48,28 @@ export type PreferenceSectionConfig<K extends NotificationPreferenceKey> = {
   rows: readonly PreferenceRowConfig<K>[];
 };
 
-/** §187: Interazioni. Messaggi non c'è, di proposito (§201). */
+/**
+ * DAS-REV-34 §15–§17: i due interruttori globali delle push di chat e gruppi. Prima
+ * ne erano fuori (HOM-14 §201); la decisione di Luigi li porta qui, non in una
+ * schermata nuova. Il mute della singola conversazione resta nel menu della chat.
+ */
+export const PUSH_MESSAGES_SECTION: PreferenceSectionConfig<PushPreferenceKey> = {
+  eyebrow: "Messaggi",
+  rows: [
+    {
+      key: "push_messages",
+      label: "Messaggi",
+      subtitle: "Notifiche push dei nuovi messaggi in chat e gruppi",
+    },
+    {
+      key: "message_preview",
+      label: "Mostra anteprima",
+      subtitle: "Mostra mittente e testo nella notifica",
+    },
+  ],
+};
+
+/** §187: Interazioni (Messaggi ha una sezione propria: DAS-REV-34 §15). */
 export const PUSH_INTERACTION_SECTION: PreferenceSectionConfig<PushPreferenceKey> = {
   eyebrow: "Interazioni",
   rows: [
@@ -125,6 +150,8 @@ export function parseNotificationPreferences(raw: unknown): NotificationPreferen
     other: Object.fromEntries(
       OTHER_PREFERENCE_KEYS.map((key) => [key, readBoolean(other, key, DEFAULT_OTHER_PREFERENCES[key])]),
     ) as Record<OtherPreferenceKey, boolean>,
+    // `push_messages` e `message_preview` (DAS-REV-34) stanno in `push` come le altre; senza valore
+    // (backend non ancora aggiornato) vale il default, cioè acceso.
     push: Object.fromEntries(
       PUSH_PREFERENCE_KEYS.map((key) => [key, readBoolean(push, key, DEFAULT_PUSH_PREFERENCES[key])]),
     ) as Record<PushPreferenceKey, boolean>,

@@ -87,6 +87,51 @@ export async function markConversationRead(conversationId: string) {
   }
 }
 
+/**
+ * DAS-REV-34 §11: conferma di lettura fino a una sequence. Il server fa clamp ai
+ * messaggi visibili, non retrocede mai il confine (`greatest`) e per i GROUP
+ * rifiuta con `PERIOD_ENDED` un ack di un periodo non più corrente.
+ */
+export async function acknowledgeConversationRead(input: {
+  conversationId: string;
+  /** Solo GROUP: il periodo osservato dalla chat. */
+  periodId: string | null;
+  upToSeq: number;
+}): Promise<{ lastReadSeq: number | null; unreadCount: number | null }> {
+  const { data, error } = await supabase.rpc("acknowledge_conversation_read", {
+    p_conversation_id: input.conversationId,
+    p_period_id: input.periodId,
+    p_up_to_seq: input.upToSeq,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const num = (value: unknown) =>
+    typeof value === "number" ? value : typeof value === "string" && /^\d+$/.test(value) ? Number(value) : null;
+
+  return { lastReadSeq: num(raw.last_read_seq), unreadCount: num(raw.unread_count) };
+}
+
+/**
+ * DAS-REV-34 §10: badge Messaggi calcolato dal server su tutto l'insieme
+ * pertinente (conversazioni con almeno un non letto + comunicazioni non lette),
+ * non dalla pagina caricata. Ritorna `total`.
+ */
+export async function fetchMessagesBadgeCount(): Promise<number> {
+  const { data, error } = await supabase.rpc("fetch_messages_badge_count");
+
+  if (error) {
+    throw error;
+  }
+
+  const total = (data as { total?: unknown } | null)?.total;
+
+  return typeof total === "number" && total > 0 ? total : 0;
+}
+
 export async function sendMessage(input: {
   body: string;
   conversationId: string;
@@ -251,6 +296,19 @@ export type InboxConversation = {
    */
   last_message_system_event_type?: string | null;
   last_message_system_payload?: Record<string, unknown> | null;
+  /**
+   * DAS-REV-34 §10, §11: colonne in coda a `fetch_inbox_conversations`. Opzionali:
+   * un server precedente non le manda e la riga resta quella di prima (nessun mute).
+   * `is_muted` è il mute effettivo valutato dal server; `unread_count` resta il
+   * numero reale di non letti (la riga muta non lo nasconde, QA-026).
+   */
+  is_muted?: boolean;
+  mute_option?: string | null;
+  muted_until?: string | null;
+  period_id?: string | null;
+  state_version?: number | null;
+  last_read_seq?: number | null;
+  max_seq?: number | null;
 };
 
 export async function fetchInboxConversations(

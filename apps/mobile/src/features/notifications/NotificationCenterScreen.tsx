@@ -47,7 +47,12 @@ import {
   markNotificationOpened,
 } from "./notification-service";
 import type { InboxNotification, NotificationCursor, NotificationPage } from "./notification-types";
-import { openNotificationTarget, useOpenNotificationFromPush } from "./use-notification-navigation";
+import type { ConversationLink } from "./conversation-target-presentation";
+import {
+  openNotificationTarget,
+  useOpenConversationFromLink,
+  useOpenNotificationFromPush,
+} from "./use-notification-navigation";
 import { NotificationRow } from "./NotificationRow";
 
 type TimelineData = InfiniteData<NotificationPage, NotificationCursor | null>;
@@ -81,8 +86,11 @@ function NotificationSkeleton() {
 }
 
 export function NotificationCenterScreen({
+  openConversation = null,
   openNotificationId = null,
 }: {
+  /** `/notifications?conversation=…`: il tap su una push chat ripreso dopo il login (DAS-REV-34 §293). */
+  openConversation?: ConversationLink | null;
   /** `/notifications?open=<id>`: il tap su un push (§177). */
   openNotificationId?: string | null;
 }) {
@@ -97,6 +105,7 @@ export function NotificationCenterScreen({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useOpenNotificationFromPush(openNotificationId);
+  useOpenConversationFromLink(openConversation);
 
   const query = useInfiniteQuery({
     enabled: !!profileId,

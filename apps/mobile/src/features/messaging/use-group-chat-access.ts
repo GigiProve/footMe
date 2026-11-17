@@ -3,8 +3,11 @@
  *
  * Quando il periodo di appartenenza del viewer finisce (uscita, rimozione,
  * fine titolo, eliminazione) la chat deve: smettere di leggere, svuotare ciò
- * che non è più autorizzato, tornare all'Inbox e dirlo con un avviso
- * discreto. Nessun evento nella timeline e nessuna riga in campanella.
+ * che non è più autorizzato e lasciare il posto al fallback focalizzato
+ * «Non fai più parte di questo gruppo» / «Il gruppo è stato eliminato»
+ * (DAS-REV-34 §22, `router.replace` verso `/messages/unavailable`). Info e
+ * Inbox conservano il ritorno con avviso della 33. Nessun evento nella
+ * timeline e nessuna riga in campanella.
  *
  * La revoca arriva da due fonti, entrambe qui:
  *   · realtime su `society_group_member_access` (UPDATE del proprio
@@ -21,18 +24,17 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigation, useRouter } from "expo-router";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 
-import { useToast } from "../../ui";
 import {
   classifyGroupAccessError,
   decideMembershipRevocation,
-  revocationMessage,
   shouldNavigateOnRevoke,
   toMembershipPeriodChange,
   type RevocationReason,
 } from "./group-chat-presentation";
 import { isChatMediaQueryOf, MESSAGING_QK } from "./messaging-keys";
-import { MESSAGES_INBOX_ROUTE } from "./messaging-routes";
+import { conversationUnavailableRoute } from "./messaging-routes";
 import { subscribeToMyGroupPeriods, unsubscribeFromConversation } from "./messaging-service";
+import { unavailableReasonForRevocation } from "./unavailable-presentation";
 
 /** Cancella le richieste in volo e rimuove tutto ciò che la conversazione aveva in cache. */
 export async function purgeConversationCache(queryClient: QueryClient, conversationId: string) {
@@ -41,6 +43,8 @@ export async function purgeConversationCache(queryClient: QueryClient, conversat
     MESSAGING_QK.groupMeta(conversationId),
     MESSAGING_QK.conversationMeta(conversationId),
     MESSAGING_QK.conversationType(conversationId),
+    // DAS-REV-34 §14, §25: lo stato Notifiche di un periodo finito non passa al successivo.
+    MESSAGING_QK.notificationState(conversationId),
   ];
   const mediaFilter = {
     predicate: (query: { queryKey: readonly unknown[] }) =>
@@ -72,7 +76,6 @@ export function useGroupChatAccess({
   const router = useRouter();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
-  const { showToast } = useToast();
   // La revoca vale per la conversazione, non per la schermata: un'altra
   // conversazione aperta nello stesso componente riparte da accesso valido.
   const [revokedConversationId, setRevokedConversationId] = useState<string | null>(null);
@@ -89,8 +92,9 @@ export function useGroupChatAccess({
 
     await purgeConversationCache(queryClient, conversationId);
 
-    // L'Inbox si riallinea: il gruppo non c'è più (o è eliminato).
+    // L'Inbox e il badge si riallineano: il gruppo non c'è più (o è eliminato).
     queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(myProfileId) });
+    queryClient.invalidateQueries({ queryKey: MESSAGING_QK.badge(myProfileId) });
 
     // Un solo navigatore vince: con Info gruppo sopra la chat, la navigazione
     // e l'avviso spettano a Info (vedi `shouldNavigateOnRevoke`).
@@ -98,14 +102,12 @@ export function useGroupChatAccess({
       return;
     }
 
-    showToast({ id: "group-access-revoked", message: revocationMessage(reason), tone: "neutral" });
-
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-
-    router.replace(MESSAGES_INBOX_ROUTE as never);
+    // DAS-REV-34 §22: con la chat aperta la superficie privata lascia il posto al
+    // fallback focalizzato (PNG 11/12), al posto di toast + back. Nessun nome,
+    // storico o composer resta sotto: la chat è sostituita, non coperta.
+    router.replace(
+      conversationUnavailableRoute(unavailableReasonForRevocation(reason)) as never,
+    );
   }
 
   /**

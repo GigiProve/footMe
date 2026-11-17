@@ -37,8 +37,10 @@ import {
   buildConversationPreview,
   buildSearchSections,
   conversationStatusLabel,
+  emptyConversationsLabel,
   filterCommunications,
   filterConversations,
+  inboxUnreadCount,
   type ChatFilter,
   type CommunicationFilter,
 } from "../inbox-helpers";
@@ -88,7 +90,7 @@ export function MessagesInboxScreen() {
   const communicationsQuery = useQuery({
     enabled: !!profileId,
     queryFn: () => fetchCommunications(),
-    queryKey: ["communications", profileId],
+    queryKey: MESSAGING_QK.communications(profileId),
   });
 
   // HOM-14 §5: il badge della campanella, non i Messaggi (§1: domini separati).
@@ -101,7 +103,9 @@ export function MessagesInboxScreen() {
       }
 
       queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(profileId) });
-      queryClient.invalidateQueries({ queryKey: ["communications", profileId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.communications(profileId) });
+      // DAS-REV-34 §10: l'aggregato del badge si rilegge a ogni focus dell'Inbox.
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.badge(profileId) });
     }, [profileId, queryClient]),
   );
 
@@ -133,13 +137,14 @@ export function MessagesInboxScreen() {
     mutationFn: markInboxAllRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: MESSAGING_QK.inbox(profileId) });
-      queryClient.invalidateQueries({ queryKey: ["communications", profileId] });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.communications(profileId) });
+      queryClient.invalidateQueries({ queryKey: MESSAGING_QK.badge(profileId) });
     },
   });
 
   const conversations = conversationsQuery.data ?? [];
   const communications = communicationsQuery.data ?? [];
-  const chatCount = conversations.filter((item) => item.unread_count > 0).length;
+  const chatCount = conversations.filter((item) => inboxUnreadCount(item) > 0).length;
   const comunicazioniCount = communications.filter((item) => !item.is_read).length;
   const isLoading = conversationsQuery.isLoading || communicationsQuery.isLoading;
   const trimmedQuery = searchQuery.trim();
@@ -305,7 +310,7 @@ function ChatTabContent({
       <ChatFilterChips onChange={onChangeFilter} value={filter} />
       {filtered.length === 0 ? (
         <AppText color="muted" style={styles.emptyCaption} variant="bodySm">
-          Nessuna conversazione trovata
+          {emptyConversationsLabel(filter)}
         </AppText>
       ) : (
         <FlatList
@@ -316,12 +321,13 @@ function ChatTabContent({
               avatarUrl={item.avatar_url}
               groupAvatarPath={item.group_avatar_path}
               isGroup={item.conversation_type === "group"}
+              isMuted={item.is_muted === true}
               lastMessage={buildConversationPreview(item, viewerProfileId)}
               name={item.display_title}
               onPress={() => onOpenConversation(item)}
               statusLabel={conversationStatusLabel(item)}
               timestamp={conversationTimestamp(item)}
-              unreadCount={item.unread_count}
+              unreadCount={inboxUnreadCount(item)}
             />
           )}
           style={styles.listContainer}
@@ -407,13 +413,14 @@ function SearchResults({
               avatarUrl={conversation.avatar_url}
               groupAvatarPath={conversation.group_avatar_path}
               isGroup={conversation.conversation_type === "group"}
+              isMuted={conversation.is_muted === true}
               key={conversation.conversation_id}
               lastMessage={buildConversationPreview(conversation, viewerProfileId)}
               name={conversation.display_title}
               onPress={() => onOpenConversation(conversation)}
               statusLabel={conversationStatusLabel(conversation)}
               timestamp={conversationTimestamp(conversation)}
-              unreadCount={conversation.unread_count}
+              unreadCount={inboxUnreadCount(conversation)}
             />
           ))}
         </View>

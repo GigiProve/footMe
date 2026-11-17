@@ -14,6 +14,10 @@
  * Riattiva, Elimina) usa sheet di conferma con un solo trattamento; la
  * riattivazione non ne ha, solo loading locale (§22).
  *
+ * DAS-REV-34 §8: da Messaggi, se lo stato del server lo consente, compare la
+ * riga personale «Notifiche · Attive/Silenziose» (sheet condiviso con le DIRECT).
+ * Mai dalla Dashboard, mai a un manager non membro, anche in ARCHIVED.
+ *
  * Ogni comando porta la versione osservata e una chiave per intenzione
  * (`useGroupCommand`): un conflitto rilegge e conserva la bozza (§10), un
  * esito incerto ritenta con la stessa chiave (§27). Nessun optimistic update.
@@ -27,6 +31,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing } from "../../../../theme/tokens";
 import { ActionSheet, AppText, type ActionSheetAction } from "../../../../ui";
 import { useUnsavedChangesGuard } from "../../../profiles/edit/use-unsaved-changes-guard";
+import { ConversationNotificationsSheet } from "../../../messaging/mute/ConversationNotificationsSheet";
+import { canChangeMute, muteValueLabel, NOTIFICATIONS_COPY } from "../../../messaging/mute/mute-presentation";
+import { useConversationNotificationState } from "../../../messaging/mute/use-conversation-notification-state";
 import { purgeConversationCache } from "../../../messaging/use-group-chat-access";
 import { DashboardGlobalEmpty, DashboardGlobalError, DashboardGlobalOffline } from "../../components/DashboardStates";
 import { GroupNotice } from "../compose/components/GroupComposeChrome";
@@ -105,6 +112,7 @@ export function GroupInfoScreen({ origin }: { origin: GroupManageOrigin }) {
   const [avatarSheet, setAvatarSheet] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [teamSheet, setTeamSheet] = useState(false);
+  const [notificationsSheet, setNotificationsSheet] = useState(false);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
@@ -112,6 +120,16 @@ export function GroupInfoScreen({ origin }: { origin: GroupManageOrigin }) {
 
   const variant = management ? infoVariantOf(management) : null;
   const status = management?.status ?? null;
+
+  /* DAS-REV-34 §5, §8: «Notifiche» è una preferenza personale e vive in Messaggi.
+     Dalla Dashboard la query non parte nemmeno (la proiezione amministrativa non
+     porta mute né preferenze). Da Messaggi non basta il parametro: decide lo stato
+     del server, che risponde NOT_MEMBER a un manager non membro → nessuna riga. */
+  const notificationsQuery = useConversationNotificationState(
+    conversationId,
+    origin === "messages" && !leaving && !!actorId,
+  );
+  const notificationState = origin === "messages" ? (notificationsQuery.data ?? null) : null;
 
   useEffect(() => {
     if (variant && status) {
@@ -573,6 +591,15 @@ export function GroupInfoScreen({ origin }: { origin: GroupManageOrigin }) {
           value={String(management.peopleCount)}
         />
       ) : null}
+      {/* §8: anche in ARCHIVED; `can_change` lo decide il server e non riabilita le altre modifiche. */}
+      {notificationState ? (
+        <GroupInfoRow
+          label={NOTIFICATIONS_COPY.rowLabel}
+          onPress={canChangeMute(notificationState) ? () => setNotificationsSheet(true) : null}
+          testID="group-info-notifications"
+          value={muteValueLabel(notificationState)}
+        />
+      ) : null}
 
       {createdLine ? (
         <AppText color="neutralMuted" style={styles.created} testID="group-info-created" variant="meta">
@@ -599,6 +626,19 @@ export function GroupInfoScreen({ origin }: { origin: GroupManageOrigin }) {
         value={management.teamId}
         visible={teamSheet}
       />
+
+      {notificationState ? (
+        <ConversationNotificationsSheet
+          conversationId={conversationId}
+          conversationType="group"
+          /* Accesso perso durante lo sheet: la rilettura della proiezione fa uscire come per ogni altro segnale (§26). */
+          onAccessLost={() => void invalidateGroupQueries(queryClient, actorId, conversationId)}
+          onClose={() => setNotificationsSheet(false)}
+          periodId={notificationState.periodId ?? management.myPeriodId}
+          profileId={actorId}
+          visible={notificationsSheet}
+        />
+      ) : null}
 
       <GroupConfirmSheet
         busy={pending === "leave"}

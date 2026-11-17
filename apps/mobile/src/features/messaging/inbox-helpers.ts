@@ -9,6 +9,24 @@ import type { InboxConversation } from "./messaging-service";
 export type ChatFilter = "all" | "direct" | "group" | "unread";
 export type CommunicationFilter = "all" | CommunicationCategory | "unread";
 
+/**
+ * DAS-REV-34 §13: un gruppo globalmente ARCHIVED resta nelle liste Tutti/Gruppi
+ * (storico consultabile) ma non contribuisce al filtro Non letti né al badge.
+ */
+export function isArchivedGroup(conversation: InboxConversation): boolean {
+  return conversation.conversation_type === "group" && conversation.group_status === "archived";
+}
+
+/**
+ * Non letti che contano per l'attenzione (DAS-REV-34 §10, §13). Il server manda
+ * già 0 per un GROUP archiviato; la regola vale anche qui, perché un payload
+ * precedente non deve far comparire un counter su una chat sola lettura. Un mute
+ * non cambia il numero: la riga silenziata mostra il conteggio reale (QA-026).
+ */
+export function inboxUnreadCount(conversation: InboxConversation): number {
+  return isArchivedGroup(conversation) ? 0 : conversation.unread_count;
+}
+
 export function filterConversations(
   list: InboxConversation[],
   filter: ChatFilter,
@@ -19,11 +37,56 @@ export function filterConversations(
     case "group":
       return list.filter((item) => item.conversation_type === "group");
     case "unread":
-      return list.filter((item) => item.unread_count > 0);
+      return list.filter((item) => inboxUnreadCount(item) > 0);
     case "all":
     default:
       return list;
   }
+}
+
+/** Empty del filtro: «Nessun messaggio da leggere» in Non letti (§25), altrimenti il testo di sempre. */
+export function emptyConversationsLabel(filter: ChatFilter): string {
+  return filter === "unread" ? "Nessun messaggio da leggere" : "Nessuna conversazione trovata";
+}
+
+/** Label della tab Messaggi (§29): il badge conta conversazioni, non messaggi. */
+export function messagesTabA11yLabel(count: number): string {
+  if (count <= 0) {
+    return "Messaggi";
+  }
+
+  return count === 1
+    ? "Messaggi, 1 conversazione da leggere"
+    : `Messaggi, ${count} conversazioni da leggere`;
+}
+
+/**
+ * Label accessibile della riga (§29): «Staff Primavera, notifiche silenziose,
+ * 17 messaggi non letti». Lo stato si annuncia a parole, non solo con l'icona.
+ */
+export function conversationRowA11yLabel(input: {
+  isMuted: boolean;
+  name: string;
+  statusLabel?: string | null;
+  unreadCount: number;
+}): string {
+  const parts = [input.name];
+
+  if (input.statusLabel) {
+    parts.push(input.statusLabel.toLowerCase());
+  }
+
+  if (input.isMuted) {
+    parts.push("notifiche silenziose");
+  }
+
+  if (input.unreadCount > 0) {
+    parts.push(
+      input.unreadCount === 1 ? "1 messaggio non letto" : `${input.unreadCount} messaggi non letti`,
+    );
+  }
+
+  return parts.join(", ");
 }
 
 const EMPTY_PREVIEW = "Apri la chat per iniziare.";

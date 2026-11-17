@@ -11,8 +11,17 @@
 /** Identità che ha compiuto l'azione o che riceve (§93–§94). */
 export type NotificationIdentityType = "person" | "media" | "society";
 
-/** I soli target che il backend produce (CHECK `notifications_target_type_check`). */
-export type NotificationTargetType = "profile" | "content" | "comment" | "scheduled_content";
+/**
+ * I soli target che il backend produce (CHECK `notifications_target_type_check`).
+ * `conversation` (DAS-REV-34 §15–§17): le notifiche strutturali dei gruppi; l'id è
+ * la Conversation e il tap passa sempre dal resolver server, mai da un'apertura diretta.
+ */
+export type NotificationTargetType =
+  | "profile"
+  | "content"
+  | "comment"
+  | "scheduled_content"
+  | "conversation";
 
 export type NotificationActor = {
   /** Falso quando l'identità è stata cancellata (§266): nome e avatar mancano. */

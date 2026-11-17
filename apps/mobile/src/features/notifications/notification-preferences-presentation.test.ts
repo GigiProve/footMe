@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_PUSH_PREFERENCES,
   OTHER_ACTIVITY_SECTION,
   PUSH_INTERACTION_SECTION,
+  PUSH_MESSAGES_SECTION,
   PUSH_PUBLISHING_SECTION,
   applyPreferenceChange,
   isPushPreferenceKey,
@@ -16,7 +18,9 @@ const FULL = {
     comments_replies: false,
     likes: true,
     mentions: true,
+    message_preview: false,
     new_followers: false,
+    push_messages: true,
     reposts: true,
     scheduled_content: false,
   },
@@ -41,10 +45,27 @@ describe("parseNotificationPreferences", () => {
     expect(parsed.other.requests).toBe(true);
   });
 
+  it("Messaggi e Mostra anteprima: acceso se il backend non li manda ancora (DAS-REV-34 §15)", () => {
+    const parsed = parseNotificationPreferences({ push: { mentions: false } });
+
+    expect(parsed.push.push_messages).toBe(true);
+    expect(parsed.push.message_preview).toBe(true);
+  });
+
+  it("legge `push.push_messages` e `push.message_preview`", () => {
+    expect(
+      parseNotificationPreferences({ push: { message_preview: false, push_messages: false } }).push,
+    ).toMatchObject({ message_preview: false, push_messages: false });
+  });
+
   it("ignora valori non booleani e chiavi sconosciute", () => {
-    const parsed = parseNotificationPreferences({ push: { mentions: "no", messages: false }, other: null });
+    const parsed = parseNotificationPreferences({
+      other: null,
+      push: { mentions: "no", messages: false, push_messages: "no" },
+    });
 
     expect(parsed.push.mentions).toBe(true);
+    expect(parsed.push.push_messages).toBe(true);
     expect(parsed.push).not.toHaveProperty("messages");
     expect(parsed.other.store).toBe(true);
   });
@@ -73,6 +94,43 @@ describe("applyPreferenceChange", () => {
     expect(next.other.requests).toBe(false);
     expect(readPreference(next, "requests")).toBe(false);
     expect(readPreference(next, "likes")).toBe(true);
+  });
+
+  it("cambia Messaggi o Mostra anteprima senza toccare l'altro interruttore", () => {
+    const parsed = parseNotificationPreferences(FULL);
+    const off = applyPreferenceChange(parsed, "push_messages", false);
+    const on = applyPreferenceChange(parsed, "message_preview", true);
+
+    expect(off.push.push_messages).toBe(false);
+    expect(off.push.message_preview).toBe(false);
+    expect(on.push.message_preview).toBe(true);
+    expect(on.push.push_messages).toBe(true);
+    expect(readPreference(off, "push_messages")).toBe(false);
+    expect(parsed.push.push_messages).toBe(true);
+  });
+});
+
+describe("sezione Messaggi (DAS-REV-34 §15–§17)", () => {
+  it("due interruttori: «Messaggi» e «Mostra anteprima», con l'aiuto che dice cosa controllano", () => {
+    expect(PUSH_MESSAGES_SECTION.eyebrow).toBe("Messaggi");
+    expect(PUSH_MESSAGES_SECTION.rows).toEqual([
+      {
+        key: "push_messages",
+        label: "Messaggi",
+        subtitle: "Notifiche push dei nuovi messaggi in chat e gruppi",
+      },
+      { key: "message_preview", label: "Mostra anteprima", subtitle: "Mostra mittente e testo nella notifica" },
+    ]);
+  });
+
+  it("sono preferenze push: restano visibili ma non modificabili col permesso OS negato", () => {
+    expect(isPushPreferenceKey("push_messages")).toBe(true);
+    expect(isPushPreferenceKey("message_preview")).toBe(true);
+  });
+
+  it("i default sono entrambi accesi", () => {
+    expect(DEFAULT_PUSH_PREFERENCES.push_messages).toBe(true);
+    expect(DEFAULT_PUSH_PREFERENCES.message_preview).toBe(true);
   });
 });
 
