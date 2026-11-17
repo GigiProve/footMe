@@ -49,7 +49,10 @@ export function scheduledContentNotificationHref(item: NotificationLike): string
   const contentType = dataText(item, "content_type");
   const contentId = dataText(item, "content_id");
 
-  return contentType && contentId ? contentDetailHref(contentType as FeedContentType, contentId) : null;
+  // HOM-15 §57: il dettaglio sa di essere stato aperto da una notifica.
+  return contentType && contentId
+    ? contentDetailHref(contentType as FeedContentType, contentId, { origin: "NOTIFICATION" })
+    : null;
 }
 
 /**

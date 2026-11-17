@@ -265,9 +265,6 @@ export function DirectorMediaTab({
         description: item.description ?? "",
         id: item.id,
         isFeatured: item.is_featured,
-        isLiked: false,
-        isSaved: false,
-        likeCount: 0,
         linkedTargets: item.linked_targets,
         ...(tagMeta ? { tag: { icon: tagMeta.icon, label: tagMeta.label } } : {}),
         thumbnailUrl:
@@ -287,6 +284,8 @@ export function DirectorMediaTab({
   return (
     <MediaTabContent
       authorName={completeProfile.profile.full_name}
+      // HOM-15 §174–§175: Mi piace e Salva reali sui media di carriera (Visitor).
+      careerMediaOwnerId={completeProfile.profile.id}
       emptyCtaLabel="Pubblica contenuto"
       emptyDescription={
         isOwner

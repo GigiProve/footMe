@@ -137,8 +137,11 @@ export function resetLikeEngine(): void {
  * conosce ancora il contenuto.
  */
 export type LikeTarget = {
-  /** HOM-08 §68, §221: anche `comment` (stessa entità `content_likes`). */
-  contentType: FeedContentType | "comment";
+  /**
+   * HOM-08 §68, §221: anche `comment` (stessa entità `content_likes`).
+   * HOM-15 §174–§175: anche `career_media`, i media di carriera del profilo.
+   */
+  contentType: FeedContentType | "comment" | "career_media";
   postId: string;
   seed: LikeSnapshot;
   canLike: boolean;

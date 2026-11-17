@@ -17,6 +17,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { useSession } from "../../auth/use-session";
+import { invalidateFollowQueries } from "../../following/invalidate-follow-queries";
 import { useUnreadNotificationsCount } from "../../notifications/use-unread-notifications-count";
 import {
   contentSavedTarget,
@@ -427,8 +428,11 @@ export function MediaSearchScreen() {
 
     try {
       await toggleFollowSource(profileId, row.source_type, row.entity_id, next);
-      queryClient.invalidateQueries({ queryKey: ["following-count"] });
-      queryClient.invalidateQueries({ queryKey: ["followed"] });
+      // HOM-15 §179: la lista unica del Follow (Feed, suggerimenti, Profilo, Cerca).
+      invalidateFollowQueries(queryClient, profileId, {
+        following: next,
+        source: { id: row.entity_id, kind: row.source_type === "club" ? "club" : "profile" },
+      });
     } catch {
       setFollowOverrides((prev) => ({ ...prev, [key]: current }));
       Alert.alert("Errore", "Non siamo riusciti ad aggiornare il follow.");

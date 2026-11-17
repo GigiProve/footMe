@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveNotificationTarget } from "./notification-target-resolver";
+import { notificationUnavailableMessage, resolveNotificationTarget } from "./notification-target-resolver";
 import type { NotificationTargetSource } from "./notification-types";
 
 const PERSON_ACTOR = { available: true, avatarUrl: null, id: "p1", name: "Marco", type: "person", verified: false } as const;
@@ -36,7 +36,7 @@ describe("target strutturato (§146–§156)", () => {
       resolveNotificationTarget(
         source({ target: { id: "c1", params: { content_type: "profile_post" }, type: "content" } }),
       ),
-    ).toEqual(route("/content/profile_post/c1"));
+    ).toEqual(route("/content/profile_post/c1?origin=NOTIFICATION"));
     expect(
       resolveNotificationTarget(
         source({
@@ -44,7 +44,7 @@ describe("target strutturato (§146–§156)", () => {
           type: "simple_reposted",
         }),
       ),
-    ).toEqual(route("/content/club_media/c2"));
+    ).toEqual(route("/content/club_media/c2?origin=NOTIFICATION"));
   });
 
   it("Post con testo apre il NUOVO post, non l'originale (§154, §67)", () => {
@@ -63,7 +63,7 @@ describe("target strutturato (§146–§156)", () => {
           type: "post_reposted_with_text",
         }),
       ),
-    ).toEqual(route("/content/profile_post/new-post"));
+    ).toEqual(route("/content/profile_post/new-post?origin=NOTIFICATION"));
   });
 
   it("Commento: dettaglio sulla sezione Commenti con il commento raggiungibile (§47, §150)", () => {
@@ -78,7 +78,7 @@ describe("target strutturato (§146–§156)", () => {
           type: "content_commented",
         }),
       ),
-    ).toEqual(route("/content/profile_post/c1?focus=comments&comment=cm1&root=cm1"));
+    ).toEqual(route("/content/profile_post/c1?focus=comments&comment=cm1&root=cm1&origin=NOTIFICATION"));
   });
 
   it("Risposta: porta anche il commento principale del thread (§51, §151)", () => {
@@ -99,7 +99,7 @@ describe("target strutturato (§146–§156)", () => {
           type: "comment_replied",
         }),
       ),
-    ).toEqual(route("/content/media_profile/c1?focus=comments&comment=reply1&root=root1"));
+    ).toEqual(route("/content/media_profile/c1?focus=comments&comment=reply1&root=root1&origin=NOTIFICATION"));
   });
 
   it("Menzione in un post apre il post che la contiene (§57, §152)", () => {
@@ -110,7 +110,7 @@ describe("target strutturato (§146–§156)", () => {
           type: "identity_mentioned",
         }),
       ),
-    ).toEqual(route("/content/profile_post/c1"));
+    ).toEqual(route("/content/profile_post/c1?origin=NOTIFICATION"));
   });
 
   it("Programmato fallito apre Programmati; riuscito il contenuto (§87, §89, §155–§156)", () => {
@@ -131,7 +131,7 @@ describe("target strutturato (§146–§156)", () => {
           type: "scheduled_content_published",
         }),
       ),
-    ).toEqual(route("/content/club_media/c1"));
+    ).toEqual(route("/content/club_media/c1?origin=NOTIFICATION"));
   });
 
   it("parametri mancanti o tipo sconosciuto: «unavailable», mai un href inventato (§157)", () => {
@@ -168,7 +168,7 @@ describe("tipi operativi esistenti (logica del Centro precedente)", () => {
 
   it("content_tag apre il contenuto taggato", () => {
     expect(operational("content_tag", { content_type: "fan_tribuna", post_id: "p9" })).toEqual(
-      route("/content/fan_tribuna/p9"),
+      route("/content/fan_tribuna/p9?origin=NOTIFICATION"),
     );
     expect(operational("content_tag", {})).toEqual({ kind: "unavailable" });
   });
@@ -230,5 +230,21 @@ describe("tipi operativi esistenti (logica del Centro precedente)", () => {
 
   it("tipo sconosciuto: si apre e basta", () => {
     expect(operational("qualcosa_di_nuovo", {})).toEqual({ kind: "none" });
+  });
+});
+
+describe("copy del target non disponibile (HOM-15 §149–§150, §295)", () => {
+  it("un follower senza id è un profilo, ogni altro target un contenuto", () => {
+    expect(notificationUnavailableMessage({ actor: null, data: {}, target: null, type: "new_follower" })).toBe(
+      "Profilo non disponibile",
+    );
+    expect(notificationUnavailableMessage({ actor: null, data: {}, target: null, type: "content_tag" })).toBe(
+      "Contenuto non disponibile",
+    );
+    expect(
+      notificationUnavailableMessage(
+        source({ target: { id: "c1", params: {}, type: "content" }, type: "content_liked" }),
+      ),
+    ).toBe("Contenuto non disponibile");
   });
 });

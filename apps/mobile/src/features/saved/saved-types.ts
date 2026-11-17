@@ -17,8 +17,12 @@ import type { FeedContentType } from "../feed/feed-types";
 export const SAVED_CATEGORIES = ["content", "profile", "society", "position"] as const;
 export type SavedCategory = (typeof SAVED_CATEGORIES)[number];
 
-/** I sei content type salvabili (Feed, dettaglio, Cerca > Media e contenuti). */
-export type SavedContentType = FeedContentType;
+/**
+ * I sei content type salvabili (Feed, dettaglio, Cerca > Media e contenuti) e,
+ * da HOM-15 (§174–§175), i media di carriera del profilo: non hanno un
+ * dettaglio `/content`, la riga dei Salvati apre il profilo sulla tab Media.
+ */
+export type SavedContentType = FeedContentType | "career_media";
 
 export type SavedTarget =
   | { type: "content"; contentType: SavedContentType; id: string }
@@ -29,8 +33,11 @@ export type SavedTarget =
 
 export type SavedTargetType = SavedTarget["type"];
 
-/** Classificazione come il Feed: Articolo, Video editoriale o Post (§78, §113). */
-export type SavedItemKind = "post" | "video" | "article";
+/**
+ * Classificazione come il Feed: Articolo, Video editoriale o Post (§78, §113).
+ * `photo` solo per i media di carriera (HOM-15): una foto del profilo non è un Post.
+ */
+export type SavedItemKind = "post" | "video" | "article" | "photo";
 
 export type SavedContentPayload = {
   item_kind: SavedItemKind;
@@ -45,6 +52,8 @@ export type SavedContentPayload = {
     is_verified: boolean;
   } | null;
   published_at: string | null;
+  /** HOM-15: solo `career_media` — il profilo che la riga apre (tab Media). */
+  owner_profile_id?: string | null;
 };
 
 export type SavedProfilePayload = {

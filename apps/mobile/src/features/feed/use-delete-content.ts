@@ -12,7 +12,11 @@
  *    `setQueryData` — senza refetch e senza perdere lo scroll (§105–107) — e
  *    si invalidano Salvati, Profilo e Cerca (§50–53);
  *  • permesso revocato (§70–72): messaggio e capability di gestione a falso
- *    subito in cache, così «Elimina» non resta finché non si riavvia l'app.
+ *    subito in cache, così «Elimina» non resta finché non si riavvia l'app;
+ *  • HOM-15 §118, §182–§183, §341, §345: dal Feed esce il contenuto CANONICO
+ *    (`payload.contentType` + `postId`), non solo `item.id` — anche i Simple
+ *    Repost `repost:<tipo>:<id>` —, i Post con testo che lo incorporano mostrano
+ *    la reference «non disponibile», e la copia su disco si ripulisce insieme.
  */
 
 import { useRef } from "react";
@@ -28,15 +32,13 @@ import {
   contentAnalyticsProps,
   type ContentVisibleKind,
 } from "./content-actions-presentation";
-import {
-  CONTENT_DELETE_INVALIDATIONS,
-  patchContentCapabilities,
-  removeContentFromFeed,
-} from "./content-lifecycle-cache";
+import { CONTENT_DELETE_INVALIDATIONS, patchContentCapabilities } from "./content-lifecycle-cache";
 import { deleteContent, isContentPermissionError } from "./content-manage-service";
 import type { ContentManageTarget } from "./content-routes";
 import { trackFeed } from "./feed-analytics";
+import { forgetDeletedContentInCache } from "./feed-cache";
 import { FEED_QK } from "./feed-keys";
+import { forgetDeletedContent } from "./feed-signal-cache";
 import type { FeedPage, FeedPageParam, FeedPostItem, FeedScope } from "./feed-types";
 
 type FeedData = InfiniteData<FeedPage, FeedPageParam>;
@@ -64,9 +66,11 @@ export function useDeleteContent({ profileId }: { profileId: string }) {
   const removeEverywhere = (target: DeleteContentTarget) => {
     for (const scope of SCOPES) {
       queryClient.setQueryData<FeedData>(FEED_QK.feed(scope, profileId), (data) =>
-        removeContentFromFeed(data, target.itemId),
+        forgetDeletedContent(data, target.contentType, target.contentId),
       );
     }
+    // §183: al prossimo avvio il contenuto non torna dalla copia su disco.
+    void forgetDeletedContentInCache(profileId, target.contentType, target.contentId);
     // Dettaglio persona: `null` è lo stato «non disponibile», non una cache vuota.
     queryClient.setQueryData<FeedPostItem | null>(FEED_QK.postDetail(target.contentId), null);
     queryClient.removeQueries({

@@ -221,7 +221,9 @@ export function NotificationCenterScreen({
 
     // §161: anche con target non disponibile la notifica risulta aperta; la
     // destinazione mostra lo stato neutro (§157–§159).
-    openNotificationTarget(router, item, "center");
+    openNotificationTarget(router, item, "center", (message) =>
+      showToast({ id: "notification-unavailable", message }),
+    );
   }
 
   async function handleRefresh() {

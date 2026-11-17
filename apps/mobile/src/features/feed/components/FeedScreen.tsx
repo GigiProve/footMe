@@ -41,7 +41,6 @@ import { useSession } from "../../auth/use-session";
 import { useUnreadNotificationsCount } from "../../notifications/use-unread-notifications-count";
 import {
   composerOriginForScope,
-  launcherExtraActionsForRole,
   OPEN_POSITION_HREF,
 } from "../../post-composer/composer-entry";
 import { composerHref } from "../../post-composer/composer-routes";
@@ -134,7 +133,6 @@ export function FeedScreen() {
   // contenuto» (§6). Senza lo stato (rete) il Post resta un tap, come HOM-06.1.
   // L'origin è la tab da cui si apre, così a pubblicazione fatta si torna qui (§123).
   const composerOrigin = composerOriginForScope(scope);
-  const extraActions = launcherExtraActionsForRole(profile?.role);
 
   const launcherQuery = useQuery({
     enabled: publishingUserId.length > 0,
@@ -147,7 +145,7 @@ export function FeedScreen() {
   const launcher = launcherQuery.data ?? null;
 
   function handleOpenComposer() {
-    if (resolveLauncherMode(launcher, extraActions) === "direct_post") {
+    if (resolveLauncherMode(launcher) === "direct_post") {
       router.push(composerHref({ origin: composerOrigin }) as never);
       return;
     }
@@ -224,7 +222,7 @@ export function FeedScreen() {
           draftsSubtitle={draftsEntrySubtitle(launcher)}
           onClose={() => setLauncherOpen(false)}
           onSelect={handleLauncherSelect}
-          rows={launcherRows(launcher, extraActions)}
+          rows={launcherRows(launcher)}
           visible={isLauncherOpen}
         />
       </SafeAreaView>

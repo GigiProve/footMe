@@ -164,9 +164,6 @@ function MediaTab({
           description: item.description ?? "",
           id: item.id,
           isFeatured: item.is_featured,
-          isLiked: false,
-          isSaved: false,
-          likeCount: 0,
           ...(tagMeta ? { tag: { icon: tagMeta.icon, label: tagMeta.label } } : {}),
           // Per i video senza thumbnail non mettiamo l'avatar del giocatore:
           // sarebbe un dato inventato (il volto del profilo come copertina
@@ -192,9 +189,6 @@ function MediaTab({
             description: "Video highlights del profilo.",
             id: "profile-highlight-video",
             isFeatured: false,
-            isLiked: false,
-            isSaved: false,
-            likeCount: 0,
             tag: { icon: "play-circle-outline", label: "Highlights" },
             // Stesso motivo di sopra: niente avatar come copertina video.
             thumbnailUrl: undefined,
@@ -222,6 +216,8 @@ function MediaTab({
   return (
     <MediaTabContent
       authorName={completeProfile.profile.full_name}
+      // HOM-15 §174–§175: Mi piace e Salva reali sui media di carriera (Visitor).
+      careerMediaOwnerId={completeProfile.profile.id}
       emptyCtaLabel="Aggiungi contenuto"
       emptyDescription={
         isOwner

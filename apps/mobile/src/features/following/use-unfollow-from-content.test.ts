@@ -87,6 +87,7 @@ describe("unfollow — §58–§59, §224, §248–§249", () => {
     await actions.unfollow(request(COMO));
 
     expect(cache.invalidateFollowQueries).toHaveBeenCalledTimes(1);
+    expect(cache.invalidateFollowQueries).toHaveBeenCalledWith({ following: false, source: COMO });
   });
 });
 

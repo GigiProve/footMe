@@ -18,7 +18,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, sizes, spacing } from "../../../theme/tokens";
+import { colors, sizes, spacing, typography } from "../../../theme/tokens";
 import { AppText, NotificationBadge } from "../../../ui";
 import { FEED_BRAND } from "../feed-labels";
 
@@ -84,9 +84,11 @@ const styles = StyleSheet.create({
     paddingRight: spacing[6],
     paddingVertical: spacing[4],
   },
+  // HOM-15 §16, §20: il wordmark è `heroName` (Mulish 900) a una misura della scala
+  // tipografica, non un numero libero: stesso aspetto di prima.
   brand: {
     flex: 1,
-    fontSize: 19,
+    fontSize: typography.fontSize[19],
   },
   badge: {
     position: "absolute",

@@ -148,15 +148,16 @@ describe("fetchFanMediaPage", () => {
     expect(page.hasMore).toBe(false);
   });
 
-  it("non espone l'icona Salvati: la griglia riceve solo lo stato, non un controllo", async () => {
+  it("non espone l'icona Salvati né uno stato Salvato: lo tiene il dettaglio canonico", async () => {
     mocks.fetchFanTribunaFeed.mockResolvedValue([
       tribunaPhoto({ is_saved: true }),
     ]);
 
     const [item] = (await fetchFanMediaPage("fan-1", null)).items;
 
-    // REV-PROF-12: il bookmark vive nel dettaglio, mai sulla thumbnail.
-    expect(item.isSaved).toBe(true);
+    // REV-PROF-12: il bookmark vive nel dettaglio, mai sulla thumbnail. HOM-15:
+    // l'elemento della griglia non porta più copie dello stato Salvato/Mi piace.
+    expect("isSaved" in item).toBe(false);
     expect(item.taggedRef?.contentType).toBe("fan_tribuna");
   });
 });

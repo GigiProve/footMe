@@ -11,6 +11,8 @@ import { useRouter } from "expo-router";
 
 import { contentDetailHref } from "../../feed/content-routes";
 import { ComposerStatusBanner } from "../../post-composer/components/ComposerStatusBanner";
+import { contentOriginForComposer } from "../../post-composer/composer-routes";
+import { articleStore } from "../article-store";
 import { publishingErrorCopy } from "../../publishing/publishing-presentation";
 import type { ContentRef, PublishingErrorKind } from "../../publishing/publishing-types";
 import { ARTICLE_DUPLICATE_ACTION } from "../use-article-editor";
@@ -31,11 +33,21 @@ export function ArticlePublishError({ error, duplicateRef, onReload = null }: Pr
   const message = publishingErrorCopy(error, "article");
 
   if (error === "article_duplicate" && duplicateRef) {
+    // HOM-15 §57: il dettaglio porta l'origin della sessione dell'editor, come il composer Post.
+    const openDuplicate = () => {
+      const origin = articleStore.getState().session?.origin;
+      router.push(
+        contentDetailHref(duplicateRef.contentType, duplicateRef.contentId, {
+          origin: origin ? contentOriginForComposer(origin) : null,
+        }) as never,
+      );
+    };
+
     return (
       <ComposerStatusBanner
         actionLabel={ARTICLE_DUPLICATE_ACTION}
         message={message}
-        onAction={() => router.push(contentDetailHref(duplicateRef.contentType, duplicateRef.contentId) as never)}
+        onAction={openDuplicate}
         tone="error"
       />
     );

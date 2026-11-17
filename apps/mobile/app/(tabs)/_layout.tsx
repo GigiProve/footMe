@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Pressable, SafeAreaView, StyleSheet, View, type ColorValue } from "react-native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Redirect, Tabs, usePathname } from "expo-router";
+import { Tabs, useIsFocused, usePathname } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
+import { usePendingAuthTarget } from "../../src/features/auth/use-pending-auth-target";
 import { useSession } from "../../src/features/auth/use-session";
 import { fetchCommunications } from "../../src/features/messaging/communications-service";
 import { fetchInboxConversations } from "../../src/features/messaging/messaging-service";
@@ -15,7 +16,7 @@ import { usePendingTeamJoin } from "../../src/features/dashboard/join-links/join
 import { usePendingEventLink } from "../../src/features/dashboard/events/detail/use-pending-event-link";
 import { AppSidebar } from "../../src/ui/sidebar";
 import { colors, radius, sizes, spacing, typography, zIndex } from "../../src/theme/tokens";
-import { AppText, Icon, type IconName } from "../../src/ui";
+import { AppText, Icon, useToastBottomInset, type IconName } from "../../src/ui";
 
 /**
  * Radici delle tab su cui compare il menu laterale flottante. La Home non
@@ -38,6 +39,12 @@ export default function TabsLayout() {
   // back nello stesso angolo (DAS-REV-08 §4, Centro Squadre), e due bersagli
   // sovrapposti non sono una navigazione.
   const showFloatingMenu = TAB_ROOTS.includes(pathname);
+
+  // HOM-15 §227: finché le tab sono a schermo la snackbar sta sopra la bottom nav, che
+  // ha altezza fissa (`tabBarStyle.height`) e copre già la safe area. Una schermata
+  // spinta sopra le tab (dettaglio, modale) la nasconde: lì l'offset torna a 0.
+  const isFocused = useIsFocused();
+  useToastBottomInset(isFocused ? sizes.tabBarHeight : 0);
 
   const conversationsQuery = useQuery({
     enabled: !!profileId,
@@ -74,22 +81,20 @@ export default function TabsLayout() {
   // dettaglio dopo login, signup e onboarding; il dettaglio rivalida
   // disponibilità, profilo e stato personale, e non iscrive nessuno.
   usePendingEventLink(isReadyForInvites);
+  // HOM-15 §297: lo stesso gancio per il target che la guardia di sessione ha
+  // ricordato prima di rimandare al login (o all'onboarding).
+  usePendingAuthTarget(isReadyForInvites);
 
   const unreadThreadsCount = profileId
     ? (conversationsQuery.data ?? []).filter((item) => item.unread_count > 0).length +
       (communicationsQuery.data ?? []).filter((item) => !item.is_read).length
     : 0;
 
-  if (isLoading) {
+  // HOM-15 §293: login e onboarding li impone la guardia comune del layout
+  // radice (`SessionGuard`), che ricorda anche il target (§297). Qui solo
+  // niente tab finché la sessione non è pronta.
+  if (isLoading || !session || needsOnboarding) {
     return null;
-  }
-
-  if (!session) {
-    return <Redirect href="/(auth)/sign-in" />;
-  }
-
-  if (needsOnboarding) {
-    return <Redirect href="/(onboarding)/profile" />;
   }
 
   return (

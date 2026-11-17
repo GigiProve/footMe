@@ -4,8 +4,8 @@
  *
  *  • §146 source normalizzata: ContentOrigin / tab del Feed → whitelist del
  *    server (mapping del contratto: HOME_PER_TE→HOME_FOR_YOU,
- *    HOME_SEGUITI→HOME_FOLLOWING, PROFILE, SEARCH, MESSAGE; SAVED, DEEP_LINK e
- *    origine assente → OTHER);
+ *    HOME_SEGUITI→HOME_FOLLOWING, PROFILE, SEARCH, MESSAGE, NOTIFICATION
+ *    (HOM-15 §57); SAVED, DEEP_LINK e origine assente → OTHER);
  *  • §149 metadata: il builder costruisce l'elemento di `p_events` con event_id,
  *    session_id e timestamp passati dal chiamante (così è deterministico);
  *  • §150 niente testo: le `props` sono ricostruite da una whitelist per tipo di
@@ -52,6 +52,9 @@ export function sourceForOrigin(origin: ContentOrigin | null | undefined): Conte
       return "SEARCH";
     case "MESSAGE":
       return "MESSAGE";
+    // HOM-15 §57: il dettaglio aperto da una notifica (Centro o push).
+    case "NOTIFICATION":
+      return "NOTIFICATION";
     case "SAVED":
     case "DEEP_LINK":
     case null:

@@ -6,7 +6,7 @@ import {
   articleCoverAltText,
   articleCoverUri,
   articleLayoutFor,
-  bookmarkAccessibilityLabel,
+  buildAuthorAccessibilityLabel,
   buildEditorialAccessibilityLabel,
   buildEditorialMetaLine,
   editorialVideoMedia,
@@ -240,9 +240,16 @@ describe("riga meta e accessibilità editoriale (§32, §85)", () => {
     ).toBe("Gazzetta dello Sport, profilo verificato, Articolo, pubblicato 3 ore fa");
   });
 
-  it("il segnalibro dice il suo stato a parole", () => {
-    expect(bookmarkAccessibilityLabel(false)).toBe("Salva contenuto");
-    expect(bookmarkAccessibilityLabel(true)).toBe("Rimuovi dai salvati");
+  // HOM-15 §26–§27, §265: l'header del dettaglio dice la verifica a parole, senza formato.
+  it("etichetta dell'header autore nel dettaglio: verifica detta, formato facoltativo", () => {
+    const publishedAt = new Date(NOW.getTime() - 3 * 3_600_000).toISOString();
+
+    expect(
+      buildAuthorAccessibilityLabel({ isVerified: true, name: "Gazzetta", now: NOW, publishedAt }),
+    ).toBe("Gazzetta, profilo verificato, pubblicato 3 ore fa");
+    expect(
+      buildAuthorAccessibilityLabel({ isVerified: false, name: "Mario", now: NOW, publishedAt: null }),
+    ).toBe("Mario");
   });
 
   it("etichetta della preview: titolo e sommario", () => {

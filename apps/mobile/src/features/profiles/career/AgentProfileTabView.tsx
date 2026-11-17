@@ -358,9 +358,6 @@ export function AgentMediaTab({
         id: item.id,
         /* I contenuti del Procuratore non hanno ancora un'evidenza persistita. */
         isFeatured: false,
-        isLiked: false,
-        isSaved: false,
-        likeCount: 0,
         ...(tagMeta ? { tag: { icon: tagMeta.icon, label: tagMeta.label } } : {}),
         thumbnailUrl:
           item.thumbnail_url ??
@@ -379,6 +376,8 @@ export function AgentMediaTab({
   return (
     <MediaTabContent
       authorName={completeProfile.profile.full_name}
+      // HOM-15 §174–§175: Mi piace e Salva reali sui media di carriera (Visitor).
+      careerMediaOwnerId={completeProfile.profile.id}
       emptyCtaLabel="Pubblica contenuto"
       emptyDescription={
         isOwner

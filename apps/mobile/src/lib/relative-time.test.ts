@@ -55,6 +55,7 @@ const hoursAgo = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).
 const minutesAgo = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000).toISOString();
 
 // HOM-02 §10: la variante compatta non ha il "fa" e usa "ieri" minuscolo.
+// HOM-15 §278: «12 min · 2 h · 3 g», la stessa scala corta per ogni unità.
 describe("formatCompactRelativeTime", () => {
   it.each([
     [minutesAgo(0.2), "ora"],
@@ -62,7 +63,8 @@ describe("formatCompactRelativeTime", () => {
     [hoursAgo(1), "1 h"],
     [hoursAgo(6), "6 h"],
     [hoursAgo(30), "ieri"],
-    [hoursAgo(24 * 2 + 3), "2 giorni fa"],
+    [hoursAgo(24 * 2 + 3), "2 g"],
+    [hoursAgo(24 * 6), "6 g"],
   ])("formatta %s come %s", (iso, expected) => {
     expect(formatCompactRelativeTime(iso, NOW)).toBe(expected);
   });

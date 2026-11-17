@@ -142,9 +142,6 @@ function mapTribunaPhoto(post: FanTribunaPost): SortableMediaItem {
     description: post.body ?? post.title ?? "",
     id: post.id,
     isFeatured: false,
-    isLiked: post.is_supported,
-    isSaved: post.is_saved,
-    likeCount: post.support_count,
     sortKey: post.published_at ?? post.created_at,
     // Il dettaglio canonico è quello del contenuto, condiviso con il feed e
     // con la ricerca: il tap apre quello, non un secondo viewer.
@@ -163,9 +160,6 @@ function mapLegacyPost(post: FanMediaPost): SortableMediaItem {
     description: post.description,
     id: post.id,
     isFeatured: false,
-    isLiked: post.is_liked,
-    isSaved: post.is_saved,
-    likeCount: post.like_count,
     sortKey: post.published_at ?? post.created_at,
     taggedRef: { contentType: "fan_media", postId: post.id },
     thumbnailUrl: post.thumbnail_url ?? post.visual_url,

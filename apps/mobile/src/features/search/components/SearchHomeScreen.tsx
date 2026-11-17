@@ -11,6 +11,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { useSession } from "../../auth/use-session";
 import { followClub } from "../../clubs/club-service";
+import { invalidateFollowQueries } from "../../following/invalidate-follow-queries";
 import {
   addRecentSearch,
   clearRecentSearches,
@@ -144,10 +145,14 @@ export function SearchHomeScreen() {
       }
       return followClub(profileId, clubId);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["search-for-you"] });
-      queryClient.invalidateQueries({ queryKey: ["following-count"] });
-      queryClient.invalidateQueries({ queryKey: ["followed"] });
+    onSuccess: (_data, clubId) => {
+      // HOM-15 §179: la lista unica del Follow; `search-for-you` è coperta dal predicate `search-*`.
+      if (profileId) {
+        invalidateFollowQueries(queryClient, profileId, {
+          following: true,
+          source: { id: clubId, kind: "club" },
+        });
+      }
     },
     onError: () => {
       Alert.alert("Errore", "Non siamo riusciti ad aggiornare il follow.");

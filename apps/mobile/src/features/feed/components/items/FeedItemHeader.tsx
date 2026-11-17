@@ -6,17 +6,81 @@
  * Società) e il testo, mai un fondo, un badge o "Profilo ufficiale". La
  * verifica è sempre lo stesso piccolo check accanto al nome.
  *
- * `formatRelativeTime` è già in src/lib: non si reimplementa il calcolo del
- * tempo relativo.
+ * HOM-15 §26–§27, §54: la riga identità (`AuthorHeaderRow`) è esportata perché
+ * anche il dettaglio di Articolo/Video/Tribuna, che non ha un `FeedItem`, usi
+ * lo stesso header del Feed invece di un secondo componente. §277: il tempo
+ * passa dal solo formatter compatto (`formatCompactRelativeTime`).
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
 
-import { formatRelativeTime } from "../../../../lib/relative-time";
+import { formatCompactRelativeTime } from "../../../../lib/relative-time";
 import { spacing } from "../../../../theme/tokens";
 import { AppText, Avatar, VerifiedCheck } from "../../../../ui";
 import { ReposterRow } from "../../../repost/components/ReposterRow";
 import { isContentItem, type FeedItem } from "../../feed-types";
+
+export type AuthorHeaderIdentity = {
+  avatarUrl: string | null;
+  isVerified: boolean;
+  kind: "club" | "profile";
+  name: string;
+};
+
+type AuthorHeaderRowProps = {
+  author: AuthorHeaderIdentity;
+  meta: string;
+  /** HOM-02 §75: etichetta parlata completa dell'autore. */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  onPressAuthor?: () => void;
+  right?: React.ReactNode;
+};
+
+/** La riga avatar · nome · check · meta · azioni, senza dipendere da un `FeedItem`. */
+export function AuthorHeaderRow({
+  author,
+  meta,
+  accessibilityLabel,
+  accessibilityHint,
+  onPressAuthor,
+  right,
+}: AuthorHeaderRowProps) {
+  return (
+    <View style={styles.row}>
+      <Pressable
+        accessibilityHint={accessibilityHint}
+        accessibilityLabel={accessibilityLabel ?? `Apri ${author.name}`}
+        accessibilityRole="button"
+        disabled={!onPressAuthor}
+        onPress={onPressAuthor}
+        style={styles.identity}
+      >
+        <Avatar
+          name={author.name}
+          size="sm"
+          square={author.kind === "club"}
+          uri={author.avatarUrl ?? undefined}
+        />
+        <View style={styles.identityText}>
+          <View style={styles.nameRow}>
+            <AppText numberOfLines={1} style={styles.name} variant="titleMd">
+              {author.name}
+            </AppText>
+            {author.isVerified ? <VerifiedCheck /> : null}
+          </View>
+          {meta ? (
+            <AppText color="muted" numberOfLines={1} variant="feedMeta">
+              {meta}
+            </AppText>
+          ) : null}
+        </View>
+      </Pressable>
+
+      {right}
+    </View>
+  );
+}
 
 type FeedItemHeaderProps = {
   item: FeedItem;
@@ -55,43 +119,19 @@ export function FeedItemHeader({
       ? (metaLine ?? "")
       : // HOM-13 §214–§216, §280–§282: nessuna reason sulle card dei contenuti («Dalla tua
         // zona», «Consigliato»…). Solo tempo e tipologia.
-        [item.publishedAt ? formatRelativeTime(item.publishedAt) : null, kindLabel]
+        [item.publishedAt ? formatCompactRelativeTime(item.publishedAt) : null, kindLabel]
           .filter(Boolean)
           .join(" · ");
 
   const row = (
-    <View style={styles.row}>
-      <Pressable
-        accessibilityHint={accessibilityHint}
-        accessibilityLabel={accessibilityLabel ?? `Apri ${author.name}`}
-        accessibilityRole="button"
-        disabled={!onPressAuthor}
-        onPress={onPressAuthor}
-        style={styles.identity}
-      >
-        <Avatar
-          name={author.name}
-          size="sm"
-          square={author.kind === "club"}
-          uri={author.avatarUrl ?? undefined}
-        />
-        <View style={styles.identityText}>
-          <View style={styles.nameRow}>
-            <AppText numberOfLines={1} style={styles.name} variant="titleMd">
-              {author.name}
-            </AppText>
-            {author.isVerified ? <VerifiedCheck /> : null}
-          </View>
-          {meta ? (
-            <AppText color="muted" numberOfLines={1} variant="feedMeta">
-              {meta}
-            </AppText>
-          ) : null}
-        </View>
-      </Pressable>
-
-      {right}
-    </View>
+    <AuthorHeaderRow
+      accessibilityHint={accessibilityHint}
+      accessibilityLabel={accessibilityLabel}
+      author={author}
+      meta={meta}
+      onPressAuthor={onPressAuthor}
+      right={right}
+    />
   );
 
   // HOM-10 §73–§76: un Simple Repost è l'originale con una riga discreta sopra. L'header resta

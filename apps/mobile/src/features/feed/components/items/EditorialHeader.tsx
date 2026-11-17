@@ -7,11 +7,13 @@
  * Il menu degli editoriali non ripete «Salva» (il segnalibro è già visibile) ed
  * espone le altre voci esattamente come nel Post. Nessun «Profilo ufficiale»
  * (§86), nessun colore per tipo di autore o di formato.
+ *
+ * HOM-15 §349–§350: il segnalibro è `SavedBookmarkButton` dei Salvati (target
+ * 44pt), lo stesso della barra del dettaglio: niente più un gemello del Feed.
  */
 
 import { StyleSheet, View } from "react-native";
 
-import { spacing } from "../../../../theme/tokens";
 import type { ContentManagement } from "../../content-management-types";
 import { FEED_POST_OPEN_AUTHOR_HINT } from "../../feed-labels";
 import {
@@ -19,8 +21,8 @@ import {
   buildEditorialMetaLine,
 } from "../../feed-video-presentation";
 import type { FeedEditorialItem } from "../../feed-types";
+import { SavedBookmarkButton } from "../../../saved/components/SavedBookmarkButton";
 import { contentSavedTarget, useIsSaved } from "../../../saved/saved-store";
-import { FeedBookmarkButton } from "./FeedBookmarkButton";
 import { FeedItemHeader } from "./FeedItemHeader";
 import { FeedItemMenu } from "./FeedItemMenu";
 
@@ -61,7 +63,11 @@ export function EditorialHeader({
       right={
         <View style={styles.right}>
           {item.payload.capabilities.canSave ? (
-            <FeedBookmarkButton isSaved={isSaved} onToggle={onToggleSaved} />
+            <SavedBookmarkButton
+              isSaved={isSaved}
+              onToggle={onToggleSaved}
+              testID="feed-bookmark"
+            />
           ) : null}
           <FeedItemMenu
             authorName={item.author?.name}
@@ -78,9 +84,10 @@ export function EditorialHeader({
 }
 
 const styles = StyleSheet.create({
+  // Il segnalibro ha già 12pt d'aria attorno all'icona (target 44): niente gap in più
+  // verso il •••, così la distanza fra le due icone resta quella di prima.
   right: {
     alignItems: "center",
     flexDirection: "row",
-    gap: spacing[4],
   },
 });

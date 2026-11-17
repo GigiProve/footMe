@@ -180,9 +180,6 @@ function CoachMediaTab({
           description: item.description ?? "",
           id: item.id,
           isFeatured: item.is_featured,
-          isLiked: false,
-          isSaved: false,
-          likeCount: 0,
           ...(tagMeta ? { tag: { icon: tagMeta.icon, label: tagMeta.label } } : {}),
           thumbnailUrl:
             item.thumbnail_url ??
@@ -206,9 +203,6 @@ function CoachMediaTab({
             description: "Video tecnico del profilo.",
             id: "coach-technical-video",
             isFeatured: false,
-            isLiked: false,
-            isSaved: false,
-            likeCount: 0,
             tag: { icon: "play-circle-outline", label: "Video tecnico" },
             thumbnailUrl: withDefaultProfileAvatar(
               completeProfile.profile.avatar_url,
@@ -227,6 +221,8 @@ function CoachMediaTab({
   return (
     <MediaTabContent
       authorName={completeProfile.profile.full_name}
+      // HOM-15 §174–§175: Mi piace e Salva reali sui media di carriera (Visitor).
+      careerMediaOwnerId={completeProfile.profile.id}
       emptyCtaLabel="Aggiungi contenuto"
       emptyDescription={
         isOwner

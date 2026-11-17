@@ -24,6 +24,7 @@ import {
   renderWithToast,
   textOf,
 } from "../feed-test-helpers";
+import { TaggedProfilesSheet } from "../../../content/components/TaggedProfilesSheet";
 import { PostFeedItem } from "./PostFeedItem";
 
 // Il video singolo monta `VideoMedia`: player nativo e binding del controller.
@@ -102,10 +103,8 @@ function pressTestId(tree: TestRenderer.ReactTestRenderer, testID: string) {
 }
 
 function taggedSheets(tree: TestRenderer.ReactTestRenderer) {
-  // Il Modal del foglio tag è l'unico con animazione slide; il menu usa fade.
-  return tree.root.findAll(
-    (node) => String(node.type) === "Modal" && node.props?.animationType === "slide",
-  );
+  // HOM-15 §249: il foglio tag è il BottomSheet condiviso; lo si cerca per componente.
+  return tree.root.findAllByType(TaggedProfilesSheet);
 }
 
 const mention = (overrides: Partial<FeedMention> = {}): FeedMention => ({

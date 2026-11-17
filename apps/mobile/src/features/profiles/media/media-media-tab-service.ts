@@ -67,9 +67,6 @@ function toMediaContentItem(post: MediaProfilePost): MediaContentItem {
     description: post.excerpt ?? post.title,
     id: post.id,
     isFeatured: false,
-    isLiked: false,
-    isSaved: post.is_saved,
-    likeCount: 0,
     /*
       Il tap apre il dettaglio contenuto condiviso — dove vivono commenti,
       reazioni e Salva — invece di un viewer locale del profilo. Nella griglia

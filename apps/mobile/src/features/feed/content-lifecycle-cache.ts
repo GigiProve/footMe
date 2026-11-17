@@ -5,7 +5,9 @@
  * Tutte pure, sul modello di `patchPostLike`: lavorano sulle pagine già caricate
  * della infinite query, senza refetch. Rimuovere l'elemento dalle pagine (e non
  * ricaricare) è ciò che mantiene tab, scroll e contenuti caricati (§107), e non
- * lascia tombstone nel punto dove era il Post (§49).
+ * lascia tombstone nel punto dove era il Post (§49): la rimozione vive in
+ * `removeCanonicalContent` (feed-signal-cache), che toglie anche i Simple Repost
+ * (HOM-15: la vecchia `removeContentFromFeed` era usata solo dai test).
  */
 
 import type { InfiniteData } from "@tanstack/react-query";
@@ -20,24 +22,6 @@ import {
 } from "./feed-types";
 
 type FeedData = InfiniteData<FeedPage, FeedPageParam>;
-
-/** Toglie un contenuto da tutte le pagine caricate. Stessa identità se non c'è. */
-export function removeContentFromFeed(
-  data: FeedData | undefined,
-  itemId: string,
-): FeedData | undefined {
-  if (!data || !data.pages.some((page) => page.items.some((item) => item.id === itemId))) {
-    return data;
-  }
-
-  return {
-    ...data,
-    pages: data.pages.map((page) => ({
-      ...page,
-      items: page.items.filter((item) => item.id !== itemId),
-    })),
-  };
-}
 
 /** §72: scrive le capability di gestione di UN contenuto, lasciando identici gli altri. */
 export function patchContentCapabilities(

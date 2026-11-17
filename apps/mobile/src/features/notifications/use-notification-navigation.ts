@@ -7,7 +7,9 @@
  *    target cancellato o bloccato atterra sullo stato neutro della destinazione
  *    («Contenuto non disponibile», «Profilo non disponibile»), mai su un errore
  *    tecnico o una pagina bianca (§157–§159). Senza identificativi non
- *    naviga: la notifica risulta comunque aperta (§161).
+ *    naviga: la notifica risulta comunque aperta (§161) e un toast dice
+ *    «Contenuto non disponibile» / «Profilo non disponibile» (HOM-15 §149–§150,
+ *    §295): non c'è una route da aprire senza id, e un tap muto sembra un guasto.
  *  • `useOpenNotificationFromPush` gestisce `/notifications?open=<id>`: legge la
  *    riga per id (select puntuale, RLS), la marca APERTA senza revisione (il tap
  *    da push apre la revisione corrente) e poi risolve il target. Quel che va
@@ -18,20 +20,25 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { useToast } from "../../ui";
 import { useSession } from "../auth/use-session";
 import { trackNotification, type NotificationOpenOrigin } from "./notification-analytics";
 import { notificationKeys } from "./notification-keys";
 import { fetchNotificationTargetSource, markNotificationOpened } from "./notification-service";
-import { resolveNotificationTarget } from "./notification-target-resolver";
+import { notificationUnavailableMessage, resolveNotificationTarget } from "./notification-target-resolver";
 import type { NotificationTargetSource } from "./notification-types";
 
 type Router = ReturnType<typeof useRouter>;
+
+/** HOM-15 §295: come mostrare il copy neutro di un target non disponibile (il toast dell'app). */
+type ShowUnavailable = (message: string) => void;
 
 /** Risolve e naviga; traccia l'esito (§256) senza mai includere testo della notifica (§261). */
 export function openNotificationTarget(
   router: Router,
   source: NotificationTargetSource,
   origin: NotificationOpenOrigin,
+  showUnavailable: ShowUnavailable,
 ): void {
   const destination = resolveNotificationTarget(source);
 
@@ -40,6 +47,7 @@ export function openNotificationTarget(
     router.push(destination.href as never);
   } else if (destination.kind === "unavailable") {
     trackNotification({ name: "notification_target_unavailable", notificationType: source.type, origin });
+    showUnavailable(notificationUnavailableMessage(source));
   }
 }
 
@@ -47,6 +55,7 @@ export function openNotificationTarget(
 export function useOpenNotificationFromPush(notificationId: string | null): void {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const { profile } = useSession();
   const profileId = profile?.id ?? "";
   const handledId = useRef<string | null>(null);
@@ -81,11 +90,13 @@ export function useOpenNotificationFromPush(notificationId: string | null): void
         }
 
         if (source) {
-          openNotificationTarget(router, source, "push");
+          openNotificationTarget(router, source, "push", (message) =>
+            showToast({ id: "notification-unavailable", message }),
+          );
         }
       } catch {
         // Riga non più leggibile o rete assente: il Centro resta com'è, nessun errore tecnico (§157).
       }
     })();
-  }, [notificationId, profileId, queryClient, router]);
+  }, [notificationId, profileId, queryClient, router, showToast]);
 }

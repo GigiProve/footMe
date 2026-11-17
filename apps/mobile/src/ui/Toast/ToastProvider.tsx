@@ -1,17 +1,41 @@
+/**
+ * Snackbar unica dell'app (HOM-15 §221).
+ *
+ * §227: sta sopra la bottom nav quando è visibile (il layout delle tab registra
+ * la propria altezza con `useToastBottomInset`), sopra la safe area e, su iOS,
+ * sopra la tastiera. Su Android la finestra si ridimensiona da sé con la
+ * tastiera (`softwareKeyboardLayoutMode: resize`, lo stesso presupposto di
+ * `ContentDetailFrame`), quindi non si somma nulla.
+ *
+ * §266: il messaggio è il nome parlato della snackbar ed è annunciato quando
+ * compare (live region su Android, annuncio esplicito su iOS); «tocca per
+ * chiudere» è un suggerimento, non sostituisce il testo. §366: l'unica ombra
+ * è `shadows.overlay`, quella degli elementi che galleggiano sulla pagina.
+ */
+
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ComponentProps,
   type ReactNode,
 } from "react";
-import { Animated, Pressable, StyleSheet, View } from "react-native";
+import {
+  AccessibilityInfo,
+  Animated,
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, radius, spacing } from "../../styles";
+import { colors, radius, shadows, spacing } from "../../styles";
 import { AppText } from "../AppText/AppText";
 
 type IoniconsName = ComponentProps<typeof Ionicons>["name"];
@@ -52,6 +76,13 @@ type ToastContextValue = {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+/**
+ * §227: chi copre il fondo dello schermo (oggi solo la bottom nav) registra qui
+ * la propria altezza. Il default è un no-op, così il gancio non richiede il
+ * provider nei test.
+ */
+const ToastInsetContext = createContext<(inset: number) => void>(() => undefined);
+
 const DISMISS_DURATION = 2500;
 /** Con un'azione da leggere e toccare, 2,5 s non bastano. */
 const DISMISS_DURATION_WITH_ACTION = 6000;
@@ -60,7 +91,7 @@ const ANIMATION_DURATION = 200;
 const ACTION_HIT_SLOP = { bottom: 13, left: 8, right: 8, top: 13 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const insets = useSafeAreaInsets();
+  const [bottomInset, setBottomInset] = useState(0);
   const [toast, setToast] = useState<ToastOptions | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(8)).current;
@@ -107,6 +138,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       if (!isSameVisible) {
         opacity.setValue(0);
         translateY.setValue(8);
+        // §266: iOS non ha live region, l'annuncio è esplicito. Android legge il
+        // contenitore (`accessibilityLiveRegion`) e non va annunciato due volte.
+        if (Platform.OS === "ios") {
+          AccessibilityInfo.announceForAccessibility(options.message);
+        }
       }
 
       Animated.parallel([
@@ -132,27 +168,26 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [opacity, translateY, hide],
   );
 
-  const bottomOffset = insets.bottom + spacing[16];
-
   return (
     <ToastContext.Provider value={{ showToast: show }}>
-      {children}
-      {toast ? (
-        <Animated.View
-          pointerEvents="box-none"
-          style={[
-            styles.container,
-            { bottom: bottomOffset, opacity, transform: [{ translateY }] },
-          ]}
-        >
+      <ToastInsetContext.Provider value={setBottomInset}>{children}</ToastInsetContext.Provider>
+      <ToastAnchor
+        bottomInset={bottomInset}
+        opacity={opacity}
+        translateY={translateY}
+        visible={toast !== null}
+      >
+        {toast ? (
           <View
+            accessibilityLiveRegion="polite"
             style={[
               styles.pill,
               toast.tone === "success" ? styles.pillSuccess : styles.pillNeutral,
             ]}
           >
             <Pressable
-              accessibilityLabel="Chiudi notifica"
+              accessibilityHint="Tocca per chiudere"
+              accessibilityLabel={toast.message}
               onPress={hide}
               style={styles.messageArea}
             >
@@ -200,10 +235,85 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               </Pressable>
             ) : null}
           </View>
-        </Animated.View>
-      ) : null}
+        ) : null}
+      </ToastAnchor>
     </ToastContext.Provider>
   );
+}
+
+/**
+ * Posizione della snackbar (§227): sopra safe area, bottom nav registrata e
+ * tastiera. La tastiera è ascoltata qui, non nel provider, perché aprirla e
+ * chiuderla non ridisegni ogni consumatore di `useToast`.
+ */
+function ToastAnchor({
+  bottomInset,
+  children,
+  opacity,
+  translateY,
+  visible,
+}: {
+  bottomInset: number;
+  children: ReactNode;
+  opacity: Animated.Value;
+  translateY: Animated.Value;
+  visible: boolean;
+}) {
+  const insets = useSafeAreaInsets();
+  const keyboardHeight = useIosKeyboardHeight();
+
+  if (!visible) {
+    return null;
+  }
+
+  // A tastiera aperta è lei a coprire bottom nav e safe area: vale il massimo.
+  const bottom = Math.max(insets.bottom, bottomInset, keyboardHeight) + spacing[16];
+
+  return (
+    <Animated.View
+      pointerEvents="box-none"
+      style={[styles.container, { bottom, opacity, transform: [{ translateY }] }]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Altezza della tastiera su iOS; 0 su Android, dove la finestra si ridimensiona da sé. */
+function useIosKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") {
+      return undefined;
+    }
+
+    const show = Keyboard.addListener("keyboardWillShow", (event) =>
+      setHeight(event.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener("keyboardWillHide", () => setHeight(0));
+
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return height;
+}
+
+/**
+ * §227: dichiara che il fondo dello schermo è coperto per `inset` punti (es. la
+ * bottom nav finché è a schermo). 0 = niente da evitare; allo smontaggio torna 0.
+ */
+export function useToastBottomInset(inset: number): void {
+  const setInset = useContext(ToastInsetContext);
+
+  useEffect(() => {
+    setInset(inset);
+
+    return () => setInset(0);
+  }, [inset, setInset]);
 }
 
 export function useToast(): ToastContextValue {
@@ -230,11 +340,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingHorizontal: spacing[16],
     paddingVertical: spacing[10],
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 4,
+    ...shadows.overlay,
   },
   pillNeutral: {
     backgroundColor: colors.surface,

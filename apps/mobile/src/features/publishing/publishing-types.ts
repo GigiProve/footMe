@@ -81,6 +81,8 @@ export type WireContentLauncher = {
   can_publish_post: boolean;
   can_publish_article: boolean;
   can_view_drafts: boolean;
+  /** HOM-15 §168: capability Position del server (titolare o chiavi Posizioni), non il ruolo. */
+  can_open_position?: boolean;
   drafts_count: number;
   scheduled_count: number;
   failed_count: number;
@@ -90,6 +92,8 @@ export type ContentLauncherState = {
   canPublishPost: boolean;
   canPublishArticle: boolean;
   canViewDrafts: boolean;
+  /** HOM-15 §168, §171: «Posizione aperta» nel «+» solo con la capability reale. */
+  canOpenPosition: boolean;
   draftsCount: number;
   scheduledCount: number;
   failedCount: number;

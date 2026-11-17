@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setAnalyticsSink, type AnalyticsEvent } from "../../lib/analytics";
 import { buildManageTarget } from "./content-actions-presentation";
+import { loadFeedCache, saveFeedCacheScope } from "./feed-cache";
 import { FEED_QK } from "./feed-keys";
 import { makeEditorialItem, makePostItem } from "./feed-post-fixtures";
 import type { FeedContentItem, FeedItem } from "./feed-types";
@@ -117,6 +118,38 @@ describe("useDeleteContent", () => {
 
     expect(client.getQueryData(FEED_QK.postDetail("a"))).toBeNull();
     expect(client.getQueryData(FEED_QK.interaction("club_media", "a"))).toBeUndefined();
+  });
+
+  it("HOM-15 §118, §182–§183: via anche i Simple Repost; le reference diventano «non disponibile»; disco ripulito", async () => {
+    mocks.deleteContent.mockResolvedValue({ status: "deleted" });
+    const a = postWith("a");
+    const wrapper = { ...a, id: "repost:club_media:a" } as FeedItem;
+    const base = postWith("q");
+    const quote = {
+      ...base,
+      payload: {
+        ...(base as FeedContentItem).payload,
+        reference: { available: true, contentId: "a", contentType: "club_media", snapshot: { title: "x" } },
+      },
+    } as FeedItem;
+    await saveFeedCacheScope("me", "per_te", { items: [a, quote] });
+    await saveFeedCacheScope("me", "seguiti", { items: [wrapper] });
+    const { client, run } = setup([a, wrapper, quote]);
+
+    await act(async () => {
+      await run(targetOf(a));
+    });
+
+    expect(idsIn(client, "per_te")).toEqual(["club_media:q"]);
+    expect(idsIn(client, "seguiti")).toEqual(["club_media:q"]);
+    const kept = client.getQueryData<ReturnType<typeof feedData>>(FEED_QK.feed("per_te", "me"))?.pages[0].items[0];
+    expect(kept?.type === "post" ? kept.payload.reference?.available : undefined).toBe(false);
+
+    await vi.waitFor(async () => {
+      const disk = await loadFeedCache("me");
+      expect(disk?.scopes.per_te.items.map((item) => item.id)).toEqual(["club_media:q"]);
+      expect(disk?.scopes.seguiti.items).toEqual([]);
+    });
   });
 
   it("copy per tipo: Articolo e video editoriale", async () => {

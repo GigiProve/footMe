@@ -18,6 +18,7 @@ import { supabase } from "../../lib/supabase";
 import { parseLikedAs } from "../interactions/interaction-identity";
 import type { LikeIdentityRef } from "../interactions/interaction-types";
 import { contentDetailHref, type ContentOrigin } from "./content-routes";
+import { logFeedAnomaly } from "./feed-diagnostics";
 import {
   asFeedContentType,
   readAuthorMeta,
@@ -157,20 +158,28 @@ function buildAuthor(row: FeedRowCore) {
   };
 }
 
+type MapFeedRowOptions = {
+  /** HOM-13 §224: `feed_unit_id`, la chiave stabile della unit (default `item_uid`). */
+  unitId?: string | null;
+  /** HOM-13 §227: la sessione Per te che ha emesso la riga. */
+  sessionId?: string | null;
+};
+
 /**
  * Riga RPC -> elemento del Feed. `null` quando la riga non è renderizzabile:
  * tipo sconosciuto, oppure payload incompleto per quel tipo (un post senza
- * post_id non è apribile e non deve occupare uno slot).
+ * post_id non è apribile e non deve occupare uno slot). HOM-15 §356: una riga
+ * scartata lascia un log tecnico (solo id e tipo, §357).
  */
-export function mapFeedRow(
-  row: FeedRowCore,
-  options?: {
-    /** HOM-13 §224: `feed_unit_id`, la chiave stabile della unit (default `item_uid`). */
-    unitId?: string | null;
-    /** HOM-13 §227: la sessione Per te che ha emesso la riga. */
-    sessionId?: string | null;
-  },
-): FeedItem | null {
+export function mapFeedRow(row: FeedRowCore, options?: MapFeedRowOptions): FeedItem | null {
+  const item = toFeedItem(row, options);
+  if (!item) {
+    logFeedAnomaly("malformed_unit", { id: options?.unitId || row.item_uid, type: row.item_type });
+  }
+  return item;
+}
+
+function toFeedItem(row: FeedRowCore, options?: MapFeedRowOptions): FeedItem | null {
   const type = asItemType(row.item_type);
   if (!type) {
     return null;

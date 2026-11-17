@@ -22,6 +22,7 @@ import { resetCommentDrafts } from "../comments/comment-draft-store";
 import { COMMENTS_QK } from "../comments/comment-keys";
 import { commentStore } from "../comments/comment-store";
 import { resetHiddenContentStore } from "../feed-feedback/hidden-content-store";
+import { resetFeedSessionSeen } from "../feed/use-feed-session-seen";
 import { resetLikeEngine } from "../feed/use-feed-post-like";
 import { resetUnfollowedSourcesStore } from "../following/unfollowed-sources-store";
 import { MODERATION_QK } from "../moderation/moderation-keys";
@@ -55,4 +56,7 @@ export function resetUserInteractions(): void {
   // Le liste in cache portano solo gli id: contro lo store appena svuotato darebbero un
   // thread bianco (A → B → A entro lo staleTime). Si buttano insieme agli store.
   queryClient.removeQueries({ queryKey: COMMENTS_QK.all });
+  // HOM-15 §281, §387: il registro impression/«già visto» è per utente. Senza reset il
+  // prossimo account non emetterebbe le impression delle card già viste dal precedente.
+  resetFeedSessionSeen();
 }

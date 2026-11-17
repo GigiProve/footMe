@@ -31,6 +31,7 @@ import {
   type FollowedEntity,
   type FollowFilter,
 } from "../../src/features/following/following-service";
+import { invalidateFollowQueries } from "../../src/features/following/invalidate-follow-queries";
 import { colors, radius, spacing } from "../../src/theme/tokens";
 
 const PAGE_SIZE = 20;
@@ -79,8 +80,13 @@ export default function FollowingScreen() {
     },
     onSuccess: (_data, item) => {
       showToast({ message: `Non segui più ${item.name}`, tone: "success" });
-      queryClient.invalidateQueries({ queryKey: ["followed"] });
-      queryClient.invalidateQueries({ queryKey: ["following-count"] });
+      // HOM-15 §179: la lista unica del Follow (Feed, suggerimenti, Profilo, Cerca).
+      if (ownerId) {
+        invalidateFollowQueries(queryClient, ownerId, {
+          following: false,
+          source: { id: item.entity_id, kind: item.kind },
+        });
+      }
     },
     onError: (error) => {
       showToast({

@@ -12,6 +12,7 @@ import {
   canonicalTargetOf,
   filterViewerSignals,
   followSourceOfItem,
+  forgetDeletedContent,
   isCanonicalTarget,
   patchAuthorFollowing,
   removeCanonicalContent,
@@ -104,6 +105,53 @@ describe("removeCanonicalContent — §125, §171, §293", () => {
     const feed = data([wrapperPost, post("orig")]);
 
     expect(ids(removeCanonicalContent(feed, "club_media", "p2"))).toEqual(["club_media:orig"]);
+  });
+});
+
+describe("forgetDeletedContent — HOM-15 §118, §182–§183, §341", () => {
+  function quoteOf(id: string, contentId: string): FeedItem {
+    const item = post(id);
+    return item.type === "post"
+      ? {
+          ...item,
+          payload: {
+            ...item.payload,
+            reference: { available: true, contentId, contentType: "club_media", snapshot: { title: "Originale" } },
+          },
+        }
+      : item;
+  }
+
+  it("toglie l'originale eliminato e i suoi Simple Repost da tutte le pagine", () => {
+    const original = post("p1");
+    const feed = data([original, post("p2")], [repostOf(original, "p-9")]);
+
+    expect(ids(forgetDeletedContent(feed, "club_media", "p1"))).toEqual(["club_media:p2"]);
+  });
+
+  it("il Post con testo che lo incorpora resta, con la reference «non disponibile»", () => {
+    const feed = data([quoteOf("q1", "p1"), post("p1")]);
+
+    const next = forgetDeletedContent(feed, "club_media", "p1");
+
+    expect(ids(next)).toEqual(["club_media:q1"]);
+    const quote = next?.pages[0].items[0];
+    expect(quote?.type === "post" ? quote.payload.reference : undefined).toEqual({
+      available: false,
+      contentId: "p1",
+      contentType: "club_media",
+      snapshot: null,
+    });
+  });
+
+  it("nulla da cambiare: stessa identità, anche delle pagine non toccate", () => {
+    const feed = data([post("p1")], [quoteOf("q1", "p7")]);
+
+    expect(forgetDeletedContent(feed, "club_media", "p9")).toBe(feed);
+    expect(forgetDeletedContent(undefined, "club_media", "p1")).toBeUndefined();
+
+    const next = forgetDeletedContent(feed, "club_media", "p1");
+    expect(next?.pages[1]).toBe(feed.pages[1]);
   });
 });
 

@@ -16,11 +16,17 @@
  *   • «route»       → navigare a `href`.
  *   • «none»        → nessuna navigazione per scelta (es. rappresentanza rimossa).
  *   • «unavailable» → mancano gli identificativi: il tap apre comunque la
- *                     notifica, senza errore né pagina bianca (§157, §161).
+ *                     notifica, senza errore né pagina bianca (§157, §161), e
+ *                     mostra il copy neutro di `notificationUnavailableMessage`
+ *                     (HOM-15 §149–§150, §295).
+ *
+ * HOM-15 §57: ogni dettaglio contenuto aperto da qui porta `origin=NOTIFICATION`.
  */
 
+import { BLOCK_COPY } from "../blocking/blocking-presentation";
+import { CONTENT_UNAVAILABLE_TITLE } from "../feed/content-availability-presentation";
 import { ROLE_LINK_HREFS } from "../role-link/role-link-routes";
-import { contentDetailHref } from "../feed/content-routes";
+import { contentDetailHref, type ContentOrigin } from "../feed/content-routes";
 import type { FeedContentType } from "../feed/feed-types";
 import { draftsHref } from "../publishing/publishing-routes";
 import {
@@ -49,6 +55,8 @@ const CONTENT_TYPES: readonly string[] = [
 const ROUTE = (href: string): NotificationDestination => ({ href, kind: "route" });
 const UNAVAILABLE: NotificationDestination = { kind: "unavailable" };
 const NONE: NotificationDestination = { kind: "none" };
+/** HOM-15 §57: la superficie di origine dei dettagli aperti da una notifica. */
+const FROM: ContentOrigin = "NOTIFICATION";
 
 function text(source: Record<string, unknown> | null | undefined, key: string): string | null {
   const value = source?.[key];
@@ -77,7 +85,7 @@ function resolveStructuredTarget(source: NotificationTargetSource): Notification
       // §149, §153, §154, §155: Mi piace, Simple Repost, Post con testo, pubblicazione riuscita.
       const contentType = contentTypeOf(text(target.params, "content_type"));
 
-      return contentType ? ROUTE(contentDetailHref(contentType, target.id)) : UNAVAILABLE;
+      return contentType ? ROUTE(contentDetailHref(contentType, target.id, { origin: FROM })) : UNAVAILABLE;
     }
 
     case "comment": {
@@ -93,6 +101,7 @@ function resolveStructuredTarget(source: NotificationTargetSource): Notification
         contentDetailHref(contentType, contentId, {
           comment: text(target.params, "comment_id") ?? target.id,
           focus: "comments",
+          origin: FROM,
           root: text(target.params, "root_comment_id"),
         }),
       );
@@ -118,7 +127,7 @@ function resolveOperational(source: NotificationTargetSource): NotificationDesti
     const contentType = contentTypeOf(text(data, "content_type"));
     const postId = text(data, "post_id");
 
-    return contentType && postId ? ROUTE(contentDetailHref(contentType, postId)) : UNAVAILABLE;
+    return contentType && postId ? ROUTE(contentDetailHref(contentType, postId, { origin: FROM })) : UNAVAILABLE;
   }
 
   if (isScheduledContentNotification(source)) {
@@ -222,6 +231,17 @@ function resolveOperational(source: NotificationTargetSource): NotificationDesti
 
   // agent_representation_removed e tipi senza destinazione: la notifica si apre e basta.
   return NONE;
+}
+
+/**
+ * HOM-15 §149–§150, §295: il copy del tap su una destinazione `unavailable`.
+ * Il follower (target profilo o riga storica `new_follower`) è un profilo;
+ * ogni altro target senza identificativi è un contenuto non più raggiungibile.
+ */
+export function notificationUnavailableMessage(source: NotificationTargetSource): string {
+  return source.target?.type === "profile" || source.type === "new_follower"
+    ? BLOCK_COPY.unavailableTitle
+    : CONTENT_UNAVAILABLE_TITLE;
 }
 
 /** La destinazione del tap: il target strutturato (§146) prima, poi la logica dei tipi operativi. */

@@ -6,6 +6,7 @@ import { discardFeedEvents, flushFeedEvents } from "../feed/feed-events-service"
 import { resetUserInteractions } from "../interactions/reset-user-interactions";
 import { clearPushStateForLogout } from "../notifications/push/push-service";
 import { saveLastAccountProfile } from "./last-account";
+import { pendingAuthTarget } from "./pending-auth-target";
 
 type LogoutOptions = {
   avatarUrl?: string | null;
@@ -35,6 +36,9 @@ export async function logout(options?: LogoutOptions) {
     // chiamata di rete.
     await clearDashboardCache({ actorId: options.profileId });
   }
+
+  // HOM-15 §297: un target da riprendere dopo il login non sopravvive al logout.
+  await pendingAuthTarget.clear();
 
   // HOM-05: gli eventi analytics in coda sono dell'utente che esce.
   await drainContentEventsForSignOut();

@@ -21,6 +21,7 @@ export {
 export {
   ToastProvider,
   useToast,
+  useToastBottomInset,
   type ToastAction,
   type ToastOptions,
   type ToastTone,

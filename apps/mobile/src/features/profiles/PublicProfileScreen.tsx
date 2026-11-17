@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { contentDetailHref } from "../feed/content-routes";
 import type { FeedContentType } from "../feed/feed-types";
+import { invalidateFollowQueries } from "../following/invalidate-follow-queries";
 
 import { KeyboardAwareForm } from "../../components/ui/keyboard-aware-form";
 import { useSession } from "../auth/use-session";
@@ -528,8 +529,11 @@ export function PublicProfileScreen() {
         await unfollowProfile(currentUserId, viewedProfileId);
         showToast({ message: `Non segui più ${name}`, tone: "neutral" });
       }
-      queryClient.invalidateQueries({ queryKey: ["following-count"] });
-      queryClient.invalidateQueries({ queryKey: ["followed"] });
+      // HOM-15 §179: la lista unica del Follow (Feed, suggerimenti, Profilo, Cerca).
+      invalidateFollowQueries(queryClient, currentUserId, {
+        following: next,
+        source: { id: viewedProfileId, kind: "profile" },
+      });
     } catch (error) {
       setIsFollowed(!next);
       showToast({

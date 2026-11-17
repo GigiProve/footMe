@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { trackArticle } from "../../../src/features/article-editor/article-analytics";
 import { articleKeys } from "../../../src/features/article-editor/article-keys";
@@ -44,6 +44,8 @@ import { useCommentsController } from "../../../src/features/comments/use-commen
 import { ContentActionRow } from "../../../src/features/feed/components/detail/ContentActionRow";
 import { ContentDetailFrame } from "../../../src/features/feed/components/detail/ContentDetailFrame";
 import { ContentDetailMedia } from "../../../src/features/feed/components/detail/ContentDetailMedia";
+import { ContentDetailSkeleton } from "../../../src/features/feed/components/detail/ContentDetailSkeleton";
+import { AuthorHeaderRow } from "../../../src/features/feed/components/items/FeedItemHeader";
 import {
   ContentLoadErrorState,
   ContentUnavailableState,
@@ -61,20 +63,23 @@ import {
 } from "../../../src/features/feed/content-routes";
 import { useBackToFeed } from "../../../src/features/feed/use-back-to-feed";
 import { createFeedVideoController } from "../../../src/features/feed/feed-video-controller";
-import { legacyVideoMedia } from "../../../src/features/feed/feed-video-presentation";
+import { FEED_POST_OPEN_AUTHOR_HINT } from "../../../src/features/feed/feed-labels";
+import {
+  buildAuthorAccessibilityLabel,
+  legacyVideoMedia,
+} from "../../../src/features/feed/feed-video-presentation";
 import type { FeedContentType, FeedMediaItem } from "../../../src/features/feed/feed-types";
 import { FeedVideoProvider } from "../../../src/features/feed/use-feed-video";
 import { useFeedVideoLifecycle } from "../../../src/features/feed/use-feed-video-lifecycle";
 import { FanContentBody } from "../../../src/features/profiles/FanContentBody";
-import { MediaContentInteractions } from "../../../src/features/profiles/media/MediaContentInteractions";
 import { MediaTribunaBody } from "../../../src/features/profiles/media/MediaTribunaBody";
 import {
-  fetchClubPublisherName,
+  fetchClubPublisher,
   fetchContentPublisher,
   type ContentPublisher,
 } from "../../../src/features/content/content-publisher-service";
 import { CompactContentModule } from "../../../src/features/content/components/CompactContentModule";
-import { ContentTaggedHeader } from "../../../src/features/content/components/ContentTaggedHeader";
+import { ContentAttribution } from "../../../src/features/content/components/ContentAttribution";
 import { TagManageSheet } from "../../../src/features/content/components/TagManageSheet";
 import type { ContentTaggedTarget } from "../../../src/features/content/components/TaggedProfilesSheet";
 import type { TaggedContentType } from "../../../src/features/content/content-tag-service";
@@ -86,6 +91,7 @@ import {
 } from "../../../src/features/content-insights/content-events-presentation";
 import { emitContentEvent } from "../../../src/features/content-insights/content-events-service";
 import { useContentDetailEvents } from "../../../src/features/content-insights/use-content-detail-events";
+import { formatCompactRelativeTime } from "../../../src/lib/relative-time";
 import { colors, radius, spacing } from "../../../src/theme/tokens";
 import { SavedBookmarkButton } from "../../../src/features/saved/components/SavedBookmarkButton";
 import { useContentSaved } from "../../../src/features/saved/use-content-saved";
@@ -189,7 +195,8 @@ function mapClubMedia(post: ClubMediaPost, viewerId: string | null): ContentView
     // HOM-06.2: il kind entra nella regola, come in `footme_feed_item_type`:
     // un 'post' lungo non è un Articolo, un 'article' breve sì.
     isArticle: isClubMediaArticle(post.visual_type, post.body, post.kind),
-    publishedAt: null,
+    // HOM-15 §27: l'header condiviso mostra il tempo anche per le Società.
+    publishedAt: post.published_at ?? post.created_at,
     publisherId: post.club_id,
     publisherKind: "club",
     publisherName: "Società",
@@ -243,7 +250,8 @@ function mapMediaProfile(
     publisherId: post.media_profile_id,
     publisherKind: "profile",
     publisherName: post.publisher_name,
-    readingLabel: post.kind === "news" ? null : `${post.reading_time_minutes} min`,
+    // HOM-15 §278: «3 min» da solo si confonderebbe col tempo dell'header («12 min»).
+    readingLabel: post.kind === "news" ? null : `${post.reading_time_minutes} min di lettura`,
     sourceName: post.source_name,
     tagged: post.tagged_targets.map((tag) => ({
       avatar_url: tag.avatar_url,
@@ -395,6 +403,10 @@ function mapFanMedia(post: FanMediaPost, publisher: ContentPublisher): ContentVi
  *    qui sotto, con la stessa riga azioni ♡ | ◯ | ↗.
  * Entrambi montano la sezione Commenti e il composer fisso. `?focus=` porta
  * alla sezione o al composer (§5–§6).
+ *
+ * HOM-15 §26–§27, §53–§54: il dettaglio storico usa l'header autore del Feed
+ * (`AuthorHeaderRow`), il segnalibro della barra per ogni tipo (§36–§37) e lo
+ * skeleton del dettaglio mentre carica (§202, §206).
  */
 export default function ContentDetailRoute() {
   const { comment, focus, id, media, origin, position, root, type } = useLocalSearchParams<{
@@ -535,33 +547,29 @@ function ContentDetailBody({
   const [content, setContent] = useState<ContentView | null>(null);
   const [fanPost, setFanPost] = useState<FanTribunaPostDetail | null>(null);
   /*
-    REV-PROF-21: il dettaglio dei contenuti Media/Creator porta anche Salva,
-    commenti, voto e Q&A, che prima vivevano in una modale dentro il profilo.
-    Serve quindi il post, non solo la sua proiezione di lettura.
+    REV-PROF-21: voto e Q&A della Tribuna editoriale vivono nel dettaglio
+    condiviso: serve il post, non solo la sua proiezione di lettura.
   */
-  const [mediaPost, setMediaPost] = useState<MediaProfilePost | null>(null);
-  // HOM-07 §141: istante della richiesta di mediaPost / mediaTribunaPost, per lo store Salvati.
-  const [mediaLoadedAt, setMediaLoadedAt] = useState(0);
   const [mediaTribunaPost, setMediaTribunaPost] =
     useState<MediaTribunaPost | null>(null);
   const [isLoading, setLoading] = useState(true);
   const [failure, setFailure] = useState<"unavailable" | "error" | null>(null);
   const [isManageOpen, setManageOpen] = useState(false);
   const backToFeed = useBackToFeed(origin);
+  const queryClient = useQueryClient();
 
   const contentType = type as ContentDetailType;
   const taggableType = asTaggedContentType(contentType);
 
-  // HOM-07 §91–§93, mockup 5: segnalibro nella barra del dettaglio, sullo store
-  // Salvati. Media/Creator (articoli e Tribuna) ha già il suo «Salva» in
-  // `MediaContentInteractions`, sullo stesso store: qui non si duplica.
+  /*
+    HOM-07 §91–§93, mockup 5: segnalibro nella barra del dettaglio, sullo store
+    Salvati. HOM-15 §36–§37: vale anche per Media/Creator (articoli e Tribuna),
+    che prima avevano un rail testuale «Salva/Salvato» sotto la riga azioni;
+    `fetch_content_interaction_state` serve già `can_save`/`is_saved` per tutti
+    e cinque i tipi.
+  */
   const bookmark = useContentSaved(contentType as FeedContentType, id ?? "", {
-    enabled:
-      !!viewerId &&
-      !!id &&
-      SUPPORTED.includes(contentType) &&
-      contentType !== "media_profile" &&
-      contentType !== "media_tribuna",
+    enabled: !!viewerId && !!id && SUPPORTED.includes(contentType),
   });
 
   const load = useCallback(async () => {
@@ -573,9 +581,14 @@ function ContentDetailBody({
 
     setLoading(true);
     setFailure(null);
-    const fetchedAt = Date.now();
-    setMediaPost(null);
     setMediaTribunaPost(null);
+
+    // Stessa chiave della query dell'header: il publisher letto qui non si rilegge.
+    const loadPublisher = (profileId: string) =>
+      queryClient.fetchQuery({
+        queryFn: () => fetchContentPublisher(profileId),
+        queryKey: ["content-publisher", "profile", profileId],
+      });
 
     try {
       if (contentType === "club_media") {
@@ -589,20 +602,17 @@ function ContentDetailBody({
       } else if (contentType === "media_tribuna") {
         const post = await fetchMediaTribunaDetail(id, viewerId);
         setFanPost(null);
-        setMediaLoadedAt(fetchedAt);
         setMediaTribunaPost(post);
-        const publisher = post ? await fetchContentPublisher(post.media_profile_id) : null;
+        const publisher = post ? await loadPublisher(post.media_profile_id) : null;
         setContent(post && publisher ? mapMediaTribuna(post, publisher) : null);
       } else if (contentType === "fan_media") {
         const post = await fetchFanMediaPostDetail(id, viewerId);
         setFanPost(null);
-        const publisher = post ? await fetchContentPublisher(post.profile_id) : null;
+        const publisher = post ? await loadPublisher(post.profile_id) : null;
         setContent(post && publisher ? mapFanMedia(post, publisher) : null);
       } else {
         const post = await fetchMediaProfilePostDetail(id, viewerId);
         setFanPost(null);
-        setMediaLoadedAt(fetchedAt);
-        setMediaPost(post);
         setContent(post ? mapMediaProfile(post, viewerId) : null);
       }
     } catch (error) {
@@ -611,12 +621,11 @@ function ContentDetailBody({
       setFailure(classifyContentError(error));
       setContent(null);
       setFanPost(null);
-      setMediaPost(null);
       setMediaTribunaPost(null);
     } finally {
       setLoading(false);
     }
-  }, [contentType, id, viewerId]);
+  }, [contentType, id, queryClient, viewerId]);
 
   useEffect(() => {
     load();
@@ -649,15 +658,25 @@ function ContentDetailBody({
   const isArticleLoading = !!content && content.articleCandidate && articleDetailQuery.isLoading;
   const articleBody = articleBodyKind(articleDetail);
 
-  // «Condiviso da [Società]»: il dettaglio storico di club_media non porta il nome.
-  const clubPublisherId =
-    content?.articleCandidate && content.publisherKind === "club" ? content.publisherId : null;
-  const clubNameQuery = useQuery({
-    enabled: clubPublisherId !== null,
-    queryFn: () => fetchClubPublisherName(clubPublisherId as string),
-    queryKey: ["content-publisher", "club", clubPublisherId],
+  /*
+    HOM-15 §26–§28: logo/avatar e verifica di chi pubblica, per l'header
+    condiviso col Feed. Per club_media porta anche il nome («Condiviso da
+    [Società]»), che il dettaglio storico non ha. Un guasto qui non blocca la
+    pagina: l'header resta con il nome già noto, senza logo né check.
+  */
+  const publisherKind = content?.publisherKind ?? null;
+  const publisherId = content?.publisherId ?? null;
+  const publisherQuery = useQuery({
+    enabled: publisherId !== null,
+    queryFn: () =>
+      publisherKind === "club"
+        ? fetchClubPublisher(publisherId as string)
+        : fetchContentPublisher(publisherId as string),
+    queryKey: ["content-publisher", publisherKind, publisherId],
   });
-  const publisherName = clubNameQuery.data ?? content?.publisherName ?? "";
+  const publisher = publisherQuery.data ?? null;
+  const publisherName =
+    (publisherKind === "club" ? publisher?.name : null) ?? content?.publisherName ?? "";
   /*
     §7J, §7K: in EXTERNAL_LINK l'immagine è quella della fonte, dentro la
     card; una cover sopra la testata la duplicherebbe. Finché il documento non
@@ -722,8 +741,9 @@ function ContentDetailBody({
       title="Contenuto"
     >
       {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} size="large" />
+        // HOM-15 §202, §206: skeleton del dettaglio, non uno spinner a schermo intero.
+        <View style={styles.scroll}>
+          <ContentDetailSkeleton />
         </View>
       ) : !content ? (
         failure === "error" ? (
@@ -738,6 +758,27 @@ function ContentDetailBody({
           keyboardShouldPersistTaps="handled"
           ref={scrollRef}
         >
+          {/*
+            HOM-15 §26–§27, §53–§54: lo stesso header autore del Feed (avatar o
+            logo, nome, verifica, tempo compatto), in testa come nel Post.
+          */}
+          <AuthorHeaderRow
+            accessibilityHint={FEED_POST_OPEN_AUTHOR_HINT}
+            accessibilityLabel={buildAuthorAccessibilityLabel({
+              isVerified: publisher?.isVerified ?? false,
+              name: publisherName,
+              publishedAt: content.publishedAt,
+            })}
+            author={{
+              avatarUrl: publisher?.avatarUrl ?? null,
+              isVerified: publisher?.isVerified ?? false,
+              kind: content.publisherKind,
+              name: publisherName,
+            }}
+            meta={content.publishedAt ? formatCompactRelativeTime(content.publishedAt) : ""}
+            onPressAuthor={openPublisher}
+          />
+
           {content.video || detailCoverUrl ? (
             // HOM-03 §35, §50: video inline o cover ampia in testa; il titolo
             // segue come testata, senza la miniatura che la cover già mostra.
@@ -773,12 +814,9 @@ function ContentDetailBody({
             />
           )}
 
-          <ContentTaggedHeader
+          <ContentAttribution
             authorName={content.authorName}
             onOpenTarget={openTarget}
-            onPressPublisher={openPublisher}
-            publishedAt={content.publishedAt}
-            publisherName={publisherName}
             readingLabel={content.readingLabel}
             tagged={content.tagged}
           />
@@ -882,32 +920,6 @@ function ContentDetailBody({
             />
           ) : null}
 
-          {/*
-            REV-PROF-21: Salva dei contenuti Media/Creator. Prima stava in una
-            modale dentro il profilo — un secondo dettaglio — e qui non
-            esisteva: ora esiste un dettaglio solo. I commenti sono di HOM-08
-            (sezione sotto), non più di questo blocco.
-          */}
-          {mediaPost ? (
-            <MediaContentInteractions
-              contentType="media_profile"
-              initialIsSaved={mediaPost.is_saved}
-              initialIsSavedAt={mediaLoadedAt}
-              postId={mediaPost.id}
-              viewerProfileId={viewerId}
-            />
-          ) : null}
-
-          {mediaTribunaPost ? (
-            <MediaContentInteractions
-              contentType="media_tribuna"
-              initialIsSaved={mediaTribunaPost.is_saved}
-              initialIsSavedAt={mediaLoadedAt}
-              postId={mediaTribunaPost.id}
-              viewerProfileId={viewerId}
-            />
-          ) : null}
-
           {content.viewerTagged ? (
             <Button
               label="Gestisci tag"
@@ -986,12 +998,6 @@ const styles = StyleSheet.create({
   bodyLoading: {
     alignItems: "center",
     paddingVertical: spacing[24],
-  },
-  centered: {
-    alignItems: "center",
-    flex: 1,
-    gap: spacing[16],
-    justifyContent: "center",
   },
   divider: {
     backgroundColor: colors.divider,

@@ -2,8 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  clearCachedFeedItems,
   clearFeedCache,
   FEED_CACHE_ITEM_CAP,
+  forgetDeletedContentInCache,
   loadFeedCache,
   removeContentFromCachedScope,
   saveFeedCacheMeta,
@@ -266,6 +268,85 @@ describe("removeContentFromCachedScope — HOM-11 §169–§170, §292", () => {
     await removeContentFromCachedScope(PROFILE, "per_te", "club_media", "zzz");
 
     expect(await AsyncStorage.getItem(KEY)).toBe(before);
+  });
+});
+
+describe("forgetDeletedContentInCache — HOM-15 §183, §345", () => {
+  it("toglie il contenuto e i suoi Simple Repost da ENTRAMBE le tab in una sola scrittura", async () => {
+    const wrapper = { ...makePost("b"), id: "repost:club_media:b" };
+    await saveFeedCacheScope(PROFILE, "per_te", { items: [makePost("a"), makePost("b")] });
+    await saveFeedCacheScope(PROFILE, "seguiti", { items: [wrapper, makePost("c")] });
+
+    await forgetDeletedContentInCache(PROFILE, "club_media", "b");
+
+    const cache = await loadFeedCache(PROFILE);
+    expect(cache?.scopes.per_te.items.map((item) => item.id)).toEqual(["a"]);
+    expect(cache?.scopes.seguiti.items.map((item) => item.id)).toEqual(["c"]);
+  });
+
+  it("un Post che incorpora il contenuto resta, con la reference «non disponibile»", async () => {
+    const quote = {
+      ...makePost("q"),
+      payload: makePostPayload({
+        postId: "q",
+        reference: { available: true, contentId: "b", contentType: "club_media", snapshot: { title: "x" } },
+      }),
+    } as FeedItem;
+    await saveFeedCacheScope(PROFILE, "per_te", { items: [quote] });
+
+    await forgetDeletedContentInCache(PROFILE, "club_media", "b");
+
+    const [kept] = (await loadFeedCache(PROFILE))?.scopes.per_te.items ?? [];
+    expect(kept?.id).toBe("q");
+    expect(kept?.type === "post" ? kept.payload.reference : undefined).toEqual({
+      available: false,
+      contentId: "b",
+      contentType: "club_media",
+      snapshot: null,
+    });
+  });
+
+  it("senza il contenuto non scrive nulla", async () => {
+    await saveFeedCacheScope(PROFILE, "per_te", { items: [makePost("a")] });
+    const before = await AsyncStorage.getItem(KEY);
+
+    await forgetDeletedContentInCache(PROFILE, "club_media", "zzz");
+
+    expect(await AsyncStorage.getItem(KEY)).toBe(before);
+  });
+});
+
+describe("clearCachedFeedItems — HOM-15 §180, §345", () => {
+  it("scarta elementi e scroll di entrambe le tab, mantiene tab attiva, primo accesso e id visti", async () => {
+    const scroll = { itemCount: 2, offset: 80, savedAt: new Date().toISOString() };
+    await saveFeedCacheScope(PROFILE, "per_te", {
+      items: [makePost("a")],
+      pageCount: 2,
+      scroll,
+      seenIds: ["a"],
+      updatedAt: new Date().toISOString(),
+    });
+    await saveFeedCacheScope(PROFILE, "seguiti", { items: [makePost("b")] });
+    await saveFeedCacheMeta(PROFILE, {
+      activeScope: "seguiti",
+      firstAccess: { personalizeDismissedAt: "2026-11-01T00:00:00.000Z" },
+    });
+
+    await clearCachedFeedItems(PROFILE);
+
+    const cache = await loadFeedCache(PROFILE);
+    expect(cache?.scopes.per_te.items).toEqual([]);
+    expect(cache?.scopes.per_te.pageCount).toBe(0);
+    expect(cache?.scopes.per_te.scroll).toBeNull();
+    expect(cache?.scopes.per_te.seenIds).toEqual(["a"]);
+    expect(cache?.scopes.seguiti.items).toEqual([]);
+    expect(cache?.activeScope).toBe("seguiti");
+    expect(cache?.firstAccess.personalizeDismissedAt).toBe("2026-11-01T00:00:00.000Z");
+  });
+
+  it("senza cache non scrive nulla e non solleva", async () => {
+    await expect(clearCachedFeedItems(PROFILE)).resolves.toBeUndefined();
+    expect(await AsyncStorage.getItem(KEY)).toBeNull();
   });
 });
 

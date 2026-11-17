@@ -24,6 +24,7 @@ import { SocietyProfileSkeleton } from "../../../src/features/clubs/society/Soci
 import { fetchSocietyTeamProfile } from "../../../src/features/clubs/society/society-profile-service";
 import { buildTeamShareMessage } from "../../../src/features/clubs/society/society-profile-model";
 import type { SocietyTeamDetail } from "../../../src/features/clubs/society/society-profile-types";
+import { invalidateFollowQueries } from "../../../src/features/following/invalidate-follow-queries";
 import { openDirectConversation } from "../../../src/features/messaging/messaging-service";
 import { trackProfileEvent } from "../../../src/features/profiles/profile-analytics";
 import { colors, spacing } from "../../../src/theme/tokens";
@@ -89,6 +90,7 @@ export default function ClubTeamProfileScreen() {
     setFollowPending(true);
     setDetail({ ...detail, viewer: { ...detail.viewer, isFollowing: !wasFollowing } });
 
+    let confirmed = false;
     try {
       /*
         Il modello follow non conosce la squadra: il target canonico è la
@@ -100,6 +102,7 @@ export default function ClubTeamProfileScreen() {
       } else {
         await followClub(profile.id, detail.club.id);
       }
+      confirmed = true;
     } catch {
       setDetail((current) =>
         current ? { ...current, viewer: { ...current.viewer, isFollowing: wasFollowing } } : current,
@@ -107,8 +110,12 @@ export default function ClubTeamProfileScreen() {
       showToast({ message: "Non siamo riusciti ad aggiornare il follow.", tone: "neutral" });
     } finally {
       setFollowPending(false);
-      queryClient.invalidateQueries({ queryKey: ["following-count"] });
-      queryClient.invalidateQueries({ queryKey: ["followed"] });
+      // HOM-15 §179: la lista unica del Follow; il Feed si ritocca solo a server confermato.
+      invalidateFollowQueries(
+        queryClient,
+        profile.id,
+        confirmed ? { following: !wasFollowing, source: { id: detail.club.id, kind: "club" } } : undefined,
+      );
     }
   }
 

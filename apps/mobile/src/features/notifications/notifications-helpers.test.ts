@@ -159,7 +159,7 @@ describe("HOM-06.2 — contenuti programmati nel Centro Notifiche (§199–§202
       type: "scheduled_content_published",
     });
 
-    expect(scheduledContentNotificationHref(item)).toBe("/content/club_media/c1");
+    expect(scheduledContentNotificationHref(item)).toBe("/content/club_media/c1?origin=NOTIFICATION");
   });
 
   it("senza tipo o id nessuna destinazione inventata; tipi estranei esclusi", () => {

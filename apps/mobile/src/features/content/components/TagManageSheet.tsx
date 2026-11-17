@@ -1,9 +1,9 @@
 import { type ComponentProps, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, spacing } from "../../../styles";
-import { AppText, ConfirmModal, useToast } from "../../../ui";
+import { colors, spacing } from "../../../styles";
+import { AppText, BottomSheet, ConfirmModal, useToast } from "../../../ui";
 import {
   hideTag,
   removeTag,
@@ -121,40 +121,30 @@ export function TagManageSheet({
   const confirmCopy = confirmAction ? CONFIRM_COPY[confirmAction] : null;
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
-      visible={visible}
-    >
-      <Pressable accessibilityLabel="Chiudi" onPress={onClose} style={styles.overlay} />
-      <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <AppText style={styles.heading} variant="titleSm">
-          Gestisci tag
-        </AppText>
-        {content ? (
-          <View style={styles.contentBlock}>
-            <CompactContentModule {...content} />
-          </View>
-        ) : null}
-
-        <View style={styles.actions}>
-          {ACTIONS.map(({ action, icon, label }) => (
-            <Pressable
-              accessibilityRole="button"
-              key={action}
-              onPress={() => handleAction(action)}
-              style={styles.actionRow}
-            >
-              <Ionicons color={colors.textSecondary} name={icon} size={20} />
-              <AppText style={styles.actionLabel} variant="bodyLg">
-                {label}
-              </AppText>
-              <Ionicons color={colors.textMuted} name="chevron-forward" size={16} />
-            </Pressable>
-          ))}
+    // HOM-15 §249, §252: lo sheet nativo PROLINK unico. Conferma e Segnalazione restano
+    // figlie dello sheet: su iOS un Modal fratello non si presenta sopra uno già aperto.
+    <BottomSheet onClose={onClose} scrollable showHandle title="Gestisci tag" visible={visible}>
+      {content ? (
+        <View style={styles.contentBlock}>
+          <CompactContentModule {...content} />
         </View>
+      ) : null}
+
+      <View style={styles.actions}>
+        {ACTIONS.map(({ action, icon, label }) => (
+          <Pressable
+            accessibilityRole="button"
+            key={action}
+            onPress={() => handleAction(action)}
+            style={styles.actionRow}
+          >
+            <Ionicons color={colors.textSecondary} name={icon} size={20} />
+            <AppText style={styles.actionLabel} variant="bodyLg">
+              {label}
+            </AppText>
+            <Ionicons color={colors.textMuted} name="chevron-forward" size={16} />
+          </Pressable>
+        ))}
       </View>
 
       {confirmCopy ? (
@@ -184,38 +174,11 @@ export function TagManageSheet({
         targetType={targetType}
         visible={isReportOpen}
       />
-    </Modal>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.40)",
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius[16],
-    borderTopRightRadius: radius[16],
-    bottom: 0,
-    left: 0,
-    paddingBottom: spacing[32],
-    paddingHorizontal: spacing[20],
-    paddingTop: spacing[12],
-    position: "absolute",
-    right: 0,
-  },
-  handle: {
-    alignSelf: "center",
-    backgroundColor: colors.border,
-    borderRadius: radius.full,
-    height: 4,
-    marginBottom: spacing[16],
-    width: 40,
-  },
-  heading: {
-    marginBottom: spacing[12],
-  },
   contentBlock: {
     marginBottom: spacing[16],
   },

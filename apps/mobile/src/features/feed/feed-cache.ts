@@ -18,7 +18,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { isCanonicalTarget } from "./feed-signal-cache";
+import { forgetDeletedContentInItems, isCanonicalTarget } from "./feed-signal-cache";
 import {
   FEED_ITEM_TYPES,
   type FeedContentType,
@@ -288,6 +288,57 @@ export async function removeContentFromCachedScope(
     ...cache,
     scopes: { ...cache.scopes, [scope]: { ...previous, items } },
   });
+}
+
+/**
+ * HOM-15 §183, §345: un contenuto ELIMINATO esce dalla copia su disco di ENTRAMBE le tab
+ * (canonico e Simple Repost) e le reference che lo incorporano diventano «non disponibile»:
+ * al prossimo avvio non torna come initialData. Una sola lettura e una sola scrittura — due
+ * `removeContentFromCachedScope` in parallelo si sovrascriverebbero a vicenda.
+ */
+export async function forgetDeletedContentInCache(
+  profileId: string,
+  contentType: FeedContentType,
+  contentId: string,
+): Promise<void> {
+  const cache = await loadFeedCache(profileId);
+  if (!cache) {
+    return;
+  }
+
+  let changed = false;
+  const scopes = { ...cache.scopes };
+  for (const scope of SCOPES) {
+    const previous = cache.scopes[scope];
+    const items = forgetDeletedContentInItems(previous.items, contentType, contentId);
+    if (items !== previous.items) {
+      changed = true;
+      scopes[scope] = { ...previous, items };
+    }
+  }
+
+  if (changed) {
+    await writeCache(profileId, { ...cache, scopes });
+  }
+}
+
+/**
+ * HOM-15 §180, §345: dopo un Block (o uno Sblocca) gli elementi su disco possono portare
+ * identità non più eleggibili: si scartano gli elementi e lo scroll di entrambe le tab, così
+ * al riavvio non tornano come initialData. Restano tab attiva, primo accesso e id già visti
+ * (non contengono contenuti dell'altra identità). Il prossimo caricamento riscrive la copia.
+ */
+export async function clearCachedFeedItems(profileId: string): Promise<void> {
+  const cache = await loadFeedCache(profileId);
+  if (!cache || SCOPES.every((scope) => cache.scopes[scope].items.length === 0)) {
+    return;
+  }
+
+  const scopes = { ...cache.scopes };
+  for (const scope of SCOPES) {
+    scopes[scope] = { ...cache.scopes[scope], items: [], pageCount: 0, scroll: null };
+  }
+  await writeCache(profileId, { ...cache, scopes });
 }
 
 /**

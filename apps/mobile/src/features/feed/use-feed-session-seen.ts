@@ -97,7 +97,10 @@ export function useFeedSessionSeen({
   return { hasSeen, markSeen };
 }
 
-/** Solo per i test. */
+/**
+ * HOM-15 §281, §387: il registro è per utente. Lo svuota `resetUserInteractions` al logout
+ * e al cambio account (e i test). La copia su disco resta del suo profilo (`feed-cache`).
+ */
 export function resetFeedSessionSeen(): void {
   seenByScope.clear();
 }

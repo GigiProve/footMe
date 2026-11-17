@@ -1,3 +1,5 @@
+import { createElement } from "react";
+import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 
 import { blockedIdentityStore } from "../blocking/blocked-identity-store";
@@ -7,6 +9,7 @@ import { createCommentDraftStore, registerCommentDraft } from "../comments/comme
 import { COMMENTS_QK } from "../comments/comment-keys";
 import { commentStore } from "../comments/comment-store";
 import { hiddenContentStore } from "../feed-feedback/hidden-content-store";
+import { useFeedSessionSeen } from "../feed/use-feed-session-seen";
 import { unfollowedSourcesStore } from "../following/unfollowed-sources-store";
 import { MODERATION_QK } from "../moderation/moderation-keys";
 import { reportDraftStore } from "../moderation/report-draft-store";
@@ -17,6 +20,8 @@ import { likeStore } from "./like-store";
 import { resetUserInteractions } from "./reset-user-interactions";
 
 vi.mock("../../ui", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe("resetUserInteractions — Block di sessione (HOM-12 §193–§194)", () => {
   it("svuota lo store dei Block e l'availability in cache", () => {
@@ -31,6 +36,29 @@ describe("resetUserInteractions — Block di sessione (HOM-12 §193–§194)", (
     expect(
       queryClient.getQueryData(BLOCK_QK.availability("user-a", { id: "u1", type: "person" })),
     ).toBeUndefined();
+  });
+});
+
+describe("resetUserInteractions — registro impression (HOM-15 §281, §387)", () => {
+  it("svuota il registro di sessione: il prossimo account emette di nuovo le impression", () => {
+    let seen!: ReturnType<typeof useFeedSessionSeen>;
+    function Probe() {
+      seen = useFeedSessionSeen({ initialSeenIds: [], profileId: "", scope: "per_te" });
+      return null;
+    }
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(createElement(Probe));
+    });
+
+    expect(seen.markSeen("club_media:p1")).toBe(true);
+    expect(seen.markSeen("club_media:p1")).toBe(false);
+
+    resetUserInteractions();
+
+    expect(seen.hasSeen("club_media:p1")).toBe(false);
+    expect(seen.markSeen("club_media:p1")).toBe(true);
+    act(() => tree.unmount());
   });
 });
 

@@ -8,6 +8,8 @@
  *
  * La patch tocca UN solo attore nelle pagine già caricate: la lista non si
  * ricarica e non salta. Errore → si torna allo stato di prima su quell'attore.
+ * A mutazione chiusa si passa dalla lista unica del Follow (HOM-15 §179), che
+ * rilegge anche questa lista: dopo la patch il dato del server coincide.
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,7 +17,8 @@ import { useState } from "react";
 
 import { useToast } from "../../ui";
 import { trackLike } from "../interactions/like-analytics";
-import { FEED_QK } from "../feed/feed-keys";
+import { followKindOfIdentity } from "../following/follow-source";
+import { invalidateFollowQueries } from "../following/invalidate-follow-queries";
 import { toggleFollowSource } from "../search/media/media-search-service";
 import { LIKES_QK } from "./likes-keys";
 import {
@@ -71,16 +74,20 @@ export function useToggleLikerFollow({
         name: "follow_from_likes",
       });
     },
-    onSettled: (_data, _error, actor) => {
+    onSettled: (_data, error, actor) => {
       setBusy(actor.key, false);
-      // I suggerimenti escludono chi è già seguito: vanno ricalcolati.
-      void queryClient.invalidateQueries({ queryKey: FEED_QK.suggestedProfiles(viewerId) });
-      void queryClient.invalidateQueries({ queryKey: FEED_QK.suggestedClubs(viewerId) });
-      void queryClient.invalidateQueries({ queryKey: FEED_QK.followingState(viewerId) });
-      // §55: lo stesso sistema Follow globale — contatori e «Seguiti» come da
-      // profilo pubblico e Cerca → Media.
-      void queryClient.invalidateQueries({ queryKey: ["following-count"] });
-      void queryClient.invalidateQueries({ queryKey: ["followed"] });
+      // HOM-15 §179: la lista unica del Follow (suggerimenti, contatori, «Seguiti», Feed,
+      // Cerca); il Feed si ritocca solo a server confermato.
+      invalidateFollowQueries(
+        queryClient,
+        viewerId,
+        error
+          ? undefined
+          : {
+              following: !actor.isFollowing,
+              source: { id: actor.actorId, kind: followKindOfIdentity(actor.actorType) },
+            },
+      );
     },
   });
 

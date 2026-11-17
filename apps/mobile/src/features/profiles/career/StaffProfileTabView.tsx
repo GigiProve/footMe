@@ -226,9 +226,6 @@ function StaffMediaTab({
         description: item.description ?? "",
         id: item.id,
         isFeatured: item.is_featured,
-        isLiked: false,
-        isSaved: false,
-        likeCount: 0,
         ...(tagMeta ? { tag: { icon: tagMeta.icon, label: tagMeta.label } } : {}),
         thumbnailUrl:
           item.thumbnail_url ??
@@ -245,6 +242,8 @@ function StaffMediaTab({
   return (
     <MediaTabContent
       authorName={completeProfile.profile.full_name}
+      // HOM-15 §174–§175: Mi piace e Salva reali sui media di carriera (Visitor).
+      careerMediaOwnerId={completeProfile.profile.id}
       emptyCtaLabel="Aggiungi contenuto"
       emptyDescription={
         isOwner

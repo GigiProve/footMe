@@ -36,7 +36,7 @@ import { useToast } from "../../ui";
 import { contentDetailHref } from "../feed/content-routes";
 import { FEED_QK } from "../feed/feed-keys";
 import { applyPublishToCaches } from "../post-composer/composer-cache";
-import { COMPOSER_FALLBACK_HREF } from "../post-composer/composer-routes";
+import { COMPOSER_FALLBACK_HREF, contentOriginForComposer } from "../post-composer/composer-routes";
 import type { ComposerMediaItem } from "../post-composer/composer-types";
 import { newComposerOperationKey } from "../post-composer/operation-key";
 import { localDraftKey, removeLocalDraft, writeLocalDraft } from "../publishing/draft-local-store";
@@ -416,11 +416,16 @@ export function useArticleEditor({ userId, profileId }: { userId: string; profil
       }
 
       const published = result.status === "published";
+      // HOM-15 §57: «Visualizza» porta l'origin, come il composer Post.
+      const detailOrigin = contentOriginForComposer(current.session.origin);
       showToast({
         action: published
           ? {
               label: ARTICLE_VIEW_ACTION,
-              onPress: () => router.push(contentDetailHref(result.ref.contentType, result.ref.contentId) as never),
+              onPress: () =>
+                router.push(
+                  contentDetailHref(result.ref.contentType, result.ref.contentId, { origin: detailOrigin }) as never,
+                ),
             }
           : undefined,
         message: current.session.editing

@@ -16,11 +16,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { useToast } from "../../ui";
+import { invalidateFollowQueries } from "../following/invalidate-follow-queries";
 import { toggleFollowSource } from "../search/media/media-search-service";
 import { contentSavedTarget, getSavedValue, savedKey, seedSaved } from "../saved/saved-store";
 import { useSetSaved } from "../saved/use-set-saved";
 import { trackFeed } from "./feed-analytics";
-import { FEED_QK } from "./feed-keys";
 import { isContentItem, type FeedContentType, type FeedItem, type FeedScope } from "./feed-types";
 
 /**
@@ -110,17 +110,19 @@ export function useToggleFollowSuggestion({
     onError: () => {
       showToast({ message: "Non è stato possibile aggiornare il follow." });
     },
-    onSettled: () => {
-      // I suggerimenti escludono chi è già seguito: la lista va ricalcolata.
-      void queryClient.invalidateQueries({
-        queryKey: FEED_QK.suggestedProfiles(profileId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: FEED_QK.suggestedClubs(profileId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: FEED_QK.followingState(profileId),
-      });
+    onSettled: (_data, error, target) => {
+      // HOM-15 §179: la lista unica del Follow (i suggerimenti escludono chi è già seguito,
+      // Profilo e Cerca devono convergere). Il Feed si ritocca solo se il server ha confermato.
+      invalidateFollowQueries(
+        queryClient,
+        profileId,
+        error
+          ? undefined
+          : {
+              following: !target.isFollowing,
+              source: { id: target.targetId, kind: target.targetType },
+            },
+      );
     },
   });
 }

@@ -245,22 +245,43 @@ export function buildEditorialAccessibilityLabel({
   name,
   isVerified,
 }: EditorialLineInput & { name: string; isVerified: boolean }): string {
+  return buildAuthorAccessibilityLabel({
+    isVerified,
+    kindLabel: EDITORIAL_KIND_LABELS[type],
+    name,
+    now,
+    publishedAt,
+  });
+}
+
+/**
+ * HOM-15 §26–§27, §265: la stessa etichetta parlata per ogni header autore,
+ * anche nel dettaglio (dove il formato è già nell'eyebrow e `kindLabel` manca).
+ * La verifica è detta a parole, non solo disegnata.
+ */
+export function buildAuthorAccessibilityLabel({
+  isVerified,
+  kindLabel,
+  name,
+  now,
+  publishedAt,
+}: {
+  isVerified: boolean;
+  kindLabel?: string | null;
+  name: string;
+  now?: Date;
+  publishedAt: string | null;
+}): string {
   const spoken = publishedAt ? formatSpokenRelativeTime(publishedAt, now) : "";
 
   return [
     name,
     isVerified ? "profilo verificato" : null,
-    EDITORIAL_KIND_LABELS[type],
+    kindLabel,
     spoken ? `pubblicato ${spoken}` : null,
   ]
     .filter(Boolean)
     .join(", ");
-}
-
-/** Etichetta del bookmark: lo stato è nel nome, non solo nel colore (§85). */
-export function bookmarkAccessibilityLabel(isSaved: boolean): string {
-  // HOM-07 §181: «Salva contenuto» / «Rimuovi dai salvati».
-  return isSaved ? "Rimuovi dai salvati" : "Salva contenuto";
 }
 
 /** §48: l'etichetta della preview è il titolo; l'azione è nel suggerimento. */

@@ -72,6 +72,7 @@ export function mapLauncher(wire: WireContentLauncher): ContentLauncherState {
   return {
     canPublishArticle: wire.can_publish_article === true,
     canPublishPost: wire.can_publish_post === true,
+    canOpenPosition: wire.can_open_position === true,
     canViewDrafts: wire.can_view_drafts === true,
     draftsCount: wire.drafts_count ?? 0,
     failedCount: wire.failed_count ?? 0,

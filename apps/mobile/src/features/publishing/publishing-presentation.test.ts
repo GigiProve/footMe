@@ -183,6 +183,7 @@ describe("lista (§140–§146, §149, §162, §195)", () => {
 describe("launcher (§4–§10)", () => {
   const base: ContentLauncherState = {
     canPublishArticle: false,
+    canOpenPosition: false,
     canPublishPost: true,
     canViewDrafts: true,
     draftsCount: 0,
@@ -201,7 +202,7 @@ describe("launcher (§4–§10)", () => {
 
   it("Articolo o altre azioni → sheet Crea contenuto (§6)", () => {
     expect(resolveLauncherMode({ ...base, canPublishArticle: true })).toBe("sheet");
-    expect(resolveLauncherMode(base, ["open_position"])).toBe("sheet");
+    expect(resolveLauncherMode({ ...base, canOpenPosition: true })).toBe("sheet");
     expect(resolveLauncherMode(null)).toBe("direct_post");
   });
 
@@ -212,6 +213,15 @@ describe("launcher (§4–§10)", () => {
       secondary: ["drafts"],
     });
     expect(launcherRows({ ...base, canViewDrafts: false })).toEqual({ primary: ["post"], secondary: [] });
+  });
+
+  it("HOM-15 §168, §171: «Posizione aperta» solo con can_open_position del server", () => {
+    expect(launcherRows({ ...base, canOpenPosition: true })).toEqual({
+      primary: ["post"],
+      secondary: ["drafts", "open_position"],
+    });
+    expect(launcherRows(base).secondary).not.toContain("open_position");
+    expect(launcherRows(null).secondary).not.toContain("open_position");
   });
 
   it("senza can_publish_post il Post non è nel foglio; con stato ignoto resta solo il Post (§5)", () => {
@@ -227,9 +237,11 @@ describe("launcher (§4–§10)", () => {
     expect(draftsEntryTab(null)).toBe("drafts");
   });
 
-  it("«Posizione aperta» resta sotto il divisore per chi ha quell'azione", () => {
-    expect(launcherRows(base, ["open_position"]).secondary).toEqual(["drafts", "open_position"]);
-    expect(launcherRows(null, ["open_position"])).toEqual({ primary: ["post"], secondary: ["open_position"] });
+  it("«Posizione aperta» resta sotto il divisore per chi ha la capability", () => {
+    expect(launcherRows({ ...base, canOpenPosition: true, canViewDrafts: false })).toEqual({
+      primary: ["post"],
+      secondary: ["open_position"],
+    });
   });
 });
 

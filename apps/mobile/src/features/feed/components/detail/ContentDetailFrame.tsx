@@ -20,7 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, spacing } from "../../../../theme/tokens";
+import { colors, sizes, spacing } from "../../../../theme/tokens";
 import { AppText } from "../../../../ui";
 
 type ContentDetailFrameProps = {
@@ -68,7 +68,7 @@ export function ContentDetailFrame({ title, right, children, footer }: ContentDe
         >
           <Ionicons color={colors.textPrimary} name="arrow-back" size={24} />
         </Pressable>
-        <AppText align="center" style={styles.topBarTitle} variant="bodySm">
+        <AppText align="center" style={styles.topBarTitle} variant="metaStrong">
           {title}
         </AppText>
         {right ?? <View style={styles.topBarButton} />}
@@ -103,18 +103,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    minHeight: 44,
+    minHeight: sizes.touchTarget,
     paddingHorizontal: spacing[20],
     paddingTop: spacing[24],
   },
   topBarButton: {
     alignItems: "center",
-    height: 44,
+    height: sizes.touchTarget,
     justifyContent: "center",
-    width: 44,
+    width: sizes.touchTarget,
   },
+  // HOM-15 §20: il titolo della barra è `metaStrong` (12,5/600), non `bodySm` con un
+  // peso forzato a mano: stessa misura e stesso peso di prima.
   topBarTitle: {
     flex: 1,
-    fontWeight: "600",
   },
 });

@@ -11,6 +11,15 @@
  * esistente; badge durata, filtri, spacing e CTA owner restano invariati.
  * Chi tocca questo file non reintroduca l'icona in griglia: la copertura è
  * in `MediaTabContent.test.tsx`.
+ *
+ * HOM-15 §174–§175: Mi piace e Salva del rail Visitor sono quelli veri — il
+ * content type `career_media` (uuid assegnato dal server a ogni elemento del
+ * json `media_items` e ai video sintetici), con gli stessi motori di ogni altro
+ * contenuto (`useCareerMediaActions`). Compaiono solo se il chiamante passa il
+ * proprietario (`careerMediaOwnerId`) e il server restituisce lo stato
+ * dell'elemento: niente più conteggi seminati a 0 né toggle solo locali. Il
+ * rail Owner resta evidenza/modifica/elimina, come negli altri contenuti
+ * propri gestiti dal profilo.
  */
 import {
   type ComponentProps,
@@ -33,9 +42,11 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { VideoPlayerModal } from "../../../components/ui/video-player-modal";
+import { formatCount } from "../../../lib/format-count";
 import { colors, radius, spacing } from "../../../theme/tokens";
 import { AppText, Button } from "../../../ui";
 import { ProfileFilterChips } from "../master/ProfileFilterChips";
+import { useCareerMediaActions } from "./use-career-media-actions";
 
 /** "0:24" — i secondi sono sempre a due cifre. */
 export function formatMediaDuration(totalSeconds: number): string {
@@ -70,6 +81,12 @@ const MEDIA_FILTER_OPTIONS: readonly { label: string; value: MediaFilter }[] = [
 
 type MediaTabContentProps = {
   authorName: string;
+  /**
+   * HOM-15: il profilo proprietario dei media di carriera. Con questo id il
+   * rail Visitor mostra Mi piace e Salva reali (`career_media`); senza, il
+   * viewer non mostra quei controlli.
+   */
+  careerMediaOwnerId?: string;
   /** Copy dell'empty state: cambia per tipologia di profilo (§24). */
   emptyCtaLabel?: string;
   emptyDescription?: string;
@@ -132,9 +149,6 @@ export type MediaContentItem = {
   description: string;
   id: string;
   isFeatured: boolean;
-  isLiked: boolean;
-  isSaved: boolean;
-  likeCount: number;
   /** Profili e società collegati al contenuto in fase di pubblicazione. */
   linkedTargets?: readonly MediaLinkedTarget[];
   tag?: MediaContentTag;
@@ -161,6 +175,7 @@ export type MediaContentItem = {
 
 export function MediaTabContent({
   authorName,
+  careerMediaOwnerId,
   emptyCtaLabel = "Aggiungi contenuto",
   emptyDescription,
   emptyTitle = "Nessun contenuto",
@@ -329,34 +344,6 @@ export function MediaTabContent({
     if (selectedItemId === itemId) {
       handleCloseViewer();
     }
-  }
-
-  function handleToggleLike(itemId: string) {
-    setItems((currentItems) =>
-      currentItems.map((item) => {
-        if (item.id !== itemId) {
-          return item;
-        }
-
-        const nextLiked = !item.isLiked;
-
-        return {
-          ...item,
-          isLiked: nextLiked,
-          likeCount: item.likeCount + (nextLiked ? 1 : -1),
-        };
-      }),
-    );
-  }
-
-  function handleToggleSaved(itemId: string) {
-    setItems((currentItems) =>
-      currentItems.map((item) =>
-        item.id === itemId
-          ? { ...item, isSaved: !item.isSaved }
-          : item,
-      ),
-    );
   }
 
   /*
@@ -580,23 +567,14 @@ export function MediaTabContent({
 
                   <View style={styles.viewerRightRail}>
                     {mode === "visitor" ? (
-                      <>
-                        <ViewerAction
-                          accessibilityLabel="Metti like al contenuto"
-                          active={item.isLiked}
-                          activeIcon="heart"
-                          count={formatCount(item.likeCount)}
-                          icon="heart-outline"
-                          onPress={() => handleToggleLike(item.id)}
+                      // HOM-15: solo i media di carriera hanno qui Like/Salva veri;
+                      // i contenuti con dettaglio canonico (`taggedRef`) non arrivano al viewer.
+                      careerMediaOwnerId && !item.taggedRef ? (
+                        <CareerMediaViewerActions
+                          itemKey={item.id}
+                          ownerProfileId={careerMediaOwnerId}
                         />
-                        <ViewerAction
-                          accessibilityLabel="Salva contenuto"
-                          active={item.isSaved}
-                          activeIcon="bookmark"
-                          icon="bookmark-outline"
-                          onPress={() => handleToggleSaved(item.id)}
-                        />
-                      </>
+                      ) : null
                     ) : (
                       <>
                         <ViewerAction
@@ -724,8 +702,45 @@ function ViewerAction({
   );
 }
 
-function formatCount(value: number) {
-  return new Intl.NumberFormat("it-IT").format(Math.max(0, value));
+/**
+ * HOM-15 §174–§175: Mi piace (con conteggio) e Salva di un media di carriera,
+ * sugli store condivisi. Nessuno stato dal server per l'elemento → nessun
+ * controllo.
+ */
+function CareerMediaViewerActions({
+  itemKey,
+  ownerProfileId,
+}: {
+  itemKey: string;
+  ownerProfileId: string;
+}) {
+  const actions = useCareerMediaActions(ownerProfileId, itemKey);
+
+  if (!actions) {
+    return null;
+  }
+
+  return (
+    <>
+      <ViewerAction
+        accessibilityLabel={actions.isLiked ? "Togli Mi piace" : "Metti like al contenuto"}
+        active={actions.isLiked}
+        activeIcon="heart"
+        count={formatCount(actions.likesCount)}
+        icon="heart-outline"
+        onPress={actions.toggleLike}
+      />
+      {actions.canSave ? (
+        <ViewerAction
+          accessibilityLabel={actions.isSaved ? "Rimuovi dai salvati" : "Salva contenuto"}
+          active={actions.isSaved}
+          activeIcon="bookmark"
+          icon="bookmark-outline"
+          onPress={actions.toggleSaved}
+        />
+      ) : null}
+    </>
+  );
 }
 
 const styles = StyleSheet.create({

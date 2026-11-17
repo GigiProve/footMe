@@ -1,7 +1,7 @@
 import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 
-import { ContentTaggedHeader } from "./ContentTaggedHeader";
+import { ContentAttribution } from "./ContentAttribution";
 import type { ContentTaggedTarget } from "./TaggedProfilesSheet";
 
 function target(id: string, name: string): ContentTaggedTarget {
@@ -39,19 +39,17 @@ function hasText(root: TestRenderer.ReactTestInstance, value: string) {
   );
 }
 
-describe("ContentTaggedHeader", () => {
-  it("shows 'con X e altri N' and opens each tagged profile", () => {
+describe("ContentAttribution", () => {
+  it("mostra «con X e altri N», la firma con «·» e apre ogni profilo taggato", () => {
     const onOpenTarget = vi.fn();
     let tree: TestRenderer.ReactTestRenderer;
 
     act(() => {
       tree = TestRenderer.create(
-        <ContentTaggedHeader
+        <ContentAttribution
           authorName="Luca Verdi"
           onOpenTarget={onOpenTarget}
-          publishedAt={new Date().toISOString()}
-          publisherName="Gazzetta dello Sport"
-          readingLabel="3 min"
+          readingLabel="3 min di lettura"
           tagged={[
             target("p1", "Marco Rossi"),
             target("p2", "Luca Bianchi"),
@@ -61,11 +59,12 @@ describe("ContentTaggedHeader", () => {
       );
     });
 
-    expect(hasText(tree!.root, "Gazzetta dello Sport")).toBe(true);
     expect(hasText(tree!.root, "con")).toBe(true);
     expect(hasText(tree!.root, "Marco Rossi")).toBe(true);
     expect(hasText(tree!.root, "altri 2")).toBe(true);
-    expect(hasText(tree!.root, "di Luca Verdi")).toBe(true);
+    expect(hasText(tree!.root, "di Luca Verdi · 3 min di lettura")).toBe(true);
+    // HOM-15 §26–§27: nome di chi pubblica e tempo stanno nell'header condiviso, non qui.
+    expect(hasText(tree!.root, "•")).toBe(false);
 
     const firstLink = tree!.root.find(
       (node) => node.props.accessibilityLabel === "Apri Marco Rossi",
@@ -78,16 +77,13 @@ describe("ContentTaggedHeader", () => {
     );
   });
 
-  it("renders both names with two tags and no overflow", () => {
+  it("con due tag mostra entrambi i nomi e nessun «altri»", () => {
     let tree: TestRenderer.ReactTestRenderer;
 
     act(() => {
       tree = TestRenderer.create(
-        <ContentTaggedHeader
-          authorName="Luca Verdi"
+        <ContentAttribution
           onOpenTarget={vi.fn()}
-          publishedAt={new Date().toISOString()}
-          publisherName="Gazzetta dello Sport"
           tagged={[target("p1", "Marco Rossi"), target("p2", "Luca Bianchi")]}
         />,
       );
@@ -96,5 +92,15 @@ describe("ContentTaggedHeader", () => {
     expect(hasText(tree!.root, "Marco Rossi")).toBe(true);
     expect(hasText(tree!.root, "Luca Bianchi")).toBe(true);
     expect(hasText(tree!.root, "altri")).toBe(false);
+  });
+
+  it("senza tag né firma non disegna nulla", () => {
+    let tree: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      tree = TestRenderer.create(<ContentAttribution onOpenTarget={vi.fn()} tagged={[]} />);
+    });
+
+    expect(tree!.toJSON()).toBeNull();
   });
 });

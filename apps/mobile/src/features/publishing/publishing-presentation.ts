@@ -513,17 +513,15 @@ export type LauncherMode = "direct_post" | "sheet";
  * §4–§10. Fast path (§5): il Post è l'unica creazione possibile E non c'è
  * nient'altro da raggiungere dal launcher — nessuna bozza, programmato o
  * fallito (§9: Bozze e programmati non dipende dall'Articolo). Con stato
- * sconosciuto (rete) si apre direttamente il Post come HOM-06.1.
+ * sconosciuto (rete) si apre direttamente il Post come HOM-06.1: senza stato
+ * nessuna capability è nota, nemmeno «Posizione aperta» (HOM-15 §168).
  */
-export function resolveLauncherMode(
-  state: ContentLauncherState | null,
-  extraActions: readonly string[] = [],
-): LauncherMode {
+export function resolveLauncherMode(state: ContentLauncherState | null): LauncherMode {
   if (!state) {
-    return extraActions.length > 0 ? "sheet" : "direct_post";
+    return "direct_post";
   }
   const pending = state.draftsCount + state.scheduledCount + state.failedCount;
-  const onlyPost = !state.canPublishArticle && extraActions.length === 0;
+  const onlyPost = !state.canPublishArticle && !state.canOpenPosition;
   return onlyPost && pending === 0 ? "direct_post" : "sheet";
 }
 
@@ -534,13 +532,12 @@ export type LauncherRowId = "post" | "article" | "drafts" | "open_position";
  *  • sopra il divisore le CREAZIONI: Post (se non si sa che manca la capability) e
  *    Articolo solo con `can_publish_article` (§8);
  *  • sotto, ciò che si raggiunge: «Bozze e programmati» solo con `can_view_drafts`,
- *    indipendente dall'Articolo (§9); «Posizione aperta» per chi ha quell'azione
- *    (azione reale del club_admin, non una voce di mockup).
+ *    indipendente dall'Articolo (§9); «Posizione aperta» solo con
+ *    `can_open_position` del server (HOM-15 §168, §171: mai dal ruolo admin).
  * Con lo stato non ancora noto (rete) resta solo il Post, come HOM-06.1.
  */
 export function launcherRows(
   state: ContentLauncherState | null,
-  extraActions: readonly string[] = [],
 ): { primary: LauncherRowId[]; secondary: LauncherRowId[] } {
   const primary: LauncherRowId[] = [];
   const secondary: LauncherRowId[] = [];
@@ -554,7 +551,7 @@ export function launcherRows(
   if (state?.canViewDrafts) {
     secondary.push("drafts");
   }
-  if (extraActions.includes("open_position")) {
+  if (state?.canOpenPosition) {
     secondary.push("open_position");
   }
 

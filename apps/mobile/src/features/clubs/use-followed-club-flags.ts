@@ -2,6 +2,7 @@ import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 
 import { useSession } from "../auth/use-session";
 import { useToast } from "../../ui";
+import { invalidateFollowQueries } from "../following/invalidate-follow-queries";
 import { fetchFollowedClubIds, followClub, unfollowClub } from "./club-service";
 
 /**
@@ -41,9 +42,9 @@ type ToggleFollowClubInput = {
 
 /**
  * Optimistically toggles the follow state of a club, updating every cached
- * `["followed-club-flags", profileId, ...]` page in place. Never
- * invalidates `["search-clubs"]` — the search list itself is untouched by
- * follow state.
+ * `["followed-club-flags", profileId, ...]` page in place. On settle it runs
+ * the shared Follow invalidation (`invalidateFollowQueries`, HOM-15 §179), the
+ * same list every Follow surface uses — `search-*` included.
  */
 export function useToggleFollowClub() {
   const { profile } = useSession();
@@ -97,9 +98,13 @@ export function useToggleFollowClub() {
 
       return { previous };
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["following-count"] });
-      queryClient.invalidateQueries({ queryKey: ["followed"] });
+    onSettled: (_data, error, { targetId, followed }) => {
+      // HOM-15 §179: la lista unica del Follow; il Feed si ritocca solo a server confermato.
+      invalidateFollowQueries(
+        queryClient,
+        profileId ?? "",
+        error ? undefined : { following: !followed, source: { id: targetId, kind: "club" } },
+      );
     },
     onSuccess: (_data, { followed }) => {
       if (followed) {

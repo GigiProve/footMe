@@ -1,8 +1,8 @@
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import { colors, radius, spacing } from "../../../styles";
-import { AppText, Avatar } from "../../../ui";
+import { colors, spacing } from "../../../styles";
+import { AppText, Avatar, BottomSheet } from "../../../ui";
 import type { TargetType } from "../content-tag-service";
 
 export type ContentTaggedTarget = {
@@ -22,7 +22,10 @@ type TaggedProfilesSheetProps = {
 
 /**
  * Bottom sheet listing every profile/club/team tagged in a piece of content.
- * Opened from the "e altri N" affordance in ContentTaggedHeader.
+ * Opened from the "e altri N" affordance in ContentAttribution.
+ *
+ * HOM-15 §249, §252: uno solo sheet nativo PROLINK (`BottomSheet` di src/ui) —
+ * stessa chiusura da backdrop, back di sistema e ✕; la lista scorre oltre il tetto.
  */
 export function TaggedProfilesSheet({
   onClose,
@@ -31,78 +34,48 @@ export function TaggedProfilesSheet({
   visible,
 }: TaggedProfilesSheetProps) {
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
+    <BottomSheet
+      onClose={onClose}
+      scrollable
+      showHandle
+      title="Profili taggati"
       visible={visible}
     >
-      <Pressable
-        accessibilityLabel="Chiudi"
-        onPress={onClose}
-        style={styles.overlay}
-      />
-      <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <AppText style={styles.heading} variant="titleSm">
-          Profili taggati
-        </AppText>
-        <ScrollView style={styles.list}>
-          {targets.map((target) => (
-            <Pressable
-              accessibilityRole="button"
-              key={`${target.target_type}:${target.target_id}`}
-              onPress={() => onOpenTarget(target)}
-              style={styles.row}
-            >
-              <Avatar
-                name={target.display_name}
-                size="sm"
-                square={target.target_type !== "profile"}
-                uri={target.avatar_url}
-              />
-              <View style={styles.rowText}>
-                <AppText numberOfLines={1} variant="bodySm">
-                  {target.display_name}
-                </AppText>
-                {target.subtitle ? (
-                  <AppText color="secondary" numberOfLines={1} variant="caption">
-                    {target.subtitle}
-                  </AppText>
-                ) : null}
-              </View>
-              <Ionicons
-                color={colors.textMuted}
-                name="chevron-forward"
-                size={16}
-              />
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-    </Modal>
+      {targets.map((target) => (
+        <Pressable
+          accessibilityRole="button"
+          key={`${target.target_type}:${target.target_id}`}
+          onPress={() => onOpenTarget(target)}
+          style={styles.row}
+        >
+          <Avatar
+            name={target.display_name}
+            size="sm"
+            square={target.target_type !== "profile"}
+            uri={target.avatar_url}
+          />
+          <View style={styles.rowText}>
+            <AppText numberOfLines={1} variant="bodySm">
+              {target.display_name}
+            </AppText>
+            {target.subtitle ? (
+              <AppText color="secondary" numberOfLines={1} variant="caption">
+                {target.subtitle}
+              </AppText>
+            ) : null}
+          </View>
+          <Ionicons
+            color={colors.textMuted}
+            name="chevron-forward"
+            size={16}
+          />
+        </Pressable>
+      ))}
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  handle: {
-    alignSelf: "center",
-    backgroundColor: colors.border,
-    borderRadius: radius.full,
-    height: 4,
-    marginBottom: spacing[16],
-    width: 40,
-  },
-  heading: {
-    marginBottom: spacing[12],
-  },
-  list: {
-    maxHeight: 360,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.40)",
-  },
   row: {
     alignItems: "center",
     flexDirection: "row",
@@ -112,17 +85,5 @@ const styles = StyleSheet.create({
   rowText: {
     flex: 1,
     gap: spacing[4],
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius[16],
-    borderTopRightRadius: radius[16],
-    bottom: 0,
-    left: 0,
-    paddingBottom: spacing[32],
-    paddingHorizontal: spacing[20],
-    paddingTop: spacing[12],
-    position: "absolute",
-    right: 0,
   },
 });

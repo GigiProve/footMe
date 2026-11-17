@@ -211,7 +211,11 @@ describe("LikesScreen — navigazione e Follow", () => {
   });
 
   it("Segui passa dal Follow globale e aggiorna subito quella riga (§55)", async () => {
-    mocks.fetchContentLikers.mockResolvedValue(page([MARCO, VARESE]));
+    // HOM-15 §179: dopo la conferma la lista unica del Follow rilegge anche i Mi piace
+    // (HOM-11 §62); il server risponde con lo stato già scritto dalla patch.
+    mocks.fetchContentLikers
+      .mockResolvedValueOnce(page([MARCO, VARESE]))
+      .mockResolvedValue(page([MARCO, { ...VARESE, isFollowing: true }]));
 
     const tree = await mount();
     await act(async () => {
@@ -220,10 +224,9 @@ describe("LikesScreen — navigazione e Follow", () => {
 
     expect(mocks.toggleFollowSource).toHaveBeenCalledWith("viewer-1", "club", "c-1", true);
     expect(textOf(tree)).toContain("Smetti di seguire Varese Calcio");
-    // L'altra riga non cambia.
+    // L'altra riga non cambia, e nessuna riga si duplica.
     expect(textOf(tree)).toContain("Segui Marco Bianchi");
-    // La lista non si è ricaricata.
-    expect(mocks.fetchContentLikers).toHaveBeenCalledTimes(1);
+    expect(countTestId(tree, "like-actor-society:c-1")).toBe(1);
   });
 
   it("Segui fallito: la riga torna com'era", async () => {

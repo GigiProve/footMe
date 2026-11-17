@@ -12,6 +12,9 @@
  * passano, e la sua assenza vuol dire «affidati al Back» (§127): non si
  * modificano le ~20 superfici che aprono `/content/...`.
  *
+ * HOM-15 §57: `NOTIFICATION` è l'origine del dettaglio aperto dal Centro
+ * Notifiche o dal tap su push (Target Resolver HOM-14).
+ *
  * HOM-08 (§5–§6, §22): `focus` (`comments` | `composer`) è l'unico parametro
  * nuovo; `commentsHref` lo sceglie dal numero di commenti.
  */
@@ -29,6 +32,7 @@ export const CONTENT_ORIGINS = [
   "SEARCH",
   "SAVED",
   "MESSAGE",
+  "NOTIFICATION",
   "DEEP_LINK",
 ] as const;
 

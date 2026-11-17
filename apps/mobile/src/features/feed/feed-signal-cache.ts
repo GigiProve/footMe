@@ -73,6 +73,65 @@ export function removeCanonicalContent(
   );
 }
 
+/** Il Post con testo che incorpora quel contenuto con una reference ancora «disponibile». */
+function hasLiveReferenceTo(item: FeedItem, contentType: FeedContentType, contentId: string): boolean {
+  const reference = item.type === "post" ? item.payload.reference : null;
+  return (
+    !!reference &&
+    reference.available &&
+    reference.contentType === contentType &&
+    reference.contentId === contentId
+  );
+}
+
+/**
+ * HOM-15 §118, §182–§183, §341: un contenuto ELIMINATO esce dalle liste — l'elemento canonico
+ * e i suoi Simple Repost (`removeCanonicalContent`) — e ogni Post con testo che lo incorpora
+ * resta, ma con la reference «non disponibile» (HOM-10 §173–§175: la stessa forma che il
+ * mapper dà a una reference senza snapshot). Sugli array, così vale per le pagine in memoria
+ * e per la copia su disco. Stessa identità se non c'è nulla da cambiare.
+ */
+export function forgetDeletedContentInItems(
+  items: FeedItem[],
+  contentType: FeedContentType,
+  contentId: string,
+): FeedItem[] {
+  if (
+    !items.some(
+      (item) => isCanonicalTarget(item, contentType, contentId) || hasLiveReferenceTo(item, contentType, contentId),
+    )
+  ) {
+    return items;
+  }
+
+  return items
+    .filter((item) => !isCanonicalTarget(item, contentType, contentId))
+    .map((item): FeedItem =>
+      item.type === "post" && item.payload.reference && hasLiveReferenceTo(item, contentType, contentId)
+        ? {
+            ...item,
+            payload: { ...item.payload, reference: { ...item.payload.reference, available: false, snapshot: null } },
+          }
+        : item,
+    );
+}
+
+/** `forgetDeletedContentInItems` sulle pagine della infinite query, senza refetch. */
+export function forgetDeletedContent(
+  data: FeedData | undefined,
+  contentType: FeedContentType,
+  contentId: string,
+): FeedData | undefined {
+  if (!data) {
+    return data;
+  }
+  const pages = data.pages.map((page) => {
+    const items = forgetDeletedContentInItems(page.items, contentType, contentId);
+    return items === page.items ? page : { ...page, items };
+  });
+  return pages.every((page, index) => page === data.pages[index]) ? data : { ...data, pages };
+}
+
 /**
  * La fonte che un elemento rappresenta per il Follow (D4, §145, §284): per un Simple
  * Repost il reposter rappresentativo, altrimenti l'autore del contenuto.

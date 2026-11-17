@@ -38,6 +38,7 @@ describe("sourceForOrigin (§146)", () => {
     expect(sourceForOrigin("PROFILE")).toBe("PROFILE");
     expect(sourceForOrigin("SEARCH")).toBe("SEARCH");
     expect(sourceForOrigin("MESSAGE")).toBe("MESSAGE");
+    expect(sourceForOrigin("NOTIFICATION")).toBe("NOTIFICATION");
     expect(sourceForOrigin("SAVED")).toBe("OTHER");
     expect(sourceForOrigin("DEEP_LINK")).toBe("OTHER");
     expect(sourceForOrigin(null)).toBe("OTHER");

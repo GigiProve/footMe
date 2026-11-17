@@ -18,15 +18,14 @@
  */
 
 import { useState, type ReactNode } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 
-import { colors, spacing } from "../../../theme/tokens";
 import type { CommentFocus, CommentTarget, ContentOrigin } from "../content-routes";
 import { FEED_QK } from "../feed-keys";
 import { fetchPostDetail } from "../feed-service";
 import { ContentLoadErrorState } from "./ContentUnavailableState";
 import { ContentDetailFrame } from "./detail/ContentDetailFrame";
+import { ContentDetailSkeleton } from "./detail/ContentDetailSkeleton";
 import { ProfilePostDetail } from "./ProfilePostDetail";
 
 type PostOrEditorialDetailProps = {
@@ -73,7 +72,7 @@ export function PostOrEditorialDetail({
     );
   }
 
-  // «Riprova» in corso: lo spinner, non l'errore di prima. Un refetch in
+  // «Riprova» in corso: lo skeleton (HOM-15 §202, §206), non l'errore di prima. Un refetch in
   // background dopo un `null` valido NON passa di qui (l'editoriale resta montato).
   const isRetrying = probe.isError && probe.isFetching;
 
@@ -88,21 +87,10 @@ export function PostOrEditorialDetail({
   if (probe.isLoading || isRetrying) {
     return (
       <ContentDetailFrame title="Contenuto">
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.accent} size="large" />
-        </View>
+        <ContentDetailSkeleton />
       </ContentDetailFrame>
     );
   }
 
   return <>{renderEditorial()}</>;
 }
-
-const styles = StyleSheet.create({
-  centered: {
-    alignItems: "center",
-    flex: 1,
-    gap: spacing[16],
-    justifyContent: "center",
-  },
-});

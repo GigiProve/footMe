@@ -30,6 +30,7 @@ import { fetchSocietyMasterProfile } from "../../src/features/clubs/society/soci
 import { buildClubShareMessage } from "../../src/features/clubs/society/society-profile-model";
 import type { PositionFilter } from "../../src/features/clubs/society/society-profile-model";
 import type { SocietyMasterProfile } from "../../src/features/clubs/society/society-profile-types";
+import { invalidateFollowQueries } from "../../src/features/following/invalidate-follow-queries";
 import { blockedIdentityStore, useBlockEntry } from "../../src/features/blocking/blocked-identity-store";
 import { trackBlocking } from "../../src/features/blocking/blocking-analytics";
 import {
@@ -190,20 +191,26 @@ export default function ClubProfileScreen() {
       viewerMode: data.viewer.mode,
     });
 
+    let confirmed = false;
     try {
       if (wasFollowing) {
         await unfollowClub(profile.id, data.club.id);
       } else {
         await followClub(profile.id, data.club.id);
       }
+      confirmed = true;
     } catch {
       // Rollback: lo stato ottimistico non sopravvive a una scrittura fallita.
       setData((current) => (current ? withFollowState(current, wasFollowing) : current));
       showToast({ message: "Non siamo riusciti ad aggiornare il follow.", tone: "neutral" });
     } finally {
       setFollowPending(false);
-      queryClient.invalidateQueries({ queryKey: ["following-count"] });
-      queryClient.invalidateQueries({ queryKey: ["followed"] });
+      // HOM-15 §179: la lista unica del Follow; il Feed si ritocca solo a server confermato.
+      invalidateFollowQueries(
+        queryClient,
+        profile.id,
+        confirmed ? { following: !wasFollowing, source: { id: data.club.id, kind: "club" } } : undefined,
+      );
     }
   }
 

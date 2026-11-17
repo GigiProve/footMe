@@ -35,7 +35,11 @@ export const CONTENT_EVENT_TYPES = [
 
 export type ContentEventType = (typeof CONTENT_EVENT_TYPES)[number];
 
-/** §146: la source normalizzata, whitelist del server. */
+/**
+ * §146: la source normalizzata, whitelist del server. `NOTIFICATION` (HOM-15
+ * §57) richiede la stessa voce nel check `content_events_source_check` e nel
+ * filtro di `record_content_events`: senza, il server scarta l'evento.
+ */
 export const CONTENT_EVENT_SOURCES = [
   "HOME_FOR_YOU",
   "HOME_FOLLOWING",
@@ -44,6 +48,7 @@ export const CONTENT_EVENT_SOURCES = [
   "SHARE",
   "MESSAGE",
   "REPOST",
+  "NOTIFICATION",
   "OTHER",
 ] as const;
 

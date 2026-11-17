@@ -20,6 +20,7 @@
 import { HideableContent } from "../../feed-feedback/components/HideableContent";
 import type { ContentManagement } from "../content-management-types";
 import type { ContentOrigin } from "../content-routes";
+import { logFeedAnomaly } from "../feed-diagnostics";
 import type {
   FeedContentType,
   FeedEditorialItem,
@@ -196,7 +197,9 @@ export function FeedItemRenderer({ item, handlers, modules }: FeedItemRendererPr
     }
 
     default: {
-      // Tipo non riconosciuto: si degrada in silenzio invece di crashare.
+      // Tipo non riconosciuto: si degrada senza crashare, con un log tecnico (HOM-15 §356).
+      const unknown = item as { id?: unknown; type?: unknown };
+      logFeedAnomaly("missing_renderer", { id: unknown.id, type: unknown.type });
       return null;
     }
   }

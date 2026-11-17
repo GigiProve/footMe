@@ -8,6 +8,16 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: (props: Record<string, unknown>) => React.createElement("Ionicon", props),
 }));
 
+const careerMocks = vi.hoisted(() => ({
+  useCareerMediaActions: vi.fn(),
+}));
+
+// HOM-15: il motore reale (store Like/Salvati, sessione, RPC) ha i suoi test;
+// qui conta solo che il viewer lo usi e non finga più lo stato.
+vi.mock("./use-career-media-actions", () => ({
+  useCareerMediaActions: careerMocks.useCareerMediaActions,
+}));
+
 vi.mock("../../../components/ui/video-player-modal", () => ({
   VideoPlayerModal: (props: Record<string, unknown>) =>
     React.createElement("mock-video-player-modal", props),
@@ -58,9 +68,6 @@ describe("MediaTabContent", () => {
             description: "Video highlights del profilo.",
             id: "profile-highlight-video",
             isFeatured: false,
-            isLiked: false,
-            isSaved: false,
-            likeCount: 0,
             tag: { icon: "play-circle-outline", label: "Highlights" },
             thumbnailUrl: "https://example.com/thumb.jpg",
             type: "video",
@@ -88,9 +95,6 @@ describe("MediaTabContent", () => {
             description: "",
             id: "normal-item",
             isFeatured: false,
-            isLiked: false,
-            isSaved: false,
-            likeCount: 0,
             tag: { icon: "play-circle-outline", label: "Highlights" },
             thumbnailUrl: "https://example.com/normal.jpg",
             type: "image",
@@ -99,9 +103,6 @@ describe("MediaTabContent", () => {
             description: "",
             id: "featured-item",
             isFeatured: true,
-            isLiked: false,
-            isSaved: false,
-            likeCount: 0,
             tag: { icon: "play-circle-outline", label: "Highlights" },
             thumbnailUrl: "https://example.com/featured.jpg",
             type: "image",
@@ -134,9 +135,6 @@ describe("MediaTabContent", () => {
       durationSeconds: 24,
       id: "clip",
       isFeatured: false,
-      isLiked: false,
-      isSaved: true,
-      likeCount: 9,
       thumbnailUrl: "https://example.com/clip.jpg",
       type: "video",
       videoUrl: "https://example.com/clip.mp4",
@@ -145,9 +143,6 @@ describe("MediaTabContent", () => {
       description: "",
       id: "shot",
       isFeatured: false,
-      isLiked: false,
-      isSaved: false,
-      likeCount: 0,
       thumbnailUrl: "https://example.com/shot.jpg",
       type: "image",
     },
@@ -198,31 +193,84 @@ describe("MediaTabContent", () => {
     },
   );
 
-  it("keeps the save action in the content detail for the visitor", () => {
+  function openClip(tree: TestRenderer.ReactTestRenderer) {
+    act(() => {
+      tree.root.findByProps({ testID: "media-grid-item-clip" }).props.onPress();
+    });
+  }
+
+  function findByLabel(tree: TestRenderer.ReactTestRenderer, label: string) {
+    return tree.root.findAll(
+      (node) => typeof node.props.icon === "string" && node.props.accessibilityLabel === label,
+    );
+  }
+
+  it("HOM-15: senza proprietario dei media il viewer Visitor non finge Mi piace né Salva", () => {
+    careerMocks.useCareerMediaActions.mockReset();
+    const tree = renderMediaTabContent(
+      <MediaTabContent authorName="Alessandro Bianchi" initialItems={[...REV_PROF_12_ITEMS]} mode="visitor" />,
+    );
+
+    openClip(tree);
+
+    expect(findByLabel(tree, "Metti like al contenuto")).toHaveLength(0);
+    expect(findByLabel(tree, "Salva contenuto")).toHaveLength(0);
+    expect(careerMocks.useCareerMediaActions).not.toHaveBeenCalled();
+  });
+
+  it("HOM-15: con il proprietario mostra lo stato del server e usa i motori condivisi", () => {
+    const toggleLike = vi.fn();
+    const toggleSaved = vi.fn();
+    careerMocks.useCareerMediaActions.mockReset();
+    careerMocks.useCareerMediaActions.mockImplementation((_owner: string, itemKey: string) =>
+      itemKey === "clip"
+        ? { canSave: true, isLiked: true, isSaved: true, likesCount: 12, toggleLike, toggleSaved }
+        : null,
+    );
     const tree = renderMediaTabContent(
       <MediaTabContent
         authorName="Alessandro Bianchi"
+        careerMediaOwnerId="owner-1"
         initialItems={[...REV_PROF_12_ITEMS]}
         mode="visitor"
       />,
     );
 
-    act(() => {
-      tree.root.findByProps({ testID: "media-grid-item-clip" }).props.onPress();
-    });
+    openClip(tree);
 
-    function findSaveAction() {
-      return tree.root.findAllByProps({ accessibilityLabel: "Salva contenuto" })[0]!;
-    }
-
-    // Lo stato salvato arriva dal contenuto, non dalla griglia.
-    expect(findSaveAction().props.active).toBe(true);
+    expect(careerMocks.useCareerMediaActions).toHaveBeenCalledWith("owner-1", "clip");
+    const [like] = findByLabel(tree, "Togli Mi piace");
+    const [save] = findByLabel(tree, "Rimuovi dai salvati");
+    expect(like?.props.active).toBe(true);
+    expect(like?.props.count).toBe("12");
+    expect(save?.props.active).toBe(true);
 
     act(() => {
-      findSaveAction().props.onPress();
+      like?.props.onPress();
+      save?.props.onPress();
     });
 
-    expect(findSaveAction().props.active).toBe(false);
+    expect(toggleLike).toHaveBeenCalledTimes(1);
+    expect(toggleSaved).toHaveBeenCalledTimes(1);
+    // L'elemento senza stato server («shot») non ha controlli: uno solo per tipo.
+    expect(findByLabel(tree, "Togli Mi piace")).toHaveLength(1);
+  });
+
+  it("HOM-15: il rail Owner resta evidenza/modifica/elimina, senza Mi piace né Salva", () => {
+    careerMocks.useCareerMediaActions.mockReset();
+    const tree = renderMediaTabContent(
+      <MediaTabContent
+        authorName="Alessandro Bianchi"
+        careerMediaOwnerId="owner-1"
+        initialItems={[...REV_PROF_12_ITEMS]}
+        mode="owner"
+      />,
+    );
+
+    openClip(tree);
+
+    expect(careerMocks.useCareerMediaActions).not.toHaveBeenCalled();
+    expect(findByLabel(tree, "Elimina").length).toBeGreaterThan(0);
   });
 
   it("non mostra più commenti finti né l'Alert «Apri la lista» nel viewer (HOM-08)", () => {

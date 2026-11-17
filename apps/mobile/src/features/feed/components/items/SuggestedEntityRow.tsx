@@ -7,13 +7,14 @@
  *
  * Profili, Società e Media usano la stessa riga (§18, §61): cambiano solo
  * avatar (quadrato per le Società) e metadata, nessun colore per tipo.
+ *
+ * HOM-15 §28: la verifica è il `VerifiedCheck` condiviso, non un check inline.
  */
 
 import { Pressable, StyleSheet, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { colors, spacing } from "../../../../theme/tokens";
-import { AppText, Avatar } from "../../../../ui";
+import { AppText, Avatar, VerifiedCheck } from "../../../../ui";
 import { FollowAction } from "./FollowAction";
 
 type SuggestedEntityRowProps = {
@@ -44,7 +45,11 @@ export function SuggestedEntityRow({
   return (
     <View style={[styles.row, showDivider ? styles.divided : null]}>
       <Pressable
-        accessibilityLabel={metaLine ? `${name}, ${metaLine}` : name}
+        // HOM-15 §265: il check è dentro un bersaglio unico, quindi la verifica va
+        // detta nell'etichetta, non lasciata al solo simbolo.
+        accessibilityLabel={[name, isVerified ? "profilo verificato" : null, metaLine]
+          .filter(Boolean)
+          .join(", ")}
         accessibilityRole="button"
         onPress={onPress}
         style={styles.identity}
@@ -56,14 +61,7 @@ export function SuggestedEntityRow({
             <AppText numberOfLines={1} style={styles.name} variant="titleSm">
               {name}
             </AppText>
-            {isVerified ? (
-              <Ionicons
-                accessibilityLabel="Verificato"
-                color={colors.accent}
-                name="checkmark-circle"
-                size={14}
-              />
-            ) : null}
+            {isVerified ? <VerifiedCheck size={14} /> : null}
           </View>
           {metaLine ? (
             <AppText color="muted" numberOfLines={1} variant="feedMeta">

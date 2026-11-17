@@ -13,12 +13,14 @@
  *    2026-11-14); non esiste una categoria Squadre;
  *  • posizione: ruolo, Società, eventuale Squadra, categoria, località e, se
  *    chiusa, «Posizione chiusa» senza CTA (§127–§128, §150). Mai scadenza,
- *    candidati o match score.
+ *    candidati o match score;
+ *  • media di carriera (HOM-15 §174–§175): stessa riga contenuto (FOTO o
+ *    VIDEO, autore = il proprietario); non ha un dettaglio `/content`, apre il
+ *    profilo sulla tab Media. Senza proprietario la riga si scarta.
  */
 
 import { contentDetailHref } from "../feed/content-routes";
 import { authorMetaParts } from "../feed/feed-post-presentation";
-import type { FeedContentType } from "../feed/feed-types";
 import { formatRole } from "../profiles/profile-display-helpers";
 import { formatCompactRelativeTime } from "../../lib/relative-time";
 import {
@@ -33,6 +35,7 @@ import {
   type SavedCategory,
   type SavedClubPayload,
   type SavedContentPayload,
+  type SavedContentType,
   type SavedCursor,
   type SavedItemKind,
   type SavedListRowWire,
@@ -102,7 +105,8 @@ function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-const CONTENT_TYPES: readonly FeedContentType[] = [
+const CONTENT_TYPES: readonly SavedContentType[] = [
+  "career_media",
   "club_media",
   "fan_media",
   "fan_tribuna",
@@ -112,7 +116,7 @@ const CONTENT_TYPES: readonly FeedContentType[] = [
 ];
 
 function itemKindOf(value: unknown): SavedItemKind {
-  return value === "video" || value === "article" ? value : "post";
+  return value === "video" || value === "article" || value === "photo" ? value : "post";
 }
 
 function parseContentPayload(raw: unknown): SavedContentPayload {
@@ -132,6 +136,7 @@ function parseContentPayload(raw: unknown): SavedContentPayload {
     duration_seconds: num(payload.duration_seconds),
     excerpt: str(payload.excerpt),
     item_kind: itemKindOf(payload.item_kind),
+    owner_profile_id: str(payload.owner_profile_id),
     published_at: str(payload.published_at),
     thumbnail_url: str(payload.thumbnail_url),
     title: str(payload.title),
@@ -207,14 +212,12 @@ export function parseSavedRow(wire: SavedListRowWire): SavedRow | null {
   switch (wire.target_type) {
     case "content": {
       const contentType = CONTENT_TYPES.find((type) => type === wire.content_type);
-      return contentType
-        ? {
-            kind: "content",
-            payload: parseContentPayload(wire.payload),
-            savedAt,
-            target: { contentType, id, type: "content" },
-          }
-        : null;
+      const payload = parseContentPayload(wire.payload);
+      // Un media di carriera si apre dal profilo: senza proprietario non porta da nessuna parte.
+      if (!contentType || (contentType === "career_media" && !payload.owner_profile_id)) {
+        return null;
+      }
+      return { kind: "content", payload, savedAt, target: { contentType, id, type: "content" } };
     }
     case "profile":
       return {
@@ -297,6 +300,10 @@ export function flattenSavedPages(pages: readonly SavedPage[] | undefined): Save
 export function savedRowHref(row: SavedRow): string {
   switch (row.kind) {
     case "content":
+      // HOM-15: il media di carriera vive nella tab Media del profilo del proprietario.
+      if (row.target.contentType === "career_media") {
+        return `/profile/${row.payload.owner_profile_id ?? ""}?tab=media`;
+      }
       // HOM-05: la provenienza Salvati, per la source degli eventi.
       return contentDetailHref(row.target.contentType, row.target.id, { origin: "SAVED" });
     case "profile":
@@ -314,6 +321,7 @@ export function savedRowHref(row: SavedRow): string {
 
 export const CONTENT_KIND_LABEL: Record<SavedItemKind, string> = {
   article: "ARTICOLO",
+  photo: "FOTO",
   post: "POST",
   video: "VIDEO",
 };
@@ -339,7 +347,12 @@ export function contentRowTitle(payload: SavedContentPayload): string {
     return text;
   }
   // Un Post solo media non ha testo: la riga dice comunque cosa si apre.
-  return { article: "Articolo", post: "Post con contenuti multimediali", video: "Video" }[payload.item_kind];
+  return {
+    article: "Articolo",
+    photo: "Foto",
+    post: "Post con contenuti multimediali",
+    video: "Video",
+  }[payload.item_kind];
 }
 
 export function contentRowTime(payload: SavedContentPayload, now?: Date): string {
@@ -353,7 +366,7 @@ export function contentRowMeta(payload: SavedContentPayload, now?: Date): string
 
 /** Una riga è una sola unità semantica (§179): tipo, titolo, autore, verifica e tempo. */
 export function contentRowAccessibilityLabel(payload: SavedContentPayload, now?: Date): string {
-  const kind = { article: "Articolo", post: "Post", video: "Video" }[payload.item_kind];
+  const kind = { article: "Articolo", photo: "Foto", post: "Post", video: "Video" }[payload.item_kind];
 
   return [
     kind,

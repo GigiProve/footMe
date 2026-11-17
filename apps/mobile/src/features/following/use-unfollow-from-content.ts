@@ -31,10 +31,10 @@ import type { ContentOrigin } from "../feed/content-routes";
 import { FEED_QK } from "../feed/feed-keys";
 import { patchAuthorFollowing, removeSourceItems } from "../feed/feed-signal-cache";
 import type { FeedPage, FeedPageParam, FeedScope } from "../feed/feed-types";
-import { LIKES_ROOT_KEY } from "../likes/likes-keys";
 import { toggleFollowSource } from "../search/media/media-search-service";
 import { trackFollow, type FollowAnalyticsEvent, type FollowEventSurface } from "./following-analytics";
 import { followSourceKey, type FollowSource } from "./follow-source";
+import { invalidateFollowQueries, type FollowChange } from "./invalidate-follow-queries";
 import { unfollowedSourcesStore, type UnfollowedSourcesStore } from "./unfollowed-sources-store";
 
 type FeedData = InfiniteData<FeedPage, FeedPageParam>;
@@ -62,8 +62,8 @@ export type FollowCache = {
   applyUnfollow: (source: FollowSource) => FeedSnapshots;
   /** Rimette le pagine com'erano (errore, o Annulla). */
   restoreFollow: (source: FollowSource, snapshots: FeedSnapshots) => void;
-  /** §62, §172: Profilo, Cerca, Seguiti, contatori, flag Società. */
-  invalidateFollowQueries: () => void;
+  /** §62, §172, HOM-15 §179: la lista unica di `invalidate-follow-queries`. */
+  invalidateFollowQueries: (change: FollowChange) => void;
 };
 
 type Deps = {
@@ -111,7 +111,7 @@ export function createUnfollowActions(
     try {
       await setFollow(request.source, true);
       track({ ...base(request), name: "follow_restore_success" });
-      cache.invalidateFollowQueries();
+      cache.invalidateFollowQueries({ following: true, source: request.source });
     } catch {
       // Il server non l'ha rimesso: si torna a «non seguita» (rimozione già confermata prima).
       store.add(key, Date.now());
@@ -143,7 +143,7 @@ export function createUnfollowActions(
       await setFollow(request.source, false);
       store.settle(key, Date.now());
       track({ ...base(request), name: "follow_remove_success" });
-      cache.invalidateFollowQueries();
+      cache.invalidateFollowQueries({ following: false, source: request.source });
       // §59, §61: la snackbar col nome reale e Annulla.
       notify({
         action: { label: UNFOLLOW_UNDO_LABEL, onPress: () => void restore(request, snapshots) },
@@ -184,18 +184,7 @@ export function createFollowFeedCache(queryClient: QueryClient, viewerId: string
       }
       return snapshots;
     },
-    invalidateFollowQueries: () => {
-      void queryClient.invalidateQueries({ queryKey: ["following-count"] });
-      void queryClient.invalidateQueries({ queryKey: ["followed"] });
-      void queryClient.invalidateQueries({ queryKey: ["followed-club-flags", viewerId] });
-      void queryClient.invalidateQueries({ queryKey: FEED_QK.followingState(viewerId) });
-      void queryClient.invalidateQueries({ queryKey: FEED_QK.suggestedProfiles(viewerId) });
-      void queryClient.invalidateQueries({ queryKey: FEED_QK.suggestedClubs(viewerId) });
-      // §62: la lista dei Mi piace porta lo stato Follow di ogni attore (`isFollowing`).
-      // Le card commento non hanno una query propria con lo stato Follow: leggono
-      // `viewerFollowsAuthor` dalla pagina e l'insieme di sessione (nessuna chiave da invalidare).
-      void queryClient.invalidateQueries({ queryKey: [LIKES_ROOT_KEY] });
-    },
+    invalidateFollowQueries: (change) => invalidateFollowQueries(queryClient, viewerId, change),
     restoreFollow: (source, snapshots) => {
       for (const scope of SCOPES) {
         const queryKey = FEED_QK.feed(scope, viewerId);

@@ -122,6 +122,35 @@ describe("parseSavedRow — parsing difensivo di list_saved", () => {
     expect(parseSavedRow(wire({ target_id: "" }))).toBeNull();
   });
 
+  it("HOM-15: media di carriera — FOTO/VIDEO, autore il proprietario; senza proprietario si scarta", () => {
+    const row = parseSavedRow(
+      wire({
+        content_type: "career_media",
+        payload: {
+          author: { id: "own-1", is_verified: false, name: "Mario Rossi", type: "person" },
+          excerpt: "Parata",
+          item_kind: "photo",
+          item_key: "a1",
+          owner_profile_id: "own-1",
+          thumbnail_url: "https://x/1.jpg",
+          title: null,
+        },
+        target_id: "m1",
+        target_type: "content",
+      }),
+    );
+
+    expect(row).toMatchObject({
+      kind: "content",
+      payload: { item_kind: "photo", owner_profile_id: "own-1" },
+      target: { contentType: "career_media", id: "m1", type: "content" },
+    });
+    expect(row?.kind === "content" && contentRowTitle(row.payload)).toBe("Parata");
+    expect(
+      parseSavedRow(wire({ content_type: "career_media", payload: { item_kind: "video" }, target_type: "content" })),
+    ).toBeNull();
+  });
+
   it("un payload mancante o malformato non lancia", () => {
     const row = parseSavedRow(wire({ payload: null, target_type: "position" }));
 
@@ -230,6 +259,14 @@ describe("destinazioni (§114, §123–§126)", () => {
     expect(href({ content_type: "profile_post", target_type: "content" })).toBe(
       "/content/profile_post/z?origin=SAVED",
     );
+    // HOM-15: il media di carriera non ha un /content: apre il profilo, tab Media.
+    expect(
+      href({
+        content_type: "career_media",
+        payload: { author: { id: "own-1", name: "Mario" }, item_kind: "photo", owner_profile_id: "own-1" },
+        target_type: "content",
+      }),
+    ).toBe("/profile/own-1?tab=media");
     expect(href({ target_type: "profile" })).toBe("/profile/z");
     expect(href({ target_type: "society" })).toBe("/club/z");
     expect(href({ target_type: "team" })).toBe("/club/team/z");
@@ -239,7 +276,12 @@ describe("destinazioni (§114, §123–§126)", () => {
 
 describe("testi di riga", () => {
   it("etichette discrete POST / VIDEO / ARTICOLO (§113)", () => {
-    expect(CONTENT_KIND_LABEL).toEqual({ article: "ARTICOLO", post: "POST", video: "VIDEO" });
+    expect(CONTENT_KIND_LABEL).toEqual({
+      article: "ARTICOLO",
+      photo: "FOTO",
+      post: "POST",
+      video: "VIDEO",
+    });
   });
 
   it("durata del video «03:24» (§111)", () => {

@@ -48,9 +48,11 @@ function bucketOf(date: Date, now: Date): RelativeBucket {
 
 /**
  * HOM-02 §10: tempo relativo per la riga autore del Post, senza il "fa" della
- * variante storica: "5 min", "1 h", "ieri", "2 giorni fa", poi data compatta
- * ("12 lug", con l'anno se non è quello corrente). `formatRelativeTime` resta
- * com'è perché altre schermate ne dipendono. `now` è iniettabile per i test.
+ * variante storica: "5 min", "1 h", "ieri", "3 g", poi data compatta ("12 lug",
+ * con l'anno se non è quello corrente). HOM-15 §277–§278: è l'unico formatter
+ * compatto di Home, Commenti, Notifiche e Salvati — «12 min · 2 h · 3 g», mai
+ * "giorni fa" accanto a "2 h". `formatRelativeTime` resta com'è perché altre
+ * schermate (Messaggi) ne dipendono. `now` è iniettabile per i test.
  */
 export function formatCompactRelativeTime(isoDate: string, now: Date = new Date()): string {
   const date = new Date(isoDate);
@@ -69,7 +71,7 @@ export function formatCompactRelativeTime(isoDate: string, now: Date = new Date(
     case "yesterday":
       return "ieri";
     case "days":
-      return `${bucket.value} giorni fa`;
+      return `${bucket.value} g`;
     case "date":
       return date.toLocaleDateString("it-IT", {
         day: "numeric",

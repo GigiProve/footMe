@@ -1,14 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { resolveLauncherMode } from "../publishing/publishing-presentation";
+import { mapLauncher } from "../publishing/publishing-service";
+import { launcherRows, resolveLauncherMode } from "../publishing/publishing-presentation";
 import type { ContentLauncherState } from "../publishing/publishing-types";
-import {
-  composerOriginForScope,
-  launcherExtraActionsForRole,
-  OPEN_POSITION_HREF,
-} from "./composer-entry";
+import { composerOriginForScope, OPEN_POSITION_HREF } from "./composer-entry";
+
+vi.mock("../../lib/supabase", () => ({ supabase: { rpc: vi.fn() } }));
 
 const onlyPost: ContentLauncherState = {
+  canOpenPosition: false,
   canPublishArticle: false,
   canPublishPost: true,
   canViewDrafts: true,
@@ -17,36 +17,42 @@ const onlyPost: ContentLauncherState = {
   scheduledCount: 0,
 };
 
-describe("launcherExtraActionsForRole (§4: azioni reali, non voci di mockup)", () => {
-  it.each(["player", "coach", "staff", "director", "agent", "fan", "media", "unknown", null, undefined])(
-    "%s → nessuna azione extra: formati legacy assorbiti da Post e Articolo",
-    (role) => {
-      expect(launcherExtraActionsForRole(role)).toEqual([]);
-    },
-  );
-
-  it("solo il club_admin ha «Posizione aperta», nella stessa destinazione di prima", () => {
-    expect(launcherExtraActionsForRole("club_admin")).toEqual(["open_position"]);
+describe("«Posizione aperta» (HOM-15 §168, §171: capability server, non il ruolo)", () => {
+  it("la riga compare solo con can_open_position, nella stessa destinazione di prima", () => {
+    expect(launcherRows({ ...onlyPost, canOpenPosition: true }).secondary).toContain("open_position");
+    expect(launcherRows(onlyPost).secondary).not.toContain("open_position");
     expect(OPEN_POSITION_HREF).toBe("/(tabs)/announcements");
+  });
+
+  it("il payload del launcher porta la capability; assente o non booleana = false", () => {
+    const wire = {
+      can_publish_article: false,
+      can_publish_post: true,
+      can_view_drafts: true,
+      drafts_count: 0,
+      failed_count: 0,
+      scheduled_count: 0,
+    };
+    expect(mapLauncher({ ...wire, can_open_position: true }).canOpenPosition).toBe(true);
+    expect(mapLauncher({ ...wire, can_open_position: false }).canOpenPosition).toBe(false);
+    expect(mapLauncher(wire).canOpenPosition).toBe(false);
   });
 });
 
 describe("«+» (HOM-06.1 §2–3, HOM-06.2 §4–§6)", () => {
-  it("chi può solo Post e non ha nulla in sospeso → composer diretto, anche un Tifoso o un Media", () => {
-    for (const role of ["player", "fan", "media"]) {
-      expect(resolveLauncherMode(onlyPost, launcherExtraActionsForRole(role))).toBe("direct_post");
-    }
+  it("chi può solo Post e non ha nulla in sospeso → composer diretto, qualunque ruolo", () => {
+    expect(resolveLauncherMode(onlyPost)).toBe("direct_post");
   });
 
-  it("senza lo stato (rete) il Post resta un tap; il club_admin ha comunque il foglio", () => {
-    expect(resolveLauncherMode(null, launcherExtraActionsForRole("player"))).toBe("direct_post");
-    expect(resolveLauncherMode(null, launcherExtraActionsForRole("club_admin"))).toBe("sheet");
+  it("senza lo stato (rete) il Post resta un tap: nessuna capability è dedotta", () => {
+    expect(resolveLauncherMode(null)).toBe("direct_post");
+    expect(launcherRows(null).secondary).toEqual([]);
   });
 
-  it("Articolo, bozze o un'azione extra → foglio «Crea contenuto»", () => {
+  it("Articolo, bozze o «Posizione aperta» → foglio «Crea contenuto»", () => {
     expect(resolveLauncherMode({ ...onlyPost, canPublishArticle: true })).toBe("sheet");
     expect(resolveLauncherMode({ ...onlyPost, draftsCount: 1 })).toBe("sheet");
-    expect(resolveLauncherMode(onlyPost, launcherExtraActionsForRole("club_admin"))).toBe("sheet");
+    expect(resolveLauncherMode({ ...onlyPost, canOpenPosition: true })).toBe("sheet");
   });
 });
 

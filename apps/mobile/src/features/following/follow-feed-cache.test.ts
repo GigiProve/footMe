@@ -147,7 +147,7 @@ describe("invalidateFollowQueries — §62, §172, §294", () => {
   it("contatori, Seguiti, flag Società, suggerimenti e lista Mi piace", () => {
     const invalidate = vi.spyOn(client, "invalidateQueries");
 
-    createFollowFeedCache(client, VIEWER).invalidateFollowQueries();
+    createFollowFeedCache(client, VIEWER).invalidateFollowQueries({ following: false, source: COMO });
 
     const keys = invalidate.mock.calls.map((call) => call[0]?.queryKey);
     expect(keys).toContainEqual(["following-count"]);

@@ -29,7 +29,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
@@ -66,6 +66,7 @@ import { FeedVideoProvider } from "../use-feed-video";
 import { useFeedVideoLifecycle } from "../use-feed-video-lifecycle";
 import { ContentLoadErrorState, ContentUnavailableState } from "./ContentUnavailableState";
 import { ContentDetailFrame } from "./detail/ContentDetailFrame";
+import { ContentDetailSkeleton } from "./detail/ContentDetailSkeleton";
 import { PostFeedItem } from "./items/PostFeedItem";
 
 /**
@@ -185,8 +186,9 @@ export function ProfilePostDetail({
         title="Post"
       >
         {query.isLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator color={colors.accent} size="large" />
+          // HOM-15 §202, §206: skeleton del dettaglio, allineato al padding del Post.
+          <View style={styles.scroll}>
+            <ContentDetailSkeleton />
           </View>
         ) : availability.status === "error" ? (
           // HOM-04 §67–68: un errore di rete non è un contenuto sparito.
@@ -288,13 +290,6 @@ export function ProfilePostDetail({
 }
 
 const styles = StyleSheet.create({
-  centered: {
-    alignItems: "center",
-    flex: 1,
-    gap: spacing[12],
-    justifyContent: "center",
-    padding: spacing[24],
-  },
   divider: {
     backgroundColor: colors.divider,
     height: StyleSheet.hairlineWidth,
